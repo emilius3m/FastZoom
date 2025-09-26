@@ -7,166 +7,145 @@
           $watch('password', () => validatePassword());
           $watch('message', () => checkServerError(), console.log('message changed'));
           $watch('repeatPassword', () => passwordsMatch())"
-  class="bg-gray-100 dark:bg-gray-900 flex justify-center items-center h-screen my-auto"
+  class="flex items-center justify-center min-h-screen px-4 py-8 bg-gray-100 dark:bg-gray-900"
 >
-  <div class="bg-indigo-100 shadow-lg rounded-lg p-8 max-w-md mx-auto w-96">
-    <h1 class="text-2xl font-bold mb-4 text-center" style="color: #1a56db">
-      Register User
-    </h1>
-    <img
-      id="login-logo"
-      src="/static/img/logo/undraw_register.png"
-      alt="Login Logo"
-      class="max-w-xs rounded-full opacity-50 shadow-md mb-4 mx-auto"
-    />
-    <div class="mb-4">
-      <label
-        for="email"
-        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-        >Email address</label
-      >
-      <input
-        type="email"
-        id="email"
-        name="username"
-        x-model="username"
-        @change="checkUsername()"
-        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-        placeholder="john.doe@company.com"
-        autocomplete="off"
-        required
-      />
-      <!-- Email Regrex Pattern checked and Error displayed-->
-      <p
-        id="username-error"
-        class="hidden mb-2 text-red-600 dark:text-red-500"
-        :class="{ 'hidden': !showUsernameError }"
-        x-show="showUsernameError"
-        x-transition.delay.100ms
-      >
-        <span class="font-medium">Please enter a valid email address</span>
-      </p>
-    </div>
-    <!-- Password Div-->
-    <div x-cloak class="mb-2 max-w-md">
-      <label
-        for="password"
-        id="password-label"
-        :class="{ 'hidden': !showPassword }"
-        class="hidden block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-        x-show="showPassword"
-        x-transition.delay.200ms
-        >Password</label
-      >
-      <input
-        type="password"
-        id="password"
-        name="password"
-        :class="{ 'hidden': !showPassword }"
-        x-show="showPassword"
-        x-model="password"
-        x-transition.delay.200ms
-        class="hidden bg-gray-50 mb-2 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-        autocomplete="new-password"
-        placeholder="Enter password matching criteria"
-        required
-      />
-      <!-- Password Regrex Pattern checked and Error displayed-->
-      <p
-        x-cloak
-        id="showPasswordError"
-        class="hidden mb-2 text-red-600 dark:text-red-500"
-        :class="{ 'hidden': !showPasswordError }"
-        x-show="showPasswordError"
-        x-transition.delay.100ms
-      >
-        <span class="font-medium"
-          >Your password is not matching criteria. Example: Password123!</span
-        >
-      </p>
-      <!-- Repeat password Div -->
-      <div class="mb-2">
-        <label
-          for="repeatPassword"
-          class="hidden block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-          x-show="showPassword"
-          :class="{ 'hidden': !showPassword }"
-          x-transition.delay.200ms
-          >Repeat password</label
-        >
-        <input
-          type="password"
-          id="repeatPassword"
-          :class="{ 'hidden': !showPassword }"
-          x-show="showPassword"
-          x-model="repeatPassword"
-          x-transition.delay.200ms
-          class="hidden shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 dark:shadow-sm-light"
-          placeholder="Enter password matching criteria"
-          required
+  <div class="w-full max-w-md">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 sm:p-8">
+      <!-- Logo and Title -->
+      <div class="flex flex-col items-center mb-6">
+        <img
+          id="login-logo"
+          src="/static/img/logo/undraw_register.png"
+          alt="Register Logo"
+          class="w-20 h-20 sm:w-24 sm:h-24 rounded-full mb-4 opacity-75 shadow-lg"
         />
-        <!-- Repeat Password input is matched against password to display error-->
-        <p
-          id="repeat-password-error"
-          class="hidden mb-2 text-red-600 dark:text-red-500"
-          :class="{ 'hidden': !showRepeatPasswordError }"
-          x-show="showRepeatPasswordError"
-          x-transition.delay.100ms
-        >
-          <span class="font-medium">Password is not Matching</span>
-        </p>
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white text-center">
+          Registrazione Utente
+        </h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Crea il tuo account FastZoom</p>
       </div>
 
-      <label
-        id="password-message"
-        :class="{ 'hidden': !showPassword }"
-        x-show="showPassword"
-        x-transition.delay.200ms
-        class="mt-1 text-sm text-gray-500 dark:text-gray-300 min-w-2xl"
-      >
-        Your password should be at least 8 characters long and include at least
-        one numerical digit, one character, and one capital letter.
-      </label>
-    </div>
-    <!-- Server Error Div -->
-    <p
-      x-cloak
-      x-text="message"
-      x-show="showServerError"
-      role="alert"
-      class="mb-2 text-red-600 dark:text-red-500"
-    >
-      <span class="font-medium"></span>
-    </p>
-    <div x-cloak class="mt-4">
-      <button
-        x-cloak
-        type="button"
-        id="register-button"
-        :class="{
-          'text-white bg-blue-700 hover-bg-blue-800 focus-ring-4 focus-outline-none focus-ring-blue-300 font-medium rounded-lg text-sm w-full sm-w-auto px-5 py-2.5 text-center dark-bg-blue-600 dark-hover-bg-blue-700 dark-focus-ring-blue-800'
-          : username && password && repeatPassword && !showUsernameError && !showPasswordError && !showRepeatPasswordError,
-          'text-white bg-blue-400 dark:bg-blue-500 cursor-not-allowed font-medium rounded-lg text-sm px-5 py-2.5 text-center w-full sm-w-auto text-center'
-          : !username || !password || !repeatPassword || showUsernameError || showPasswordError || showRepeatPasswordError
-        }"
-        x-bind:disabled="!username || !password || !repeatPassword || showUsernameError || showPasswordError || showRepeatPasswordError"
-        @click="registerUser()"
-      >
-        Register new account
-      </button>
-      <div class="mt-2">
-        <button
-          type="button"
-          id="create-user-button"
-          hx-get="{{ url_for('get_login') }}"
-          hx-target="#register-page"
-          hx-swap="outerHTML"
-          hx-push-url="true"
-          class="text-white bg-green-500 hover:bg-green-600 focus-ring-4 focus-outline-none focus-ring-green-300 font-medium rounded-lg text-sm w-full sm-w-auto px-5 py-2.5 text-center dark-bg-green-600 dark-hover-bg-green-700 dark-focus-ring-green-800"
+      <!-- Registration Form -->
+      <form @submit.prevent="registerUser()">
+        <!-- Email Input -->
+        <div class="mb-4">
+          <label for="email" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+            Indirizzo Email
+          </label>
+          <input
+            type="email"
+            id="email"
+            name="username"
+            x-model="username"
+            @change="checkUsername()"
+            required
+            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-3 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 transition duration-200"
+            placeholder="john.doe@company.com"
+            autocomplete="email"
+          />
+          <p
+            id="username-error"
+            x-show="showUsernameError"
+            class="mt-2 text-sm text-red-600 dark:text-red-400"
+          >
+            <span class="font-medium">Inserisci un indirizzo email valido</span>
+          </p>
+        </div>
+
+        <!-- Password Input -->
+        <div class="mb-4" x-show="showPassword">
+          <label
+            for="password"
+            id="password-label"
+            class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+          >
+            Password
+          </label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            x-model="password"
+            required
+            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-3 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 transition duration-200"
+            placeholder="Inserisci una password"
+            autocomplete="new-password"
+          />
+          <p
+            x-show="showPasswordError"
+            class="mt-2 text-sm text-red-600 dark:text-red-400"
+          >
+            <span class="font-medium">La password non soddisfa i criteri. Esempio: Password123!</span>
+          </p>
+          <label
+            id="password-message"
+            class="mt-1 text-sm text-gray-500 dark:text-gray-300"
+          >
+            La password deve essere di almeno 8 caratteri e includere almeno un numero, un carattere speciale e una lettera maiuscola.
+          </label>
+        </div>
+
+        <!-- Repeat Password Input -->
+        <div class="mb-6" x-show="showPassword">
+          <label for="repeatPassword" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+            Ripeti Password
+          </label>
+          <input
+            type="password"
+            id="repeatPassword"
+            x-model="repeatPassword"
+            required
+            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-3 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 transition duration-200"
+            placeholder="Ripeti la password"
+            autocomplete="new-password"
+          />
+          <p
+            id="repeat-password-error"
+            x-show="showRepeatPasswordError"
+            class="mt-2 text-sm text-red-600 dark:text-red-400"
+          >
+            <span class="font-medium">Le password non corrispondono</span>
+          </p>
+        </div>
+
+        <!-- Server Error Alert -->
+        <div
+          x-show="showServerError"
+          class="mb-4 p-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-red-200 dark:text-red-900 border border-red-200 dark:border-red-800"
+          role="alert"
         >
-          Return to login
+          <span class="font-medium" x-text="message"></span>
+        </div>
+
+        <!-- Register Button -->
+        <button
+          type="submit"
+          id="register-button"
+          :disabled="!username || !password || !repeatPassword || showUsernameError || showPasswordError || showRepeatPasswordError"
+          :class="{
+            'opacity-50 cursor-not-allowed': !username || !password || !repeatPassword || showUsernameError || showPasswordError || showRepeatPasswordError,
+            'hover:bg-blue-800 dark:hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800': username && password && repeatPassword && !showUsernameError && !showPasswordError && !showRepeatPasswordError
+          }"
+          class="w-full text-white bg-blue-700 font-medium rounded-lg text-sm px-5 py-3 text-center dark:bg-blue-600 transition duration-200"
+        >
+          Registra Nuovo Account
         </button>
-      </div>
+
+        <!-- Return to Login Button -->
+        <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <button
+            type="button"
+            id="create-user-button"
+            hx-get="{{ url_for('get_login') }}"
+            hx-target="#register-page"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+            class="w-full text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-3 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800 transition duration-200"
+          >
+            Torna al Login
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
