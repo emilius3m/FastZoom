@@ -1,0 +1,558 @@
+{% extends "base/auth_base.html" %} {% block title %} User | FastAPI HTMX {%
+endblock %} {% block content %}
+
+<div id="dashboard-body" class="p-4 mt-4 sm:ml-64">
+  <div
+    class="p-4 border-2 border-gray-200 border-dashed rounded-lg dark:border-gray-700"
+  >
+    <div
+      x-data="{ isLoading: false, 
+          isUpdated:false, 
+      isAdded:false, 
+      isDeleted:false, 
+      message:''}"
+      id="user-page"
+    >
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <div
+          class="flex items-center justify-center h-24 rounded bg-gray-50 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path stroke="currentColor" stroke-linecap="round"
+              stroke-linejoin="round" stroke-width="2" d="M9 1v16M1 9h16"
+            </svg>
+          </p>
+        </div>
+        <div
+          class="flex items-center justify-center h-24 rounded bg-gray-50 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+        <div
+          class="flex items-center justify-center h-24 rounded bg-gray-50 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+      </div>
+      {%if error_messages%}
+      <div
+        id="error-message"
+        class="p-4 mb-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300"
+        role="alert"
+      >
+        {% for error_message in error_messages %}
+        <span class="font-medium">{{ error_message }}</span>
+        {%endfor%}
+      </div>
+      {% else %}
+      <!-- Table for the users extracted from the back end -->
+      <div hx-ext="response-targets">
+        <div id="create-user-form">
+          <div
+            x-init="$watch('isUpdated', value => { if (value) setTimeout(() => { isUpdated = false }, 3000) }); 
+                    $watch('isAdded', value => {if (value) setTimeout(() => { isAdded = false }, 3000) }); 
+                    $watch('isDeleted', value => { if (value) setTimeout(() => { isDeleted = false }, 3000) })"
+          >
+            <div
+              x-show="isUpdated"
+              x-transition:leave="transition ease-in duration-1000"
+              x-transition:leave-start="opacity-100"
+              x-transition:leave-end="opacity-0"
+              class="p-4 mb-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300"
+              role="alert"
+            >
+              <span class="font-medium" x-text="message"></span>
+            </div>
+            <div
+              x-show="isAdded"
+              x-transition:leave="transition ease-in duration-1000"
+              x-transition:leave-start="opacity-100"
+              x-transition:leave-end="opacity-0"
+              class="p-4 mb-4 text-sm text-green-800 rounded-lg bg-green-50 dark:bg-gray-800 dark:text-green-400"
+              role="alert"
+            >
+              <span class="font-medium" x-text="message"></span>
+            </div>
+            <div
+              x-show="isDeleted"
+              x-transition:leave="transition ease-in duration-1000"
+              x-transition:leave-start="opacity-100"
+              x-transition:leave-end="opacity-0"
+              class="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400"
+              role="alert"
+            >
+              <span class="font-medium" x-text="message"></span>
+            </div>
+          </div>
+          {%if error_message%}
+          <div
+            id="error-message"
+            class="p-4 mb-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300"
+            role="alert"
+          >
+            <span class="font-medium">{{ error_message }}</span>
+          </div>
+          {% else %}
+          <div
+            class="relative my-scroll overflow-x-auto shadow-md sm:rounded-lg"
+          >
+            <table
+              class="w-full text-sm text-left text-gray-500 dark:text-gray-400"
+            >
+              <thead
+                class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"
+              >
+                <tr>
+                  <th scope="col" class="px-6 py-3">User Email</th>
+                  <th scope="col" class="px-6 py-3">Active</th>
+                  <th scope="col" class="px-6 py-3">Super User</th>
+                  <th scope="col" class="px-6 py-3">Role</th>
+                  <th scope="col" class="px-6 py-3">Created</th>
+                  <th scope="col" class="px-6 py-3">Profile</th>
+                  <th scope="col" class="px-6 py-3">
+                    <span class="sr-only">Edit</span>
+                  </th>
+                  <th scope="col" class="px-6 py-3">
+                    <span class="sr-only">Delete</span>
+                  </th>
+                </tr>
+              </thead>
+              {% for user in users %}
+
+              <tbody hx-target="closest tr" hx-swap="outerHTML">
+                <tr
+                  x-data="{ openHover: false }"
+                  x-effect="console.log(openHover)"
+                  class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  <td
+                    scope="row"
+                    class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+                  >
+                    {{ user.email }}
+                  </td>
+                  <td class="px-6 py-4">
+                    {% if user.is_active %}
+                    <span style="font-weight: bold; color: green"
+                      >&#10003;</span
+                    >
+                    <!-- Bold green tick symbol -->
+                    {% else %} &#10007;
+                    <!-- Red cross symbol -->
+                    {% endif %}
+                  </td>
+                  <td class="px-6 py-4">
+                    {% if user.is_superuser %}
+                    <span style="font-weight: bold; color: green"
+                      >&#10003;</span
+                    >
+                    <!-- Bold green tick symbol -->
+                    {% else %} &#10007;
+                    <!-- Red cross symbol -->
+                    {% endif %}
+                  </td>
+                  <td class="px-6 py-4">
+                    {% if user.role and user.role.role_name %} {{
+                    user.role.role_name }} {% else %} Not Available {% endif %}
+                  </td>
+
+                  <td class="px-6 py-4">
+                    {{ user.created.strftime('%d-%m-%Y')}}
+                  </td>
+                  <td class="px-6 py-4" style="position: relative">
+                    <button
+                      @mouseenter="openHover = true"
+                      @mouseleave="openHover = false"
+                      class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+                    >
+                      User profile
+                    </button>
+                    <div
+                      x-show="openHover"
+                      x-transition:enter="transition ease-out duration-100"
+                      x-transition:enter-start="transform opacity-0 scale-95"
+                      x-transition:enter-end="transform opacity-100 scale-100"
+                      x-transition:leave="transition ease-in duration-75"
+                      x-transition:leave-start="transform opacity-100 scale-100"
+                      x-transition:leave-end="transform opacity-0 scale-95"
+                      class="absolute z-10 w-64 max-w-sm px-4 py-2 top-1/2 transform -translate-x-full -translate-y-1/2 bg-white border rounded-lg shadow-lg dark:text-gray-400 dark:bg-gray-800 dark:border-gray-600"
+                      @mouseenter="openHover = true"
+                      @mouseleave="openHover = false"
+                    >
+                      <div>
+                        <img
+                          class="w-10 h-10 rounded-full mb-3"
+                          src="{{ user.profile.profile_picture }}"
+                          alt="{{ user.first_name }}"
+                        />
+                        <h3>{{ user.profile.name }}</h3>
+                        <p class="font-semibold">
+                          {{ user.profile.first_name }} {{
+                          user.profile.last_name }}
+                        </p>
+                        <p>Phone: {{ user.profile.phone }}</p>
+                        <p>
+                          Birth Date: {{ user.profile.date_of_birth.strftime('%d
+                          %b %Y') if user.profile.date_of_birth else 'Not
+                          provided' }}
+                        </p>
+                        <p>Company: {{ user.profile.company }}</p>
+                        <!-- More user details -->
+                      </div>
+                      <div class="flex mb-3">
+                        <button
+                          type="button"
+                          class="inline-flex items-center justify-center w-full px-5 py-2 me-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
+                        >
+                          <svg
+                            class="w-3.5 h-3.5 me-2.5"
+                            aria-hidden="true"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="currentColor"
+                            viewBox="0 0 18 18"
+                          >
+                            <path
+                              d="M3 7H1a1 1 0 0 0-1 1v8a2 2 0 0 0 4 0V8a1 1 0 0 0-1-1Zm12.954 0H12l1.558-4.5a1.778 1.778 0 0 0-3.331-1.06A24.859 24.859 0 0 1 6 6.8v9.586h.114C8.223 16.969 11.015 18 13.6 18c1.4 0 1.592-.526 1.88-1.317l2.354-7A2 2 0 0 0 15.954 7Z"
+                            /></svg
+                          >Like page
+                        </button>
+                        <button
+                          id="dropdown-button"
+                          class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-lg shrink-0 focus:outline-none hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700"
+                          type="button"
+                        >
+                          <svg
+                            class="w-3.5 h-3.5"
+                            aria-hidden="true"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="currentColor"
+                            viewBox="0 0 16 3"
+                          >
+                            <path
+                              d="M2 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6.041 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM14 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-2 py-4 text-right">
+                    <a
+                      href="#"
+                      hx-swap="outerHTML"
+                      hx-get="{{ url_for('get_user_by_id', user_id=user.id) }}"
+                      hx-target="#user-page"
+                      hx-select="#edit-user-form"
+                      class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
+                      hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                      >Edit</a
+                    >
+                  </td>
+                  <td class="pr-3 py-4 text-right">
+                    <a
+                      href="#"
+                      hx-confirm="Are you sure you want to delete this user? "
+                      onclick="deleteUser('{{ user.id }}', '{{token}}')"
+                      class="font-medium text-red-600 dark:text-red-500 hover:underline"
+                      >Delete</a
+                    >
+                  </td>
+                </tr>
+              </tbody>
+              {% endfor %}
+            </table>
+
+            <!-- {% endif %} -->
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      <div
+        class="flex items-center justify-center h-48 mt-4 mb-4 rounded bg-gray-50 dark:bg-gray-800"
+      >
+        <p class="text-2xl text-gray-400 dark:text-gray-500">
+          <svg
+            class="w-3.5 h-3.5"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 18 18"
+          >
+            <path
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 1v16M1 9h16"
+            />
+          </svg>
+        </p>
+      </div>
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div
+          class="flex items-center justify-center rounded bg-gray-50 h-28 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+        <div
+          class="flex items-center justify-center rounded bg-gray-50 h-28 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+        <div
+          class="flex items-center justify-center rounded bg-gray-50 h-28 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+        <div
+          class="flex items-center justify-center rounded bg-gray-50 h-28 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+      </div>
+      <div
+        class="flex items-center justify-center h-48 mb-4 rounded bg-gray-50 dark:bg-gray-800"
+      >
+        <p class="text-2xl text-gray-400 dark:text-gray-500">
+          <svg
+            class="w-3.5 h-3.5"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 18 18"
+          >
+            <path
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 1v16M1 9h16"
+            />
+          </svg>
+        </p>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div
+          class="flex items-center justify-center rounded bg-gray-50 h-28 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+        <div
+          class="flex items-center justify-center rounded bg-gray-50 h-28 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+        <div
+          class="flex items-center justify-center rounded bg-gray-50 h-28 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+        <div
+          class="flex items-center justify-center rounded bg-gray-50 h-28 dark:bg-gray-800"
+        >
+          <p class="text-2xl text-gray-400 dark:text-gray-500">
+            <svg
+              class="w-3.5 h-3.5"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 18 18"
+            >
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 1v16M1 9h16"
+              />
+            </svg>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function deleteUser(userId, authToken) {
+    try {
+      const response = await fetch(`/users/${userId}`, {
+        method: "DELETE",
+        headers: {
+          accept: "*/*",
+          Authorization: `Bearer ${authToken}`, // Use Authorization header with Bearer scheme
+        },
+      });
+
+      if (response.status === 204) {
+        // Successful deletion
+        window.location.reload();
+      } else {
+        // Handle error (consider user-friendly messages)
+        console.error("Failed to delete user:", response.statusText);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  }
+</script>
+
+{% endblock %}
+
+<style>
+  .my-scroll {
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+</style>

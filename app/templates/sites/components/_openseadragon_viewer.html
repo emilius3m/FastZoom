@@ -1,0 +1,959 @@
+<!-- templates/sites/components/_openseadragon_viewer.html - OPENSEADRAGON IMAGE VIEWER -->
+<div id="openseadragon-viewer"
+     class="w-full h-full bg-gray-900 relative"
+     x-data="openSeadragonViewer()"
+     x-init="initViewer()"
+     @photo-changed.window="handlePhotoChanged($event.detail)">
+
+    <!-- Loading State -->
+    <div x-show="isLoading"
+         class="absolute inset-0 flex items-center justify-center bg-gray-900 text-white">
+        <div class="text-center">
+            <svg class="animate-spin h-8 w-8 text-white mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-sm">Caricamento visualizzatore avanzato...</p>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div x-show="hasError && !isLoading"
+         class="absolute inset-0 flex items-center justify-center bg-gray-900 text-white">
+        <div class="text-center">
+            <svg class="h-12 w-12 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="text-lg font-medium mb-2">Errore Visualizzatore</h3>
+            <p class="text-sm text-gray-300" x-text="errorMessage"></p>
+            <button @click="retryLoad()" 
+                    class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                Riprova
+            </button>
+        </div>
+    </div>
+
+    <!-- OpenSeadragon Container -->
+    <div id="openseadragon-container" 
+         class="w-full h-full"
+         x-show="!isLoading && !hasError"></div>
+
+    <!-- Viewer Controls Overlay -->
+    <div x-show="!isLoading && !hasError" 
+         class="absolute top-4 right-4 flex flex-col space-y-2 z-10">
+        
+        <!-- Zoom Controls -->
+        <div class="bg-black bg-opacity-50 rounded-lg p-2">
+            <button @click="zoomIn()" 
+                    class="block w-8 h-8 text-white hover:text-gray-300 transition-colors mb-1">
+                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"></path>
+                </svg>
+            </button>
+            
+            <button @click="zoomOut()" 
+                    class="block w-8 h-8 text-white hover:text-gray-300 transition-colors mb-1">
+                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"></path>
+                </svg>
+            </button>
+            
+            <button @click="resetZoom()" 
+                    class="block w-8 h-8 text-white hover:text-gray-300 transition-colors">
+                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- View Controls -->
+        <div class="bg-black bg-opacity-50 rounded-lg p-2">
+            <button @click="toggleFullscreen()" 
+                    class="block w-8 h-8 text-white hover:text-gray-300 transition-colors mb-1">
+                <svg x-show="!isFullscreen" class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                </svg>
+                <svg x-show="isFullscreen" class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V4.5M9 9H4.5M9 9L3.5 3.5M15 9v-4.5M15 9h4.5M15 9l5.5-5.5M9 15v4.5M9 15H4.5M9 15l-5.5 5.5M15 15v4.5M15 15h4.5m0 0l-5.5 5.5"></path>
+                </svg>
+            </button>
+
+            <button @click="toggleRotation()" 
+                    class="block w-8 h-8 text-white hover:text-gray-300 transition-colors">
+                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Info Panel Toggle -->
+        <button @click="toggleInfo()" 
+                class="bg-black bg-opacity-50 rounded-lg p-2 w-8 h-8 text-white hover:text-gray-300 transition-colors">
+            <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Info Panel -->
+    <div x-show="showInfo && !isLoading && !hasError" 
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 transform translate-x-full"
+         x-transition:enter-end="opacity-100 transform translate-x-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 transform translate-x-0"
+         x-transition:leave-end="opacity-0 transform translate-x-full"
+         class="absolute top-0 right-0 w-80 h-full bg-black bg-opacity-90 text-white p-6 overflow-y-auto z-20">
+        
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold">Informazioni Immagine</h3>
+            <button @click="showInfo = false" 
+                    class="text-gray-400 hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <template x-if="currentImageInfo">
+            <div class="space-y-4">
+                <!-- Basic Info -->
+                <div>
+                    <h4 class="font-medium text-gray-300 mb-2">Dettagli Base</h4>
+                    <div class="text-sm space-y-1">
+                        <div>
+                            <span class="text-gray-400">Dimensioni:</span>
+                            <span x-text="`${currentImageInfo.width || 'N/A'} × ${currentImageInfo.height || 'N/A'} px`"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Zoom corrente:</span>
+                            <span x-text="currentZoom ? `${Math.round(currentZoom * 100)}%` : 'N/A'"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Rotazione:</span>
+                            <span x-text="currentRotation ? `${currentRotation}°` : '0°'"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Viewport Info -->
+                <div x-show="viewportInfo">
+                    <h4 class="font-medium text-gray-300 mb-2">Viewport</h4>
+                    <div class="text-sm space-y-1">
+                        <div>
+                            <span class="text-gray-400">Posizione X:</span>
+                            <span x-text="viewportInfo ? Math.round(viewportInfo.x * 100) / 100 : 'N/A'"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Posizione Y:</span>
+                            <span x-text="viewportInfo ? Math.round(viewportInfo.y * 100) / 100 : 'N/A'"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls Help -->
+                <div>
+                    <h4 class="font-medium text-gray-300 mb-2">Controlli</h4>
+                    <div class="text-sm space-y-1 text-gray-400">
+                        <div>• Mouse: Trascina per spostare</div>
+                        <div>• Rotella: Zoom in/out</div>
+                        <div>• Doppio click: Zoom rapido</div>
+                        <div>• Ctrl + rotella: Rotazione</div>
+                        <div>• Tasto destro: Menu contestuale</div>
+                    </div>
+                </div>
+
+                <!-- Performance Info -->
+                <div x-show="performanceInfo">
+                    <h4 class="font-medium text-gray-300 mb-2">Performance</h4>
+                    <div class="text-sm space-y-1">
+                        <div>
+                            <span class="text-gray-400">FPS:</span>
+                            <span x-text="performanceInfo ? performanceInfo.fps : 'N/A'"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Tile caricate:</span>
+                            <span x-text="performanceInfo ? performanceInfo.tilesLoaded : 'N/A'"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Loading Indicator for Tiles -->
+    <div x-show="tilesLoading && !isLoading" 
+         class="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-lg text-sm">
+        <div class="flex items-center">
+            <svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Caricamento tiles...</span>
+        </div>
+    </div>
+
+    <!-- Navigation Helper -->
+    <div x-show="showNavigationHelper && !isLoading && !hasError" 
+         class="absolute bottom-4 right-4 bg-black bg-opacity-75 text-white p-3 rounded-lg text-xs max-w-xs">
+        <div class="space-y-1">
+            <div><strong>Controlli rapidi:</strong></div>
+            <div>• Trascina: Sposta immagine</div>
+            <div>• Rotella: Zoom</div>
+            <div>• Doppio click: Zoom fit</div>
+            <div>• Ctrl+Rotella: Ruota</div>
+        </div>
+        <button @click="showNavigationHelper = false" 
+                class="absolute top-1 right-1 text-gray-400 hover:text-white">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<script>
+function openSeadragonViewer() {
+    return {
+        // Core State
+        viewer: null,
+        isLoading: true,
+        hasError: false,
+        errorMessage: '',
+        isInitialized: false,
+        currentPhotoData: null,
+
+        // UI State  
+        showInfo: false,
+        showNavigationHelper: true,
+        isFullscreen: false,
+        tilesLoading: false,
+
+        // Image Info
+        currentImageInfo: null,
+        currentZoom: null,
+        currentRotation: 0,
+        viewportInfo: null,
+        performanceInfo: null,
+
+        // Configuration
+        config: {
+            prefixUrl: "https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/images/",
+            animationTime: 0.5,
+            blendTime: 0.1,
+            constrainDuringPan: true,
+            maxZoomPixelRatio: 2,
+            minZoomLevel: 0.1,
+            maxZoomLevel: 10,
+            zoomPerClick: 2.0,
+            zoomPerScroll: 1.2,
+            clickTimeThreshold: 300,
+            clickDistThreshold: 5,
+            smoothTileEdgesMinZoom: 1.1,
+            crossOriginPolicy: 'Anonymous'
+        },
+
+        setupViewer() {
+            // Just setup the component ready state, don't initialize OpenSeadragon yet
+            this.isLoading = false;
+            console.log('OpenSeadragon viewer ready - waiting for activation');
+        },
+
+        async initViewer() {
+            console.log('OpenSeadragon viewer initViewer called');
+            
+            try {
+                this.isLoading = true;
+                this.hasError = false;
+
+                // Wait for OpenSeadragon to be available
+                if (typeof OpenSeadragon === 'undefined') {
+                    console.log('Loading OpenSeadragon library...');
+                    await this.loadOpenSeadragon();
+                }
+
+                // Get current photo from parent
+                const photosManager = this.findPhotosManager();
+                let currentPhoto = photosManager?.currentPhoto || this.currentPhotoData;
+                
+                console.log('Current photo data:', currentPhoto);
+                
+                if (!currentPhoto) {
+                    console.error('No photo data available for OpenSeadragon viewer');
+                    this.isLoading = false;
+                    return;
+                }
+
+                // Initialize viewer
+                console.log('Creating OpenSeadragon viewer...');
+                await this.createViewer(currentPhoto);
+                this.setupEventHandlers();
+                this.isInitialized = true;
+                console.log('OpenSeadragon viewer initialized successfully');
+
+            } catch (error) {
+                console.error('Errore nell\'inizializzazione del viewer:', error);
+                this.hasError = true;
+                this.errorMessage = error.message || 'Errore sconosciuto nell\'inizializzazione';
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        async waitForCurrentPhoto(maxAttempts = 20, delay = 100) {
+            console.log('Waiting for current photo data...');
+            
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                const photo = this.getCurrentPhoto();
+                console.log(`Attempt ${attempt + 1}: Photo data:`, photo);
+                
+                if (photo) {
+                    console.log('Photo data found!', photo);
+                    return photo;
+                }
+                
+                // Wait before next attempt
+                await new Promise(resolve => setTimeout(resolve, delay));
+                
+                // Increase delay for subsequent attempts
+                delay = Math.min(delay * 1.1, 300);
+            }
+            
+            console.error('Failed to get photo data after', maxAttempts, 'attempts');
+            return null;
+        },
+
+        async loadOpenSeadragon() {
+            return new Promise((resolve, reject) => {
+                if (window.OpenSeadragon) {
+                    resolve();
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js';
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error('Impossibile caricare OpenSeadragon'));
+                document.head.appendChild(script);
+            });
+        },
+
+        getCurrentPhoto() {
+            // Try multiple methods to get the current photo
+            try {
+                // Method 1: Try to access parent Alpine data directly
+                let element = this.$el;
+                while (element && element.parentElement) {
+                    element = element.parentElement;
+                    if (element.hasAttribute && element.hasAttribute('x-data')) {
+                        const xDataValue = element.getAttribute('x-data');
+                        if (xDataValue && xDataValue.includes('photosManager')) {
+                            const alpineData = Alpine.$data(element);
+                            if (alpineData && alpineData.currentPhoto) {
+                                return alpineData.currentPhoto;
+                            }
+                        }
+                    }
+                }
+
+                // Method 2: Try global access through window
+                if (window.photosManagerInstance && window.photosManagerInstance.currentPhoto) {
+                    return window.photosManagerInstance.currentPhoto;
+                }
+
+                // Method 3: Find by CSS selector
+                const photosContainer = document.querySelector('[x-data*="photosManager"]');
+                if (photosContainer) {
+                    const manager = Alpine.$data(photosContainer);
+                    if (manager && manager.currentPhoto) {
+                        return manager.currentPhoto;
+                    }
+                }
+
+                return null;
+            } catch (error) {
+                console.warn('Error accessing current photo:', error);
+                return null;
+            }
+        },
+
+        findPhotosManager() {
+            try {
+                // Navigate up the DOM tree to find the photos manager component
+                let element = this.$el;
+                while (element && element.parentElement) {
+                    element = element.parentElement;
+                    if (element.hasAttribute && element.hasAttribute('x-data')) {
+                        const xDataValue = element.getAttribute('x-data');
+                        if (xDataValue && xDataValue.includes('photosManager')) {
+                            return Alpine.$data(element);
+                        }
+                    }
+                }
+                return null;
+            } catch (error) {
+                console.warn('Error finding photos manager:', error);
+                return null;
+            }
+        },
+
+        async createViewer(photo) {
+            const container = document.getElementById('openseadragon-container');
+            if (!container) {
+                throw new Error('Container OpenSeadragon non trovato');
+            }
+
+            // Determine tile source
+            const tileSource = this.getTileSource(photo);
+
+            this.viewer = OpenSeadragon(Object.assign({
+                element: container,
+                tileSources: [tileSource],
+                sequenceMode: false,
+                showNavigationControl: false, // We'll use custom controls
+                showZoomControl: false,
+                showHomeControl: false,
+                showFullPageControl: false,
+                showRotationControl: false,
+                gestureSettingsMouse: {
+                    scrollToZoom: true,
+                    clickToZoom: true,
+                    dblClickToZoom: true,
+                    pinchToZoom: true,
+                    flickEnabled: true,
+                    flickMinSpeed: 120,
+                    flickMomentum: 0.25
+                },
+                gestureSettingsTouch: {
+                    scrollToZoom: false,
+                    clickToZoom: false,
+                    dblClickToZoom: true,
+                    pinchToZoom: true,
+                    flickEnabled: true,
+                    flickMinSpeed: 120,
+                    flickMomentum: 0.25
+                }
+            }, this.config));
+
+            // Wait for viewer to be ready
+            await new Promise((resolve) => {
+                this.viewer.addHandler('open', () => {
+                    this.currentImageInfo = {
+                        width: this.viewer.world.getItemAt(0).getContentSize().x,
+                        height: this.viewer.world.getItemAt(0).getContentSize().y
+                    };
+                    resolve();
+                });
+            });
+        },
+
+        getTileSource(photo) {
+            // Check if we have DZI or other tiled formats
+            if (photo.dzi_url) {
+                return photo.dzi_url;
+            }
+
+            // Check for IIIF support
+            if (photo.iiif_info) {
+                return photo.iiif_info;
+            }
+
+            // Fallback to simple image
+            return {
+                type: 'image',
+                url: photo.file_url,
+                buildPyramid: true,
+                crossOriginPolicy: 'Anonymous'
+            };
+        },
+
+        setupEventHandlers() {
+            if (!this.viewer) return;
+
+            // Zoom change
+            this.viewer.addHandler('zoom', (event) => {
+                this.currentZoom = event.zoom;
+                this.updateViewportInfo();
+            });
+
+            // Pan change  
+            this.viewer.addHandler('pan', (event) => {
+                this.updateViewportInfo();
+            });
+
+            // Rotation change
+            this.viewer.addHandler('rotate', (event) => {
+                this.currentRotation = event.degrees || 0;
+            });
+
+            // Tiles loading
+            this.viewer.addHandler('tile-load-failed', () => {
+                console.warn('Alcuni tiles non sono stati caricati correttamente');
+            });
+
+            this.viewer.addHandler('tile-loaded', () => {
+                this.updatePerformanceInfo();
+            });
+
+            // Fullscreen changes
+            this.viewer.addHandler('full-screen', (event) => {
+                this.isFullscreen = event.fullScreen;
+            });
+
+            // Custom keyboard shortcuts
+            this.viewer.addHandler('canvas-key', (event) => {
+                this.handleKeyPress(event.originalEvent);
+            });
+
+            // Context menu for advanced operations
+            this.viewer.addHandler('canvas-contextmenu', (event) => {
+                event.preventDefaultAction = true;
+                this.showContextMenu(event.position);
+            });
+        },
+
+        updateViewportInfo() {
+            if (!this.viewer) return;
+
+            const viewport = this.viewer.viewport;
+            this.viewportInfo = {
+                x: viewport.getCenter().x,
+                y: viewport.getCenter().y,
+                zoom: viewport.getZoom(),
+                rotation: viewport.getRotation()
+            };
+        },
+
+        updatePerformanceInfo() {
+            if (!this.viewer) return;
+
+            // Simple performance metrics
+            const world = this.viewer.world;
+            const tiledImage = world.getItemAt(0);
+            
+            if (tiledImage) {
+                this.performanceInfo = {
+                    fps: Math.round(this.viewer.fps || 0),
+                    tilesLoaded: tiledImage._loadedTiles ? Object.keys(tiledImage._loadedTiles).length : 0
+                };
+            }
+        },
+
+        // Control Methods
+        zoomIn() {
+            if (!this.viewer) return;
+            this.viewer.viewport.zoomBy(this.config.zoomPerClick);
+        },
+
+        zoomOut() {
+            if (!this.viewer) return;
+            this.viewer.viewport.zoomBy(1 / this.config.zoomPerClick);
+        },
+
+        resetZoom() {
+            if (!this.viewer) return;
+            this.viewer.viewport.goHome();
+        },
+
+        toggleFullscreen() {
+            if (!this.viewer) return;
+            
+            if (this.viewer.isFullPage()) {
+                this.viewer.setFullPage(false);
+            } else {
+                this.viewer.setFullPage(true);
+            }
+        },
+
+        toggleRotation() {
+            if (!this.viewer) return;
+            const newRotation = (this.currentRotation + 90) % 360;
+            this.viewer.viewport.setRotation(newRotation);
+        },
+
+        toggleInfo() {
+            this.showInfo = !this.showInfo;
+            if (this.showInfo) {
+                this.updateViewportInfo();
+                this.updatePerformanceInfo();
+            }
+        },
+
+        // Advanced Methods
+        fitToWindow() {
+            if (!this.viewer) return;
+            this.viewer.viewport.goHome();
+        },
+
+        resetView() {
+            if (!this.viewer) return;
+            this.viewer.viewport.goHome();
+            this.viewer.viewport.setRotation(0);
+            this.currentRotation = 0;
+        },
+
+        handleKeyPress(event) {
+            if (!this.viewer) return;
+
+            switch(event.key) {
+                case '+':
+                case '=':
+                    this.zoomIn();
+                    break;
+                case '-':
+                    this.zoomOut();
+                    break;
+                case '0':
+                    this.resetZoom();
+                    break;
+                case 'r':
+                case 'R':
+                    this.toggleRotation();
+                    break;
+                case 'f':
+                case 'F':
+                    this.toggleFullscreen();
+                    break;
+                case 'i':
+                case 'I':
+                    this.toggleInfo();
+                    break;
+                case 'h':
+                case 'H':
+                    this.showNavigationHelper = !this.showNavigationHelper;
+                    break;
+            }
+        },
+
+        showContextMenu(position) {
+            // Custom context menu could be implemented here
+            console.log('Context menu at:', position);
+        },
+
+        retryLoad() {
+            this.hasError = false;
+            this.errorMessage = '';
+            this.initViewer();
+        },
+
+        // Cleanup
+        destroy() {
+            if (this.viewer) {
+                this.viewer.destroy();
+                this.viewer = null;
+            }
+            this.isInitialized = false;
+        },
+
+        // Event handlers
+        handlePhotoChanged(detail) {
+            console.log('Photo changed event received:', detail);
+            if (detail && detail.photo && this.isInitialized) {
+                this.updateViewer(detail.photo);
+            } else if (detail && detail.photo && !this.isInitialized) {
+                // If viewer not initialized yet, try to initialize with new photo
+                this.currentPhotoData = detail.photo;
+                this.initViewer();
+            }
+        },
+
+        async updateViewer(photo) {
+            if (!this.viewer || !photo) return;
+
+            try {
+                this.isLoading = true;
+                const tileSource = this.getTileSource(photo);
+                
+                // Replace current image
+                this.viewer.world.removeAll();
+                this.viewer.addTiledImage({
+                    tileSource: tileSource,
+                    success: () => {
+                        this.currentImageInfo = {
+                            width: this.viewer.world.getItemAt(0).getContentSize().x,
+                            height: this.viewer.world.getItemAt(0).getContentSize().y
+                        };
+                        this.isLoading = false;
+                    },
+                    error: () => {
+                        this.hasError = true;
+                        this.errorMessage = 'Errore nel caricamento dell\'immagine';
+                        this.isLoading = false;
+                    }
+                });
+            } catch (error) {
+                console.error('Errore nell\'aggiornamento del viewer:', error);
+                this.hasError = true;
+                this.errorMessage = error.message;
+                this.isLoading = false;
+            }
+        }
+    };
+}
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+                this.isLoading = false;
+            }
+        }
+    };
+}
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+
+                this.errorMessage = error.message;
+                this.isLoading = false;
+            }
+        }
+    };
+}
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+
+            }
+        }
+    };
+}
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+                this.viewer.addTiledImage({
+                    tileSource: tileSource,
+                    success: () => {
+                        this.currentImageInfo = {
+                            width: this.viewer.world.getItemAt(0).getContentSize().x,
+                            height: this.viewer.world.getItemAt(0).getContentSize().y
+                        };
+                        this.isLoading = false;
+                    },
+                    error: () => {
+                        this.hasError = true;
+                        this.errorMessage = 'Errore nel caricamento dell\'immagine';
+                        this.isLoading = false;
+                    }
+                });
+            } catch (error) {
+                console.error('Errore nell\'aggiornamento del viewer:', error);
+                this.hasError = true;
+                this.errorMessage = error.message;
+                this.isLoading = false;
+            }
+        }
+    };
+}
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+
+</script>
+
+
+});
+</script>
+
+                    }
+                });
+            } catch (error) {
+                console.error('Errore nell\'aggiornamento del viewer:', error);
+                this.hasError = true;
+                this.errorMessage = error.message;
+                this.isLoading = false;
+            }
+        }
+    };
+}
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+                    success: () => {
+                        this.currentImageInfo = {
+                            width: this.viewer.world.getItemAt(0).getContentSize().x,
+                            height: this.viewer.world.getItemAt(0).getContentSize().y
+                        };
+                        this.isLoading = false;
+                    },
+                    error: () => {
+                        this.hasError = true;
+                        this.errorMessage = 'Errore nel caricamento dell\'immagine';
+                        this.isLoading = false;
+                    }
+                });
+            } catch (error) {
+                console.error('Errore nell\'aggiornamento del viewer:', error);
+                this.hasError = true;
+                this.errorMessage = error.message;
+                this.isLoading = false;
+            }
+        }
+    };
+}
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+
+                        this.errorMessage = 'Errore nel caricamento dell\'immagine';
+                        this.isLoading = false;
+                    }
+                });
+            } catch (error) {
+                console.error('Errore nell\'aggiornamento del viewer:', error);
+                this.hasError = true;
+                this.errorMessage = error.message;
+                this.isLoading = false;
+            }
+        }
+    };
+}
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+                            width: this.viewer.world.getItemAt(0).getContentSize().x,
+                            height: this.viewer.world.getItemAt(0).getContentSize().y
+                        };
+                        this.isLoading = false;
+                    },
+                    error: () => {
+                        this.hasError = true;
+                        this.errorMessage = 'Errore nel caricamento dell\'immagine';
+                        this.isLoading = false;
+                    }
+                });
+            } catch (error) {
+                console.error('Errore nell\'aggiornamento del viewer:', error);
+                this.hasError = true;
+                this.errorMessage = error.message;
+                this.isLoading = false;
+            }
+        }
+    };
+}
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+// Initialize when Alpine is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('openSeadragonViewer', openSeadragonViewer);
+});
+</script>
+
+

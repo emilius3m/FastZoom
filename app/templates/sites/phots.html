@@ -1,0 +1,1268 @@
+<!-- templates/sites/photos.html - GESTIONE COLLEZIONE FOTOGRAFICA -->
+{% extends "base/site_base.html" %}
+
+{% block title %}Collezione Fotografica - {{ site.name }} | Sistema Archeologico{% endblock %}
+
+{% block nav_photos %}text-blue-600 bg-blue-50{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto p-6" x-data="photosManager">
+
+    <!-- Success Alert -->
+    <div x-show="showAlert"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform translate-y-2"
+         x-transition:enter-end="opacity-100 transform translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 transform translate-y-0"
+         x-transition:leave-end="opacity-0 transform translate-y-2"
+         class="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative"
+         role="alert">
+        <strong class="font-bold">Successo!</strong>
+        <span class="block sm:inline" x-text="alertMessage"></span>
+        <span @click="showAlert = false" class="absolute top-0 bottom-0 right-0 px-4 py-3 cursor-pointer">
+            <svg class="fill-current h-6 w-6 text-green-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+            </svg>
+        </span>
+    </div>
+
+    <!-- Header Section -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">Gestione fotografie archeologiche - {{ site.name }} ({{ site.code }})</h1>
+            <p class="mt-2 text-gray-600">Gestisci la collezione fotografica del sito archeologico</p>
+        </div>
+        
+        <div class="mt-4 lg:mt-0 flex flex-col sm:flex-row gap-3">
+            {% if user_role in ['admin', 'superadmin' ,'curator'] %}{% endif %}
+            <!-- Upload Button -->
+            <button @click="showUploadModal = true"
+                    class="w-52 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                Carica Foto
+            </button>
+
+            <!-- Bulk Actions -->
+            <button @click="showBulkModal = true"
+                    x-show="selectedPhotos.length > 0"
+                    class="w-52 inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                </svg>
+                Azioni di Massa (<span x-text="selectedPhotos.length"></span>)
+            </button>
+            
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Totale Foto</dt>
+                            <dd class="text-lg font-medium text-gray-900" x-text="totalPhotos"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2h4a1 1 0 110 2h-1v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6H3a1 1 0 110-2h4z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Spazio Utilizzato</dt>
+                            <dd class="text-lg font-medium text-gray-900" x-text="formatFileSize(totalSize)"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Tag Unici</dt>
+                            <dd class="text-lg font-medium text-gray-900" x-text="uniqueTags"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Ultimo Upload</dt>
+                            <dd class="text-lg font-medium text-gray-900" x-text="formatDate(lastUpload)"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Search -->
+            <div>
+                <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Ricerca</label>
+                <input type="text" 
+                       id="search"
+                       x-model="filters.search" 
+                       @input="applyFilters()"
+                       placeholder="Nome file, descrizione..."
+                       class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+            </div>
+
+            <!-- Tag Filter -->
+            <div>
+                <label for="tagFilter" class="block text-sm font-medium text-gray-700 mb-1">Tag</label>
+                <select x-model="filters.tag" 
+                        @change="applyFilters()"
+                        id="tagFilter"
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Tutti i tag</option>
+                    <template x-for="tag in availableTags" :key="tag">
+                        <option :value="tag" x-text="tag"></option>
+                    </template>
+                </select>
+            </div>
+
+            <!-- Date Range -->
+            <div>
+                <label for="dateRange" class="block text-sm font-medium text-gray-700 mb-1">Periodo</label>
+                <select x-model="filters.dateRange" 
+                        @change="applyFilters()"
+                        id="dateRange"
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Tutto il periodo</option>
+                    <option value="today">Oggi</option>
+                    <option value="week">Ultima settimana</option>
+                    <option value="month">Ultimo mese</option>
+                    <option value="year">Ultimo anno</option>
+                </select>
+            </div>
+
+            <!-- Sort By -->
+            <div>
+                <label for="sortBy" class="block text-sm font-medium text-gray-700 mb-1">Ordina per</label>
+                <select x-model="filters.sortBy" 
+                        @change="applyFilters()"
+                        id="sortBy"
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <option value="upload_date_desc">Data upload (recenti)</option>
+                    <option value="upload_date_asc">Data upload (più vecchie)</option>
+                    <option value="filename_asc">Nome file (A-Z)</option>
+                    <option value="filename_desc">Nome file (Z-A)</option>
+                    <option value="size_desc">Dimensione (maggiore)</option>
+                    <option value="size_asc">Dimensione (minore)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Active Filters Display -->
+        <div x-show="hasActiveFilters()" class="mt-4 flex flex-wrap gap-2">
+            <span class="text-sm text-gray-600">Filtri attivi:</span>
+            <template x-if="filters.search">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Ricerca: <span x-text="filters.search" class="ml-1"></span>
+                    <button @click="filters.search = ''; applyFilters()" class="ml-1 text-blue-600 hover:text-blue-500">×</button>
+                </span>
+            </template>
+            <template x-if="filters.tag">
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Tag: <span x-text="filters.tag" class="ml-1"></span>
+                    <button @click="filters.tag = ''; applyFilters()" class="ml-1 text-green-600 hover:text-green-500">×</button>
+                </span>
+            </template>
+            <button @click="clearAllFilters()" class="text-sm text-red-600 hover:text-red-500">Cancella tutti i filtri</button>
+        </div>
+    </div>
+
+    <!-- View Mode Toggle -->
+    <div class="flex justify-between items-center mb-6">
+        <div class="text-sm text-gray-600">
+            <span x-text="filteredPhotos.length"></span> di <span x-text="totalPhotos"></span> foto
+        </div>
+        
+        <div class="flex rounded-md shadow-sm" role="group">
+            <button @click="viewMode = 'grid'" 
+                    :class="viewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                    class="px-4 py-2 text-sm font-medium border border-gray-200 rounded-l-lg focus:z-10 focus:ring-2 focus:ring-blue-500 transition-colors">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                </svg>
+            </button>
+            <button @click="viewMode = 'list'" 
+                    :class="viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                    class="px-4 py-2 text-sm font-medium border-t border-b border-r border-gray-200 rounded-r-lg focus:z-10 focus:ring-2 focus:ring-blue-500 transition-colors">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Photos Grid View -->
+    <div x-show="viewMode === 'grid'" class="mb-8">
+        <div x-show="isLoading" class="flex justify-center items-center h-64">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+
+        <div x-show="!isLoading && filteredPhotos.length === 0" class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Nessuna foto trovata</h3>
+            <p class="mt-1 text-sm text-gray-500">
+                <span x-show="hasActiveFilters()">Prova a modificare i filtri di ricerca.</span>
+                <span x-show="!hasActiveFilters()">Inizia caricando la prima foto.</span>
+            </p>
+        </div>
+
+        <div x-show="!isLoading && filteredPhotos.length > 0" 
+             class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <template x-for="photo in paginatedPhotos" :key="photo.id">
+                <div class="bg-white rounded-lg shadow overflow-hidden group hover:shadow-lg transition-shadow duration-200">
+                    <!-- Photo Thumbnail -->
+                    <div class="aspect-square bg-gray-200 relative overflow-hidden">
+                        <img :src="photo.thumbnail_url || photo.file_url" 
+                             :alt="photo.filename"
+                             class="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-200"
+                             @click="openPhotoModal(photos.indexOf(photo))"
+                             loading="lazy">
+                        
+                        <!-- Overlay Actions -->
+                        <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                            <div class="flex space-x-2">
+                                <button @click="openPhotoModal(photos.indexOf(photo))" 
+                                        class="p-2 bg-white rounded-full text-gray-700 hover:text-blue-600 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                </button>
+                                {% if user_role in ['admin', 'curator'] %}
+                                <button @click="editPhoto(photo)" 
+                                        class="p-2 bg-white rounded-full text-gray-700 hover:text-green-600 transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                    </svg>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Selection Checkbox -->
+                        {% if user_role in ['admin', 'curator'] %}
+                        <div class="absolute top-2 left-2">
+                            <input type="checkbox" 
+                                   :value="photo.id"
+                                   x-model="selectedPhotos"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Photo Info -->
+                    <div class="p-3">
+                        <h3 class="text-sm font-medium text-gray-900 truncate" x-text="photo.filename"></h3>
+                        <p class="text-xs text-gray-500 mt-1">
+                            <span x-text="formatFileSize(photo.file_size)"></span>
+                            • <span x-text="formatDate(photo.upload_date, true)"></span>
+                        </p>
+                        
+                        <!-- Tags -->
+                        <div x-show="photo.tags && photo.tags.length > 0" class="mt-2">
+                            <div class="flex flex-wrap gap-1">
+                                <template x-for="tag in (photo.tags || []).slice(0, 2)" :key="tag">
+                                    <span class="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full" x-text="tag"></span>
+                                </template>
+                                <span x-show="(photo.tags || []).length > 2" class="inline-block px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">
+                                    +<span x-text="(photo.tags || []).length - 2"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Photos List View -->
+    <div x-show="viewMode === 'list'" class="mb-8">
+        <div x-show="isLoading" class="flex justify-center items-center h-64">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+
+        <div x-show="!isLoading && filteredPhotos.length === 0" class="text-center py-12">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Nessuna foto trovata</h3>
+            <p class="mt-1 text-sm text-gray-500">
+                <span x-show="hasActiveFilters()">Prova a modificare i filtri di ricerca.</span>
+                <span x-show="!hasActiveFilters()">Inizia caricando la prima foto.</span>
+            </p>
+        </div>
+
+        <div x-show="!isLoading && filteredPhotos.length > 0" class="bg-white shadow overflow-hidden sm:rounded-md">
+            <ul class="divide-y divide-gray-200">
+                <template x-for="photo in paginatedPhotos" :key="photo.id">
+                    <li class="hover:bg-gray-50 transition-colors duration-150">
+                        <div class="px-4 py-4 sm:px-6 flex items-center">
+                            <!-- Selection Checkbox -->
+                            {% if user_role in ['admin', 'curator'] %}
+                            <div class="flex-shrink-0 mr-4">
+                                <input type="checkbox" 
+                                       :value="photo.id"
+                                       x-model="selectedPhotos"
+                                       class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            </div>
+                            {% endif %}
+
+                            <!-- Thumbnail -->
+                            <div class="flex-shrink-0 mr-4">
+                                <img :src="photo.thumbnail_url || photo.file_url" 
+                                     :alt="photo.filename"
+                                     class="h-16 w-16 object-cover rounded-lg cursor-pointer"
+                                     @click="openPhotoModal(photos.indexOf(photo))">
+                            </div>
+
+                            <!-- Photo Details -->
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="text-sm font-medium text-gray-900 truncate cursor-pointer hover:text-blue-600 transition-colors"
+                                            @click="openPhotoModal(photos.indexOf(photo))"
+                                            x-text="photo.filename"></h3>
+                                        
+                                        <div class="mt-1 flex items-center text-sm text-gray-500">
+                                            <span x-text="formatFileSize(photo.file_size)"></span>
+                                            <span class="mx-2">•</span>
+                                            <span x-text="`${photo.width || 'N/A'} × ${photo.height || 'N/A'} px`"></span>
+                                            <span class="mx-2">•</span>
+                                            <span x-text="formatDate(photo.upload_date)"></span>
+                                        </div>
+
+                                        <!-- Description -->
+                                        <p x-show="photo.description" 
+                                           class="mt-1 text-sm text-gray-600 line-clamp-2" 
+                                           x-text="photo.description"></p>
+
+                                        <!-- Tags -->
+                                        <div x-show="photo.tags && photo.tags.length > 0" class="mt-2">
+                                            <div class="flex flex-wrap gap-1">
+                                                <template x-for="tag in photo.tags || []" :key="tag">
+                                                    <span class="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full" x-text="tag"></span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Actions -->
+                                    <div class="flex-shrink-0 ml-4">
+                                        <div class="flex space-x-2">
+                                            <button @click="openPhotoModal(photos.indexOf(photo))" 
+                                                    class="text-gray-400 hover:text-blue-600 transition-colors">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                </svg>
+                                            </button>
+                                            {% if user_role in ['admin', 'curator'] %}
+                                            <button @click="editPhoto(photo)" 
+                                                    class="text-gray-400 hover:text-green-600 transition-colors">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                </svg>
+                                            </button>
+                                            <button @click="confirmDeletePhoto(photo)" 
+                                                    class="text-gray-400 hover:text-red-600 transition-colors">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                </svg>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div x-show="filteredPhotos.length > itemsPerPage" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-lg shadow">
+        <div class="flex-1 flex justify-between sm:hidden">
+            <button @click="previousPage()" 
+                    :disabled="currentPage <= 1"
+                    :class="currentPage <= 1 ? 'cursor-not-allowed text-gray-400' : 'text-gray-700 hover:text-gray-500'"
+                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white">
+                Precedente
+            </button>
+            <button @click="nextPage()" 
+                    :disabled="currentPage >= totalPages"
+                    :class="currentPage >= totalPages ? 'cursor-not-allowed text-gray-400' : 'text-gray-700 hover:text-gray-500'"
+                    class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white">
+                Successiva
+            </button>
+        </div>
+        
+        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+            <div>
+                <p class="text-sm text-gray-700">
+                    Mostra da <span class="font-medium" x-text="startItem"></span> a 
+                    <span class="font-medium" x-text="endItem"></span> di 
+                    <span class="font-medium" x-text="filteredPhotos.length"></span> risultati
+                </p>
+            </div>
+            <div>
+                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button @click="previousPage()" 
+                            :disabled="currentPage <= 1"
+                            :class="currentPage <= 1 ? 'cursor-not-allowed text-gray-300' : 'text-gray-500 hover:bg-gray-50'"
+                            class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium">
+                        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+
+                    <template x-for="page in visiblePages" :key="page">
+                        <button @click="goToPage(page)" 
+                                :class="page === currentPage ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'"
+                                class="relative inline-flex items-center px-4 py-2 border text-sm font-medium"
+                                x-text="page"></button>
+                    </template>
+
+                    <button @click="nextPage()" 
+                            :disabled="currentPage >= totalPages"
+                            :class="currentPage >= totalPages ? 'cursor-not-allowed text-gray-300' : 'text-gray-500 hover:bg-gray-50'"
+                            class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium">
+                        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Modal -->
+    {% include 'sites/components/_photo_modal.html' %}
+
+    <!-- Upload Modal with Archaeological Metadata -->
+    {% if user_role in ['admin', 'curator'] %}
+    {% include 'sites/components/_upload_modal.html' %}
+
+    <!-- Edit Photo Modal -->
+    <div x-show="showEditModal" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+         x-cloak>
+        
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <template x-if="editingPhoto">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium text-gray-900">Modifica Foto</h3>
+                        <button @click="closeEditModal()" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <form @submit.prevent="savePhotoEdit()">
+                        <div class="space-y-4">
+                            <!-- Filename -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Nome File</label>
+                                <input type="text" 
+                                       x-model="editingPhoto.filename"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                       required>
+                            </div>
+
+                            <!-- Description -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Descrizione</label>
+                                <textarea x-model="editingPhoto.description"
+                                          rows="3"
+                                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                          placeholder="Descrizione della foto..."></textarea>
+                            </div>
+
+                            <!-- Tags -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tag</label>
+                                <input type="text" 
+                                       x-model="editingPhoto.tagsString"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="Separati da virgole...">
+                                <p class="text-xs text-gray-500 mt-1">Separare i tag con virgole</p>
+                            </div>
+
+                            <!-- Current Tags Display -->
+                            <div x-show="editingPhoto.tags && editingPhoto.tags.length > 0">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Tag Attuali</label>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="tag in editingPhoto.tags || []" :key="tag">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            <span x-text="tag"></span>
+                                            <button @click="removeTag(tag)" type="button" class="ml-1 text-blue-600 hover:text-blue-800">×</button>
+                                        </span>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end space-x-3 mt-6">
+                            <button type="button" 
+                                    @click="closeEditModal()"
+                                    class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                Annulla
+                            </button>
+                            <button type="submit" 
+                                    :disabled="isSaving"
+                                    :class="isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'"
+                                    class="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors">
+                                <span x-show="!isSaving">Salva Modifiche</span>
+                                <span x-show="isSaving">Salvataggio...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div x-show="showDeleteModal" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+         x-cloak>
+        
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                    <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </div>
+                
+                <h3 class="text-lg font-medium text-gray-900 mt-4">Sei sicuro di voler eliminare la foto?</h3>
+                
+                <template x-if="photoToDelete">
+                    <div class="mt-2">
+                        <p class="text-sm text-gray-500" x-text="photoToDelete.filename"></p>
+                        <p class="text-sm text-red-600 mt-2">Questa azione non può essere annullata. La foto e tutti i suoi file verranno eliminati permanentemente.</p>
+                    </div>
+                </template>
+            </div>
+
+            <div class="flex justify-center space-x-3 mt-6">
+                <button @click="showDeleteModal = false; photoToDelete = null" 
+                        class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Annulla
+                </button>
+                <button @click="deletePhoto()" 
+                        :disabled="isDeleting"
+                        :class="isDeleting ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'"
+                        class="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors">
+                    <span x-show="!isDeleting">Elimina</span>
+                    <span x-show="isDeleting">Eliminazione...</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Modal -->
+    <div x-show="showBulkModal" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+         x-cloak>
+        
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900">
+                    Azioni di Massa (<span x-text="selectedPhotos.length"></span> foto selezionate)
+                </h3>
+                <button @click="closeBulkModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Add Tags -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Aggiungi Tag</label>
+                    <input type="text" 
+                           x-model="bulkActions.addTags"
+                           placeholder="Nuovi tag (separati da virgole)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                </div>
+
+                <!-- Remove Tags -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Rimuovi Tag</label>
+                    <input type="text" 
+                           x-model="bulkActions.removeTags"
+                           placeholder="Tag da rimuovere (separati da virgole)"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                </div>
+            </div>
+
+            <div class="flex justify-between mt-6">
+                <button @click="bulkDeletePhotos()" 
+                        class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
+                    Elimina Selezionate
+                </button>
+                
+                <div class="flex space-x-3">
+                    <button @click="closeBulkModal()" 
+                            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Annulla
+                    </button>
+                    <button @click="applyBulkActions()" 
+                            :disabled="isBulkProcessing"
+                            :class="isBulkProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'"
+                            class="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors">
+                        <span x-show="!isBulkProcessing">Applica Modifiche</span>
+                        <span x-show="isBulkProcessing">Elaborazione...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Main JavaScript Component -->
+<script>
+function photosManager() {
+    return {
+        // Data Properties
+        photos: [],
+        filteredPhotos: [],
+        paginatedPhotos: [],
+        currentPage: 1,
+        itemsPerPage: 24,
+        totalPhotos: 0,
+        totalSize: 0,
+        uniqueTags: 0,
+        lastUpload: null,
+        isLoading: false,
+        viewMode: 'grid',
+        selectedPhotos: [],
+        userRole: '{{ user_role }}',
+
+        // Modal States
+        showPhotoModal: false,
+        showUploadModal: false,
+        showEditModal: false,
+        showDeleteModal: false,
+        showBulkModal: false,
+        showAlert: false,
+        alertMessage: '',
+
+        // Photo Modal Data
+        currentPhoto: null,
+        currentPhotoIndex: 0,
+        viewMode: 'standard',
+        imageLoaded: false,
+        imageError: false,
+        showMobileInfo: false,
+
+        // Edit Modal Data
+        editingPhoto: null,
+        isSaving: false,
+
+        // Delete Modal Data
+        photoToDelete: null,
+        isDeleting: false,
+
+        // Upload Data - simplified since handled by upload modal component
+        selectedFiles: [],
+        isUploading: false,
+        uploadProgress: 0,
+
+        // Bulk Actions Data
+        isBulkProcessing: false,
+        bulkActions: {
+            addTags: '',
+            removeTags: ''
+        },
+
+        // Filters
+        filters: {
+            search: '',
+            tag: '',
+            dateRange: '',
+            sortBy: 'upload_date_desc'
+        },
+        availableTags: [],
+
+        // Computed Properties
+        get totalPages() {
+            return Math.ceil(this.filteredPhotos.length / this.itemsPerPage);
+        },
+
+        get startItem() {
+            return (this.currentPage - 1) * this.itemsPerPage + 1;
+        },
+
+        get endItem() {
+            return Math.min(this.currentPage * this.itemsPerPage, this.filteredPhotos.length);
+        },
+
+        get visiblePages() {
+            const totalPages = this.totalPages;
+            const current = this.currentPage;
+            const delta = 2;
+            const range = [];
+            
+            const start = Math.max(1, current - delta);
+            const end = Math.min(totalPages, current + delta);
+            
+            for (let i = start; i <= end; i++) {
+                range.push(i);
+            }
+            
+            return range;
+        },
+
+        // Initialization
+        async init() {
+            this.isLoading = true;
+            
+            // Make this instance globally accessible
+            window.photosManagerInstance = this;
+            
+            try {
+                await this.loadPhotos();
+                this.updateStatistics();
+                this.extractAvailableTags();
+                this.applyFilters();
+                
+                // Check for photo ID in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const photoId = urlParams.get('photo');
+                if (photoId) {
+                    const photoIndex = this.photos.findIndex(p => p.id == photoId);
+                    if (photoIndex !== -1) {
+                        this.openPhotoModal(photoIndex);
+                    }
+                }
+            } catch (error) {
+                console.error('Errore durante inizializzazione:', error);
+                this.showAlertMessage('Errore durante il caricamento delle foto');
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        // Data Loading
+        async loadPhotos() {
+            try {
+                const response = await fetch(`/sites/{{ site.id }}/api/photos`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error:', response.status, errorText);
+                    throw new Error(`Errore API ${response.status}: ${response.statusText}`);
+                }
+                
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    console.error('Invalid response type:', contentType);
+                    throw new Error('La risposta del server non è in formato JSON');
+                }
+                
+                const data = await response.json();
+                this.photos = Array.isArray(data) ? data : [];
+                
+            } catch (error) {
+                console.error('Errore nel caricamento foto:', error);
+                // Set empty array as fallback
+                this.photos = [];
+                throw error;
+            }
+        },
+
+        // Statistics
+        updateStatistics() {
+            this.totalPhotos = this.photos.length;
+            this.totalSize = this.photos.reduce((sum, photo) => sum + (photo.file_size || 0), 0);
+            this.lastUpload = this.photos.length > 0 ? 
+                Math.max(...this.photos.map(p => new Date(p.upload_date).getTime())) : null;
+        },
+
+        extractAvailableTags() {
+            const tagSet = new Set();
+            this.photos.forEach(photo => {
+                if (photo.tags) {
+                    photo.tags.forEach(tag => tagSet.add(tag));
+                }
+            });
+            this.availableTags = Array.from(tagSet).sort();
+            this.uniqueTags = this.availableTags.length;
+        },
+
+        // Filtering and Sorting
+        applyFilters() {
+            let filtered = [...this.photos];
+
+            // Search filter
+            if (this.filters.search.trim()) {
+                const searchTerm = this.filters.search.toLowerCase();
+                filtered = filtered.filter(photo => 
+                    photo.filename.toLowerCase().includes(searchTerm) ||
+                    (photo.description && photo.description.toLowerCase().includes(searchTerm))
+                );
+            }
+
+            // Tag filter
+            if (this.filters.tag) {
+                filtered = filtered.filter(photo => 
+                    photo.tags && photo.tags.includes(this.filters.tag)
+                );
+            }
+
+            // Date range filter
+            if (this.filters.dateRange) {
+                const now = new Date();
+                let startDate;
+                
+                switch (this.filters.dateRange) {
+                    case 'today':
+                        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        break;
+                    case 'week':
+                        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                        break;
+                    case 'month':
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+                        break;
+                    case 'year':
+                        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+                        break;
+                }
+                
+                if (startDate) {
+                    filtered = filtered.filter(photo => 
+                        new Date(photo.upload_date) >= startDate
+                    );
+                }
+            }
+
+            // Sorting
+            filtered.sort((a, b) => {
+                switch (this.filters.sortBy) {
+                    case 'upload_date_desc':
+                        return new Date(b.upload_date) - new Date(a.upload_date);
+                    case 'upload_date_asc':
+                        return new Date(a.upload_date) - new Date(b.upload_date);
+                    case 'filename_asc':
+                        return a.filename.localeCompare(b.filename);
+                    case 'filename_desc':
+                        return b.filename.localeCompare(a.filename);
+                    case 'size_desc':
+                        return (b.file_size || 0) - (a.file_size || 0);
+                    case 'size_asc':
+                        return (a.file_size || 0) - (b.file_size || 0);
+                    default:
+                        return 0;
+                }
+            });
+
+            this.filteredPhotos = filtered;
+            this.currentPage = 1;
+            this.updatePagination();
+        },
+
+        hasActiveFilters() {
+            return this.filters.search || this.filters.tag || this.filters.dateRange;
+        },
+
+        clearAllFilters() {
+            this.filters.search = '';
+            this.filters.tag = '';
+            this.filters.dateRange = '';
+            this.applyFilters();
+        },
+
+        // Pagination
+        updatePagination() {
+            const start = (this.currentPage - 1) * this.itemsPerPage;
+            const end = start + this.itemsPerPage;
+            this.paginatedPhotos = this.filteredPhotos.slice(start, end);
+        },
+
+        goToPage(page) {
+            this.currentPage = page;
+            this.updatePagination();
+        },
+
+        previousPage() {
+            if (this.currentPage > 1) {
+                this.goToPage(this.currentPage - 1);
+            }
+        },
+
+        nextPage() {
+            if (this.currentPage < this.totalPages) {
+                this.goToPage(this.currentPage + 1);
+            }
+        },
+
+        // Photo Modal Methods
+        openPhotoModal(index) {
+            this.currentPhotoIndex = index;
+            this.currentPhoto = this.photos[index];
+            this.showPhotoModal = true;
+            this.imageLoaded = false;
+            this.imageError = false;
+            
+            // Make this instance globally accessible for OpenSeadragon
+            window.photosManagerInstance = this;
+            
+            // Update URL
+            const url = new URL(window.location);
+            url.searchParams.set('photo', this.currentPhoto.id);
+            window.history.replaceState(null, '', url.toString());
+        },
+
+        ...window.photoModalMethods,
+
+        // Upload Methods - handled by upload modal component
+        closeUploadModal() {
+            this.showUploadModal = false;
+        },
+
+        // Method called by upload modal after successful upload
+        async refreshPhotos() {
+            try {
+                await this.loadPhotos();
+                this.updateStatistics();
+                this.extractAvailableTags();
+                this.applyFilters();
+                this.showAlertMessage('Foto caricate con successo!');
+            } catch (error) {
+                console.error('Error refreshing photos:', error);
+                this.showAlertMessage('Errore nel refresh delle foto');
+            }
+        },
+
+        // Edit Methods
+        editPhoto(photo) {
+            this.editingPhoto = {
+                ...photo,
+                tagsString: photo.tags ? photo.tags.join(', ') : ''
+            };
+            this.showEditModal = true;
+        },
+
+        closeEditModal() {
+            this.showEditModal = false;
+            this.editingPhoto = null;
+            this.isSaving = false;
+        },
+
+        removeTag(tagToRemove) {
+            if (this.editingPhoto && this.editingPhoto.tags) {
+                this.editingPhoto.tags = this.editingPhoto.tags.filter(tag => tag !== tagToRemove);
+                this.editingPhoto.tagsString = this.editingPhoto.tags.join(', ');
+            }
+        },
+
+        async savePhotoEdit() {
+            if (!this.editingPhoto) return;
+            
+            this.isSaving = true;
+            
+            try {
+                // Process tags
+                const tags = this.editingPhoto.tagsString
+                    ? this.editingPhoto.tagsString.split(',').map(tag => tag.trim()).filter(tag => tag)
+                    : [];
+
+                const updateData = {
+                    filename: this.editingPhoto.filename,
+                    description: this.editingPhoto.description || '',
+                    tags: tags
+                };
+
+                const response = await fetch(`/sites/{{ site.id }}/photos/${this.editingPhoto.id}/update`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updateData)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Errore durante il salvataggio');
+                }
+
+                // Update local data
+                const photoIndex = this.photos.findIndex(p => p.id === this.editingPhoto.id);
+                if (photoIndex !== -1) {
+                    this.photos[photoIndex] = { ...this.photos[photoIndex], ...updateData };
+                }
+
+                // Update current photo if it's the one being edited
+                if (this.currentPhoto && this.currentPhoto.id === this.editingPhoto.id) {
+                    this.currentPhoto = { ...this.currentPhoto, ...updateData };
+                }
+
+                this.extractAvailableTags();
+                this.applyFilters();
+                this.showAlertMessage('Foto modificata con successo!');
+                this.closeEditModal();
+                
+            } catch (error) {
+                console.error('Errore durante il salvataggio:', error);
+                this.showAlertMessage('Errore durante il salvataggio');
+            } finally {
+                this.isSaving = false;
+            }
+        },
+
+        // Delete Methods
+        confirmDeletePhoto(photo) {
+            this.photoToDelete = photo;
+            this.showDeleteModal = true;
+        },
+
+        async deletePhoto() {
+            if (!this.photoToDelete) return;
+            
+            this.isDeleting = true;
+            
+            try {
+                const response = await fetch(`/sites/{{ site.id }}/photos/${this.photoToDelete.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Errore durante l\'eliminazione');
+                }
+
+                // Remove from local data
+                this.photos = this.photos.filter(p => p.id !== this.photoToDelete.id);
+                
+                // Close photo modal if showing deleted photo
+                if (this.currentPhoto && this.currentPhoto.id === this.photoToDelete.id) {
+                    this.closePhotoModal();
+                }
+
+                this.updateStatistics();
+                this.extractAvailableTags();
+                this.applyFilters();
+                this.showAlertMessage('Foto eliminata con successo!');
+                
+            } catch (error) {
+                console.error('Errore durante l\'eliminazione:', error);
+                this.showAlertMessage('Errore durante l\'eliminazione della foto');
+            } finally {
+                this.isDeleting = false;
+                this.showDeleteModal = false;
+                this.photoToDelete = null;
+            }
+        },
+
+        // Bulk Actions
+        closeBulkModal() {
+            this.showBulkModal = false;
+            this.bulkActions = {
+                addTags: '',
+                removeTags: ''
+            };
+        },
+
+        async applyBulkActions() {
+            if (!this.selectedPhotos.length) return;
+            
+            this.isBulkProcessing = true;
+            
+            try {
+                const addTags = this.bulkActions.addTags
+                    ? this.bulkActions.addTags.split(',').map(tag => tag.trim()).filter(tag => tag)
+                    : [];
+                
+                const removeTags = this.bulkActions.removeTags
+                    ? this.bulkActions.removeTags.split(',').map(tag => tag.trim()).filter(tag => tag)
+                    : [];
+
+                const response = await fetch(`/sites/{{ site.id }}/photos/bulk-update`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        photo_ids: this.selectedPhotos,
+                        add_tags: addTags,
+                        remove_tags: removeTags
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Errore durante l\'aggiornamento di massa');
+                }
+
+                // Refresh data
+                await this.loadPhotos();
+                this.updateStatistics();
+                this.extractAvailableTags();
+                this.applyFilters();
+
+                this.showAlertMessage(`${this.selectedPhotos.length} foto aggiornate con successo!`);
+                this.selectedPhotos = [];
+                this.closeBulkModal();
+                
+            } catch (error) {
+                console.error('Errore durante l\'aggiornamento di massa:', error);
+                this.showAlertMessage('Errore durante l\'aggiornamento delle foto');
+            } finally {
+                this.isBulkProcessing = false;
+            }
+        },
+
+        async bulkDeletePhotos() {
+            if (!this.selectedPhotos.length || !confirm(`Sei sicuro di voler eliminare ${this.selectedPhotos.length} foto? Questa azione non può essere annullata.`)) {
+                return;
+            }
+            
+            this.isBulkProcessing = true;
+            
+            try {
+                const response = await fetch(`/sites/{{ site.id }}/api/photos/bulk-delete`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        photo_ids: this.selectedPhotos
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Errore durante l\'eliminazione di massa');
+                }
+
+                // Refresh data
+                await this.loadPhotos();
+                this.updateStatistics();
+                this.extractAvailableTags();
+                this.applyFilters();
+
+                this.showAlertMessage(`${this.selectedPhotos.length} foto eliminate con successo!`);
+                this.selectedPhotos = [];
+                this.closeBulkModal();
+                
+            } catch (error) {
+                console.error('Errore durante l\'eliminazione di massa:', error);
+                this.showAlertMessage('Errore durante l\'eliminazione delle foto');
+            } finally {
+                this.isBulkProcessing = false;
+            }
+        },
+
+        // Utility Methods
+        showAlertMessage(message) {
+            this.alertMessage = message;
+            this.showAlert = true;
+            setTimeout(() => {
+                this.showAlert = false;
+            }, 5000);
+        },
+
+        formatFileSize(bytes) {
+            if (!bytes) return 'N/A';
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        },
+
+        formatDate(dateString, short = false) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            return short 
+                ? date.toLocaleDateString('it-IT')
+                : date.toLocaleString('it-IT');
+        }
+    };
+}
+
+// Initialize when DOM is ready
+document.addEventListener('alpine:init', () => {
+    Alpine.data('photosManager', photosManager);
+});
+</script>
+{% endblock %}

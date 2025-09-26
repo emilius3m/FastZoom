@@ -1,0 +1,344 @@
+/* app/static/css/themes.css - DARK MODE THEME CONFIGURATION */
+
+/* Ensure Tailwind dark mode works properly */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom dark mode enhancements */
+.dark {
+  color-scheme: dark;
+}
+
+/* Smooth transitions for theme switching */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Custom scrollbar for dark mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Focus styles for dark mode */
+.dark .focus\:ring-blue-500:focus {
+  --tw-ring-opacity: 1;
+  --tw-ring-color: rgb(59 130 246 / var(--tw-ring-opacity));
+}
+
+/* Custom dark mode utilities */
+.dark-mode-toggle {
+  @apply text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5;
+}
+
+/* Enhanced text contrast for dark mode */
+.dark .text-gray-900 {
+  @apply text-white;
+}
+
+.dark .text-gray-800 {
+  @apply text-gray-100;
+}
+
+.dark .text-gray-700 {
+  @apply text-gray-200;
+}
+
+.dark .text-gray-600 {
+  @apply text-gray-300;
+}
+
+.dark .text-gray-500 {
+  @apply text-gray-400;
+}
+
+.dark .text-gray-400 {
+  @apply text-gray-500;
+}
+
+.dark .text-gray-300 {
+  @apply text-gray-400;
+}
+
+.dark .text-gray-200 {
+  @apply text-gray-300;
+}
+
+.dark .text-gray-100 {
+  @apply text-gray-400;
+}
+
+/* Enhanced background colors for dark mode */
+.dark .bg-white {
+  @apply bg-gray-800;
+}
+
+.dark .bg-gray-50 {
+  @apply bg-gray-900;
+}
+
+.dark .bg-gray-100 {
+  @apply bg-gray-700;
+}
+
+.dark .bg-gray-200 {
+  @apply bg-gray-600;
+}
+
+.dark .bg-gray-300 {
+  @apply bg-gray-500;
+}
+
+.dark .bg-gray-400 {
+  @apply bg-gray-400;
+}
+
+/* Enhanced border colors for dark mode */
+.dark .border-gray-200 {
+  @apply border-gray-600;
+}
+
+.dark .border-gray-300 {
+  @apply border-gray-500;
+}
+
+.dark .border-gray-400 {
+  @apply border-gray-400;
+}
+
+.dark .border-gray-500 {
+  @apply border-gray-300;
+}
+
+/* Enhanced hover states for dark mode */
+.dark .hover\:bg-gray-50:hover {
+  @apply hover:bg-gray-700;
+}
+
+.dark .hover\:bg-gray-100:hover {
+  @apply hover:bg-gray-600;
+}
+
+.dark .hover\:text-gray-700:hover {
+  @apply hover:text-gray-200;
+}
+
+.dark .hover\:text-gray-600:hover {
+  @apply hover:text-gray-300;
+}
+
+/* Enhanced form elements for dark mode */
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="date"],
+.dark input[type="datetime-local"],
+.dark textarea,
+.dark select {
+  @apply bg-gray-700 border-gray-600 text-white placeholder-gray-400;
+}
+
+.dark input[type="text"]:focus,
+.dark input[type="email"]:focus,
+.dark input[type="password"]:focus,
+.dark input[type="date"]:focus,
+.dark input[type="datetime-local"]:focus,
+.dark textarea:focus,
+.dark select:focus {
+  @apply border-blue-500 bg-gray-600;
+}
+
+/* Enhanced button styles for dark mode */
+.dark .bg-blue-600 {
+  @apply bg-blue-700;
+}
+
+.dark .bg-blue-700 {
+  @apply bg-blue-600;
+}
+
+.dark .hover\:bg-blue-700:hover {
+  @apply hover:bg-blue-600;
+}
+
+.dark .hover\:bg-blue-600:hover {
+  @apply hover:bg-blue-700;
+}
+
+/* Enhanced alert colors for dark mode */
+.dark .bg-green-50 {
+  @apply bg-green-900/20;
+}
+
+.dark .bg-red-50 {
+  @apply bg-red-900/20;
+}
+
+.dark .bg-yellow-50 {
+  @apply bg-yellow-900/20;
+}
+
+.dark .bg-blue-50 {
+  @apply bg-blue-900/20;
+}
+
+.dark .text-green-800 {
+  @apply text-green-200;
+}
+
+.dark .text-red-800 {
+  @apply text-red-200;
+}
+
+.dark .text-yellow-800 {
+  @apply text-yellow-200;
+}
+
+.dark .text-blue-800 {
+  @apply text-blue-200;
+}
+
+.dark .border-green-200 {
+  @apply border-green-700;
+}
+
+.dark .border-red-200 {
+  @apply border-red-700;
+}
+
+.dark .border-yellow-200 {
+  @apply border-yellow-700;
+}
+
+.dark .border-blue-200 {
+  @apply border-blue-700;
+}
+
+/* Enhanced navigation styles for dark mode */
+.dark .bg-white {
+  @apply bg-gray-800;
+}
+
+.dark nav {
+  @apply bg-gray-800 border-gray-700;
+}
+
+/* Enhanced modal styles for dark mode */
+.dark .modal-backdrop {
+  @apply bg-gray-900 bg-opacity-75;
+}
+
+.dark .modal-content {
+  @apply bg-gray-800 border-gray-700;
+}
+
+/* Enhanced card styles for dark mode */
+.dark .card {
+  @apply bg-gray-800 border-gray-700;
+}
+
+/* Enhanced table styles for dark mode */
+.dark table {
+  @apply bg-gray-800;
+}
+
+.dark th {
+  @apply bg-gray-700 text-gray-200 border-gray-600;
+}
+
+.dark td {
+  @apply bg-gray-800 text-gray-300 border-gray-600;
+}
+
+.dark .hover\:bg-gray-50:hover {
+  @apply hover:bg-gray-700;
+}
+
+/* Enhanced pagination styles for dark mode */
+.dark .pagination-button {
+  @apply bg-gray-700 text-gray-200 border-gray-600 hover:bg-gray-600;
+}
+
+.dark .pagination-button.active {
+  @apply bg-blue-600 text-white;
+}
+
+/* Enhanced dropdown styles for dark mode */
+.dark .dropdown-menu {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.dark .dropdown-item {
+  @apply text-gray-200 hover:bg-gray-700;
+}
+
+/* Enhanced badge styles for dark mode */
+.dark .badge {
+  @apply bg-gray-700 text-gray-200;
+}
+
+.dark .bg-blue-100 {
+  @apply bg-blue-900/20;
+}
+
+.dark .text-blue-800 {
+  @apply text-blue-200;
+}
+
+.dark .badge-success {
+  @apply bg-green-700 text-green-100;
+}
+
+.dark .badge-warning {
+  @apply bg-yellow-700 text-yellow-100;
+}
+
+.dark .badge-error {
+  @apply bg-red-700 text-red-100;
+}
+
+/* Enhanced progress bar styles for dark mode */
+.dark .progress-bar {
+  @apply bg-gray-700;
+}
+
+.dark .progress-fill {
+  @apply bg-blue-600;
+}
+
+/* Enhanced tooltip styles for dark mode */
+.dark .tooltip {
+  @apply bg-gray-800 text-gray-200 border-gray-700;
+}
+
+/* Ensure theme toggle button works properly */
+#theme-toggle-light-icon {
+  display: block;
+}
+
+#theme-toggle-dark-icon {
+  display: none;
+}
+
+.dark #theme-toggle-light-icon {
+  display: none;
+}
+
+.dark #theme-toggle-dark-icon {
+  display: block;
+}

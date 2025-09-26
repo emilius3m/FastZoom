@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Sistema Archeologico - {% endblock %}</title>
+
+    <!-- Include the CSS for Flowbite -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.8.1/flowbite.min.css"
+      rel="stylesheet"
+    />
+
+
+    <!-- Custom Theme Styles -->
+    <link href="/static/css/themes.css" rel="stylesheet">
+
+    <!-- Include the Flowbite JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.0.0/flowbite.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        initFlowbite();
+      });
+    </script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+
+    {% block additional_head %}{% endblock %}
+  </head>
+
+  <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+    <!-- Theme Toggle Button -->
+    <div class="fixed top-4 right-4 z-50 flex space-x-2">
+      <button
+        id="theme-toggle"
+        type="button"
+        class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5"
+        aria-label="Toggle theme"
+        title="Cambia tema"
+      >
+        <!-- Light mode icon -->
+        <svg id="theme-toggle-light-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 2L13.09 8.26L20 9L14 14.74L15.18 21.02L10 17.77L4.82 21.02L6 14.74L0 9L6.91 8.26L10 2Z"></path>
+        </svg>
+        <!-- Dark mode icon -->
+        <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+        </svg>
+      </button>
+
+      <!-- Reset theme button (temporary) -->
+      <button
+        id="reset-theme"
+        type="button"
+        class="text-xs bg-red-500 text-white hover:bg-red-600 px-2 py-1 rounded"
+        title="Reset tema"
+        onclick="localStorage.removeItem('theme'); location.reload();"
+      >
+        Reset
+      </button>
+    </div>
+
+    {% if current_page not in ["register", "login"] %}
+      {% include "partials/auth_navigation.html" %}
+    {% endif %}
+
+    <!-- Main content -->
+    <main class="min-h-screen">
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- Components -->
+    <script type="text/javascript" src="/static/js/components.js"></script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+      // Simple theme toggle functionality
+      document.addEventListener('DOMContentLoaded', function() {
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const lightIcon = document.getElementById('theme-toggle-light-icon');
+        const darkIcon = document.getElementById('theme-toggle-dark-icon');
+
+        if (!themeToggleBtn || !lightIcon || !darkIcon) {
+          console.error('Theme toggle elements not found');
+          return;
+        }
+
+        // Check for saved theme preference or default to light mode
+        let currentTheme = localStorage.getItem('theme') || 'light';
+
+        // Apply initial theme
+        function applyTheme(theme) {
+          const htmlElement = document.documentElement;
+
+          if (theme === 'dark') {
+            htmlElement.classList.add('dark');
+            lightIcon.classList.add('hidden');
+            darkIcon.classList.remove('hidden');
+          } else {
+            htmlElement.classList.remove('dark');
+            lightIcon.classList.remove('hidden');
+            darkIcon.classList.add('hidden');
+          }
+
+          currentTheme = theme;
+          localStorage.setItem('theme', theme);
+
+          console.log('Theme applied:', theme);
+        }
+
+        // Apply initial theme
+        applyTheme(currentTheme);
+
+        // Toggle theme on button click
+        themeToggleBtn.addEventListener('click', function() {
+          const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+          applyTheme(newTheme);
+          console.log('Theme toggled to:', newTheme);
+        });
+
+        console.log('Theme toggle initialized');
+      });
+    </script>
+
+    <!-- Theme Toggle -->
+    <script type="text/javascript" src="/static/js/theme.js"></script>
+
+
+    <!-- Include the hyperscript script -->
+    <script src="https://unpkg.com/hyperscript.org@0.9.11"></script>
+
+    {% block additional_scripts %}{% endblock %}
+  </body>
+</html>

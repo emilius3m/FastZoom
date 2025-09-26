@@ -1,0 +1,780 @@
+<!-- templates/sites/components/_upload_modal.html - VERSIONE COMPLETA CORRETTA -->
+<div x-show="showUploadModal"
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-hidden h-full w-full z-50"
+     @click.self="closeUploadModal">
+ 
+ <div class="fixed inset-0 flex" x-data="uploadManager">
+     <!-- Sidebar for Steps (Vertical Progress Bar) -->
+     <div class="w-64 bg-gray-100 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col p-6">
+         <div class="flex-1 flex flex-col justify-center">
+             <div class="space-y-8">
+                 <!-- Step 1 -->
+                 <div class="flex items-center space-x-3">
+                     <div :class="step >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'"
+                          class="flex items-center justify-center w-10 h-10 rounded-full text-sm font-medium">1</div>
+                     <div>
+                         <span class="text-sm font-medium text-gray-900 dark:text-white">Seleziona File</span>
+                         <div :class="step === 1 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'"
+                              class="h-1 mt-1 rounded-full transition-colors"></div>
+                     </div>
+                 </div>
+
+                 <!-- Step 2 -->
+                 <div class="flex items-center space-x-3">
+                     <div :class="step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'"
+                          class="flex items-center justify-center w-10 h-10 rounded-full text-sm font-medium">2</div>
+                     <div>
+                         <span class="text-sm font-medium text-gray-900 dark:text-white">Metadati</span>
+                         <div :class="step === 2 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'"
+                              class="h-1 mt-1 rounded-full transition-colors"></div>
+                     </div>
+                 </div>
+
+                 <!-- Step 3 -->
+                 <div class="flex items-center space-x-3">
+                     <div :class="step >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'"
+                          class="flex items-center justify-center w-10 h-10 rounded-full text-sm font-medium">3</div>
+                     <div>
+                         <span class="text-sm font-medium text-gray-900 dark:text-white">Carica</span>
+                         <div :class="step === 3 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'"
+                              class="h-1 mt-1 rounded-full transition-colors"></div>
+                     </div>
+                 </div>
+             </div>
+         </div>
+     </div>
+
+     <!-- Main Content Area -->
+     <div class="flex-1 flex flex-col overflow-hidden">
+         <!-- Header -->
+         <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+             <div>
+                 <h3 class="text-xl font-semibold text-gray-600 dark:text-white">Carica Fotografie Archeologiche</h3>
+                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">Carica e cataloga le foto con metadati archeologici completi</p>
+             </div>
+             <button @click="closeUploadModal"
+                     class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
+                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                 </svg>
+             </button>
+         </div>
+
+         <!-- Scrollable Content -->
+         <div class="flex-1 overflow-y-auto p-6">
+             <!-- Step 1: File Selection with Drag & Drop -->
+             <div x-show="step === 1" x-transition:enter="transition ease-out duration-300">
+                 
+                 <!-- Drag & Drop Zone -->
+                 <div @dragover.prevent="dragover = true"
+                      @dragleave.prevent="dragover = false"
+                      @drop.prevent="handleDrop($event)"
+                      :class="{'border-blue-500 bg-blue-50': dragover, 'border-gray-300': !dragover}"
+                      class="border-2 border-dashed rounded-lg p-8 text-center transition-colors">
+                     
+                     <div class="space-y-4">
+                         <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                         </svg>
+                         <div>
+                             <h3 class="text-lg font-medium text-gray-900 dark:text-white">Trascina i file qui</h3>
+                             <p class="text-sm text-gray-600 dark:text-gray-300">oppure clicca per selezionare</p>
+                         </div>
+                         <button @click="$refs.fileInput.click()"
+                                 class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                             </svg>
+                             Seleziona File
+                         </button>
+                     </div>
+                     
+                     <input type="file"
+                            x-ref="fileInput"
+                            @change="handleFileSelect($event)"
+                            multiple
+                            accept="image/*"
+                            class="hidden">
+                 </div>
+
+                 <!-- File List -->
+                 <div x-show="selectedFiles.length > 0" class="mt-6">
+                     <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                         File Selezionati (<span x-text="selectedFiles.length"></span>)
+                     </h4>
+                     <div class="space-y-2 max-h-96 overflow-y-auto">
+                         <template x-for="(file, index) in selectedFiles" :key="index">
+                             <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                 <div class="flex items-center space-x-3">
+                                     <!-- Preview thumbnail -->
+                                     <div class="w-10 h-10 bg-gray-200 dark:bg-gray-600 rounded overflow-hidden">
+                                         <img x-show="file.preview"
+                                              :src="file.preview"
+                                              class="w-full h-full object-cover"
+                                              alt="Preview">
+                                     </div>
+                                     <div>
+                                         <p class="text-sm font-medium text-gray-900 dark:text-white" x-text="file.name"></p>
+                                         <p class="text-xs text-gray-500 dark:text-gray-400">
+                                             <span x-text="(file.size / 1024 / 1024).toFixed(2)"></span> MB
+                                             <span x-show="file.width && file.height"> •
+                                                 <span x-text="file.width"></span>×<span x-text="file.height"></span>
+                                             </span>
+                                         </p>
+                                     </div>
+                                 </div>
+                                 <button @click="removeFile(index)"
+                                         class="p-1 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">
+                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                     </svg>
+                                 </button>
+                             </div>
+                         </template>
+                     </div>
+                 </div>
+             </div>
+
+             <!-- Step 2: Metadata Form -->
+             <div x-show="step === 2" x-transition:enter="transition ease-out duration-300">
+                 <div class="space-y-6">
+                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                         <div class="flex items-center">
+                             <svg class="w-5 h-5 text-blue-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                             </svg>
+                             <p class="text-sm text-blue-800">
+                                 I metadati inseriti saranno applicati a tutte le foto selezionate.
+                                 Potrai modificarli individualmente dopo il caricamento.
+                             </p>
+                         </div>
+                     </div>
+
+                     <!-- Metadata Form -->
+                     <form @submit.prevent="step = 3" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         
+                         <!-- Archaeological Context -->
+                         <div class="md:col-span-2">
+                             <h4 class="text-lg font-medium text-gray-900 mb-4">Contesto Archeologico</h4>
+                         </div>
+
+                         <div>
+                             <label for="inventory_number" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Numero Inventario
+                             </label>
+                             <input type="text"
+                                    id="inventory_number"
+                                    x-model="metadata.inventory_number"
+                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="es. PMP001/2024">
+                         </div>
+
+                         <div>
+                             <label for="excavation_area" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Area di Scavo
+                             </label>
+                             <input type="text"
+                                    id="excavation_area"
+                                    x-model="metadata.excavation_area"
+                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="es. Area A, Settore 1">
+                         </div>
+
+                         <div>
+                             <label for="stratigraphic_unit" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Unità Stratigrafica
+                             </label>
+                             <input type="text"
+                                    id="stratigraphic_unit"
+                                    x-model="metadata.stratigraphic_unit"
+                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="es. US 145">
+                         </div>
+
+                         <div>
+                             <label for="find_date" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Data Rinvenimento
+                             </label>
+                             <input type="date"
+                                    id="find_date"
+                                    x-model="metadata.find_date"
+                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                         </div>
+
+                         <!-- Object Details -->
+                         <div class="md:col-span-2 mt-6">
+                             <h4 class="text-lg font-medium text-gray-900 mb-4">Dettagli Oggetto</h4>
+                         </div>
+
+                         <div>
+                             <label for="material" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Materiale
+                             </label>
+                             <select id="material"
+                                     x-model="metadata.material"
+                                     class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                 <option value="">Seleziona materiale...</option>
+                                 <option value="ceramica">Ceramica</option>
+                                 <option value="bronzo">Bronzo</option>
+                                 <option value="ferro">Ferro</option>
+                                 <option value="pietra">Pietra</option>
+                                 <option value="marmo">Marmo</option>
+                                 <option value="vetro">Vetro</option>
+                                 <option value="osso">Osso</option>
+                                 <option value="legno">Legno</option>
+                                 <option value="oro">Oro</option>
+                                 <option value="argento">Argento</option>
+                                 <option value="terracotta">Terracotta</option>
+                                 <option value="altro">Altro</option>
+                             </select>
+                         </div>
+
+                         <div>
+                             <label for="object_type" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Tipologia Oggetto
+                             </label>
+                             <input type="text"
+                                    id="object_type"
+                                    x-model="metadata.object_type"
+                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="es. vaso, fibula, moneta">
+                         </div>
+
+                         <div>
+                             <label for="chronology_period" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Periodo Cronologico
+                             </label>
+                             <input type="text"
+                                    id="chronology_period"
+                                    x-model="metadata.chronology_period"
+                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="es. Romano Imperiale">
+                         </div>
+
+                         <div>
+                             <label for="conservation_status" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Stato di Conservazione
+                             </label>
+                             <select id="conservation_status"
+                                     x-model="metadata.conservation_status"
+                                     class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                 <option value="">Seleziona stato...</option>
+                                 <option value="eccellente">Eccellente</option>
+                                 <option value="buono">Buono</option>
+                                 <option value="discreto">Discreto</option>
+                                 <option value="cattivo">Cattivo</option>
+                                 <option value="frammentario">Frammentario</option>
+                                 <option value="restaurato">Restaurato</option>
+                             </select>
+                         </div>
+
+                         <!-- Photo Details -->
+                         <div class="md:col-span-2 mt-6">
+                             <h4 class="text-lg font-medium text-gray-900 mb-4">Dettagli Fotografici</h4>
+                         </div>
+
+                         <div>
+                             <label for="photo_type" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Tipo Fotografia
+                             </label>
+                             <select id="photo_type"
+                                     x-model="metadata.photo_type"
+                                     class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                 <option value="">Seleziona tipo...</option>
+                                 <option value="vista_generale">Vista Generale</option>
+                                 <option value="dettaglio">Dettaglio</option>
+                                 <option value="sezione">Sezione</option>
+                                 <option value="contesto_rinvenimento">Contesto Rinvenimento</option>
+                                 <option value="pre_restauro">Pre-Restauro</option>
+                                 <option value="post_restauro">Post-Restauro</option>
+                                 <option value="laboratorio">Laboratorio</option>
+                                 <option value="stratigrafia">Stratigrafia</option>
+                             </select>
+                         </div>
+
+                         <div>
+                             <label for="photographer" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Fotografo
+                             </label>
+                             <input type="text"
+                                    id="photographer"
+                                    x-model="metadata.photographer"
+                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="Nome del fotografo">
+                         </div>
+
+                         <div class="md:col-span-2">
+                             <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Descrizione
+                             </label>
+                             <textarea id="description"
+                                       x-model="metadata.description"
+                                       rows="3"
+                                       class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="Descrizione dettagliata delle fotografie..."></textarea>
+                         </div>
+
+                         <div class="md:col-span-2">
+                             <label for="keywords" class="block text-sm font-medium text-gray-700 mb-2">
+                                 Parole Chiave
+                             </label>
+                             <input type="text"
+                                    id="keywords"
+                                    x-model="metadata.keywords"
+                                    class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="ceramica, decorazione, geometrica (separate da virgola)">
+                             <p class="mt-1 text-xs text-gray-500">Separate le parole chiave con virgole</p>
+                         </div>
+                     </form>
+                 </div>
+             </div>
+
+             <!-- Step 3: Upload Progress -->
+             <div x-show="step === 3" x-transition:enter="transition ease-out duration-300">
+                 <div class="text-center space-y-6">
+                     <div>
+                         <svg x-show="!isUploading && !uploadComplete"
+                              class="mx-auto h-12 w-12 text-blue-600"
+                              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                         </svg>
+                         
+                         <svg x-show="isUploading"
+                              class="mx-auto h-12 w-12 text-blue-600 animate-spin"
+                              fill="none" viewBox="0 0 24 24">
+                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                         </svg>
+                         
+                         <svg x-show="uploadComplete"
+                              class="mx-auto h-12 w-12 text-green-600"
+                              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                         </svg>
+                     </div>
+
+                     <div>
+                         <h3 x-show="!isUploading && !uploadComplete" class="text-lg font-medium text-gray-900">
+                             Pronto per il caricamento
+                         </h3>
+                         <h3 x-show="isUploading" class="text-lg font-medium text-gray-900">
+                             Caricamento in corso...
+                         </h3>
+                         <h3 x-show="uploadComplete" class="text-lg font-medium text-green-900">
+                             Caricamento completato!
+                         </h3>
+                         
+                         <p class="mt-2 text-sm text-gray-600">
+                             <span x-show="!isUploading && !uploadComplete">
+                                 <span x-text="selectedFiles.length"></span> foto verranno caricate con i metadati inseriti
+                             </span>
+                             <span x-show="isUploading">
+                                 <span x-text="uploadedFiles"></span> di <span x-text="selectedFiles.length"></span> foto caricate
+                             </span>
+                             <span x-show="uploadComplete">
+                                 Tutte le <span x-text="selectedFiles.length"></span> foto sono state caricate con successo
+                             </span>
+                         </p>
+                     </div>
+
+                     <!-- Enhanced Progress Bar -->
+                     <div x-show="isUploading" class="w-full">
+                         <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
+                             <div class="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                                  :style="`width: ${uploadProgress}%`"></div>
+                         </div>
+                         <div class="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                             <span x-text="`Caricamento: ${uploadedFiles}/${selectedFiles.length} foto`"></span>
+                             <span x-text="`${uploadProgress}%`"></span>
+                         </div>
+                     </div>
+
+                     <!-- Upload Results -->
+                     <div x-show="uploadResults.length > 0" class="mt-6 text-left">
+                         <h4 class="text-sm font-medium text-gray-900 mb-3">Risultati Caricamento</h4>
+                         <div class="space-y-2 max-h-96 overflow-y-auto">
+                             <template x-for="result in uploadResults" :key="result.filename">
+                                 <div class="flex items-center justify-between p-2 rounded"
+                                      :class="result.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'">
+                                     <span class="text-sm" x-text="result.filename"></span>
+                                     <span class="text-xs">
+                                         <span x-show="result.success">✓</span>
+                                         <span x-show="!result.success">✗</span>
+                                     </span>
+                                 </div>
+                             </template>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+         </div>
+
+         <!-- Fixed Footer for Actions -->
+         <div class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600 p-4 flex justify-between items-center">
+             <!-- Step 1 Actions -->
+             <template x-if="step === 1">
+                 <div class="w-full flex justify-between items-center">
+                     <button @click="clearFiles()"
+                             x-show="selectedFiles.length > 0"
+                             class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">
+                         Rimuovi Tutti
+                     </button>
+                     <div class="flex space-x-3">
+                         <button @click="closeUploadModal"
+                                 class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
+                             Annulla
+                         </button>
+                         <button @click="step = 2"
+                                 :disabled="selectedFiles.length === 0"
+                                 class="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 border border-transparent rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                             Continua
+                         </button>
+                     </div>
+                 </div>
+             </template>
+
+             <!-- Step 2 Actions -->
+             <template x-if="step === 2">
+                 <div class="w-full flex justify-between items-center">
+                     <button @click="step = 1"
+                             class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
+                         Indietro
+                     </button>
+                     <div class="flex space-x-3">
+                         <button @click="closeUploadModal"
+                                 class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
+                             Annulla
+                         </button>
+                         <button @click="step = 3"
+                                 class="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 border border-transparent rounded-md hover:bg-blue-700 dark:hover:bg-blue-600">
+                             Procedi al Caricamento
+                         </button>
+                     </div>
+                 </div>
+             </template>
+
+             <!-- Step 3 Actions -->
+             <template x-if="step === 3">
+                 <div class="w-full flex justify-between items-center">
+                     <button x-show="!isUploading && !uploadComplete"
+                             @click="step = 2"
+                             class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
+                         Indietro
+                     </button>
+                     
+                     <div class="flex space-x-3">
+                         <button x-show="!isUploading && !uploadComplete"
+                                 @click="startUpload()"
+                                 class="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 border border-transparent rounded-md hover:bg-blue-700 dark:hover:bg-blue-600">
+                             Inizia Caricamento
+                         </button>
+                         
+                         <button x-show="uploadComplete"
+                                 @click="finishUpload()"
+                                 class="px-6 py-2 text-sm font-medium text-white bg-green-600 dark:bg-green-700 border border-transparent rounded-md hover:bg-green-700 dark:hover:bg-green-600">
+                             Completa
+                         </button>
+                     </div>
+                 </div>
+             </template>
+         </div>
+     </div>
+ </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('uploadManager', () => ({
+        // State
+        step: 1,
+        dragover: false,
+        selectedFiles: [],
+        
+        // Metadata
+        metadata: {
+            inventory_number: '',
+            excavation_area: '',
+            stratigraphic_unit: '',
+            find_date: '',
+            material: '',
+            object_type: '',
+            chronology_period: '',
+            conservation_status: '',
+            photo_type: '',
+            photographer: '',
+            description: '',
+            keywords: ''
+        },
+        
+        // Upload state
+        isUploading: false,
+        uploadComplete: false,
+        uploadProgress: 0,
+        uploadedFiles: 0,
+        uploadResults: [],
+        
+        // 🔧 METODI HELPER PER COMUNICAZIONE PARENT-CHILD
+        getParentComponent() {
+            // Trova il parent component Alpine.js
+            let parent = this.$el;
+            while (parent && parent.parentElement) {
+                parent = parent.parentElement;
+                if (parent._x_dataStack && parent._x_dataStack[0]) {
+                    const parentData = parent._x_dataStack[0];
+                    if (parentData.showUploadModal !== undefined) {
+                        return parentData;
+                    }
+                }
+            }
+            return null;
+        },
+
+        closeUploadModal() {
+            const parent = this.getParentComponent();
+            if (parent && parent.showUploadModal !== undefined) {
+                parent.showUploadModal = false;
+            }
+            this.$dispatch('close-upload-modal');
+            this.resetUploadState();
+        },
+
+        resetUploadState() {
+            this.step = 1;
+            this.selectedFiles = [];
+            this.isUploading = false;
+            this.uploadComplete = false;
+            this.uploadProgress = 0;
+            this.uploadedFiles = 0;
+            this.uploadResults = [];
+            this.metadata = {
+                inventory_number: '',
+                excavation_area: '',
+                stratigraphic_unit: '',
+                find_date: '',
+                material: '',
+                object_type: '',
+                chronology_period: '',
+                conservation_status: '',
+                photo_type: '',
+                photographer: '',
+                description: '',
+                keywords: ''
+            };
+        },
+        
+        handleDrop(event) {
+            this.dragover = false;
+            const files = Array.from(event.dataTransfer.files);
+            this.processFiles(files);
+        },
+        
+        handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            this.processFiles(files);
+        },
+        
+        async processFiles(files) {
+            for (const file of files) {
+                if (file.type.startsWith('image/')) {
+                    const processedFile = await this.processFile(file);
+                    this.selectedFiles.push(processedFile);
+                }
+            }
+        },
+        
+        async processFile(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        resolve({
+                            file: file,
+                            name: file.name,
+                            size: file.size,
+                            type: file.type,
+                            preview: e.target.result,
+                            width: img.width,
+                            height: img.height
+                        });
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        },
+        
+        removeFile(index) {
+            this.selectedFiles.splice(index, 1);
+        },
+        
+        clearFiles() {
+            this.selectedFiles = [];
+        },
+        
+        async startUpload() {
+            this.isUploading = true;
+            this.uploadProgress = 0;
+            this.uploadedFiles = 0;
+            this.uploadResults = [];
+            
+            const totalFiles = this.selectedFiles.length;
+            console.log(`🚀 Starting upload of ${totalFiles} files`);
+            
+            for (let i = 0; i < this.selectedFiles.length; i++) {
+                const fileData = this.selectedFiles[i];
+                
+                // Update progress to show current file being uploaded
+                const baseProgress = Math.round((i / totalFiles) * 100);
+                this.uploadProgress = baseProgress;
+                
+                console.log(`📤 Uploading file ${i + 1}/${totalFiles}: ${fileData.name}`);
+                
+                try {
+                    const uploadResponse = await this.uploadSingleFileWithProgress(fileData, i, totalFiles);
+                    this.uploadResults.push({
+                        filename: fileData.name,
+                        success: true,
+                        photo_id: uploadResponse?.photo_id || uploadResponse?.id // ID della foto caricata
+                    });
+                    console.log(`✅ Successfully uploaded: ${fileData.name}`);
+                } catch (error) {
+                    this.uploadResults.push({
+                        filename: fileData.name,
+                        success: false,
+                        error: error.message
+                    });
+                    console.error(`❌ Failed to upload: ${fileData.name}`, error);
+                }
+                
+                this.uploadedFiles++;
+                this.uploadProgress = Math.round((this.uploadedFiles / totalFiles) * 100);
+                
+                // Small delay to show progress visually
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            this.isUploading = false;
+            this.uploadComplete = true;
+            console.log(`🎉 Upload completed: ${this.uploadResults.filter(r => r.success).length}/${totalFiles} successful`);
+        },
+        
+        async uploadSingleFileWithProgress(fileData, index, total) {
+            // Create FormData
+            const formData = new FormData();
+            formData.append('photos', fileData.file);
+            
+            // Add metadata
+            Object.keys(this.metadata).forEach(key => {
+                if (this.metadata[key]) {
+                    formData.append(key, this.metadata[key]);
+                }
+            });
+            
+            // Use XMLHttpRequest for progress tracking
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.addEventListener('progress', (event) => {
+                    if (event.lengthComputable) {
+                        const fileProgress = (event.loaded / event.total) * 100;
+                        // Calculate overall progress including file progress
+                        const overallProgress = ((index / total) * 100) + ((fileProgress / total));
+                        this.uploadProgress = Math.round(overallProgress);
+                    }
+                });
+                
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            resolve(response);
+                        } catch (e) {
+                            reject(new Error('Invalid response format'));
+                        }
+                    } else {
+                        reject(new Error(`Upload failed: ${xhr.statusText}`));
+                    }
+                });
+                
+                xhr.addEventListener('error', () => {
+                    reject(new Error('Network error during upload'));
+                });
+                
+                xhr.open('POST', `/sites/{{ site.id }}/api/photos/upload`);
+                xhr.send(formData);
+            });
+        },
+        
+        async uploadSingleFile(fileData) {
+            const formData = new FormData();
+            formData.append('photos', fileData.file);
+            
+            // Add metadata
+            Object.keys(this.metadata).forEach(key => {
+                if (this.metadata[key]) {
+                    formData.append(key, this.metadata[key]);
+                }
+            });
+            
+            const response = await fetch(`/sites/{{ site.id }}/api/photos/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${response.statusText}`);
+            }
+            
+            const responseData = await response.json();
+            console.log('📤 Upload response:', responseData);
+            
+            return responseData;
+        },
+        
+        // 🔧 FUNZIONE FINISHUPLOAD CORRETTA CON AVVIO PROCESSI BACKGROUND
+        finishUpload() {
+            // Accesso sicuro al parent component
+            const parent = this.getParentComponent();
+            if (parent) {
+                if (parent.showUploadModal !== undefined) {
+                    parent.showUploadModal = false;
+                }
+                
+                // Avvia processi background per le foto caricate
+                const uploadedPhotoIds = this.uploadResults
+                    .filter(result => result.success && result.photo_id)
+                    .map(result => result.photo_id);
+                
+                console.log('📸 Starting background processes for uploaded photos:', uploadedPhotoIds);
+                
+                // Avvia il refresh con gli ID delle foto caricate
+                if (parent.refreshPhotos && typeof parent.refreshPhotos === 'function') {
+                    parent.refreshPhotos(uploadedPhotoIds);
+                }
+                
+                // Avvia monitoraggio processi background
+                if (uploadedPhotoIds.length > 0 && parent.startMonitoringNewPhotos) {
+                    parent.startMonitoringNewPhotos(uploadedPhotoIds);
+                }
+            }
+            
+            // Event-based communication come backup
+            this.$dispatch('close-upload-modal');
+            this.$dispatch('photos-uploaded', { photoIds: uploadedPhotoIds });
+            
+            // Reset stato
+            this.resetUploadState();
+            
+            // Non fare reload automatico per permettere il monitoraggio dei processi
+            console.log('✅ Upload completed successfully, background processing started');
+        }
+    }));
+});
+</script>

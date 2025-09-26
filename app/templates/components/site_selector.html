@@ -1,0 +1,100 @@
+<!-- templates/auth/site_selection.html -->
+{% extends "base.html" %}
+
+{% block title %}Selezione Sito - {{ museum_name }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="text-center">
+            <h2 class="mt-6 text-3xl font-extrabold text-gray-900">
+                Seleziona Sito Archeologico
+            </h2>
+            <p class="mt-2 text-sm text-gray-600">
+                Hai accesso a {{ sites_count }} siti. Seleziona quello su cui lavorare.
+            </p>
+        </div>
+    </div>
+
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-2xl" 
+         x-data="{ selectedSite: null }">
+        <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            
+            <!-- Griglia siti disponibili -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {% for site in sites %}
+                <div class="relative">
+                    <input type="radio" 
+                           name="selected_site" 
+                           value="{{ site.id }}"
+                           id="site_{{ site.id }}"
+                           class="sr-only"
+                           x-model="selectedSite">
+                    
+                    <label for="site_{{ site.id }}" 
+                           class="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 hover:border-gray-300 focus-within:ring-2 focus-within:ring-blue-500"
+                           :class="selectedSite === '{{ site.id }}' ? 'border-blue-500 bg-blue-50' : ''">
+                        
+                        <div class="flex-1">
+                            <div class="flex items-center">
+                                <h3 class="text-lg font-medium text-gray-900">
+                                    {{ site.name }}
+                                </h3>
+                                <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {{ site.permission_level }}
+                                </span>
+                            </div>
+                            
+                            {% if site.location %}
+                            <p class="mt-1 text-sm text-gray-500">
+                                📍 {{ site.location }}
+                            </p>
+                            {% endif %}
+                            
+                            <p class="mt-1 text-xs text-gray-400">
+                                Codice: {{ site.code }}
+                            </p>
+                        </div>
+                        
+                        <!-- Icona selezione -->
+                        <div class="ml-3" 
+                             x-show="selectedSite === '{{ site.id }}'">
+                            <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Form accesso -->
+            <form method="post" action="/auth/select-site" class="mt-6">
+                <button type="submit"
+                         class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                         :disabled="!selectedSite">
+
+                    <span id="loading" class="hidden">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+
+                    Accedi al Sito Selezionato
+                </button>
+            </form>
+            
+            <!-- Link logout -->
+            <div class="mt-4 text-center">
+                <form method="post" action="/auth/logout" style="display: inline;">
+                    <button type="submit" class="text-sm text-gray-500 hover:text-gray-700 underline">
+                        Esci e cambia utente
+                    </button>
+                </form>
+            </div>
+            
+        </div>
+    </div>
+</div>
+{% endblock %}

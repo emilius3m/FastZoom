@@ -1,0 +1,377 @@
+<!-- templates/sites/components/_team_edit_permissions_modal.html - MODAL MODIFICA PERMESSI MEMBRO -->
+<div x-show="showEditModal" 
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50"
+     @click.self="showEditModal = false">
+    
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white"
+         x-data="editPermissionsManager">
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6 pb-4 border-b">
+            <div>
+                <h3 class="text-xl font-semibold text-gray-900">Modifica Permessi Membro</h3>
+                <p class="mt-1 text-sm text-gray-600" 
+                   x-text="selectedMember ? 'Modifica permessi per: ' + getUserDisplayName(selectedMember) : ''"></p>
+            </div>
+            <button @click="$parent.showEditModal = false" 
+                    class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Member Info -->
+        <div x-show="selectedMember" class="mb-6 flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+            <div class="flex-shrink-0">
+                <div class="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium"
+                     x-text="getUserInitials(selectedMember)">
+                </div>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h4 class="text-lg font-medium text-gray-900" x-text="getUserDisplayName(selectedMember)"></h4>
+                <p class="text-sm text-gray-600" x-text="selectedMember ? selectedMember.email : ''"></p>
+                <div class="mt-2 flex items-center space-x-4 text-sm text-gray-500">
+                    <span x-show="selectedMember && selectedMember.archaeological_role" 
+                          x-text="'Ruolo: ' + selectedMember.archaeological_role"></span>
+                    <span x-show="selectedMember && selectedMember.institution" 
+                          x-text="'Istituzione: ' + selectedMember.institution"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Form -->
+        <form @submit.prevent="savePermissions" class="space-y-6">
+            
+            <!-- Archaeological Role -->
+            <div>
+                <label for="edit_archaeological_role" class="block text-sm font-medium text-gray-700 mb-2">
+                    Ruolo Archeologico
+                </label>
+                <select id="edit_archaeological_role"
+                        x-model="editData.archaeological_role"
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Seleziona ruolo...</option>
+                    <option value="Direttore di Scavo">Direttore di Scavo</option>
+                    <option value="Archeologo Senior">Archeologo Senior</option>
+                    <option value="Archeologo">Archeologo</option>
+                    <option value="Archeologo Junior">Archeologo Junior</option>
+                    <option value="Specialista">Specialista</option>
+                    <option value="Documentalista">Documentalista</option>
+                    <option value="Fotografo">Fotografo</option>
+                    <option value="Disegnatore">Disegnatore</option>
+                    <option value="Studente">Studente</option>
+                    <option value="Volontario">Volontario</option>
+                    <option value="Collaboratore Esterno">Collaboratore Esterno</option>
+                </select>
+            </div>
+
+            <!-- Specialization -->
+            <div>
+                <label for="edit_specialization" class="block text-sm font-medium text-gray-700 mb-2">
+                    Specializzazione
+                </label>
+                <input type="text" 
+                       id="edit_specialization"
+                       x-model="editData.specialization"
+                       class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="es. Ceramica romana, Numismatica">
+            </div>
+
+            <!-- Institution -->
+            <div>
+                <label for="edit_institution" class="block text-sm font-medium text-gray-700 mb-2">
+                    Istituzione/Università
+                </label>
+                <input type="text" 
+                       id="edit_institution"
+                       x-model="editData.institution"
+                       class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                       placeholder="es. Università di Roma, Soprintendenza Archeologica">
+            </div>
+
+            <!-- Permission Level -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-3">
+                    Livello di Permessi *
+                </label>
+                <div class="space-y-3">
+                    <label class="relative flex items-start p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50"
+                           :class="{'ring-2 ring-blue-500 border-blue-500 bg-blue-50': editData.permission_level === 'read'}">
+                        <input type="radio" 
+                               name="edit_permission_level" 
+                               value="read"
+                               x-model="editData.permission_level"
+                               class="mt-0.5">
+                        <div class="ml-3">
+                            <div class="flex items-center">
+                                <span class="text-sm font-medium text-gray-900">Lettore (Read)</span>
+                                <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    Collaboratore
+                                </span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Può visualizzare foto e documenti, scaricare contenuti, esportare dati
+                            </p>
+                        </div>
+                    </label>
+
+                    <label class="relative flex items-start p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50"
+                           :class="{'ring-2 ring-blue-500 border-blue-500 bg-blue-50': editData.permission_level === 'write'}">
+                        <input type="radio" 
+                               name="edit_permission_level" 
+                               value="write"
+                               x-model="editData.permission_level"
+                               class="mt-0.5">
+                        <div class="ml-3">
+                            <div class="flex items-center">
+                                <span class="text-sm font-medium text-gray-900">Scrittore (Write)</span>
+                                <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Archeologo
+                                </span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Può caricare foto, aggiungere documentazione, modificare metadati + tutti i permessi di lettura
+                            </p>
+                        </div>
+                    </label>
+
+                    <label class="relative flex items-start p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50"
+                           :class="{'ring-2 ring-red-500 border-red-500 bg-red-50': editData.permission_level === 'admin'}">
+                        <input type="radio" 
+                               name="edit_permission_level" 
+                               value="admin"
+                               x-model="editData.permission_level"
+                               class="mt-0.5">
+                        <div class="ml-3">
+                            <div class="flex items-center">
+                                <span class="text-sm font-medium text-gray-900">Amministratore (Admin)</span>
+                                <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    Direttore Scavo
+                                </span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Controllo completo: gestione team, modifica sito, validazione dati + tutti i permessi
+                            </p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Access Duration -->
+            <div>
+                <label for="edit_access_duration" class="block text-sm font-medium text-gray-700 mb-2">
+                    Durata Accesso
+                </label>
+                <select id="edit_access_duration"
+                        x-model="editData.access_duration"
+                        @change="updateExpiryDate"
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <option value="no_change">Non modificare</option>
+                    <option value="permanent">Permanente</option>
+                    <option value="1_month">1 Mese</option>
+                    <option value="3_months">3 Mesi</option>
+                    <option value="6_months">6 Mesi</option>
+                    <option value="1_year">1 Anno</option>
+                    <option value="custom">Data Personalizzata</option>
+                </select>
+                
+                <div x-show="editData.access_duration === 'custom'" 
+                     x-transition:enter="transition ease-out duration-200"
+                     class="mt-2">
+                    <input type="date" 
+                           x-model="editData.expires_at"
+                           class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div>
+                <label for="edit_notes" class="block text-sm font-medium text-gray-700 mb-2">
+                    Note sui Permessi (Opzionale)
+                </label>
+                <textarea id="edit_notes"
+                          x-model="editData.notes"
+                          rows="3"
+                          class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Note aggiuntive sui permessi o ruolo del membro..."></textarea>
+            </div>
+
+            <!-- Status Toggle -->
+            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                    <h4 class="text-sm font-medium text-gray-900">Stato Membro</h4>
+                    <p class="text-sm text-gray-500">Attiva o disattiva l'accesso del membro al sito</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" 
+                           x-model="editData.is_active"
+                           class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <span class="ms-3 text-sm font-medium text-gray-900" x-text="editData.is_active ? 'Attivo' : 'Inattivo'"></span>
+                </label>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-between pt-6 border-t">
+                <button type="button" 
+                        @click="$parent.showEditModal = false"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                    Annulla
+                </button>
+                
+                <button type="submit"
+                        :disabled="!canSaveChanges || isSaving"
+                        :class="(!canSaveChanges || isSaving) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'"
+                        class="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md">
+                    <span x-show="!isSaving">Salva Modifiche</span>
+                    <span x-show="isSaving" class="flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Salvando...
+                    </span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('editPermissionsManager', () => ({
+        editData: {
+            archaeological_role: '',
+            specialization: '',
+            institution: '',
+            permission_level: 'read',
+            access_duration: 'no_change',
+            expires_at: '',
+            notes: '',
+            is_active: true
+        },
+        
+        isSaving: false,
+        
+        get selectedMember() {
+            return this.$parent.selectedMember;
+        },
+        
+        get canSaveChanges() {
+            return this.editData.permission_level && 
+                   (this.editData.access_duration !== 'custom' || this.editData.expires_at);
+        },
+        
+        init() {
+            this.$watch('$parent.selectedMember', (member) => {
+                if (member) {
+                    this.loadMemberData(member);
+                }
+            });
+        },
+        
+        loadMemberData(member) {
+            this.editData = {
+                archaeological_role: member.archaeological_role || '',
+                specialization: member.specialization || '',
+                institution: member.institution || '',
+                permission_level: member.permission_level || 'read',
+                access_duration: 'no_change',
+                expires_at: member.expires_at ? member.expires_at.split('T')[0] : '',
+                notes: member.notes || '',
+                is_active: member.is_active !== false
+            };
+        },
+        
+        updateExpiryDate() {
+            const now = new Date();
+            switch(this.editData.access_duration) {
+                case '1_month':
+                    now.setMonth(now.getMonth() + 1);
+                    this.editData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case '3_months':
+                    now.setMonth(now.getMonth() + 3);
+                    this.editData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case '6_months':
+                    now.setMonth(now.getMonth() + 6);
+                    this.editData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case '1_year':
+                    now.setFullYear(now.getFullYear() + 1);
+                    this.editData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case 'permanent':
+                case 'custom':
+                case 'no_change':
+                    // Non modificare data automaticamente
+                    break;
+            }
+        },
+        
+        async savePermissions() {
+            this.isSaving = true;
+            
+            try {
+                const response = await fetch(`/sites/{{ site.id }}/team/${this.selectedMember.user_id}/update-permissions`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(this.editData)
+                });
+                
+                if (response.ok) {
+                    const updatedMember = await response.json();
+                    
+                    // Update the member in the parent's array
+                    const memberIndex = this.$parent.members.findIndex(m => m.user_id === this.selectedMember.user_id);
+                    if (memberIndex !== -1) {
+                        this.$parent.members[memberIndex] = { ...this.$parent.members[memberIndex], ...updatedMember };
+                    }
+                    
+                    // Update filtered members too
+                    this.$parent.filterMembers();
+                    this.$parent.calculateStats();
+                    
+                    this.$parent.showEditModal = false;
+                    
+                    // Show success message
+                    alert('Permessi aggiornati con successo!');
+                } else {
+                    const error = await response.json();
+                    alert('Errore nell\'aggiornamento: ' + (error.detail || 'Errore sconosciuto'));
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('Errore nell\'aggiornamento dei permessi');
+            } finally {
+                this.isSaving = false;
+            }
+        },
+        
+        // Helper methods
+        getUserInitials(member) {
+            if (member && member.first_name && member.last_name) {
+                return (member.first_name[0] + member.last_name[0]).toUpperCase();
+            }
+            return member && member.email ? member.email[0].toUpperCase() : '?';
+        },
+        
+        getUserDisplayName(member) {
+            if (member && member.first_name && member.last_name) {
+                return `${member.first_name} ${member.last_name}`;
+            }
+            return member && member.email ? member.email.split('@')[0] : 'Utente Sconosciuto';
+        }
+    }));
+});
+</script>

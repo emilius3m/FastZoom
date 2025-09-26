@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archaeological System - Entity Relationship Diagram</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .diagram {
+            position: relative;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow-x: auto;
+        }
+
+        .entities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .entity {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            border-left: 5px solid #667eea;
+        }
+
+        .entity:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .entity-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+            text-align: center;
+        }
+
+        .attributes {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .attribute {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+        }
+
+        .attribute:hover {
+            background-color: #f8f9fa;
+        }
+
+        .primary-key {
+            background-color: #e8f5e8;
+            color: #2d5a2d;
+            font-weight: bold;
+        }
+
+        .foreign-key {
+            background-color: #fff3cd;
+            color: #856404;
+            font-style: italic;
+        }
+
+        .regular-attribute {
+            background-color: #f8f9fa;
+            color: #495057;
+        }
+
+        .attribute-type {
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin-left: 5px;
+        }
+
+        .relationships-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .relationships-title {
+            font-size: 1.5em;
+            color: #667eea;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .relationship {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 8px 0;
+            transition: all 0.2s ease;
+        }
+
+        .relationship:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .relationship-text {
+            font-size: 0.95em;
+            color: #495057;
+        }
+
+        .cardinality {
+            font-size: 0.8em;
+            color: #667eea;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        .pk-color { background-color: #e8f5e8; }
+        .fk-color { background-color: #fff3cd; }
+        .attr-color { background-color: #f8f9fa; }
+
+        .connection-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .connection-line {
+            position: absolute;
+            background: #667eea;
+            height: 2px;
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
+        }
+
+        .connection-line:hover {
+            opacity: 1;
+        }
+
+        .connection-label {
+            position: absolute;
+            background: rgba(102, 126, 234, 0.9);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+        }
+
+        @media (max-width: 768px) {
+            .entities-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .legend {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Archaeological System</h1>
+            <p>Entity Relationship Diagram</p>
+        </div>
+
+        <div class="diagram">
+            <div class="entities-grid">
+                <!-- User Entity -->
+                <div class="entity" id="user">
+                    <div class="entity-title">👤 User</div>
+                    <div class="attributes">
+                        <div class="attribute primary-key">id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">email <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">hashed_password <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">is_active <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">is_superuser <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">is_verified <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">first_name <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">last_name <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">created_at <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute regular-attribute">updated_at <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute regular-attribute">last_login <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute foreign-key">role_id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute foreign-key">profile_id <span class="attribute-type">(UUID)</span></div>
+                    </div>
+                </div>
+
+                <!-- UserProfile Entity -->
+                <div class="entity" id="userprofile">
+                    <div class="entity-title">📋 UserProfile</div>
+                    <div class="attributes">
+                        <div class="attribute primary-key">id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">first_name <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">last_name <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">gender <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">date_of_birth <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute regular-attribute">phone <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">city <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">country <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">address <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">company <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">specialization <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">institution <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">academic_title <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">bio <span class="attribute-type">(Text)</span></div>
+                    </div>
+                </div>
+
+                <!-- Role Entity -->
+                <div class="entity" id="role">
+                    <div class="entity-title">🛡️ Role</div>
+                    <div class="attributes">
+                        <div class="attribute primary-key">id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">role_name <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">role_desc <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">can_create_sites <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">can_manage_users <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">can_export_data <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">can_access_admin <span class="attribute-type">(Boolean)</span></div>
+                    </div>
+                </div>
+
+                <!-- ArchaeologicalSite Entity -->
+                <div class="entity" id="site">
+                    <div class="entity-title">🏛️ ArchaeologicalSite</div>
+                    <div class="attributes">
+                        <div class="attribute primary-key">id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">name <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">code <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">location <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">region <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">province <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">description <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">historical_period <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">coordinates_lat <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">coordinates_lng <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">is_active <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">is_public <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">created_at <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute regular-attribute">updated_at <span class="attribute-type">(DateTime)</span></div>
+                    </div>
+                </div>
+
+                <!-- UserSitePermission Entity -->
+                <div class="entity" id="permission">
+                    <div class="entity-title">🔐 UserSitePermission</div>
+                    <div class="attributes">
+                        <div class="attribute primary-key">id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute foreign-key">user_id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute foreign-key">site_id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">permission_level <span class="attribute-type">(Enum)</span></div>
+                        <div class="attribute foreign-key">assigned_by <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">is_active <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">notes <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">created_at <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute regular-attribute">updated_at <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute regular-attribute">expires_at <span class="attribute-type">(DateTime)</span></div>
+                    </div>
+                </div>
+
+                <!-- Photo Entity -->
+                <div class="entity" id="photo">
+                    <div class="entity-title">📸 Photo</div>
+                    <div class="attributes">
+                        <div class="attribute primary-key">id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">filename <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">original_filename <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">file_path <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">file_size <span class="attribute-type">(Integer)</span></div>
+                        <div class="attribute regular-attribute">mime_type <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">width <span class="attribute-type">(Integer)</span></div>
+                        <div class="attribute regular-attribute">height <span class="attribute-type">(Integer)</span></div>
+                        <div class="attribute regular-attribute">dpi <span class="attribute-type">(Integer)</span></div>
+                        <div class="attribute regular-attribute">color_profile <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">title <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">description <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">keywords <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">photo_type <span class="attribute-type">(Enum)</span></div>
+                        <div class="attribute regular-attribute">photographer <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">photo_date <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute regular-attribute">camera_model <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">lens <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">inventory_number <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">old_inventory_number <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">catalog_number <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">excavation_area <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">stratigraphic_unit <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">grid_square <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">depth_level <span class="attribute-type">(Float)</span></div>
+                        <div class="attribute regular-attribute">find_date <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute regular-attribute">finder <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">excavation_campaign <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">material <span class="attribute-type">(Enum)</span></div>
+                        <div class="attribute regular-attribute">material_details <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">object_type <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">object_function <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">length_cm <span class="attribute-type">(Float)</span></div>
+                        <div class="attribute regular-attribute">width_cm <span class="attribute-type">(Float)</span></div>
+                        <div class="attribute regular-attribute">height_cm <span class="attribute-type">(Float)</span></div>
+                        <div class="attribute regular-attribute">diameter_cm <span class="attribute-type">(Float)</span></div>
+                        <div class="attribute regular-attribute">weight_grams <span class="attribute-type">(Float)</span></div>
+                        <div class="attribute regular-attribute">chronology_period <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">chronology_culture <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">dating_from <span class="attribute-type">(Integer)</span></div>
+                        <div class="attribute regular-attribute">dating_to <span class="attribute-type">(Integer)</span></div>
+                        <div class="attribute regular-attribute">dating_notes <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">conservation_status <span class="attribute-type">(Enum)</span></div>
+                        <div class="attribute regular-attribute">conservation_notes <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">restoration_history <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">bibliography <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">comparative_references <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">external_links <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">exif_data <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">iptc_data <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">copyright_holder <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">license_type <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">usage_rights <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">is_published <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">is_validated <span class="attribute-type">(Boolean)</span></div>
+                        <div class="attribute regular-attribute">validation_notes <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute foreign-key">validated_by <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">validated_at <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute foreign-key">site_id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute foreign-key">uploaded_by <span class="attribute-type">(UUID)</span></div>
+                    </div>
+                </div>
+
+                <!-- PhotoModification Entity -->
+                <div class="entity" id="photomodification">
+                    <div class="entity-title">📝 PhotoModification</div>
+                    <div class="attributes">
+                        <div class="attribute primary-key">id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute foreign-key">photo_id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute foreign-key">modified_by <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">modification_type <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">field_changed <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">old_value <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">new_value <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">notes <span class="attribute-type">(Text)</span></div>
+                    </div>
+                </div>
+
+                <!-- UserActivity Entity -->
+                <div class="entity" id="activity">
+                    <div class="entity-title">📊 UserActivity</div>
+                    <div class="attributes">
+                        <div class="attribute primary-key">id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute foreign-key">user_id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">activity_date <span class="attribute-type">(DateTime)</span></div>
+                        <div class="attribute regular-attribute">activity_type <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">activity_desc <span class="attribute-type">(String)</span></div>
+                        <div class="attribute foreign-key">site_id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">photo_id <span class="attribute-type">(UUID)</span></div>
+                        <div class="attribute regular-attribute">ip_address <span class="attribute-type">(String)</span></div>
+                        <div class="attribute regular-attribute">user_agent <span class="attribute-type">(Text)</span></div>
+                        <div class="attribute regular-attribute">extra_data <span class="attribute-type">(Text)</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Connection Lines -->
+            <div class="connection-lines" id="connection-lines"></div>
+
+            <!-- Relationships Section -->
+            <div class="relationships-section">
+                <h2 class="relationships-title">🔗 Entity Relationships</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                    <div class="relationship">
+                        <span class="relationship-text">User → UserProfile</span>
+                        <span class="cardinality">1:1</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">User → Role</span>
+                        <span class="cardinality">1:1</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">User → UserSitePermission</span>
+                        <span class="cardinality">1:N</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">User → UserActivity</span>
+                        <span class="cardinality">1:N</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">User → Photo (uploader)</span>
+                        <span class="cardinality">1:N</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">User → Photo (validator)</span>
+                        <span class="cardinality">1:N</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">User → PhotoModification</span>
+                        <span class="cardinality">1:N</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">Role → User</span>
+                        <span class="cardinality">1:N</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">ArchaeologicalSite → UserSitePermission</span>
+                        <span class="cardinality">1:N</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">ArchaeologicalSite → Photo</span>
+                        <span class="cardinality">1:N</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">Photo → PhotoModification</span>
+                        <span class="cardinality">1:N</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">UserSitePermission → User (assigned_by)</span>
+                        <span class="cardinality">N:1</span>
+                    </div>
+                    <div class="relationship">
+                        <span class="relationship-text">UserActivity → User, Site, Photo</span>
+                        <span class="cardinality">N:1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color pk-color"></div>
+                    <span>Primary Key</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color fk-color"></div>
+                    <span>Foreign Key</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color attr-color"></div>
+                    <span>Regular Attribute</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add interactive features
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add tooltips to entities
+            const entities = document.querySelectorAll('.entity');
+            entities.forEach(entity => {
+                entity.title = `Click to highlight relationships for ${entity.querySelector('.entity-title').textContent}`;
+            });
+
+            // Add click handlers for highlighting
+            entities.forEach(entity => {
+                entity.addEventListener('click', function() {
+                    // Remove previous highlights
+                    document.querySelectorAll('.entity').forEach(e => e.classList.remove('highlighted'));
+                    document.querySelectorAll('.relationship').forEach(r => r.classList.remove('highlighted'));
+
+                    // Add highlight to clicked entity
+                    this.classList.add('highlighted');
+
+                    // Highlight related relationships
+                    const entityTitle = this.querySelector('.entity-title').textContent.trim();
+                    const relationships = document.querySelectorAll('.relationship');
+
+                    relationships.forEach(rel => {
+                        const relText = rel.querySelector('.relationship-text').textContent;
+                        if (relText.includes(entityTitle)) {
+                            rel.classList.add('highlighted');
+                        }
+                    });
+                });
+            });
+
+            // Add hover effects for relationships
+            const relationships = document.querySelectorAll('.relationship');
+            relationships.forEach(rel => {
+                rel.addEventListener('mouseenter', function() {
+                    this.style.transform = 'scale(1.02)';
+                    this.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.3)';
+                });
+
+                rel.addEventListener('mouseleave', function() {
+                    this.style.transform = 'scale(1)';
+                    this.style.boxShadow = 'none';
+                });
+            });
+        });
+
+        // Add CSS for highlighted state
+        const style = document.createElement('style');
+        style.textContent = `
+            .entity.highlighted {
+                border-color: #667eea !important;
+                box-shadow: 0 0 20px rgba(102, 126, 234, 0.5) !important;
+                transform: translateY(-5px) scale(1.02) !important;
+            }
+
+            .relationship.highlighted {
+                background: #667eea !important;
+                color: white !important;
+                border-color: #667eea !important;
+                transform: scale(1.02);
+            }
+
+            .relationship.highlighted .cardinality {
+                color: white !important;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
