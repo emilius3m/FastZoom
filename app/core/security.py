@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.database.db import get_async_session
 from app.services.site_service import SiteService
 from app.models.user_sites import PermissionLevel
+from app.models.users import User
 
 settings = get_settings()
 
@@ -303,6 +304,26 @@ async def get_current_user_sites_with_blacklist(
     """
     token_payload = await get_current_user_token_with_blacklist(request, db)
     return SecurityService.get_sites_from_token(token_payload)
+
+async def current_active_user(
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_async_session)
+) -> User:
+    """
+    Dependency: ottiene l'utente corrente attivo dal database
+    """
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    return user
 
 # Versioni alternative per compatibilità OAuth2 (header-based)
 async def get_current_user_token_header(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:

@@ -1,5 +1,7 @@
 from typing import Dict, Any, List
 from uuid import UUID
+from datetime import datetime
+import nh3
 from fastapi import APIRouter, Depends, HTTPException, status, Form, Request, Response, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -8,13 +10,19 @@ from sqlalchemy import select
 
 from app.database.session import get_async_session
 from app.services.auth_service import AuthService
-from app.core.security import get_current_user_id, get_current_user_sites, SecurityService
+from app.core.security import get_current_user_id, get_current_user_sites, SecurityService, current_active_user
 from app.core.config import get_settings
 from app.models.users import User
+from app.models.user_profiles import UserProfile as UserProfileModelDB
+from app.routes.view.view_crud import SQLAlchemyCRUD
 
 settings = get_settings()
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+
+# CRUD instances for user operations
+user_crud = SQLAlchemyCRUD[User](User)
+user_profile_crud = SQLAlchemyCRUD[UserProfileModelDB](UserProfileModelDB)
 
 @router.post("/login", response_class=HTMLResponse)
 async def login(
@@ -458,3 +466,114 @@ async def debug_token_test(
             "token_found": access_token_cookie is not None,
             "raw_cookie": access_token_cookie
         }
+
+@router.post("/post_update_user/{user_id}")
+async def post_update_user(
+    user_id: str,
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    gender: str = Form(None),
+    dob: str = Form(None),
+    city: str = Form(None),
+    country: str = Form(None),
+    address: str = Form(None),
+    phone: str = Form(None),
+    company: str = Form(None),
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(current_active_user)
+):
+    """
+    API endpoint to update user profile information.
+    Allows users to update their own profile or superusers to update any profile.
+    Accepts form data from HTMX.
+    """
+    try:
+        # Convert string user_id to UUID
+        try:
+            target_user_id = UUID(user_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid user ID format"
+            )
+
+        # Check permissions: allow self-update or superuser
+        if target_user_id != current_user.id and not current_user.is_superuser:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this user profile"
+            )
+
+        # Sanitize input data using nh3
+        sanitized_data = {}
+        form_data = {
+            "first_name": first_name,
+            "last_name": last_name,
+            "gender": gender,
+            "date_of_birth": dob,
+            "city": city,
+            "country": country,
+            "address": address,
+            "phone": phone,
+            "company": company
+        }
+
+        for field, value in form_data.items():
+            if value is not None and value != "":
+                if field == "date_of_birth" and value:
+                    # Handle date parsing
+                    try:
+                        sanitized_data[field] = datetime.strptime(value, "%Y-%m-%d")
+                    except ValueError:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Invalid date format. Use YYYY-MM-DD"
+                        )
+                else:
+                    # Sanitize string fields
+                    sanitized_data[field] = nh3.clean(str(value))
+
+        # Fetch the user being updated
+        user_to_update = await user_crud.read_by_primary_key(db, target_user_id)
+
+        if user_to_update.profile_id is None:
+            # Create new UserProfile
+            new_profile = await user_profile_crud.create({
+                "user_id": target_user_id,
+                **sanitized_data
+            }, db)
+
+            # Update user profile_id
+            await user_crud.update(db, target_user_id, {"profile_id": new_profile.id})
+
+            return JSONResponse(
+                status_code=status.HTTP_201_CREATED,
+                content={
+                    "message": "User profile created successfully",
+                    "profile_id": str(new_profile.id),
+                    "user_id": str(target_user_id)
+                }
+            )
+
+        else:
+            # Update existing user profile
+            updated_profile = await user_profile_crud.update(
+                db, user_to_update.profile_id, sanitized_data
+            )
+
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "message": "User profile updated successfully",
+                    "profile_id": str(updated_profile.id),
+                    "user_id": str(target_user_id)
+                }
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update user profile: {str(e)}"
+        )

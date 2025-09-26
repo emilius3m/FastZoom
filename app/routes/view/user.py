@@ -4,8 +4,9 @@ import uuid
 from datetime import datetime
 
 import nh3
-from fastapi import Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse
+from loguru import logger
+from fastapi import Depends, HTTPException, Request, Response, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRouter
 from fastapi_csrf_protect import CsrfProtect
 
@@ -13,7 +14,7 @@ from app.database.db import CurrentAsyncSession
 from app.database.security import current_active_user
 from app.models.users import Role as RoleModelDB
 from app.models.users import User as UserModelDB
-from app.models.users import UserProfile as UserProfileModelDB
+from app.models.user_profiles import UserProfile as UserProfileModelDB
 from app.routes.view.errors import handle_error
 from app.routes.view.view_crud import SQLAlchemyCRUD
 from app.schema.users import ProfileUpdate
@@ -131,139 +132,3 @@ async def profile_view(
         return HTMLResponse(content=f"<div class='alert alert-danger'>Error loading profile: {str(e)}</div>", status_code=500)
 
 
-@user_view_route.get("/get_create_users", response_class=HTMLResponse)
-async def get_create_users(
-    request: Request,
-    current_user: UserModelDB = Depends(current_active_user),
-):
-    """
-    Route handler function to render the template for creating a new user.
-
-    Args:
-        request (Request): The incoming HTTP request object.
-        current_user (UserModelDB): The currently authenticated user object, obtained from the current_active_user dependency.
-
-    Returns:
-        TemplateResponse: The rendered HTML template for creating a new user.
-
-    Raises:
-        HTTPException: If the current user is not a superuser, with a 403 Forbidden status code and a detail message.
-    """
-    # checking the current user as super user
-    try:
-        if not current_user.is_superuser:
-            raise HTTPException(status_code=403, detail="Not authorized to add users")
-        # Redirecting to the add role page upon successful role creation
-        return templates.TemplateResponse(
-            "partials/user/add_user.html",
-            {"request": request},
-        )
-    except Exception as e:
-        return handle_error("partials/user/add_user.html", {"request": request}, e)
-
-
-# Defining end point to get the record based on the id
-@user_view_route.get("/get_user/{user_id}", response_class=HTMLResponse)
-async def get_user_by_id(
-    request: Request,
-    user_id: uuid.UUID,
-    db: CurrentAsyncSession,
-    current_user: UserModelDB = Depends(current_active_user),
-    skip: int = 0,
-    limit: int = 100,
-):
-    try:
-        roles = await role_crud.read_all(db, skip, limit)
-        # checking the current user as super user
-        if not current_user.is_superuser:
-            raise HTTPException(
-                status_code=403, detail="Not authorized to view this page"
-            )
-        user = await user_crud.read_by_primary_key(db, user_id, join_relationships=True)
-
-        csrf_token = request.headers.get("X-CSRF-Token")
-
-        return templates.TemplateResponse(
-            "partials/user/edit_user.html",
-            {
-                "request": request,
-                "user": user,
-                "roles": roles,
-                "user_type": current_user.is_superuser,
-                "csrf_token": csrf_token,
-            },
-        )
-    except Exception as e:
-        csrf_token = request.headers.get("X-CSRF-Token")
-        return handle_error(
-            "partials/user/edit_user.html",
-            {
-                "request": request,
-                "user": user,
-                "roles": roles,
-                "user_type": current_user.is_superuser,
-                "csrf_token": csrf_token,
-            },
-            e,
-        )
-
-
-# Defining a endpoint to update the record based on the id
-@user_view_route.post("/post_update_user/{user_id}", response_class=HTMLResponse)
-async def post_update_user(
-    request: Request,
-    user_id: uuid.UUID,
-    db: CurrentAsyncSession,
-    current_user: UserModelDB = Depends(current_active_user),
-    csrf_protect: CsrfProtect = Depends(),
-):
-
-    try:
-        await csrf_protect.validate_csrf(request)
-        # Allow self-update or superuser
-        if user_id != current_user.id and not current_user.is_superuser:
-            raise HTTPException(status_code=403, detail="Not authorized to update this profile")
-
-        form = await request.form()
-        # Iterate over the form fields and sanitize the values before validating against the Pydantic model
-        profile_data = ProfileUpdate(
-            first_name=nh3.clean(str(form.get("first_name"))),
-            last_name=nh3.clean(str(form.get("last_name"))),
-            gender=nh3.clean(str(form.get("gender"))),
-            date_of_birth=(
-                datetime.strptime(nh3.clean(str(form.get("dob"))), "%Y-%m-%d")
-                if form.get("dob")
-                else None
-            ),
-            address=nh3.clean(str(form.get("address"))),
-            city=nh3.clean(str(form.get("city"))),
-            country=nh3.clean(str(form.get("country"))),
-            phone=nh3.clean(str(form.get("phone"))),
-            company=nh3.clean(str(form.get("company"))),
-        )
-
-        # Fetch the user being updated
-        user_to_update = await user_crud.read_by_primary_key(db, user_id)
-
-        if user_to_update.profile_id is None:
-            # Create UserProfile
-            new_profile = await user_profile_crud.create(dict(profile_data), db)
-
-            # Update user profile id
-            await user_crud.update(db, user_id, {"profile_id": new_profile.id})
-
-        else:
-            # Update existing user profile
-            await user_profile_crud.update(
-                db, user_to_update.profile_id, dict(profile_data)
-            )
-
-        # Redirect to dashboard after update
-        return RedirectResponse(url="/dashboard", status_code=303)
-
-    except Exception as e:
-        logger.error(f"Profile update error: {str(e)}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to update profile: {str(e)}"
-        )

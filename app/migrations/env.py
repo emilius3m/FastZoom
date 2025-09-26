@@ -21,7 +21,8 @@ sys.path.append(BASE_DIR)
 from app.database.base import Base
 
 # 🔥 IMPORT ESPLICITO DI TUTTI I MODELLI - necessario per autogenerate
-from app.models.users import User, UserProfile, Role, UserActivity
+from app.models.users import User, Role, UserActivity
+from app.models.user_profiles import UserProfile
 from app.models.user_sites import UserSitePermission, PermissionLevel  # 🆕 NUOVO
 
 
