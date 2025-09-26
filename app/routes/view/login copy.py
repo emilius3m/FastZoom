@@ -42,8 +42,8 @@ async def dashboard_view(
 
     context = {
         "request": request,
-        "title": "FastAPI-HTMX",
-        "message": f"Welcome to FastAPI-HTMX! {user_email}",
+        "title": "FastZoom",
+        "message": f"Welcome to FastZoom! {user_email}",
         "cookie_value": "[access_token cookie]",  # Non mostrare il vero token per sicurezza
         "csrf_token": csrf_token,
         "user_type": user_type,

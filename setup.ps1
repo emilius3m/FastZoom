@@ -4,7 +4,7 @@
 )
 
 # ============= CONFIGURAZIONE GLOBALE =============
-$PROJECT_NAME = "FastAPI-HTMX Archaeological System"
+$PROJECT_NAME = "FastZoom Archaeological System"
 $FASTAPI_PORT = 8000
 $MINIO_PORT = 9000
 $MINIO_CONSOLE_PORT = 9001
@@ -22,10 +22,10 @@ $MC_DOWNLOAD_URL = "https://dl.min.io/client/mc/release/windows-amd64/mc.exe"
 
 function Show-Help {
     Write-Host "================================================================" -ForegroundColor Blue
-    Write-Host "        FastAPI-HTMX Archaeological System - Setup Script      " -ForegroundColor Blue  
+    Write-Host "        FastZoom Archaeological System - Setup Script      " -ForegroundColor Blue
     Write-Host "================================================================" -ForegroundColor Blue
     Write-Host ""
-    Write-Host "🏺 FastAPI Commands:" -ForegroundColor Green
+    Write-Host "🏺 FastZoom Commands:" -ForegroundColor Green
     Write-Host "  setup           - Complete project setup (FastAPI + MinIO)" -ForegroundColor Yellow
     Write-Host "  install         - Install Python dependencies only" -ForegroundColor Yellow
     Write-Host "  env             - Create .env configuration file" -ForegroundColor Yellow

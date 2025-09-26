@@ -1,5 +1,4 @@
-{% extends "base/auth_base.html" %} {% block title %} Register User | FastAPI
-HTMX{% endblock %} {% block content %}
+{% extends "base/auth_base.html" %} {% block title %} Register User | FastZoom{% endblock %} {% block content %}
 <div
   x-cloak
   id="register-page"
@@ -159,7 +158,7 @@ HTMX{% endblock %} {% block content %}
         <button
           type="button"
           id="create-user-button"
-          hx-get="{{ url_for('get_dashboard') }}"
+          hx-get="{{ url_for('get_login') }}"
           hx-target="#register-page"
           hx-swap="outerHTML"
           hx-push-url="true"

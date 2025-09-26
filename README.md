@@ -17,7 +17,6 @@ This project provides a robust backend for archaeological documentation, enablin
 - [Alembic](https://alembic.sqlalchemy.org/) (^1.13.0): Database migration tool.
 - [Pydantic](https://docs.pydantic.dev/) (^2.8.0): Data validation and serialization.
 - [Jinja2](https://jinja.palletsprojects.com/) (^3.1.0): Templating engine for HTML.
-- [HTMX](https://htmx.org/) (via CDN): Enables AJAX, CSS Transitions, WebSockets without JavaScript.
 - [Alpine.js](https://alpinejs.dev/) (via CDN): Lightweight JavaScript for interactivity.
 - [OpenSeadragon](https://openseadragon.github.io/) (minified JS): Deep zoom image viewer for high-res photos.
 - [MinIO](https://min.io/) (Python client): Object storage for photos and deep zoom tiles.
@@ -43,13 +42,7 @@ Dependencies are managed via Poetry (`pyproject.toml` and `poetry.lock`).
 - **API Endpoints**: RESTful APIs for CRUD on users, sites, photos, etc.
 - **Database Migrations**: Alembic for schema evolution.
 
-## Demo
 
-<p align="center">
-  <img src="app/static/img/logo/FastAPI-HTMX.gif" alt="FastAPI HTMX Demo">
-</p>
-
-(Note: GIF shows core HTMX interactions; actual app includes deep zoom and site-specific features.)
 
 ## Admin Login Credentials
 

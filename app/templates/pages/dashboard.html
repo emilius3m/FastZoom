@@ -201,7 +201,7 @@
         </div>
         <div class="ml-4">
           <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Fotografie</p>
-          <p class="text-2xl font-semibold text-gray-900 dark:text-white">10,247</p>
+          <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ photos_count|default(0) }}</p>
         </div>
       </div>
     </div>
@@ -227,45 +227,12 @@
         </div>
         <div class="ml-4">
           <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Utenti Attivi</p>
-          <p class="text-2xl font-semibold text-gray-900 dark:text-white">24</p>
+          <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ users_count|default(0) }}</p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Quick Actions -->
-  <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
-    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Azioni Rapide</h2>
-    </div>
-    <div class="p-6">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <button class="flex items-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
-          <i class="fas fa-upload text-blue-600 dark:text-blue-400 text-xl mr-3"></i>
-          <div class="text-left">
-            <div class="font-medium text-gray-900 dark:text-white">Carica Fotografie</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Aggiungi nuove immagini</div>
-          </div>
-        </button>
-        
-        <button class="flex items-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
-          <i class="fas fa-plus text-green-600 dark:text-green-400 text-xl mr-3"></i>
-          <div class="text-left">
-            <div class="font-medium text-gray-900 dark:text-white">Nuovo Reperto</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Cataloga un reperto</div>
-          </div>
-        </button>
-        
-        <button class="flex items-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
-          <i class="fas fa-search text-purple-600 dark:text-purple-400 text-xl mr-3"></i>
-          <div class="text-left">
-            <div class="font-medium text-gray-900 dark:text-white">Ricerca Avanzata</div>
-            <div class="text-sm text-gray-600 dark:text-gray-400">Trova reperti e foto</div>
-          </div>
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- Sites Overview -->
   <div class="bg-white dark:bg-gray-800 rounded-lg shadow">

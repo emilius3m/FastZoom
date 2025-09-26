@@ -7,7 +7,7 @@ from uuid import UUID
 
 # IMPORT MANCANTI - Aggiungi questi:
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 # Sistema archeologico multi-sito
 from app.models.users import User
@@ -187,6 +187,28 @@ async def dashboard_view(
         # Ottieni informazioni utente dal database
         user = await db.execute(select(User).where(User.id == current_user_id))
         user = user.scalar_one_or_none()
+
+        # Calcola conteggio foto reali per tutti i siti accessibili
+        photos_count = 0
+        users_count = 0
+        if user_sites:
+            site_ids = [UUID(site['id']) for site in user_sites]
+            
+            # Conteggio foto
+            photos_result = await db.execute(
+                select(func.count(Photo.id)).where(Photo.site_id.in_(site_ids))
+            )
+            photos_count = photos_result.scalar() or 0
+            
+            # Conteggio utenti unici
+            users_result = await db.execute(
+                select(func.count(User.id.distinct())).join(
+                    UserSitePermission, UserSitePermission.user_id == User.id
+                ).where(
+                    UserSitePermission.site_id.in_(site_ids)
+                )
+            )
+            users_count = users_result.scalar() or 0
         
         # Context completo per il template
         context = {
@@ -197,6 +219,8 @@ async def dashboard_view(
             # VARIABILI RICHIESTE DA auth_navigation.html
             "sites": user_sites,
             "sites_count": len(user_sites),
+            "photos_count": photos_count,
+            "users_count": users_count,
             "user_email": user.email if user else None,
             "user_type": "superuser" if user and user.is_superuser else "user",
             "current_site_name": user_sites[0]["name"] if user_sites else None,
@@ -268,7 +292,7 @@ async def dashboard_view_csrf(
     
     context = {
         "request": request,
-        "title": "FastAPI-HTMX",
+        "title": "FastZoom",
         "message": f"Welcome to FastAPI! {user_type}",
         "cookie_value": "[access_token cookie]",
         "csrf_token": csrf_token,
