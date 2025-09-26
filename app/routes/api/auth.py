@@ -1,14 +1,16 @@
 from typing import Dict, Any, List
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Form, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Form, Request, Response, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.database.session import get_async_session
 from app.services.auth_service import AuthService
 from app.core.security import get_current_user_id, get_current_user_sites, SecurityService
 from app.core.config import get_settings
+from app.models.users import User
 
 settings = get_settings()
 
@@ -109,6 +111,74 @@ async def login(
             </div>
             ''',
             status_code=500
+        )
+
+
+@router.post("/register")
+async def register(
+    request: Request,
+    response: Response,
+    data: dict = Body(...),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Register endpoint per nuovi utenti (JSON API)
+    Accetta {email, password} dal frontend JS, crea utente e ritorna JSON
+    """
+    try:
+        # Debug: log incoming data
+        print(f"Registration request data: {data}")
+        
+        email = data.get("email")
+        password = data.get("password")
+        first_name = data.get("first_name", "")
+        last_name = data.get("last_name", "")
+
+        if not email or not password:
+            return JSONResponse(
+                status_code=422,
+                content={"detail": "Email and password are required"}
+            )
+
+        # Check if user already exists
+        existing_user = await db.execute(
+            select(User).where(User.email == email)
+        )
+        if existing_user.scalar_one_or_none():
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Un account con questa email è già registrato."}
+            )
+
+        # Hash password
+        hashed_password = SecurityService.get_password_hash(password)
+
+        # Create new user
+        user = User(
+            email=email,
+            hashed_password=hashed_password,
+            first_name=first_name,
+            last_name=last_name,
+            is_active=True,
+            is_superuser=False,
+            is_verified=False  # Require admin verification or email confirmation
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+        print(f"User registered successfully: {user.id}")
+
+        return JSONResponse(
+            status_code=201,
+            content={"message": "User created successfully"}
+        )
+
+    except Exception as e:
+        print(f"Registration error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Si è verificato un errore durante la registrazione."}
         )
 
 @router.post("/token", response_class=JSONResponse)
