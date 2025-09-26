@@ -10,23 +10,23 @@
 
     </div>
   </div>
-<div class="max-w-7xl mx-auto p-6" x-data="usersList">
+<div class="max-w-7xl mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="usersList">
     <!-- Page Header -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div class="px-6 py-4 border-b border-gray-200">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         Gestione Utenti Sistema Archeologico
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600">
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         Amministra gli utenti del sistema e i loro permessi per i siti archeologici
                     </p>
                 </div>
                 <div class="flex items-center space-x-3 mt-4 sm:mt-0">
                     <!-- Export Button -->
                     <button @click="exportUsers" 
-                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
@@ -66,12 +66,12 @@
     </div>
 
     <!-- Filters and Search -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <!-- Search -->
                 <div class="md:col-span-2">
-                    <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Cerca</label>
+                    <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cerca</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,18 +82,18 @@
                                id="search"
                                x-model="searchTerm"
                                @input="filterUsers"
-                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                                placeholder="Cerca per email, nome...">
                     </div>
                 </div>
 
                 <!-- Status Filter -->
                 <div>
-                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-2">Stato</label>
-                    <select id="statusFilter" 
+                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stato</label>
+                    <select id="statusFilter"
                             x-model="statusFilter"
                             @change="filterUsers"
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                         <option value="">Tutti</option>
                         <option value="active">Attivi</option>
                         <option value="inactive">Inattivi</option>
@@ -104,11 +104,11 @@
 
                 <!-- Sort -->
                 <div>
-                    <label for="sortBy" class="block text-sm font-medium text-gray-700 mb-2">Ordina per</label>
-                    <select id="sortBy" 
+                    <label for="sortBy" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ordina per</label>
+                    <select id="sortBy"
                             x-model="sortBy"
                             @change="sortUsers"
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                         <option value="email">Email</option>
                         <option value="created_at">Data Creazione</option>
                         <option value="last_login">Ultimo Accesso</option>
@@ -144,17 +144,17 @@
     </div>
 
     <!-- Users Table -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="px-6 py-4 border-b border-gray-200">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div class="flex justify-between items-center">
-                <h2 class="text-lg font-semibold text-gray-900">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                     Utenti (<span x-text="filteredUsers.length"></span>)
                 </h2>
-                <div class="flex items-center space-x-2 text-sm text-gray-500">
+                <div class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                     <span>Mostra:</span>
-                    <select x-model.number="pageSize" 
+                    <select x-model.number="pageSize"
                             @change="currentPage = 1"
-                            class="border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500">
+                            class="border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                         <option value="10">10</option>
                         <option value="25">25</option>
                         <option value="50">50</option>
@@ -221,7 +221,7 @@
                         </th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     <!-- Empty State -->
                     <tr x-show="paginatedUsers.length === 0">
                         <td colspan="7" class="px-6 py-12 text-center">
@@ -249,7 +249,7 @@
 
                     <!-- User Rows -->
                     <template x-for="user in paginatedUsers" :key="user.id">
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <!-- User Info -->
                             <td class="px-6 py-4">
                                 <div class="flex items-center">

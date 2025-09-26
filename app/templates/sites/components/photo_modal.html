@@ -81,11 +81,8 @@
                     
                     <!-- Photo container -->
                     <div id="photo-container" class="h-100 d-flex align-items-center justify-content-center bg-black">
-                        <!-- Standard photo view -->
-                        <img id="modal-photo-img" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;" />
-                        
-                        <!-- Deep Zoom container (hidden by default) -->
-                        <div id="deep-zoom-container" class="w-100 h-100 d-none"></div>
+                        <!-- Deep Zoom container (OpenSeadragon only) -->
+                        <div id="deep-zoom-container" class="w-100 h-100"></div>
                     </div>
                     
                     <!-- Deep Zoom Progress Overlay -->
@@ -122,19 +119,16 @@
                         </button>
                     </div>
                     
-                    <!-- Deep Zoom controls -->
+                    <!-- OpenSeadragon controls -->
                     <div class="position-absolute bottom-0 end-0 m-3">
                         <div class="btn-group-vertical" role="group">
-                            <button type="button" class="btn btn-dark btn-sm" id="toggle-deep-zoom" title="Attiva/Disattiva Deep Zoom" disabled>
-                                <i class="fas fa-search-plus"></i>
-                            </button>
-                            <button type="button" class="btn btn-dark btn-sm d-none" id="zoom-in" title="Zoom In">
+                            <button type="button" class="btn btn-dark btn-sm" id="zoom-in" title="Zoom In">
                                 <i class="fas fa-plus"></i>
                             </button>
-                            <button type="button" class="btn btn-dark btn-sm d-none" id="zoom-out" title="Zoom Out">
+                            <button type="button" class="btn btn-dark btn-sm" id="zoom-out" title="Zoom Out">
                                 <i class="fas fa-minus"></i>
                             </button>
-                            <button type="button" class="btn btn-dark btn-sm d-none" id="zoom-reset" title="Reset Zoom">
+                            <button type="button" class="btn btn-dark btn-sm" id="zoom-reset" title="Reset Zoom">
                                 <i class="fas fa-expand-arrows-alt"></i>
                             </button>
                         </div>
@@ -474,6 +468,10 @@
     </div>
 </div>
 </div>
+
+<!-- Load OpenSeadragon library -->
+<script src="/static/js/openseadragon.min.js"></script>
+
 <!-- JavaScript per il Photo Modal -->
 <script>
 /**
@@ -614,29 +612,13 @@ class PhotoModal {
     }
     
     async loadPhotoImage(photo) {
-        return new Promise((resolve, reject) => {
-            const img = document.getElementById('modal-photo-img');
-            
-            img.onload = () => {
-                this.resetDeepZoom();
-                resolve();
-            };
-            
-            img.onerror = () => {
-                reject(new Error('Failed to load image'));
-            };
-            
-            // Set image source
-            if (photo.file_url) {
-                img.src = photo.file_url;
-            } else if (photo.photo_id || photo.id) {
-                const photoId = photo.photo_id || photo.id;
-                const siteId = window.photoCollection?.siteId || window.siteId;
-                img.src = `/sites/${siteId}/photos/${photoId}/stream`;
-            } else {
-                reject(new Error('No image URL available'));
-            }
-        });
+        // Always initialize OpenSeadragon viewer instead of standard image
+        try {
+            await this.initializeDeepZoom(photo);
+        } catch (error) {
+            console.error('Error loading photo with OpenSeadragon:', error);
+            throw error;
+        }
     }
     
     async loadPhotoMetadata(photo) {
@@ -932,34 +914,68 @@ class PhotoModal {
     
     async initializeDeepZoom(photo) {
         try {
-            document.getElementById('modal-photo-img')?.classList.add('d-none');
-            
             const container = document.getElementById('deep-zoom-container');
-            if (!container) return;
+            if (!container) {
+                throw new Error('OpenSeadragon container not found');
+            }
             
             container.classList.remove('d-none');
             container.innerHTML = '';
             
-            if (typeof OpenSeadragon !== 'undefined') {
-                const photoId = photo.photo_id || photo.id;
-                const siteId = window.photoCollection?.siteId || window.siteId;
+            // Wait for OpenSeadragon to be loaded if it's not available yet
+            if (typeof OpenSeadragon === 'undefined') {
+                console.log('OpenSeadragon not loaded, waiting...');
+                await this.waitForOpenSeadragon();
+            }
+            
+            const photoId = photo.photo_id || photo.id;
+            const siteId = window.photoCollection?.siteId || window.siteId;
+            
+            // Try Deep Zoom first, fallback to regular image if not available
+            let tileSource;
+            if (photo.has_deep_zoom) {
+                tileSource = `/sites/${siteId}/photos/${photoId}/deepzoom/info`;
+                console.log('Using deep zoom source:', tileSource);
+            } else {
+                // Fallback to display regular image in OpenSeadragon
+                // Use the /full endpoint which seems to be working based on server logs
+                const imageUrl = `/photos/${photoId}/full`;
+                console.log('Using fallback image source:', imageUrl);
                 
-                this.deepZoomViewer = OpenSeadragon({
-                    element: container,
-                    prefixUrl: '/static/images/openseadragon/',
-                    tileSources: `/sites/${siteId}/photos/${photoId}/deepzoom/info`,
-                    showNavigationControl: true,
-                    showZoomControl: true,
-                    showHomeControl: true,
-                    showFullPageControl: false,
-                    gestureSettingsMouse: {
-                        clickToZoom: false,
-                        dblClickToZoom: true,
-                        scrollToZoom: true,
-                        pinchToZoom: true
-                    }
-                });
-                
+                tileSource = {
+                    type: 'image',
+                    url: imageUrl,
+                    buildPyramid: true,
+                    crossOriginPolicy: 'Anonymous'
+                };
+            }
+            
+            console.log('Initializing OpenSeadragon with tile source:', tileSource);
+            
+            this.deepZoomViewer = OpenSeadragon({
+                element: container,
+                prefixUrl: '/static/img/openseadragon/',
+                tileSources: tileSource,
+                showNavigationControl: true,
+                showZoomControl: true,
+                showHomeControl: true,
+                showFullPageControl: false,
+                gestureSettingsMouse: {
+                    clickToZoom: false,
+                    dblClickToZoom: true,
+                    scrollToZoom: true,
+                    pinchToZoom: true
+                },
+                // Add error handling
+                onError: (error) => {
+                    console.error('OpenSeadragon error:', error);
+                    this.showError('Errore nel caricamento dell\'immagine');
+                }
+            });
+            
+            // Wait for the viewer to open
+            this.deepZoomViewer.addHandler('open', () => {
+                console.log('OpenSeadragon viewer opened successfully');
                 this.deepZoomActive = true;
                 
                 // Show zoom controls
@@ -971,16 +987,28 @@ class PhotoModal {
                 document.getElementById('zoom-in').onclick = () => this.deepZoomViewer.viewport.zoomBy(1.2);
                 document.getElementById('zoom-out').onclick = () => this.deepZoomViewer.viewport.zoomBy(0.8);
                 document.getElementById('zoom-reset').onclick = () => this.deepZoomViewer.viewport.goHome();
-                
-            } else {
-                throw new Error('OpenSeadragon not loaded');
-            }
+            });
+            
+            this.deepZoomViewer.addHandler('open-failed', (event) => {
+                console.error('OpenSeadragon failed to open:', event);
+                this.showError('Errore nel caricamento dell\'immagine');
+            });
             
         } catch (error) {
-            console.error('Error initializing deep zoom:', error);
-            this.showError('Errore nell\'inizializzazione del Deep Zoom');
+            console.error('Error initializing OpenSeadragon:', error);
+            this.showError('Errore nell\'inizializzazione del visualizzatore OpenSeadragon: ' + error.message);
             this.resetDeepZoom();
         }
+    }
+    
+    async waitForOpenSeadragon(maxAttempts = 10) {
+        for (let i = 0; i < maxAttempts; i++) {
+            if (typeof OpenSeadragon !== 'undefined') {
+                return true;
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        throw new Error('OpenSeadragon library failed to load');
     }
     
     async startDeepZoomProcessing(photo) {
@@ -1004,9 +1032,6 @@ class PhotoModal {
     }
     
     resetDeepZoom() {
-        document.getElementById('deep-zoom-container')?.classList.add('d-none');
-        document.getElementById('modal-photo-img')?.classList.remove('d-none');
-        
         document.querySelectorAll('#zoom-in, #zoom-out, #zoom-reset').forEach(btn => {
             btn.classList.add('d-none');
         });
