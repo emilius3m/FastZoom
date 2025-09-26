@@ -69,12 +69,11 @@ class User(Base):
         "Role", uselist=False, back_populates="users"
     )
     
-    profile_id: Mapped[Optional[UUID]] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("user_profiles.id"), nullable=True, default=None
-    )
-    
     profile: Mapped[Optional["UserProfile"]] = relationship(
-        "UserProfile", uselist=False, back_populates="user", cascade="all, delete"
+        "UserProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
     )
     
     # Attività utente
@@ -277,76 +276,6 @@ class User(Base):
         """Aggiorna timestamp ultimo accesso"""
         self.last_login = datetime.now(timezone.utc)
         await db.commit()
-
-
-class UserProfile(BaseSQLModel):
-    """
-    Profilo utente esteso con informazioni archeologiche
-    """
-    
-    __tablename__ = "user_profiles"
-    
-    # Informazioni personali
-    first_name: Mapped[str] = mapped_column(String(length=120), index=True)
-    last_name: Mapped[str] = mapped_column(String(length=120), index=True)
-    gender: Mapped[Optional[str]] = mapped_column(String(length=10), nullable=True)
-    date_of_birth: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    
-    # Contatti
-    phone: Mapped[Optional[str]] = mapped_column(String(length=20), nullable=True)
-    
-    # Localizzazione
-    city: Mapped[Optional[str]] = mapped_column(String(length=50), nullable=True)
-    country: Mapped[Optional[str]] = mapped_column(String(length=50), nullable=True)
-    address: Mapped[Optional[str]] = mapped_column(String(length=255), nullable=True)
-    
-    # Informazioni professionali
-    company: Mapped[Optional[str]] = mapped_column(String(length=100), nullable=True)
-    
-    # Informazioni aggiuntive sistema archeologico
-    specialization: Mapped[Optional[str]] = mapped_column(
-        String(length=200), nullable=True
-    )  # Es. "Ceramica romana", "Numismatica medievale"
-    
-    institution: Mapped[Optional[str]] = mapped_column(
-        String(length=200), nullable=True
-    )  # Es. "Università La Sapienza", "Soprintendenza Lazio"
-    
-    academic_title: Mapped[Optional[str]] = mapped_column(
-        String(length=100), nullable=True
-    )  # Es. "Prof.", "Dott.", "Arch."
-    
-    bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
-    # Relazione con User
-    user: Mapped["User"] = relationship("User", back_populates="profile")
-    
-    def get_full_name(self) -> str:
-        """Nome completo dell'utente"""
-        name_parts = []
-        
-        if self.academic_title:
-            name_parts.append(self.academic_title)
-        
-        if self.first_name:
-            name_parts.append(self.first_name)
-        
-        if self.last_name:
-            name_parts.append(self.last_name)
-        
-        return " ".join(name_parts).strip()
-    
-    def get_display_affiliation(self) -> str:
-        """Affiliazione da mostrare"""
-        parts = []
-        
-        if self.institution:
-            parts.append(self.institution)
-        
-        if self.specialization:
-            parts.append(f"({self.specialization})")
-        
-        return " ".join(parts).strip()
 
 
 class Role(BaseSQLModel):

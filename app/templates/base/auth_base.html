@@ -11,7 +11,6 @@
       rel="stylesheet"
     />
 
-
     <!-- Custom Theme Styles -->
     <link href="/static/css/themes.css" rel="stylesheet">
 
@@ -27,7 +26,8 @@
       src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
     ></script>
 
-    {% block additional_head %}{% endblock %}
+    {% block additional_head %}
+      {% endblock %}
   </head>
 
   <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
@@ -127,10 +127,12 @@
     <!-- Theme Toggle -->
     <script type="text/javascript" src="/static/js/theme.js"></script>
 
+    {% block additional_scripts %}
+    {% endblock %}
 
-    <!-- Include the hyperscript script -->
-    <script src="https://unpkg.com/hyperscript.org@0.9.11"></script>
 
-    {% block additional_scripts %}{% endblock %}
+    {% if current_user %}
+    {% include "partials/profile_modal.html" %}
+    {% endif %}
   </body>
 </html>

@@ -126,6 +126,10 @@ async def get_current_user_from_token(
     if not jwt_token:
         return None
     
+    # Rimuovi "Bearer " prefix se presente (per cookie)
+    if jwt_token.startswith("Bearer "):
+        jwt_token = jwt_token[7:]
+    
     # Verifica token
     payload = SecurityService.verify_token(jwt_token)
     if not payload:

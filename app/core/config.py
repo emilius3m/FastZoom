@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     # Configurazioni esistenti
     database_url: str = "sqlite+aiosqlite:///./archaeological_catalog.db"
     secret_key: str = "archaeological-site-secret-key-2025"
+    algorithm: str = "HS256"
 
     # MinIO Storage
     minio_url: str = "http://localhost:9000"

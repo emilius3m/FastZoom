@@ -1681,9 +1681,11 @@ async def get_recent_photos(db: AsyncSession, site_id: UUID, limit: int = 6) -> 
 
 async def get_site_team(db: AsyncSession, site_id: UUID) -> List[Dict]:
     """Recupera team del sito"""
+    from sqlalchemy.orm import selectinload
+    
     team_query = select(User, UserSitePermission).join(
         UserSitePermission, User.id == UserSitePermission.user_id
-    ).where(
+    ).options(selectinload(User.profile)).where(
         and_(
             UserSitePermission.site_id == site_id,
             UserSitePermission.is_active == True

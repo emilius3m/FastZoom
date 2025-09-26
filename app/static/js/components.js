@@ -221,3 +221,49 @@ function showAlertMessage(alertData) {
     console.warn("Could not access Alpine.js data:", error);
   }
 }
+
+// Sidebar toggle functionality
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing sidebar...');
+    
+    // Ensure Flowbite is available
+    if (typeof window.initFlowbite === 'function') {
+        window.initFlowbite();
+        console.log('Flowbite initialized');
+    }
+    
+    // Manual sidebar toggle as fallback
+    const sidebarToggle = document.querySelector('[data-drawer-toggle="logo-sidebar"]');
+    const sidebar = document.getElementById('logo-sidebar');
+    
+    if (sidebarToggle && sidebar) {
+        console.log('Sidebar elements found, adding manual toggle');
+        
+        sidebarToggle.addEventListener('click', function() {
+            console.log('Sidebar toggle clicked');
+            sidebar.classList.toggle('-translate-x-full');
+        });
+        
+        // Close sidebar when clicking outside (on mobile)
+        document.addEventListener('click', function(event) {
+            const isClickInsideSidebar = sidebar.contains(event.target);
+            const isToggleButton = sidebarToggle.contains(event.target);
+            
+            if (!isClickInsideSidebar && !isToggleButton && !sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.add('-translate-x-full');
+            }
+        });
+        
+        // Handle ESC key to close sidebar
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && !sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.add('-translate-x-full');
+            }
+        });
+    } else {
+        console.error('Sidebar toggle elements not found:', {
+            sidebarToggle: !!sidebarToggle,
+            sidebar: !!sidebar
+        });
+    }
+});

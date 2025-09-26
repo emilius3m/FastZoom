@@ -20,6 +20,7 @@ from app.schema.users import ProfileUpdate
 
 # from app.schema.users import RoleCreate
 from app.templates import templates
+from app.core.security import get_current_user_sites_with_blacklist
 
 # Create an APIRouter
 user_view_route = APIRouter()
@@ -94,6 +95,40 @@ async def get_users(
             },
             e,
         )
+
+
+@user_view_route.get("/profile/", response_class=HTMLResponse)
+async def profile_view(
+    request: Request,
+    db: CurrentAsyncSession,
+    current_user: UserModelDB = Depends(current_active_user),
+):
+    """
+    Route handler for user profile modal partial.
+    Returns partial HTML for HTMX integration in dashboard.
+    """
+    try:
+        # Get user sites (adapt to project security)
+        from app.core.security import get_current_user_sites_with_blacklist
+        user_sites = await get_current_user_sites_with_blacklist(request, db)
+        
+        # Get user profile if exists
+        user_profile = current_user.profile if current_user.profile else None
+        
+        context = {
+            "request": request,
+            "current_user": current_user,
+            "user_profile": user_profile,
+            "user_sites": user_sites,
+            "sites_count": len(user_sites),
+            "csrf_token": request.headers.get("X-CSRF-Token", ""),
+            "current_page": "profile"
+        }
+        
+        return templates.TemplateResponse("partials/profile_modal.html", context)
+        
+    except Exception as e:
+        return HTMLResponse(content=f"<div class='alert alert-danger'>Error loading profile: {str(e)}</div>", status_code=500)
 
 
 @user_view_route.get("/get_create_users", response_class=HTMLResponse)
@@ -174,10 +209,9 @@ async def get_user_by_id(
 
 
 # Defining a endpoint to update the record based on the id
-@user_view_route.put("/post_update_user/{user_id}", response_class=HTMLResponse)
+@user_view_route.post("/post_update_user/{user_id}", response_class=HTMLResponse)
 async def post_update_user(
     request: Request,
-    response: Response,
     user_id: uuid.UUID,
     db: CurrentAsyncSession,
     current_user: UserModelDB = Depends(current_active_user),
@@ -186,9 +220,9 @@ async def post_update_user(
 
     try:
         await csrf_protect.validate_csrf(request)
-        # checking the current user as super user
-        if not current_user.is_superuser:
-            raise HTTPException(status_code=403, detail="Not authorized to add users")
+        # Allow self-update or superuser
+        if user_id != current_user.id and not current_user.is_superuser:
+            raise HTTPException(status_code=403, detail="Not authorized to update this profile")
 
         form = await request.form()
         # Iterate over the form fields and sanitize the values before validating against the Pydantic model
@@ -208,14 +242,6 @@ async def post_update_user(
             company=nh3.clean(str(form.get("company"))),
         )
 
-        role_id = (nh3.clean(str(form.get("role_id"))),)
-        role_id = uuid.UUID(role_id[0]) if role_id[0] else None
-
-        if role_id is None:
-            raise HTTPException(
-                status_code=400, detail="Role is required to create a user Profile"
-            )
-
         # Fetch the user being updated
         user_to_update = await user_crud.read_by_primary_key(db, user_id)
 
@@ -226,74 +252,18 @@ async def post_update_user(
             # Update user profile id
             await user_crud.update(db, user_id, {"profile_id": new_profile.id})
 
-            # Update user role
-            if role_id:
-                await user_crud.update(db, user_id, {"role_id": role_id})
-
-            csrf_token, signed_token = csrf_protect.generate_csrf_tokens()
-            headers = {
-                "HX-Location": "/user",
-                "HX-Trigger": json.dumps(
-                    {
-                        "showAlert": {
-                            "type": "updated",
-                            "message": f"Profile for {profile_data.first_name , profile_data.last_name} updated successfully.",
-                            "source": "user-page",
-                        },
-                    }
-                ),
-                "csrf_token": csrf_token,
-            }
-            response = HTMLResponse(content="", headers=headers)
-
-            csrf_protect.unset_csrf_cookie(response)
-
-            csrf_protect.set_csrf_cookie(signed_token, response)
-
-            return response
         else:
             # Update existing user profile
             await user_profile_crud.update(
                 db, user_to_update.profile_id, dict(profile_data)
             )
 
-            # Update user role
-            if role_id:
-                await user_crud.update(db, user_id, {"role_id": role_id})
+        # Redirect to dashboard after update
+        return RedirectResponse(url="/dashboard", status_code=303)
 
-            csrf_token, signed_token = csrf_protect.generate_csrf_tokens()
-
-            headers = {
-                "HX-Location": "/user",
-                "HX-Trigger": json.dumps(
-                    {
-                        "showAlert": {
-                            "type": "updated",
-                            "message": f"Profile for {profile_data.first_name , profile_data.last_name} updated successfully.",
-                            "source": "user-page",
-                        },
-                    }
-                ),
-                "csrf_token": csrf_token,
-            }
-            response = HTMLResponse(content="", headers=headers)
-
-            csrf_protect.unset_csrf_cookie(response)
-
-            csrf_protect.set_csrf_cookie(signed_token, response)
-
-            return response
     except Exception as e:
-        user = await user_crud.read_by_primary_key(db, user_id, join_relationships=True)
-        roles = await role_crud.read_all(db)
-        csrf_token = request.headers.get("X-CSRF-Token")
-        return handle_error(
-            "partials/user/edit_user.html",
-            {
-                "request": request,
-                "user": user,
-                "roles": roles,
-                "csrf_token": csrf_token,
-            },
-            e,
+        logger.error(f"Profile update error: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to update profile: {str(e)}"
         )

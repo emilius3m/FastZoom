@@ -14,6 +14,7 @@ from app.models.users import User
 from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission
 from app.models.photos import Photo
+from app.models.user_profiles import UserProfile
 
 # Sicurezza multi-sito - DEPENDENCY CON BLACKLIST CHECK
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
@@ -26,7 +27,7 @@ from app.exception import http_exception_handler
 
 from fastapi_csrf_protect import CsrfProtect
 from fastapi import APIRouter, Request
-from app.core.csrf_settings import CsrfSettings
+from app.core.csrf_settings import CsrfSettings, _csrf_tokens_optional
 from app.templates import templates
 from app.routes.admin import admin_router
 # 🔧 NUOVO IMPORT - Router Sites
@@ -62,7 +63,7 @@ except ImportError:
 settings = get_settings()
 app = FastAPI(
     title="Sistema Archeologico Multi-Sito",
-    description="Catalogazione digitale per musei archeologici",
+    description="Catalogazione digitale per siti archeologici",
     version="1.0.0",
     exception_handlers={HTTPException: http_exception_handler}
 )
@@ -188,6 +189,12 @@ async def dashboard_view(
         user = await db.execute(select(User).where(User.id == current_user_id))
         user = user.scalar_one_or_none()
 
+        # Ottieni profilo utente
+        user_profile_result = await db.execute(
+            select(UserProfile).where(UserProfile.user_id == current_user_id)
+        )
+        user_profile = user_profile_result.scalar_one_or_none()
+
         # Calcola conteggio foto reali per tutti i siti accessibili
         photos_count = 0
         users_count = 0
@@ -210,6 +217,9 @@ async def dashboard_view(
             )
             users_count = users_result.scalar() or 0
         
+        # CSRF opzionale
+        csrf_token, signed_token, csrf_instance = _csrf_tokens_optional()
+
         # Context completo per il template
         context = {
             "request": request,
@@ -224,11 +234,20 @@ async def dashboard_view(
             "user_email": user.email if user else None,
             "user_type": "superuser" if user and user.is_superuser else "user",
             "current_site_name": user_sites[0]["name"] if user_sites else None,
-            "current_page": "dashboard"
+            "current_page": "dashboard",
+            "current_user": user,
+            "user_profile": user_profile,
+            "csrf_token": csrf_token
         }
 
         logger.info(f"Dashboard rendered: user_id={current_user_id}, sites={len(user_sites)}")
-        return templates.TemplateResponse("pages/dashboard.html", context)
+        response = templates.TemplateResponse("pages/dashboard.html", context)
+        
+        # Se CSRF disponibile, imposta cookie firmato
+        if csrf_instance and signed_token:
+            csrf_instance.set_csrf_cookie(signed_token, response)
+        
+        return response
         
     except Exception as e:
         logger.error(f"Dashboard error: {str(e)}")
@@ -264,16 +283,6 @@ async def archaeological_dashboard(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore interno dashboard"
         )
-
-def _csrf_tokens_optional():
-    """Prova a generare token CSRF; se non configurato, fallback non bloccante."""
-    try:
-        csrf = CsrfProtect()
-        token, signed = csrf.generate_csrf_tokens()
-        return token, signed, csrf
-    except Exception as e:
-        logger.warning(f"CSRF disabled/fallback: {e}")
-        return "csrf-disabled", None, None
 
 @app.get("/dashboard2", response_class=HTMLResponse)
 async def dashboard_view_csrf(
@@ -428,7 +437,14 @@ async def health_check():
         "multi_site_enabled": getattr(settings, 'site_selection_enabled', True)
     }
 
-# Startup/shutdown
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Chiusura sistema"""
+    museum_name = getattr(settings, 'museum_name', 'Museo Archeologico')
+    logger.info(f"🏺 {museum_name} - Sistema arrestato")
+
 @app.on_event("startup")
 async def on_startup():
     """Inizializzazione sistema archeologico"""
@@ -442,8 +458,5 @@ async def on_startup():
         logger.error(f"❌ Errore avvio: {e}")
         raise
 
-@app.on_event("shutdown")
-async def on_shutdown():
-    """Chiusura sistema"""
-    museum_name = getattr(settings, 'museum_name', 'Museo Archeologico')
-    logger.info(f"🏺 {museum_name} - Sistema arrestato")
+
+

@@ -114,3 +114,16 @@ class ProfileBase(BaseModel):
     phone: Optional[str] = Field(None, min_length=0, max_length=15, title="Phone Number")
     company: Optional[str] = Field(None, min_length=0, max_length=100, title="Company")
     user_id: Optional[UUID4] = Field(default_factory=uuid.uuid4, title="User ID")
+
+class ProfileUpdate(BaseModel):
+    """Schema for updating user profile"""
+    model_config = ConfigDict(hide_input_in_errors=True)
+    first_name: Optional[str] = Field(None, title="First Name", min_length=3, max_length=120)
+    last_name: Optional[str] = Field(None, title="Last Name", min_length=3, max_length=120)
+    gender: Optional[str] = Field(None, min_length=3, max_length=10, title="Gender")
+    date_of_birth: Optional[datetime] = Field(None, title="Date of Birth")
+    city: Optional[str] = Field(None, min_length=0, max_length=50, title="City")
+    country: Optional[str] = Field(None, min_length=0, max_length=50, title="Country")
+    address: Optional[str] = Field(None, min_length=0, max_length=255, title="Address")
+    phone: Optional[str] = Field(None, min_length=0, max_length=15, title="Phone Number")
+    company: Optional[str] = Field(None, min_length=0, max_length=100, title="Company")
