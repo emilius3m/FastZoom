@@ -1,335 +1,423 @@
-<p align="center">
-  <img src=app/static/img/logo/logo.jpg width="350">
-</p>
-
-<h1 align="center">FastAPI HTMX</h1>
+# FastZoom
 
 <p align="center">
-  Web App providing boilerplate implementation for user management, roles, groups, and CRUD operations using  HTMX, FastAPI and AlpineJS for rapid prototyping and without worrying for the user management.
+  <img src="app/static/img/logo/logo.jpg" width="350">
 </p>
+
+## Overview
+
+FastZoom is a modern web application built with FastAPI, designed for managing archaeological sites and artifacts. It allows users to upload high-resolution photos, organize them by site, and view them with deep zoom capabilities using OpenSeadragon. The app supports user authentication, role-based permissions, team management, and secure file storage via MinIO. The frontend leverages HTMX for dynamic interactions, Jinja2 for templating, and Tailwind CSS with Flowbite for styling.
+
+This project provides a robust backend for archaeological documentation, enabling collaborative workflows for teams to annotate, search, and share site photos and data.
 
 ## External Libraries Used
 
-This project leverages several external libraries to provide a robust and efficient solution. Below is a brief description of each library along with a link to their documentation:
+- [FastAPI](https://fastapi.tiangolo.com/) (^0.115.0): High-performance web framework for APIs and HTML responses.
+- [SQLAlchemy](https://www.sqlalchemy.org/) (^2.0.0): ORM and SQL toolkit for database interactions.
+- [Alembic](https://alembic.sqlalchemy.org/) (^1.13.0): Database migration tool.
+- [Pydantic](https://docs.pydantic.dev/) (^2.8.0): Data validation and serialization.
+- [Jinja2](https://jinja.palletsprojects.com/) (^3.1.0): Templating engine for HTML.
+- [HTMX](https://htmx.org/) (via CDN): Enables AJAX, CSS Transitions, WebSockets without JavaScript.
+- [Alpine.js](https://alpinejs.dev/) (via CDN): Lightweight JavaScript for interactivity.
+- [OpenSeadragon](https://openseadragon.github.io/) (minified JS): Deep zoom image viewer for high-res photos.
+- [MinIO](https://min.io/) (Python client): Object storage for photos and deep zoom tiles.
+- [Uvicorn](https://www.uvicorn.org/) (^0.30.0): ASGI server.
+- [Passlib](https://passlib.readthedocs.io/) (^1.7.0): Password hashing.
+- [python-multipart](https://github.com/encode/python-multipart) (^0.0.9): Form data parsing for uploads.
+- [Pillow](https://pillow.readthedocs.io/) (^10.0.0): Image processing for thumbnails and tiles.
 
-- [FastAPI](https://fastapi.tiangolo.com/) (^0.115.14): A modern, fast (high-performance), web framework for building APIs and serving HTML templates with Python 3.6+ based on standard Python type hints.
-- [SQLAlchemy](https://www.sqlalchemy.org/) (^2.0.41): The Python SQL toolkit and Object Relational Mapper that gives application developers the full power and flexibility of SQL.
-- [FastAPI Users](https://fastapi-users.github.io/fastapi-users/) (^14.0.1): Ready-to-use and customizable users management for FastAPI.
-- [Uvicorn](https://www.uvicorn.org/) (^0.35.0): A lightning-fast ASGI server implementation, using `uvloop` and `httptools`.
-- [Jinja2](https://palletsprojects.com/p/jinja/) (^3.1.6): A modern and designer-friendly templating language for Python.
-- [NH3](https://github.com/Th3Whit3Wolf/nh3) (^0.2.21): A Python binding to the HTML sanitizer `h3`.
-- [Alembic](https://alembic.sqlalchemy.org/en/latest/) (^1.16.2): A lightweight database migration tool for usage with the SQLAlchemy Database Toolkit.
-- [AlpineJS](https://alpinejs.dev/) (loaded from CDN): A rugged, minimal framework for composing JavaScript behavior in your HTML templates.
-- [Flowbite](https://flowbite.com/) (loaded from CDN): A component library built on top of Tailwind CSS for building modern web interfaces.
-- [Pydantic](https://docs.pydantic.dev/2.0/) (^2.11.7): Data validation and settings management using Python type annotations.
+Dependencies are managed via Poetry (`pyproject.toml` and `poetry.lock`).
 
-## Features Implemented
+## Features
 
-- User Authentication and Authorization
-- Role Management
-- Group Management
-- Dashboard for managing users, roles, and groups
-- RESTful API endpoints for CRUD operations
-- HTML templates for the web interface
-- Database migrations with Alembic
-- Unified error handling approach.
-
-## Troubleshooting and Maintenance
-
-### Thumbnail Issues Resolution
-
-**Problem**: Photo thumbnails were returning 404 errors, preventing images from displaying properly in the web interface.
-
-**Root Cause**: The database contained photos with broken thumbnail paths (set to `None` or invalid paths like `thumbnails/None.jpg`) due to failed thumbnail generation during photo uploads.
-
-**Solutions Implemented**:
-
-1. **Fixed Thumbnail Generation Logic** (`app/services/photo_service.py`):
-   - Improved error handling in thumbnail generation
-   - Better logging for debugging thumbnail issues
-
-2. **Created Thumbnail Regeneration Script** (`scripts/regenerate_thumbnails.py`):
-   - Automatically finds photos with broken thumbnail paths
-   - Fixes invalid paths (like `None.jpg`)
-   - Regenerates thumbnails from original files
-   - Updates database with correct thumbnail paths
-
-3. **Added Fallback Thumbnail Mechanism** (`app/routes/sites_router.py`):
-   - Photos without thumbnails show a placeholder image instead of 404
-   - Graceful degradation maintains UI functionality
-   - Uses `app/static/img/logo/None_thumb.jpg` as fallback
-
-**Usage**:
-
-To regenerate thumbnails for existing photos with broken paths:
-
-```bash
-python scripts/regenerate_thumbnails.py
-```
-
-**Current Status**:
-- ✅ Thumbnail routes properly implemented
-- ✅ Fallback mechanism for missing thumbnails
-- ✅ Script available for regenerating existing thumbnails
-- ✅ Error handling improved in thumbnail generation
-
-**Database Status** (as of last run):
-- 5 photos with broken thumbnail paths identified
-- 3 photos with invalid paths (fixed)
-- 2 photos with `None` paths (using fallback thumbnails)
-
-## To-Do (Future Enhancements)
-
-- 🎨 Implement Theming using Flowbite and Tailwind
-- 🚦 Implement a rate limiter to prevent abuse and ensure fair usage
-- ✅ 📦 Integrate MinIO object storage for efficient file saving and management **[Completed]**
-- 🔑 Add functionality to allow users to update their passwords
-- 🔄 Implement a password reset feature on the login page
-- ⚡ Implement rendering of blocks using FastAPI Fragment instead of reloading complete page or partials **[In Progress]**
-- 📝 Develop a logging service to track and analyze user activity
-- ✅ 🛡️ Implement CSRF protection to enhance security **[Completed]**
-- 💾 Integrate Neon database (SQLite) for production use **[In Progress]**
-- ✅ 🎨 Replace HyperScript code with Alpine JS **[Completed]**
-- ✅ 🚀 Boilerplate code to work with Python 12 and HTMX 2 **[Completed]**
-- ✅ 📱 Fixing the GUI issues appearing in mobile view **[Completed]**
-- 🧪 Add more tests
-- 🔧 Wrapper to handle the pydantic models inputs efficiently from front end **[In Progress]**
+- **User Management**: Registration, login, password updates, profiles, and admin controls.
+- **Role and Permissions**: Custom roles with granular permissions for sites and photos.
+- **Site Management**: Create, edit, and organize archaeological sites with teams and user assignments.
+- **Photo Upload and Storage**: Secure uploads to MinIO, automatic thumbnail generation, and deep zoom pyramid creation (DZI format).
+- **Deep Zoom Viewing**: Interactive photo viewer with zoom, pan, rotate, and annotation support using OpenSeadragon.
+- **Search and Filtering**: API endpoints for searching photos, sites, and artifacts.
+- **Admin Dashboard**: Manage users, sites, roles, and permissions via intuitive interfaces.
+- **Team Collaboration**: Invite users to sites, manage group permissions.
+- **Security**: CSRF protection, JWT authentication, rate limiting prepared.
+- **Responsive UI**: Mobile-friendly design with themes and modals for uploads/edits.
+- **API Endpoints**: RESTful APIs for CRUD on users, sites, photos, etc.
+- **Database Migrations**: Alembic for schema evolution.
 
 ## Demo
 
 <p align="center">
-  <img src=app/static/img/logo/FastAPI-HTMX.gif>
+  <img src="app/static/img/logo/FastAPI-HTMX.gif" alt="FastAPI HTMX Demo">
 </p>
 
-## Admin Login Credential
+(Note: GIF shows core HTMX interactions; actual app includes deep zoom and site-specific features.)
 
-- **email:** superuser@admin.com
-- **password:** password123
+## Admin Login Credentials
+
+- **Email**: superuser@admin.com
+- **Password**: password123
+
+Use these to access the admin dashboard after setup.
 
 ## Quick Setup Using PowerShell Script
 
-For Windows users, you can use the provided `setup.ps1` script to automate the setup and management of your FastAPI-HTMX project. This script covers all essential project operations.
+For Windows, use `setup.ps1` to automate setup.
 
-### Available Commands
+### Commands
 
-| Command     | Description                         |
-| ----------- | ----------------------------------- |
-| setup       | Complete project setup              |
-| install     | Install dependencies only           |
-| env         | Create .env file                    |
-| migrate     | Run database migrations             |
-| init-db     | Initialize database with migrations |
-| run         | Start the application               |
-| run-dev     | Start in development mode           |
-| credentials | Show admin login credentials        |
-| status      | Show project status                 |
-| clean       | Clean up generated files            |
+| Command      | Description                     |
+|--------------|---------------------------------|
+| setup        | Full project initialization     |
+| install      | Install dependencies            |
+| env          | Generate .env file              |
+| migrate      | Run Alembic migrations          |
+| init-db      | Initialize database             |
+| run          | Start production server         |
+| run-dev      | Start with auto-reload          |
+| credentials  | Display admin credentials       |
+| status       | Check project status            |
+| clean        | Clean temporary files           |
 
 ### Usage
 
-1. **Open PowerShell** and navigate to your project directory:
-   ```powershell
-   cd "C:\Users\mahmad\Desktop\Coding\FastAPI-HTMX"
+1. Open PowerShell in the project directory:
    ```
-2. **Run a command** (for example, to set up the project):
-   ```powershell
+   cd "C:\Users\E3M\OneDrive - beniculturali.it\Desktop\FastZoom"
+   ```
+
+2. Run a command, e.g.:
+   ```
    .\setup.ps1 setup
    ```
-   Or to start the application:
-   ```powershell
-   .\setup.ps1 run
+
+   Or start the app:
+   ```
+   .\setup.ps1 run-dev
    ```
 
----
+## Manual Setup
 
-## Manual Setup Procedure
+### Prerequisites
 
-You can also set up and manage the project manually using the following steps:
+- Python 3.12+
+- MinIO server (local or cloud) for storage.
+- PostgreSQL/SQLite for database (SQLite for dev).
 
-### Creating the `.env` File
+### Steps
 
-Create a `.env` file in the root directory of the project and add the following environment variables:
-
-```
-# Database Configuration
-DATABASE_URL="sqlite+aiosqlite:///./users.db"
-SECRET_KEY="super-secret-key-example-123456789"
-
-# MinIO Configuration (Required for file uploads)
-MINIO_URL="http://localhost:9000"
-MINIO_ACCESS_KEY="minioadmin123456789"
-MINIO_SECRET_KEY="miniosecret987654321xyz"
-MINIO_BUCKET="my-fastapi-bucket"
-MINIO_SECURE=false
-
-# CSRF Protection
-CSRF_SECRET_KEY="csrf-secret-key-example-987654321"
-COOKIE_SAMESITE="lax"
-COOKIE_SECURE=true
-```
-
-Replace `your_secret_key` with a strong secret key for your application.
-
-**Note:** While using sample MinIO credentials will allow the database to record file uploads, the actual files won't be stored without valid MinIO server credentials. For full file storage functionality, set up a MinIO server or use valid MinIO service credentials.
-
-### Running the Project
-
-1. **Clone the repository:**
-
-   ```sh
-   git clone https://github.com/yourusername/project-management.git
-   cd project-management
+1. **Clone/Navigate**:
+   ```
+   git clone <repo-url>
+   cd FastZoom
    ```
 
-2. **Install dependencies:**
-   If you are using `poetry`, run:
-
-   ```sh
+2. **Install Dependencies**:
+   ```
    poetry install
    ```
-
-   If you are using `pip`, run:
-
-   ```sh
+   Or with pip:
+   ```
    pip install -r requirements.txt
    ```
 
-3. **Run database migrations:**
+3. **Environment Configuration**:
 
-   ```sh
+   Create `.env` in the root:
+   ```
+   # Database
+   DATABASE_URL=sqlite+aiosqlite:///./fastzoom.db
+
+   # JWT/Security
+   SECRET_KEY=your-super-secret-key-change-me
+   CSRF_SECRET_KEY=your-csrf-secret-key-change-me
+
+   # MinIO Storage
+   MINIO_URL=http://localhost:9000
+   MINIO_ACCESS_KEY=minioadmin
+   MINIO_SECRET_KEY=minioadmin
+   MINIO_BUCKET=fastzoom-bucket
+   MINIO_SECURE=false
+
+   # App
+   COOKIE_SAMESITE=lax
+   COOKIE_SECURE=false  # Set true for HTTPS
+   ```
+
+   **MinIO Setup**: Run MinIO locally (`minio server /data`) and create the bucket.
+
+4. **Database Migrations**:
+   ```
    alembic upgrade head
    ```
 
-4. **Run database migrations:**
-
-   ```sh
-   alembic revision --autogenerate -m "Initial migration"
+5. **Run the Application**:
+   ```
+   poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
 
-5. **Insert Required import in Migration File:**
+6. **Access**: Open http://localhost:8000 in your browser.
 
-   After generating the initial migration, open the newly created revision file in app/migrations/versions/ and add the following imports at the top of the file:
+### Updating Models for Migrations
 
-   ```sh
-   import fastapi_users_db_sqlalchemy.generics
-   import app.models.groups
-   ```
+When adding new models in `app/models/`:
 
-6. **Apply the changes:**
-
-   ```sh
-   alembic upgrade head
-   ```
-
-7. **Start the application:**
-   If you are using `poetry`, run:
-
-   ```sh
-   poetry run python main.py
-   ```
-
-   If you are using `uvicorn` directly, run:
-
-   ```sh
-   uvicorn main:app --reload
-   ```
-
-8. **Access the application:**
-   Open your web browser and navigate to `http://127.0.0.1:8080`.
-
-## Updating Model References in `init_models`
-
-When you define a new **Database model** in your application, it's essential to update the `init_models` function to ensure that Alembic can detect and generate migrations for this new model correctly. This step is crucial for maintaining the integrity of your database schema and ensuring that all models are correctly versioned.
-
-### Steps to Update `init_models`
-
-1. **Locate `init_models` Function**: Open the `base.py` file in `app/database/base.py`. This file contains the `init_models` function, which is responsible for importing all the models in your application.
-
-2. **Add New Model Import**: Once you have defined a new model in your application, you need to import it in the `init_models` function. Ensure that you follow the existing import structure. For example, if your new model is `Invoice` and it's located in the `models.financial` module, you would add the following line:
-
+1. Import in `app/database/base.py` `init_models()`:
    ```python
-   from ..models.financial import Invoice  # noqa: F401
+   from ..models.new_model import NewModel  # noqa: F401
    ```
 
-   The `# noqa: F401` comment at the end of the import statement tells the linter to ignore the "imported but unused" warning, as the import is necessary for Alembic to detect and generate migrations for the model.
-
-3. **Follow Import Conventions**: If you have multiple models in the same module, you can import them in a single line to keep the `init_models` function organized. For example:
-
-   ```python
-   from ..models.financial import Invoice, Payment, Transaction  # noqa: F401
+2. Generate migration:
+   ```
+   alembic revision --autogenerate -m "Add new model"
    ```
 
-4. **Save Changes**: After adding the import statement for your new model, save the changes to the `base.py` file.
-
-5. **Generate Alembic Migration**: With the new model imported in the `init_models` function, you can now generate an Alembic migration script that includes this model. Run the Alembic command to autogenerate a migration:
-
-   ```bash
-   alembic revision --autogenerate -m "Added new model Invoice"
+3. Review and apply:
    ```
-
-6. **Review and Apply Migration**: Always review the generated migration script to ensure it accurately represents the changes to your models. After reviewing, apply the migration to update your database schema:
-
-   ```bash
    alembic upgrade head
    ```
 
 ## Project Structure
 
-Below is an overview of the project structure for application. This structure is designed to organize the application's components logically, making it easier to navigate and maintain.
-
-```bash
-FastAPI-HTMX/
+```
+FastZoom/
 ├── app/
-│ ├── core/             # Core application logic and utilities
-│ │ ├── config.py         # Application configuration
-│ │ └── security.py       # Security utilities
-│ ├── database/         # Database configurations and connections
-│ │ ├── base.py           # Base database setup
-│ │ └── session.py        # Database session management
-│ ├── migrations/         # Alembic migration scripts
-│ ├── models/           # SQLAlchemy ORM models
-│ │ ├── groups.py         # Group model definitions
-│ │ ├── roles.py          # Role model definitions
-│ │ └── users.py          # User model definitions
-│ ├── routes/           # API route definitions
-│ │ ├── api/
-│ │ │ ├── auth.py         # Authentication endpoints
-│ │ │ └── users.py        # User management endpoints
-│ │ └── view/           # View routes for web interface
-│ │   ├── group.py        # Group management views
-│ │   ├── role.py         # Role management views
-│ │   └── view_crud.py    # SQLAlchemyCRUD class
-│ ├── schema/           # Pydantic schemas
-│ │ ├── group.py          # Group schemas
-│ │ ├── role.py           # Role schemas
-│ │ └── user.py           # User schemas
-│ ├── static/           # Static files
-│ │ ├── css/              # Stylesheets
-│ │ ├── js/               # JavaScript files
-│ │ └── img/              # Images and assets
-│ └── templates/        # Jinja2 HTML templates
-│   ├── auth/             # Authentication templates
-│   ├── components/       # Reusable components
-│   └── partials/         # Partial templates
-├── tests/              # Unit and integration tests
-├── .env                # Environment variables
-├── alembic.ini         # Alembic configuration
-├── main.py             # Application entry point
-├── poetry.lock         # Poetry dependencies lock
-├── pyproject.toml      # Project configuration
-└── README.md           # Project documentation
+│   ├── core/              # Config, security, permissions
+│   ├── database/          # DB session, base, migrations
+│   ├── models/            # SQLAlchemy models (users, sites, photos, etc.)
+│   ├── routes/            # API and view routes (admin, sites, photos)
+│   ├── schema/            # Pydantic schemas
+│   ├── services/          # Business logic (photo, site, MinIO, deep zoom)
+│   ├── static/            # CSS, JS (OpenSeadragon, HTMX), images
+│   └── templates/         # Jinja2 HTML (sites, photos, admin, modals)
+├── alembic/               # Migration versions
+├── tests/                 # Unit tests
+├── main.py                # App entrypoint
+├── pyproject.toml         # Poetry config
+├── alembic.ini
+├── setup.ps1              # Windows setup script
+└── README.md
 ```
 
 ## ER Diagram
 
-Here's the Entity-Relationship (ER) diagram for database:
+```mermaid
+erDiagram
+    USER {
+        UUID id PK
+        string email UK
+        string hashed_password
+        boolean is_active
+        boolean is_superuser
+        boolean is_verified
+        string first_name
+        string last_name
+        datetime created_at
+        datetime updated_at
+        datetime last_login
+        UUID role_id FK
+        UUID profile_id FK
+    }
+    USER_PROFILE {
+        UUID id PK
+        string first_name
+        string last_name
+        string gender
+        datetime date_of_birth
+        string phone
+        string city
+        string country
+        string address
+        string company
+        string specialization
+        string institution
+        string academic_title
+        text bio
+    }
+    ROLE {
+        UUID id PK
+        string role_name UK
+        string role_desc
+        boolean can_create_sites
+        boolean can_manage_users
+        boolean can_export_data
+        boolean can_access_admin
+    }
+    ARCHAEOLOGICAL_SITE {
+        UUID id PK
+        string name UK
+        string code UK
+        string location
+        string region
+        string province
+        text description
+        string historical_period
+        string site_type
+        string coordinates_lat
+        string coordinates_lng
+        string municipality
+        string research_status
+        boolean is_active
+        boolean is_public
+        datetime created_at
+        datetime updated_at
+    }
+    USER_SITE_PERMISSION {
+        UUID id PK
+        UUID user_id FK
+        UUID site_id FK
+        enum permission_level
+        UUID assigned_by FK
+        boolean is_active
+        text notes
+        datetime created_at
+        datetime updated_at
+        datetime expires_at
+    }
+    PHOTO {
+        UUID id PK
+        string filename
+        string original_filename
+        string file_path
+        int file_size
+        string mime_type
+        int width
+        int height
+        int dpi
+        string color_profile
+        string thumbnail_path
+        string title
+        text description
+        text keywords
+        enum photo_type
+        string photographer
+        datetime photo_date
+        string camera_model
+        string lens
+        string inventory_number
+        string old_inventory_number
+        string catalog_number
+        string excavation_area
+        string stratigraphic_unit
+        string grid_square
+        float depth_level
+        datetime find_date
+        string finder
+        string excavation_campaign
+        enum material
+        string material_details
+        string object_type
+        string object_function
+        float length_cm
+        float width_cm
+        float height_cm
+        float diameter_cm
+        float weight_grams
+        string chronology_period
+        string chronology_culture
+        int dating_from
+        int dating_to
+        text dating_notes
+        enum conservation_status
+        text conservation_notes
+        text restoration_history
+        text bibliography
+        text comparative_references
+        text external_links
+        text exif_data
+        text iptc_data
+        string copyright_holder
+        string license_type
+        text usage_rights
+        boolean is_published
+        boolean is_validated
+        text validation_notes
+        UUID validated_by FK
+        datetime validated_at
+        UUID site_id FK
+        UUID uploaded_by FK
+        boolean has_deep_zoom
+        string deep_zoom_status
+        int deep_zoom_levels
+        int deep_zoom_tile_count
+        datetime deep_zoom_processed_at
+    }
+    PHOTO_MODIFICATION {
+        UUID id PK
+        UUID photo_id FK
+        UUID modified_by FK
+        string modification_type
+        string field_changed
+        text old_value
+        text new_value
+        text notes
+    }
+    USER_ACTIVITY {
+        UUID id PK
+        UUID user_id FK
+        datetime activity_date
+        string activity_type
+        string activity_desc
+        UUID site_id FK
+        UUID photo_id
+        string ip_address
+        text user_agent
+        text extra_data
+    }
+    TOKEN_BLACKLIST {
+        UUID id PK
+        string token_jti UK
+        UUID user_id FK
+        datetime invalidated_at
+        string reason
+    }
 
-![ER Diagram](app/static/img/logo/er_diagram.png)
+    USER ||--|| USER_PROFILE : "has (1:1)"
+    USER }o--|| ROLE : "assigned (N:1)"
+    USER ||--o{ USER_SITE_PERMISSION : "has (1:N)"
+    ARCHAEOLOGICAL_SITE ||--o{ USER_SITE_PERMISSION : "has (1:N)"
+    USER ||--o{ USER_SITE_PERMISSION : "assigned_by (N:1)"
+    ARCHAEOLOGICAL_SITE ||--o{ PHOTO : "contains (1:N)"
+    USER ||--o{ PHOTO : "uploads (1:N)"
+    USER ||--o{ PHOTO : "validates (1:N)"
+    PHOTO ||--o{ PHOTO_MODIFICATION : "has (1:N)"
+    USER ||--o{ PHOTO_MODIFICATION : "performs (1:N)"
+    USER ||--o{ USER_ACTIVITY : "performs (1:N)"
+    ARCHAEOLOGICAL_SITE ||--o{ USER_ACTIVITY : "on (1:N)"
+    PHOTO ||--o{ USER_ACTIVITY : "on (1:N)"
+    USER ||--o{ TOKEN_BLACKLIST : "has (1:N)"
+```
+
+The diagram illustrates relationships between Users, Profiles, Roles, Sites, Permissions, Photos, Modifications, Activities, and Token Blacklist. Key: PK=Primary Key, FK=Foreign Key, UK=Unique Key.
+
+## Troubleshooting
+
+### Photo Thumbnails and Deep Zoom
+
+- **Issue**: Missing thumbnails or DZI tiles (404 errors).
+- **Cause**: Failed generation during upload or invalid MinIO paths.
+- **Fix**:
+  - Ensure MinIO is running and bucket accessible.
+  - Run thumbnail regeneration if needed (custom script available in services).
+  - Fallback images used for missing assets.
+- **Deep Zoom**: Tiles generated on upload; viewer in `photo_modal.html` uses OpenSeadragon.
+
+### MinIO Integration
+
+- Verify credentials in `.env`.
+- Test bucket access: `mc mb myminio/fastzoom-bucket` (using MinIO client).
+
+## To-Do (Future Enhancements)
+
+- Implement artifact annotation and metadata editing.
+- Add search enhancements for photos/artifacts.
+- Integrate Neon/PostgreSQL for production DB.
+- Rate limiting and advanced logging.
+- Mobile app optimizations.
+- More comprehensive tests.
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request for any changes.
+Contributions welcome! Fork the repo, create a branch, and submit a PR. Ensure tests pass and follow PEP 8.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT License. See [LICENSE](LICENSE) for details.
