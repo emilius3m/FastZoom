@@ -10,31 +10,31 @@
 
     </div>
   </div>
-<div class="max-w-7xl mx-auto p-6" x-data="sitesList">
+<div class="max-w-7xl mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="sitesList">
     <!-- Page Header -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div class="px-6 py-4 border-b border-gray-200">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         Gestione Siti Archeologici
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600">
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         Amministra i siti del sistema archeologico e i relativi utenti autorizzati
                     </p>
                 </div>
                 <div class="flex items-center space-x-3 mt-4 sm:mt-0">
                     <!-- Export Button -->
-                    <button @click="exportSites" 
-                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <button @click="exportSites"
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         Esporta
                     </button>
-                    
+
                     <!-- New Site Button -->
-                    <a href="/admin/sites/new/" 
+                    <a href="/admin/sites/new/"
                        class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -47,12 +47,12 @@
     </div>
 
     <!-- Success/Error Messages -->
-    <div x-show="showAlert" 
+    <div x-show="showAlert"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0 transform translate-y-2"
          x-transition:enter-end="opacity-100 transform translate-y-0"
-         class="mb-6 p-4 rounded-lg border" 
-         :class="alertType === 'success' ? 'text-green-800 bg-green-100 border-green-200' : 'text-red-800 bg-red-100 border-red-200'"
+         class="mb-6 p-4 rounded-lg border"
+         :class="alertType === 'success' ? 'text-green-800 dark:text-green-300 bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-700' : 'text-red-800 dark:text-red-300 bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-700'"
          role="alert">
         <div class="flex items-center">
             <svg x-show="alertType === 'success'" class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -66,34 +66,34 @@
     </div>
 
     <!-- Filters and Search -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <!-- Search -->
                 <div class="md:col-span-2">
-                    <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Cerca</label>
+                    <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cerca</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
                         </div>
-                        <input type="text" 
+                        <input type="text"
                                id="search"
                                x-model="searchTerm"
                                @input="filterSites"
-                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                                placeholder="Cerca per nome, codice, ubicazione...">
                     </div>
                 </div>
 
                 <!-- Region Filter -->
                 <div>
-                    <label for="regionFilter" class="block text-sm font-medium text-gray-700 mb-2">Regione</label>
-                    <select id="regionFilter" 
+                    <label for="regionFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Regione</label>
+                    <select id="regionFilter"
                             x-model="regionFilter"
                             @change="filterSites"
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                         <option value="">Tutte le regioni</option>
                         <template x-for="region in availableRegions" :key="region">
                             <option :value="region" x-text="region"></option>
@@ -103,11 +103,11 @@
 
                 <!-- Status Filter -->
                 <div>
-                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-2">Stato</label>
-                    <select id="statusFilter" 
+                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stato</label>
+                    <select id="statusFilter"
                             x-model="statusFilter"
                             @change="filterSites"
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                         <option value="">Tutti</option>
                         <option value="active">Attivi</option>
                         <option value="inactive">Inattivi</option>
@@ -117,43 +117,43 @@
             </div>
 
             <!-- Quick Stats -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-6 border-t border-gray-200">
-                <div class="text-center">
+            <div class="flex flex-wrap items-center justify-center gap-6 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div class="flex items-center space-x-2">
                     <div class="text-2xl font-bold text-blue-600" x-text="stats.total"></div>
-                    <div class="text-sm text-gray-600">Totale Siti</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Totale</div>
                 </div>
-                <div class="text-center">
+                <div class="flex items-center space-x-2">
                     <div class="text-2xl font-bold text-green-600" x-text="stats.active"></div>
-                    <div class="text-sm text-gray-600">Attivi</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Attivi</div>
                 </div>
-                <div class="text-center">
+                <div class="flex items-center space-x-2">
                     <div class="text-2xl font-bold text-purple-600" x-text="stats.public"></div>
-                    <div class="text-sm text-gray-600">Pubblici</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Pubblici</div>
                 </div>
-                <div class="text-center">
+                <div class="flex items-center space-x-2">
                     <div class="text-2xl font-bold text-orange-600" x-text="stats.withUsers"></div>
-                    <div class="text-sm text-gray-600">Con Utenti</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Con Utenti</div>
                 </div>
-                <div class="text-center">
+                <div class="flex items-center space-x-2">
                     <div class="text-2xl font-bold text-red-600" x-text="stats.withPhotos"></div>
-                    <div class="text-sm text-gray-600">Con Foto</div>
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Con Foto</div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Sites Table -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div class="px-6 py-4 border-b border-gray-200">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div class="flex justify-between items-center">
-                <h2 class="text-lg font-semibold text-gray-900">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                     Siti Archeologici (<span x-text="filteredSites.length"></span>)
                 </h2>
-                <div class="flex items-center space-x-2 text-sm text-gray-500">
+                <div class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                     <span>Mostra:</span>
-                    <select x-model.number="pageSize" 
+                    <select x-model.number="pageSize"
                             @change="currentPage = 1"
-                            class="border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500">
+                            class="border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                         <option value="10">10</option>
                         <option value="25">25</option>
                         <option value="50">50</option>
@@ -175,11 +175,11 @@
 
         <!-- Table -->
         <div x-show="!isLoading" class="overflow-x-auto">
-            <table class="w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+            <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th @click="setSortBy('name')" 
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                        <th @click="setSortBy('name')"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                             <div class="flex items-center space-x-1">
                                 <span>Sito</span>
                                 <svg x-show="sortBy === 'name'" class="w-4 h-4" :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -187,16 +187,16 @@
                                 </svg>
                             </div>
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Codice</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ubicazione</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Regione</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stato</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utenti</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Foto</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Azioni</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Codice</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ubicazione</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Regione</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Stato</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Utenti</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Foto</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Azioni</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     <!-- Empty State -->
                     <tr x-show="paginatedSites.length === 0">
                         <td colspan="8" class="px-6 py-12 text-center">
@@ -204,13 +204,13 @@
                                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                                 </svg>
-                                <h3 class="mt-2 text-sm font-medium text-gray-900">Nessun sito trovato</h3>
-                                <p class="mt-1 text-sm text-gray-500">
+                                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Nessun sito trovato</h3>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                     <span x-show="searchTerm || regionFilter || statusFilter">Prova a modificare i filtri di ricerca.</span>
                                     <span x-show="!searchTerm && !regionFilter && !statusFilter">Inizia creando il primo sito archeologico del sistema.</span>
                                 </p>
                                 <div class="mt-6">
-                                    <a href="/admin/sites/new/" 
+                                    <a href="/admin/sites/new/"
                                        class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                         <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -224,7 +224,7 @@
 
                     <!-- Site Rows -->
                     <template x-for="site in paginatedSites" :key="site.id">
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <!-- Site Info -->
                             <td class="px-6 py-4">
                                 <div class="flex items-center">
@@ -234,44 +234,44 @@
                                         </div>
                                     </div>
                                     <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900" x-text="site.name"></div>
-                                        <div class="text-sm text-gray-500" x-text="site.historical_period || 'Periodo non specificato'"></div>
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="site.name"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="site.historical_period || 'Periodo non specificato'"></div>
                                     </div>
                                 </div>
                             </td>
 
                             <!-- Code -->
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800" x-text="site.code"></span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300" x-text="site.code"></span>
                             </td>
 
                             <!-- Location -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                 <span x-text="site.location || 'Non specificata'"></span>
                             </td>
 
                             <!-- Region -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 <span x-text="site.region || 'N/A'"></span>
                             </td>
 
                             <!-- Status -->
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex flex-col space-y-1">
-                                    <span x-show="site.is_active" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <span x-show="site.is_active" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300">
                                         Attivo
                                     </span>
-                                    <span x-show="!site.is_active" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <span x-show="!site.is_active" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300">
                                         Inattivo
                                     </span>
-                                    <span x-show="site.is_public" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    <span x-show="site.is_public" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300">
                                         Pubblico
                                     </span>
                                 </div>
                             </td>
 
                             <!-- Users Count -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                 <div class="flex items-center">
                                     <svg class="w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -281,7 +281,7 @@
                             </td>
 
                             <!-- Photos Count -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                 <div class="flex items-center">
                                     <svg class="w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -294,8 +294,8 @@
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <div class="flex items-center justify-end space-x-2">
                                     <!-- View/Edit Button -->
-                                    <a :href="'/admin/sites/' + site.id + '/edit/'" 
-                                       class="text-blue-600 hover:text-blue-900 p-1 rounded-full hover:bg-blue-100"
+                                    <a :href="'/admin/sites/' + site.id + '/edit/'"
+                                       class="text-blue-600 hover:text-blue-900 p-1 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900"
                                        title="Modifica sito">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
@@ -303,8 +303,8 @@
                                     </a>
 
                                     <!-- Users Management -->
-                                    <a :href="'/admin/sites/' + site.id + '/users/'" 
-                                       class="text-purple-600 hover:text-purple-900 p-1 rounded-full hover:bg-purple-100"
+                                    <a :href="'/admin/sites/' + site.id + '/users/'"
+                                       class="text-purple-600 hover:text-purple-900 p-1 rounded-full hover:bg-purple-100 dark:hover:bg-purple-900"
                                        title="Gestisci utenti">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -313,7 +313,7 @@
 
                                     <!-- Toggle Active Button -->
                                     <button @click="toggleSiteStatus(site)"
-                                            :class="site.is_active ? 'text-red-600 hover:text-red-900 hover:bg-red-100' : 'text-green-600 hover:text-green-900 hover:bg-green-100'"
+                                            :class="site.is_active ? 'text-red-600 hover:text-red-900 hover:bg-red-100 dark:hover:bg-red-900' : 'text-green-600 hover:text-green-900 hover:bg-green-100 dark:hover:bg-green-900'"
                                             class="p-1 rounded-full"
                                             :title="site.is_active ? 'Disattiva sito' : 'Attiva sito'">
                                         <svg x-show="site.is_active" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,8 +325,8 @@
                                     </button>
 
                                     <!-- DANGEROUS DELETE Button -->
-                                    <button @click="initiateDangerousDelete(site)" 
-                                            class="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-100"
+                                    <button @click="initiateDangerousDelete(site)"
+                                            class="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900"
                                             title="ELIMINA SITO - OPERAZIONE PERICOLOSA">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -341,33 +341,33 @@
         </div>
 
         <!-- Pagination -->
-        <div x-show="totalPages > 1" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+        <div x-show="totalPages > 1" class="bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6">
             <div class="flex items-center justify-between">
                 <div class="flex-1 flex justify-between sm:hidden">
-                    <button @click="previousPage" 
+                    <button @click="previousPage"
                             :disabled="currentPage === 1"
-                            class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                            class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
                         Precedente
                     </button>
-                    <button @click="nextPage" 
+                    <button @click="nextPage"
                             :disabled="currentPage === totalPages"
-                            class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                            class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
                         Successivo
                     </button>
                 </div>
                 <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                     <div>
-                        <p class="text-sm text-gray-700">
-                            Mostra da <span class="font-medium" x-text="(currentPage - 1) * pageSize + 1"></span> 
-                            a <span class="font-medium" x-text="Math.min(currentPage * pageSize, filteredSites.length)"></span> 
+                        <p class="text-sm text-gray-700 dark:text-gray-300">
+                            Mostra da <span class="font-medium" x-text="(currentPage - 1) * pageSize + 1"></span>
+                            a <span class="font-medium" x-text="Math.min(currentPage * pageSize, filteredSites.length)"></span>
                             di <span class="font-medium" x-text="filteredSites.length"></span> risultati
                         </p>
                     </div>
                     <div>
                         <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                            <button @click="previousPage" 
+                            <button @click="previousPage"
                                     :disabled="currentPage === 1"
-                                    class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
                                 <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
                                 </svg>
@@ -375,15 +375,15 @@
 
                             <template x-for="page in getVisiblePages()" :key="page">
                                 <button @click="currentPage = page"
-                                        :class="page === currentPage ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'"
+                                        :class="page === currentPage ? 'bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-600 dark:text-blue-300' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'"
                                         class="relative inline-flex items-center px-4 py-2 border text-sm font-medium"
                                         x-text="page">
                                 </button>
                             </template>
 
-                            <button @click="nextPage" 
+                            <button @click="nextPage"
                                     :disabled="currentPage === totalPages"
-                                    class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
                                 <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
                                 </svg>
@@ -396,26 +396,26 @@
     </div>
 
     <!-- 🚨 MODAL DI CONFERMA ELIMINAZIONE PERICOLOSA 🚨 -->
-    <div x-show="showDangerModal" 
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50"
-         @click.self="closeDangerModal">
-        
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white">
+    <div x-show="showDangerModal"
+          x-transition:enter="transition ease-out duration-300"
+          x-transition:enter-start="opacity-0"
+          x-transition:enter-end="opacity-100"
+          x-transition:leave="transition ease-in duration-200"
+          x-transition:leave-start="opacity-100"
+          x-transition:leave-end="opacity-0"
+          class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50"
+          @click.self="closeDangerModal">
+
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <!-- Header -->
             <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center">
-                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
                         <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
                         </svg>
                     </div>
-                    <h3 class="text-xl font-bold text-red-600 ml-3">⚠️ ELIMINAZIONE PERICOLOSA ⚠️</h3>
+                    <h3 class="text-xl font-bold text-red-600 dark:text-red-400 ml-3">⚠️ ELIMINAZIONE PERICOLOSA ⚠️</h3>
                 </div>
                 <button @click="closeDangerModal" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -425,7 +425,7 @@
             </div>
 
             <!-- Danger Information -->
-            <div class="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded">
+            <div class="mb-6 p-4 bg-red-50 dark:bg-red-900 border-l-4 border-red-400 rounded">
                 <div class="flex">
                     <div class="flex-shrink-0">
                         <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
@@ -433,8 +433,8 @@
                         </svg>
                     </div>
                     <div class="ml-3">
-                        <h4 class="text-lg font-medium text-red-800">Stai per eliminare definitivamente un sito archeologico</h4>
-                        <div class="mt-2 text-sm text-red-700">
+                        <h4 class="text-lg font-medium text-red-800 dark:text-red-300">Stai per eliminare definitivamente un sito archeologico</h4>
+                        <div class="mt-2 text-sm text-red-700 dark:text-red-200">
                             <p><strong>Sito:</strong> <span x-text="siteToDelete?.name"></span> (<span x-text="siteToDelete?.code"></span>)</p>
                             <p><strong>Ubicazione:</strong> <span x-text="siteToDelete?.location || 'Non specificata'"></span></p>
                         </div>
@@ -443,9 +443,9 @@
             </div>
 
             <!-- Data Warning -->
-            <div x-show="siteToDelete?.users_count > 0 || siteToDelete?.photos_count > 0" class="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <h4 class="text-lg font-semibold text-yellow-800 mb-2">🚨 ATTENZIONE: Dati collegati rilevati</h4>
-                <ul class="list-disc list-inside text-yellow-700 space-y-1">
+            <div x-show="siteToDelete?.users_count > 0 || siteToDelete?.photos_count > 0" class="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                <h4 class="text-lg font-semibold text-yellow-800 dark:text-yellow-300 mb-2">🚨 ATTENZIONE: Dati collegati rilevati</h4>
+                <ul class="list-disc list-inside text-yellow-700 dark:text-yellow-200 space-y-1">
                     <li x-show="siteToDelete?.users_count > 0">
                         <strong x-text="siteToDelete?.users_count"></strong> utenti hanno permessi su questo sito
                     </li>
@@ -453,32 +453,32 @@
                         <strong x-text="siteToDelete?.photos_count"></strong> fotografie sono collegate a questo sito
                     </li>
                 </ul>
-                <p class="mt-3 text-sm font-semibold text-yellow-800">
+                <p class="mt-3 text-sm font-semibold text-yellow-800 dark:text-yellow-300">
                     L'eliminazione del sito comporterà la perdita permanente di tutti questi dati!
                 </p>
             </div>
 
             <!-- Password Confirmation Form -->
             <div class="mb-6">
-                <div class="bg-gray-50 p-4 rounded-lg border">
-                    <h4 class="font-semibold text-gray-900 mb-3">Conferma con password amministratore</h4>
-                    <p class="text-sm text-gray-600 mb-4">
+                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <h4 class="font-semibold text-gray-900 dark:text-white mb-3">Conferma con password amministratore</h4>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
                         Per procedere con l'eliminazione, inserisci la tua password di amministratore:
                     </p>
-                    
+
                     <div class="space-y-4">
                         <div>
-                            <label for="admin_password" class="block text-sm font-medium text-gray-700 mb-2">
+                            <label for="admin_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Password Amministratore *
                             </label>
                             <div class="relative">
-                                <input type="password" 
-                                       id="admin_password"
-                                       x-model="confirmPassword"
-                                       @input="passwordError = ''"
-                                       class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
-                                       placeholder="Inserisci la tua password..."
-                                       required>
+                                <input type="password"
+                                        id="admin_password"
+                                        x-model="confirmPassword"
+                                        @input="passwordError = ''"
+                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-red-500 focus:border-red-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                        placeholder="Inserisci la tua password..."
+                                        required>
                                 <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
                                     <svg class="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
@@ -491,16 +491,16 @@
                         <!-- Confirmation Checkbox -->
                         <div class="flex items-start">
                             <div class="flex items-center h-5">
-                                <input id="confirm_delete" 
-                                       type="checkbox" 
-                                       x-model="confirmDelete"
-                                       class="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded">
+                                <input id="confirm_delete"
+                                        type="checkbox"
+                                        x-model="confirmDelete"
+                                        class="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded">
                             </div>
                             <div class="ml-3 text-sm">
-                                <label for="confirm_delete" class="font-medium text-gray-900">
+                                <label for="confirm_delete" class="font-medium text-gray-900 dark:text-white">
                                     Confermo di voler eliminare definitivamente questo sito archeologico
                                 </label>
-                                <p class="text-gray-500">Sono consapevole che questa azione non può essere annullata.</p>
+                                <p class="text-gray-500 dark:text-gray-400">Sono consapevole che questa azione non può essere annullata.</p>
                             </div>
                         </div>
                     </div>
@@ -870,5 +870,13 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 });
+
+// Theme management
+if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+}
 </script>
 {% endblock %}
+
+
+
