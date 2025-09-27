@@ -1,0 +1,305 @@
+<!-- templates/sites/components/_metadata_form.html - COMPONENTE RIUTILIZZABILE PER METADATI -->
+<div class="space-y-6" x-data="metadataFormComponent()" x-init="initializeForm()">
+    
+    <!-- Info Notice (only for upload mode) -->
+    <div x-show="formMode === 'upload'" class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex items-center">
+            <svg class="w-5 h-5 text-blue-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+            </svg>
+            <p class="text-sm text-blue-800">
+                <span x-show="formMode === 'upload'">I metadati inseriti saranno applicati a tutte le foto selezionate. Potrai modificarli individualmente dopo il caricamento.</span>
+                <span x-show="formMode === 'edit'">Modifica i metadati di questa foto.</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Metadata Form -->
+    <form @submit.prevent="handleSubmit()" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Archaeological Context -->
+        <div class="md:col-span-2">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Contesto Archeologico</h4>
+        </div>
+
+        <div>
+            <label for="inventory_number" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Numero Inventario
+            </label>
+            <input type="text"
+                   id="inventory_number"
+                   x-model="formData.inventory_number"
+                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   placeholder="es. PMP001/2024">
+        </div>
+
+        <div>
+            <label for="excavation_area" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Area di Scavo
+            </label>
+            <input type="text"
+                   id="excavation_area"
+                   x-model="formData.excavation_area"
+                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   placeholder="es. Area A, Settore 1">
+        </div>
+
+        <div>
+            <label for="stratigraphic_unit" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Unità Stratigrafica
+            </label>
+            <input type="text"
+                   id="stratigraphic_unit"
+                   x-model="formData.stratigraphic_unit"
+                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   placeholder="es. US 145">
+        </div>
+
+        <div>
+            <label for="find_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Data Rinvenimento
+            </label>
+            <input type="date"
+                   id="find_date"
+                   x-model="formData.find_date"
+                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+        </div>
+
+        <!-- Object Details -->
+        <div class="md:col-span-2 mt-6">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Dettagli Oggetto</h4>
+        </div>
+
+        <div>
+            <label for="material" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Materiale
+            </label>
+            <select id="material"
+                    x-model="formData.material"
+                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                <option value="">Seleziona materiale...</option>
+                <option value="ceramica">Ceramica</option>
+                <option value="bronzo">Bronzo</option>
+                <option value="ferro">Ferro</option>
+                <option value="pietra">Pietra</option>
+                <option value="marmo">Marmo</option>
+                <option value="vetro">Vetro</option>
+                <option value="osso">Osso</option>
+                <option value="legno">Legno</option>
+                <option value="oro">Oro</option>
+                <option value="argento">Argento</option>
+                <option value="terracotta">Terracotta</option>
+                <option value="altro">Altro</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="object_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Tipologia Oggetto
+            </label>
+            <input type="text"
+                   id="object_type"
+                   x-model="formData.object_type"
+                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   placeholder="es. vaso, fibula, moneta">
+        </div>
+
+        <div>
+            <label for="chronology_period" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Periodo Cronologico
+            </label>
+            <input type="text"
+                   id="chronology_period"
+                   x-model="formData.chronology_period"
+                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   placeholder="es. Romano Imperiale">
+        </div>
+
+        <div>
+            <label for="conservation_status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Stato di Conservazione
+            </label>
+            <select id="conservation_status"
+                    x-model="formData.conservation_status"
+                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                <option value="">Seleziona stato...</option>
+                <option value="eccellente">Eccellente</option>
+                <option value="buono">Buono</option>
+                <option value="discreto">Discreto</option>
+                <option value="cattivo">Cattivo</option>
+                <option value="frammentario">Frammentario</option>
+                <option value="restaurato">Restaurato</option>
+            </select>
+        </div>
+
+        <!-- Photo Details -->
+        <div class="md:col-span-2 mt-6">
+            <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Dettagli Fotografici</h4>
+        </div>
+
+        <div>
+            <label for="photo_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Tipo Fotografia
+            </label>
+            <select id="photo_type"
+                    x-model="formData.photo_type"
+                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                <option value="">Seleziona tipo...</option>
+                <option value="vista_generale">Vista Generale</option>
+                <option value="dettaglio">Dettaglio</option>
+                <option value="sezione">Sezione</option>
+                <option value="contesto_rinvenimento">Contesto Rinvenimento</option>
+                <option value="pre_restauro">Pre-Restauro</option>
+                <option value="post_restauro">Post-Restauro</option>
+                <option value="laboratorio">Laboratorio</option>
+                <option value="stratigrafia">Stratigrafia</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="photographer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Fotografo
+            </label>
+            <input type="text"
+                   id="photographer"
+                   x-model="formData.photographer"
+                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   placeholder="Nome del fotografo">
+        </div>
+
+        <div class="md:col-span-2">
+            <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Descrizione
+            </label>
+            <textarea id="description"
+                      x-model="formData.description"
+                      rows="3"
+                      class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Descrizione dettagliata delle fotografie..."></textarea>
+        </div>
+
+        <div class="md:col-span-2">
+            <label for="keywords" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Parole Chiave
+            </label>
+            <input type="text"
+                   id="keywords"
+                   x-model="formData.keywords"
+                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   placeholder="ceramica, decorazione, geometrica (separate da virgola)">
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Separate le parole chiave con virgole</p>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('metadataFormComponent', () => ({
+        formMode: 'upload', // 'upload' or 'edit'
+        formData: {
+            inventory_number: '',
+            excavation_area: '',
+            stratigraphic_unit: '',
+            find_date: '',
+            material: '',
+            object_type: '',
+            chronology_period: '',
+            conservation_status: '',
+            photo_type: '',
+            photographer: '',
+            description: '',
+            keywords: ''
+        },
+        
+        // Initialize form with mode and optional data
+        initializeForm() {
+            // Get mode from parent or default to upload
+            const mode = this.$el.getAttribute('data-mode') || 'upload';
+            this.formMode = mode;
+            
+            // If in edit mode, load existing data
+            if (mode === 'edit') {
+                const photoData = this.$el.getAttribute('data-photo');
+                if (photoData) {
+                    try {
+                        const photo = JSON.parse(photoData);
+                        this.loadPhotoData(photo);
+                    } catch (e) {
+                        console.error('Error parsing photo data:', e);
+                    }
+                }
+            }
+        },
+        
+        // Load photo data for editing
+        loadPhotoData(photo) {
+            this.formData = {
+                inventory_number: photo.inventory_number || '',
+                excavation_area: photo.excavation_area || '',
+                stratigraphic_unit: photo.stratigraphic_unit || '',
+                find_date: photo.find_date || '',
+                material: photo.material || '',
+                object_type: photo.object_type || '',
+                chronology_period: photo.chronology_period || '',
+                conservation_status: photo.conservation_status || '',
+                photo_type: photo.photo_type || '',
+                photographer: photo.photographer || '',
+                description: photo.description || '',
+                keywords: Array.isArray(photo.tags) ? photo.tags.join(', ') : (photo.keywords || '')
+            };
+        },
+        
+        // Reset form data
+        resetForm() {
+            this.formData = {
+                inventory_number: '',
+                excavation_area: '',
+                stratigraphic_unit: '',
+                find_date: '',
+                material: '',
+                object_type: '',
+                chronology_period: '',
+                conservation_status: '',
+                photo_type: '',
+                photographer: '',
+                description: '',
+                keywords: ''
+            };
+        },
+        
+        // Get form data for submission
+        getFormData() {
+            return {...this.formData};
+        },
+        
+        // Validate form (basic validation)
+        validateForm() {
+            // Add validation logic here if needed
+            return true;
+        },
+        
+        // Handle form submission
+        handleSubmit() {
+            if (this.validateForm()) {
+                // Emit event with form data
+                this.$dispatch('metadata-form-submit', {
+                    mode: this.formMode,
+                    data: this.getFormData()
+                });
+            }
+        },
+        
+        // Method to expose form data to parent components
+        getMetadata() {
+            return this.getFormData();
+        },
+        
+        // Method to set form data from parent
+        setMetadata(data) {
+            if (data && typeof data === 'object') {
+                this.formData = {...this.formData, ...data};
+            }
+        }
+    }));
+});
+</script>

@@ -53,400 +53,45 @@
             </div>
         </div>
 
-        <!-- Edit Form -->
-        <form @submit.prevent="saveChanges" class="space-y-8">
+        <!-- Include Reusable Metadata Form Component for Edit -->
+        <div x-ref="editMetadataForm"
+             @metadata-form-submit="handleEditMetadataSubmit($event)"
+             data-mode="edit"
+             :data-photo="JSON.stringify(selectedPhoto)">
+            {% include 'sites/components/_metadata_form.html' %}
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-between pt-6 border-t mt-6">
+            <button type="button"
+                    @click="showEditModal = false"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
+                Annulla
+            </button>
             
-            <!-- Basic Info Section -->
-            <div class="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">Informazioni di Base</h4>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="edit_title" class="block text-sm font-medium text-gray-700 mb-2">
-                            Titolo Fotografia
-                        </label>
-                        <input type="text" 
-                               id="edit_title"
-                               x-model="editData.title"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="Titolo descrittivo della foto">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_photo_type" class="block text-sm font-medium text-gray-700 mb-2">
-                            Tipo Fotografia
-                        </label>
-                        <select id="edit_photo_type" 
-                                x-model="editData.photo_type"
-                                class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                            <option value="">Seleziona tipo...</option>
-                            <option value="vista_generale">Vista Generale</option>
-                            <option value="dettaglio">Dettaglio</option>
-                            <option value="sezione">Sezione</option>
-                            <option value="contesto_rinvenimento">Contesto Rinvenimento</option>
-                            <option value="pre_restauro">Pre-Restauro</option>
-                            <option value="post_restauro">Post-Restauro</option>
-                            <option value="laboratorio">Laboratorio</option>
-                            <option value="stratigrafia">Stratigrafia</option>
-                            <option value="archivio">Archivio</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="mt-4">
-                    <label for="edit_description" class="block text-sm font-medium text-gray-700 mb-2">
-                        Descrizione
-                    </label>
-                    <textarea id="edit_description"
-                              x-model="editData.description"
-                              rows="3"
-                              class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                              placeholder="Descrizione dettagliata della fotografia..."></textarea>
-                </div>
-                
-                <div class="mt-4">
-                    <label for="edit_keywords" class="block text-sm font-medium text-gray-700 mb-2">
-                        Parole Chiave
-                    </label>
-                    <input type="text" 
-                           id="edit_keywords"
-                           x-model="editData.keywords"
-                           class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                           placeholder="ceramica, decorazione, geometrica (separate da virgola)">
-                    <p class="mt-1 text-xs text-gray-500">Separate le parole chiave con virgole</p>
-                </div>
-            </div>
-
-            <!-- Archaeological Context Section -->
-            <div class="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">Contesto Archeologico</h4>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="edit_inventory_number" class="block text-sm font-medium text-gray-700 mb-2">
-                            Numero Inventario
-                        </label>
-                        <input type="text" 
-                               id="edit_inventory_number"
-                               x-model="editData.inventory_number"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="es. PMP001/2024">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_catalog_number" class="block text-sm font-medium text-gray-700 mb-2">
-                            Numero Catalogo
-                        </label>
-                        <input type="text" 
-                               id="edit_catalog_number"
-                               x-model="editData.catalog_number"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="Numero di catalogo">
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                    <div>
-                        <label for="edit_excavation_area" class="block text-sm font-medium text-gray-700 mb-2">
-                            Area di Scavo
-                        </label>
-                        <input type="text" 
-                               id="edit_excavation_area"
-                               x-model="editData.excavation_area"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="es. Area A, Settore 1">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_stratigraphic_unit" class="block text-sm font-medium text-gray-700 mb-2">
-                            Unità Stratigrafica
-                        </label>
-                        <input type="text" 
-                               id="edit_stratigraphic_unit"
-                               x-model="editData.stratigraphic_unit"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="es. US 145">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_grid_square" class="block text-sm font-medium text-gray-700 mb-2">
-                            Quadrato di Scavo
-                        </label>
-                        <input type="text" 
-                               id="edit_grid_square"
-                               x-model="editData.grid_square"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="es. A1">
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div>
-                        <label for="edit_find_date" class="block text-sm font-medium text-gray-700 mb-2">
-                            Data Rinvenimento
-                        </label>
-                        <input type="date" 
-                               id="edit_find_date"
-                               x-model="editData.find_date"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_finder" class="block text-sm font-medium text-gray-700 mb-2">
-                            Scopritore
-                        </label>
-                        <input type="text" 
-                               id="edit_finder"
-                               x-model="editData.finder"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="Nome dell'archeologo">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Object Details Section -->
-            <div class="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">Dettagli Oggetto</h4>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="edit_material" class="block text-sm font-medium text-gray-700 mb-2">
-                            Materiale
-                        </label>
-                        <select id="edit_material" 
-                                x-model="editData.material"
-                                class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                            <option value="">Seleziona materiale...</option>
-                            <option value="ceramica">Ceramica</option>
-                            <option value="bronzo">Bronzo</option>
-                            <option value="ferro">Ferro</option>
-                            <option value="pietra">Pietra</option>
-                            <option value="marmo">Marmo</option>
-                            <option value="vetro">Vetro</option>
-                            <option value="osso">Osso</option>
-                            <option value="legno">Legno</option>
-                            <option value="oro">Oro</option>
-                            <option value="argento">Argento</option>
-                            <option value="terracotta">Terracotta</option>
-                            <option value="altro">Altro</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label for="edit_object_type" class="block text-sm font-medium text-gray-700 mb-2">
-                            Tipologia Oggetto
-                        </label>
-                        <input type="text" 
-                               id="edit_object_type"
-                               x-model="editData.object_type"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="es. vaso, fibula, moneta">
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div>
-                        <label for="edit_chronology_period" class="block text-sm font-medium text-gray-700 mb-2">
-                            Periodo Cronologico
-                        </label>
-                        <input type="text" 
-                               id="edit_chronology_period"
-                               x-model="editData.chronology_period"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="es. Romano Imperiale">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_conservation_status" class="block text-sm font-medium text-gray-700 mb-2">
-                            Stato di Conservazione
-                        </label>
-                        <select id="edit_conservation_status" 
-                                x-model="editData.conservation_status"
-                                class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                            <option value="">Seleziona stato...</option>
-                            <option value="eccellente">Eccellente</option>
-                            <option value="buono">Buono</option>
-                            <option value="discreto">Discreto</option>
-                            <option value="cattivo">Cattivo</option>
-                            <option value="frammentario">Frammentario</option>
-                            <option value="restaurato">Restaurato</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Dimensions -->
-                <div class="mt-4">
-                    <h5 class="text-sm font-medium text-gray-700 mb-3">Dimensioni (cm)</h5>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <label for="edit_length_cm" class="block text-xs font-medium text-gray-500 mb-1">
-                                Lunghezza
-                            </label>
-                            <input type="number" 
-                                   id="edit_length_cm"
-                                   x-model="editData.length_cm"
-                                   step="0.1"
-                                   class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                   placeholder="0.0">
-                        </div>
-                        <div>
-                            <label for="edit_width_cm" class="block text-xs font-medium text-gray-500 mb-1">
-                                Larghezza
-                            </label>
-                            <input type="number" 
-                                   id="edit_width_cm"
-                                   x-model="editData.width_cm"
-                                   step="0.1"
-                                   class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                   placeholder="0.0">
-                        </div>
-                        <div>
-                            <label for="edit_height_cm" class="block text-xs font-medium text-gray-500 mb-1">
-                                Altezza
-                            </label>
-                            <input type="number" 
-                                   id="edit_height_cm"
-                                   x-model="editData.height_cm"
-                                   step="0.1"
-                                   class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                   placeholder="0.0">
-                        </div>
-                        <div>
-                            <label for="edit_weight_grams" class="block text-xs font-medium text-gray-500 mb-1">
-                                Peso (g)
-                            </label>
-                            <input type="number" 
-                                   id="edit_weight_grams"
-                                   x-model="editData.weight_grams"
-                                   step="0.1"
-                                   class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                   placeholder="0.0">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Photo Technical Info Section -->
-            <div class="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">Informazioni Fotografiche</h4>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label for="edit_photographer" class="block text-sm font-medium text-gray-700 mb-2">
-                            Fotografo
-                        </label>
-                        <input type="text" 
-                               id="edit_photographer"
-                               x-model="editData.photographer"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="Nome del fotografo">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_photo_date" class="block text-sm font-medium text-gray-700 mb-2">
-                            Data Scatto
-                        </label>
-                        <input type="datetime-local" 
-                               id="edit_photo_date"
-                               x-model="editData.photo_date"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div>
-                        <label for="edit_camera_model" class="block text-sm font-medium text-gray-700 mb-2">
-                            Modello Fotocamera
-                        </label>
-                        <input type="text" 
-                               id="edit_camera_model"
-                               x-model="editData.camera_model"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="es. Canon EOS 5D Mark IV">
-                    </div>
-                    
-                    <div>
-                        <label for="edit_lens" class="block text-sm font-medium text-gray-700 mb-2">
-                            Obiettivo
-                        </label>
-                        <input type="text" 
-                               id="edit_lens"
-                               x-model="editData.lens"
-                               class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="es. EF 24-70mm f/2.8L">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Publication Settings -->
-            <div class="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">Impostazioni Pubblicazione</h4>
-                
-                <div class="space-y-4">
-                    <div class="flex items-center">
-                        <input id="edit_is_published" 
-                               type="checkbox" 
-                               x-model="editData.is_published"
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label for="edit_is_published" class="ml-2 block text-sm text-gray-900">
-                            Pubblica foto (visibile pubblicamente)
-                        </label>
-                    </div>
-                    
-                    <div class="flex items-center">
-                        <input id="edit_is_validated" 
-                               type="checkbox" 
-                               x-model="editData.is_validated"
-                               class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
-                        <label for="edit_is_validated" class="ml-2 block text-sm text-gray-900">
-                            Segna come validata
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="mt-4">
-                    <label for="edit_copyright_holder" class="block text-sm font-medium text-gray-700 mb-2">
-                        Detentore Copyright
-                    </label>
-                    <input type="text" 
-                           id="edit_copyright_holder"
-                           x-model="editData.copyright_holder"
-                           class="block w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                           placeholder="es. Università di Roma">
-                </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="flex items-center justify-between pt-6 border-t">
+            <div class="flex space-x-3">
                 <button type="button"
-                        @click="showEditModal = false"
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                    Annulla
+                        @click="resetEditForm()"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
+                    Ripristina
                 </button>
                 
-                <div class="flex space-x-3">
-                    <button type="button" 
-                            @click="resetChanges"
-                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-                        Ripristina
-                    </button>
-                    
-                    <button type="submit"
-                            :disabled="isSaving"
-                            :class="isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'"
-                            class="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md">
-                        <span x-show="!isSaving">Salva Modifiche</span>
-                        <span x-show="isSaving" class="flex items-center">
-                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Salvando...
-                        </span>
-                    </button>
-                </div>
+                <button type="button"
+                        @click="submitEditForm()"
+                        :disabled="isSaving"
+                        :class="isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700 dark:hover:bg-blue-600'"
+                        class="px-6 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-700 border border-transparent rounded-md">
+                    <span x-show="!isSaving">Salva Modifiche</span>
+                    <span x-show="isSaving" class="flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Salvando...
+                    </span>
+                </button>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
