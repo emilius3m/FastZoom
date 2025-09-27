@@ -48,14 +48,25 @@
                     </button>
 
                     <!-- Bulk Actions -->
-                    <button @click="showBulkModal = true"
-                            x-show="selectedPhotos.length > 0"
-                            class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-                        </svg>
-                        Azioni di Massa (<span x-text="selectedPhotos.length"></span>)
-                    </button>
+                    <div x-show="selectedPhotos.length > 0" class="flex space-x-2">
+                        <!-- Multi-Edit Button -->
+                        <button @click="editPhoto(null)"
+                                class="inline-flex items-center px-4 py-2 bg-green-600 dark:bg-green-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            Modifica Metadati (<span x-text="selectedPhotos.length"></span>)
+                        </button>
+                        
+                        <!-- Other Bulk Actions -->
+                        <button @click="showBulkModal = true"
+                                class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                            </svg>
+                            Altri (<span x-text="selectedPhotos.length"></span>)
+                        </button>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -1081,6 +1092,11 @@ function photosManager() {
         viewMode: 'grid',
         selectedPhotos: [],
         userRole: '{{ user_role }}',
+        
+        // Multi-edit state
+        get isMultipleSelection() {
+            return this.selectedPhotos.length > 1;
+        },
 
         // Modal States
         showPhotoModal: false,
@@ -1868,8 +1884,20 @@ function photosManager() {
         // Edit Methods
         editPhoto(photo) {
             console.log('editPhoto called with photo:', photo);
-            //Alpine.store('photoEdit').openEditModal(photo);
-            this.selectedPhoto = photo;  // Set selected photo for the edit modal
+            
+            // Check if this is a single photo edit or if we should open multi-edit
+            if (this.selectedPhotos.length > 1) {
+                // Multi-edit mode: don't set selectedPhoto, use selectedPhotos array
+                this.selectedPhoto = null;
+            } else {
+                // Single photo edit mode
+                this.selectedPhoto = photo;
+                // If the photo isn't already selected, select it
+                if (!this.selectedPhotos.includes(photo.id)) {
+                    this.selectedPhotos = [photo.id];
+                }
+            }
+            
             this.showEditModal = true;
 
             // Initialize the metadata form with the photo data
@@ -1879,13 +1907,23 @@ function photosManager() {
                 if (editFormElement) {
                     // Find the Alpine.js component within the element
                     const metadataComponent = Alpine.$data(editFormElement.querySelector('[x-data*="metadataFormComponent"]'));
-                    if (metadataComponent && metadataComponent.loadPhotoData) {
-                        console.log('Loading photo data into form component');
-                        metadataComponent.loadPhotoData(photo);
+                    if (metadataComponent) {
+                        if (this.isMultipleSelection) {
+                            // For multi-edit, don't load specific photo data - form will be empty
+                            console.log('Multi-edit mode: form will start empty');
+                            if (metadataComponent.clearForm) {
+                                metadataComponent.clearForm();
+                            }
+                        } else if (metadataComponent.loadPhotoData) {
+                            console.log('Loading photo data into form component');
+                            metadataComponent.loadPhotoData(photo);
+                        }
                     } else {
-                        console.warn('Metadata form component not found or missing loadPhotoData method');
+                        console.warn('Metadata form component not found');
                         // Fallback: dispatch event to load photo data
-                        this.$dispatch('load-photo-data', { photo: photo });
+                        if (!this.isMultipleSelection) {
+                            this.$dispatch('load-photo-data', { photo: photo });
+                        }
                     }
                 } else {
                     console.warn('Edit metadata form element not found');
@@ -1965,6 +2003,17 @@ function photosManager() {
 
         // Updated save method that works with metadata form
         async savePhotoEditWithMetadata(metadata) {
+            if (this.isMultipleSelection) {
+                // Bulk edit mode
+                await this.saveBulkEdit(metadata);
+            } else {
+                // Single photo edit mode
+                await this.saveSinglePhotoEdit(metadata);
+            }
+        },
+        
+        // Single photo edit method
+        async saveSinglePhotoEdit(metadata) {
             if (!this.selectedPhoto || !metadata) {
                 console.error('No photo selected or metadata provided');
                 return;
@@ -1973,7 +2022,7 @@ function photosManager() {
             this.isSaving = true;
 
             try {
-                console.log('Saving photo edit with metadata:', metadata);
+                console.log('Saving single photo edit with metadata:', metadata);
 
                 const response = await fetch(`/sites/{{ site.id }}/photos/${this.selectedPhoto.id}/update`, {
                     method: 'PUT',
@@ -2010,6 +2059,71 @@ function photosManager() {
             } catch (error) {
                 console.error('Errore durante il salvataggio:', error);
                 this.showAlertMessage(`Errore durante il salvataggio: ${error.message}`);
+            } finally {
+                this.isSaving = false;
+            }
+        },
+        
+        // Bulk edit method
+        async saveBulkEdit(metadata) {
+            if (!this.selectedPhotos.length || !metadata) {
+                console.error('No photos selected or metadata provided for bulk edit');
+                return;
+            }
+
+            this.isSaving = true;
+
+            try {
+                console.log('Saving bulk edit with metadata:', metadata, 'for photos:', this.selectedPhotos);
+
+                // Filter out empty/null values from metadata for bulk edit
+                const filteredMetadata = {};
+                Object.keys(metadata).forEach(key => {
+                    const value = metadata[key];
+                    if (value !== null && value !== undefined && value !== '') {
+                        // For arrays (like tags), only include if not empty
+                        if (Array.isArray(value)) {
+                            if (value.length > 0) {
+                                filteredMetadata[key] = value;
+                            }
+                        } else {
+                            filteredMetadata[key] = value;
+                        }
+                    }
+                });
+
+                const response = await fetch(`/sites/{{ site.id }}/photos/bulk-update`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        photo_ids: this.selectedPhotos,
+                        metadata: filteredMetadata
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Errore durante l'aggiornamento di massa: ${response.status} ${errorText}`);
+                }
+
+                const result = await response.json();
+
+                // Refresh data to reflect changes
+                await this.loadPhotos();
+                this.updateStatistics();
+                this.extractAvailableTags();
+                this.applyFilters();
+                
+                this.showAlertMessage(`${this.selectedPhotos.length} foto aggiornate con successo!`);
+                this.selectedPhotos = []; // Clear selection
+                this.closeEditModal();
+
+            } catch (error) {
+                console.error('Errore durante l\'aggiornamento di massa:', error);
+                this.showAlertMessage(`Errore durante l'aggiornamento: ${error.message}`);
             } finally {
                 this.isSaving = false;
             }

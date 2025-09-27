@@ -1426,7 +1426,7 @@ async def bulk_update_photos(
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Aggiorna più foto in blocco"""
+    """Aggiorna più foto in blocco con supporto completo per metadati archeologici"""
     site, permission = site_access
 
     if not permission.can_write():
@@ -1434,11 +1434,16 @@ async def bulk_update_photos(
 
     # Correzione critica: Converti gli ID string in UUID
     photo_ids_raw = update_data.get("photo_ids", [])
+    metadata = update_data.get("metadata", {})
+    
+    # Legacy support for tag operations
     add_tags = update_data.get("add_tags", [])
     remove_tags = update_data.get("remove_tags", [])
 
     if not photo_ids_raw:
         raise HTTPException(status_code=400, detail="Nessuna foto selezionata")
+
+    logger.info(f"Bulk update received data: {update_data}")
 
     try:
         # Converti string ID in UUID objects
@@ -1471,57 +1476,166 @@ async def bulk_update_photos(
         if not photos:
             raise HTTPException(status_code=404, detail="Nessuna foto trovata con gli ID specificati")
 
+        # Campi aggiornabili (stessi del singolo update)
+        updatable_fields = {
+            'title', 'description', 'keywords', 'photo_type', 'photographer',
+            'inventory_number', 'old_inventory_number', 'catalog_number',
+            'excavation_area', 'stratigraphic_unit', 'grid_square', 'depth_level',
+            'find_date', 'finder', 'excavation_campaign',
+            'material', 'material_details', 'object_type', 'object_function',
+            'length_cm', 'width_cm', 'height_cm', 'diameter_cm', 'weight_grams',
+            'chronology_period', 'chronology_culture',
+            'dating_from', 'dating_to', 'dating_notes',
+            'conservation_status', 'conservation_notes', 'restoration_history',
+            'bibliography', 'comparative_references', 'external_links',
+            'copyright_holder', 'license_type', 'usage_rights',
+            'validation_notes'
+        }
+
+        # Filtra solo i campi che sono stati forniti e sono aggiornabili
+        filtered_metadata = {}
+        for field in updatable_fields:
+            if field in metadata and metadata[field] is not None and metadata[field] != '':
+                value = metadata[field]
+                
+                # Gestione campi numerici
+                if field in ['length_cm', 'width_cm', 'height_cm', 'diameter_cm', 'weight_grams', 'depth_level']:
+                    try:
+                        filtered_metadata[field] = float(value) if value else None
+                    except (ValueError, TypeError):
+                        filtered_metadata[field] = None
+                else:
+                    filtered_metadata[field] = value
+
+        # Gestione campi enum
+        if 'photo_type' in filtered_metadata and filtered_metadata['photo_type']:
+            try:
+                filtered_metadata['photo_type'] = PhotoType(filtered_metadata['photo_type'])
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Tipo foto non valido: {filtered_metadata['photo_type']}"
+                )
+
+        if 'material' in filtered_metadata and filtered_metadata['material']:
+            try:
+                filtered_metadata['material'] = MaterialType(filtered_metadata['material'])
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Materiale non valido: {filtered_metadata['material']}"
+                )
+
+        if 'conservation_status' in filtered_metadata and filtered_metadata['conservation_status']:
+            try:
+                filtered_metadata['conservation_status'] = ConservationStatus(filtered_metadata['conservation_status'])
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Stato di conservazione non valido: {filtered_metadata['conservation_status']}"
+                )
+
+        # Gestione date
+        if 'find_date' in filtered_metadata and filtered_metadata['find_date']:
+            try:
+                if isinstance(filtered_metadata['find_date'], str):
+                    try:
+                        filtered_metadata['find_date'] = datetime.fromisoformat(filtered_metadata['find_date'])
+                    except ValueError:
+                        try:
+                            filtered_metadata['find_date'] = datetime.strptime(filtered_metadata['find_date'], '%Y-%m-%d')
+                        except ValueError:
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Formato data non valido per find_date"
+                            )
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Formato data non valido per find_date"
+                )
+
+        # Gestione JSON fields
+        if 'keywords' in filtered_metadata:
+            if isinstance(filtered_metadata['keywords'], str) and filtered_metadata['keywords']:
+                keywords_list = [kw.strip() for kw in filtered_metadata['keywords'].split(',') if kw.strip()]
+                filtered_metadata['keywords'] = json.dumps(keywords_list)
+            elif isinstance(filtered_metadata['keywords'], list):
+                filtered_metadata['keywords'] = json.dumps(filtered_metadata['keywords'])
+
+        if 'external_links' in filtered_metadata and isinstance(filtered_metadata['external_links'], list):
+            filtered_metadata['external_links'] = json.dumps(filtered_metadata['external_links'])
+
+        logger.info(f"Bulk update: filtered metadata to apply: {filtered_metadata}")
+
         updated_count = 0
+        updated_fields = []
+        
         for photo in photos:
             try:
-                # Update tags (assuming you have a tags field)
-                current_tags = getattr(photo, 'tags', None) or []
-                if isinstance(current_tags, str):
-                    try:
-                        current_tags = json.loads(current_tags)
-                    except:
-                        current_tags = []
+                # Applica metadati archeologici
+                for field, value in filtered_metadata.items():
+                    old_value = getattr(photo, field, None)
+                    setattr(photo, field, value)
+                    if field not in updated_fields:
+                        updated_fields.append(field)
+                    logger.info(f"Bulk update - Photo {photo.id} - Field '{field}': '{old_value}' -> '{value}'")
 
-                # Add new tags
-                for tag in add_tags:
-                    if tag not in current_tags:
-                        current_tags.append(tag)
+                # Legacy support: gestisci ancora i tag se forniti
+                if add_tags or remove_tags:
+                    current_tags = getattr(photo, 'tags', None) or []
+                    if isinstance(current_tags, str):
+                        try:
+                            current_tags = json.loads(current_tags)
+                        except:
+                            current_tags = []
 
-                # Remove tags
-                for tag in remove_tags:
-                    if tag in current_tags:
-                        current_tags.remove(tag)
+                    # Add new tags
+                    for tag in add_tags:
+                        if tag not in current_tags:
+                            current_tags.append(tag)
 
-                if hasattr(photo, 'tags'):
-                    photo.tags = current_tags
+                    # Remove tags
+                    for tag in remove_tags:
+                        if tag in current_tags:
+                            current_tags.remove(tag)
+
+                    if hasattr(photo, 'tags'):
+                        photo.tags = current_tags
+                        if 'tags' not in updated_fields:
+                            updated_fields.append('tags')
+
+                # Aggiorna timestamp
                 photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
-
                 updated_count += 1
-
-                # Log activity for each photo
-                await log_user_activity(
-                    db=db,
-                    user_id=current_user_id,
-                    site_id=site_id,
-                    activity_type="UPDATE",
-                    activity_desc=f"Aggiornamento massivo foto {photo.filename}",
-                    extra_data=json.dumps({  # JSON string, non dict
-                        "photo_id": str(photo.id),
-                        "bulk_operation": True,
-                        "add_tags": add_tags,
-                        "remove_tags": remove_tags
-                    })
-                )
 
             except Exception as e:
                 logger.warning(f"Error updating photo {photo.id}: {e}")
                 continue
 
+        # Log activity for bulk operation
+        await log_user_activity(
+            db=db,
+            user_id=current_user_id,
+            site_id=site_id,
+            activity_type="BULK_UPDATE",
+            activity_desc=f"Aggiornamento massivo di {updated_count} foto",
+            extra_data=json.dumps({
+                "photo_count": updated_count,
+                "photo_ids": [str(pid) for pid in photo_ids],
+                "updated_fields": updated_fields,
+                "metadata_fields": list(filtered_metadata.keys()),
+                "add_tags": add_tags,
+                "remove_tags": remove_tags
+            })
+        )
+
         await db.commit()
 
         return JSONResponse({
             "message": f"{updated_count} foto aggiornate con successo",
-            "updated_count": updated_count
+            "updated_count": updated_count,
+            "updated_fields": updated_fields
         })
 
     except HTTPException:
