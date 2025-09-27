@@ -16,7 +16,7 @@
             <div>
                 <h3 class="text-xl font-semibold text-gray-900">Modifica Metadati Fotografici</h3>
                 <p class="mt-1 text-sm text-gray-600"
-                   x-text="selectedPhoto ? 'Modifica i metadati archeologici per: ' + (selectedPhoto.original_filename || selectedPhoto.filename) : 'Caricamento dati foto...'"></p>
+                   x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto  ? 'Modifica i metadati archeologici per: ' + (selectedPhoto.original_filename || selectedPhoto.filename) : 'Caricamento dati foto...'"></p>
             </div>
             <button @click="closeEditModal()"
                     class="text-gray-400 hover:text-gray-600">
@@ -27,25 +27,26 @@
         </div>
 
         <!-- Photo Preview -->
-        <div x-show="selectedPhoto" class="mb-6 flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+        <div x-show="typeof selectedPhoto !== 'undefined' && selectedPhoto" class="mb-6 flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
             <div class="flex-shrink-0">
-                <img :src="selectedPhoto ? (selectedPhoto.thumbnail_url || selectedPhoto.file_url) : ''"
-                     :alt="selectedPhoto ? selectedPhoto.filename : ''"
+                <img :src="typeof selectedPhoto !== 'undefined' && selectedPhoto ? (selectedPhoto.thumbnail_url || selectedPhoto.file_url) : ''"
+                     :alt="typeof selectedPhoto !== 'undefined' && selectedPhoto ? selectedPhoto.filename : ''"
                      class="w-24 h-24 object-cover rounded-lg">
             </div>
             <div class="flex-1 min-w-0">
-                <h4 class="text-lg font-medium text-gray-900" x-text="selectedPhoto ? (selectedPhoto.original_filename || selectedPhoto.filename) : 'Caricamento...'"></h4>
+                <h4 class="text-lg font-medium text-gray-900" x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? (selectedPhoto.original_filename || selectedPhoto.filename) : 'Caricamento...'"></h4>
                 <div class="mt-1 flex items-center space-x-4 text-sm text-gray-500">
-                    <span x-text="selectedPhoto ? `${selectedPhoto.width || 'N/A'} × ${selectedPhoto.height || 'N/A'} px` : 'Caricamento...'"></span>
-                    <span x-text="selectedPhoto ? formatFileSize(selectedPhoto.file_size) : 'Caricamento...'"></span>
-                    <span x-text="selectedPhoto ? formatDate(selectedPhoto.upload_date) : 'Caricamento...'"></span>
+                    <span x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? ((selectedPhoto.width || 'N/A') + ' x ' + (selectedPhoto.height || 'N/A') + ' px') : 'Caricamento...'"></span>
+
+                    <span x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? formatFileSize(selectedPhoto.file_size) : 'Caricamento...'"></span>
+                    <span x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? formatDate(selectedPhoto.upload_date) : 'Caricamento...'"></span>
                 </div>
                 <div class="mt-2 flex items-center space-x-2">
-                    <span x-show="selectedPhoto && selectedPhoto.tags && selectedPhoto.tags.length > 0"
+                    <span x-show="typeof selectedPhoto !== 'undefined' && selectedPhoto && selectedPhoto.tags && selectedPhoto.tags.length > 0"
                           class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        <span x-text="selectedPhoto ? selectedPhoto.tags.length + ' tag' : ''"></span>
+                        <span x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? selectedPhoto.tags.length + ' tag' : ''"></span>
                     </span>
-                    <span x-show="selectedPhoto && selectedPhoto.deep_zoom_status === 'completed'"
+                    <span x-show="typeof selectedPhoto !== 'undefined' && selectedPhoto && selectedPhoto.deep_zoom_status === 'completed'"
                           class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         Deep zoom disponibile
                     </span>
@@ -53,20 +54,6 @@
             </div>
         </div>
 
-        <!-- Loading State -->
-        <div x-show="!selectedPhoto" class="mb-6 flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
-            <div class="flex-shrink-0">
-                <div class="w-24 h-24 bg-gray-200 rounded-lg animate-pulse"></div>
-            </div>
-            <div class="flex-1 min-w-0">
-                <div class="h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
-                <div class="mt-1 flex items-center space-x-4">
-                    <div class="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
-                    <div class="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
-                    <div class="h-4 bg-gray-200 rounded animate-pulse w-24"></div>
-                </div>
-            </div>
-        </div>
 
         <!-- Include Reusable Metadata Form Component for Edit -->
         <div x-ref="editMetadataForm"
@@ -75,7 +62,7 @@
              @submit-metadata-form="submitEditForm()"
              @reset-metadata-form="resetEditForm()"
              data-mode="edit"
-             :data-photo="selectedPhoto ? JSON.stringify(selectedPhoto) : '{}'"
+             :data-photo="typeof selectedPhoto !== 'undefined' && selectedPhoto ? JSON.stringify(selectedPhoto) : '{}'"
              x-init="
                  // Watch for selectedPhoto changes and update the form
                  $watch('selectedPhoto', (photo) => {

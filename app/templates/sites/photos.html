@@ -947,6 +947,7 @@
     {% include 'sites/components/_upload_modal.html' %}
 
     <!-- Edit Photo Modal with Reusable Metadata Form -->
+
     {% include 'sites/components/_photo_edit_modal.html' %}
 
     <!-- Delete Confirmation Modal -->
@@ -1061,7 +1062,6 @@
     </div>
     {% endif %}
 </div>
-
 
 <!-- Main JavaScript Component -->
 <script>
@@ -1868,6 +1868,7 @@ function photosManager() {
         // Edit Methods
         editPhoto(photo) {
             console.log('editPhoto called with photo:', photo);
+            //Alpine.store('photoEdit').openEditModal(photo);
             this.selectedPhoto = photo;  // Set selected photo for the edit modal
             this.showEditModal = true;
 
@@ -2344,6 +2345,20 @@ function photosManager() {
 
 // Initialize when DOM is ready
 document.addEventListener('alpine:init', () => {
+    Alpine.store('photoEdit', {
+        selectedPhoto: null,
+        isEditModalOpen: false,
+
+        openEditModal(photo) {
+            this.selectedPhoto = photo;
+            this.isEditModalOpen = true;
+        },
+
+        closeEditModal() {
+            this.selectedPhoto = null;
+            this.isEditModalOpen = false;
+        }
+    });
     Alpine.data('photosManager', photosManager);
 });
 </script>
