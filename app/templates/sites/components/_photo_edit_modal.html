@@ -60,7 +60,23 @@
              @submit-metadata-form="submitEditForm()"
              @reset-metadata-form="resetEditForm()"
              data-mode="edit"
-             :data-photo="selectedPhoto ? JSON.stringify(selectedPhoto) : '{}'">
+             :data-photo="selectedPhoto ? JSON.stringify(selectedPhoto) : '{}'"
+             x-init="
+                 // Watch for selectedPhoto changes and update the form
+                 $watch('selectedPhoto', (photo) => {
+                     if (photo) {
+                         console.log('Photo changed, updating form with:', photo);
+                         $nextTick(() => {
+                             // Find the metadata component and load the data
+                             const metadataComponent = Alpine.$data($el.querySelector('[x-data*=\"metadataFormComponent\"]'));
+                             if (metadataComponent && metadataComponent.loadPhotoData) {
+                                 metadataComponent.loadPhotoData(photo);
+                                 console.log('Photo data loaded into form');
+                             }
+                         });
+                     }
+                 });
+             ">
             {% include 'sites/components/_metadata_form.html' %}
         </div>
 

@@ -993,7 +993,7 @@ async def get_processing_queue_status(
 async def update_photo(
         site_id: UUID,
         photo_id: UUID,
-        update_data: dict,
+        request: Request,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
@@ -1010,6 +1010,14 @@ async def update_photo(
 
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+
+    # Parse JSON request body
+    try:
+        update_data = await request.json()
+        logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Received data: {update_data}")
+    except Exception as e:
+        logger.error(f"PUT /sites/{site_id}/photos/{photo_id}/update - JSON parsing error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid JSON data: {str(e)}")
 
     # Verifica che la foto appartenga al sito
     photo_query = select(Photo).where(
@@ -1111,8 +1119,15 @@ async def update_photo(
             )
 
     # Gestione JSON fields
-    if 'keywords' in filtered_data and isinstance(filtered_data['keywords'], list):
-        filtered_data['keywords'] = json.dumps(filtered_data['keywords'])
+    if 'keywords' in filtered_data:
+        if isinstance(filtered_data['keywords'], str) and filtered_data['keywords']:
+            # Convert comma-separated string to list, then to JSON
+            keywords_list = [kw.strip() for kw in filtered_data['keywords'].split(',') if kw.strip()]
+            filtered_data['keywords'] = json.dumps(keywords_list)
+        elif isinstance(filtered_data['keywords'], list):
+            filtered_data['keywords'] = json.dumps(filtered_data['keywords'])
+        elif not filtered_data['keywords']:
+            filtered_data['keywords'] = None
 
     if 'external_links' in filtered_data and isinstance(filtered_data['external_links'], list):
         filtered_data['external_links'] = json.dumps(filtered_data['external_links'])

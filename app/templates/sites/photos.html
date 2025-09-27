@@ -1887,30 +1887,46 @@ function photosManager() {
         // Handle metadata form submission for edit
         handleEditMetadataSubmit(event) {
             console.log('handleEditMetadataSubmit called with:', event.detail);
-            const metadata = event.detail.metadata;
+            const metadata = event.detail.data || event.detail.metadata;  // Support both formats
             this.savePhotoEditWithMetadata(metadata);
         },
         
         // Submit edit form programmatically
         submitEditForm() {
-            const editFormElement = this.$refs.editMetadataForm;
-            if (editFormElement && editFormElement.getMetadata) {
-                const metadata = editFormElement.getMetadata();
-                this.savePhotoEditWithMetadata(metadata);
-            } else {
-                // Fallback: dispatch event to trigger form submission
-                this.$dispatch('submit-metadata-form');
+            console.log('submitEditForm called');
+            const editFormContainer = this.$refs.editMetadataForm;
+            if (editFormContainer) {
+                // Find the Alpine component inside the container
+                const metadataComponent = Alpine.$data(editFormContainer.querySelector('[x-data*="metadataFormComponent"]'));
+                if (metadataComponent && metadataComponent.getMetadata) {
+                    const metadata = metadataComponent.getMetadata();
+                    console.log('Got metadata from component:', metadata);
+                    this.savePhotoEditWithMetadata(metadata);
+                } else {
+                    // Fallback: trigger form submission via event
+                    const form = editFormContainer.querySelector('form');
+                    if (form) {
+                        form.dispatchEvent(new Event('submit', { bubbles: true }));
+                    }
+                }
             }
         },
         
         // Reset edit form
         resetEditForm() {
-            const editFormElement = this.$refs.editMetadataForm;
-            if (editFormElement && editFormElement.loadPhotoData && this.selectedPhoto) {
-                editFormElement.loadPhotoData(this.selectedPhoto);
-            } else {
-                // Fallback: dispatch event to reset form
-                this.$dispatch('reset-metadata-form');
+            console.log('resetEditForm called');
+            const editFormContainer = this.$refs.editMetadataForm;
+            if (editFormContainer && this.selectedPhoto) {
+                // Find the Alpine component inside the container
+                const metadataComponent = Alpine.$data(editFormContainer.querySelector('[x-data*="metadataFormComponent"]'));
+                if (metadataComponent && metadataComponent.loadPhotoData) {
+                    metadataComponent.loadPhotoData(this.selectedPhoto);
+                } else {
+                    // Fallback: try to trigger re-initialization
+                    if (metadataComponent && metadataComponent.initializeForm) {
+                        metadataComponent.initializeForm();
+                    }
+                }
             }
         },
 
