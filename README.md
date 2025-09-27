@@ -42,6 +42,27 @@ Dependencies are managed via Poetry (`pyproject.toml` and `poetry.lock`).
 - **API Endpoints**: RESTful APIs for CRUD on users, sites, photos, etc.
 - **Database Migrations**: Alembic for schema evolution.
 
+### 🆕 **New Advanced Features**
+
+- **🔍 OpenSeadragon Exclusive Viewing**: Advanced high-resolution image viewer with OpenSeadragon as the only viewing method, ensuring professional-grade archaeological photo examination with deep zoom capabilities, smooth navigation, and optimal performance for large scientific images.
+
+- **📋 Reusable Metadata Management**: Comprehensive modular component system for archaeological metadata with a single reusable form component supporting both upload and edit workflows, ensuring consistency across all metadata operations and reducing code duplication.
+
+- **🎨 Enhanced User Interface**:
+  - **Smart Information Sidebar**: Photo metadata panel with intelligent hover zones and button triggers for non-intrusive access to archaeological information
+  - **Integrated Action Bar**: Professional interface with info button relocated to top action bar alongside Download, Share, and Edit functions
+  - **Responsive Design**: Mobile-optimized interface adapting to different screen sizes with dark mode support
+
+- **⚡ Advanced Component Architecture**:
+  - **Event-Driven Communication**: Clean separation of concerns using Alpine.js events for seamless parent-child component interaction
+  - **Mode-Based Functionality**: Dynamic component behavior supporting 'upload' and 'edit' modes with automatic data loading
+  - **Professional Workflow**: Streamlined archaeological documentation process with specialized metadata fields and validation
+
+- **🏛️ Archaeological-Specific Features**:
+  - **Complete Metadata Support**: Comprehensive fields for inventory numbers, excavation areas, stratigraphic units, materials, object types, chronological periods, and conservation status
+  - **Professional Documentation**: Photographer credits, photo types, find dates, and detailed archaeological context
+  - **Data Consistency**: Unified metadata structure across upload and edit operations ensuring archaeological documentation standards
+
 
 
 ## Admin Login Credentials
@@ -398,14 +419,41 @@ The diagram illustrates relationships between Users, Profiles, Roles, Sites, Per
 - Verify credentials in `.env`.
 - Test bucket access: `mc mb myminio/fastzoom-bucket` (using MinIO client).
 
+## 🚀 Recent Enhancements (v2.0 Features)
+
+### OpenSeadragon Integration
+- **Exclusive Image Viewing**: Removed all standard image viewers to ensure OpenSeadragon is the only method for viewing archaeological photos
+- **Enhanced Navigation**: Thumbnail navigation fully integrated with OpenSeadragon for seamless browsing experience
+- **Professional Quality**: High-resolution image examination capabilities optimized for archaeological documentation
+
+### Modular Component System
+- **Reusable Metadata Form**: Single component serving both upload and edit workflows (`_metadata_form.html`)
+- **Event-Based Architecture**: Clean component communication using Alpine.js events (`@metadata-form-submit`)
+- **Code Reduction**: Eliminated ~300 lines of duplicate code through component reusability
+- **Maintainable Structure**: Centralized metadata field definitions for easy maintenance and updates
+
+### User Experience Improvements
+- **Smart UI Elements**: Information sidebar with hover zones and button triggers
+- **Consistent Interface**: Integrated action buttons in top navigation bar
+- **Responsive Design**: Mobile-optimized interface with full dark mode support
+- **Professional Workflow**: Streamlined archaeological photo documentation process
+
+### Technical Specifications
+- **Framework**: Alpine.js for reactive components
+- **Styling**: Tailwind CSS with dark mode compatibility
+- **Communication**: Event-driven and direct method access patterns
+- **Data Binding**: Seamless parent-child component integration
+- **Validation**: Extensible form validation structure
+- **Initialization**: Automatic mode detection and data loading
+
 ## To-Do (Future Enhancements)
 
-- Implement artifact annotation and metadata editing.
 - Add search enhancements for photos/artifacts.
 - Integrate Neon/PostgreSQL for production DB.
 - Rate limiting and advanced logging.
 - Mobile app optimizations.
 - More comprehensive tests.
+- Advanced annotation tools for archaeological features.
 
 ## Contributing
 

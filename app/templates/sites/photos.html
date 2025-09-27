@@ -946,92 +946,8 @@
     {% if user_role in ['admin', 'curator'] %}
     {% include 'sites/components/_upload_modal.html' %}
 
-    <!-- Edit Photo Modal -->
-    <div x-show="showEditModal"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50"
-         x-cloak>
-
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-            <template x-if="editingPhoto">
-                <div>
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Modifica Foto</h3>
-                        <button @click="closeEditModal()" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <form @submit.prevent="savePhotoEdit()">
-                        <div class="space-y-4">
-                            <!-- Filename -->
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome File</label>
-                                <input type="text"
-                                       x-model="editingPhoto.filename"
-                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                       required>
-                            </div>
-
-                            <!-- Description -->
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
-                                <textarea x-model="editingPhoto.description"
-                                          rows="3"
-                                          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                          placeholder="Descrizione della foto..."></textarea>
-                            </div>
-
-                            <!-- Tags -->
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tag</label>
-                                <input type="text"
-                                       x-model="editingPhoto.tagsString"
-                                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                       placeholder="Separati da virgole...">
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Separare i tag con virgole</p>
-                            </div>
-
-                            <!-- Current Tags Display -->
-                            <div x-show="editingPhoto.tags && editingPhoto.tags.length > 0">
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tag Attuali</label>
-                                <div class="flex flex-wrap gap-2">
-                                    <template x-for="tag in editingPhoto.tags || []" :key="tag">
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                                            <span x-text="tag"></span>
-                                            <button @click="removeTag(tag)" type="button" class="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">×</button>
-                                        </span>
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-end space-x-3 mt-6">
-                            <button type="button"
-                                    @click="closeEditModal()"
-                                    class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                Annulla
-                            </button>
-                            <button type="submit"
-                                    :disabled="isSaving"
-                                    :class="isSaving ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800'"
-                                    class="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors">
-                                <span x-show="!isSaving">Salva Modifiche</span>
-                                <span x-show="isSaving">Salvataggio...</span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </template>
-        </div>
-    </div>
+    <!-- Edit Photo Modal with Reusable Metadata Form -->
+    {% include 'sites/components/_photo_edit_modal.html' %}
 
     <!-- Delete Confirmation Modal -->
     <div x-show="showDeleteModal"
@@ -1951,16 +1867,57 @@ function photosManager() {
 
         // Edit Methods
         editPhoto(photo) {
-            this.editingPhoto = {
-                ...photo,
-                tagsString: photo.tags ? photo.tags.join(', ') : ''
-            };
+            console.log('editPhoto called with photo:', photo);
+            this.selectedPhoto = photo;  // Set selected photo for the edit modal
             this.showEditModal = true;
+            
+            // Initialize the metadata form with the photo data
+            this.$nextTick(() => {
+                // Get the metadata form component reference
+                const editFormElement = this.$refs.editMetadataForm;
+                if (editFormElement && editFormElement.loadPhotoData) {
+                    editFormElement.loadPhotoData(photo);
+                } else {
+                    // Fallback: dispatch event to load photo data
+                    this.$dispatch('load-photo-data', { photo: photo });
+                }
+            });
+        },
+        
+        // Handle metadata form submission for edit
+        handleEditMetadataSubmit(event) {
+            console.log('handleEditMetadataSubmit called with:', event.detail);
+            const metadata = event.detail.metadata;
+            this.savePhotoEditWithMetadata(metadata);
+        },
+        
+        // Submit edit form programmatically
+        submitEditForm() {
+            const editFormElement = this.$refs.editMetadataForm;
+            if (editFormElement && editFormElement.getMetadata) {
+                const metadata = editFormElement.getMetadata();
+                this.savePhotoEditWithMetadata(metadata);
+            } else {
+                // Fallback: dispatch event to trigger form submission
+                this.$dispatch('submit-metadata-form');
+            }
+        },
+        
+        // Reset edit form
+        resetEditForm() {
+            const editFormElement = this.$refs.editMetadataForm;
+            if (editFormElement && editFormElement.loadPhotoData && this.selectedPhoto) {
+                editFormElement.loadPhotoData(this.selectedPhoto);
+            } else {
+                // Fallback: dispatch event to reset form
+                this.$dispatch('reset-metadata-form');
+            }
         },
 
         closeEditModal() {
             this.showEditModal = false;
-            this.editingPhoto = null;
+            this.selectedPhoto = null;  // Clear selected photo
+            this.editingPhoto = null;   // Keep for backward compatibility
             this.isSaving = false;
         },
 
@@ -1971,57 +1928,68 @@ function photosManager() {
             }
         },
 
-        async savePhotoEdit() {
-            if (!this.editingPhoto) return;
+        // Updated save method that works with metadata form
+        async savePhotoEditWithMetadata(metadata) {
+            if (!this.selectedPhoto || !metadata) {
+                console.error('No photo selected or metadata provided');
+                return;
+            }
 
             this.isSaving = true;
 
             try {
-                // Process tags
-                const tags = this.editingPhoto.tagsString
-                    ? this.editingPhoto.tagsString.split(',').map(tag => tag.trim()).filter(tag => tag)
-                    : [];
+                console.log('Saving photo edit with metadata:', metadata);
 
-                const updateData = {
-                    filename: this.editingPhoto.filename,
-                    description: this.editingPhoto.description || '',
-                    tags: tags
-                };
-
-                const response = await fetch(`/sites/{{ site.id }}/photos/${this.editingPhoto.id}/update`, {
+                const response = await fetch(`/sites/{{ site.id }}/photos/${this.selectedPhoto.id}/update`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(updateData)
+                    body: JSON.stringify(metadata)
                 });
 
                 if (!response.ok) {
-                    throw new Error('Errore durante il salvataggio');
+                    const errorText = await response.text();
+                    throw new Error(`Errore durante il salvataggio: ${response.status} ${errorText}`);
                 }
 
+                const updatedPhoto = await response.json();
+
                 // Update local data
-                const photoIndex = this.photos.findIndex(p => p.id === this.editingPhoto.id);
+                const photoIndex = this.photos.findIndex(p => p.id === this.selectedPhoto.id);
                 if (photoIndex !== -1) {
-                    this.photos[photoIndex] = { ...this.photos[photoIndex], ...updateData };
+                    this.photos[photoIndex] = { ...this.photos[photoIndex], ...updatedPhoto };
                 }
 
                 // Update current photo if it's the one being edited
-                if (this.currentPhoto && this.currentPhoto.id === this.editingPhoto.id) {
-                    this.currentPhoto = { ...this.currentPhoto, ...updateData };
+                if (this.currentPhoto && this.currentPhoto.id === this.selectedPhoto.id) {
+                    this.currentPhoto = { ...this.currentPhoto, ...updatedPhoto };
                 }
 
                 this.extractAvailableTags();
                 this.applyFilters();
-                this.showAlertMessage('Foto modificata con successo!');
+                this.showAlertMessage('Metadati foto aggiornati con successo!');
                 this.closeEditModal();
 
             } catch (error) {
                 console.error('Errore durante il salvataggio:', error);
-                this.showAlertMessage('Errore durante il salvataggio');
+                this.showAlertMessage(`Errore durante il salvataggio: ${error.message}`);
             } finally {
                 this.isSaving = false;
+            }
+        },
+        
+        // Legacy savePhotoEdit method for backward compatibility
+        async savePhotoEdit() {
+            console.warn('savePhotoEdit: This method is deprecated, use savePhotoEditWithMetadata instead');
+            if (this.selectedPhoto) {
+                // Try to get metadata from form component
+                const editFormElement = this.$refs.editMetadataForm;
+                if (editFormElement && editFormElement.getMetadata) {
+                    const metadata = editFormElement.getMetadata();
+                    await this.savePhotoEditWithMetadata(metadata);
+                }
             }
         },
 

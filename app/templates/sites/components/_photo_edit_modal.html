@@ -1,5 +1,5 @@
 <!-- templates/sites/components/_photo_edit_modal.html - EDITOR METADATI FOTO -->
-<div x-show="showEditModal" 
+<div x-show="showEditModal"
      x-transition:enter="transition ease-out duration-300"
      x-transition:enter-start="opacity-0"
      x-transition:enter-end="opacity-100"
@@ -7,7 +7,7 @@
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
      class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50"
-     @click.self="showEditModal = false">
+     @click.self="closeEditModal()">
     
     <div class="relative top-10 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
         
@@ -16,9 +16,9 @@
             <div>
                 <h3 class="text-xl font-semibold text-gray-900">Modifica Metadati Fotografici</h3>
                 <p class="mt-1 text-sm text-gray-600"
-                   x-text="'Modifica i metadati archeologici per: ' + (selectedPhoto ? selectedPhoto.filename : '')"></p>
+                   x-text="'Modifica i metadati archeologici per: ' + (selectedPhoto ? (selectedPhoto.original_filename || selectedPhoto.filename) : '')"></p>
             </div>
-            <button @click="showEditModal = false"
+            <button @click="closeEditModal()"
                     class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -29,25 +29,25 @@
         <!-- Photo Preview -->
         <div class="mb-6 flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
             <div class="flex-shrink-0">
-                <img :src="selectedPhoto ? '/photos/' + selectedPhoto.id + '/thumbnail' : ''"
+                <img :src="selectedPhoto ? (selectedPhoto.thumbnail_url || selectedPhoto.file_url) : ''"
                      :alt="selectedPhoto ? selectedPhoto.filename : ''"
                      class="w-24 h-24 object-cover rounded-lg">
             </div>
             <div class="flex-1 min-w-0">
-                <h4 class="text-lg font-medium text-gray-900" x-text="selectedPhoto ? selectedPhoto.filename : ''"></h4>
+                <h4 class="text-lg font-medium text-gray-900" x-text="selectedPhoto ? (selectedPhoto.original_filename || selectedPhoto.filename) : ''"></h4>
                 <div class="mt-1 flex items-center space-x-4 text-sm text-gray-500">
-                    <span x-text="selectedPhoto ? selectedPhoto.resolution : ''"></span>
-                    <span x-text="selectedPhoto ? selectedPhoto.file_size_mb + ' MB' : ''"></span>
-                    <span x-text="formatDate(selectedPhoto ? selectedPhoto.created_at : '')"></span>
+                    <span x-text="selectedPhoto ? `${selectedPhoto.width || 'N/A'} × ${selectedPhoto.height || 'N/A'} px` : ''"></span>
+                    <span x-text="selectedPhoto ? formatFileSize(selectedPhoto.file_size) : ''"></span>
+                    <span x-text="selectedPhoto ? formatDate(selectedPhoto.upload_date) : ''"></span>
                 </div>
                 <div class="mt-2 flex items-center space-x-2">
-                    <span x-show="selectedPhoto && selectedPhoto.is_validated"
-                          class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Validata
-                    </span>
-                    <span x-show="selectedPhoto && selectedPhoto.is_published"
+                    <span x-show="selectedPhoto && selectedPhoto.tags && selectedPhoto.tags.length > 0"
                           class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        Pubblicata
+                        <span x-text="selectedPhoto ? selectedPhoto.tags.length + ' tag' : ''"></span>
+                    </span>
+                    <span x-show="selectedPhoto && selectedPhoto.deep_zoom_status === 'completed'"
+                          class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Deep zoom disponibile
                     </span>
                 </div>
             </div>
@@ -56,15 +56,18 @@
         <!-- Include Reusable Metadata Form Component for Edit -->
         <div x-ref="editMetadataForm"
              @metadata-form-submit="handleEditMetadataSubmit($event)"
+             @load-photo-data="loadPhotoData($event)"
+             @submit-metadata-form="submitEditForm()"
+             @reset-metadata-form="resetEditForm()"
              data-mode="edit"
-             :data-photo="JSON.stringify(selectedPhoto)">
+             :data-photo="selectedPhoto ? JSON.stringify(selectedPhoto) : '{}'">
             {% include 'sites/components/_metadata_form.html' %}
         </div>
 
         <!-- Actions -->
         <div class="flex items-center justify-between pt-6 border-t mt-6">
             <button type="button"
-                    @click="showEditModal = false"
+                    @click="closeEditModal()"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
                 Annulla
             </button>
