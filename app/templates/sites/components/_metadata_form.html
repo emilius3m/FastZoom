@@ -213,31 +213,46 @@ document.addEventListener('alpine:init', () => {
         
         // Initialize form with mode and optional data
         initializeForm() {
+            console.log('Initializing metadata form');
             // Get mode from parent or default to upload
             const mode = this.$el.getAttribute('data-mode') || 'upload';
             this.formMode = mode;
-            
+
             // If in edit mode, load existing data
             if (mode === 'edit') {
                 const photoData = this.$el.getAttribute('data-photo');
-                if (photoData) {
+                if (photoData && photoData !== '{}' && photoData !== 'null') {
                     try {
                         const photo = JSON.parse(photoData);
+                        console.log('Parsed photo data for edit mode:', photo);
                         this.loadPhotoData(photo);
                     } catch (e) {
                         console.error('Error parsing photo data:', e);
+                        this.resetForm();
                     }
+                } else {
+                    console.log('No photo data available for edit mode, resetting form');
+                    this.resetForm();
                 }
+            } else {
+                console.log('Upload mode, resetting form');
+                this.resetForm();
             }
         },
         
         // Load photo data for editing
         loadPhotoData(photo) {
+            console.log('Loading photo data into form:', photo);
+            if (!photo) {
+                console.warn('No photo data provided to loadPhotoData');
+                return;
+            }
+
             this.formData = {
                 inventory_number: photo.inventory_number || '',
                 excavation_area: photo.excavation_area || '',
                 stratigraphic_unit: photo.stratigraphic_unit || '',
-                find_date: photo.find_date || '',
+                find_date: photo.find_date ? photo.find_date.split('T')[0] : '', // Convert ISO date to YYYY-MM-DD format
                 material: photo.material || '',
                 object_type: photo.object_type || '',
                 chronology_period: photo.chronology_period || '',
@@ -247,6 +262,7 @@ document.addEventListener('alpine:init', () => {
                 description: photo.description || '',
                 keywords: Array.isArray(photo.tags) ? photo.tags.join(', ') : (photo.keywords || '')
             };
+            console.log('Form data loaded:', this.formData);
         },
         
         // Reset form data
