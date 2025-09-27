@@ -72,6 +72,18 @@
                              if (metadataComponent && metadataComponent.loadPhotoData) {
                                  metadataComponent.loadPhotoData(photo);
                                  console.log('Photo data loaded into form');
+                             } else {
+                                 console.warn('Metadata component not found, retrying...');
+                                 // Retry after a short delay
+                                 setTimeout(() => {
+                                     const retryComponent = Alpine.$data($el.querySelector('[x-data*=\"metadataFormComponent\"]'));
+                                     if (retryComponent && retryComponent.loadPhotoData) {
+                                         retryComponent.loadPhotoData(photo);
+                                         console.log('Photo data loaded on retry');
+                                     } else {
+                                         console.error('Failed to find metadata component after retry');
+                                     }
+                                 }, 100);
                              }
                          });
                      }
