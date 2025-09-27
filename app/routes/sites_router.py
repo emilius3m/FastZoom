@@ -1132,16 +1132,23 @@ async def update_photo(
     if 'external_links' in filtered_data and isinstance(filtered_data['external_links'], list):
         filtered_data['external_links'] = json.dumps(filtered_data['external_links'])
 
+    # Log filtered data before applying changes
+    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Filtered data to apply: {filtered_data}")
+    
     # Aggiorna i campi della foto
     for field, value in filtered_data.items():
+        old_value = getattr(photo, field, None)
         # Assicurati che i valori vuoti siano None per i campi nullable
         if value == '' or value == 'null' or value == 'None':
             setattr(photo, field, None)
+            logger.info(f"PUT - Field '{field}': '{old_value}' -> None")
         else:
             setattr(photo, field, value)
+            logger.info(f"PUT - Field '{field}': '{old_value}' -> '{value}'")
 
     # Aggiorna timestamp
     photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
+    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Photo updated timestamp: {photo.updated}")
 
     # Log dell'attività
     await log_user_activity(
@@ -1158,12 +1165,20 @@ async def update_photo(
 
     await db.commit()
     await db.refresh(photo)
-
-    return {
+    
+    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Photo successfully committed to database")
+    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Updated fields: {list(filtered_data.keys())}")
+    
+    # Create response with photo data to verify changes
+    response_data = {
         "message": "Foto aggiornata con successo",
         "photo_id": str(photo_id),
-        "updated_fields": list(filtered_data.keys())
+        "updated_fields": list(filtered_data.keys()),
+        "photo_data": photo.to_dict()
     }
+    
+    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Response: {response_data}")
+    return response_data
 
 
 @sites_router.delete("/{site_id}/photos/{photo_id}")
