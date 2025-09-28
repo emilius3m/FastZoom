@@ -18,6 +18,7 @@ from app.models.users import User, UserActivity
 from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission, PermissionLevel
 from app.models.photos import Photo, PhotoType, MaterialType, ConservationStatus
+from app.models.form_schemas import FormSchema
 from app.templates import templates
 from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service
@@ -194,12 +195,39 @@ async def site_documentation(
 
     # Documenti del sito (assumendo un modello Document)
     documents = []  # TODO: Implementare get_site_documents quando disponibile il modello Document
+    
+    # Form schemas del sito
+    form_schemas_query = select(FormSchema).where(
+        and_(FormSchema.site_id == site_id, FormSchema.is_active == True)
+    ).order_by(FormSchema.created_at.desc())
+    
+    form_schemas = await db.execute(form_schemas_query)
+    form_schemas = form_schemas.scalars().all()
+    
+    # Prepara i form schema per il template
+    schemas_list = []
+    for schema in form_schemas:
+        try:
+            schema_json = json.loads(schema.schema_json)
+            schemas_list.append({
+                "id": str(schema.id),
+                "name": schema.name,
+                "description": schema.description,
+                "category": schema.category,
+                "created_at": schema.created_at.isoformat(),
+                "updated_at": schema.updated_at.isoformat(),
+                "schema": schema_json
+            })
+        except json.JSONDecodeError:
+            logger.warning(f"Invalid JSON in schema {schema.id}")
+            continue
 
     context = {
         "request": request,
         "site": site,
         "user_permission": permission,
         "documents": documents,
+        "form_schemas": schemas_list,
         "can_write": permission.can_write()
     }
 
@@ -1690,6 +1718,7 @@ async def update_team_member_permissions(
     await db.commit()
 
     return {"message": "Permessi aggiornati con successo"}
+
 
 
 # === FUNZIONI HELPER ===

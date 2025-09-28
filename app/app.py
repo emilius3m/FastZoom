@@ -33,6 +33,8 @@ from app.routes.admin import admin_router
 from app.routes.sites_router import sites_router
 # 🔧 NUOVO IMPORT - Router Photos (senza prefisso /sites)
 from app.routes.photos_router import photos_router
+# 🔧 NUOVO IMPORT - Router Form Schemas
+from app.routes.api.form_schemas import form_schemas_router
 
 
 
@@ -92,6 +94,13 @@ app.include_router(
 app.include_router(
     photos_router,
     tags=["photos"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+)
+
+# 📋 INCLUSIONE ROUTER FORM SCHEMAS - Endpoints per form builder
+app.include_router(
+    form_schemas_router,
+    tags=["form-schemas"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 

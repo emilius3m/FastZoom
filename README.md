@@ -455,6 +455,306 @@ The diagram illustrates relationships between Users, Profiles, Roles, Sites, Per
 - More comprehensive tests.
 - Advanced annotation tools for archaeological features.
 
+## 🛠️ Form Builder Drag-and-Drop con Schema JSON
+
+FastZoom integra un potente sistema di form builder drag-and-drop con schema JSON, perfetto per il sistema archeologico modulare. Questa implementazione utilizza Alpine.js e si integra perfettamente con lo stack esistente.
+
+### Architettura del Form Builder
+
+Il sistema è basato su schema JSON per moduli archeologici specifici:
+
+```javascript
+// Esempio schema per modulo "Ceramica"
+const ceramicModuleSchema = {
+  id: "ceramic_module",
+  name: "Rilevamento Ceramico",
+  icon: "🏺",
+  category: "artifact",
+  fields: [
+    {
+      id: "fabric_type",
+      type: "select",
+      label: "Tipo di Impasto",
+      required: true,
+      options: [
+        { value: "depurato", label: "Depurato" },
+        { value: "comune", label: "Comune" },
+        { value: "cucina", label: "Da cucina" }
+      ]
+    },
+    {
+      id: "decoration",
+      type: "multiselect",
+      label: "Decorazione",
+      options: [
+        { value: "dipinta", label: "Dipinta" },
+        { value: "incisa", label: "Incisa" },
+        { value: "impressa", label: "Impressa" }
+      ]
+    },
+    {
+      id: "dimensions",
+      type: "group",
+      label: "Dimensioni",
+      fields: [
+        { id: "diameter", type: "number", label: "Diametro (cm)", step: 0.1 },
+        { id: "height", type: "number", label: "Altezza (cm)", step: 0.1 }
+      ]
+    },
+    {
+      id: "photos",
+      type: "file",
+      label: "Fotografie",
+      multiple: true,
+      accept: "image/*"
+    }
+  ]
+};
+```
+
+### Form Builder Interface con Alpine.js
+
+Il component principale per il Form Builder:
+
+```javascript
+Alpine.data('formBuilder', () => ({
+    // Palette di componenti disponibili
+    availableComponents: [
+        { type: 'text', label: 'Testo', icon: '📝' },
+        { type: 'textarea', label: 'Area Testo', icon: '📄' },
+        { type: 'select', label: 'Menu a Tendina', icon: '📋' },
+        { type: 'multiselect', label: 'Selezione Multipla', icon: '☑️' },
+        { type: 'number', label: 'Numero', icon: '🔢' },
+        { type: 'date', label: 'Data', icon: '📅' },
+        { type: 'file', label: 'File Upload', icon: '📎' },
+        { type: 'radio', label: 'Radio Button', icon: '◉' },
+        { type: 'checkbox', label: 'Checkbox', icon: '✅' },
+        { type: 'group', label: 'Gruppo Campi', icon: '📦' }
+    ],
+    
+    // Form in costruzione
+    formSchema: {
+        id: '',
+        name: '',
+        category: 'artifact',
+        fields: []
+    },
+    
+    selectedField: null,
+    draggedComponent: null,
+    
+    // Drag & Drop Handlers
+    startDrag(component, event) {
+        this.draggedComponent = component;
+        event.dataTransfer.effectAllowed = 'copy';
+    },
+    
+    allowDrop(event) {
+        event.preventDefault();
+    },
+    
+    dropComponent(event) {
+        event.preventDefault();
+        if (this.draggedComponent) {
+            const newField = this.createFieldFromComponent(this.draggedComponent);
+            this.formSchema.fields.push(newField);
+            this.draggedComponent = null;
+        }
+    },
+    
+    createFieldFromComponent(component) {
+        const fieldId = 'field_' + Date.now();
+        const baseField = {
+            id: fieldId,
+            type: component.type,
+            label: component.label,
+            required: false
+        };
+        
+        // Configurazioni specifiche per tipo
+        switch (component.type) {
+            case 'select':
+            case 'multiselect':
+                baseField.options = [
+                    { value: 'option1', label: 'Opzione 1' }
+                ];
+                break;
+            case 'number':
+                baseField.min = 0;
+                baseField.step = 1;
+                break;
+            case 'file':
+                baseField.accept = '*/*';
+                baseField.multiple = false;
+                break;
+            case 'group':
+                baseField.fields = [];
+                break;
+        }
+        
+        return baseField;
+    },
+    
+    // Field Management
+    selectField(field) {
+        this.selectedField = field;
+    },
+    
+    removeField(index) {
+        this.formSchema.fields.splice(index, 1);
+        this.selectedField = null;
+    },
+    
+    moveFieldUp(index) {
+        if (index > 0) {
+            const field = this.formSchema.fields.splice(index, 1)[0];
+            this.formSchema.fields.splice(index - 1, 0, field);
+        }
+    },
+    
+    moveFieldDown(index) {
+        if (index < this.formSchema.fields.length - 1) {
+            const field = this.formSchema.fields.splice(index, 1)[0];
+            this.formSchema.fields.splice(index + 1, 0, field);
+        }
+    },
+    
+    // Add option to select/multiselect
+    addOption(field) {
+        if (!field.options) field.options = [];
+        field.options.push({
+            value: 'new_option',
+            label: 'Nuova Opzione'
+        });
+    },
+    
+    removeOption(field, index) {
+        field.options.splice(index, 1);
+    },
+    
+    // Save Form Schema
+    async saveFormSchema() {
+        try {
+            const response = await fetch('/api/form-schemas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.formSchema)
+            });
+            
+            if (response.ok) {
+                this.showSuccessMessage('Schema salvato con successo!');
+            }
+        } catch (error) {
+            console.error('Error saving schema:', error);
+        }
+    },
+    
+    // Preview Form
+    previewForm() {
+        this.$dispatch('preview-form', { schema: this.formSchema });
+    }
+}));
+```
+
+### Dynamic Form Renderer
+
+Component per renderizzare i form dai schema JSON:
+
+```javascript
+// Component per renderizzare i form dai schema JSON
+Alpine.data('dynamicFormRenderer', (schema) => ({
+    schema: schema,
+    formData: {},
+    
+    init() {
+        // Inizializza formData con valori default
+        this.initializeFormData();
+    },
+    
+    initializeFormData() {
+        this.schema.fields.forEach(field => {
+            this.formData[field.id] = this.getDefaultValue(field);
+        });
+    },
+    
+    getDefaultValue(field) {
+        switch (field.type) {
+            case 'multiselect':
+                return [];
+            case 'number':
+                return field.min || 0;
+            case 'checkbox':
+                return false;
+            case 'file':
+                return field.multiple ? [] : null;
+            default:
+                return '';
+        }
+    },
+    
+    async submitForm() {
+        try {
+            const response = await fetch(`/api/sites/${siteId}/data`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    module_id: this.schema.id,
+                    coordinates: this.coordinates,
+                    data: this.formData
+                })
+            });
+            
+            if (response.ok) {
+                this.$dispatch('form-submitted', { data: this.formData });
+            }
+        } catch (error) {
+            console.error('Form submission error:', error);
+        }
+    }
+}));
+```
+
+### Caratteristiche del Sistema
+
+✅ **Creazione moduli drag-and-drop** per tutti i tipi di rilevamenti archeologici
+✅ **Salvataggio schemi JSON** riutilizzabili
+✅ **Renderizzazione form dinamica** sulla mappa
+✅ **Integrazione perfetta** con il sistema FastAPI esistente
+✅ **Personalizzazione campi** con proprietà specifiche archeologiche
+
+### Tipi di Campo Supportati
+
+- **Testo**: Input di testo semplice
+- **Area Testo**: Textarea per descrizioni lunghe
+- **Select**: Menu a tendina con opzioni predefinite
+- **Multiselect**: Selezione multipla
+- **Numero**: Input numerici con min/max/step
+- **Data**: Selettore data
+- **File**: Upload files (singolo o multiplo)
+- **Radio**: Bottoni radio per scelte esclusive
+- **Checkbox**: Caselle di controllo
+- **Gruppo**: Raggruppamento di campi correlati
+
+### Integrazione con FastAPI
+
+Il form builder si integra con gli endpoint API esistenti:
+
+```python
+# Endpoint per salvare schema form
+@router.post("/api/form-schemas")
+async def save_form_schema(schema: FormSchema):
+    # Salva schema in database
+    pass
+
+# Endpoint per recuperare dati form
+@router.post("/api/sites/{site_id}/data")
+async def save_form_data(site_id: UUID, data: FormData):
+    # Salva dati raccolti
+    pass
+```
+
+Questo sistema fornisce un'interfaccia completa per la creazione e gestione di moduli archeologici personalizzati, garantendo flessibilità e riutilizzabilità dei componenti.
+
 ## Contributing
 
 Contributions welcome! Fork the repo, create a branch, and submit a PR. Ensure tests pass and follow PEP 8.
