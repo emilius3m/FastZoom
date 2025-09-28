@@ -1,0 +1,421 @@
+<!-- templates/sites/archaeological_plans.html - MAPPA ARCHEOLOGICA LEAFLET -->
+{% extends "base/site_base.html" %}
+
+{% block title %}Piante Archeologiche - {{ site.name }} | Sistema Archeologico{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto p-6" x-data="archaeologicalMapManager">
+    
+    <!-- Header Controls -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-12 w-12 bg-green-500 dark:bg-green-600 rounded-lg flex items-center justify-center">
+                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Piante Archeologiche</h1>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">{{ site.name }} - Gestione mappe interattive</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <!-- Plan Selector -->
+                    <div class="relative" x-show="availablePlans.length > 0">
+                        <select x-model="selectedPlanId" @change="switchPlan()" 
+                                class="block w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="">Seleziona Pianta</option>
+                            <template x-for="plan in availablePlans" :key="plan.id">
+                                <option :value="plan.id" x-text="plan.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Upload Plan Button -->
+                    {% if can_write %}
+                    <button @click="showPlanUploadModal = true"
+                            class="inline-flex items-center px-4 py-2 bg-green-600 dark:bg-green-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-800">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        Carica Pianta
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Controls -->
+    <div x-show="currentPlan" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="currentPlan?.name">
+                        Pianta Archeologica
+                    </h3>
+                    
+                    <div class="flex items-center space-x-2">
+                        <!-- Toggle Grid -->
+                        <label class="flex items-center text-sm">
+                            <input type="checkbox" x-model="gridConfig.showMajorGrid" 
+                                   @change="updateGridVisibility()" class="mr-2">
+                            <span class="text-gray-700 dark:text-gray-300">Griglia Principale</span>
+                        </label>
+                        
+                        <label class="flex items-center text-sm">
+                            <input type="checkbox" x-model="gridConfig.showMinorGrid" 
+                                   @change="updateGridVisibility()" class="mr-2">
+                            <span class="text-gray-700 dark:text-gray-300">Griglia Secondaria</span>
+                        </label>
+                        
+                        <label class="flex items-center text-sm">
+                            <input type="checkbox" x-model="gridConfig.showLabels" 
+                                   @change="updateGridVisibility()" class="mr-2">
+                            <span class="text-gray-700 dark:text-gray-300">Etichette</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <!-- Data Collection Toggle -->
+                    {% if can_write %}
+                    <button @click="toggleDataCollection()" 
+                            :class="isDataCollectionMode ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'"
+                            class="px-4 py-2 rounded-lg text-sm font-medium">
+                        <span x-show="!isDataCollectionMode">🔍 Attiva Raccolta Dati</span>
+                        <span x-show="isDataCollectionMode">⏹️ Disattiva Raccolta</span>
+                    </button>
+                    
+                    <!-- Grid Mode Toggle -->
+                    <button @click="toggleGridMode()" 
+                            :class="isGridMode ? 'bg-orange-600 text-white' : 'bg-blue-600 text-white'"
+                            class="px-4 py-2 rounded-lg text-sm font-medium">
+                        <span x-show="!isGridMode">🏗️ Aggiungi Unità</span>
+                        <span x-show="isGridMode">⏹️ Disattiva Griglia</span>
+                    </button>
+                    {% endif %}
+                    
+                    <!-- Layer Panel -->
+                    <button @click="showLayersPanel = true" 
+                            class="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium">
+                        🗂️ Layer
+                    </button>
+                    
+                    <!-- Export Data -->
+                    <button @click="exportData()" 
+                            class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium">
+                        📊 Esporta Dati
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Status Bar -->
+            <div class="mt-3 flex items-center space-x-4 text-sm">
+                <div x-show="isDataCollectionMode" class="text-orange-600 dark:text-orange-400">
+                    👆 Clicca sulla mappa per aggiungere un punto di rilevamento
+                </div>
+                <div x-show="isGridMode" class="text-orange-600 dark:text-orange-400">
+                    🏗️ Clicca sulla mappa per aggiungere un'unità di scavo
+                </div>
+                <div x-show="currentPlan" class="text-gray-600 dark:text-gray-400">
+                    📍 <span x-text="excavationUnits.length"></span> unità di scavo • 
+                    🔬 <span x-text="archaeologicalData.length"></span> punti dati
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet Map Container -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div id="archaeological-map" 
+             x-init="initMap()"
+             class="w-full h-96 lg:h-[700px] rounded-lg"
+             style="min-height: 600px;">
+        </div>
+    </div>
+
+    <!-- Excavation Units Panel -->
+    <div x-show="currentPlan && excavationUnits.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4">
+            <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">📋 Unità di Scavo Attive</h4>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <template x-for="unit in excavationUnits" :key="unit.id">
+                    <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:border-blue-300 dark:hover:border-blue-500">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-sm text-gray-900 dark:text-white" x-text="unit.id"></div>
+                            <div :class="'px-2 py-1 rounded-full text-xs font-medium ' + getStatusClass(unit.status)" 
+                                 x-text="unit.status_display">
+                            </div>
+                        </div>
+                        
+                        <div class="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                            <div x-text="unit.coordinates.x + 'm E, ' + unit.coordinates.y + 'm N'"></div>
+                            <div x-text="unit.size.x + 'x' + unit.size.y + 'm'"></div>
+                            <div x-show="unit.supervisor">
+                                Resp: <span x-text="unit.supervisor"></span>
+                            </div>
+                            <div x-show="unit.current_depth > 0">
+                                Prof: <span x-text="unit.current_depth + 'm'"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex space-x-1 mt-3">
+                            <button @click="editUnit(unit)" 
+                                    class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 border border-blue-300 rounded">
+                                ✏️ Modifica
+                            </button>
+                            <button @click="viewUnitData(unit)" 
+                                    class="text-green-600 hover:text-green-800 text-xs px-2 py-1 border border-green-300 rounded">
+                                🔬 Dati
+                            </button>
+                            {% if can_write %}
+                            <button @click="removeUnit(unit.id)" 
+                                    class="text-red-600 hover:text-red-800 text-xs px-2 py-1 border border-red-300 rounded">
+                                🗑️
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plan Upload Modal -->
+    {% if can_write %}
+    <div x-show="showPlanUploadModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+         style="display: none;">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">📤 Carica Nuova Pianta Archeologica</h3>
+            
+            <form @submit.prevent="uploadPlan()" class="space-y-4">
+                <!-- File Upload -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        File Pianta (JPG, PNG)
+                    </label>
+                    <input type="file" 
+                           x-ref="planFileInput"
+                           accept="image/*"
+                           required
+                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+                
+                <!-- Plan Info -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome Pianta</label>
+                        <input x-model="newPlan.name" 
+                               type="text" 
+                               required
+                               class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                               placeholder="es. Domus Flavia - Pianta Generale">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo Pianta</label>
+                        <select x-model="newPlan.plan_type" 
+                                class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="general">Generale</option>
+                            <option value="detail">Dettaglio</option>
+                            <option value="section">Sezione</option>
+                            <option value="reconstruction">Ricostruzione</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrizione</label>
+                    <textarea x-model="newPlan.description" 
+                              rows="3"
+                              class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              placeholder="Descrizione della pianta archeologica..."></textarea>
+                </div>
+                
+                <!-- Coordinate System -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Origine X</label>
+                        <input x-model.number="newPlan.origin_x" 
+                               type="number" 
+                               step="0.1"
+                               class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Origine Y</label>
+                        <input x-model.number="newPlan.origin_y" 
+                               type="number" 
+                               step="0.1"
+                               class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Scala</label>
+                        <input x-model="newPlan.drawing_scale" 
+                               type="text" 
+                               placeholder="1:100"
+                               class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Rilevatore</label>
+                        <input x-model="newPlan.surveyor" 
+                               type="text" 
+                               class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                </div>
+                
+                <!-- Options -->
+                <div class="flex items-center space-x-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="newPlan.is_primary" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Pianta Principale</span>
+                    </label>
+                </div>
+                
+                <div class="flex items-center justify-end space-x-3 pt-4">
+                    <button type="button" 
+                            @click="showPlanUploadModal = false"
+                            class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg">
+                        Annulla
+                    </button>
+                    <button type="submit" 
+                            :disabled="isUploadingPlan"
+                            class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
+                        <span x-show="!isUploadingPlan">Carica Pianta</span>
+                        <span x-show="isUploadingPlan">Caricamento...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Module Selector Modal -->
+    <div x-show="showModuleSelector" 
+         class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+         style="display: none;">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Seleziona Tipo di Rilevamento</h3>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <template x-for="module in availableModules" :key="module.id">
+                    <button @click="selectModule(module)"
+                            class="p-4 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-center">
+                        <div class="text-3xl mb-2" x-text="module.icon"></div>
+                        <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="module.name"></div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400" x-text="module.category"></div>
+                    </button>
+                </template>
+            </div>
+            
+            <div class="flex justify-end">
+                <button @click="showModuleSelector = false" 
+                        class="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg">
+                    Annulla
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unit Creation Modal -->
+    <div x-show="showUnitModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+         style="display: none;">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🏗️ Nuova Unità di Scavo</h3>
+            
+            <form @submit.prevent="createExcavationUnit()" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">ID Unità</label>
+                    <input x-model="newUnit.id" readonly 
+                           class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Coordinata X</label>
+                        <input x-model="newUnit.coordinates_x" readonly 
+                               class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Coordinata Y</label>
+                        <input x-model="newUnit.coordinates_y" readonly 
+                               class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Dimensione</label>
+                        <select x-model="newUnit.size_x" @change="newUnit.size_y = newUnit.size_x" 
+                                class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="1">1x1m</option>
+                            <option value="2">2x2m</option>
+                            <option value="5" selected>5x5m</option>
+                            <option value="10">10x10m</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Stato</label>
+                        <select x-model="newUnit.status" 
+                                class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="planned">Pianificata</option>
+                            <option value="in_progress">In Corso</option>
+                            <option value="completed">Completata</option>
+                            <option value="suspended">Sospesa</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Responsabile</label>
+                    <input x-model="newUnit.supervisor" 
+                           class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white" 
+                           placeholder="Nome del responsabile di scavo">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Note</label>
+                    <textarea x-model="newUnit.notes" 
+                              class="mt-1 block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white" 
+                              rows="3" 
+                              placeholder="Note archeologiche, obiettivi di scavo..."></textarea>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" @click="cancelUnitCreation()" 
+                            class="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg">
+                        Annulla
+                    </button>
+                    <button type="submit" 
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Crea Unità
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<!-- Include Leaflet CSS/JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="/static/css/archaeological_map.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Include Alpine.js Archaeological Map Component -->
+<script src="/static/js/archaeological_map.js"></script>
+<script>
+    // Set global site ID for JavaScript
+    const siteId = '{{ site.id }}';
+</script>
+
+{% endblock %}

@@ -1,0 +1,223 @@
+/* CSS per mappe archeologiche con Leaflet */
+
+/* === STILI GENERALI MAPPA === */
+
+#archaeological-map {
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+}
+
+.leaflet-container {
+    background-color: #f8f9fa !important;
+}
+
+/* === STILI GRIGLIA ARCHEOLOGICA === */
+
+.grid-line.major {
+    stroke-width: 2;
+    stroke: #2563eb;
+    opacity: 0.8;
+}
+
+.grid-line.minor {
+    stroke-width: 1;
+    stroke: #94a3b8;
+    opacity: 0.5;
+}
+
+.grid-coordinate-label {
+    background: transparent !important;
+    border: none !important;
+    pointer-events: none;
+}
+
+.grid-label {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 10px;
+    font-weight: bold;
+    color: #374151;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* === STILI UNITÀ DI SCAVO === */
+
+.excavation-unit-label {
+    background: transparent !important;
+    border: none !important;
+    pointer-events: none;
+}
+
+.unit-label {
+    background: rgba(37, 99, 235, 0.9);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    text-align: center;
+    border: 1px solid #1d4ed8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    white-space: nowrap;
+}
+
+/* Stili per stati unità di scavo */
+.excavation-unit.status-planned {
+    stroke: #94a3b8 !important;
+    fill: #94a3b8 !important;
+}
+
+.excavation-unit.status-in_progress {
+    stroke: #f59e0b !important;
+    fill: #f59e0b !important;
+}
+
+.excavation-unit.status-completed {
+    stroke: #10b981 !important;
+    fill: #10b981 !important;
+}
+
+.excavation-unit.status-suspended {
+    stroke: #ef4444 !important;
+    fill: #ef4444 !important;
+}
+
+/* === STILI MARKER ARCHEOLOGICI === */
+
+.custom-archaeological-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.marker-icon {
+    background: white;
+    border: 2px solid #2563eb;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    width: 30px;
+    height: 30px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease;
+}
+
+.marker-icon:hover {
+    transform: scale(1.1);
+}
+
+/* === POPUP PERSONALIZZATI === */
+
+.leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.excavation-popup {
+    min-width: 200px;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.excavation-popup h4 {
+    margin: 0 0 8px 0;
+    color: #1f2937;
+    font-size: 14px;
+}
+
+.excavation-popup p {
+    margin: 4px 0;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.data-popup {
+    min-width: 180px;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.data-popup h4 {
+    margin: 0 0 8px 0;
+    color: #1f2937;
+    font-size: 14px;
+}
+
+.data-popup p {
+    margin: 4px 0;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* === CONTROLLI MAPPA === */
+
+.leaflet-control-zoom {
+    border: none !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.leaflet-control-zoom a {
+    background-color: white !important;
+    border: 1px solid #d1d5db !important;
+    color: #374151 !important;
+    font-weight: bold !important;
+    transition: all 0.2s ease !important;
+}
+
+.leaflet-control-zoom a:hover {
+    background-color: #f3f4f6 !important;
+    border-color: #9ca3af !important;
+}
+
+/* === ANIMAZIONI === */
+
+.excavation-unit {
+    transition: all 0.3s ease;
+}
+
+.excavation-unit:hover {
+    opacity: 0.8;
+    stroke-width: 3;
+}
+
+.custom-archaeological-marker {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* === STILI RESPONSIVE === */
+
+@media (max-width: 768px) {
+    .grid-label {
+        font-size: 8px;
+        padding: 1px 2px;
+    }
+    
+    .unit-label {
+        font-size: 9px;
+        padding: 1px 4px;
+    }
+    
+    .marker-icon {
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
+    }
+    
+    .excavation-popup,
+    .data-popup {
+        min-width: 150px;
+    }
+}

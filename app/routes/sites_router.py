@@ -260,6 +260,38 @@ async def site_team_management(
     return templates.TemplateResponse("sites/teams.html", context)
 
 
+@sites_router.get("/{site_id}/archaeological-plans", response_class=HTMLResponse)
+async def site_archaeological_plans(
+        request: Request,
+        site_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Gestione piante archeologiche e griglie di scavo"""
+    site, permission = site_access
+    
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi insufficienti")
+    
+    # Get current user info
+    user_query = select(User).where(User.id == current_user_id)
+    user = await db.execute(user_query)
+    current_user = user.scalar_one_or_none()
+    
+    context = {
+        "request": request,
+        "site": site,
+        "user_permission": permission,
+        "current_user": current_user,
+        "can_read": permission.can_read(),
+        "can_write": permission.can_write(),
+        "can_admin": permission.can_admin()
+    }
+    
+    return templates.TemplateResponse("sites/archaeological_plans.html", context)
+
+
 # === API ENDPOINTS PER DASHBOARD ===
 
 @sites_router.get("/{site_id}/api/stats")

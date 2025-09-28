@@ -44,6 +44,9 @@ class ArchaeologicalSite(Base):
     # Relazione con i form schema del sito
     form_schemas = relationship("FormSchema", back_populates="site", cascade="all, delete-orphan")
     
+    # Relazione con le piante archeologiche
+    plans = relationship("ArchaeologicalPlan", back_populates="site", cascade="all, delete-orphan")
+    
     def __repr__(self):
         return f"<ArchaeologicalSite(name='{self.name}', code='{self.code}')>"
     

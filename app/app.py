@@ -16,7 +16,7 @@ from app.models.photos import Photo
 from app.models.users import User, Role, UserActivity
 from app.models.user_profiles import UserProfile
 # Sicurezza multi-sito - DEPENDENCY CON BLACKLIST CHECK
-from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
+from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
 from app.core.config import get_settings
 
 # Route imports
@@ -35,6 +35,8 @@ from app.routes.sites_router import sites_router
 from app.routes.photos_router import photos_router
 # 🔧 NUOVO IMPORT - Router Form Schemas
 from app.routes.api.form_schemas import form_schemas_router
+# 🗺️ NUOVO IMPORT - Router Archaeological Plans API
+from app.routes.api.archaeological_plans import archaeological_plans_router
 
 
 
@@ -101,6 +103,13 @@ app.include_router(
 app.include_router(
     form_schemas_router,
     tags=["form-schemas"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+)
+
+# 🗺️ INCLUSIONE ROUTER ARCHAEOLOGICAL PLANS - API per piante archeologiche
+app.include_router(
+    archaeological_plans_router,
+    tags=["archaeological-plans"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 
