@@ -36,7 +36,7 @@ from app.routes.photos_router import photos_router
 # 🔧 NUOVO IMPORT - Router Form Schemas
 from app.routes.api.form_schemas import form_schemas_router
 # 🗺️ NUOVO IMPORT - Router Archaeological Plans API
-from app.routes.api.archaeological_plans import archaeological_plans_router
+from app.routes.api.archaeological_plans import plans_router as archaeological_plans_router
 
 
 
