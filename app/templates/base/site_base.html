@@ -34,39 +34,9 @@
   </head>
 
   <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
-    <!-- Theme Toggle Button
-    <div class="fixed top-4 right-4 z-50 flex space-x-2">
-      <button
-        id="theme-toggle"
-        type="button"
-        class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5"
-        aria-label="Toggle theme"
-        title="Cambia tema"
-      >
-         Light mode icon
-        <svg id="theme-toggle-light-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 2L13.09 8.26L20 9L14 14.74L15.18 21.02L10 17.77L4.82 21.02L6 14.74L0 9L6.91 8.26L10 2Z"></path>
-        </svg>
-        Dark mode icon
-        <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
-        </svg>
-      </button>
-
-      Reset theme button (temporary)
-      <button
-        id="reset-theme"
-        type="button"
-        class="text-xs bg-red-500 text-white hover:bg-red-600 px-2 py-1 rounded"
-        title="Reset tema"
-        onclick="localStorage.removeItem('theme'); location.reload();"
-      >
-        Reset
-      </button>
-    </div>-->
-
-    <!-- Navigation -->
-    <nav class="bg-white border-gray-200 px-4 lg:px-6 py-2.5 dark:bg-gray-900 dark:border-gray-700">
+    {% if current_page not in ["register", "login"] %}
+      {% include "partials/auth_navigation.html" %}
+    {% endif %}
       <div class="flex flex-wrap justify-between items-center max-w-screen-xl mx-auto">
         <div class="flex justify-start items-center">
           <!-- Logo -->
@@ -118,89 +88,8 @@
           </button>
         </div>
       </div>
-    </nav>
-
-    <!-- Mobile Navigation Menu (hidden by default) -->
-    <div class="md:hidden hidden" id="navbar-user">
-      <ul class="flex flex-col font-medium p-4 border border-gray-100 rounded-lg bg-gray-50 space-y-2">
-        <li><a href="/dashboard" class="block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Dashboard</a></li>
-        <li><a href="/sites" class="block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Siti</a></li>
-        <li><a href="/photos" class="block py-2 px-3 text-gray-900 rounded hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">Foto</a></li>
-      </ul>
-    </div>
-
-    <!-- Notifications dropdown -->
-    <div class="hidden overflow-hidden z-50 my-4 max-w-sm text-base list-none bg-white rounded divide-y divide-gray-100 shadow-lg dark:divide-gray-600 dark:bg-gray-700" id="notification-dropdown">
-        <div class="block py-2 px-4 text-base font-medium text-center text-gray-700 bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-            Notifiche
-        </div>
-        <div>
-        <a href="#" class="flex py-3 px-4 border-b hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600">
-            <div class="flex-shrink-0">
-            <img class="w-11 h-11 rounded-full" src="" alt="Bonnie Green avatar">
-            <div class="flex absolute justify-center items-center ml-6 -mt-5 w-5 h-5 rounded-full border border-white bg-blue-700 dark:border-gray-700">
-                <svg class="w-2 h-2 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 18 18"><path d="M15.977.783A1 1 0 0 0 15 0H3a1 1 0 0 0-.977.783L.2 9h4.239a2.99 2.99 0 0 1 2.742 1.8 1.977 1.977 0 0 0 3.638 0A2.99 2.99 0 0 1 13.561 9H17.8L15.977.783ZM6 2h6a1 1 0 1 1 0 2H6a1 1 0 0 1 0-2Zm7 5H5a1 1 0 0 1 0-2h8a1 1 0 1 1 0 2Z"/><path d="M1 18h16a1 1 0 0 0 1-1v-6h-4.439a.99.99 0 0 0-.908.6 3.978 3.978 0 0 1-7.306 0 .99.99 0 0 0-.908-.6H0v6a1 1 0 0 0 1 1Z"/></svg>
-            </div>
-            </div>
-            <div class="pl-3 w-full">
-                <div class="text-gray-500 font-normal text-sm mb-1.5 dark:text-gray-400">Nuova foto caricata da <span class="font-semibold text-gray-900 dark:text-white">Team Scavo</span>: "Foto del reperto 2024-001"</div>
-                <div class="text-xs font-medium text-blue-700 dark:text-blue-400">pochi minuti fa</div>
-            </div>
-        </a>
-        <a href="#" class="flex py-3 px-4 border-b hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600">
-            <div class="flex-shrink-0">
-            <img class="w-11 h-11 rounded-full" src="" alt="Jese Leos avatar">
-            <div class="flex absolute justify-center items-center ml-6 -mt-5 w-5 h-5 bg-gray-900 rounded-full border border-white dark:border-gray-700">
-                <svg class="w-2 h-2 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 18"><path d="M6.5 9a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9ZM8 10H5a5.006 5.006 0 0 0-5 5v2a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-2a5.006 5.006 0 0 0-5-5Zm11-3h-2V5a1 1 0 0 0-2 0v2h-2a1 1 0 1 0 0 2h2v2a1 1 0 0 0 2 0V9h2a1 1 0 1 0 0-2Z"/></svg>
-            </div>
-            </div>
-            <div class="pl-3 w-full">
-                <div class="text-gray-500 font-normal text-sm mb-1.5 dark:text-gray-400"><span class="font-semibold text-gray-900 dark:text-white">Utente X</span> ha aggiunto un nuovo sito.</div>
-                <div class="text-xs font-medium text-blue-700 dark:text-blue-400">10 minuti fa</div>
-            </div>
-        </a>
-        <a href="#" class="flex py-3 px-4 border-b hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600">
-            <div class="flex-shrink-0">
-            <img class="w-11 h-11 rounded-full" src="" alt="Joseph McFall avatar">
-            <div class="flex absolute justify-center items-center ml-6 -mt-5 w-5 h-5 bg-red-600 rounded-full border border-white dark:border-gray-700">
-              <svg class="w-2 h-2 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 18"> <path d="M17.947 2.053a5.209 5.209 0 0 0-3.793-1.53A6.414 6.414 0 0 0 10 2.311 6.482 6.482 0 0 0 5.824.5a5.2 5.2 0 0 0-3.8 1.521c-1.915 1.916-2.315 5.392.625 8.333l7 7a.5.5 0 0 0 .708 0l7-7a6.6 6.6 0 0 0 2.123-4.508 5.179 5.179 0 0 0-1.533-3.793Z"/> </svg>
-            </div>
-            </div>
-            <div class="pl-3 w-full">
-                <div class="text-gray-500 font-normal text-sm mb-1.5 dark:text-gray-400"><span class="font-semibold text-gray-900 dark:text-white">Joseph Mcfall</span> ha approvato il tuo upload.</div>
-                <div class="text-xs font-medium text-blue-700 dark:text-blue-400">44 minuti fa</div>
-            </div>
-        </a>
-        </div>
-        <a href="/notifications/" class="block py-2 text-base font-medium text-center text-gray-900 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:text-white dark:hover:underline">
-            <div class="inline-flex items-center ">
-            <svg aria-hidden="true" class="mr-2 w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path></svg>
-            Visualizza tutte
-            </div>
-        </a>
-    </div>
-
-    <!-- Dropdown menu -->
-    <div class="z-50 hidden my-4 text-base list-none bg-white divide-y divide-gray-100 rounded-lg shadow-sm dark:bg-gray-700 dark:divide-gray-600" id="user-dropdown">
-      <div class="px-4 py-3">
-        <span class="block text-sm text-gray-900 dark:text-white">{{ current_user.email if current_user else 'Guest' }}</span>
-        <span class="block text-sm text-gray-500 truncate dark:text-gray-400">Utente del sistema</span>
-      </div>
-      <ul class="py-2" aria-labelledby="user-menu-button">
-        <li>
-          <a href="/profile" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white">Profilo_site_base</a>
-        </li>
-        <li>
-          <a href="/settings" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white">Impostazioni</a>
-        </li>
-        <li>
-          <a href="/logout" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white">Esci</a>
-        </li>
-      </ul>
-    </div>
-
-    <!-- Main content -->
-    <main class="flex-1">
+    <!-- Main content with proper padding for sidebar -->
+    <main class="flex-1 p-4 pt-20 sm:ml-64">
       {% block content %}{% endblock %}
     </main>
 
