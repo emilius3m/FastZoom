@@ -1,0 +1,1058 @@
+{% extends "base/site_base.html" %}
+
+{% block title %}Catalogazione ICCD - {{ site.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.iccd-section {
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.iccd-section-header {
+    background: #f8f9fa;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.iccd-section-content {
+    padding: 1.5rem;
+}
+
+.iccd-form-group {
+    margin-bottom: 1rem;
+}
+
+.iccd-form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.iccd-required {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.iccd-validation-error {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.iccd-validation-success {
+    color: #28a745;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.iccd-nct-display {
+    background: #e9ecef;
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #007bff;
+}
+
+.iccd-progress {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 2rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    transition: width 0.3s ease;
+}
+
+.iccd-toolbar {
+    position: sticky;
+    top: 70px;
+    background: white;
+    border-bottom: 1px solid #dee2e6;
+    padding: 1rem 0;
+    margin-bottom: 2rem;
+    z-index: 100;
+}
+
+.schema-selector {
+    max-width: 200px;
+}
+
+.level-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.level-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.level-P { background: #ffc107; color: #000; }
+.level-C { background: #17a2b8; color: white; }
+.level-A { background: #28a745; color: white; }
+
+.material-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.material-chip {
+    background: #e9ecef;
+    padding: 0.25rem 0.75rem;
+    border-radius: 16px;
+    font-size: 0.875rem;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.material-chip.selected {
+    background: #007bff;
+    color: white;
+    border-color: #0056b3;
+}
+
+.section-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+.section-collapsed .iccd-section-content {
+    display: none;
+}
+
+.chronology-input-group {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0.5rem;
+    align-items: center;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" x-data="iccdCatalogation()" x-init="init()">
+    
+    <!-- Toolbar fisso -->
+    <div class="iccd-toolbar">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <label for="schemaType" class="form-label mb-0">Tipo Schema</label>
+                <select id="schemaType" class="form-select schema-selector" 
+                        x-model="formData.schema_type" 
+                        @change="loadSchemaTemplate()">
+                    <option value="RA">🏺 RA - Reperto Archeologico</option>
+                    <option value="CA">🏛️ CA - Complesso Archeologico</option>
+                    <option value="SI">🗺️ SI - Sito Archeologico</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="catalogLevel" class="form-label mb-0">Livello Catalogazione</label>
+                <select id="catalogLevel" class="form-select" 
+                        x-model="formData.level"
+                        @change="updateRequiredSections()">
+                    <option value="P">P - Precatalogazione</option>
+                    <option value="C">C - Catalogazione</option>
+                    <option value="A">A - Approfondimento</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <div class="level-indicator">
+                    <span class="level-badge" :class="'level-' + formData.level" x-text="getLevelName()"></span>
+                    <small class="text-muted" x-text="completedSections + '/' + totalSections + ' sezioni'"></small>
+                </div>
+            </div>
+            <div class="col-md-3 text-end">
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-secondary" @click="validateForm()">
+                        <i class="fas fa-check-circle"></i> Valida
+                    </button>
+                    <button type="button" class="btn btn-success" @click="saveRecord()" :disabled="!isValid">
+                        <i class="fas fa-save"></i> Salva Scheda
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="iccd-progress">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Completamento Scheda ICCD</h6>
+            <span class="badge bg-primary" x-text="Math.round(completionPercentage) + '%'"></span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" :style="'width: ' + completionPercentage + '%'"></div>
+        </div>
+        
+        <!-- NCT Display -->
+        <div class="iccd-nct-display mt-3" x-show="formData.iccd_data.CD?.NCT">
+            <strong>Codice NCT:</strong> 
+            <span x-text="generateNCTDisplay()"></span>
+        </div>
+    </div>
+
+    <!-- Alert per validazioni -->
+    <div x-show="showAlert" class="alert" :class="alertClass" role="alert" x-transition>
+        <div class="d-flex align-items-center">
+            <i :class="alertIcon" class="me-2"></i>
+            <span x-text="alertMessage"></span>
+        </div>
+    </div>
+
+    <!-- Sezione CD - CODICI -->
+    <div class="iccd-section">
+        <div class="iccd-section-header section-toggle" @click="toggleSection('CD')">
+            <div>
+                <h5 class="mb-0">CD - CODICI <span class="iccd-required">*</span></h5>
+                <small class="text-muted">Identificativi e metadati della scheda</small>
+            </div>
+            <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.CD}"></i>
+        </div>
+        <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.CD}">
+            <div class="iccd-form-row">
+                <div class="iccd-form-group">
+                    <label class="form-label">Tipo Scheda <span class="iccd-required">*</span></label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.CD.TSK" readonly>
+                </div>
+                <div class="iccd-form-group">
+                    <label class="form-label">Livello Ricerca <span class="iccd-required">*</span></label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.CD.LIR" readonly>
+                </div>
+                <div class="iccd-form-group">
+                    <label class="form-label">Ente Schedatore <span class="iccd-required">*</span></label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.CD.ESC" 
+                           placeholder="SSABAP-RM">
+                </div>
+            </div>
+            
+            <!-- NCT - Codice Univoco -->
+            <div class="mt-4">
+                <h6>NCT - Codice Univoco <span class="iccd-required">*</span></h6>
+                <div class="iccd-form-row">
+                    <div class="iccd-form-group">
+                        <label class="form-label">Codice Regione (NCTR) <span class="iccd-required">*</span></label>
+                        <input type="text" class="form-control" x-model="formData.iccd_data.CD.NCT.NCTR" 
+                               pattern="[0-9]{2}" maxlength="2" placeholder="12">
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Numero Catalogo (NCTN) <span class="iccd-required">*</span></label>
+                        <input type="text" class="form-control" x-model="formData.iccd_data.CD.NCT.NCTN" 
+                               pattern="[0-9]{8}" maxlength="8" placeholder="Generato automaticamente" readonly>
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Suffisso (NCTS)</label>
+                        <input type="text" class="form-control" x-model="formData.iccd_data.CD.NCT.NCTS" 
+                               pattern="[A-Z]{1,2}" maxlength="2" placeholder="A, B, AA...">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sezione OG - OGGETTO -->
+    <div class="iccd-section">
+        <div class="iccd-section-header section-toggle" @click="toggleSection('OG')">
+            <div>
+                <h5 class="mb-0">OG - OGGETTO <span class="iccd-required">*</span></h5>
+                <small class="text-muted">Definizione e classificazione dell'oggetto</small>
+            </div>
+            <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.OG}"></i>
+        </div>
+        <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.OG}">
+            <div class="iccd-form-row">
+                <div class="iccd-form-group">
+                    <label class="form-label">Definizione <span class="iccd-required">*</span></label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGT.OGTD" 
+                           placeholder="coppa, anfora, lucerna, fibula..." list="object-definitions">
+                    <datalist id="object-definitions">
+                        <option value="coppa">
+                        <option value="anfora">
+                        <option value="lucerna">
+                        <option value="fibula">
+                        <option value="moneta">
+                        <option value="anello">
+                        <option value="vaso">
+                        <option value="piatto">
+                        <option value="statuetta">
+                    </datalist>
+                </div>
+                <div class="iccd-form-group">
+                    <label class="form-label">Tipologia</label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGT.OGTT" 
+                           placeholder="Specificazione tipologica">
+                </div>
+                <div class="iccd-form-group">
+                    <label class="form-label">Denominazione</label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGT.OGTN" 
+                           placeholder="Nome proprio se noto">
+                </div>
+            </div>
+            
+            <!-- Numero Inventario -->
+            <div class="mt-4">
+                <h6>Numero d'Inventario</h6>
+                <div class="iccd-form-row">
+                    <div class="iccd-form-group">
+                        <label class="form-label">Numero</label>
+                        <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGN.OGNN" 
+                               placeholder="Numero d'inventario">
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Specifiche</label>
+                        <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGN.OGNS" 
+                               placeholder="Specificazioni">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sezione LC - LOCALIZZAZIONE -->
+    <div class="iccd-section">
+        <div class="iccd-section-header section-toggle" @click="toggleSection('LC')">
+            <div>
+                <h5 class="mb-0">LC - LOCALIZZAZIONE <span class="iccd-required">*</span></h5>
+                <small class="text-muted">Localizzazione geografica e amministrativa</small>
+            </div>
+            <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.LC}"></i>
+        </div>
+        <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.LC}">
+            <h6>Localizzazione Geografico-Amministrativa <span class="iccd-required">*</span></h6>
+            <div class="iccd-form-row">
+                <div class="iccd-form-group">
+                    <label class="form-label">Stato <span class="iccd-required">*</span></label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVC.PVCS" 
+                           value="Italia" readonly>
+                </div>
+                <div class="iccd-form-group">
+                    <label class="form-label">Regione <span class="iccd-required">*</span></label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVC.PVCR" 
+                           value="Lazio" readonly>
+                </div>
+                <div class="iccd-form-group">
+                    <label class="form-label">Provincia <span class="iccd-required">*</span></label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVC.PVCP" 
+                           value="RM" readonly>
+                </div>
+                <div class="iccd-form-group">
+                    <label class="form-label">Comune <span class="iccd-required">*</span></label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVC.PVCC" 
+                           value="Roma" readonly>
+                </div>
+            </div>
+            
+            <h6 class="mt-4">Localizzazione Specifica</h6>
+            <div class="iccd-form-row">
+                <div class="iccd-form-group">
+                    <label class="form-label">Denominazione</label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVL.PVLN" 
+                           placeholder="Domus Flavia">
+                </div>
+                <div class="iccd-form-group">
+                    <label class="form-label">Indirizzo</label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVL.PVLI" 
+                           placeholder="Via o località">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sezioni condizionali per livello C e A -->
+    <template x-show="['C', 'A'].includes(formData.level)">
+        
+        <!-- Sezione DT - CRONOLOGIA -->
+        <div class="iccd-section">
+            <div class="iccd-section-header section-toggle" @click="toggleSection('DT')">
+                <div>
+                    <h5 class="mb-0">DT - CRONOLOGIA <span class="iccd-required">*</span></h5>
+                    <small class="text-muted">Datazione dell'oggetto</small>
+                </div>
+                <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.DT}"></i>
+            </div>
+            <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.DT}">
+                <h6>Cronologia Generica</h6>
+                <div class="chronology-input-group">
+                    <div class="iccd-form-group">
+                        <label class="form-label">Secolo da</label>
+                        <select class="form-select" x-model="formData.iccd_data.DT.DTS.DTSI">
+                            <option value="">Seleziona...</option>
+                            <option value="VIII a.C.">VIII a.C.</option>
+                            <option value="VII a.C.">VII a.C.</option>
+                            <option value="VI a.C.">VI a.C.</option>
+                            <option value="V a.C.">V a.C.</option>
+                            <option value="IV a.C.">IV a.C.</option>
+                            <option value="III a.C.">III a.C.</option>
+                            <option value="II a.C.">II a.C.</option>
+                            <option value="I a.C.">I a.C.</option>
+                            <option value="I d.C.">I d.C.</option>
+                            <option value="II d.C.">II d.C.</option>
+                            <option value="III d.C.">III d.C.</option>
+                            <option value="IV d.C.">IV d.C.</option>
+                            <option value="V d.C.">V d.C.</option>
+                            <option value="VI d.C.">VI d.C.</option>
+                        </select>
+                    </div>
+                    <div class="text-center">—</div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Secolo a</label>
+                        <select class="form-select" x-model="formData.iccd_data.DT.DTS.DTSF">
+                            <option value="">Seleziona...</option>
+                            <option value="VIII a.C.">VIII a.C.</option>
+                            <option value="VII a.C.">VII a.C.</option>
+                            <option value="VI a.C.">VI a.C.</option>
+                            <option value="V a.C.">V a.C.</option>
+                            <option value="IV a.C.">IV a.C.</option>
+                            <option value="III a.C.">III a.C.</option>
+                            <option value="II a.C.">II a.C.</option>
+                            <option value="I a.C.">I a.C.</option>
+                            <option value="I d.C.">I d.C.</option>
+                            <option value="II d.C.">II d.C.</option>
+                            <option value="III d.C.">III d.C.</option>
+                            <option value="IV d.C.">IV d.C.</option>
+                            <option value="V d.C.">V d.C.</option>
+                            <option value="VI d.C.">VI d.C.</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="iccd-form-group mt-3">
+                    <label class="form-label">Validità</label>
+                    <select class="form-select" x-model="formData.iccd_data.DT.DTS.DTSV">
+                        <option value="">Seleziona...</option>
+                        <option value="ca.">ca. (circa)</option>
+                        <option value="?">? (incerto)</option>
+                        <option value="ante">ante</option>
+                        <option value="post">post</option>
+                        <option value="non ante">non ante</option>
+                        <option value="non post">non post</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sezione MT - DATI TECNICI -->
+        <div class="iccd-section">
+            <div class="iccd-section-header section-toggle" @click="toggleSection('MT')">
+                <div>
+                    <h5 class="mb-0">MT - DATI TECNICI <span class="iccd-required">*</span></h5>
+                    <small class="text-muted">Materia, tecnica e misure</small>
+                </div>
+                <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.MT}"></i>
+            </div>
+            <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.MT}">
+                <h6>Materia e Tecnica <span class="iccd-required">*</span></h6>
+                <div class="iccd-form-group">
+                    <label class="form-label">Materia <span class="iccd-required">*</span></label>
+                    <div class="material-chips">
+                        <template x-for="material in availableMaterials" :key="material">
+                            <div class="material-chip" 
+                                 :class="{'selected': formData.iccd_data.MT?.MTC?.MTCM?.includes(material)}"
+                                 @click="toggleMaterial(material)"
+                                 x-text="material">
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div class="iccd-form-group mt-3">
+                    <label class="form-label">Tecnica</label>
+                    <input type="text" class="form-control" x-model="formData.iccd_data.MT.MTC.MTCT" 
+                           placeholder="tornio, modellato a mano, fusione...">
+                </div>
+                
+                <h6 class="mt-4">Misure</h6>
+                <div class="iccd-form-row">
+                    <div class="iccd-form-group">
+                        <label class="form-label">Altezza (cm)</label>
+                        <input type="number" class="form-control" x-model="formData.iccd_data.MT.MIS.MISA" 
+                               step="0.1" min="0">
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Larghezza (cm)</label>
+                        <input type="number" class="form-control" x-model="formData.iccd_data.MT.MIS.MISL" 
+                               step="0.1" min="0">
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Profondità (cm)</label>
+                        <input type="number" class="form-control" x-model="formData.iccd_data.MT.MIS.MISP" 
+                               step="0.1" min="0">
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Diametro (cm)</label>
+                        <input type="number" class="form-control" x-model="formData.iccd_data.MT.MIS.MISD" 
+                               step="0.1" min="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sezione DA - DATI ANALITICI -->
+        <div class="iccd-section">
+            <div class="iccd-section-header section-toggle" @click="toggleSection('DA')">
+                <div>
+                    <h5 class="mb-0">DA - DATI ANALITICI <span class="iccd-required">*</span></h5>
+                    <small class="text-muted">Descrizione e stato di conservazione</small>
+                </div>
+                <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.DA}"></i>
+            </div>
+            <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.DA}">
+                <h6>Descrizione <span class="iccd-required">*</span></h6>
+                <div class="iccd-form-group">
+                    <label class="form-label">Descrizione Oggetto <span class="iccd-required">*</span></label>
+                    <textarea class="form-control" x-model="formData.iccd_data.DA.DES.DESO" 
+                              rows="4" placeholder="Descrizione dettagliata del reperto (minimo 10 caratteri)"></textarea>
+                </div>
+                <div class="iccd-form-group">
+                    <label class="form-label">Descrizione Iconografica</label>
+                    <textarea class="form-control" x-model="formData.iccd_data.DA.DES.DESI" 
+                              rows="3" placeholder="Descrizione di decorazioni e iconografia"></textarea>
+                </div>
+                
+                <h6 class="mt-4">Stato di Conservazione <span class="iccd-required">*</span></h6>
+                <div class="iccd-form-row">
+                    <div class="iccd-form-group">
+                        <label class="form-label">Stato <span class="iccd-required">*</span></label>
+                        <select class="form-select" x-model="formData.iccd_data.DA.STC.STCC">
+                            <option value="">Seleziona...</option>
+                            <option value="ottimo">Ottimo</option>
+                            <option value="buono">Buono</option>
+                            <option value="discreto">Discreto</option>
+                            <option value="cattivo">Cattivo</option>
+                            <option value="pessimo">Pessimo</option>
+                        </select>
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Indicazioni Specifiche</label>
+                        <textarea class="form-control" x-model="formData.iccd_data.DA.STC.STCS" 
+                                  rows="2" placeholder="Dettagli sullo stato conservativo"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Sezioni per livello A - Approfondimento -->
+    <template x-show="formData.level === 'A'">
+        
+        <!-- Sezione AU - DEFINIZIONE CULTURALE -->
+        <div class="iccd-section">
+            <div class="iccd-section-header section-toggle" @click="toggleSection('AU')">
+                <div>
+                    <h5 class="mb-0">AU - DEFINIZIONE CULTURALE <span class="iccd-required">*</span></h5>
+                    <small class="text-muted">Ambito culturale di appartenenza</small>
+                </div>
+                <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.AU}"></i>
+            </div>
+            <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.AU}">
+                <div class="iccd-form-row">
+                    <div class="iccd-form-group">
+                        <label class="form-label">Denominazione <span class="iccd-required">*</span></label>
+                        <input type="text" class="form-control" x-model="formData.iccd_data.AU.AUT.AUTM" 
+                               placeholder="romano, etrusco, greco, italico..." list="cultural-contexts">
+                        <datalist id="cultural-contexts">
+                            <option value="romano">
+                            <option value="etrusco">
+                            <option value="greco">
+                            <option value="italico">
+                            <option value="orientale">
+                            <option value="barbarico">
+                        </datalist>
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Specifiche</label>
+                        <input type="text" class="form-control" x-model="formData.iccd_data.AU.AUT.AUTS" 
+                               placeholder="Specificazioni dell'ambito culturale">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sezione NS - NOTIZIE STORICHE -->
+        <div class="iccd-section">
+            <div class="iccd-section-header section-toggle" @click="toggleSection('NS')">
+                <div>
+                    <h5 class="mb-0">NS - NOTIZIE STORICHE</h5>
+                    <small class="text-muted">Informazioni sul rinvenimento</small>
+                </div>
+                <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.NS}"></i>
+            </div>
+            <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.NS}">
+                <div class="iccd-form-row">
+                    <div class="iccd-form-group">
+                        <label class="form-label">Rinvenimento</label>
+                        <textarea class="form-control" x-model="formData.iccd_data.NS.NSC.NSCR" 
+                                  rows="3" placeholder="Circostanze e modalità di rinvenimento"></textarea>
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Data Rinvenimento</label>
+                        <input type="date" class="form-control" x-model="formData.iccd_data.NS.NSC.NSCD">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sezione RS - FONTI E DOCUMENTI -->
+        <div class="iccd-section">
+            <div class="iccd-section-header section-toggle" @click="toggleSection('RS')">
+                <div>
+                    <h5 class="mb-0">RS - FONTI E DOCUMENTI</h5>
+                    <small class="text-muted">Documentazione di riferimento</small>
+                </div>
+                <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.RS}"></i>
+            </div>
+            <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.RS}">
+                <div class="iccd-form-row">
+                    <div class="iccd-form-group">
+                        <label class="form-label">Responsabile Ricerca</label>
+                        <input type="text" class="form-control" x-model="formData.iccd_data.RS.RSE.RSER" 
+                               placeholder="Nome del responsabile">
+                    </div>
+                    <div class="iccd-form-group">
+                        <label class="form-label">Anno Realizzazione</label>
+                        <input type="number" class="form-control" x-model="formData.iccd_data.RS.RSE.RSEC" 
+                               min="1800" max="2030" placeholder="YYYY">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function iccdCatalogation() {
+    return {
+        // Stato del form
+        formData: {
+            schema_type: 'RA',
+            level: 'C',
+            cataloging_institution: 'SSABAP-RM',
+            iccd_data: {}
+        },
+        
+        // UI state
+        collapsedSections: {
+            CD: false,
+            OG: false,
+            LC: false,
+            DT: false,
+            MT: false,
+            DA: false,
+            AU: false,
+            NS: false,
+            RS: false
+        },
+        
+        // Validazione
+        validationErrors: [],
+        isValid: false,
+        
+        // Progress
+        totalSections: 6,
+        completedSections: 0,
+        completionPercentage: 0,
+        
+        // Alert system
+        showAlert: false,
+        alertMessage: '',
+        alertClass: 'alert-info',
+        alertIcon: 'fas fa-info-circle',
+        
+        // Dati disponibili
+        availableMaterials: [
+            'ceramica', 'terracotta', 'argilla', 'bronzo', 'ferro', 'piombo',
+            'oro', 'argento', 'marmo', 'travertino', 'tufo', 'legno', 'osso',
+            'avorio', 'vetro', 'ambra', 'pasta vitrea'
+        ],
+        
+        // Inizializzazione
+        async init() {
+            await this.loadSchemaTemplate();
+            this.generateNCT();
+            this.updateProgress();
+            
+            // Watch per aggiornamenti automatici
+            this.$watch('formData', () => {
+                this.updateProgress();
+            }, { deep: true });
+        },
+        
+        // Caricamento template schema
+        async loadSchemaTemplate() {
+            try {
+                const response = await fetch(`/api/iccd/schema-templates/${this.formData.schema_type}`);
+                if (response.ok) {
+                    const template = await response.json();
+                    this.initializeFormData(template);
+                }
+            } catch (error) {
+                console.error('Errore caricamento template:', error);
+                this.showAlertMessage('Errore caricamento template schema', 'error');
+            }
+        },
+        
+        // Inizializzazione dati form
+        initializeFormData(template) {
+            // Inizializza struttura dati ICCD
+            this.formData.iccd_data = {
+                CD: {
+                    TSK: this.formData.schema_type,
+                    LIR: this.formData.level,
+                    NCT: {
+                        NCTR: '12', // Lazio
+                        NCTN: '', // Generato automaticamente
+                        NCTS: ''
+                    },
+                    ESC: this.formData.cataloging_institution
+                },
+                OG: {
+                    OGT: {
+                        OGTD: '',
+                        OGTT: '',
+                        OGTN: ''
+                    },
+                    OGN: {
+                        OGNN: '',
+                        OGNS: ''
+                    }
+                },
+                LC: {
+                    PVC: {
+                        PVCS: 'Italia',
+                        PVCR: 'Lazio',
+                        PVCP: 'RM',
+                        PVCC: 'Roma'
+                    },
+                    PVL: {
+                        PVLN: 'Domus Flavia',
+                        PVLI: 'Palatino'
+                    },
+                    LDC: {
+                        LDCN: '',
+                        LDCU: ''
+                    }
+                }
+            };
+            
+            // Aggiungi sezioni condizionali
+            if (['C', 'A'].includes(this.formData.level)) {
+                this.formData.iccd_data.DT = {
+                    DTS: {
+                        DTSI: '',
+                        DTSF: '',
+                        DTSV: ''
+                    },
+                    DTM: {
+                        DTMA: null,
+                        DTMB: null,
+                        DTMV: ''
+                    }
+                };
+                
+                this.formData.iccd_data.MT = {
+                    MTC: {
+                        MTCM: [],
+                        MTCT: ''
+                    },
+                    MIS: {
+                        MISA: null,
+                        MISL: null,
+                        MISP: null,
+                        MISD: null,
+                        MISU: 'cm'
+                    }
+                };
+                
+                this.formData.iccd_data.DA = {
+                    DES: {
+                        DESO: '',
+                        DESI: ''
+                    },
+                    ISR: {
+                        ISRC: '',
+                        ISRI: '',
+                        ISRL: ''
+                    },
+                    STC: {
+                        STCC: '',
+                        STCS: ''
+                    }
+                };
+            }
+            
+            if (this.formData.level === 'A') {
+                this.formData.iccd_data.AU = {
+                    AUT: {
+                        AUTM: '',
+                        AUTS: ''
+                    }
+                };
+                
+                this.formData.iccd_data.NS = {
+                    NSC: {
+                        NSCR: '',
+                        NSCD: ''
+                    }
+                };
+                
+                this.formData.iccd_data.RS = {
+                    RSE: {
+                        RSER: '',
+                        RSEC: ''
+                    }
+                };
+            }
+            
+            this.updateRequiredSections();
+        },
+        
+        // Aggiornamento sezioni richieste
+        updateRequiredSections() {
+            const sectionsByLevel = {
+                'P': ['CD', 'OG', 'LC'],
+                'C': ['CD', 'OG', 'LC', 'DT', 'MT', 'DA'],
+                'A': ['CD', 'OG', 'LC', 'DT', 'MT', 'DA', 'AU', 'NS', 'RS']
+            };
+            
+            this.totalSections = sectionsByLevel[this.formData.level].length;
+            this.loadSchemaTemplate(); // Ricarica template per nuovo livello
+        },
+        
+        // Generazione NCT
+        generateNCT() {
+            const now = new Date();
+            const year = now.getFullYear().toString().slice(-2);
+            const timestamp = now.getTime().toString().slice(-6);
+            this.formData.iccd_data.CD.NCT.NCTN = year + timestamp;
+        },
+        
+        // Display NCT
+        generateNCTDisplay() {
+            const nct = this.formData.iccd_data.CD?.NCT;
+            if (!nct) return '';
+            
+            return `${nct.NCTR || ''}${nct.NCTN || ''}${nct.NCTS || ''}`;
+        },
+        
+        // Toggle sezioni
+        toggleSection(section) {
+            this.collapsedSections[section] = !this.collapsedSections[section];
+        },
+        
+        // Toggle materiali
+        toggleMaterial(material) {
+            if (!this.formData.iccd_data.MT) {
+                this.formData.iccd_data.MT = { MTC: { MTCM: [] } };
+            }
+            if (!this.formData.iccd_data.MT.MTC) {
+                this.formData.iccd_data.MT.MTC = { MTCM: [] };
+            }
+            if (!this.formData.iccd_data.MT.MTC.MTCM) {
+                this.formData.iccd_data.MT.MTC.MTCM = [];
+            }
+            
+            const materials = this.formData.iccd_data.MT.MTC.MTCM;
+            const index = materials.indexOf(material);
+            
+            if (index > -1) {
+                materials.splice(index, 1);
+            } else {
+                materials.push(material);
+            }
+        },
+        
+        // Aggiornamento progresso
+        updateProgress() {
+            let completed = 0;
+            const requiredSections = this.getRequiredSections();
+            
+            requiredSections.forEach(section => {
+                if (this.isSectionComplete(section)) {
+                    completed++;
+                }
+            });
+            
+            this.completedSections = completed;
+            this.completionPercentage = (completed / this.totalSections) * 100;
+        },
+        
+        // Sezioni richieste per livello
+        getRequiredSections() {
+            const sections = {
+                'P': ['CD', 'OG', 'LC'],
+                'C': ['CD', 'OG', 'LC', 'DT', 'MT', 'DA'],
+                'A': ['CD', 'OG', 'LC', 'DT', 'MT', 'DA', 'AU', 'NS', 'RS']
+            };
+            return sections[this.formData.level] || [];
+        },
+        
+        // Verifica completezza sezione
+        isSectionComplete(section) {
+            const data = this.formData.iccd_data[section];
+            if (!data) return false;
+            
+            switch (section) {
+                case 'CD':
+                    return !!(data.TSK && data.LIR && data.NCT?.NCTR && data.NCT?.NCTN && data.ESC);
+                case 'OG':
+                    return !!(data.OGT?.OGTD);
+                case 'LC':
+                    return !!(data.PVC?.PVCS && data.PVC?.PVCR && data.PVC?.PVCP && data.PVC?.PVCC);
+                case 'DT':
+                    return !!(data.DTS?.DTSI || data.DTM?.DTMA);
+                case 'MT':
+                    return !!(data.MTC?.MTCM?.length > 0);
+                case 'DA':
+                    return !!(data.DES?.DESO && data.DES.DESO.length >= 10 && data.STC?.STCC);
+                case 'AU':
+                    return !!(data.AUT?.AUTM);
+                default:
+                    return false;
+            }
+        },
+        
+        // Nome livello
+        getLevelName() {
+            const names = {
+                'P': 'Precatalogazione',
+                'C': 'Catalogazione', 
+                'A': 'Approfondimento'
+            };
+            return names[this.formData.level] || '';
+        },
+        
+        // Validazione form
+        async validateForm() {
+            this.validationErrors = [];
+            
+            try {
+                const response = await fetch('/api/iccd/validate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        schema_type: this.formData.schema_type,
+                        level: this.formData.level,
+                        iccd_data: this.formData.iccd_data
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.valid) {
+                    this.isValid = true;
+                    this.showAlertMessage('Scheda ICCD validata con successo!', 'success');
+                } else {
+                    this.isValid = false;
+                    this.validationErrors = result.errors;
+                    this.showAlertMessage(`Trovati ${result.errors.length} errori di validazione`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Errore validazione:', error);
+                this.showAlertMessage('Errore durante la validazione', 'error');
+            }
+        },
+        
+        // Salvataggio record
+        async saveRecord() {
+            if (!this.isValid) {
+                await this.validateForm();
+                if (!this.isValid) return;
+            }
+            
+            try {
+                const response = await fetch(`/api/iccd/sites/{{ site.id }}/records`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(this.formData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    this.showAlertMessage(
+                        `Scheda ICCD salvata con successo! NCT: ${result.nct}`, 
+                        'success'
+                    );
+                    
+                    // Redirect dopo salvataggio
+                    setTimeout(() => {
+                        window.location.href = `/sites/{{ site.id }}/iccd`;
+                    }, 2000);
+                } else {
+                    const error = await response.json();
+                    this.showAlertMessage(error.detail || 'Errore durante il salvataggio', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Errore salvataggio:', error);
+                this.showAlertMessage('Errore durante il salvataggio', 'error');
+            }
+        },
+        
+        // Sistema alert
+        showAlertMessage(message, type) {
+            this.alertMessage = message;
+            
+            const alertConfig = {
+                success: {
+                    class: 'alert-success',
+                    icon: 'fas fa-check-circle'
+                },
+                error: {
+                    class: 'alert-danger',
+                    icon: 'fas fa-exclamation-circle'
+                },
+                warning: {
+                    class: 'alert-warning',
+                    icon: 'fas fa-exclamation-triangle'
+                },
+                info: {
+                    class: 'alert-info',
+                    icon: 'fas fa-info-circle'
+                }
+            };
+            
+            const config = alertConfig[type] || alertConfig.info;
+            this.alertClass = config.class;
+            this.alertIcon = config.icon;
+            this.showAlert = true;
+            
+            // Auto-hide dopo 5 secondi
+            setTimeout(() => {
+                this.showAlert = false;
+            }, 5000);
+        }
+    }
+}
+</script>
+{% endblock %}

@@ -492,9 +492,10 @@ async def generate_iccd_pdf(
         raise HTTPException(status_code=404, detail="Scheda ICCD non trovata")
     
     try:
-        # TODO: Implementare generazione PDF con template ICCD ufficiale
-        # Per ora ritorna placeholder
-        pdf_content = b"PDF placeholder - ICCD schema will be implemented"
+        # Genera PDF usando il servizio ICCD
+        from app.services.iccd_pdf_service import generate_iccd_pdf_quick
+        
+        pdf_content = generate_iccd_pdf_quick(record, record.site.name if record.site else "")
         
         filename = f"ICCD_{record.schema_type}_{record.get_nct()}.pdf"
         
@@ -571,3 +572,110 @@ async def get_iccd_statistics(
             "by_status": by_status
         }
     })
+
+
+# === VALIDAZIONE DATI ICCD ===
+
+@iccd_router.post("/validate")
+async def validate_iccd_data(
+    validation_request: dict,
+    current_user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Valida dati ICCD secondo standard ministeriali."""
+    
+    try:
+        schema_type = validation_request.get('schema_type')
+        level = validation_request.get('level')
+        iccd_data = validation_request.get('iccd_data')
+        
+        if not all([schema_type, level, iccd_data]):
+            raise HTTPException(status_code=400, detail="schema_type, level e iccd_data sono obbligatori")
+        
+        # Crea servizio validazione
+        from app.services.iccd_validation_service import ICCDValidationService
+        validation_service = ICCDValidationService(db)
+        
+        # Valida dati
+        is_valid, errors = await validation_service.validate_record(schema_type, level, iccd_data)
+        
+        return JSONResponse({
+            "valid": is_valid,
+            "errors": errors,
+            "schema_type": schema_type,
+            "level": level,
+            "validation_timestamp": datetime.utcnow().isoformat()
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating ICCD data: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore validazione: {str(e)}")
+
+
+# === INTEGRAZIONE CON SISTEMA FASTZOOM ===
+
+@iccd_router.post("/sites/{site_id}/initialize")
+async def initialize_iccd_for_site(
+    site_id: UUID,
+    site_access: tuple = Depends(get_site_access_for_iccd),
+    current_user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Inizializza sistema ICCD per un sito archeologico."""
+    site, permission = site_access
+    
+    if not permission.can_admin():
+        raise HTTPException(status_code=403, detail="Permessi di amministratore richiesti")
+    
+    try:
+        from app.services.iccd_integration_service import ICCDIntegrationService, auto_setup_iccd_for_new_site
+        
+        # Configurazione automatica ICCD
+        setup_result = await auto_setup_iccd_for_new_site(site_id, current_user_id, db)
+        
+        if setup_result["success"]:
+            logger.info(f"ICCD system initialized for site {site_id}")
+            return JSONResponse({
+                "message": "Sistema ICCD inizializzato con successo",
+                "site_id": str(site_id),
+                "setup_result": setup_result,
+                "iccd_enabled": setup_result["iccd_enabled"]
+            })
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Errore inizializzazione ICCD: {setup_result.get('errors', ['Unknown error'])}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error initializing ICCD for site {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore inizializzazione: {str(e)}")
+
+
+@iccd_router.get("/sites/{site_id}/integration-status")
+async def get_iccd_integration_status(
+    site_id: UUID,
+    site_access: tuple = Depends(get_site_access_for_iccd),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Ottieni status integrazione ICCD per un sito."""
+    site, permission = site_access
+    
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
+    
+    try:
+        from app.services.iccd_integration_service import ICCDIntegrationService
+        
+        service = ICCDIntegrationService(db)
+        validation_result = await service.validate_iccd_integration(site_id)
+        
+        return JSONResponse(validation_result)
+        
+    except Exception as e:
+        logger.error(f"Error getting ICCD integration status: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore verifica integrazione: {str(e)}")

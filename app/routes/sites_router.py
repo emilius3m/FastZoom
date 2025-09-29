@@ -2074,3 +2074,165 @@ async def get_site_team(db: AsyncSession, site_id: UUID) -> List[Dict]:
         }
         for user, permission in team
     ]
+
+
+# === ROUTES ICCD - CATALOGAZIONE ARCHEOLOGICA STANDARDIZZATA ===
+
+@sites_router.get("/{site_id}/iccd", response_class=HTMLResponse)
+async def site_iccd_records(
+        request: Request,
+        site_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Lista schede ICCD del sito archeologico."""
+    site, permission = site_access
+    
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi insufficienti")
+    
+    # Get current user info
+    user_query = select(User).where(User.id == current_user_id)
+    user = await db.execute(user_query)
+    current_user = user.scalar_one_or_none()
+    
+    context = {
+        "request": request,
+        "site": site,
+        "user_permission": permission,
+        "current_user": current_user,
+        "can_read": permission.can_read(),
+        "can_write": permission.can_write(),
+        "can_admin": permission.can_admin()
+    }
+    
+    return templates.TemplateResponse("sites/iccd_records.html", context)
+
+
+@sites_router.get("/{site_id}/iccd/new", response_class=HTMLResponse)
+async def new_iccd_record(
+        request: Request,
+        site_id: UUID,
+        schema_type: str = "RA",
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Form per creare nuova scheda ICCD."""
+    site, permission = site_access
+    
+    if not permission.can_write():
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+    
+    # Get current user info
+    user_query = select(User).where(User.id == current_user_id)
+    user = await db.execute(user_query)
+    current_user = user.scalar_one_or_none()
+    
+    context = {
+        "request": request,
+        "site": site,
+        "user_permission": permission,
+        "current_user": current_user,
+        "schema_type": schema_type,
+        "can_read": permission.can_read(),
+        "can_write": permission.can_write(),
+        "can_admin": permission.can_admin()
+    }
+    
+    return templates.TemplateResponse("sites/iccd_catalogation.html", context)
+
+
+@sites_router.get("/{site_id}/iccd/{record_id}", response_class=HTMLResponse)
+async def view_iccd_record(
+        request: Request,
+        site_id: UUID,
+        record_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Visualizza scheda ICCD specifica."""
+    site, permission = site_access
+    
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi insufficienti")
+    
+    # Get current user info
+    user_query = select(User).where(User.id == current_user_id)
+    user = await db.execute(user_query)
+    current_user = user.scalar_one_or_none()
+    
+    # Recupera record ICCD dal database tramite API
+    try:
+        # Qui useremo l'API endpoint per ottenere i dati
+        from app.routes.api.iccd_records import get_iccd_record
+        record_response = await get_iccd_record(site_id, record_id, site_access, db)
+        record_data = json.loads(record_response.body.decode())
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading ICCD record {record_id}: {e}")
+        raise HTTPException(status_code=500, detail="Errore caricamento scheda ICCD")
+    
+    context = {
+        "request": request,
+        "site": site,
+        "user_permission": permission,
+        "current_user": current_user,
+        "record": record_data,
+        "record_id": str(record_id),
+        "can_read": permission.can_read(),
+        "can_write": permission.can_write(),
+        "can_admin": permission.can_admin()
+    }
+    
+    return templates.TemplateResponse("sites/iccd_view.html", context)
+
+
+@sites_router.get("/{site_id}/iccd/{record_id}/edit", response_class=HTMLResponse)
+async def edit_iccd_record(
+        request: Request,
+        site_id: UUID,
+        record_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Form per modificare scheda ICCD esistente."""
+    site, permission = site_access
+    
+    if not permission.can_write():
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+    
+    # Get current user info
+    user_query = select(User).where(User.id == current_user_id)
+    user = await db.execute(user_query)
+    current_user = user.scalar_one_or_none()
+    
+    # Recupera record ICCD dal database tramite API
+    try:
+        from app.routes.api.iccd_records import get_iccd_record
+        record_response = await get_iccd_record(site_id, record_id, site_access, db)
+        record_data = json.loads(record_response.body.decode())
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading ICCD record {record_id} for edit: {e}")
+        raise HTTPException(status_code=500, detail="Errore caricamento scheda ICCD")
+    
+    context = {
+        "request": request,
+        "site": site,
+        "user_permission": permission,
+        "current_user": current_user,
+        "record": record_data,
+        "record_id": str(record_id),
+        "edit_mode": True,
+        "can_read": permission.can_read(),
+        "can_write": permission.can_write(),
+        "can_admin": permission.can_admin()
+    }
+    
+    return templates.TemplateResponse("sites/iccd_catalogation.html", context)
