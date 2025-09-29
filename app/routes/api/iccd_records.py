@@ -162,11 +162,20 @@ async def create_iccd_record(
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
     
     try:
+        # Log dei dati ricevuti per debug
+        logger.info(f"Creating ICCD record for site {site_id} by user {current_user_id}")
+        logger.info(f"Record data keys: {list(record_data.keys())}")
+
         # Validazione dati base
         required_fields = ['schema_type', 'level', 'iccd_data', 'cataloging_institution']
         for field in required_fields:
             if field not in record_data:
+                logger.error(f"Missing required field: {field}")
                 raise HTTPException(status_code=400, detail=f"Campo obbligatorio mancante: {field}")
+
+        # Validazione aggiuntiva dei dati ICCD
+        if not isinstance(record_data['iccd_data'], dict):
+            raise HTTPException(status_code=400, detail="iccd_data deve essere un oggetto JSON")
         
         # Genera NCT se non fornito
         nct_data = record_data.get('iccd_data', {}).get('CD', {}).get('NCT', {})
@@ -210,10 +219,16 @@ async def create_iccd_record(
             site_id=site_id,
             created_by=current_user_id
         )
-        
+
         db.add(iccd_record)
-        await db.commit()
+        await db.flush()  # Flush per ottenere l'ID senza commit
         await db.refresh(iccd_record)
+
+        # Verifica che il record sia stato creato correttamente
+        if not iccd_record.id:
+            raise HTTPException(status_code=500, detail="Errore creazione record nel database")
+
+        await db.commit()
         
         logger.info(f"ICCD record created: {iccd_record.get_nct()} for site {site_id}")
         
@@ -227,7 +242,7 @@ async def create_iccd_record(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating ICCD record: {e}")
+        logger.error(f"Error creating ICCD record: {e}", exc_info=True)
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Errore creazione scheda ICCD: {str(e)}")
 
