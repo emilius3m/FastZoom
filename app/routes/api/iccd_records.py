@@ -543,38 +543,38 @@ async def get_iccd_statistics(
     total_records = await db.execute(
         select(func.count(ICCDRecord.id)).where(ICCDRecord.site_id == site_id)
     )
-    total_records = total_records.scalar()
+    total_records = total_records.scalar() or 0
     
     # Per tipo schema
-    by_schema = await db.execute(
+    by_schema_result = await db.execute(
         select(ICCDRecord.schema_type, func.count(ICCDRecord.id))
         .where(ICCDRecord.site_id == site_id)
         .group_by(ICCDRecord.schema_type)
     )
-    by_schema = {row[0]: row[1] for row in by_schema.fetchall()}
-    
+    by_schema = {row[0]: row[1] for row in by_schema_result.fetchall()}
+
     # Per livello
-    by_level = await db.execute(
+    by_level_result = await db.execute(
         select(ICCDRecord.level, func.count(ICCDRecord.id))
         .where(ICCDRecord.site_id == site_id)
         .group_by(ICCDRecord.level)
     )
-    by_level = {row[0]: row[1] for row in by_level.fetchall()}
-    
+    by_level = {row[0]: row[1] for row in by_level_result.fetchall()}
+
     # Per status
-    by_status = await db.execute(
+    by_status_result = await db.execute(
         select(ICCDRecord.status, func.count(ICCDRecord.id))
         .where(ICCDRecord.site_id == site_id)
         .group_by(ICCDRecord.status)
     )
-    by_status = {row[0]: row[1] for row in by_status.fetchall()}
-    
+    by_status = {row[0]: row[1] for row in by_status_result.fetchall()}
+
     # Validate
-    validated_count = await db.execute(
+    validated_count_result = await db.execute(
         select(func.count(ICCDRecord.id))
         .where(and_(ICCDRecord.site_id == site_id, ICCDRecord.is_validated == True))
     )
-    validated_count = validated_count.scalar()
+    validated_count = validated_count_result.scalar() or 0
     
     return JSONResponse({
         "site_id": str(site_id),

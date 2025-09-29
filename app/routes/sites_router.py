@@ -2107,8 +2107,8 @@ async def site_iccd_records(
         "can_admin": permission.can_admin()
     }
     
-    # Usa template semplificato temporaneamente per evitare errori database
-    return templates.TemplateResponse("sites/iccd_simple.html", context)
+    # Usa template completo per visualizzare lista schede ICCD
+    return templates.TemplateResponse("sites/iccd_records.html", context)
 
 
 @sites_router.get("/{site_id}/iccd/new", response_class=HTMLResponse)

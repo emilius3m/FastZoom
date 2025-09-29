@@ -3,146 +3,12 @@
 {% block title %}Schede ICCD - {{ site.name }}{% endblock %}
 
 {% block extra_css %}
-<style>
-.iccd-card {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 1rem;
-    transition: all 0.3s ease;
-}
 
-.iccd-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    transform: translateY(-2px);
-}
 
-.iccd-card-header {
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #dee2e6;
-    display: flex;
-    justify-content: between;
-    align-items: center;
-}
-
-.iccd-card-body {
-    padding: 1.5rem;
-}
-
-.iccd-nct {
-    font-family: monospace;
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: #007bff;
-}
-
-.iccd-object-name {
-    font-size: 1.1rem;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
-}
-
-.iccd-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    font-size: 0.875rem;
-    color: #6c757d;
-    margin-bottom: 1rem;
-}
-
-.iccd-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.level-P { background: #fff3cd; color: #856404; }
-.level-C { background: #d1ecf1; color: #0c5460; }
-.level-A { background: #d4edda; color: #155724; }
-
-.status-draft { background: #f8f9fa; color: #495057; }
-.status-submitted { background: #fff3cd; color: #856404; }
-.status-approved { background: #d4edda; color: #155724; }
-.status-published { background: #d1ecf1; color: #0c5460; }
-
-.validation-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.validation-validated {
-    color: #28a745;
-}
-
-.validation-not-validated {
-    color: #dc3545;
-}
-
-.iccd-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.iccd-filters {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 8px;
-    margin-bottom: 2rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.stats-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.stats-card {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 8px;
-    text-align: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.stats-number {
-    font-size: 2rem;
-    font-weight: bold;
-    color: #007bff;
-}
-
-.stats-label {
-    font-size: 0.875rem;
-    color: #6c757d;
-    margin-top: 0.5rem;
-}
-
-.empty-state {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: #6c757d;
-}
-
-.empty-state-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
-    opacity: 0.3;
-}
-
-.pagination-wrapper {
-    display: flex;
-    justify-content: center;
-    margin-top: 2rem;
-}
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid" x-data="iccdRecordsList()" x-init="init()">
+<div class="container-fluid" x-data="iccdRecordsList" x-init="init()">
     
     <!-- Header con azioni -->
     <div class="flex justify-between items-center mb-6">
@@ -372,16 +238,18 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+
+{% block extra_js %}{% endblock %}
 <script>
-function iccdRecordsList() {
-    return {
+
+
+document.addEventListener('alpine:init', () => {
+    Alpine.data('iccdRecordsList', () => ({
         // Dati
         records: [],
         statistics: null,
-        
+
         // Filtri
         filters: {
             schema_type: '',
@@ -389,11 +257,11 @@ function iccdRecordsList() {
             status: '',
             is_validated: ''
         },
-        
+
         // Ricerca
         searchQuery: '',
         searchTimeout: null,
-        
+
         // Paginazione
         pagination: {
             page: 1,
@@ -401,10 +269,10 @@ function iccdRecordsList() {
             total: 0,
             pages: 0
         },
-        
+
         // UI State
         loading: true,
-        
+
         // Inizializzazione
         async init() {
             await this.loadStatistics();
@@ -553,7 +421,7 @@ function iccdRecordsList() {
                 minute: '2-digit'
             });
         }
-    }
-}
+    }));
+});
 </script>
 {% endblock %}
