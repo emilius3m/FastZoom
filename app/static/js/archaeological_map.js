@@ -728,4 +728,4 @@ document.addEventListener('alpine:init', () => {
 });
 
 // Global site ID (to be set by template)
-let siteId = '{{ site.id }}';
+let siteId;
