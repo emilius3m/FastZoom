@@ -1,0 +1,570 @@
+{% extends "base/site_base.html" %}
+
+{% block title %}Sistema ICCD Gerarchico - {{ site.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.iccd-system {
+    background: #f8fafc;
+    min-height: calc(100vh - 200px);
+}
+
+.hierarchy-level {
+    transition: all 0.3s ease;
+}
+
+.hierarchy-level:hover {
+    transform: translateY(-2px);
+}
+
+.level-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px 12px 0 0;
+    padding: 1.5rem;
+    margin-bottom: 0;
+}
+
+.level-content {
+    background: white;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.schema-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.schema-card:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+}
+
+.schema-card.has-records {
+    border-color: #10b981;
+    background: linear-gradient(45deg, #ecfdf5, #f0fdf4);
+}
+
+.record-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.record-item:hover {
+    background: #e2e8f0;
+    border-color: #3b82f6;
+}
+
+.breadcrumb-nav {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.alert-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    min-width: 350px;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.level-1 { background: linear-gradient(135deg, #10b981, #059669); }
+.level-2 { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.level-3 { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.level-authority { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+
+.count-badge {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 20px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.action-button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.action-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.nct-code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    background: #e5e7eb;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', path='js/iccd_hierarchy.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="iccd-system" x-data="iccdHierarchicalSystem()" x-init="init()">
+    
+    <!-- Loading Overlay -->
+    <div x-show="loading" class="loading-overlay" x-transition>
+        <div class="text-center text-white">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-lg">Caricamento Sistema ICCD...</p>
+        </div>
+    </div>
+    
+    <!-- Alert Toast -->
+    <div x-show="showAlert" x-transition class="alert-toast" :class="{
+        'bg-green-500': alertType === 'success',
+        'bg-red-500': alertType === 'error',
+        'bg-yellow-500': alertType === 'warning',
+        'bg-blue-500': alertType === 'info'
+    }">
+        <div class="p-4 text-white">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas mr-3" :class="{
+                        'fa-check-circle': alertType === 'success',
+                        'fa-exclamation-circle': alertType === 'error',
+                        'fa-exclamation-triangle': alertType === 'warning',
+                        'fa-info-circle': alertType === 'info'
+                    }"></i>
+                    <span x-text="alertMessage"></span>
+                </div>
+                <button @click="hideAlert()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header Sistema ICCD -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-lg mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold mb-2">
+                    🏛️ Sistema ICCD - {{ site.name }}
+                </h1>
+                <p class="text-blue-100 text-lg">
+                    Organizzazione gerarchica dal generale al particolare
+                </p>
+            </div>
+            <div class="text-right">
+                <div class="bg-blue-500 px-4 py-2 rounded-lg mb-2">
+                    <div class="text-sm text-blue-100">Standard MiC-ICCD</div>
+                    <div class="font-bold">2025</div>
+                </div>
+                <div class="text-blue-200 text-sm">Conforme alle normative ufficiali</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Breadcrumb Gerarchico -->
+    <div x-show="breadcrumb && breadcrumb.length > 0" class="breadcrumb-nav" x-transition>
+        <nav class="flex items-center space-x-3 text-sm">
+            <i class="fas fa-home text-gray-500"></i>
+            <template x-for="(item, index) in breadcrumb" :key="index">
+                <div class="flex items-center space-x-3">
+                    <span x-show="index > 0" class="text-gray-400">→</span>
+                    <button @click="navigateToLevel('detail', item.record)"
+                            class="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                            x-text="item.name"></button>
+                </div>
+            </template>
+        </nav>
+    </div>
+    
+    <!-- Contenuto Principale -->
+    <div class="space-y-8">
+        
+        <!-- LIVELLO 1: CONTENITORE TERRITORIALE -->
+        <div class="hierarchy-level">
+            <div class="level-header level-1">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">
+                            🌍 LIVELLO 1 - CONTENITORE TERRITORIALE
+                        </h2>
+                        <p class="text-blue-100">Definizione del contesto geografico e amministrativo</p>
+                    </div>
+                    <div class="count-badge">
+                        <span x-text="hierarchyTree.organized?.level1?.SI ? '1' : '0'"></span> Siti
+                    </div>
+                </div>
+            </div>
+            
+            <div class="level-content p-6">
+                <!-- Scheda SI - Sito Archeologico -->
+                <div class="schema-card p-6" :class="{'has-records': hierarchyTree.organized?.level1?.SI}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="text-4xl">📍</div>
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900 mb-1">
+                                    SI - Sito Archeologico: {{ site.name }}
+                                </h3>
+                                <p class="text-gray-600 mb-2">
+                                    Contenitore territoriale delle testimonianze materiali
+                                </p>
+                                <div x-show="hierarchyTree.organized?.level1?.SI" class="nct-code">
+                                    NCT: <span x-text="hierarchyTree.organized?.level1?.SI?.nct"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button x-show="!hierarchyTree.organized?.level1?.SI"
+                                    @click="createICCDRecord('SI')"
+                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                                ➕ Crea Scheda SI
+                            </button>
+                            <button x-show="hierarchyTree.organized?.level1?.SI"
+                                    @click="navigateToLevel('detail', hierarchyTree.organized.level1.SI)"
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                👁️ Visualizza
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- LIVELLO 2: BENI IMMOBILI -->
+        <div class="hierarchy-level">
+            <div class="level-header level-2">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">
+                            🏛️ LIVELLO 2 - BENI IMMOBILI
+                        </h2>
+                        <p class="text-blue-100">Strutture architettoniche e contesti stratigrafici</p>
+                    </div>
+                    <div class="count-badge">
+                        <span x-text="(hierarchyTree.organized?.level2?.CA?.length || 0) + (hierarchyTree.organized?.level2?.MA?.length || 0) + (hierarchyTree.organized?.level2?.SAS?.length || 0)"></span> Strutture
+                    </div>
+                </div>
+            </div>
+            
+            <div class="level-content p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Scheda CA - Complessi Archeologici -->
+                    <div class="schema-card p-6" :class="{'has-records': hierarchyTree.organized?.level2?.CA?.length > 0}">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="text-3xl">🏛️</div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900">CA - Complessi</h3>
+                                <p class="text-sm text-gray-600">Architetture complesse</p>
+                            </div>
+                        </div>
+                        
+                        <div x-show="hierarchyTree.organized?.level2?.CA?.length > 0" class="mb-4 space-y-2">
+                            <template x-for="complex in hierarchyTree.organized.level2.CA">
+                                <div class="record-item p-3">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="font-medium text-gray-900" x-text="complex.iccd_data?.OG?.OGT?.OGTD || 'Complesso'"></div>
+                                            <div class="text-xs text-gray-500 nct-code" x-text="complex.nct"></div>
+                                        </div>
+                                        <button @click="navigateToLevel('detail', complex)"
+                                                class="text-blue-600 hover:text-blue-800 text-sm">
+                                            Apri →
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <button @click="createICCDRecord('CA', hierarchyTree.organized?.level1?.SI?.id)"
+                                :disabled="!hierarchyTree.organized?.level1?.SI"
+                                class="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
+                            ➕ Nuovo Complesso
+                        </button>
+                    </div>
+                    
+                    <!-- Scheda MA - Monumenti Archeologici -->
+                    <div class="schema-card p-6" :class="{'has-records': hierarchyTree.organized?.level2?.MA?.length > 0}">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="text-3xl">🏛️</div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900">MA - Monumenti</h3>
+                                <p class="text-sm text-gray-600">Architetture singole</p>
+                            </div>
+                        </div>
+                        
+                        <div x-show="hierarchyTree.organized?.level2?.MA?.length > 0" class="mb-4 space-y-2">
+                            <template x-for="monument in hierarchyTree.organized.level2.MA">
+                                <div class="record-item p-3">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="font-medium text-gray-900" x-text="monument.iccd_data?.OG?.OGT?.OGTD || 'Monumento'"></div>
+                                            <div class="text-xs text-gray-500 nct-code" x-text="monument.nct"></div>
+                                        </div>
+                                        <button @click="navigateToLevel('detail', monument)"
+                                                class="text-blue-600 hover:text-blue-800 text-sm">
+                                            Apri →
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <button @click="createICCDRecord('MA', hierarchyTree.organized?.level1?.SI?.id)"
+                                :disabled="!hierarchyTree.organized?.level1?.SI"
+                                class="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
+                            ➕ Nuovo Monumento
+                        </button>
+                    </div>
+                    
+                    <!-- Scheda SAS - Saggi Stratigrafici -->
+                    <div class="schema-card p-6" :class="{'has-records': hierarchyTree.organized?.level2?.SAS?.length > 0}">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="text-3xl">📐</div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900">SAS - Saggi</h3>
+                                <p class="text-sm text-gray-600">Sequenze stratigrafiche</p>
+                            </div>
+                        </div>
+                        
+                        <div x-show="hierarchyTree.organized?.level2?.SAS?.length > 0" class="mb-4 space-y-2">
+                            <template x-for="survey in hierarchyTree.organized.level2.SAS">
+                                <div class="record-item p-3">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="font-medium text-gray-900" x-text="survey.iccd_data?.OG?.OGT?.OGTD || 'Saggio'"></div>
+                                            <div class="text-xs text-gray-500 nct-code" x-text="survey.nct"></div>
+                                        </div>
+                                        <button @click="navigateToLevel('detail', survey)"
+                                                class="text-blue-600 hover:text-blue-800 text-sm">
+                                            Apri →
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <button @click="createICCDRecord('SAS', hierarchyTree.organized?.level1?.SI?.id)"
+                                :disabled="!hierarchyTree.organized?.level1?.SI"
+                                class="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
+                            ➕ Nuovo Saggio
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- LIVELLO 3: BENI MOBILI -->
+        <div class="hierarchy-level">
+            <div class="level-header level-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">
+                            🏺 LIVELLO 3 - BENI MOBILI
+                        </h2>
+                        <p class="text-orange-100">Reperti archeologici e materiali</p>
+                    </div>
+                    <div class="count-badge">
+                        <span x-text="(hierarchyTree.organized?.level3?.RA?.length || 0) + (hierarchyTree.organized?.level3?.NU?.length || 0) + (hierarchyTree.organized?.level3?.TMA?.length || 0) + (hierarchyTree.organized?.level3?.AT?.length || 0)"></span> Reperti
+                    </div>
+                </div>
+            </div>
+            
+            <div class="level-content p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    
+                    <!-- Scheda RA - Reperti Archeologici -->
+                    <div class="schema-card p-4">
+                        <div class="text-center">
+                            <div class="text-3xl mb-2">🏺</div>
+                            <h3 class="font-bold text-gray-900 mb-1">RA - Reperti</h3>
+                            <div class="text-3xl font-bold text-orange-600 mb-3" 
+                                 x-text="hierarchyTree.organized?.level3?.RA?.length || 0"></div>
+                            <button @click="createICCDRecord('RA')"
+                                    class="w-full px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm transition-colors">
+                                ➕ Nuovo Reperto
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Scheda NU - Beni Numismatici -->
+                    <div class="schema-card p-4">
+                        <div class="text-center">
+                            <div class="text-3xl mb-2">💰</div>
+                            <h3 class="font-bold text-gray-900 mb-1">NU - Numismatica</h3>
+                            <div class="text-3xl font-bold text-orange-600 mb-3" 
+                                 x-text="hierarchyTree.organized?.level3?.NU?.length || 0"></div>
+                            <button @click="createICCDRecord('NU')"
+                                    class="w-full px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm transition-colors">
+                                ➕ Nuova Moneta
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Scheda TMA - Tabella Materiali -->
+                    <div class="schema-card p-4">
+                        <div class="text-center">
+                            <div class="text-3xl mb-2">📊</div>
+                            <h3 class="font-bold text-gray-900 mb-1">TMA - Lotti</h3>
+                            <div class="text-3xl font-bold text-orange-600 mb-3" 
+                                 x-text="hierarchyTree.organized?.level3?.TMA?.length || 0"></div>
+                            <button @click="createICCDRecord('TMA')"
+                                    class="w-full px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm transition-colors">
+                                ➕ Nuovo Lotto
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Scheda AT - Antropologia Fisica -->
+                    <div class="schema-card p-4">
+                        <div class="text-center">
+                            <div class="text-3xl mb-2">🦴</div>
+                            <h3 class="font-bold text-gray-900 mb-1">AT - Antropologia</h3>
+                            <div class="text-3xl font-bold text-orange-600 mb-3" 
+                                 x-text="hierarchyTree.organized?.level3?.AT?.length || 0"></div>
+                            <button @click="createICCDRecord('AT')"
+                                    class="w-full px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm transition-colors">
+                                ➕ Nuovo Reperto
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- AUTHORITY FILES E MODULI -->
+        <div class="hierarchy-level">
+            <div class="level-header level-authority">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">
+                            📋 AUTHORITY FILES E MODULI SPECIALI
+                        </h2>
+                        <p class="text-purple-100">Riferimenti normativi e documentazione specialistica</p>
+                    </div>
+                    <div class="count-badge">
+                        <span x-text="(authorityFiles?.excavations?.length || 0) + (authorityFiles?.surveys?.length || 0) + (authorityFiles?.bibliography?.length || 0) + (authorityFiles?.authors?.length || 0)"></span> Files
+                    </div>
+                </div>
+            </div>
+            
+            <div class="level-content p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    <!-- Authority Files -->
+                    <div class="schema-card p-6">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4">Authority Files</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button @click="createAuthorityFile('DSC', { name: 'Scavo ' + new Date().getFullYear() })"
+                                    class="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm transition-colors">
+                                📋 DSC - Scavi
+                                <div class="text-xs mt-1" x-text="(authorityFiles?.excavations?.length || 0) + ' files'"></div>
+                            </button>
+                            <button @click="createAuthorityFile('RCG', { name: 'Ricognizione ' + new Date().getFullYear() })"
+                                    class="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm transition-colors">
+                                🔍 RCG - Ricognizioni
+                                <div class="text-xs mt-1" x-text="(authorityFiles?.surveys?.length || 0) + ' files'"></div>
+                            </button>
+                            <button @click="createAuthorityFile('BIB', { name: 'Bibliografia ' + new Date().getFullYear() })"
+                                    class="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm transition-colors">
+                                📚 BIB - Bibliografia
+                                <div class="text-xs mt-1" x-text="(authorityFiles?.bibliography?.length || 0) + ' files'"></div>
+                            </button>
+                            <button @click="createAuthorityFile('AUT', { name: 'Autori ' + new Date().getFullYear() })"
+                                    class="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm transition-colors">
+                                👤 AUT - Autori
+                                <div class="text-xs mt-1" x-text="(authorityFiles?.authors?.length || 0) + ' files'"></div>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Moduli Speciali -->
+                    <div class="schema-card p-6">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4">Moduli Speciali</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button class="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm transition-colors">
+                                📝 MINV - Inventari
+                                <div class="text-xs mt-1">In sviluppo</div>
+                            </button>
+                            <button class="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm transition-colors">
+                                📜 MOEP - Epigrafia
+                                <div class="text-xs mt-1">In sviluppo</div>
+                            </button>
+                            <button class="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm transition-colors">
+                                🏗️ MOPR - Progetti
+                                <div class="text-xs mt-1">In sviluppo</div>
+                            </button>
+                            <button class="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm transition-colors">
+                                📍 MOSI - Siti/Aree
+                                <div class="text-xs mt-1">In sviluppo</div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+    
+    <!-- Footer Informativo -->
+    <div class="mt-12 p-6 bg-gray-100 rounded-lg text-center text-gray-600">
+        <p class="mb-2">
+            <strong>Sistema ICCD Gerarchico</strong> - Conforme agli standard del Ministero della Cultura
+        </p>
+        <p class="text-sm">
+            Organizzazione dal generale al particolare: Siti → Complessi/Monumenti/Saggi → Reperti/Materiali
+        </p>
+    </div>
+</div>
+
+<script>
+// Imposta siteId globale per il component
+window.siteId = '{{ site.id }}';
+</script>
+{% endblock %}

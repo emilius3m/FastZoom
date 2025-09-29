@@ -26,7 +26,13 @@ from app.services.archaeological_minio_service import archaeological_minio_servi
 from app.services.deep_zoom_minio_service import deep_zoom_minio_service
 from app.services.storage_management_service import storage_management_service
 
+# Import API router for hierarchical ICCD system
+from app.routes.api.iccd_hierarchy import iccd_hierarchy_router
+
 sites_router = APIRouter(prefix="/sites", tags=["sites"])
+
+# Include hierarchical ICCD API endpoints
+sites_router.include_router(iccd_hierarchy_router, prefix="/{site_id}")
 
 
 async def get_site_access(
@@ -2086,7 +2092,52 @@ async def site_iccd_records(
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Lista schede ICCD del sito archeologico."""
+    """Redirect to hierarchical ICCD system."""
+    # Redirect to the new hierarchical system
+    return RedirectResponse(url=f"/sites/{site_id}/iccd/hierarchy", status_code=302)
+
+
+@sites_router.get("/{site_id}/iccd/hierarchy", response_class=HTMLResponse)
+async def site_iccd_hierarchy(
+        request: Request,
+        site_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Sistema gerarchico ICCD completo del sito archeologico."""
+    site, permission = site_access
+    
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi insufficienti")
+    
+    # Get current user info
+    user_query = select(User).where(User.id == current_user_id)
+    user = await db.execute(user_query)
+    current_user = user.scalar_one_or_none()
+    
+    context = {
+        "request": request,
+        "site": site,
+        "user_permission": permission,
+        "current_user": current_user,
+        "can_read": permission.can_read(),
+        "can_write": permission.can_write(),
+        "can_admin": permission.can_admin()
+    }
+    
+    return templates.TemplateResponse("sites/iccd_hierarchy.html", context)
+
+
+@sites_router.get("/{site_id}/iccd/records", response_class=HTMLResponse)
+async def site_iccd_records_list(
+        request: Request,
+        site_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Lista schede ICCD del sito archeologico (legacy endpoint)."""
     site, permission = site_access
     
     if not permission.can_read():

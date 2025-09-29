@@ -48,7 +48,7 @@ class ArchaeologicalSite(Base):
     plans = relationship("ArchaeologicalPlan", back_populates="site", cascade="all, delete-orphan")
     
     # Relazione con le schede ICCD
-    iccd_records = relationship("ICCDRecord", back_populates="site", cascade="all, delete-orphan")
+    iccd_records = relationship("ICCDBaseRecord", back_populates="site", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<ArchaeologicalSite(name='{self.name}', code='{self.code}')>"

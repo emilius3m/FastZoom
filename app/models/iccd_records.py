@@ -1,4 +1,4 @@
-"""Modelli per Standard ICCD - Catalogazione Archeologica Standardizzata."""
+"""Modelli per Standard ICCD - Sistema Gerarchico Completo."""
 
 import uuid
 from datetime import datetime
@@ -9,63 +9,105 @@ from sqlalchemy.orm import relationship, mapped_column, Mapped
 from app.database.base import Base
 
 
-class ICCDRecord(Base):
-    """Modello per schede ICCD (Istituto Centrale per il Catalogo e la Documentazione)."""
+class ICCDBaseRecord(Base):
+    """Modello base per tutte le schede ICCD con supporto gerarchico."""
     
-    __tablename__ = "iccd_records"
+    __tablename__ = "iccd_base_records"
     
     # Chiave primaria
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     
     # Codice Univoco Nazionale ICCD
-    nct_region: Mapped[str] = mapped_column(String(2), nullable=False, index=True)  # NCTR - Codice regione
-    nct_number: Mapped[str] = mapped_column(String(8), nullable=False, index=True)  # NCTN - Numero catalogo
-    nct_suffix: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)     # NCTS - Suffisso
+    nct_region: Mapped[str] = mapped_column(String(2), nullable=False, default='12')  # NCTR - Lazio
+    nct_number: Mapped[str] = mapped_column(String(8), nullable=False)               # NCTN
+    nct_suffix: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)      # NCTS
     
-    # Metadati scheda ICCD
-    schema_type: Mapped[str] = mapped_column(String(5), nullable=False, index=True)  # RA, CA, SI, etc.
-    level: Mapped[str] = mapped_column(String(1), nullable=False, index=True)        # P, C, A (Precatalogazione, Catalogazione, Approfondimento)
+    # Metadati scheda
+    schema_type: Mapped[str] = mapped_column(String(5), nullable=False)  # SI, CA, MA, SAS, RA, NU, TMA, AT
+    schema_version: Mapped[str] = mapped_column(String(10), default='3.00')
+    level: Mapped[str] = mapped_column(String(1), nullable=False, default='C')  # P, C, A
     
-    # Dati ICCD completi in formato JSON secondo standard 4.00
+    # Dati JSON della scheda
     iccd_data: Mapped[dict] = mapped_column(JSON, nullable=False)
     
-    # Informazioni ente schedatore
-    cataloging_institution: Mapped[str] = mapped_column(String(100), nullable=False)  # ESC - Ente schedatore
-    cataloger_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Nome catalogatore
+    # Relazioni gerarchiche
+    parent_id: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("iccd_base_records.id"), nullable=True)
+    site_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"))
     
-    # Stato scheda
-    is_validated: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    validation_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    validation_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
-    # Status workflow
-    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)  # draft, submitted, approved, published
-    
-    # Metadati temporali
-    survey_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # Data rilevamento
-    creation_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)  # Data creazione scheda
-    
-    # Relazioni con sistema FastZoom
-    site_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"), nullable=False)
-    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    validated_by: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    
-    # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Metadati gestione
+    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, onupdate=datetime.utcnow)
+    status: Mapped[str] = mapped_column(String(20), default='draft')  # draft, validated, published
     
     # Relazioni
+    parent = relationship("ICCDBaseRecord", remote_side=[id])
+    children = relationship("ICCDBaseRecord", back_populates="parent")
     site = relationship("ArchaeologicalSite", back_populates="iccd_records")
     creator = relationship("User", foreign_keys=[created_by])
-    validator = relationship("User", foreign_keys=[validated_by])
     
-    # Indici e vincoli per performance e integrità
     __table_args__ = (
         Index('idx_nct_complete', 'nct_region', 'nct_number', 'nct_suffix'),
         Index('idx_schema_site', 'schema_type', 'site_id'),
-        Index('idx_status_level', 'status', 'level'),
-        UniqueConstraint('nct_region', 'nct_number', 'nct_suffix', name='uq_nct_complete'),
+        Index('idx_hierarchy', 'parent_id', 'schema_type'),
+        UniqueConstraint('nct_region', 'nct_number', 'nct_suffix', name='uq_nct_complete')
     )
+
+
+# Mantengo ICCDRecord per compatibilità con il codice esistente
+class ICCDRecord(ICCDBaseRecord):
+    """Alias per compatibilità con il sistema esistente."""
+    
+    __tablename__ = None  # Usa la stessa tabella di ICCDBaseRecord
+    
+    # Campi aggiuntivi per compatibilità
+    @property
+    def cataloging_institution(self) -> str:
+        """Ente schedatore estratto dai dati ICCD."""
+        return self.iccd_data.get('CD', {}).get('ESC', 'SSABAP-RM')
+    
+    @property
+    def cataloger_name(self) -> Optional[str]:
+        """Nome catalogatore estratto dai dati ICCD."""
+        return self.iccd_data.get('CD', {}).get('RCG', {}).get('RCGR', None)
+    
+    @property
+    def is_validated(self) -> bool:
+        """Stato validazione."""
+        return self.status in ['validated', 'published']
+    
+    @property
+    def validation_date(self) -> Optional[datetime]:
+        """Data validazione."""
+        return self.updated_at if self.is_validated else None
+    
+    @property
+    def validation_notes(self) -> Optional[str]:
+        """Note validazione."""
+        return self.iccd_data.get('CD', {}).get('RCG', {}).get('RCGN', None)
+    
+    @property
+    def survey_date(self) -> Optional[datetime]:
+        """Data rilevamento."""
+        survey_str = self.iccd_data.get('CD', {}).get('RCG', {}).get('RCGD', None)
+        if survey_str:
+            try:
+                return datetime.fromisoformat(survey_str)
+            except:
+                return None
+        return None
+    
+    @property
+    def creation_date(self) -> datetime:
+        """Data creazione scheda."""
+        return self.created_at
+    
+    @property
+    def validated_by(self) -> Optional[UUID]:
+        """ID validatore."""
+        return self.created_by if self.is_validated else None
+    
+    validator = relationship("User", foreign_keys=[validated_by], viewonly=True)
     
     def __repr__(self):
         return f"<ICCDRecord(nct='{self.get_nct()}', type='{self.schema_type}', level='{self.level}')>"
@@ -203,6 +245,57 @@ class ICCDRecord(Base):
             "is_complete": is_complete,
             "missing_sections": missing_sections
         }
+
+
+class ICCDRelation(Base):
+    """Modello per relazioni tra schede ICCD."""
+    
+    __tablename__ = "iccd_relations"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    source_record_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("iccd_base_records.id"))
+    target_record_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("iccd_base_records.id"))
+    
+    relation_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Tipi: "contenuto_in", "composto_da", "relazionato_a", "derivato_da",
+    #       "stesso_contesto", "stesso_corredo", "stessa_campagna"
+    
+    relation_level: Mapped[str] = mapped_column(String(1), default='1')  # 1=principale, 2=secondaria, 3=terziaria
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    
+    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Relazioni
+    source_record = relationship("ICCDBaseRecord", foreign_keys=[source_record_id])
+    target_record = relationship("ICCDBaseRecord", foreign_keys=[target_record_id])
+    creator = relationship("User")
+
+
+class ICCDAuthorityFile(Base):
+    """Authority Files per campagne di scavo e altri riferimenti."""
+    
+    __tablename__ = "iccd_authority_files"
+    
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    authority_type: Mapped[str] = mapped_column(String(10), nullable=False)  # DSC, RCG, BIB, AUT
+    authority_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    
+    # Dati specifici authority
+    authority_data: Mapped[dict] = mapped_column(JSON)
+    
+    site_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"))
+    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Relazioni
+    site = relationship("ArchaeologicalSite")
+    creator = relationship("User")
 
 
 class ICCDSchemaTemplate(Base):
