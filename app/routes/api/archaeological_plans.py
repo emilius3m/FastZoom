@@ -1,3 +1,6 @@
+# Add import for listing objects in bucket for debugging
+from app.services.archaeological_minio_service import archaeological_minio_service
+import asyncio
 # app/routes/api/archaeological_plans.py - API per gestione piante archeologiche e griglie
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
@@ -274,17 +277,90 @@ async def get_plan_image(
     if not plan:
         raise HTTPException(status_code=404, detail="Pianta non trovata")
     
-    # Genera URL dell'immagine (da implementare con il sistema storage)
-    # Per ora restituiamo il path
-    return JSONResponse({
-        "plan_id": str(plan_id),
-        "image_path": plan.image_path,
-        "image_url": f"/static/uploads/{plan.image_path}",  # Temporaneo
-        "dimensions": {
-            "width": plan.image_width,
-            "height": plan.image_height
-        }
-    })
+    # Serve l'immagine direttamente
+    try:
+        # Determina se l'immagine è su MinIO o locale
+        if plan.image_path.startswith("plans/") or not plan.image_path.startswith("storage/"):
+            # Immagine su MinIO - gestisci i piani archeologici
+            from app.services.archaeological_minio_service import archaeological_minio_service
+            import io
+            from fastapi.responses import StreamingResponse
+            
+            # Per i piani archeologici, usa direttamente il path come oggetto nel bucket archaeological-photos
+            # Il path è già nel formato corretto: site_id/filename.ext
+            try:
+                # Debug: List objects in bucket to see what's actually there
+                try:
+                    objects = await asyncio.to_thread(
+                        archaeological_minio_service.client.list_objects,
+                        bucket_name=archaeological_minio_service.buckets['photos'],
+                        prefix=f"{plan.site_id}/",
+                        recursive=True
+                    )
+                    logger.info(f"Objects in bucket for site {plan.site_id}:")
+                    for obj in objects:
+                        logger.info(f"  - {obj.object_name} ({obj.size} bytes)")
+                except Exception as list_error:
+                    logger.error(f"Error listing objects: {list_error}")
+                
+                image_data = await archaeological_minio_service.get_file(plan.image_path)
+                
+                if image_data and isinstance(image_data, bytes):
+                    # Determina il tipo di contenuto dall'estensione del file
+                    import os
+                    ext = os.path.splitext(plan.image_filename)[1].lower()
+                    content_type = "image/jpeg"  # default
+                    if ext in [".jpg", ".jpeg"]:
+                        content_type = "image/jpeg"
+                    elif ext == ".png":
+                        content_type = "image/png"
+                    elif ext in [".tif", ".tiff"]:
+                        content_type = "image/tiff"
+                    
+                    return StreamingResponse(
+                        io.BytesIO(image_data),
+                        media_type=content_type,
+                        headers={"Cache-Control": "public, max-age=3600"}
+                    )
+                else:
+                    raise HTTPException(status_code=404, detail="Immagine non trovata su MinIO")
+            except Exception as minio_error:
+                logger.error(f"MinIO error for path {plan.image_path}: {minio_error}")
+                raise HTTPException(status_code=404, detail="Immagine non trovata su MinIO")
+        
+        else:
+            # Immagine su filesystem locale
+            from fastapi.responses import FileResponse
+            from pathlib import Path
+            
+            # Costruisci il path completo del file
+            file_path = Path("app/static/uploads") / plan.image_path
+            
+            if file_path.exists():
+                # Determina il tipo di contenuto dall'estensione del file
+                import os
+                ext = os.path.splitext(plan.image_filename)[1].lower()
+                content_type = "image/jpeg"  # default
+                if ext in [".jpg", ".jpeg"]:
+                    content_type = "image/jpeg"
+                elif ext == ".png":
+                    content_type = "image/png"
+                elif ext in [".tif", ".tiff"]:
+                    content_type = "image/tiff"
+                
+                return FileResponse(
+                    file_path,
+                    media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=3600"}
+                )
+            else:
+                raise HTTPException(status_code=404, detail="Immagine non trovata localmente")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error serving plan image: {e}")
+        raise HTTPException(status_code=500, detail="Errore nel servire l'immagine")
 
 
 # === UNITÀ DI SCAVO ===
