@@ -209,67 +209,6 @@ class ICCDPDFGenerator:
             ('BACKGROUND', (0, 0), (0, -1), grey),
             ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('FONTNAME', (0, 0), (0, 0
-    
-    def _add_header(self, story, iccd_record: ICCDRecord, site_name: str):
-        """Aggiunge intestazione ministeriale al PDF."""
-        
-        # Logo/Header ministeriale
-        header_data = [
-            ["MINISTERO DELLA CULTURA", ""],
-            ["Direzione Generale Archeologia, Belle Arti e Paesaggio", ""],
-            ["Soprintendenza Speciale per i Beni Archeologici di Roma", ""],
-            ["", f"Scheda {iccd_record.schema_type} - {iccd_record.get_level_display()}"]
-        ]
-        
-        header_table = Table(header_data, colWidths=[12*cm, 6*cm])
-        header_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (0, 2), 10),
-            ('FONTSIZE', (1, 3), (1, 3), 12),
-            ('FONTNAME', (1, 3), (1, 3), 'Helvetica-Bold'),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ]))
-        
-        story.append(header_table)
-        story.append(Spacer(1, 12))
-        
-        # Titolo scheda
-        schema_names = {
-            'RA': 'REPERTO ARCHEOLOGICO',
-            'CA': 'COMPLESSO ARCHEOLOGICO', 
-            'SI': 'SITO ARCHEOLOGICO'
-        }
-        title = f"SCHEDA {iccd_record.schema_type} - {schema_names.get(iccd_record.schema_type, 'BENE CULTURALE')}"
-        story.append(Paragraph(title, self.styles['ICCDTitle']))
-        
-        # Informazioni sito
-        if site_name:
-            story.append(Paragraph(f"<b>Sito:</b> {site_name}", self.styles['ICCDField']))
-        
-        story.append(Spacer(1, 12))
-        story.append(HRFlowable(width="100%", thickness=1, color=black))
-        story.append(Spacer(1, 12))
-    
-    def _add_nct_section(self, story, iccd_record: ICCDRecord):
-        """Aggiunge sezione codice NCT prominente."""
-        
-        nct_data = [
-            ["CODICE UNIVOCO NAZIONALE (NCT)", iccd_record.get_nct()],
-            ["Ente Schedatore", iccd_record.cataloging_institution],
-            ["Data Creazione", iccd_record.creation_date.strftime("%d/%m/%Y") if iccd_record.creation_date else ""],
-            ["Status", iccd_record.get_status_display()]
-        ]
-        
-        nct_table = Table(nct_data, colWidths=[8*cm, 10*cm])
-        nct_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), grey),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
             ('FONTNAME', (1, 0), (1, 0), 'Helvetica-Bold'),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
@@ -278,7 +217,7 @@ class ICCDPDFGenerator:
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ]))
-        
+
         story.append(nct_table)
         story.append(Spacer(1, 12))
     
