@@ -58,13 +58,17 @@ class ArchaeologicalMinIOService:
     def _initialize_buckets_sync(self):
         """Inizializza bucket archeologici con policy avanzate"""
         try:
-            for bucket_name in self.buckets.values():
+            # Include the legacy 'storage' bucket for compatibility
+            all_buckets = dict(self.buckets)
+            all_buckets['storage'] = 'storage'  # Add legacy bucket
+            
+            for bucket_type, bucket_name in all_buckets.items():
                 if not self.client.bucket_exists(bucket_name):
                     self.client.make_bucket(bucket_name)
-                    logger.info(f"Created bucket: {bucket_name}")
+                    logger.info(f"Created bucket: {bucket_name} ({bucket_type})")
 
-                    # Policy di accesso per bucket pubblici (thumbnails)
-                    if bucket_name == "thumbnails":
+                    # Policy di accesso per bucket pubblici (thumbnails e storage)
+                    if bucket_name in ["thumbnails", "storage"]:
                         policy = {
                             "Version": "2012-10-17",
                             "Statement": [
@@ -76,8 +80,11 @@ class ArchaeologicalMinIOService:
                                 }
                             ]
                         }
-                        self.client.set_bucket_policy(bucket_name, json.dumps(policy))
-                        logger.info(f"Set public policy for bucket: {bucket_name}")
+                        try:
+                            self.client.set_bucket_policy(bucket_name, json.dumps(policy))
+                            logger.info(f"Set public policy for bucket: {bucket_name}")
+                        except Exception as policy_error:
+                            logger.warning(f"Could not set policy for {bucket_name}: {policy_error}")
 
         except Exception as e:
             logger.error(f"Error initializing buckets: {e}")
@@ -168,7 +175,7 @@ class ArchaeologicalMinIOService:
         site_id: str,
         archaeological_metadata: Dict[str, Any]
     ) -> str:
-        """Upload foto con metadati archeologici completi e supporto multipart"""
+        """Upload foto con metadati archeologici completi e gestione storage full"""
 
         object_name = f"{site_id}/{photo_id}"
 
@@ -191,8 +198,43 @@ class ArchaeologicalMinIOService:
             return f"minio://{self.buckets['photos']}/{object_name}"
 
         except S3Error as e:
-            logger.error(f"MinIO upload error: {e}")
-            raise HTTPException(status_code=500, detail="Upload failed")
+            error_msg = str(e)
+            
+            # Check if it's a storage full error
+            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
+                logger.error(f"MinIO storage full during photo upload: {photo_id}")
+                
+                # Try emergency cleanup
+                try:
+                    from app.services.storage_management_service import storage_management_service
+                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=500)
+                    
+                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > 200:
+                        logger.info(f"Emergency cleanup successful, retrying photo upload for {photo_id}")
+                        
+                        # Retry upload after cleanup
+                        result = await asyncio.to_thread(
+                            self.client.put_object,
+                            bucket_name=self.buckets['photos'],
+                            object_name=object_name,
+                            data=io.BytesIO(photo_data),
+                            length=len(photo_data),
+                            content_type='image/jpeg',
+                            metadata=metadata
+                        )
+                        
+                        logger.info(f"Photo uploaded after cleanup: {object_name} ({len(photo_data)} bytes)")
+                        return f"minio://{self.buckets['photos']}/{object_name}"
+                    else:
+                        logger.error(f"Emergency cleanup insufficient for photo {photo_id}")
+                        raise HTTPException(status_code=507, detail="Storage full, cleanup insufficient")
+                        
+                except Exception as cleanup_error:
+                    logger.error(f"Emergency cleanup failed for photo {photo_id}: {cleanup_error}")
+                    raise HTTPException(status_code=507, detail="Storage full, cleanup failed")
+            else:
+                logger.error(f"MinIO upload error: {e}")
+                raise HTTPException(status_code=500, detail="Upload failed")
 
     async def get_photo_stream_url(self, photo_path: str, expires_hours: int = 24) -> Optional[str]:
         """Genera URL temporaneo per streaming foto grandi"""
@@ -269,7 +311,7 @@ class ArchaeologicalMinIOService:
             return []
 
     async def upload_thumbnail(self, thumbnail_data: bytes, photo_id: str) -> str:
-        """Upload thumbnail per foto"""
+        """Upload thumbnail per foto con gestione errori storage full"""
 
         object_name = f"{photo_id}.jpg"
 
@@ -287,8 +329,42 @@ class ArchaeologicalMinIOService:
             return f"{self.buckets['thumbnails']}/{object_name}"
 
         except S3Error as e:
-            logger.error(f"MinIO thumbnail upload error: {e}")
-            raise HTTPException(status_code=500, detail="Thumbnail upload failed")
+            error_msg = str(e)
+            
+            # Check if it's a storage full error
+            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
+                logger.error(f"MinIO storage full during thumbnail upload: {photo_id}")
+                
+                # Try to trigger emergency cleanup
+                try:
+                    from app.services.storage_management_service import storage_management_service
+                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=100)
+                    
+                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > 50:
+                        logger.info(f"Emergency cleanup successful, retrying thumbnail upload for {photo_id}")
+                        
+                        # Retry upload after cleanup
+                        result = await asyncio.to_thread(
+                            self.client.put_object,
+                            bucket_name=self.buckets['thumbnails'],
+                            object_name=object_name,
+                            data=io.BytesIO(thumbnail_data),
+                            length=len(thumbnail_data),
+                            metadata={'Content-Type': 'image/jpeg'}
+                        )
+                        
+                        logger.info(f"Thumbnail uploaded after cleanup: {object_name}")
+                        return f"{self.buckets['thumbnails']}/{object_name}"
+                    else:
+                        logger.error(f"Emergency cleanup insufficient for thumbnail {photo_id}")
+                        raise HTTPException(status_code=507, detail="Storage full, cleanup insufficient")
+                        
+                except Exception as cleanup_error:
+                    logger.error(f"Emergency cleanup failed for thumbnail {photo_id}: {cleanup_error}")
+                    raise HTTPException(status_code=507, detail="Storage full, cleanup failed")
+            else:
+                logger.error(f"MinIO thumbnail upload error: {e}")
+                raise HTTPException(status_code=500, detail="Thumbnail upload failed")
 
     async def get_thumbnail_url(self, photo_id: str, expires_hours: int = 24) -> Optional[str]:
         """Genera URL per thumbnail"""
@@ -384,6 +460,14 @@ class ArchaeologicalMinIOService:
             # Map sites/ paths to archaeological-photos bucket, removing 'sites/' prefix
             object_name = path[6:]  # Remove 'sites/' prefix (6 characters)
             return self.buckets['photos'], object_name
+        elif path.startswith('storage/sites/'):
+            # Handle legacy storage/sites/ paths - map to photos bucket
+            object_name = path[14:]  # Remove 'storage/sites/' prefix
+            return self.buckets['photos'], object_name
+        elif path.startswith('storage/'):
+            # Handle other storage/ paths - map to photos bucket by default
+            object_name = path[8:]  # Remove 'storage/' prefix
+            return self.buckets['photos'], object_name
         elif path.startswith('thumbnails/'):
             # Map thumbnails/ paths to thumbnails bucket
             object_name = path[11:]  # Remove 'thumbnails/' prefix
@@ -402,7 +486,10 @@ class ArchaeologicalMinIOService:
                     # Path starts with UUID/site_id, map to photos bucket with full path as object
                     return self.buckets['photos'], path
                 except ValueError:
-                    pass
+                    # Check if first part is 'storage' and handle it
+                    if first_part == 'storage':
+                        # Map to photos bucket, use rest of path as object name
+                        return self.buckets['photos'], parts[1] if len(parts) > 1 else ''
             return parts[0], parts[1] if len(parts) > 1 else ''
 
     async def get_storage_stats(self, site_id: str) -> Dict[str, Any]:

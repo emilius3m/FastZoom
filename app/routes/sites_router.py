@@ -24,6 +24,7 @@ from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service
 from app.services.archaeological_minio_service import archaeological_minio_service
 from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+from app.services.storage_management_service import storage_management_service
 
 sites_router = APIRouter(prefix="/sites", tags=["sites"])
 
@@ -390,65 +391,99 @@ async def upload_photo(
 
         # Process each photo - Upload first, schedule background processing after
         for file in photos:
-            # 1. Salva file su MinIO
-            filename, file_path, file_size = await storage_service.save_upload_file(
-                file, str(site_id), str(current_user_id)
-            )
+            try:
+                # Ensure MinIO buckets exist before uploading
+                await storage_management_service.ensure_buckets_exist()
+                
+                # 1. Check storage health before uploading
+                storage_usage = await storage_management_service.get_storage_usage()
+                if storage_usage.get('total_size_gb', 0) > 8:  # >80% of 10GB
+                    logger.warning(f"Storage usage critical ({storage_usage.get('total_size_gb', 0)}GB), triggering cleanup")
+                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=1000)
+                    logger.info(f"Pre-upload cleanup: {cleanup_result}")
 
-            # 2. Estrai metadati dal file caricato
-            await file.seek(0)  # Reset file pointer
-            exif_data, metadata = await photo_metadata_service.extract_metadata_from_file(
-                file, filename
-            )
+                # 2. Salva file su MinIO
+                filename, file_path, file_size = await storage_service.save_upload_file(
+                    file, str(site_id), str(current_user_id)
+                )
 
-            # 3. Crea record nel database
-            photo_record = await photo_metadata_service.create_photo_record(
-                filename=filename,
-                original_filename=file.filename,
-                file_path=file_path,
-                file_size=file_size,
-                site_id=str(site_id),
-                uploaded_by=str(current_user_id),
-                metadata=metadata
-            )
+                # 3. Estrai metadati dal file caricato
+                await file.seek(0)  # Reset file pointer
+                exif_data, metadata = await photo_metadata_service.extract_metadata_from_file(
+                    file, filename
+                )
 
-            # 4. Sovrascrivi metadati forniti dall'utente
-            if title:
-                photo_record.title = title
-            if description:
-                photo_record.description = description
-            if photographer:
-                photo_record.photographer = photographer
-            if photo_type:
-                try:
-                    photo_record.photo_type = PhotoType(photo_type)
-                except ValueError:
-                    logger.warning(f"Tipo foto non valido: {photo_type}")
+                # 4. Crea record nel database
+                photo_record = await photo_metadata_service.create_photo_record(
+                    filename=filename,
+                    original_filename=file.filename,
+                    file_path=file_path,
+                    file_size=file_size,
+                    site_id=str(site_id),
+                    uploaded_by=str(current_user_id),
+                    metadata=metadata
+                )
 
-            # 5. Salva nel database PRIMA di generare il thumbnail
-            db.add(photo_record)
-            await db.commit()
-            await db.refresh(photo_record)
+                # 5. Sovrascrivi metadati forniti dall'utente
+                if title:
+                    photo_record.title = title
+                if description:
+                    photo_record.description = description
+                if photographer:
+                    photo_record.photographer = photographer
+                if photo_type:
+                    try:
+                        photo_record.photo_type = PhotoType(photo_type)
+                    except ValueError:
+                        logger.warning(f"Tipo foto non valido: {photo_type}")
 
-            # Log photo ID for debugging
-            logger.info(f"Photo record saved with ID: {photo_record.id}")
-
-            # 6. Genera thumbnail DOPO che il record è stato salvato
-            await file.seek(0)  # Reset file pointer per thumbnail
-            thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
-                file, str(photo_record.id)
-            )
-
-            if thumbnail_path:
-                photo_record.thumbnail_path = thumbnail_path
-                # Salva il thumbnail path nel database
+                # 6. Salva nel database PRIMA di generare il thumbnail
+                db.add(photo_record)
                 await db.commit()
-                logger.info(f"Thumbnail generated and saved: {thumbnail_path}")
-            else:
-                logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+                await db.refresh(photo_record)
 
-            # Log thumbnail path for debugging
-            logger.info(f"Photo {photo_record.id} saved with thumbnail_path: {photo_record.thumbnail_path}")
+                # Log photo ID for debugging
+                logger.info(f"Photo record saved with ID: {photo_record.id}")
+
+                # 7. Genera thumbnail DOPO che il record è stato salvato
+                await file.seek(0)  # Reset file pointer per thumbnail
+                thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
+                    file, str(photo_record.id)
+                )
+
+                if thumbnail_path:
+                    photo_record.thumbnail_path = thumbnail_path
+                    # Salva il thumbnail path nel database
+                    await db.commit()
+                    logger.info(f"Thumbnail generated and saved: {thumbnail_path}")
+                else:
+                    logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+
+                # Log thumbnail path for debugging
+                logger.info(f"Photo {photo_record.id} saved with thumbnail_path: {photo_record.thumbnail_path}")
+                
+            except HTTPException as he:
+                # Handle HTTP exceptions (like storage full)
+                if he.status_code == 507:  # Storage full
+                    logger.error(f"Storage full during upload of {file.filename}")
+                    # Try one more cleanup attempt
+                    try:
+                        cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=2000)
+                        if cleanup_result['success']:
+                            logger.info(f"Emergency cleanup successful: {cleanup_result['total_freed_mb']}MB freed")
+                            # Could retry upload here if needed
+                        else:
+                            logger.error(f"Emergency cleanup failed: {cleanup_result}")
+                    except Exception as cleanup_error:
+                        logger.error(f"Cleanup attempt failed: {cleanup_error}")
+                
+                # Re-raise the HTTP exception to be handled by outer try-catch
+                raise he
+                
+            except Exception as photo_error:
+                logger.error(f"Error processing photo {file.filename}: {photo_error}")
+                # Continue with other photos, don't fail the entire batch
+                continue
 
             # 7. Log attività
             activity = UserActivity(
@@ -738,15 +773,143 @@ async def get_site_storage_stats(
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Ottieni statistiche storage del sito"""
+    """Ottieni statistiche storage del sito con gestione avanzata"""
     site, permission = site_access
 
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi richiesti")
 
-    # Ottieni statistiche da MinIO
-    stats = await archaeological_minio_service.get_storage_stats(str(site_id))
-    return JSONResponse(stats)
+    try:
+        # Ottieni statistiche da MinIO archeologico
+        site_stats = await archaeological_minio_service.get_storage_stats(str(site_id))
+        
+        # Ottieni statistiche globali storage
+        global_stats = await storage_management_service.get_storage_usage()
+        
+        # Controlla se storage è quasi pieno (>85%)
+        storage_warning = False
+        if global_stats.get('total_size_gb', 0) > 0:
+            # Assumiamo un limite di 10GB per MinIO locale
+            storage_usage_percent = (global_stats['total_size_gb'] / 10.0) * 100
+            storage_warning = storage_usage_percent > 85
+        
+        combined_stats = {
+            **site_stats,
+            'global_storage': global_stats,
+            'storage_warning': storage_warning,
+            'storage_usage_percent': min(100, storage_usage_percent) if 'storage_usage_percent' in locals() else 0
+        }
+        
+        return JSONResponse(combined_stats)
+        
+    except Exception as e:
+        logger.error(f"Error getting storage stats: {e}")
+        return JSONResponse({
+            'site_id': str(site_id),
+            'total_size_mb': 0,
+            'photo_count': 0,
+            'document_count': 0,
+            'total_files': 0,
+            'storage_warning': True,
+            'error': str(e)
+        })
+
+
+@sites_router.post("/{site_id}/api/storage/cleanup")
+async def emergency_storage_cleanup(
+        site_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Cleanup di emergenza dello storage MinIO"""
+    site, permission = site_access
+
+    if not permission.can_admin():
+        raise HTTPException(status_code=403, detail="Solo gli amministratori possono eseguire il cleanup")
+
+    try:
+        # Assicurati che tutti i bucket esistano
+        bucket_check = await storage_management_service.ensure_buckets_exist()
+        logger.info(f"Bucket check result: {bucket_check}")
+        
+        # Esegui cleanup di emergenza
+        cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=500)
+        
+        return JSONResponse({
+            'success': cleanup_result['success'],
+            'total_freed_mb': cleanup_result['total_freed_mb'],
+            'cleanup_actions': cleanup_result['cleanup_actions'],
+            'bucket_check': bucket_check,
+            'message': f"Cleanup completato: {cleanup_result['total_freed_mb']}MB liberati"
+        })
+        
+    except Exception as e:
+        logger.error(f"Emergency cleanup failed: {e}")
+        return JSONResponse({
+            'success': False,
+            'total_freed_mb': 0,
+            'cleanup_actions': [],
+            'error': str(e),
+            'message': f"Cleanup fallito: {str(e)}"
+        }, status_code=500)
+
+
+@sites_router.get("/{site_id}/api/storage/health")
+async def check_storage_health(
+        site_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Controlla lo stato di salute dello storage MinIO"""
+    site, permission = site_access
+
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi richiesti")
+
+    try:
+        # Controlla i bucket
+        bucket_status = await storage_management_service.ensure_buckets_exist()
+        
+        # Controlla l'utilizzo dello storage
+        storage_usage = await storage_management_service.get_storage_usage()
+        
+        # Determina lo stato di salute
+        health_status = "healthy"
+        issues = []
+        
+        if bucket_status['errors']:
+            health_status = "warning"
+            issues.append(f"{len(bucket_status['errors'])} bucket errors")
+        
+        if storage_usage.get('total_size_gb', 0) > 8:  # >80% di 10GB
+            health_status = "critical"
+            issues.append("Storage usage critical (>80%)")
+        elif storage_usage.get('total_size_gb', 0) > 6:  # >60% di 10GB
+            if health_status == "healthy":
+                health_status = "warning"
+            issues.append("Storage usage high (>60%)")
+        
+        return JSONResponse({
+            'status': health_status,
+            'issues': issues,
+            'bucket_status': bucket_status,
+            'storage_usage': storage_usage,
+            'recommendations': [
+                "Run emergency cleanup if storage >85%",
+                "Check for orphaned files",
+                "Consider archiving old photos"
+            ] if health_status != "healthy" else []
+        })
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return JSONResponse({
+            'status': 'error',
+            'issues': [f"Health check failed: {str(e)}"],
+            'bucket_status': {},
+            'storage_usage': {},
+            'recommendations': ["Contact system administrator"]
+        }, status_code=500)
 
 
 @sites_router.get("/{site_id}/api/photos/search")

@@ -459,13 +459,48 @@ class PhotoMetadataService:
                         thumbnail_buffer.seek(0)
                         thumbnail_data = thumbnail_buffer.read()
 
-                        # Upload con servizio archeologico
-                        thumbnail_url = await archaeological_minio_service.upload_thumbnail(
-                            thumbnail_data, photo_id
-                        )
+                        try:
+                            # Upload con servizio archeologico
+                            thumbnail_url = await archaeological_minio_service.upload_thumbnail(
+                                thumbnail_data, photo_id
+                            )
 
-                        logger.info(f"Thumbnail uploaded with archaeological service: {photo_id}")
-                        return thumbnail_url
+                            logger.info(f"Thumbnail uploaded with archaeological service: {photo_id}")
+                            return thumbnail_url
+                            
+                        except Exception as upload_error:
+                            error_msg = str(upload_error)
+                            
+                            # Check if it's a storage full error
+                            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
+                                logger.error(f"MinIO storage full - triggering emergency cleanup for thumbnail: {photo_id}")
+                                
+                                # Try emergency cleanup
+                                try:
+                                    from app.services.storage_management_service import storage_management_service
+                                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=100)
+                                    
+                                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > 50:
+                                        logger.info(f"Emergency cleanup freed {cleanup_result['total_freed_mb']}MB, retrying thumbnail upload")
+                                        
+                                        # Retry upload after cleanup
+                                        thumbnail_buffer.seek(0)
+                                        thumbnail_data = thumbnail_buffer.read()
+                                        thumbnail_url = await archaeological_minio_service.upload_thumbnail(
+                                            thumbnail_data, photo_id
+                                        )
+                                        logger.info(f"Thumbnail uploaded after emergency cleanup: {photo_id}")
+                                        return thumbnail_url
+                                    else:
+                                        logger.warning(f"Emergency cleanup insufficient, falling back to local storage for thumbnail: {photo_id}")
+                                        raise Exception("Storage full after cleanup attempt")
+                                        
+                                except Exception as cleanup_error:
+                                    logger.error(f"Emergency cleanup failed: {cleanup_error}")
+                                    raise Exception("Storage full and cleanup failed")
+                            else:
+                                # Other MinIO error, fallback to local
+                                raise upload_error
                     else:
                         raise Exception("MinIO not available")
 
