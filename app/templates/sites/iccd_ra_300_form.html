@@ -1,0 +1,459 @@
+{% extends "base/site_base.html" %}
+
+{% block title %}Scheda RA 3.00 - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    
+    <!-- Template per Scheda RA 3.00 ICCD -->
+    <div x-data="iccdRA300Schema()" class="iccd-ra-form">
+        
+        <!-- Header ICCD -->
+        <div class="bg-blue-600 text-white p-4 rounded-t-lg">
+            <h1 class="text-xl font-bold">📋 SCHEDA RA 3.00 - REPERTI ARCHEOLOGICI</h1>
+            <p class="text-blue-100">Standard ICCD - Ministero della Cultura</p>
+            <div class="mt-2 text-sm">
+                <span class="bg-blue-700 px-2 py-1 rounded">NCT: </span>
+                <span x-text="generateNCT()"></span>
+            </div>
+        </div>
+        
+        <!-- Form Sections -->
+        <div class="bg-white border-x border-b rounded-b-lg">
+            
+            <!-- CD - CODICI (Obbligatorio) -->
+            <div class="p-6 border-b bg-red-50">
+                <h2 class="text-lg font-semibold text-red-800 mb-4">CD - CODICI ⚠️ OBBLIGATORIO</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">TSK - Tipo scheda</label>
+                        <input x-model="iccdData.CD.TSK" readonly value="RA"
+                               class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">LIR - Livello ricerca <span class="text-red-500">*</span></label>
+                        <select x-model="iccdData.CD.LIR" class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                            <option value="P">P - Precatalogazione</option>
+                            <option value="C">C - Catalogazione</option>
+                            <option value="A">A - Approfondimento</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">ESC - Ente schedatore <span class="text-red-500">*</span></label>
+                        <input x-model="iccdData.CD.ESC" placeholder="SSABAP-RM"
+                               class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                </div>
+                
+                <!-- NCT - Codice Univoco -->
+                <div class="mt-4 p-4 bg-yellow-50 rounded border">
+                    <h3 class="font-semibold text-yellow-800 mb-2">NCT - CODICE UNIVOCO ⚠️</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">NCTR - Codice Regione</label>
+                            <input x-model="iccdData.CD.NCT.NCTR" value="12" readonly
+                                   class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md px-3 py-2">
+                            <p class="text-xs text-gray-500">12 = Lazio</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">NCTN - Numero Catalogo</label>
+                            <input x-model="iccdData.CD.NCT.NCTN" readonly
+                                   :value="generateProgressiveNumber()"
+                                   class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md px-3 py-2">
+                            <p class="text-xs text-gray-500">8 cifre - generato automaticamente</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">NCTS - Suffisso (opzionale)</label>
+                            <input x-model="iccdData.CD.NCT.NCTS" maxlength="2"
+                                   class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                            <p class="text-xs text-gray-500">Max 2 lettere maiuscole</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OG - OGGETTO (Obbligatorio) -->
+            <div class="p-6 border-b bg-red-50">
+                <h2 class="text-lg font-semibold text-red-800 mb-4">OG - OGGETTO ⚠️ OBBLIGATORIO</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">OGTD - Definizione <span class="text-red-500">*</span></label>
+                        <input x-model="iccdData.OG.OGT.OGTD" 
+                               placeholder="es: coppa, anfora, lucerna"
+                               class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                        <p class="text-xs text-gray-500">Da Thesaurus ICCD</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">OGTT - Tipologia</label>
+                        <input x-model="iccdData.OG.OGT.OGTT" 
+                               placeholder="Specificazione tipologica"
+                               class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">CLSC - Categoria</label>
+                    <select x-model="iccdData.OG.CLS.CLSC" class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                        <option value="">Seleziona categoria...</option>
+                        <option value="ABBIGLIAMENTO E ORNAMENTI PERSONALI">Abbigliamento e Ornamenti Personali</option>
+                        <option value="ARREDI">Arredi</option>
+                        <option value="EDILIZIA">Edilizia</option>
+                        <option value="STRUMENTI-UTENSILI-OGGETTI D'USO">Strumenti-Utensili-Oggetti d'Uso</option>
+                        <option value="SCULTURA">Scultura</option>
+                        <option value="PITTURA">Pittura</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- LC - LOCALIZZAZIONE (Obbligatorio) -->
+            <div class="p-6 border-b bg-red-50">
+                <h2 class="text-lg font-semibold text-red-800 mb-4">LC - LOCALIZZAZIONE GEOGRAFICO-AMMINISTRATIVA ⚠️ OBBLIGATORIO</h2>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">PVCS - Stato</label>
+                        <input x-model="iccdData.LC.PVC.PVCS" value="Italia" readonly
+                               class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">PVCR - Regione</label>
+                        <input x-model="iccdData.LC.PVC.PVCR" value="Lazio" readonly
+                               class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">PVCP - Provincia</label>
+                        <input x-model="iccdData.LC.PVC.PVCP" value="RM" readonly
+                               class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">PVCC - Comune</label>
+                        <input x-model="iccdData.LC.PVC.PVCC" value="Roma" readonly
+                               class="mt-1 block w-full bg-gray-100 border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">PVLN - Denominazione sito</label>
+                    <input x-model="iccdData.LC.PVL.PVLN" value="{{ site.name }}"
+                           class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                </div>
+            </div>
+
+            <!-- DT - CRONOLOGIA (Obbligatorio) -->
+            <div class="p-6 border-b bg-red-50">
+                <h2 class="text-lg font-semibold text-red-800 mb-4">DT - CRONOLOGIA ⚠️ OBBLIGATORIO</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">DTZG - Fascia cronologica</label>
+                        <input x-model="iccdData.DT.DTZ[0].DTZG" 
+                               placeholder="es: I secolo d.C., età augustea"
+                               class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">DTZS - Validità</label>
+                        <select x-model="iccdData.DT.DTZ[0].DTZS" class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                            <option value="">Seleziona validità...</option>
+                            <option value="ca.">ca. (circa)</option>
+                            <option value="?">? (incerta)</option>
+                            <option value="ante">ante</option>
+                            <option value="post">post</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700">DTM - Motivazione cronologia</label>
+                    <select x-model="iccdData.DT.DTM" class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                        <option value="">Seleziona motivazione...</option>
+                        <option value="analisi stilistica">Analisi stilistica</option>
+                        <option value="dati stratigrafici">Dati stratigrafici</option>
+                        <option value="confronti">Confronti</option>
+                        <option value="dati epigrafici">Dati epigrafici</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- MT - DATI TECNICI (Obbligatorio) -->
+            <div class="p-6 border-b bg-red-50">
+                <h2 class="text-lg font-semibold text-red-800 mb-4">MT - DATI TECNICI ⚠️ OBBLIGATORIO</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Materia e Tecnica -->
+                    <div>
+                        <h3 class="font-semibold text-gray-800 mb-2">MTC - Materia e Tecnica</h3>
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">MTCM - Materia <span class="text-red-500">*</span></label>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <template x-for="material in materialsList">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" :value="material"
+                                               x-model="iccdData.MT.MTC.MTCM" class="mr-2">
+                                        <span x-text="material"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Misure -->
+                    <div>
+                        <h3 class="font-semibold text-gray-800 mb-2">MIS - Misure (almeno una richiesta)</h3>
+                        <div class="space-y-2">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">MISA - Altezza (cm)</label>
+                                <input type="number" step="0.01" x-model="iccdData.MT.MIS.MISA"
+                                       class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">MISD - Diametro (cm)</label>
+                                <input type="number" step="0.01" x-model="iccdData.MT.MIS.MISD"
+                                       class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">MISL - Larghezza (cm)</label>
+                                <input type="number" step="0.01" x-model="iccdData.MT.MIS.MISL"
+                                       class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DA - DATI ANALITICI (Obbligatorio) -->
+            <div class="p-6 border-b bg-red-50">
+                <h2 class="text-lg font-semibold text-red-800 mb-4">DA - DATI ANALITICI ⚠️ OBBLIGATORIO</h2>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">DESO - Descrizione oggetto <span class="text-red-500">*</span></label>
+                    <textarea x-model="iccdData.DA.DES.DESO" rows="5"
+                              placeholder="Descrizione dettagliata del reperto archeologico..."
+                              class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2"></textarea>
+                    <p class="text-xs text-gray-500">Minimo 20 caratteri</p>
+                </div>
+            </div>
+
+            <!-- Paragrafi Obbligatori Compilazione -->
+            <div class="p-6 border-b bg-yellow-50">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- AD - Accesso Dati -->
+                    <div>
+                        <h2 class="text-lg font-semibold text-yellow-800 mb-4">AD - ACCESSO AI DATI ⚠️ OBBLIGATORIO</h2>
+                        <label class="block text-sm font-medium text-gray-700">ADSP - Profilo di accesso</label>
+                        <select x-model="iccdData.AD.ADSP" class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                            <option value="1">1 - Libero</option>
+                            <option value="2">2 - Riservato enti</option>
+                            <option value="3">3 - Riservato</option>
+                        </select>
+                    </div>
+                    
+                    <!-- CM - Compilazione -->
+                    <div>
+                        <h2 class="text-lg font-semibold text-yellow-800 mb-4">CM - COMPILAZIONE ⚠️ OBBLIGATORIO</h2>
+                        <div class="space-y-2">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">CMPD - Data compilazione</label>
+                                <input x-model="iccdData.CM.CMP.CMPD" :value="new Date().getFullYear()"
+                                       class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">CMPN - Nome compilatore</label>
+                                <input x-model="iccdData.CM.CMP.CMPN" 
+                                       placeholder="{{ current_user.first_name }} {{ current_user.last_name }}"
+                                       class="mt-1 block w-full border-gray-300 rounded-md px-3 py-2">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="p-6 flex justify-between items-center">
+                <div class="text-sm text-gray-600">
+                    <span class="text-red-500">*</span> Campi obbligatori secondo standard ICCD
+                </div>
+                
+                <div class="flex space-x-3">
+                    <button @click="validateICCDSchema()" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                        🔍 Valida Schema
+                    </button>
+                    <button @click="saveICCDRecord()" 
+                            class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                        💾 Salva Scheda RA
+                    </button>
+                    <button @click="exportICCDPDF()" 
+                            class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
+                        📄 Esporta PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- JavaScript Component -->
+<script>
+function iccdRA300Schema() {
+    return {
+        // Dati ICCD inizializzati
+        iccdData: {
+            CD: {
+                TSK: 'RA',
+                LIR: 'C',
+                NCT: {
+                    NCTR: '12',
+                    NCTN: '',
+                    NCTS: ''
+                },
+                ESC: 'SSABAP-RM'
+            },
+            OG: {
+                OGT: { OGTD: '', OGTT: '', OGTN: '' },
+                CLS: { CLSC: '', CLSS: '', CLSP: '' }
+            },
+            LC: {
+                PVC: {
+                    PVCS: 'Italia',
+                    PVCR: 'Lazio', 
+                    PVCP: 'RM',
+                    PVCC: 'Roma'
+                },
+                PVL: { PVLN: '{{ site.name }}' }
+            },
+            DT: {
+                DTZ: [{ DTZG: '', DTZS: '' }],
+                DTM: ''
+            },
+            MT: {
+                MTC: { MTCM: [], MTCT: [] },
+                MIS: { MISA: null, MISD: null, MISL: null, MISU: 'cm' }
+            },
+            DA: {
+                DES: { DESO: '' }
+            },
+            AD: { ADSP: '1' },
+            CM: {
+                CMP: {
+                    CMPD: new Date().getFullYear().toString(),
+                    CMPN: ''
+                }
+            }
+        },
+        
+        // Lista materiali ICCD
+        materialsList: [
+            'ceramica', 'terracotta', 'argilla',
+            'bronzo', 'ferro', 'oro', 'argento',
+            'marmo', 'travertino', 'tufo',
+            'vetro', 'legno', 'osso', 'avorio'
+        ],
+        
+        init() {
+            this.iccdData.CD.NCT.NCTN = this.generateProgressiveNumber();
+        },
+        
+        generateProgressiveNumber() {
+            const now = new Date();
+            const year = now.getFullYear().toString().slice(-2);
+            const timestamp = now.getTime().toString().slice(-6);
+            return year + timestamp;
+        },
+        
+        generateNCT() {
+            return this.iccdData.CD.NCT.NCTR + 
+                   this.iccdData.CD.NCT.NCTN + 
+                   (this.iccdData.CD.NCT.NCTS || '');
+        },
+        
+        validateICCDSchema() {
+            // Validazione conforme ICCD
+            const errors = [];
+            
+            // CD validation
+            if (!this.iccdData.CD.NCT.NCTR || !this.iccdData.CD.NCT.NCTN) {
+                errors.push('NCT incompleto');
+            }
+            
+            // OG validation  
+            if (!this.iccdData.OG.OGT.OGTD) {
+                errors.push('OGTD (Definizione) obbligatoria');
+            }
+            
+            // MT validation
+            if (!this.iccdData.MT.MTC.MTCM.length) {
+                errors.push('Almeno un materiale (MTCM) obbligatorio');
+            }
+            
+            // Almeno una misura
+            const hasMeasure = this.iccdData.MT.MIS.MISA || 
+                               this.iccdData.MT.MIS.MISD || 
+                               this.iccdData.MT.MIS.MISL;
+            if (!hasMeasure) {
+                errors.push('Almeno una misura obbligatoria');
+            }
+            
+            // DA validation
+            if (!this.iccdData.DA.DES.DESO || this.iccdData.DA.DES.DESO.length < 20) {
+                errors.push('Descrizione oggetto minimo 20 caratteri');
+            }
+            
+            if (errors.length > 0) {
+                alert('Errori validazione ICCD:\n' + errors.join('\n'));
+                return false;
+            }
+            
+            alert('✅ Schema ICCD RA 3.00 valido!');
+            return true;
+        },
+        
+        async saveICCDRecord() {
+            if (!this.validateICCDSchema()) return;
+            
+            try {
+                const response = await fetch(`/api/iccd/sites/{{ site.id }}/records`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        schema_type: 'RA',
+                        level: this.iccdData.CD.LIR,
+                        cataloging_institution: this.iccdData.CD.ESC,
+                        iccd_data: this.iccdData
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ Scheda RA 3.00 salvata con NCT: ${result.nct}`);
+                    window.location.href = `/sites/{{ site.id }}/iccd`;
+                } else {
+                    const error = await response.json();
+                    alert('❌ Errore: ' + (error.detail || 'Errore sconosciuto'));
+                }
+            } catch (error) {
+                console.error('Errore salvataggio ICCD:', error);
+                alert('❌ Errore nel salvataggio');
+            }
+        },
+        
+        async exportICCDPDF() {
+            try {
+                const nct = this.generateNCT();
+                // Placeholder per PDF - sarà implementato quando la scheda è salvata
+                alert(`📄 PDF RA 3.00 sarà generato per NCT: ${nct}`);
+            } catch (error) {
+                console.error('Errore export PDF:', error);
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

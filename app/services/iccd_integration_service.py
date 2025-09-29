@@ -10,7 +10,7 @@ from loguru import logger
 
 from app.models.iccd_records import ICCDSchemaTemplate
 from app.models.form_schemas import FormSchema
-from app.data.iccd_templates import ICCD_TEMPLATES, get_template_by_type
+from app.data.iccd_templates_fixed import ICCD_TEMPLATES, get_template_by_type
 
 
 class ICCDIntegrationService:

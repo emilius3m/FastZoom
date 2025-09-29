@@ -269,6 +269,34 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                             },
                             "minItems": 1
                         },
+                        "DTS": {
+                            "type": "array",
+                            "title": "CRONOLOGIA SPECIFICA",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "DTSI": {
+                                        "type": "integer", 
+                                        "title": "Da (anno)",
+                                        "minimum": -753,
+                                        "maximum": 2100,
+                                        "description": "Anno iniziale"
+                                    },
+                                    "DTSF": {
+                                        "type": "integer",
+                                        "title": "A (anno)", 
+                                        "minimum": -753,
+                                        "maximum": 2100,
+                                        "description": "Anno finale"
+                                    },
+                                    "DTSV": {
+                                        "type": "string",
+                                        "title": "Validità",
+                                        "enum": ["ca.", "?", "ante", "post"]
+                                    }
+                                }
+                            }
+                        },
                         "DTM": {
                             "type": "string",
                             "title": "Motivazione cronologia",
@@ -278,7 +306,7 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                     },
                     "anyOf": [
                         { "required": ["DTZ"] },
-                        { "required": ["DTM"] }
+                        { "required": ["DTS"] }
                     ],
                     "additionalProperties": false
                 },
@@ -309,6 +337,15 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                                     },
                                     "minItems": 1,
                                     "uniqueItems": true
+                                },
+                                "MTCT": {
+                                    "type": "array",
+                                    "title": "Tecnica",
+                                    "description": "Tecniche di lavorazione",
+                                    "items": {
+                                        "type": "string", 
+                                        "examples": ["tornio", "modellato a mano", "matrice", "fusione", "martellato", "inciso", "dipinto"]
+                                    }
                                 }
                             },
                             "required": ["MTCM"],
@@ -333,10 +370,24 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                                     "minimum": 0,
                                     "multipleOf": 0.01
                                 },
+                                "MISP": {
+                                    "type": "number",
+                                    "title": "Profondità",
+                                    "description": "Profondità in cm", 
+                                    "minimum": 0,
+                                    "multipleOf": 0.01
+                                },
                                 "MISD": {
                                     "type": "number",
                                     "title": "Diametro",
                                     "description": "Diametro in cm",
+                                    "minimum": 0,
+                                    "multipleOf": 0.01
+                                },
+                                "MISE": {
+                                    "type": "number",
+                                    "title": "Spessore",
+                                    "description": "Spessore in cm",
                                     "minimum": 0,
                                     "multipleOf": 0.01
                                 },
@@ -350,7 +401,9 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                             "anyOf": [
                                 { "required": ["MISA"] },
                                 { "required": ["MISL"] }, 
-                                { "required": ["MISD"] }
+                                { "required": ["MISP"] },
+                                { "required": ["MISD"] },
+                                { "required": ["MISE"] }
                             ],
                             "additionalProperties": false
                         }
@@ -377,10 +430,70 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                             },
                             "required": ["DESO"],
                             "additionalProperties": false
+                        },
+                        "ISR": {
+                            "type": "array",
+                            "title": "ISCRIZIONI",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "ISRC": {
+                                        "type": "string",
+                                        "title": "Classe",
+                                        "enum": ["votiva", "funeraria", "onoraria", "sacra", "profana", "instrumentum domesticum", "numerale", "di possesso"]
+                                    },
+                                    "ISRI": {
+                                        "type": "string",
+                                        "title": "Trascrizione",
+                                        "description": "Testo dell'iscrizione"
+                                    },
+                                    "ISRL": {
+                                        "type": "string",
+                                        "title": "Lingua",
+                                        "enum": ["latino", "greco", "etrusco", "osco", "umbro", "messapico"]
+                                    },
+                                    "ISRT": {
+                                        "type": "string", 
+                                        "title": "Tecnica scrittura",
+                                        "enum": ["graffito", "dipinto", "inciso", "impresso", "rilievo"]
+                                    }
+                                }
+                            }
+                        },
+                        "NSC": {
+                            "type": "string",
+                            "title": "Notizie storico-critiche",
+                            "description": "Campo a testo libero per notizie aggiuntive"
                         }
                     },
                     "required": ["DES"],
                     "additionalProperties": false
+                },
+
+                "CO": {
+                    "type": "object",
+                    "title": "CONSERVAZIONE",
+                    "description": "Stato di conservazione del bene",
+                    "properties": {
+                        "STC": {
+                            "type": "object",
+                            "title": "STATO DI CONSERVAZIONE",
+                            "properties": {
+                                "STCC": {
+                                    "type": "string",
+                                    "title": "Stato di conservazione", 
+                                    "enum": ["ottimo", "buono", "discreto", "mediocre", "cattivo", "pessimo"],
+                                    "enumNames": ["Ottimo", "Buono", "Discreto", "Mediocre", "Cattivo", "Pessimo"]
+                                },
+                                "STCS": {
+                                    "type": "string",
+                                    "title": "Indicazioni specifiche",
+                                    "description": "Descrizione dettagliata stato conservativo"
+                                }
+                            },
+                            "required": ["STCC"]
+                        }
+                    }
                 },
 
                 "AD": {
@@ -423,6 +536,16 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                                 }
                             },
                             "required": ["CMPD", "CMPN"]
+                        },
+                        "RSR": {
+                            "type": "string",
+                            "title": "Responsabile scientifico",
+                            "description": "Responsabile attività catalogazione"
+                        },
+                        "FUR": {
+                            "type": "string",
+                            "title": "Funzionario responsabile",
+                            "description": "Funzionario responsabile tutela"
                         }
                     },
                     "required": ["CMP"],
@@ -437,19 +560,37 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
         "ui_schema": {
             "CD": {
                 "ui:order": ["TSK", "LIR", "NCT", "ESC", "ECP"],
-                "TSK": { "ui:readonly": true }
+                "TSK": { "ui:readonly": true },
+                "NCT": {
+                    "ui:order": ["NCTR", "NCTN", "NCTS"],
+                    "NCTR": { "ui:help": "Codice ISTAT regione (12 per Lazio)" },
+                    "NCTN": { "ui:help": "8 cifre - generato automaticamente" }
+                }
             },
             "OG": {
                 "ui:order": ["OGT", "CLS"],
                 "OGT": {
+                    "ui:order": ["OGTD", "OGTT", "OGTN"],
                     "OGTD": {
                         "ui:help": "Utilizzare termini dal Thesaurus ICCD"
                     }
+                },
+                "CLS": {
+                    "CLSC": {
+                        "ui:help": "Scegliere dalla classificazione ICCD"
+                    }
                 }
             },
+            "LC": {
+                "ui:order": ["PVC", "PVL", "LDC"]
+            },
             "MT": {
+                "ui:order": ["MTC", "MIS"],
                 "MTC": {
                     "MTCM": {
+                        "ui:widget": "checkboxes"
+                    },
+                    "MTCT": {
                         "ui:widget": "checkboxes"
                     }
                 }
@@ -460,14 +601,30 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                         "ui:widget": "textarea",
                         "ui:options": { "rows": 5 }
                     }
+                },
+                "NSC": {
+                    "ui:widget": "textarea",
+                    "ui:options": { "rows": 3 }
+                }
+            },
+            "CM": {
+                "CMP": {
+                    "CMPN": {
+                        "ui:help": "Nome e cognome del catalogatore"
+                    }
                 }
             }
         }
     }
 
-# Template semplificati per altri schemi
+
+# Mantieni le altre funzioni esistenti per compatibilità
+def get_iccd_ra_template() -> Dict[str, Any]:
+    """Wrapper per compatibilità - usa schema RA 3.00."""
+    return get_iccd_ra_300_template()
+
 def get_iccd_ca_template() -> Dict[str, Any]:
-    """Template per CA - Complesso Archeologico."""
+    """Template semplificato per CA."""
     return {
         "id": "iccd_ca_template",
         "name": "Scheda CA - Complesso Archeologico ICCD",
@@ -478,7 +635,7 @@ def get_iccd_ca_template() -> Dict[str, Any]:
     }
 
 def get_iccd_si_template() -> Dict[str, Any]:
-    """Template per SI - Sito Archeologico."""
+    """Template semplificato per SI."""
     return {
         "id": "iccd_si_template", 
         "name": "Scheda SI - Sito Archeologico ICCD",
@@ -488,12 +645,7 @@ def get_iccd_si_template() -> Dict[str, Any]:
         "standard": "ICCD_MiC_2021"
     }
 
-# Funzioni di utilità
-def get_iccd_ra_template() -> Dict[str, Any]:
-    """Wrapper per compatibilità."""
-    return get_iccd_ra_300_template()
-
-# Dizionario template
+# Dizionario con tutti i template disponibili
 ICCD_TEMPLATES = {
     "RA": get_iccd_ra_300_template(),
     "CA": get_iccd_ca_template(), 
@@ -508,8 +660,8 @@ def get_all_templates() -> Dict[str, Dict[str, Any]]:
     """Ottieni tutti i template ICCD disponibili."""
     return ICCD_TEMPLATES
 
-def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia") -> Dict[str, Any]:
-    """Genera dati ICCD di default per schema RA 3.00."""
+def generate_default_iccd_data_ra300(schema_type: str, site_name: str = "Domus Flavia") -> Dict[str, Any]:
+    """Genera dati ICCD di default per schema RA 3.00 ufficiale."""
     
     now = datetime.now()
     year = now.year % 100
@@ -522,10 +674,11 @@ def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia"
             "TSK": schema_type,
             "LIR": "C",
             "NCT": {
-                "NCTR": "12",
+                "NCTR": "12",  # Lazio
                 "NCTN": nct_number
             },
-            "ESC": "SSABAP-RM"
+            "ESC": "SSABAP-RM",
+            "ECP": "SSABAP-RM"
         },
         "OG": {
             "OGT": {
@@ -544,11 +697,19 @@ def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia"
                 "PVCS": "Italia",
                 "PVCR": "Lazio",
                 "PVCP": "RM", 
-                "PVCC": "Roma"
+                "PVCC": "Roma",
+                "PVCL": ""
             },
             "PVL": {
                 "PVLN": site_name,
-                "PVLI": "Palatino"
+                "PVLI": "Palatino",
+                "PVLE": "Parco archeologico del Colosseo"
+            },
+            "LDC": {
+                "LDCN": "",
+                "LDCU": "",
+                "LDCQ": "",
+                "LDCS": ""
             }
         },
         "DT": {
@@ -560,18 +721,29 @@ def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia"
         },
         "MT": {
             "MTC": {
-                "MTCM": []
+                "MTCM": [],
+                "MTCT": []
             },
             "MIS": {
                 "MISA": None,
                 "MISL": None,
+                "MISP": None,
                 "MISD": None,
+                "MISE": None,
                 "MISU": "cm"
             }
         },
         "DA": {
             "DES": {
                 "DESO": ""
+            },
+            "ISR": [],
+            "NSC": ""
+        },
+        "CO": {
+            "STC": {
+                "STCC": "buono",
+                "STCS": ""
             }
         },
         "AD": {
@@ -581,6 +753,13 @@ def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia"
             "CMP": {
                 "CMPD": current_year,
                 "CMPN": ""
-            }
+            },
+            "RSR": "",
+            "FUR": ""
         }
     }
+
+# Funzione principale per compatibilità
+def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia") -> Dict[str, Any]:
+    """Genera dati ICCD di default - usa schema RA 3.00 ufficiale."""
+    return generate_default_iccd_data_ra300(schema_type, site_name)

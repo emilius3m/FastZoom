@@ -2107,7 +2107,8 @@ async def site_iccd_records(
         "can_admin": permission.can_admin()
     }
     
-    return templates.TemplateResponse("sites/iccd_records.html", context)
+    # Usa template semplificato temporaneamente per evitare errori database
+    return templates.TemplateResponse("sites/iccd_simple.html", context)
 
 
 @sites_router.get("/{site_id}/iccd/new", response_class=HTMLResponse)
@@ -2141,7 +2142,7 @@ async def new_iccd_record(
         "can_admin": permission.can_admin()
     }
     
-    return templates.TemplateResponse("sites/iccd_catalogation.html", context)
+    return templates.TemplateResponse("sites/iccd_ra_300_form.html", context)
 
 
 @sites_router.get("/{site_id}/iccd/{record_id}", response_class=HTMLResponse)
