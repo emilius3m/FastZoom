@@ -2173,15 +2173,15 @@ async def new_iccd_record(
 ):
     """Form per creare nuova scheda ICCD."""
     site, permission = site_access
-    
+
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
-    
+
     # Get current user info
     user_query = select(User).where(User.id == current_user_id)
     user = await db.execute(user_query)
     current_user = user.scalar_one_or_none()
-    
+
     context = {
         "request": request,
         "site": site,
@@ -2192,8 +2192,15 @@ async def new_iccd_record(
         "can_write": permission.can_write(),
         "can_admin": permission.can_admin()
     }
-    
-    return templates.TemplateResponse("sites/iccd_ra_300_form.html", context)
+
+    # Seleziona template in base al tipo schema
+    template_name = "sites/iccd_ra_300_form.html"  # Default RA
+    if schema_type == "SI":
+        template_name = "sites/iccd_si_300_form.html"
+    elif schema_type == "CA":
+        template_name = "sites/iccd_ca_300_form.html"  # Per futuro
+
+    return templates.TemplateResponse(template_name, context)
 
 
 @sites_router.get("/{site_id}/iccd/{record_id}", response_class=HTMLResponse)
@@ -2216,12 +2223,32 @@ async def view_iccd_record(
     user = await db.execute(user_query)
     current_user = user.scalar_one_or_none()
     
-    # Recupera record ICCD dal database tramite API
+    # Recupera record ICCD dal database
     try:
-        # Qui useremo l'API endpoint per ottenere i dati
-        from app.routes.api.iccd_records import get_iccd_record
-        record_response = await get_iccd_record(site_id, record_id, site_access, db)
-        record_data = json.loads(record_response.body.decode())
+        from app.models.iccd_records import ICCDBaseRecord
+        
+        record_query = select(ICCDBaseRecord).where(
+            and_(
+                ICCDBaseRecord.id == record_id,
+                ICCDBaseRecord.site_id == site_id
+            )
+        )
+        result = await db.execute(record_query)
+        record = result.scalar_one_or_none()
+        
+        if not record:
+            raise HTTPException(status_code=404, detail="Scheda ICCD non trovata")
+        
+        # Convert to dict for template
+        record_data = {
+            "id": str(record.id),
+            "schema_type": record.schema_type,
+            "nct": f"{record.nct_region}{record.nct_number}{record.nct_suffix or ''}",
+            "iccd_data": record.iccd_data,
+            "created_at": record.created_at.isoformat() if record.created_at else None,
+            "updated_at": record.updated_at.isoformat() if record.updated_at else None
+        }
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -2263,11 +2290,32 @@ async def edit_iccd_record(
     user = await db.execute(user_query)
     current_user = user.scalar_one_or_none()
     
-    # Recupera record ICCD dal database tramite API
+    # Recupera record ICCD dal database
     try:
-        from app.routes.api.iccd_records import get_iccd_record
-        record_response = await get_iccd_record(site_id, record_id, site_access, db)
-        record_data = json.loads(record_response.body.decode())
+        from app.models.iccd_records import ICCDBaseRecord
+        
+        record_query = select(ICCDBaseRecord).where(
+            and_(
+                ICCDBaseRecord.id == record_id,
+                ICCDBaseRecord.site_id == site_id
+            )
+        )
+        result = await db.execute(record_query)
+        record = result.scalar_one_or_none()
+        
+        if not record:
+            raise HTTPException(status_code=404, detail="Scheda ICCD non trovata")
+        
+        # Convert to dict for template
+        record_data = {
+            "id": str(record.id),
+            "schema_type": record.schema_type,
+            "nct": f"{record.nct_region}{record.nct_number}{record.nct_suffix or ''}",
+            "iccd_data": record.iccd_data,
+            "created_at": record.created_at.isoformat() if record.created_at else None,
+            "updated_at": record.updated_at.isoformat() if record.updated_at else None
+        }
+        
     except HTTPException:
         raise
     except Exception as e:

@@ -75,17 +75,16 @@ class UserSitePermission(Base):
     
     # Relazioni
     user: Mapped["User"] = relationship(
-        "User", 
-        foreign_keys=[user_id], 
+        "User",
+        foreign_keys=[user_id],
         back_populates="site_permissions"
     )
     site: Mapped["ArchaeologicalSite"] = relationship(
-        "ArchaeologicalSite", 
-        foreign_keys=[site_id], 
+        "ArchaeologicalSite",
         back_populates="user_permissions"
-    ) 
+    )
     assigned_by_user: Mapped[Optional["User"]] = relationship(
-        "User", 
+        "User",
         foreign_keys=[assigned_by],
         back_populates="granted_permissions"
     )

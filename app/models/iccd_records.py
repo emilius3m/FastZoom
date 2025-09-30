@@ -44,7 +44,7 @@ class ICCDBaseRecord(Base):
     parent = relationship("ICCDBaseRecord", remote_side=[id])
     children = relationship("ICCDBaseRecord", back_populates="parent")
     site = relationship("ArchaeologicalSite", back_populates="iccd_records")
-    creator = relationship("User", foreign_keys=[created_by])
+    creator = relationship("User")
     
     __table_args__ = (
         Index('idx_nct_complete', 'nct_region', 'nct_number', 'nct_suffix'),
@@ -107,7 +107,7 @@ class ICCDRecord(ICCDBaseRecord):
         """ID validatore."""
         return self.created_by if self.is_validated else None
     
-    validator = relationship("User", foreign_keys=[validated_by], viewonly=True)
+    validator = relationship("User", viewonly=True)
     
     def __repr__(self):
         return f"<ICCDRecord(nct='{self.get_nct()}', type='{self.schema_type}', level='{self.level}')>"

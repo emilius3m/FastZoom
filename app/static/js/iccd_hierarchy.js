@@ -56,7 +56,7 @@ function iccdHierarchicalSystem() {
         
         async loadSiteHierarchy() {
             try {
-                const response = await fetch(`/api/iccd/hierarchy/${window.siteId}`);
+                const response = await fetch(`/sites/${window.siteId}/api/iccd/hierarchy`);
                 if (response.ok) {
                     this.hierarchyTree = await response.json();
                     this.buildHierarchicalView();
@@ -101,6 +101,18 @@ function iccdHierarchicalSystem() {
         },
         
         async createICCDRecord(schemaType, parentId = null) {
+            // For SI records, redirect to the form instead of creating directly
+            if (schemaType === 'SI') {
+                window.location.href = `/sites/${window.siteId}/iccd/new?schema_type=SI`;
+                return;
+            }
+            
+            // For other schema types, check if SI exists first
+            if (!this.hierarchyTree.organized?.level1?.SI && schemaType !== 'SI') {
+                this.showAlertMessage('È necessario creare prima la Scheda SI (Sito Archeologico)', 'warning');
+                return;
+            }
+            
             const recordData = this.initializeSchemaData(schemaType);
             
             // Assegna gerarchia
@@ -308,7 +320,7 @@ function iccdHierarchicalSystem() {
         
         async createRelation(sourceId, targetId, relationType, level = '1') {
             try {
-                const response = await fetch('/api/iccd/relations', {
+                const response = await fetch(`/sites/${window.siteId}/api/iccd/relations`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -337,7 +349,7 @@ function iccdHierarchicalSystem() {
         
         async loadAuthorityFiles() {
             try {
-                const response = await fetch(`/api/iccd/authority-files/${window.siteId}`);
+                const response = await fetch(`/sites/${window.siteId}/api/iccd/authority-files`);
                 if (response.ok) {
                     this.authorityFiles = await response.json();
                 } else {
@@ -351,7 +363,7 @@ function iccdHierarchicalSystem() {
         
         async createAuthorityFile(type, data) {
             try {
-                const response = await fetch('/api/iccd/authority-files', {
+                const response = await fetch(`/sites/${window.siteId}/api/iccd/authority-files`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -388,6 +400,12 @@ function iccdHierarchicalSystem() {
         
         // Navigazione gerarchica
         navigateToLevel(level, record = null) {
+            if (level === 'detail' && record) {
+                // Redirect to the view page for the record
+                window.location.href = `/sites/${window.siteId}/iccd/${record.id}`;
+                return;
+            }
+            
             this.currentLevel = level;
             this.selectedRecord = record;
             this.updateBreadcrumb();

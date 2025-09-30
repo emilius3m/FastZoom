@@ -88,7 +88,7 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
-    
+
     # Permessi assegnati da questo utente (se è admin)
     granted_permissions: Mapped[List["UserSitePermission"]] = relationship(
         "UserSitePermission",

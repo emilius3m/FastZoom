@@ -269,6 +269,34 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                             },
                             "minItems": 1
                         },
+                        "DTS": {
+                            "type": "array",
+                            "title": "CRONOLOGIA SPECIFICA",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "DTSI": {
+                                        "type": "integer", 
+                                        "title": "Da (anno)",
+                                        "minimum": -753,
+                                        "maximum": 2100,
+                                        "description": "Anno iniziale"
+                                    },
+                                    "DTSF": {
+                                        "type": "integer",
+                                        "title": "A (anno)", 
+                                        "minimum": -753,
+                                        "maximum": 2100,
+                                        "description": "Anno finale"
+                                    },
+                                    "DTSV": {
+                                        "type": "string",
+                                        "title": "Validità",
+                                        "enum": ["ca.", "?", "ante", "post"]
+                                    }
+                                }
+                            }
+                        },        
                         "DTM": {
                             "type": "string",
                             "title": "Motivazione cronologia",
@@ -278,6 +306,7 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                     },
                     "anyOf": [
                         { "required": ["DTZ"] },
+                        { "required": ["DTS"] },
                         { "required": ["DTM"] }
                     ],
                     "additionalProperties": false
@@ -309,6 +338,15 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                                     },
                                     "minItems": 1,
                                     "uniqueItems": true
+                                  },
+                                "MTCT": {
+                                    "type": "array",
+                                    "title": "Tecnica",
+                                    "description": "Tecniche di lavorazione",
+                                    "items": {
+                                        "type": "string", 
+                                        "examples": ["tornio", "modellato a mano", "matrice", "fusione", "martellato", "inciso", "dipinto"]
+                                    }
                                 }
                             },
                             "required": ["MTCM"],
@@ -333,6 +371,14 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                                     "minimum": 0,
                                     "multipleOf": 0.01
                                 },
+                                                                },
+                                "MISP": {
+                                    "type": "number",
+                                    "title": "Profondità",
+                                    "description": "Profondità in cm", 
+                                    "minimum": 0,
+                                    "multipleOf": 0.01
+                                },
                                 "MISD": {
                                     "type": "number",
                                     "title": "Diametro",
@@ -340,6 +386,14 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                                     "minimum": 0,
                                     "multipleOf": 0.01
                                 },
+                                                                },
+                                "MISE": {
+                                    "type": "number",
+                                    "title": "Spessore",
+                                    "description": "Spessore in cm",
+                                    "minimum": 0,
+                                    "multipleOf": 0.01
+                                },         
                                 "MISU": {
                                     "type": "string",
                                     "title": "Unità di misura",
@@ -350,7 +404,9 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                             "anyOf": [
                                 { "required": ["MISA"] },
                                 { "required": ["MISL"] }, 
-                                { "required": ["MISD"] }
+                                { "required": ["MISP"] },
+                                { "required": ["MISD"] },
+                                { "required": ["MISE"] }
                             ],
                             "additionalProperties": false
                         }
@@ -377,6 +433,41 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                             },
                             "required": ["DESO"],
                             "additionalProperties": false
+                                                      "additionalProperties": false
+                        },
+                        "ISR": {
+                            "type": "array",
+                            "title": "ISCRIZIONI",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "ISRC": {
+                                        "type": "string",
+                                        "title": "Classe",
+                                        "enum": ["votiva", "funeraria", "onoraria", "sacra", "profana", "instrumentum domesticum", "numerale", "di possesso"]
+                                    },
+                                    "ISRI": {
+                                        "type": "string",
+                                        "title": "Trascrizione",
+                                        "description": "Testo dell'iscrizione"
+                                    },
+                                    "ISRL": {
+                                        "type": "string",
+                                        "title": "Lingua",
+                                        "enum": ["latino", "greco", "etrusco", "osco", "umbro", "messapico"]
+                                    },
+                                    "ISRT": {
+                                        "type": "string", 
+                                        "title": "Tecnica scrittura",
+                                        "enum": ["graffito", "dipinto", "inciso", "impresso", "rilievo"]
+                                    }
+                                }
+                            }
+                        },
+                        "NSC": {
+                            "type": "string",
+                            "title": "Notizie storico-critiche",
+                            "description": "Campo a testo libero per notizie aggiuntive"
                         }
                     },
                     "required": ["DES"],
@@ -478,14 +569,894 @@ def get_iccd_ca_template() -> Dict[str, Any]:
     }
 
 def get_iccd_si_template() -> Dict[str, Any]:
-    """Template per SI - Sito Archeologico."""
+    """Template completo per scheda SI 3.00 - Sito Archeologico secondo standard ICCD ufficiale."""
+
     return {
-        "id": "iccd_si_template", 
-        "name": "Scheda SI - Sito Archeologico ICCD",
+        "id": "iccd_si_300",
+        "name": "Scheda SI 3.00 - Siti Archeologici ICCD",
         "category": "site",
-        "icon": "🗺️",
+        "icon": "🌍",
         "version": "3.00",
-        "standard": "ICCD_MiC_2021"
+        "standard": "ICCD_MiC_2025",
+        "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "title": "SCHEDA SI 3.00 - SITI ARCHEOLOGICI",
+            "description": "Standard ICCD per la catalogazione dei siti archeologici",
+
+            "properties": {
+                "CD": {
+                    "type": "object",
+                    "title": "CODICI",
+                    "description": "Paragrafo obbligatorio - codici identificativi",
+                    "properties": {
+                        "TSK": {
+                            "type": "string",
+                            "title": "Tipo scheda",
+                            "const": "SI",
+                            "description": "Sito Archeologico"
+                        },
+                        "LIR": {
+                            "type": "string",
+                            "title": "Livello ricerca",
+                            "enum": ["P", "I", "C", "A"],
+                            "enumNames": ["Precatalogazione", "Inventario", "Catalogazione", "Approfondimento"],
+                            "default": "C",
+                            "description": "P=Precatalogazione, I=Inventario, C=Catalogazione, A=Approfondimento"
+                        },
+                        "NCT": {
+                            "type": "object",
+                            "title": "CODICE UNIVOCO",
+                            "description": "Codice identificativo univoco nazionale",
+                            "properties": {
+                                "NCTR": {
+                                    "type": "string",
+                                    "title": "Codice Regione",
+                                    "pattern": "^[0-9]{2}$",
+                                    "description": "Codice ISTAT regione (12=Lazio)"
+                                },
+                                "NCTN": {
+                                    "type": "string",
+                                    "title": "Numero catalogo generale",
+                                    "pattern": "^[0-9]{8}$",
+                                    "description": "8 cifre - numero progressivo nazionale"
+                                },
+                                "NCTS": {
+                                    "type": "string",
+                                    "title": "Suffisso",
+                                    "pattern": "^[A-Z]{0,2}$",
+                                    "description": "Massimo 2 lettere maiuscole"
+                                }
+                            },
+                            "required": ["NCTR", "NCTN"],
+                            "additionalProperties": false
+                        },
+                        "ESC": {
+                            "type": "string",
+                            "title": "Ente schedatore",
+                            "description": "Codice ente responsabile redazione scheda",
+                            "examples": ["SSABAP-RM", "SABAP-RM", "UnivRoma1"]
+                        },
+                        "ECP": {
+                            "type": "string",
+                            "title": "Ente competente",
+                            "description": "Codice ente MiC competente per tutela"
+                        }
+                    },
+                    "required": ["TSK", "LIR", "NCT", "ESC"],
+                    "additionalProperties": false
+                },
+
+                "RV": {
+                    "type": "object",
+                    "title": "RELAZIONI",
+                    "description": "Relazioni con altri beni catalogati",
+                    "properties": {
+                        "RVE": {
+                            "type": "array",
+                            "title": "Relazioni",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "RVEL": {
+                                        "type": "string",
+                                        "title": "Livello relazione",
+                                        "enum": ["1", "2", "3"],
+                                        "description": "1=principale, 2=secondaria, 3=terziaria"
+                                    },
+                                    "RVER": {
+                                        "type": "string",
+                                        "title": "Codice bene correlato",
+                                        "pattern": "^[0-9]{2}[0-9]{8}[A-Z]{0,2}$"
+                                    },
+                                    "RVET": {
+                                        "type": "string",
+                                        "title": "Tipo relazione",
+                                        "enum": ["parte di", "contiene", "correlato a", "derivato da"]
+                                    }
+                                },
+                                "required": ["RVEL", "RVER", "RVET"]
+                            }
+                        }
+                    }
+                },
+
+                "OG": {
+                    "type": "object",
+                    "title": "OGGETTO",
+                    "description": "Paragrafo obbligatorio - identificazione del sito",
+                    "properties": {
+                        "OGT": {
+                            "type": "object",
+                            "title": "OGGETTO",
+                            "properties": {
+                                "OGTD": {
+                                    "type": "string",
+                                    "title": "Definizione",
+                                    "description": "Definizione tipologica del sito",
+                                    "examples": [
+                                        "area archeologica",
+                                        "sito pluristratificato",
+                                        "abitato",
+                                        "necropoli",
+                                        "villa",
+                                        "palazzo imperiale",
+                                        "complesso termale",
+                                        "santuario"
+                                    ]
+                                },
+                                "OGTT": {
+                                    "type": "string",
+                                    "title": "Tipologia",
+                                    "description": "Specificazione tipologica del sito"
+                                },
+                                "OGTN": {
+                                    "type": "string",
+                                    "title": "Denominazione",
+                                    "description": "Nome proprio del sito"
+                                }
+                            },
+                            "required": ["OGTD"],
+                            "additionalProperties": false
+                        },
+                        "OGD": {
+                            "type": "object",
+                            "title": "DESCRIZIONE",
+                            "properties": {
+                                "OGDD": {
+                                    "type": "string",
+                                    "title": "Descrizione generale",
+                                    "description": "Descrizione generale del sito archeologico",
+                                    "minLength": 50
+                                }
+                            },
+                            "required": ["OGDD"],
+                            "additionalProperties": false
+                        }
+                    },
+                    "required": ["OGT", "OGD"],
+                    "additionalProperties": false
+                },
+
+                "LC": {
+                    "type": "object",
+                    "title": "LOCALIZZAZIONE GEOGRAFICO-AMMINISTRATIVA",
+                    "description": "Paragrafo obbligatorio - localizzazione del sito",
+                    "properties": {
+                        "PVC": {
+                            "type": "object",
+                            "title": "LOCALIZZAZIONE GEOGRAFICO-AMMINISTRATIVA",
+                            "properties": {
+                                "PVCS": {
+                                    "type": "string",
+                                    "title": "Stato",
+                                    "default": "Italia"
+                                },
+                                "PVCR": {
+                                    "type": "string",
+                                    "title": "Regione",
+                                    "description": "Da codici ISTAT",
+                                    "default": "Lazio"
+                                },
+                                "PVCP": {
+                                    "type": "string",
+                                    "title": "Provincia",
+                                    "description": "Sigla provincia",
+                                    "default": "RM"
+                                },
+                                "PVCC": {
+                                    "type": "string",
+                                    "title": "Comune",
+                                    "description": "Nome comune",
+                                    "default": "Roma"
+                                },
+                                "PVCL": {
+                                    "type": "string",
+                                    "title": "Località",
+                                    "description": "Frazione, località"
+                                }
+                            },
+                            "required": ["PVCS", "PVCR", "PVCP", "PVCC"],
+                            "additionalProperties": false
+                        },
+                        "PVL": {
+                            "type": "object",
+                            "title": "LOCALIZZAZIONE SPECIFICA",
+                            "properties": {
+                                "PVLN": {
+                                    "type": "string",
+                                    "title": "Denominazione",
+                                    "description": "Nome specifico del luogo",
+                                    "default": "Palatino - Domus Flavia"
+                                },
+                                "PVLI": {
+                                    "type": "string",
+                                    "title": "Indirizzo/località",
+                                    "description": "Indirizzo o descrizione località"
+                                }
+                            },
+                            "required": ["PVLN"],
+                            "additionalProperties": false
+                        }
+                    },
+                    "required": ["PVC", "PVL"],
+                    "additionalProperties": false
+                },
+
+                "GP": {
+                    "type": "object",
+                    "title": "GEOREFERENZIAZIONE",
+                    "description": "Coordinate geografiche del sito",
+                    "properties": {
+                        "GPP": {
+                            "type": "object",
+                            "title": "PUNTO",
+                            "properties": {
+                                "GPPX": {
+                                    "type": "number",
+                                    "title": "Coordinata X/Longitudine",
+                                    "description": "Longitudine in gradi decimali WGS84",
+                                    "minimum": -180,
+                                    "maximum": 180
+                                },
+                                "GPPY": {
+                                    "type": "number",
+                                    "title": "Coordinata Y/Latitudine",
+                                    "description": "Latitudine in gradi decimali WGS84",
+                                    "minimum": -90,
+                                    "maximum": 90
+                                },
+                                "GPPZ": {
+                                    "type": "number",
+                                    "title": "Quota",
+                                    "description": "Quota s.l.m. in metri"
+                                }
+                            },
+                            "required": ["GPPX", "GPPY"]
+                        },
+                        "GPM": {
+                            "type": "string",
+                            "title": "Metodo posizionamento",
+                            "enum": ["GPS", "stazione totale", "cartografia tecnica", "rilievo diretto", "fotogrammetria"],
+                            "description": "Metodo utilizzato per il posizionamento"
+                        },
+                        "GPS": {
+                            "type": "string",
+                            "title": "Sistema riferimento",
+                            "enum": ["WGS84", "ED50", "UTM32N", "UTM33N", "Roma40"],
+                            "default": "WGS84",
+                            "description": "Sistema di riferimento coordinate"
+                        }
+                    }
+                },
+
+                "CS": {
+                    "type": "object",
+                    "title": "DATI CATASTALI",
+                    "description": "Informazioni catastali del sito",
+                    "properties": {
+                        "CST": {
+                            "type": "array",
+                            "title": "Catasto",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "CSTT": {
+                                        "type": "string",
+                                        "title": "Tipo catasto",
+                                        "enum": ["terreni", "urbano", "fabbricati"]
+                                    },
+                                    "CSTC": {
+                                        "type": "string",
+                                        "title": "Comune catastale",
+                                        "description": "Denominazione comune catastale"
+                                    },
+                                    "CSTF": {
+                                        "type": "string",
+                                        "title": "Foglio",
+                                        "description": "Numero foglio catastale"
+                                    },
+                                    "CSTN": {
+                                        "type": "string",
+                                        "title": "Numero particella",
+                                        "description": "Numero particella catastale"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                "DT": {
+                    "type": "object",
+                    "title": "CRONOLOGIA",
+                    "description": "Paragrafo obbligatorio - datazione del sito",
+                    "properties": {
+                        "DTZ": {
+                            "type": "array",
+                            "title": "CRONOLOGIA GENERICA",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "DTZG": {
+                                        "type": "string",
+                                        "title": "Fascia cronologica",
+                                        "examples": [
+                                            "età repubblicana",
+                                            "età imperiale",
+                                            "I secolo d.C.",
+                                            "età flavia",
+                                            "età domizianea",
+                                            "epoca tardoantica",
+                                            "pluristratificato"
+                                        ]
+                                    },
+                                    "DTZS": {
+                                        "type": "string",
+                                        "title": "Validità",
+                                        "enum": ["ca.", "?", "ante", "post", "non ante", "non post"]
+                                    }
+                                },
+                                "required": ["DTZG"]
+                            },
+                            "minItems": 1
+                        },
+                        "DTS": {
+                            "type": "array",
+                            "title": "CRONOLOGIA SPECIFICA",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "DTSI": {
+                                        "type": "integer",
+                                        "title": "Da (anno)",
+                                        "minimum": -753,
+                                        "maximum": 2100,
+                                        "description": "Anno iniziale"
+                                    },
+                                    "DTSF": {
+                                        "type": "integer",
+                                        "title": "A (anno)",
+                                        "minimum": -753,
+                                        "maximum": 2100,
+                                        "description": "Anno finale"
+                                    },
+                                    "DTSV": {
+                                        "type": "string",
+                                        "title": "Validità",
+                                        "enum": ["ca.", "?", "ante", "post"]
+                                    }
+                                },
+                                "if": {
+                                    "properties": { "DTSI": { "type": "integer" } }
+                                },
+                                "then": {
+                                    "properties": {
+                                        "DTSF": { "minimum": { "$data": "1/DTSI" } }
+                                    }
+                                }
+                            }
+                        },
+                        "DTM": {
+                            "type": "array",
+                            "title": "Motivazione cronologia",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "analisi stilistica",
+                                    "dati stratigrafici",
+                                    "confronti",
+                                    "dati epigrafici",
+                                    "analisi archeometriche",
+                                    "documentazione d'archivio",
+                                    "fonti letterarie",
+                                    "bolli laterizi"
+                                ]
+                            },
+                            "description": "Fonte dell'attribuzione cronologica"
+                        }
+                    },
+                    "anyOf": [
+                        { "required": ["DTZ"] },
+                        { "required": ["DTS"] }
+                    ],
+                    "additionalProperties": false
+                },
+
+                "AU": {
+                    "type": "object",
+                    "title": "DEFINIZIONE CULTURALE",
+                    "description": "Contesto culturale del sito",
+                    "properties": {
+                        "AUT": {
+                            "type": "array",
+                            "title": "AMBITO CULTURALE",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "AUTN": {
+                                        "type": "string",
+                                        "title": "Denominazione",
+                                        "examples": [
+                                            "romano",
+                                            "greco",
+                                            "etrusco",
+                                            "italico",
+                                            "romano-imperiale",
+                                            "tardoantico",
+                                            "bizantino"
+                                        ]
+                                    },
+                                    "AUTS": {
+                                        "type": "string",
+                                        "title": "Specifiche",
+                                        "description": "Specificazioni dell'ambito culturale"
+                                    },
+                                    "AUTM": {
+                                        "type": "string",
+                                        "title": "Motivazione attribuzione",
+                                        "enum": ["analisi stilistica", "dati stratigrafici", "confronti", "documentazione"]
+                                    }
+                                },
+                                "required": ["AUTN"]
+                            }
+                        }
+                    }
+                },
+
+                "DA": {
+                    "type": "object",
+                    "title": "DATI ANALITICI",
+                    "description": "Paragrafo obbligatorio - descrizione analitica",
+                    "properties": {
+                        "DES": {
+                            "type": "object",
+                            "title": "DESCRIZIONE",
+                            "properties": {
+                                "DESS": {
+                                    "type": "string",
+                                    "title": "Descrizione sintetica",
+                                    "description": "Descrizione sintetica del sito",
+                                    "minLength": 100,
+                                    "maxLength": 500
+                                },
+                                "DESA": {
+                                    "type": "string",
+                                    "title": "Descrizione analitica",
+                                    "description": "Descrizione dettagliata e approfondita del sito",
+                                    "minLength": 200
+                                }
+                            },
+                            "anyOf": [
+                                { "required": ["DESS"] },
+                                { "required": ["DESA"] }
+                            ],
+                            "additionalProperties": false
+                        },
+                        "USE": {
+                            "type": "object",
+                            "title": "USO ATTUALE",
+                            "properties": {
+                                "USEG": {
+                                    "type": "string",
+                                    "title": "Uso generico",
+                                    "enum": [
+                                        "area archeologica aperta al pubblico",
+                                        "area archeologica non accessibile",
+                                        "area edificata",
+                                        "area verde",
+                                        "area agricola",
+                                        "area industriale",
+                                        "museo"
+                                    ]
+                                },
+                                "USES": {
+                                    "type": "string",
+                                    "title": "Uso specifico",
+                                    "description": "Specificazione dell'uso attuale"
+                                }
+                            }
+                        },
+                        "VSB": {
+                            "type": "object",
+                            "title": "VINCOLI",
+                            "properties": {
+                                "VSBA": {
+                                    "type": "string",
+                                    "title": "Vincolo archeologico",
+                                    "enum": ["vincolato", "non vincolato", "in corso di vincolo"],
+                                    "description": "Presenza di vincolo archeologico"
+                                },
+                                "VSBR": {
+                                    "type": "string",
+                                    "title": "Riferimenti normativi",
+                                    "description": "Riferimenti normativi del vincolo"
+                                },
+                                "VSBD": {
+                                    "type": "string",
+                                    "title": "Data vincolo",
+                                    "pattern": "^[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?$",
+                                    "description": "Data istituzione vincolo (YYYY-MM-DD)"
+                                }
+                            }
+                        }
+                    },
+                    "required": ["DES"],
+                    "additionalProperties": false
+                },
+
+                "SCC": {
+                    "type": "object",
+                    "title": "DATI ARCHEOLOGICI",
+                    "description": "Informazioni specifiche archeologiche",
+                    "properties": {
+                        "SCD": {
+                            "type": "array",
+                            "title": "SCAVI",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "SCDT": {
+                                        "type": "string",
+                                        "title": "Tipo scavo",
+                                        "enum": [
+                                            "scavo stratigrafico",
+                                            "scavo in estensione",
+                                            "sondaggio",
+                                            "scavo d'urgenza",
+                                            "scavo preventivo",
+                                            "ricognizione di superficie"
+                                        ]
+                                    },
+                                    "SCDA": {
+                                        "type": "string",
+                                        "title": "Anno scavo",
+                                        "pattern": "^[0-9]{4}(-[0-9]{4})?$",
+                                        "description": "Anno o periodo scavi (YYYY o YYYY-YYYY)"
+                                    },
+                                    "SCDR": {
+                                        "type": "string",
+                                        "title": "Responsabile scavo",
+                                        "description": "Nome del responsabile scientifico"
+                                    },
+                                    "SCDE": {
+                                        "type": "string",
+                                        "title": "Ente responsabile",
+                                        "description": "Ente che ha condotto lo scavo"
+                                    }
+                                }
+                            }
+                        },
+                        "SCR": {
+                            "type": "array",
+                            "title": "RICOGNIZIONI",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "SCRT": {
+                                        "type": "string",
+                                        "title": "Tipo ricognizione",
+                                        "enum": ["sistematica", "intensiva", "estensiva", "selettiva"]
+                                    },
+                                    "SCRA": {
+                                        "type": "string",
+                                        "title": "Anno ricognizione",
+                                        "pattern": "^[0-9]{4}(-[0-9]{4})?$"
+                                    },
+                                    "SCRR": {
+                                        "type": "string",
+                                        "title": "Responsabile ricognizione"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                "CO": {
+                    "type": "object",
+                    "title": "CONSERVAZIONE",
+                    "description": "Stato di conservazione del sito",
+                    "properties": {
+                        "STC": {
+                            "type": "object",
+                            "title": "STATO DI CONSERVAZIONE",
+                            "properties": {
+                                "STCC": {
+                                    "type": "string",
+                                    "title": "Stato di conservazione",
+                                    "enum": ["ottimo", "buono", "discreto", "mediocre", "cattivo", "pessimo", "non determinabile"],
+                                    "enumNames": ["Ottimo", "Buono", "Discreto", "Mediocre", "Cattivo", "Pessimo", "Non determinabile"]
+                                },
+                                "STCS": {
+                                    "type": "string",
+                                    "title": "Indicazioni specifiche",
+                                    "description": "Descrizione dettagliata stato conservativo"
+                                }
+                            },
+                            "required": ["STCC"]
+                        },
+                        "RST": {
+                            "type": "object",
+                            "title": "RISCHI",
+                            "properties": {
+                                "RSTT": {
+                                    "type": "array",
+                                    "title": "Tipologia rischi",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": [
+                                            "rischio sismico",
+                                            "dissesto idrogeologico",
+                                            "erosione",
+                                            "inquinamento",
+                                            "urbanizzazione",
+                                            "attività agricole",
+                                            "vandalismo",
+                                            "saccheggio"
+                                        ]
+                                    }
+                                },
+                                "RSTS": {
+                                    "type": "string",
+                                    "title": "Descrizione rischi",
+                                    "description": "Descrizione dettagliata dei rischi"
+                                }
+                            }
+                        }
+                    }
+                },
+
+                "TU": {
+                    "type": "object",
+                    "title": "CONDIZIONE GIURIDICA E VINCOLI",
+                    "description": "Aspetti giuridici e normativi",
+                    "properties": {
+                        "CDG": {
+                            "type": "object",
+                            "title": "CONDIZIONE GIURIDICA",
+                            "properties": {
+                                "CDGG": {
+                                    "type": "string",
+                                    "title": "Indicazione generica",
+                                    "enum": ["proprietà Stato", "proprietà Ente locale", "proprietà privata", "proprietà mista"]
+                                },
+                                "CDGS": {
+                                    "type": "string",
+                                    "title": "Indicazione specifica",
+                                    "description": "Specificazione della proprietà"
+                                }
+                            }
+                        }
+                    }
+                },
+
+                "DO": {
+                    "type": "object",
+                    "title": "FONTI E DOCUMENTI",
+                    "description": "Documentazione di riferimento",
+                    "properties": {
+                        "FTA": {
+                            "type": "array",
+                            "title": "DOCUMENTAZIONE FOTOGRAFICA",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "FTAN": {
+                                        "type": "string",
+                                        "title": "Codice identificativo",
+                                        "description": "Codice univoco fotografia"
+                                    },
+                                    "FTAP": {
+                                        "type": "string",
+                                        "title": "Tipo fotografia",
+                                        "enum": ["fotografia digitale", "fotografia analogica", "fotogrammetria", "ripresa aerea", "ortofoto"]
+                                    },
+                                    "FTAD": {
+                                        "type": "string",
+                                        "title": "Data",
+                                        "pattern": "^[0-9]{4}(-[0-9]{2}(-[0-9]{2})?)?$"
+                                    }
+                                }
+                            }
+                        },
+                        "DRA": {
+                            "type": "array",
+                            "title": "DOCUMENTAZIONE GRAFICA",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "DRAT": {
+                                        "type": "string",
+                                        "title": "Tipo documentazione",
+                                        "enum": ["pianta", "sezione", "prospetto", "rilievo", "mappa", "carta archeologica"]
+                                    },
+                                    "DRAN": {
+                                        "type": "string",
+                                        "title": "Codice identificativo"
+                                    }
+                                }
+                            }
+                        },
+                        "BIB": {
+                            "type": "array",
+                            "title": "BIBLIOGRAFIA",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "BIBX": {
+                                        "type": "string",
+                                        "title": "Codice identificativo",
+                                        "description": "Riferimento Authority file BIB"
+                                    },
+                                    "BIBN": {
+                                        "type": "string",
+                                        "title": "Citazione completa"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                "AD": {
+                    "type": "object",
+                    "title": "ACCESSO AI DATI",
+                    "description": "Paragrafo obbligatorio - profilo accesso",
+                    "properties": {
+                        "ADSP": {
+                            "type": "string",
+                            "title": "Profilo di accesso",
+                            "enum": ["1", "2", "3"],
+                            "enumNames": ["Libero", "Riservato enti", "Riservato"],
+                            "default": "1",
+                            "description": "1=libero, 2=riservato enti, 3=riservato"
+                        }
+                    },
+                    "required": ["ADSP"],
+                    "additionalProperties": false
+                },
+
+                "CM": {
+                    "type": "object",
+                    "title": "COMPILAZIONE",
+                    "description": "Paragrafo obbligatorio - dati di compilazione",
+                    "properties": {
+                        "CMP": {
+                            "type": "object",
+                            "title": "COMPILAZIONE",
+                            "properties": {
+                                "CMPD": {
+                                    "type": "string",
+                                    "title": "Data",
+                                    "pattern": "^[0-9]{4}$",
+                                    "description": "Anno di compilazione (YYYY)"
+                                },
+                                "CMPN": {
+                                    "type": "string",
+                                    "title": "Nome compilatore",
+                                    "description": "Chi ha compilato la scheda"
+                                },
+                                "CMPR": {
+                                    "type": "string",
+                                    "title": "Referente scientifico",
+                                    "description": "Responsabile scientifico della catalogazione"
+                                }
+                            },
+                            "required": ["CMPD", "CMPN"]
+                        },
+                        "RSR": {
+                            "type": "string",
+                            "title": "Responsabile scientifico",
+                            "description": "Responsabile attività catalogazione"
+                        },
+                        "FUR": {
+                            "type": "string",
+                            "title": "Funzionario responsabile",
+                            "description": "Funzionario responsabile tutela"
+                        }
+                    },
+                    "required": ["CMP"],
+                    "additionalProperties": false
+                },
+
+                "AN": {
+                    "type": "object",
+                    "title": "ANNOTAZIONI",
+                    "description": "Campo libero per osservazioni",
+                    "properties": {
+                        "OSS": {
+                            "type": "string",
+                            "title": "Osservazioni",
+                            "description": "Annotazioni aggiuntive non inseribili altrove"
+                        },
+                        "MOR": {
+                            "type": "string",
+                            "title": "Motivo revisione",
+                            "description": "Motivazione di eventuali revisioni della scheda"
+                        }
+                    }
+                }
+            },
+
+            "required": ["CD", "OG", "LC", "DT", "DA", "AD", "CM"],
+            "additionalProperties": false
+        },
+
+        "ui_schema": {
+            "CD": {
+                "ui:order": ["TSK", "LIR", "NCT", "ESC", "ECP"],
+                "TSK": { "ui:readonly": true },
+                "NCT": {
+                    "ui:order": ["NCTR", "NCTN", "NCTS"],
+                    "NCTR": { "ui:help": "Codice ISTAT regione (12 per Lazio)" },
+                    "NCTN": { "ui:help": "8 cifre - generato automaticamente" }
+                }
+            },
+            "OG": {
+                "ui:order": ["OGT", "OGD"],
+                "OGT": {
+                    "ui:order": ["OGTD", "OGTT", "OGTN"],
+                    "OGTD": {
+                        "ui:help": "Utilizzare termini specifici per siti archeologici"
+                    }
+                },
+                "OGD": {
+                    "OGDD": {
+                        "ui:widget": "textarea",
+                        "ui:options": { "rows": 4 }
+                    }
+                }
+            },
+            "LC": {
+                "ui:order": ["PVC", "PVL"]
+            },
+            "GP": {
+                "GPP": {
+                    "ui:order": ["GPPX", "GPPY", "GPPZ"],
+                    "GPPX": { "ui:help": "Longitudine in gradi decimali WGS84" },
+                    "GPPY": { "ui:help": "Latitudine in gradi decimali WGS84" }
+                }
+            },
+            "DA": {
+                "DES": {
+                    "DESS": {
+                        "ui:widget": "textarea",
+                        "ui:options": { "rows": 3 }
+                    },
+                    "DESA": {
+                        "ui:widget": "textarea",
+                        "ui:options": { "rows": 6 }
+                    }
+                }
+            },
+            "AN": {
+                "OSS": {
+                    "ui:widget": "textarea",
+                    "ui:options": { "rows": 3 }
+                }
+            }
+        }
     }
 
 # Funzioni di utilità
@@ -508,43 +1479,43 @@ def get_all_templates() -> Dict[str, Dict[str, Any]]:
     """Ottieni tutti i template ICCD disponibili."""
     return ICCD_TEMPLATES
 
-def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia") -> Dict[str, Any]:
-    """Genera dati ICCD di default per schema RA 3.00."""
-    
+def generate_default_iccd_data_si300(schema_type: str, site_name: str = "Domus Flavia") -> Dict[str, Any]:
+    """Genera dati ICCD di default per schema SI 3.00 - Sito Archeologico."""
+
     now = datetime.now()
     year = now.year % 100
     sequence = now.microsecond % 1000000
     nct_number = f"{year:02d}{sequence:06d}"
     current_year = str(now.year)
-    
+
     return {
         "CD": {
             "TSK": schema_type,
             "LIR": "C",
             "NCT": {
-                "NCTR": "12",
+                "NCTR": "12",  # Lazio
                 "NCTN": nct_number
             },
-            "ESC": "SSABAP-RM"
+            "ESC": "SSABAP-RM",
+            "ECP": "SSABAP-RM"
         },
         "OG": {
             "OGT": {
-                "OGTD": "",
-                "OGTT": "",
-                "OGTN": ""
+                "OGTD": "palazzo imperiale",
+                "OGTT": "residenza imperiale",
+                "OGTN": site_name
             },
-            "CLS": {
-                "CLSC": "",
-                "CLSS": "",
-                "CLSP": ""
+            "OGD": {
+                "OGDD": f"Il sito archeologico di {site_name} rappresenta un importante complesso architettonico dell'epoca imperiale romana."
             }
         },
         "LC": {
             "PVC": {
                 "PVCS": "Italia",
                 "PVCR": "Lazio",
-                "PVCP": "RM", 
-                "PVCC": "Roma"
+                "PVCP": "RM",
+                "PVCC": "Roma",
+                "PVCL": ""
             },
             "PVL": {
                 "PVLN": site_name,
@@ -553,25 +1524,34 @@ def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia"
         },
         "DT": {
             "DTZ": [{
-                "DTZG": "età imperiale",
+                "DTZG": "età flavia",
                 "DTZS": "ca."
             }],
-            "DTM": "dati stratigrafici"
+            "DTM": ["dati stratigrafici"]
         },
-        "MT": {
-            "MTC": {
-                "MTCM": []
-            },
-            "MIS": {
-                "MISA": None,
-                "MISL": None,
-                "MISD": None,
-                "MISU": "cm"
-            }
+        "AU": {
+            "AUT": [{
+                "AUTN": "romano-imperiale",
+                "AUTS": "epoca flavia",
+                "AUTM": "dati stratigrafici"
+            }]
         },
         "DA": {
             "DES": {
-                "DESO": ""
+                "DESS": f"Sito archeologico di {site_name}, complesso architettonico di epoca imperiale romana situato sul Palatino."
+            },
+            "USE": {
+                "USEG": "area archeologica aperta al pubblico"
+            },
+            "VSB": {
+                "VSBA": "vincolato",
+                "VSBR": "D.Lgs. 42/2004"
+            }
+        },
+        "CO": {
+            "STC": {
+                "STCC": "buono",
+                "STCS": "Il sito presenta un buono stato di conservazione grazie ai recenti interventi di restauro."
             }
         },
         "AD": {
@@ -580,7 +1560,90 @@ def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia"
         "CM": {
             "CMP": {
                 "CMPD": current_year,
-                "CMPN": ""
-            }
+                "CMPN": "",
+                "CMPR": ""
+            },
+            "RSR": "",
+            "FUR": ""
         }
     }
+
+def generate_default_iccd_data(schema_type: str, site_name: str = "Domus Flavia") -> Dict[str, Any]:
+    """Genera dati ICCD di default - usa schema appropriato per tipo."""
+    if schema_type == "SI":
+        return generate_default_iccd_data_si300(schema_type, site_name)
+    else:
+        # Usa schema RA per default
+        now = datetime.now()
+        year = now.year % 100
+        sequence = now.microsecond % 1000000
+        nct_number = f"{year:02d}{sequence:06d}"
+        current_year = str(now.year)
+
+        return {
+            "CD": {
+                "TSK": schema_type,
+                "LIR": "C",
+                "NCT": {
+                    "NCTR": "12",
+                    "NCTN": nct_number
+                },
+                "ESC": "SSABAP-RM"
+            },
+            "OG": {
+                "OGT": {
+                    "OGTD": "",
+                    "OGTT": "",
+                    "OGTN": ""
+                },
+                "CLS": {
+                    "CLSC": "",
+                    "CLSS": "",
+                    "CLSP": ""
+                }
+            },
+            "LC": {
+                "PVC": {
+                    "PVCS": "Italia",
+                    "PVCR": "Lazio",
+                    "PVCP": "RM",
+                    "PVCC": "Roma"
+                },
+                "PVL": {
+                    "PVLN": site_name,
+                    "PVLI": "Palatino"
+                }
+            },
+            "DT": {
+                "DTZ": [{
+                    "DTZG": "età imperiale",
+                    "DTZS": "ca."
+                }],
+                "DTM": "dati stratigrafici"
+            },
+            "MT": {
+                "MTC": {
+                    "MTCM": []
+                },
+                "MIS": {
+                    "MISA": None,
+                    "MISL": None,
+                    "MISD": None,
+                    "MISU": "cm"
+                }
+            },
+            "DA": {
+                "DES": {
+                    "DESO": ""
+                }
+            },
+            "AD": {
+                "ADSP": "1"
+            },
+            "CM": {
+                "CMP": {
+                    "CMPD": current_year,
+                    "CMPN": ""
+                }
+            }
+        }

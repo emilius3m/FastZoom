@@ -185,11 +185,8 @@ class Photo(BaseSQLModel):
     )
     
     uploader: Mapped["User"] = relationship("User", foreign_keys=[uploaded_by])
-    
-    validator: Mapped[Optional["User"]] = relationship(
-        "User",
-        foreign_keys=[validated_by]
-    )
+
+    validator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[validated_by])
     
     # Storico modifiche
     modifications: Mapped[List["PhotoModification"]] = relationship(
