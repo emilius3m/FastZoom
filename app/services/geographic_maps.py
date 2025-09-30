@@ -512,15 +512,23 @@ class GeographicMapService:
             photo_data = {
                 "id": str(photo.id),
                 "site_id": str(photo.site_id),
-                "title": photo.title,
+                "title": photo.title or photo.original_filename or photo.filename,
                 "description": photo.description,
                 "filename": photo.filename,
+                "original_filename": photo.original_filename,
                 "file_path": photo.file_path,
                 "file_size": photo.file_size,
                 "mime_type": photo.mime_type,
                 "keywords": photo.keywords,
+                "width": photo.width,
+                "height": photo.height,
                 "created": photo.created.isoformat() if photo.created else None,
-                "uploaded_by": str(photo.uploaded_by) if photo.uploaded_by else None
+                "upload_date": photo.created.isoformat() if photo.created else None,
+                "uploaded_by": str(photo.uploaded_by) if photo.uploaded_by else None,
+                # URL delle immagini necessarie per la visualizzazione
+                "thumbnail_url": photo.thumbnail_url,
+                "full_url": photo.full_url,
+                "resolution": f"{photo.width}x{photo.height}" if photo.width and photo.height else None
             }
             photos_data.append(photo_data)
         

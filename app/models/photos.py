@@ -218,10 +218,6 @@ class Photo(BaseSQLModel):
     
     @property
     def thumbnail_url(self) -> str:
-        if self.thumbnail_path:
-            from app.core.config import get_settings
-            settings = get_settings()
-            return f"{settings.minio_url}/{settings.minio_bucket}/{self.thumbnail_path}"
         return f"/photos/{self.id}/thumbnail"
 
     @property

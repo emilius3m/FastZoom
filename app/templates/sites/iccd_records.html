@@ -20,10 +20,12 @@
             <p class="text-gray-600 dark:text-gray-400 mt-1">Catalogazione archeologica standardizzata per {{ site.name }}</p>
         </div>
         <div>
+            <template x-if="can_write">
             <a href="/sites/{{ site.id }}/iccd/new" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg inline-flex items-center transition-colors">
                 <i class="fas fa-plus mr-2"></i>
                 Nuova Scheda ICCD
             </a>
+            </template>
         </div>
     </div>
 
@@ -121,9 +123,11 @@
             <div class="text-6xl mb-4 text-gray-400 dark:text-gray-600">🏺</div>
             <h4 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nessuna scheda ICCD trovata</h4>
             <p class="text-gray-600 dark:text-gray-400 mb-6">Inizia creando la prima scheda di catalogazione archeologica per questo sito.</p>
+            <template x-if="can_write">
             <a href="/sites/{{ site.id }}/iccd/new" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
                 <i class="fas fa-plus mr-2"></i>Crea Prima Scheda
             </a>
+            </template>
         </div>
 
         <!-- Cards schede -->
@@ -139,9 +143,11 @@
                             <button class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900" @click="viewRecord(record.id)" title="Visualizza scheda">
                                 <i class="fas fa-eye"></i>
                             </button>
+                            <template x-if="can_write">
                             <button class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900" @click="editRecord(record.id)" title="Modifica scheda">
                                 <i class="fas fa-edit"></i>
                             </button>
+                            </template>
                             <button class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 p-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900" @click="downloadPDF(record.id)" title="Scarica PDF">
                                 <i class="fas fa-file-pdf"></i>
                             </button>
