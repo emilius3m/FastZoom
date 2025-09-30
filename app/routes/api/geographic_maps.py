@@ -563,12 +563,17 @@ async def save_manual_marker(
 
 # === GESTIONE ASSOCIAZIONI FOTO ===
 
+from pydantic import BaseModel
+
+class PhotoAssociationRequest(BaseModel):
+    photo_ids: List[UUID]
+
 @geographic_maps_router.post("/sites/{site_id}/maps/{map_id}/markers/{marker_id}/photos")
 async def associate_photos_to_marker(
     site_id: UUID,
     map_id: UUID,
     marker_id: UUID,
-    photo_ids: List[UUID],
+    request: PhotoAssociationRequest,
     site_access: tuple = Depends(get_site_access_for_maps),
     current_user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_async_session)
@@ -599,14 +604,14 @@ async def associate_photos_to_marker(
         photos = await db.execute(
             select(Photo).where(
                 and_(
-                    Photo.id.in_(photo_ids),
+                    Photo.id.in_(request.photo_ids),
                     Photo.site_id == site_id
                 )
             )
         )
         photos = photos.scalars().all()
         
-        if len(photos) != len(photo_ids):
+        if len(photos) != len(request.photo_ids):
             raise HTTPException(status_code=400, detail="Alcune foto non esistono o non appartengono al sito")
         
         # Rimuovi associazioni esistenti
