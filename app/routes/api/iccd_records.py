@@ -206,16 +206,34 @@ async def create_iccd_record(
         record_data['iccd_data']['CD']['NCT'] = nct_data
         
         # Crea record ICCD
+        # Aggiorna i dati ICCD con l'istituto di catalogazione, il nome catalogatore e la data rilevamento
+        iccd_data = record_data['iccd_data'].copy()
+        if 'CD' not in iccd_data:
+            iccd_data['CD'] = {}
+        if 'ESC' not in iccd_data['CD']:
+            iccd_data['CD']['ESC'] = record_data['cataloging_institution']
+        
+        # Aggiungi il catalogatore e la data rilevamento se forniti
+        if record_data.get('cataloger_name') or record_data.get('survey_date'):
+            if 'RCG' not in iccd_data['CD']:
+                iccd_data['CD']['RCG'] = {}
+            if record_data.get('cataloger_name'):
+                iccd_data['CD']['RCG']['RCGR'] = record_data['cataloger_name']
+            if record_data.get('survey_date'):
+                # Convert datetime to ISO format string for storage
+                survey_date = record_data['survey_date']
+                if isinstance(survey_date, str):
+                    iccd_data['CD']['RCG']['RCGD'] = survey_date
+                else:
+                    iccd_data['CD']['RCG']['RCGD'] = survey_date.isoformat()
+        
         iccd_record = ICCDRecord(
             nct_region=nct_data['NCTR'],
             nct_number=nct_data['NCTN'],
             nct_suffix=nct_data.get('NCTS'),
             schema_type=record_data['schema_type'],
             level=record_data['level'],
-            iccd_data=record_data['iccd_data'],
-            cataloging_institution=record_data['cataloging_institution'],
-            cataloger_name=record_data.get('cataloger_name'),
-            survey_date=datetime.fromisoformat(record_data['survey_date']) if record_data.get('survey_date') else None,
+            iccd_data=iccd_data,
             site_id=site_id,
             created_by=current_user_id
         )
@@ -319,23 +337,46 @@ async def update_iccd_record(
     try:
         # Campi aggiornabili
         updatable_fields = [
-            'level', 'iccd_data', 'cataloging_institution', 'cataloger_name',
-            'survey_date', 'status', 'validation_notes'
+            'level', 'iccd_data',
+            'status', 'validation_notes'
         ]
         
         for field in updatable_fields:
             if field in record_data:
                 value = record_data[field]
                 
-                # Gestione date
-                if field == 'survey_date' and value:
-                    if isinstance(value, str):
-                        try:
-                            value = datetime.fromisoformat(value)
-                        except ValueError:
-                            value = datetime.strptime(value, '%Y-%m-%d')
-                
-                setattr(record, field, value)
+                # Gestione campi speciali
+                if field == 'cataloger_name':
+                    # Aggiorna il catalogatore nei dati ICCD
+                    if 'CD' not in record.iccd_data:
+                        record.iccd_data['CD'] = {}
+                    if 'RCG' not in record.iccd_data['CD']:
+                        record.iccd_data['CD']['RCG'] = {}
+                    record.iccd_data['CD']['RCG']['RCGR'] = value
+                elif field == 'cataloging_institution':
+                    # Aggiorna l'istituto di catalogazione nei dati ICCD
+                    if 'CD' not in record.iccd_data:
+                        record.iccd_data['CD'] = {}
+                    record.iccd_data['CD']['ESC'] = value
+                elif field == 'survey_date':
+                    # Aggiorna la data di rilevamento nei dati ICCD
+                    if 'CD' not in record.iccd_data:
+                        record.iccd_data['CD'] = {}
+                    if 'RCG' not in record.iccd_data['CD']:
+                        record.iccd_data['CD']['RCG'] = {}
+                    
+                    if value:
+                        # Convert datetime to ISO format string for storage
+                        if isinstance(value, str):
+                            record.iccd_data['CD']['RCG']['RCGD'] = value
+                        else:
+                            record.iccd_data['CD']['RCG']['RCGD'] = value.isoformat()
+                    else:
+                        # Rimuovi la data se è None
+                        if 'RCGD' in record.iccd_data['CD']['RCG']:
+                            del record.iccd_data['CD']['RCG']['RCGD']
+                else:
+                    setattr(record, field, value)
         
         record.updated_at = datetime.utcnow()
         
@@ -393,13 +434,13 @@ async def validate_iccd_record(
             )
         
         # Aggiorna validazione
-        record.is_validated = validation_data.get('is_valid', True)
+        is_valid = validation_data.get('is_valid', True)
         record.validation_date = datetime.utcnow()
         record.validated_by = current_user_id
         record.validation_notes = validation_data.get('notes')
         
-        if record.is_validated:
-            record.status = 'approved'
+        # Imposta lo stato appropriato in base alla validazione
+        record.status = 'validated' if is_valid else 'draft'
         
         await db.commit()
         await db.refresh(record)
@@ -572,7 +613,7 @@ async def get_iccd_statistics(
     # Validate
     validated_count_result = await db.execute(
         select(func.count(ICCDRecord.id))
-        .where(and_(ICCDRecord.site_id == site_id, ICCDRecord.is_validated == True))
+        .where(and_(ICCDRecord.site_id == site_id, ICCDRecord.status.in_(['validated', 'published'])))
     )
     validated_count = validated_count_result.scalar() or 0
     
