@@ -1,0 +1,326 @@
+erDiagram
+    USERS {
+        uuid id PK
+        string email
+        string hashed_password
+        boolean is_active
+        boolean is_superuser
+        boolean is_verified
+        string first_name
+        string last_name
+        datetime created_at
+        datetime updated_at
+        datetime last_login
+        uuid role_id FK
+    }
+
+    ROLES {
+        uuid id PK
+        string role_name
+        string role_desc
+        boolean can_create_sites
+        boolean can_manage_users
+        boolean can_export_data
+        boolean can_access_admin
+    }
+
+    USER_PROFILE {
+        uuid id PK
+        uuid user_id FK
+        string first_name
+        string last_name
+        string phone
+        string department
+        string position
+        string institution
+        text bio
+        datetime created_at
+        datetime updated_at
+    }
+
+    ARCHAEOLOGICAL_SITES {
+        uuid id PK
+        string name
+        string code
+        string location
+        string region
+        string province
+        text description
+        string historical_period
+        string site_type
+        string coordinates_lat
+        string coordinates_lng
+        string municipality
+        string research_status
+        boolean is_active
+        boolean is_public
+        datetime created_at
+        datetime updated_at
+    }
+
+    USER_SITE_PERMISSIONS {
+        uuid id PK
+        uuid user_id FK
+        uuid site_id FK
+        string permission_level
+        uuid assigned_by FK
+        boolean is_active
+        text notes
+        datetime created_at
+        datetime updated_at
+        datetime expires_at
+    }
+
+    USER_ACTIVITIES {
+        uuid id PK
+        uuid user_id FK
+        uuid site_id FK
+        uuid photo_id FK
+        datetime activity_date
+        string activity_type
+        string activity_desc
+        string ip_address
+        string user_agent
+        text extra_data
+        datetime created_at
+        datetime updated_at
+    }
+
+    TOKEN_BLACKLIST {
+        uuid id PK
+        string token_jti
+        uuid user_id FK
+        datetime invalidated_at
+        string reason
+        datetime created_at
+        datetime updated_at
+    }
+
+    PHOTOS {
+        uuid id PK
+        uuid site_id FK
+        uuid uploaded_by FK
+        uuid validated_by FK
+        string filename
+        string original_filename
+        string file_path
+        integer file_size
+        string mime_type
+        integer width
+        integer height
+        integer dpi
+        string color_profile
+        string thumbnail_path
+        string title
+        text description
+        text keywords
+        string photo_type
+        string photographer
+        datetime photo_date
+        string camera_model
+        string lens
+        string inventory_number
+        string old_inventory_number
+        string catalog_number
+        string excavation_area
+        string stratigraphic_unit
+        string grid_square
+        float depth_level
+        datetime find_date
+        string finder
+        string excavation_campaign
+        string material
+        string material_details
+        string object_type
+        string object_function
+        float length_cm
+        float width_cm
+        float height_cm
+        float diameter_cm
+        float weight_grams
+        string chronology_period
+        string chronology_culture
+        integer dating_from
+        integer dating_to
+        text dating_notes
+        string conservation_status
+        text conservation_notes
+        text restoration_history
+        text bibliography
+        text comparative_references
+        text external_links
+        text exif_data
+        text iptc_data
+        string copyright_holder
+        string license_type
+        text usage_rights
+        boolean is_published
+        boolean is_validated
+        text validation_notes
+        boolean has_deep_zoom
+        string deep_zoom_status
+        integer deep_zoom_levels
+        integer deep_zoom_tile_count
+        datetime deep_zoom_processed_at
+        datetime created
+        datetime updated
+    }
+
+    PHOTO_MODIFICATIONS {
+        uuid id PK
+        uuid photo_id FK
+        uuid modified_by FK
+        string modification_type
+        string field_changed
+        text old_value
+        text new_value
+        text notes
+        datetime created
+        datetime updated
+    }
+
+    GEOGRAPHIC_MAPS {
+        uuid id PK
+        uuid site_id FK
+        uuid created_by FK
+        string name
+        text description
+        float bounds_north
+        float bounds_south
+        float bounds_east
+        float bounds_west
+        float center_lat
+        float center_lng
+        integer default_zoom
+        json map_config
+        boolean is_active
+        boolean is_default
+        datetime created_at
+        datetime updated_at
+    }
+
+    GEOGRAPHIC_MAP_LAYERS {
+        uuid id PK
+        uuid map_id FK
+        uuid site_id FK
+        uuid created_by FK
+        string name
+        text description
+        string layer_type
+        json geojson_data
+        integer features_count
+        json style_config
+        boolean is_visible
+        integer display_order
+        float bounds_north
+        float bounds_south
+        float bounds_east
+        float bounds_west
+        datetime created_at
+        datetime updated_at
+    }
+
+    GEOGRAPHIC_MAP_MARKERS {
+        uuid id PK
+        uuid map_id FK
+        uuid site_id FK
+        uuid created_by FK
+        float latitude
+        float longitude
+        string title
+        text description
+        string marker_type
+        string icon
+        string color
+        json metadata
+        datetime created_at
+        datetime updated_at
+    }
+
+    GEOGRAPHIC_MAP_MARKER_PHOTOS {
+        uuid id PK
+        uuid marker_id FK
+        uuid photo_id FK
+        text description
+        integer display_order
+        boolean is_primary
+        datetime created_at
+        uuid created_by FK
+    }
+
+    ICCD_RECORDS {
+        uuid id PK
+        uuid site_id FK
+        uuid created_by FK
+        uuid updated_by FK
+        string record_type
+        string record_number
+        json record_data
+        string status
+        text notes
+        datetime created_at
+        datetime updated_at
+    }
+
+    ARCHAEOLOGICAL_PLANS {
+        uuid id PK
+        uuid site_id FK
+        uuid uploaded_by FK
+        string plan_title
+        string plan_description
+        string plan_type
+        string file_path
+        string file_format
+        integer width_px
+        integer height_px
+        string scale
+        text notes
+        boolean is_published
+        datetime created_at
+        datetime updated_at
+    }
+
+    FORM_SCHEMAS {
+        uuid id PK
+        uuid site_id FK
+        uuid created_by FK
+        string schema_name
+        string schema_type
+        json schema_definition
+        boolean is_active
+        text description
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% Relationships
+    USERS ||--o{ USER_PROFILE : "has"
+    USERS ||--o{ USER_SITE_PERMISSIONS : "has"
+    USERS ||--o{ USER_ACTIVITIES : "performs"
+    USERS ||--o{ TOKEN_BLACKLIST : "invalidates"
+    USERS ||--o{ PHOTOS : "uploads"
+    USERS ||--o{ PHOTOS : "validates"
+    USERS ||--o{ PHOTO_MODIFICATIONS : "modifies"
+    USERS ||--o{ GEOGRAPHIC_MAPS : "creates"
+    USERS ||--o{ GEOGRAPHIC_MAP_LAYERS : "creates"
+    USERS ||--o{ GEOGRAPHIC_MAP_MARKERS : "creates"
+    USERS ||--o{ GEOGRAPHIC_MAP_MARKER_PHOTOS : "creates"
+    USERS ||--o{ ICCD_RECORDS : "creates"
+    USERS ||--o{ ICCD_RECORDS : "updates"
+    USERS ||--o{ ARCHAEOLOGICAL_PLANS : "uploads"
+    USERS ||--o{ FORM_SCHEMAS : "creates"
+    USERS }o--|| ROLES : "has"
+    ARCHAEOLOGICAL_SITES ||--o{ USER_SITE_PERMISSIONS : "grants"
+    ARCHAEOLOGICAL_SITES ||--o{ USER_ACTIVITIES : "records"
+    ARCHAEOLOGICAL_SITES ||--o{ PHOTOS : "contains"
+    ARCHAEOLOGICAL_SITES ||--o{ GEOGRAPHIC_MAPS : "has"
+    ARCHAEOLOGICAL_SITES ||--o{ GEOGRAPHIC_MAP_LAYERS : "contains"
+    ARCHAEOLOGICAL_SITES ||--o{ GEOGRAPHIC_MAP_MARKERS : "contains"
+    ARCHAEOLOGICAL_SITES ||--o{ ICCD_RECORDS : "contains"
+    ARCHAEOLOGICAL_SITES ||--o{ ARCHAEOLOGICAL_PLANS : "has"
+    ARCHAEOLOGICAL_SITES ||--o{ FORM_SCHEMAS : "has"
+    PHOTOS ||--o{ PHOTO_MODIFICATIONS : "has"
+    GEOGRAPHIC_MAPS ||--o{ GEOGRAPHIC_MAP_LAYERS : "contains"
+    GEOGRAPHIC_MAPS ||--o{ GEOGRAPHIC_MAP_MARKERS : "contains"
+    GEOGRAPHIC_MAP_MARKERS ||--o{ GEOGRAPHIC_MAP_MARKER_PHOTOS : "associates"
+    PHOTOS ||--o{ GEOGRAPHIC_MAP_MARKER_PHOTOS : "linked_to"
