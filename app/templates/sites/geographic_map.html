@@ -111,13 +111,23 @@
                     </button>
                     
                     <!-- Save Map Button -->
-                    <button x-show="selectedMapId && (markers.length > 0 || geojsonLayers.length > 0)" 
+                    <button x-show="selectedMapId && (markers.length > 0 || geojsonLayers.length > 0)"
                             @click="saveMapToServer()"
                             class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 border border-transparent rounded-lg text-sm font-medium text-white">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
                         </svg>
                         Salva
+                    </button>
+                    
+                    <!-- Delete Map Button -->
+                    <button x-show="selectedMapId && currentMap"
+                            @click="deleteMapFromServer()"
+                            class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 border border-transparent rounded-lg text-sm font-medium text-white">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Elimina
                     </button>
                     {% endif %}
                     
@@ -1234,6 +1244,60 @@ document.addEventListener('alpine:init', () => {
             });
             this.geojsonLayers = [];
             this.layerCounter = 0;
+        },
+        
+        // === ELIMINAZIONE MAPPA ===
+        
+        async deleteMapFromServer() {
+            if (!this.selectedMapId || !this.currentMap) {
+                alert('Nessuna mappa selezionata');
+                return;
+            }
+            
+            // Conferma eliminazione
+            const confirmDelete = confirm(
+                `Sei sicuro di voler eliminare la mappa "${this.currentMap.name}"?\n\n` +
+                'Questa azione eliminerà anche tutti i layer e marker associati.\n' +
+                'L\'operazione non può essere annullata.'
+            );
+            
+            if (!confirmDelete) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    alert('Mappa eliminata con successo!');
+                    
+                    // Pulisci mappa corrente
+                    this.clearMapData();
+                    this.currentMap = null;
+                    this.selectedMapId = '';
+                    
+                    // Ricarica lista mappe
+                    await this.loadAvailableMaps();
+                    
+                    // Se non ci sono più mappe, resetta la vista
+                    if (this.availableMaps.length === 0) {
+                        this.map.fitBounds(this.defaultBounds);
+                    }
+                    
+                } else {
+                    const error = await response.json();
+                    alert('Errore durante l\'eliminazione: ' + error.detail);
+                }
+                
+            } catch (error) {
+                console.error('Error deleting map:', error);
+                alert('Errore durante l\'eliminazione della mappa');
+            }
         }
     }));
 });
