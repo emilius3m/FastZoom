@@ -356,8 +356,8 @@
     </div>
 
     <!-- Create Map Modal -->
-    <div x-show="showCreateMapModal" 
-         class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+    <div x-show="showCreateMapModal"
+         class="fixed inset-0 bg-black bg-opacity-50 z-[1050] flex items-center justify-center p-4"
          style="display: none;">
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🗺️ Crea Nuova Mappa Geografica</h3>
@@ -392,6 +392,51 @@
                         Annulla
                     </button>
                     <button type="submit" 
+                            class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        Crea Mappa
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Map Modal -->
+    <div x-show="showCreateMapModal"
+         class="fixed inset-0 bg-black bg-opacity-50 z-[1050] flex items-center justify-center p-4"
+         style="display: none;">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🗺️ Crea Nuova Mappa Geografica</h3>
+
+            <form @submit.prevent="createNewMap()" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome Mappa</label>
+                    <input x-model="newMap.name"
+                           type="text"
+                           required
+                           class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                           placeholder="es. Mappa Contatori Acqua">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrizione</label>
+                    <textarea x-model="newMap.description"
+                              rows="3"
+                              class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              placeholder="Descrizione della mappa geografica..."></textarea>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" x-model="newMap.is_default" class="mr-2">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Mappa di Default</span>
+                </div>
+
+                <div class="flex items-center justify-end space-x-3 pt-4">
+                    <button type="button"
+                            @click="showCreateMapModal = false"
+                            class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg">
+                        Annulla
+                    </button>
+                    <button type="submit"
                             class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                         Crea Mappa
                     </button>
@@ -1082,290 +1127,6 @@ document.addEventListener('alpine:init', () => {
         }
     }, 100);
 });
-
-if (geojsonData.type !== 'FeatureCollection') {
-                    alert('Il file deve essere una FeatureCollection GeoJSON');
-                    return;
-                }
-                
-                await this.addGeoJSONLayer(geojsonData, file.name);
-                
-                // Reset input
-                event.target.value = '';
-                
-            } catch (error) {
-                console.error('Errore caricamento GeoJSON:', error);
-                alert('Errore nel caricamento del file GeoJSON. Verifica che sia un file JSON valido.');
-            }
-        },
-        
-        cleanJsonContent(text) {
-            // Rimuovi spazi bianchi all'inizio e alla fine
-            text = text.trim();
-            
-            // Cerca pattern come "var json_Nome = " o "const json_Nome = " all'inizio
-            const jsVarPattern = /^(var|const|let)\s+\w+\s*=\s*/;
-            if (jsVarPattern.test(text)) {
-                text = text.replace(jsVarPattern, '');
-            }
-            
-            // Rimuovi punto e virgola finale se presente
-            if (text.endsWith(';')) {
-                text = text.slice(0, -1);
-            }
-            
-            return text.trim();
-        },
-        
-        async addGeoJSONLayer(geojsonData, fileName) {
-            this.layerCounter++;
-            
-            const layerInfo = {
-                id: this.layerCounter,
-                name: fileName.replace(/\.[^/.]+$/, ""), // Remove extension
-                type: geojsonData.type,
-                features: geojsonData.features.length,
-                visible: true,
-                data: geojsonData
-            };
-            
-            // Create Leaflet layer
-            const leafletLayer = L.geoJSON(geojsonData, {
-                style: this.getFeatureStyle,
-                pointToLayer: this.createCustomMarker.bind(this),
-                onEachFeature: this.bindFeaturePopup.bind(this)
-            }).addTo(this.map);
-            
-            layerInfo.leafletLayer = leafletLayer;
-            layerInfo.bounds = leafletLayer.getBounds();
-            
-            this.geojsonLayers.push(layerInfo);
-            
-            // Fit map to new layer
-            if (layerInfo.bounds.isValid()) {
-                this.map.fitBounds(layerInfo.bounds);
-            }
-            
-            console.log('Layer GeoJSON aggiunto:', layerInfo);
-        },
-        
-        getFeatureStyle(feature) {
-            return {
-                color: '#3388ff',
-                weight: 2,
-                opacity: 0.8,
-                fillColor: '#3388ff',
-                fillOpacity: 0.2
-            };
-        },
-        
-        createCustomMarker(feature, latlng) {
-            // Custom icon based on properties
-            const props = feature.properties;
-            let icon = '📍';
-            let color = '#3388ff';
-            
-            // Check for layer name or feature properties
-            const layerName = this.geojsonLayers[this.geojsonLayers.length - 1]?.name?.toLowerCase() || '';
-            const featureName = (props.Name || props.name || '').toLowerCase();
-            const notes = (props.Note || props.Notes || props.note || props.notes || '').toLowerCase();
-            
-            // Water meter detection
-            if (layerName.includes('contatori') || layerName.includes('acqua') || 
-                featureName.includes('contatore') || notes.includes('contatore')) {
-                icon = '💧';
-                color = '#0ea5e9';
-            }
-            // Museum detection
-            else if (featureName.includes('museo')) {
-                icon = '🏛️';
-                color = '#8b5a2b';
-            }
-            // Theater detection
-            else if (featureName.includes('teatro')) {
-                icon = '🎭';
-                color = '#dc2626';
-            }
-            // Bathroom/WC detection
-            else if (featureName.includes('bagni') || featureName.includes('wc')) {
-                icon = '🚽';
-                color = '#059669';
-            }
-            // House detection
-            else if (featureName.includes('casa') || props['N. casa'] || props.N_casa) {
-                icon = '🏠';
-                color = '#d97706';
-            }
-            
-            const customIcon = L.divIcon({
-                className: 'custom-geojson-marker',
-                html: `<div style="background: ${color}; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${icon}</div>`,
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
-            });
-            
-            return L.marker(latlng, { icon: customIcon });
-        },
-        
-        bindFeaturePopup(feature, layer) {
-            const props = feature.properties;
-            let popupContent = '<div class="geojson-popup" style="max-width: 400px;">';
-            
-            // Title
-            const title = props.Name || props.name || props.title || 'Feature';
-            popupContent += `<h4 style="margin: 0 0 10px 0; color: #2c5aa0; font-size: 16px;">${title}</h4>`;
-            
-            // Coordinates
-            if (feature.geometry.type === 'Point') {
-                const coords = feature.geometry.coordinates;
-                popupContent += `<p><strong>Coordinate:</strong><br>Lat: ${coords[1].toFixed(6)}<br>Lng: ${coords[0].toFixed(6)}</p>`;
-            }
-            
-            // Description with images
-            if (props.description) {
-                popupContent += `<div style="margin: 10px 0;">${props.description}</div>`;
-            }
-            
-            // Other properties (excluding technical ones)
-            const excludeProps = ['description', 'Name', 'name', 'title', 'fid', 'timestamp', 'begin', 'end', 'altitudeMode', 'tessellate', 'extrude', 'visibility', 'drawOrder', 'icon', 'gx_media_links', 'auxiliary_storage_callouts_originx', 'auxiliary_storage_callouts_originy', 'auxiliary_storage_callouts_destinationx', 'auxiliary_storage_callouts_destinationy'];
-            
-            for (const [key, value] of Object.entries(props)) {
-                if (!excludeProps.includes(key) && value !== null && value !== undefined && value !== '' && value !== -1) {
-                    popupContent += `<p style="margin: 3px 0; font-size: 14px;"><strong>${key}:</strong> ${value}</p>`;
-                }
-            }
-            
-            popupContent += '</div>';
-            
-            layer.bindPopup(popupContent, {
-                maxWidth: 400,
-                maxHeight: 300
-            });
-        },
-        
-        // === LAYER CONTROLS ===
-        
-        toggleLayer(layer) {
-            if (layer.visible) {
-                this.map.addLayer(layer.leafletLayer);
-            } else {
-                this.map.removeLayer(layer.leafletLayer);
-            }
-        },
-        
-        fitLayerBounds(layer) {
-            if (layer.bounds && layer.bounds.isValid()) {
-                this.map.fitBounds(layer.bounds);
-            }
-        },
-        
-        removeLayer(layerId) {
-            const layerIndex = this.geojsonLayers.findIndex(l => l.id === layerId);
-            if (layerIndex !== -1) {
-                const layer = this.geojsonLayers[layerIndex];
-                this.map.removeLayer(layer.leafletLayer);
-                this.geojsonLayers.splice(layerIndex, 1);
-            }
-        },
-        
-        toggleManualMarkers() {
-            if (this.showManualMarkers) {
-                this.map.addLayer(this.markersLayer);
-            } else {
-                this.map.removeLayer(this.markersLayer);
-            }
-        },
-        
-        // === SALVATAGGIO/CARICAMENTO SERVER ===
-        
-        async saveMapToServer() {
-            if (!this.selectedMapId) {
-                alert('Seleziona prima una mappa');
-                return;
-            }
-            
-            try {
-                // Salva layer GeoJSON
-                for (const layer of this.geojsonLayers) {
-                    const layerData = {
-                        name: layer.name,
-                        layer_type: 'geojson',
-                        geojson_data: layer.data,
-                        is_visible: layer.visible
-                    };
-                    
-                    await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/layers`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(layerData)
-                    });
-                }
-                
-                // Salva marker manuali
-                for (const marker of this.markers) {
-                    const markerData = {
-                        latitude: marker.data.lat,
-                        longitude: marker.data.lng,
-                        title: marker.data.title,
-                        description: marker.data.description,
-                        marker_type: marker.data.type
-                    };
-                    
-                    await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/markers`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(markerData)
-                    });
-                }
-                
-                alert('Mappa salvata con successo sul server!');
-                
-            } catch (error) {
-                console.error('Error saving map:', error);
-                alert('Errore durante il salvataggio');
-            }
-        },
-        
-        loadMapLayers() {
-            // TODO: Carica layer dal server
-            console.log('Loading layers for map:', this.selectedMapId);
-        },
-        
-        loadMapMarkers() {
-            // TODO: Carica marker dal server
-            console.log('Loading markers for map:', this.selectedMapId);
-        },
-        
-        clearMapData() {
-            // Pulisci mappa
-            this.markersLayer.clearLayers();
-            this.markers = [];
-            this.markerCounter = 0;
-            
-            this.geojsonLayers.forEach(layer => {
-                this.map.removeLayer(layer.leafletLayer);
-            });
-            this.geojsonLayers = [];
-            this.layerCounter = 0;
-        }
-    }));
-});
-
-// Set global site ID for JavaScript
-let siteId = '{{ site.id }}';
-
-// Expose to global scope for popup callbacks
-window.geographicMapManager = null;
-document.addEventListener('alpine:init', () => {
-    // Wait a bit for component to initialize
-    setTimeout(() => {
-        const element = document.querySelector('[x-data="geographicMapManager"]');
-        if (element && element._x_dataStack) {
-            window.geographicMapManager = element._x_dataStack[0];
-        }
-    }, 100);
-});
 </script>
 
 {% endblock %}
-
