@@ -69,7 +69,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto p-6" x-data="geographicMapManager">
+<div class=" mx-auto" x-data="geographicMapManager">
     
     <!-- Header Controls -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
@@ -207,9 +207,9 @@
     </div>
 
     <!-- Main Content with Sidebar Layout -->
-    <div class="flex gap-6">
+    <div class="flex gap-4 ">
         <!-- Map and Controls (Main Content) -->
-        <div class="flex-1">
+        <div class="flex-1 z-10">
             <!-- Leaflet Map Container -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
                 <div id="map" 
@@ -286,7 +286,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+
 
         <!-- Photos Sidebar -->
         <div x-show="showPhotosSidebar" class="w-80 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -357,66 +357,40 @@
 
     <!-- Create Map Modal -->
     <div x-show="showCreateMapModal"
-         class="fixed inset-0 bg-black bg-opacity-50 z-[1050] flex items-center justify-center p-4"
-         style="display: none;">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🗺️ Crea Nuova Mappa Geografica</h3>
+         class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+         style="display: none; overflow-y: auto;"
+         @click.self="showCreateMapModal = false">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <!-- Modal Header with Close Button -->
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">🗺️ Crea Nuova Mappa Geografica</h3>
+                <button type="button"
+                        @click="showCreateMapModal = false"
+                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
             
-            <form @submit.prevent="createNewMap()" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome Mappa</label>
-                    <input x-model="newMap.name" 
-                           type="text" 
-                           required
-                           class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                           placeholder="es. Mappa Contatori Acqua">
+            <form @submit.prevent="createNewMap()" class="space-y-6">
+                <!-- Basic Information -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome Mappa</label>
+                        <input x-model="newMap.name"
+                               type="text"
+                               required
+                               class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                               placeholder="es. Mappa Contatori Acqua">
+                    </div>
+                    
+                    <div class="flex items-center pt-7">
+                        <input type="checkbox" x-model="newMap.is_default" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Mappa di Default</span>
+                    </div>
                 </div>
                 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrizione</label>
-                    <textarea x-model="newMap.description" 
-                              rows="3"
-                              class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                              placeholder="Descrizione della mappa geografica..."></textarea>
-                </div>
-                
-                <div class="flex items-center">
-                    <input type="checkbox" x-model="newMap.is_default" class="mr-2">
-                    <span class="text-sm text-gray-700 dark:text-gray-300">Mappa di Default</span>
-                </div>
-                
-                <div class="flex items-center justify-end space-x-3 pt-4">
-                    <button type="button" 
-                            @click="showCreateMapModal = false"
-                            class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg">
-                        Annulla
-                    </button>
-                    <button type="submit" 
-                            class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                        Crea Mappa
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Create Map Modal -->
-    <div x-show="showCreateMapModal"
-         class="fixed inset-0 bg-black bg-opacity-50 z-[1050] flex items-center justify-center p-4"
-         style="display: none;">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🗺️ Crea Nuova Mappa Geografica</h3>
-
-            <form @submit.prevent="createNewMap()" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome Mappa</label>
-                    <input x-model="newMap.name"
-                           type="text"
-                           required
-                           class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                           placeholder="es. Mappa Contatori Acqua">
-                </div>
-
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrizione</label>
                     <textarea x-model="newMap.description"
@@ -424,12 +398,110 @@
                               class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                               placeholder="Descrizione della mappa geografica..."></textarea>
                 </div>
-
-                <div class="flex items-center">
-                    <input type="checkbox" x-model="newMap.is_default" class="mr-2">
-                    <span class="text-sm text-gray-700 dark:text-gray-300">Mappa di Default</span>
+                
+                <!-- Map Configuration -->
+                <div class="border-t pt-4">
+                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">⚙️ Configurazione Mappa</h4>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zoom Minimo</label>
+                            <input x-model.number="newMap.min_zoom"
+                                   type="number"
+                                   min="1"
+                                   max="20"
+                                   class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zoom Massimo</label>
+                            <input x-model.number="newMap.max_zoom"
+                                   type="number"
+                                   min="1"
+                                   max="28"
+                                   class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Zoom Default</label>
+                            <input x-model.number="newMap.default_zoom"
+                                   type="number"
+                                   min="1"
+                                   max="28"
+                                   class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 space-y-3">
+                        <div class="flex items-center">
+                            <input type="checkbox" x-model="newMap.zoom_control" class="mr-2">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Mostra controlli zoom</span>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <input type="checkbox" x-model="newMap.attribution_control" class="mr-2">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Mostra attribuzione</span>
+                        </div>
+                    </div>
                 </div>
-
+                
+                <!-- Bounds Configuration -->
+                <div class="border-t pt-4">
+                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">🗺️ Area di Interesse</h4>
+                    
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nord (Lat)</label>
+                            <input x-model.number="newMap.bounds.north"
+                                   type="number"
+                                   step="any"
+                                   class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                   placeholder="41.436">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sud (Lat)</label>
+                            <input x-model.number="newMap.bounds.south"
+                                   type="number"
+                                   step="any"
+                                   class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                   placeholder="41.431">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Est (Lng)</label>
+                            <input x-model.number="newMap.bounds.east"
+                                   type="number"
+                                   step="any"
+                                   class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                   placeholder="14.625">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ovest (Lng)</label>
+                            <input x-model.number="newMap.bounds.west"
+                                   type="number"
+                                   step="any"
+                                   class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                   placeholder="14.614">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 flex items-center space-x-4">
+                        <button type="button"
+                                @click="copyCurrentBounds()"
+                                class="px-3 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600">
+                            📍 Usa Vista Corrente
+                        </button>
+                        
+                        <button type="button"
+                                @click="useDefaultBounds()"
+                                class="px-3 py-2 bg-gray-500 text-white text-sm rounded-md hover:bg-gray-600">
+                            🔄 Usa Default
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="flex items-center justify-end space-x-3 pt-4">
                     <button type="button"
                             @click="showCreateMapModal = false"
@@ -486,7 +558,18 @@ document.addEventListener('alpine:init', () => {
         newMap: {
             name: '',
             description: '',
-            is_default: false
+            is_default: false,
+            min_zoom: 1,
+            max_zoom: 28,
+            default_zoom: 15,
+            zoom_control: true,
+            attribution_control: true,
+            bounds: {
+                north: 41.43582073892966,
+                south: 41.431069139716755,
+                east: 14.625093525136856,
+                west: 14.613550167117397
+            }
         },
         
         // Coordinate area default
@@ -591,24 +674,26 @@ document.addEventListener('alpine:init', () => {
         
         async createNewMap() {
             try {
-                const mapBounds = this.map.getBounds();
-                const center = this.map.getCenter();
+                const center = this.calculateCenter();
                 
                 const mapData = {
                     name: this.newMap.name,
                     description: this.newMap.description,
                     bounds: {
-                        north: mapBounds.getNorth(),
-                        south: mapBounds.getSouth(),
-                        east: mapBounds.getEast(),
-                        west: mapBounds.getWest()
+                        north: this.newMap.bounds.north,
+                        south: this.newMap.bounds.south,
+                        east: this.newMap.bounds.east,
+                        west: this.newMap.bounds.west
                     },
-                    center: {
-                        lat: center.lat,
-                        lng: center.lng
-                    },
-                    default_zoom: this.map.getZoom(),
-                    is_default: this.newMap.is_default
+                    center: center,
+                    default_zoom: this.newMap.default_zoom,
+                    is_default: this.newMap.is_default,
+                    map_config: {
+                        min_zoom: this.newMap.min_zoom,
+                        max_zoom: this.newMap.max_zoom,
+                        zoom_control: this.newMap.zoom_control,
+                        attribution_control: this.newMap.attribution_control
+                    }
                 };
                 
                 const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps`, {
@@ -648,8 +733,48 @@ document.addEventListener('alpine:init', () => {
             this.newMap = {
                 name: '',
                 description: '',
-                is_default: false
+                is_default: false,
+                min_zoom: 1,
+                max_zoom: 28,
+                default_zoom: 15,
+                zoom_control: true,
+                attribution_control: true,
+                bounds: {
+                    north: 41.43582073892966,
+                    south: 41.431069139716755,
+                    east: 14.625093525136856,
+                    west: 14.613550167117397
+                }
             };
+        },
+        
+        calculateCenter() {
+            const bounds = this.newMap.bounds;
+            return {
+                lat: (bounds.north + bounds.south) / 2,
+                lng: (bounds.east + bounds.west) / 2
+            };
+        },
+        
+        copyCurrentBounds() {
+            const mapBounds = this.map.getBounds();
+            this.newMap.bounds = {
+                north: mapBounds.getNorth(),
+                south: mapBounds.getSouth(),
+                east: mapBounds.getEast(),
+                west: mapBounds.getWest()
+            };
+            this.newMap.default_zoom = this.map.getZoom();
+        },
+        
+        useDefaultBounds() {
+            this.newMap.bounds = {
+                north: 41.43582073892966,
+                south: 41.431069139716755,
+                east: 14.625093525136856,
+                west: 14.613550167117397
+            };
+            this.newMap.default_zoom = 15;
         },
         
         // === EVENT HANDLERS ===

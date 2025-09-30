@@ -221,3 +221,9 @@
         min-width: 150px;
     }
 }
+
+/* Ensure modals appear above Leaflet maps */
+#map {
+    position: relative;
+    z-index: 1;
+}

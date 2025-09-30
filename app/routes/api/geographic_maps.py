@@ -85,7 +85,34 @@ async def get_site_geographic_maps(
     maps = await db.execute(maps_query)
     maps = maps.scalars().all()
     
-    maps_data = [map_obj.to_dict() for map_obj in maps]
+    # Create dict manually to avoid relationship access issues
+    maps_data = []
+    for map_obj in maps:
+        map_data = {
+            "id": str(map_obj.id),
+            "site_id": str(map_obj.site_id),
+            "name": map_obj.name,
+            "description": map_obj.description,
+            "bounds": {
+                "north": map_obj.bounds_north,
+                "south": map_obj.bounds_south,
+                "east": map_obj.bounds_east,
+                "west": map_obj.bounds_west
+            },
+            "center": {
+                "lat": map_obj.center_lat,
+                "lng": map_obj.center_lng
+            },
+            "default_zoom": map_obj.default_zoom,
+            "map_config": map_obj.map_config or {},
+            "is_active": map_obj.is_active,
+            "is_default": map_obj.is_default,
+            "created_at": map_obj.created_at.isoformat() if map_obj.created_at else None,
+            "updated_at": map_obj.updated_at.isoformat() if map_obj.updated_at else None,
+            "layers_count": 0,  # Avoid relationship access
+            "markers_count": 0  # Avoid relationship access
+        }
+        maps_data.append(map_data)
     
     return JSONResponse({
         "site_id": str(site_id),
@@ -110,13 +137,14 @@ async def create_geographic_map(
     try:
         # Se è mappa di default, rimuovi flag da altre mappe
         if map_data.get('is_default', False):
+            # Use proper SQLAlchemy async update syntax
             await db.execute(
-                select(GeographicMap).where(
+                GeographicMap.__table__.update().where(
                     and_(
                         GeographicMap.site_id == site_id,
                         GeographicMap.is_default == True
                     )
-                ).update({GeographicMap.is_default: False})
+                ).values(is_default=False)
             )
         
         # Crea mappa
@@ -142,10 +170,36 @@ async def create_geographic_map(
         
         logger.info(f"Geographic map created: {new_map.id} for site {site_id}")
         
+        # Create dict manually to avoid relationship access issues
+        map_data = {
+            "id": str(new_map.id),
+            "site_id": str(new_map.site_id),
+            "name": new_map.name,
+            "description": new_map.description,
+            "bounds": {
+                "north": new_map.bounds_north,
+                "south": new_map.bounds_south,
+                "east": new_map.bounds_east,
+                "west": new_map.bounds_west
+            },
+            "center": {
+                "lat": new_map.center_lat,
+                "lng": new_map.center_lng
+            },
+            "default_zoom": new_map.default_zoom,
+            "map_config": new_map.map_config or {},
+            "is_active": new_map.is_active,
+            "is_default": new_map.is_default,
+            "created_at": new_map.created_at.isoformat() if new_map.created_at else None,
+            "updated_at": new_map.updated_at.isoformat() if new_map.updated_at else None,
+            "layers_count": 0,  # New map has no layers yet
+            "markers_count": 0  # New map has no markers yet
+        }
+        
         return JSONResponse({
             "message": "Mappa geografica creata con successo",
             "map_id": str(new_map.id),
-            "map_data": new_map.to_dict()
+            "map_data": map_data
         })
         
     except Exception as e:
@@ -183,11 +237,86 @@ async def get_geographic_map_details(
     if not map_obj:
         raise HTTPException(status_code=404, detail="Mappa non trovata")
     
-    map_data = map_obj.to_dict()
-    map_data.update({
-        "layers": [layer.to_dict() for layer in map_obj.geojson_layers],
-        "markers": [marker.to_dict() for marker in map_obj.manual_markers]
-    })
+    # Create dict manually to avoid relationship access issues
+    map_data = {
+        "id": str(map_obj.id),
+        "site_id": str(map_obj.site_id),
+        "name": map_obj.name,
+        "description": map_obj.description,
+        "bounds": {
+            "north": map_obj.bounds_north,
+            "south": map_obj.bounds_south,
+            "east": map_obj.bounds_east,
+            "west": map_obj.bounds_west
+        },
+        "center": {
+            "lat": map_obj.center_lat,
+            "lng": map_obj.center_lng
+        },
+        "default_zoom": map_obj.default_zoom,
+        "map_config": map_obj.map_config or {},
+        "is_active": map_obj.is_active,
+        "is_default": map_obj.is_default,
+        "created_at": map_obj.created_at.isoformat() if map_obj.created_at else None,
+        "updated_at": map_obj.updated_at.isoformat() if map_obj.updated_at else None,
+        "layers": [],  # Will be populated below if relationships are loaded
+        "markers": []  # Will be populated below if relationships are loaded
+    }
+    
+    # Safely add layers and markers if they were loaded with selectinload
+    try:
+        if hasattr(map_obj, 'geojson_layers') and map_obj.geojson_layers:
+            for layer in map_obj.geojson_layers:
+                layer_data = {
+                    "id": str(layer.id),
+                    "map_id": str(layer.map_id),
+                    "site_id": str(layer.site_id),
+                    "name": layer.name,
+                    "description": layer.description,
+                    "layer_type": layer.layer_type,
+                    "geojson_data": layer.geojson_data,
+                    "features_count": layer.features_count,
+                    "style_config": layer.style_config or {},
+                    "is_visible": layer.is_visible,
+                    "display_order": layer.display_order,
+                    "bounds": {
+                        "north": layer.bounds_north,
+                        "south": layer.bounds_south,
+                        "east": layer.bounds_east,
+                        "west": layer.bounds_west
+                    } if layer.bounds_north else None,
+                    "created_at": layer.created_at.isoformat() if layer.created_at else None,
+                    "updated_at": layer.updated_at.isoformat() if layer.updated_at else None
+                }
+                map_data["layers"].append(layer_data)
+    except Exception:
+        # If relationship access fails, just leave empty list
+        pass
+    
+    try:
+        if hasattr(map_obj, 'manual_markers') and map_obj.manual_markers:
+            for marker in map_obj.manual_markers:
+                marker_data = {
+                    "id": str(marker.id),
+                    "map_id": str(marker.map_id),
+                    "site_id": str(marker.site_id),
+                    "latitude": marker.latitude,
+                    "longitude": marker.longitude,
+                    "title": marker.title,
+                    "description": marker.description,
+                    "marker_type": marker.marker_type,
+                    "icon": marker.icon,
+                    "color": marker.color,
+                    "metadata": marker.marker_metadata or {},
+                    "created_at": marker.created_at.isoformat() if marker.created_at else None,
+                    "updated_at": marker.updated_at.isoformat() if marker.updated_at else None,
+                    "photos_count": 0,  # Avoid further relationship access
+                    "photos": []  # Avoid further relationship access
+                }
+                map_data["markers"].append(marker_data)
+    except Exception:
+        # If relationship access fails, just leave empty list
+        pass
     
     return JSONResponse(map_data)
 
@@ -220,7 +349,9 @@ async def delete_geographic_map(
     
     try:
         # Elimina mappa (CASCADE eliminerà layer e marker)
-        await db.delete(map_obj)
+        await db.execute(
+            delete(GeographicMap).where(GeographicMap.id == map_id)
+        )
         await db.commit()
         
         logger.info(f"Geographic map deleted: {map_id}")
@@ -313,10 +444,33 @@ async def save_geojson_layer(
         
         logger.info(f"GeoJSON layer saved: {layer.id} for map {map_id}")
         
+        # Create dict manually to avoid relationship access issues
+        layer_data = {
+            "id": str(layer.id),
+            "map_id": str(layer.map_id),
+            "site_id": str(layer.site_id),
+            "name": layer.name,
+            "description": layer.description,
+            "layer_type": layer.layer_type,
+            "geojson_data": layer.geojson_data,
+            "features_count": layer.features_count,
+            "style_config": layer.style_config or {},
+            "is_visible": layer.is_visible,
+            "display_order": layer.display_order,
+            "bounds": {
+                "north": layer.bounds_north,
+                "south": layer.bounds_south,
+                "east": layer.bounds_east,
+                "west": layer.bounds_west
+            } if layer.bounds_north else None,
+            "created_at": layer.created_at.isoformat() if layer.created_at else None,
+            "updated_at": layer.updated_at.isoformat() if layer.updated_at else None
+        }
+        
         return JSONResponse({
             "message": "Layer GeoJSON salvato con successo",
             "layer_id": str(layer.id),
-            "layer_data": layer.to_dict()
+            "layer_data": layer_data
         })
         
     except Exception as e:
@@ -377,10 +531,29 @@ async def save_manual_marker(
         
         logger.info(f"Manual marker saved: {marker.id} for map {map_id}")
         
+        # Create dict manually to avoid relationship access issues
+        marker_data = {
+            "id": str(marker.id),
+            "map_id": str(marker.map_id),
+            "site_id": str(marker.site_id),
+            "latitude": marker.latitude,
+            "longitude": marker.longitude,
+            "title": marker.title,
+            "description": marker.description,
+            "marker_type": marker.marker_type,
+            "icon": marker.icon,
+            "color": marker.color,
+            "metadata": marker.marker_metadata or {},
+            "created_at": marker.created_at.isoformat() if marker.created_at else None,
+            "updated_at": marker.updated_at.isoformat() if marker.updated_at else None,
+            "photos_count": 0,  # New marker has no photos yet
+            "photos": []  # New marker has no photos yet
+        }
+        
         return JSONResponse({
             "message": "Marker salvato con successo",
             "marker_id": str(marker.id),
-            "marker_data": marker.to_dict()
+            "marker_data": marker_data
         })
         
     except Exception as e:
@@ -513,7 +686,23 @@ async def get_site_photos_for_association(
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
     
-    photos_data = [photo.to_dict() for photo in photos]
+    # Create dict manually to avoid relationship access issues
+    photos_data = []
+    for photo in photos:
+        photo_data = {
+            "id": str(photo.id),
+            "site_id": str(photo.site_id),
+            "title": photo.title,
+            "description": photo.description,
+            "filename": photo.filename,
+            "file_path": photo.file_path,
+            "file_size": photo.file_size,
+            "mime_type": photo.mime_type,
+            "keywords": photo.keywords,
+            "created": photo.created.isoformat() if photo.created else None,
+            "uploaded_by": str(photo.uploaded_by) if photo.uploaded_by else None
+        }
+        photos_data.append(photo_data)
     
     return JSONResponse({
         "site_id": str(site_id),
