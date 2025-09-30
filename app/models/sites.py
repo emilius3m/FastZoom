@@ -50,6 +50,9 @@ class ArchaeologicalSite(Base):
     # Relazione con le schede ICCD
     iccd_records = relationship("ICCDBaseRecord", back_populates="site", cascade="all, delete-orphan")
     
+    # Relazione con le mappe geografiche
+    geographic_maps = relationship("GeographicMap", back_populates="site", cascade="all, delete-orphan")
+    
     def __repr__(self):
         return f"<ArchaeologicalSite(name='{self.name}', code='{self.code}')>"
     

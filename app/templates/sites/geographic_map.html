@@ -1,4 +1,4 @@
-<!-- templates/sites/geographic_map.html - MAPPA GEOGRAFICA CON LAYOUT COMPLETO -->
+<!-- templates/sites/geographic_map.html - MAPPA GEOGRAFICA COMPLETA CON GESTIONE SERVER -->
 {% extends "base/site_base.html" %}
 
 {% block title %}Mappa Geografica - {{ site.name }} | Sistema Archeologico{% endblock %}
@@ -7,16 +7,16 @@
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-    .marker-popup {
+    .marker-popup, .geojson-popup {
         font-family: Arial, sans-serif;
     }
     
-    .marker-popup h4 {
+    .marker-popup h4, .geojson-popup h4 {
         margin: 0 0 10px 0;
         color: #2c5aa0;
     }
     
-    .marker-popup p {
+    .marker-popup p, .geojson-popup p {
         margin: 5px 0;
         font-size: 14px;
     }
@@ -27,9 +27,43 @@
         border-radius: 0.5rem;
     }
     
-    .custom-marker {
+    .custom-marker, .custom-geojson-marker {
         background: transparent !important;
         border: none !important;
+    }
+    
+    .photos-sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 350px;
+        height: 100vh;
+        background: white;
+        box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        overflow-y: auto;
+    }
+    
+    .photos-sidebar.open {
+        transform: translateX(0);
+    }
+    
+    .photo-thumbnail {
+        width: 80px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    
+    .photo-thumbnail:hover {
+        opacity: 0.8;
+    }
+    
+    .photo-thumbnail.selected {
+        border: 3px solid #3b82f6;
     }
 </style>
 {% endblock %}
@@ -55,8 +89,53 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
-                    <!-- Add Marker Button -->
+                    <!-- Map Selector -->
+                    <div class="relative" x-show="availableMaps.length > 0">
+                        <select x-model="selectedMapId" @change="switchMap()" 
+                                class="block w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="">Seleziona Mappa</option>
+                            <template x-for="map in availableMaps" :key="map.id">
+                                <option :value="map.id" x-text="map.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Create New Map Button -->
                     {% if can_write %}
+                    <button @click="showCreateMapModal = true"
+                            class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 border border-transparent rounded-lg text-sm font-medium text-white">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Nuova Mappa
+                    </button>
+                    
+                    <!-- Save Map Button -->
+                    <button x-show="selectedMapId && (markers.length > 0 || geojsonLayers.length > 0)" 
+                            @click="saveMapToServer()"
+                            class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 border border-transparent rounded-lg text-sm font-medium text-white">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                        </svg>
+                        Salva
+                    </button>
+                    {% endif %}
+                    
+                    <!-- Upload GeoJSON Button -->
+                    <button @click="$refs.geojsonFileInput.click()"
+                            class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 border border-transparent rounded-lg text-sm font-medium text-white">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Carica GeoJSON
+                    </button>
+                    <input type="file" 
+                           x-ref="geojsonFileInput" 
+                           @change="loadGeoJSONFile($event)"
+                           accept=".geojson,.json"
+                           style="display: none;">
+                    
+                    <!-- Add Marker Button -->
                     <button @click="toggleAddMarker()"
                             :class="isAddingMarker ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'"
                             class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white">
@@ -69,33 +148,27 @@
                         <span x-show="!isAddingMarker">Aggiungi Marker</span>
                         <span x-show="isAddingMarker">Annulla</span>
                     </button>
-                    {% endif %}
                     
-                    <!-- Clear All Button -->
-                    <button @click="clearAllMarkers()"
-                            class="inline-flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 border border-transparent rounded-lg text-sm font-medium text-white">
+                    <!-- Photos Sidebar Toggle -->
+                    <button @click="showPhotosSidebar = !showPhotosSidebar"
+                            :class="showPhotosSidebar ? 'bg-pink-600 hover:bg-pink-700' : 'bg-gray-600 hover:bg-gray-700'"
+                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
-                        Pulisci Tutto
+                        Foto
+                        <span x-show="availablePhotos.length > 0" class="ml-1 bg-white text-gray-800 rounded-full text-xs px-2 py-0.5" x-text="availablePhotos.length"></span>
                     </button>
                     
-                    <!-- Export Button -->
-                    <button @click="exportMarkers()"
-                            class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white">
+                    <!-- Layers Control Button -->
+                    <button @click="showLayersPanel = !showLayersPanel"
+                            :class="showLayersPanel ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-gray-600 hover:bg-gray-700'"
+                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14-7l2 2-2 2m0 0H5m14-7l2 2-2 2M5 21l14-14"></path>
                         </svg>
-                        Esporta Dati
-                    </button>
-                    
-                    <!-- Load Data Button -->
-                    <button @click="loadDataFromServer()"
-                            class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 border border-transparent rounded-lg text-sm font-medium text-white">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                        Carica Dati
+                        Layer
+                        <span x-show="geojsonLayers.length > 0" class="ml-1 bg-white text-gray-800 rounded-full text-xs px-2 py-0.5" x-text="geojsonLayers.length"></span>
                     </button>
                 </div>
             </div>
@@ -108,12 +181,16 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
                     <div class="text-sm">
-                        <span class="font-medium text-gray-900 dark:text-white">Markers totali:</span>
+                        <span class="font-medium text-gray-900 dark:text-white">Mappa:</span>
+                        <span class="text-blue-600 dark:text-blue-400 font-bold" x-text="currentMap?.name || 'Nessuna mappa selezionata'">-</span>
+                    </div>
+                    <div class="text-sm">
+                        <span class="font-medium text-gray-900 dark:text-white">Markers:</span>
                         <span class="text-blue-600 dark:text-blue-400 font-bold" x-text="markerCount">0</span>
                     </div>
                     <div class="text-sm">
-                        <span class="font-medium text-gray-900 dark:text-white">Area:</span>
-                        <span class="text-gray-600 dark:text-gray-400">Lat: 41.431-41.436, Lng: 14.614-14.625</span>
+                        <span class="font-medium text-gray-900 dark:text-white">Layer:</span>
+                        <span class="text-purple-600 dark:text-purple-400 font-bold" x-text="geojsonLayers.length">0</span>
                     </div>
                 </div>
                 
@@ -121,55 +198,205 @@
                     <div x-show="isAddingMarker" class="text-orange-600 dark:text-orange-400 text-sm">
                         👆 Clicca sulla mappa per aggiungere un marker
                     </div>
+                    <div x-show="selectedMarkerForPhotos" class="text-green-600 dark:text-green-400 text-sm">
+                        📷 Seleziona foto per il marker <span x-text="selectedMarkerForPhotos?.title"></span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Leaflet Map Container -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div id="map" 
-             x-init="initMap()"
-             class="w-full h-96 lg:h-[600px] rounded-lg">
+    <!-- Main Content with Sidebar Layout -->
+    <div class="flex gap-6">
+        <!-- Map and Controls (Main Content) -->
+        <div class="flex-1">
+            <!-- Leaflet Map Container -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+                <div id="map" 
+                     x-init="initMap()"
+                     class="w-full h-96 lg:h-[600px] rounded-lg">
+                </div>
+            </div>
+
+            <!-- Layers Control Panel -->
+            <div x-show="showLayersPanel" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+                <div class="px-6 py-4">
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🗂️ Controllo Layer</h4>
+                    
+                    <!-- GeoJSON Layers -->
+                    <div x-show="geojsonLayers.length > 0" class="mb-4">
+                        <h5 class="text-md font-medium text-gray-800 dark:text-gray-200 mb-3">Layer GeoJSON</h5>
+                        <div class="space-y-2">
+                            <template x-for="layer in geojsonLayers" :key="layer.id">
+                                <div class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-600 rounded-lg">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" 
+                                               :id="'layer-' + layer.id"
+                                               x-model="layer.visible"
+                                               @change="toggleLayer(layer)"
+                                               class="mr-3 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                        <div>
+                                            <label :for="'layer-' + layer.id" class="font-medium text-gray-900 dark:text-white cursor-pointer" x-text="layer.name"></label>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                <span x-text="layer.features + ' features'"></span>
+                                                <span class="mx-1">•</span>
+                                                <span x-text="layer.type"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button @click="fitLayerBounds(layer)" 
+                                                class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 border border-blue-300 rounded">
+                                            🔍 Zoom
+                                        </button>
+                                        <button @click="removeLayer(layer.id)" 
+                                                class="text-red-600 hover:text-red-800 text-xs px-2 py-1 border border-red-300 rounded">
+                                            🗑️ Rimuovi
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Manual Markers -->
+                    <div x-show="markers.length > 0" class="mb-4">
+                        <h5 class="text-md font-medium text-gray-800 dark:text-gray-200 mb-3">Marker Manuali</h5>
+                        <div class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-600 rounded-lg">
+                            <div class="flex items-center">
+                                <input type="checkbox" 
+                                       id="manual-markers"
+                                       x-model="showManualMarkers"
+                                       @change="toggleManualMarkers()"
+                                       class="mr-3 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                <div>
+                                    <label for="manual-markers" class="font-medium text-gray-900 dark:text-white cursor-pointer">Marker Aggiunti Manualmente</label>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400" x-text="markers.length + ' markers'"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="geojsonLayers.length === 0 && markers.length === 0" class="text-center text-gray-500 dark:text-gray-400 py-8">
+                        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M34 40h10v-4a6 6 0 00-10.712-3.714M34 40H14m20 0v-4a9.971 9.971 0 00-.712-3.714M14 40H4v-4a6 6 0 0110.713-3.714M14 40v-4c0-1.313.253-2.566.713-3.714m0 0A9.971 9.971 0 0124 24c4.21 0 7.863 2.613 9.288 6.286"></path>
+                        </svg>
+                        <p>Nessun layer caricato</p>
+                        <p class="text-sm">Carica un file GeoJSON per iniziare</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Photos Sidebar -->
+        <div x-show="showPhotosSidebar" class="w-80 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white">📷 Gestione Foto</h4>
+                    <button @click="showPhotosSidebar = false" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Search Photos -->
+                <div class="mb-4">
+                    <input type="text" 
+                           x-model="photoSearchQuery"
+                           @input="searchPhotos()"
+                           placeholder="Cerca foto..."
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+
+                <!-- Selected Marker Info -->
+                <div x-show="selectedMarkerForPhotos" class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <h5 class="font-medium text-blue-900 dark:text-blue-200 mb-2">Marker Selezionato</h5>
+                    <p class="text-sm text-blue-700 dark:text-blue-300" x-text="selectedMarkerForPhotos?.title"></p>
+                    <p class="text-xs text-blue-600 dark:text-blue-400" x-text="'Foto associate: ' + (selectedMarkerForPhotos?.photos?.length || 0)"></p>
+                </div>
+
+                <!-- Photos List -->
+                <div class="space-y-3 max-h-96 overflow-y-auto">
+                    <template x-for="photo in availablePhotos" :key="photo.id">
+                        <div class="flex items-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-300">
+                            <img :src="photo.thumbnail_url" 
+                                 :alt="photo.title"
+                                 class="photo-thumbnail mr-3"
+                                 @click="togglePhotoSelection(photo)">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate" x-text="photo.title || photo.filename"></p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="photo.description || 'Nessuna descrizione'"></p>
+                                <div class="flex items-center mt-1">
+                                    <input type="checkbox" 
+                                           :checked="isPhotoSelected(photo.id)"
+                                           @change="togglePhotoSelection(photo)"
+                                           class="mr-2 h-3 w-3 text-blue-600">
+                                    <span class="text-xs text-gray-400" x-text="photo.resolution || ''"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="availablePhotos.length === 0" class="text-center text-gray-500 py-8">
+                        <p>Nessuna foto disponibile</p>
+                        <p class="text-sm">Carica foto nella sezione foto del sito</p>
+                    </div>
+                </div>
+
+                <!-- Photos Actions -->
+                <div x-show="selectedMarkerForPhotos && selectedPhotos.length > 0" class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <button @click="associatePhotosToMarker()" 
+                            class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
+                        Associa <span x-text="selectedPhotos.length"></span> foto al marker
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Markers List -->
-    <div x-show="markers.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="px-6 py-4">
-            <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">📍 Markers sulla Mappa</h4>
+    <!-- Create Map Modal -->
+    <div x-show="showCreateMapModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+         style="display: none;">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">🗺️ Crea Nuova Mappa Geografica</h3>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <template x-for="marker in markers" :key="marker.data.id">
-                    <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:border-blue-300 dark:hover:border-blue-500">
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="font-semibold text-sm text-gray-900 dark:text-white" x-text="marker.data.title"></div>
-                            <div class="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" 
-                                 x-text="'#' + marker.data.id">
-                            </div>
-                        </div>
-                        
-                        <div class="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                            <div x-text="'Lat: ' + marker.data.lat.toFixed(6)"></div>
-                            <div x-text="'Lng: ' + marker.data.lng.toFixed(6)"></div>
-                            <div x-text="'Aggiunto: ' + new Date(marker.data.timestamp).toLocaleDateString('it-IT')"></div>
-                        </div>
-                        
-                        <div class="flex space-x-1 mt-3">
-                            <button @click="centerMapOnMarker(marker)" 
-                                    class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 border border-blue-300 rounded">
-                                🔍 Centra
-                            </button>
-                            {% if can_write %}
-                            <button @click="removeMarker(marker.data.id)" 
-                                    class="text-red-600 hover:text-red-800 text-xs px-2 py-1 border border-red-300 rounded">
-                                🗑️ Rimuovi
-                            </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                </template>
-            </div>
+            <form @submit.prevent="createNewMap()" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome Mappa</label>
+                    <input x-model="newMap.name" 
+                           type="text" 
+                           required
+                           class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                           placeholder="es. Mappa Contatori Acqua">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrizione</label>
+                    <textarea x-model="newMap.description" 
+                              rows="3"
+                              class="block w-full border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                              placeholder="Descrizione della mappa geografica..."></textarea>
+                </div>
+                
+                <div class="flex items-center">
+                    <input type="checkbox" x-model="newMap.is_default" class="mr-2">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Mappa di Default</span>
+                </div>
+                
+                <div class="flex items-center justify-end space-x-3 pt-4">
+                    <button type="button" 
+                            @click="showCreateMapModal = false"
+                            class="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg">
+                        Annulla
+                    </button>
+                    <button type="submit" 
+                            class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        Crea Mappa
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -190,9 +417,35 @@ document.addEventListener('alpine:init', () => {
         isAddingMarker: false,
         markers: [],
         markerCounter: 0,
+        showLayersPanel: false,
+        showManualMarkers: true,
+        showPhotosSidebar: false,
+        showCreateMapModal: false,
         
-        // Coordinate area
-        bounds: [
+        // Gestione mappe multiple
+        availableMaps: [],
+        selectedMapId: '',
+        currentMap: null,
+        
+        // GeoJSON Layers
+        geojsonLayers: [],
+        layerCounter: 0,
+        
+        // Gestione foto
+        availablePhotos: [],
+        selectedPhotos: [],
+        selectedMarkerForPhotos: null,
+        photoSearchQuery: '',
+        
+        // Nuova mappa
+        newMap: {
+            name: '',
+            description: '',
+            is_default: false
+        },
+        
+        // Coordinate area default
+        defaultBounds: [
             [41.431069139716755, 14.613550167117397],
             [41.43582073892966, 14.625093525136856]
         ],
@@ -211,7 +464,7 @@ document.addEventListener('alpine:init', () => {
                     zoomControl: false,
                     maxZoom: 28,
                     minZoom: 1
-                }).fitBounds(this.bounds);
+                }).fitBounds(this.defaultBounds);
 
                 // Aggiungi controlli zoom
                 L.control.zoom({
@@ -231,11 +484,9 @@ document.addEventListener('alpine:init', () => {
                     this.handleMapClick(e);
                 });
                 
-                // Aggiungi marker di esempio
-                this.addMarkerAtCoords(L.latLng(41.4334, 14.6194), {
-                    title: "Centro Area",
-                    description: "Punto centrale dell'area di interesse archeologico"
-                });
+                // Carica mappe disponibili e foto
+                await this.loadAvailableMaps();
+                await this.loadAvailablePhotos();
                 
                 console.log('Geographic map initialized successfully');
                 
@@ -244,12 +495,124 @@ document.addEventListener('alpine:init', () => {
             }
         },
         
+        // === GESTIONE MAPPE MULTIPLE ===
+        
+        async loadAvailableMaps() {
+            try {
+                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.availableMaps = data.maps;
+                    
+                    // Seleziona la mappa di default se disponibile
+                    const defaultMap = this.availableMaps.find(m => m.is_default);
+                    if (defaultMap) {
+                        this.selectedMapId = defaultMap.id;
+                        await this.switchMap();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading maps:', error);
+            }
+        },
+        
+        async switchMap() {
+            if (!this.selectedMapId) {
+                this.currentMap = null;
+                this.clearMapData();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}`);
+                if (response.ok) {
+                    this.currentMap = await response.json();
+                    
+                    // Aggiorna bounds mappa
+                    const bounds = [
+                        [this.currentMap.bounds.south, this.currentMap.bounds.west],
+                        [this.currentMap.bounds.north, this.currentMap.bounds.east]
+                    ];
+                    this.map.fitBounds(bounds);
+                    
+                    // Carica dati salvati
+                    this.loadMapLayers();
+                    this.loadMapMarkers();
+                }
+            } catch (error) {
+                console.error('Error switching map:', error);
+            }
+        },
+        
+        async createNewMap() {
+            try {
+                const mapBounds = this.map.getBounds();
+                const center = this.map.getCenter();
+                
+                const mapData = {
+                    name: this.newMap.name,
+                    description: this.newMap.description,
+                    bounds: {
+                        north: mapBounds.getNorth(),
+                        south: mapBounds.getSouth(),
+                        east: mapBounds.getEast(),
+                        west: mapBounds.getWest()
+                    },
+                    center: {
+                        lat: center.lat,
+                        lng: center.lng
+                    },
+                    default_zoom: this.map.getZoom(),
+                    is_default: this.newMap.is_default
+                };
+                
+                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(mapData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    // Ricarica mappe
+                    await this.loadAvailableMaps();
+                    
+                    // Seleziona la nuova mappa
+                    this.selectedMapId = result.map_id;
+                    await this.switchMap();
+                    
+                    // Chiudi modal e reset
+                    this.showCreateMapModal = false;
+                    this.resetNewMap();
+                    
+                } else {
+                    const error = await response.json();
+                    alert('Errore durante la creazione: ' + error.detail);
+                }
+                
+            } catch (error) {
+                console.error('Error creating map:', error);
+                alert('Errore durante la creazione');
+            }
+        },
+        
+        resetNewMap() {
+            this.newMap = {
+                name: '',
+                description: '',
+                is_default: false
+            };
+        },
+        
         // === EVENT HANDLERS ===
         
         handleMapClick(e) {
             if (this.isAddingMarker) {
                 this.addMarkerAtCoords(e.latlng);
-                this.toggleAddMarker(); // Disattiva modalità dopo aver aggiunto
+                this.toggleAddMarker();
             }
         },
         
@@ -275,7 +638,8 @@ document.addEventListener('alpine:init', () => {
                 title: data.title || `Punto ${this.markerCounter}`,
                 description: data.description || `Marker aggiunto alle coordinate ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`,
                 timestamp: data.timestamp || new Date().toISOString(),
-                type: data.type || 'generic'
+                type: data.type || 'generic',
+                photos: data.photos || []
             };
 
             // Crea icona personalizzata
@@ -291,19 +655,8 @@ document.addEventListener('alpine:init', () => {
                 icon: customIcon
             }).addTo(this.markersLayer);
 
-            // Popup con informazioni
-            const popupContent = `
-                <div class="marker-popup">
-                    <h4>${markerData.title}</h4>
-                    <p><strong>ID:</strong> ${markerData.id}</p>
-                    <p><strong>Coordinate:</strong><br>
-                       Lat: ${markerData.lat.toFixed(6)}<br>
-                       Lng: ${markerData.lng.toFixed(6)}</p>
-                    <p><strong>Descrizione:</strong><br>${markerData.description}</p>
-                    <p><strong>Aggiunto:</strong> ${new Date(markerData.timestamp).toLocaleString('it-IT')}</p>
-                </div>
-            `;
-
+            // Popup con informazioni e gestione foto
+            const popupContent = this.createMarkerPopupContent(markerData);
             marker.bindPopup(popupContent);
             
             // Salva riferimento marker
@@ -315,110 +668,704 @@ document.addEventListener('alpine:init', () => {
             return marker;
         },
         
-        removeMarker(markerId) {
-            const markerIndex = this.markers.findIndex(m => m.data.id === markerId);
-            if (markerIndex !== -1) {
-                const marker = this.markers[markerIndex];
-                this.markersLayer.removeLayer(marker.leafletMarker);
-                this.markers.splice(markerIndex, 1);
+        createMarkerPopupContent(markerData) {
+            let photosHtml = '';
+            if (markerData.photos && markerData.photos.length > 0) {
+                photosHtml = `
+                    <div style="margin: 10px 0;">
+                        <strong>Foto Associate (${markerData.photos.length}):</strong>
+                        <div style="display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;">
+                            ${markerData.photos.map(photo => 
+                                `<img src="${photo.thumbnail_url}" alt="${photo.title}" 
+                                      style="width: 40px; height: 30px; object-fit: cover; border-radius: 3px; cursor: pointer;"
+                                      onclick="window.open('${photo.full_url}', '_blank')">`
+                            ).join('')}
+                        </div>
+                    </div>
+                `;
             }
-        },
-        
-        clearAllMarkers() {
-            if (confirm('Sei sicuro di voler rimuovere tutti i marker?')) {
-                this.markersLayer.clearLayers();
-                this.markers = [];
-                this.markerCounter = 0;
-            }
-        },
-        
-        centerMapOnMarker(marker) {
-            this.map.setView([marker.data.lat, marker.data.lng], 18);
-            marker.leafletMarker.openPopup();
-        },
-        
-        // === EXPORT/IMPORT ===
-        
-        exportMarkers() {
-            const data = this.markers.map(marker => marker.data);
             
-            const exportData = {
-                site_id: "{{ site.id if site else 'unknown' }}",
-                export_date: new Date().toISOString(),
-                total_markers: data.length,
-                bounds: {
-                    north: 41.43582073892966,
-                    south: 41.431069139716755,
-                    east: 14.625093525136856,
-                    west: 14.613550167117397
-                },
-                markers: data
-            };
-
-            // Download come file JSON
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `mappa_geografica_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            return `
+                <div class="marker-popup">
+                    <h4>${markerData.title}</h4>
+                    <p><strong>ID:</strong> ${markerData.id}</p>
+                    <p><strong>Coordinate:</strong><br>
+                       Lat: ${markerData.lat.toFixed(6)}<br>
+                       Lng: ${markerData.lng.toFixed(6)}</p>
+                    <p><strong>Descrizione:</strong><br>${markerData.description}</p>
+                    <p><strong>Aggiunto:</strong> ${new Date(markerData.timestamp).toLocaleString('it-IT')}</p>
+                    ${photosHtml}
+                    <div style="margin-top: 10px;">
+                        <button onclick="window.geographicMapManager.selectMarkerForPhotos('${markerData.id}')" 
+                                style="background: #3b82f6; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-right: 5px;">
+                            📷 Gestisci Foto
+                        </button>
+                    </div>
+                </div>
+            `;
         },
         
-        async loadDataFromServer() {
+        selectMarkerForPhotos(markerId) {
+            const marker = this.markers.find(m => m.data.id == markerId);
+            if (marker) {
+                this.selectedMarkerForPhotos = marker.data;
+                this.showPhotosSidebar = true;
+                this.selectedPhotos = [];
+            }
+        },
+        
+        // === GESTIONE FOTO ===
+        
+        async loadAvailablePhotos() {
             try {
-                const siteId = "{{ site.id if site else 'ab0a8d00-3bdf-4978-98db-b6ec91b4004e' }}";
-                const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans`);
-                
+                const response = await fetch(`/api/geographic-maps/sites/${siteId}/photos?limit=100`);
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('Dati ricevuti dal server:', data);
-                    
-                    if (data.plans && data.plans.length > 0) {
-                        data.plans.forEach((plan, index) => {
-                            // Esempio: se il piano ha coordinate geografiche
-                            if (plan.geographic_coords) {
-                                this.addMarkerAtCoords(
-                                    L.latLng(plan.geographic_coords.lat, plan.geographic_coords.lng),
-                                    {
-                                        id: plan.id,
-                                        title: plan.name,
-                                        description: plan.description || 'Piano archeologico',
-                                        type: 'archaeological_plan'
-                                    }
-                                );
-                            }
-                        });
-                    } else {
-                        alert('Nessun dato trovato sul server');
-                    }
-                } else {
-                    throw new Error('Errore nel caricamento dati');
+                    this.availablePhotos = data.photos;
                 }
             } catch (error) {
-                console.error('Errore nel caricamento:', error);
-                
-                // Dati di esempio per test
-                const sampleData = [
-                    {lat: 41.432, lng: 14.620, title: "Punto A", description: "Esempio punto archeologico A"},
-                    {lat: 41.434, lng: 14.618, title: "Punto B", description: "Esempio punto archeologico B"},
-                    {lat: 41.433, lng: 14.622, title: "Punto C", description: "Esempio punto archeologico C"}
-                ];
-                
-                sampleData.forEach(point => {
-                    this.addMarkerAtCoords(L.latLng(point.lat, point.lng), point);
+                console.error('Error loading photos:', error);
+            }
+        },
+        
+        searchPhotos() {
+            // TODO: Implementare ricerca foto con debounce
+            console.log('Searching photos:', this.photoSearchQuery);
+        },
+        
+        togglePhotoSelection(photo) {
+            const index = this.selectedPhotos.findIndex(p => p.id === photo.id);
+            if (index >= 0) {
+                this.selectedPhotos.splice(index, 1);
+            } else {
+                this.selectedPhotos.push(photo);
+            }
+        },
+        
+        isPhotoSelected(photoId) {
+            return this.selectedPhotos.some(p => p.id === photoId);
+        },
+        
+        async associatePhotosToMarker() {
+            if (!this.selectedMarkerForPhotos || this.selectedPhotos.length === 0) return;
+            
+            try {
+                const photoIds = this.selectedPhotos.map(p => p.id);
+                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/markers/${this.selectedMarkerForPhotos.id}/photos`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(photoIds)
                 });
                 
-                alert('Server non disponibile. Caricati dati di esempio.');
+                if (response.ok) {
+                    // Aggiorna marker con foto associate
+                    this.selectedMarkerForPhotos.photos = [...this.selectedPhotos];
+                    
+                    // Aggiorna popup
+                    const marker = this.markers.find(m => m.data.id === this.selectedMarkerForPhotos.id);
+                    if (marker) {
+                        marker.data.photos = [...this.selectedPhotos];
+                        const popupContent = this.createMarkerPopupContent(marker.data);
+                        marker.leafletMarker.bindPopup(popupContent);
+                    }
+                    
+                    // Reset selezione
+                    this.selectedPhotos = [];
+                    alert(`Associate ${photoIds.length} foto al marker`);
+                    
+                } else {
+                    const error = await response.json();
+                    alert('Errore associazione foto: ' + error.detail);
+                }
+                
+            } catch (error) {
+                console.error('Error associating photos:', error);
+                alert('Errore durante l\'associazione foto');
             }
+        },
+        
+        // === GESTIONE GEOJSON LAYERS ===
+        
+        async loadGeoJSONFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            try {
+                let text = await file.text();
+                
+                // Pulisci il contenuto da prefissi JavaScript come "var json_Nome = "
+                text = this.cleanJsonContent(text);
+                
+                const geojsonData = JSON.parse(text);
+                
+                if (geojsonData.type !== 'FeatureCollection') {
+                    alert('Il file deve essere una FeatureCollection GeoJSON');
+                    return;
+                }
+                
+                await this.addGeoJSONLayer(geojsonData, file.name);
+                
+                // Reset input
+                event.target.value = '';
+                
+            } catch (error) {
+                console.error('Errore caricamento GeoJSON:', error);
+                alert('Errore nel caricamento del file GeoJSON. Verifica che sia un file JSON valido.');
+            }
+        },
+        
+        cleanJsonContent(text) {
+            // Rimuovi spazi bianchi all'inizio e alla fine
+            text = text.trim();
+            
+            // Cerca pattern come "var json_Nome = " o "const json_Nome = " all'inizio
+            const jsVarPattern = /^(var|const|let)\s+\w+\s*=\s*/;
+            if (jsVarPattern.test(text)) {
+                text = text.replace(jsVarPattern, '');
+            }
+            
+            // Rimuovi punto e virgola finale se presente
+            if (text.endsWith(';')) {
+                text = text.slice(0, -1);
+            }
+            
+            return text.trim();
+        },
+        
+        async addGeoJSONLayer(geojsonData, fileName) {
+            this.layerCounter++;
+            
+            const layerInfo = {
+                id: this.layerCounter,
+                name: fileName.replace(/\.[^/.]+$/, ""), // Remove extension
+                type: geojsonData.type,
+                features: geojsonData.features.length,
+                visible: true,
+                data: geojsonData
+            };
+            
+            // Create Leaflet layer
+            const leafletLayer = L.geoJSON(geojsonData, {
+                style: this.getFeatureStyle,
+                pointToLayer: this.createCustomMarker.bind(this),
+                onEachFeature: this.bindFeaturePopup.bind(this)
+            }).addTo(this.map);
+            
+            layerInfo.leafletLayer = leafletLayer;
+            layerInfo.bounds = leafletLayer.getBounds();
+            
+            this.geojsonLayers.push(layerInfo);
+            
+            // Fit map to new layer
+            if (layerInfo.bounds.isValid()) {
+                this.map.fitBounds(layerInfo.bounds);
+            }
+            
+            console.log('Layer GeoJSON aggiunto:', layerInfo);
+        },
+        
+        getFeatureStyle(feature) {
+            return {
+                color: '#3388ff',
+                weight: 2,
+                opacity: 0.8,
+                fillColor: '#3388ff',
+                fillOpacity: 0.2
+            };
+        },
+        
+        createCustomMarker(feature, latlng) {
+            // Custom icon based on properties
+            const props = feature.properties;
+            let icon = '📍';
+            let color = '#3388ff';
+            
+            // Check for layer name or feature properties
+            const layerName = this.geojsonLayers[this.geojsonLayers.length - 1]?.name?.toLowerCase() || '';
+            const featureName = (props.Name || props.name || '').toLowerCase();
+            const notes = (props.Note || props.Notes || props.note || props.notes || '').toLowerCase();
+            
+            // Water meter detection
+            if (layerName.includes('contatori') || layerName.includes('acqua') || 
+                featureName.includes('contatore') || notes.includes('contatore')) {
+                icon = '💧';
+                color = '#0ea5e9';
+            }
+            // Museum detection
+            else if (featureName.includes('museo')) {
+                icon = '🏛️';
+                color = '#8b5a2b';
+            }
+            // Theater detection
+            else if (featureName.includes('teatro')) {
+                icon = '🎭';
+                color = '#dc2626';
+            }
+            // Bathroom/WC detection
+            else if (featureName.includes('bagni') || featureName.includes('wc')) {
+                icon = '🚽';
+                color = '#059669';
+            }
+            // House detection
+            else if (featureName.includes('casa') || props['N. casa'] || props.N_casa) {
+                icon = '🏠';
+                color = '#d97706';
+            }
+            
+            const customIcon = L.divIcon({
+                className: 'custom-geojson-marker',
+                html: `<div style="background: ${color}; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${icon}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            return L.marker(latlng, { icon: customIcon });
+        },
+        
+        bindFeaturePopup(feature, layer) {
+            const props = feature.properties;
+            let popupContent = '<div class="geojson-popup" style="max-width: 400px;">';
+            
+            // Title
+            const title = props.Name || props.name || props.title || 'Feature';
+            popupContent += `<h4 style="margin: 0 0 10px 0; color: #2c5aa0; font-size: 16px;">${title}</h4>`;
+            
+            // Coordinates
+            if (feature.geometry.type === 'Point') {
+                const coords = feature.geometry.coordinates;
+                popupContent += `<p><strong>Coordinate:</strong><br>Lat: ${coords[1].toFixed(6)}<br>Lng: ${coords[0].toFixed(6)}</p>`;
+            }
+            
+            // Description with images
+            if (props.description) {
+                popupContent += `<div style="margin: 10px 0;">${props.description}</div>`;
+            }
+            
+            // Other properties (excluding technical ones)
+            const excludeProps = ['description', 'Name', 'name', 'title', 'fid', 'timestamp', 'begin', 'end', 'altitudeMode', 'tessellate', 'extrude', 'visibility', 'drawOrder', 'icon', 'gx_media_links', 'auxiliary_storage_callouts_originx', 'auxiliary_storage_callouts_originy', 'auxiliary_storage_callouts_destinationx', 'auxiliary_storage_callouts_destinationy'];
+            
+            for (const [key, value] of Object.entries(props)) {
+                if (!excludeProps.includes(key) && value !== null && value !== undefined && value !== '' && value !== -1) {
+                    popupContent += `<p style="margin: 3px 0; font-size: 14px;"><strong>${key}:</strong> ${value}</p>`;
+                }
+            }
+            
+            popupContent += '</div>';
+            
+            layer.bindPopup(popupContent, {
+                maxWidth: 400,
+                maxHeight: 300
+            });
+        },
+        
+        // === LAYER CONTROLS ===
+        
+        toggleLayer(layer) {
+            if (layer.visible) {
+                this.map.addLayer(layer.leafletLayer);
+            } else {
+                this.map.removeLayer(layer.leafletLayer);
+            }
+        },
+        
+        fitLayerBounds(layer) {
+            if (layer.bounds && layer.bounds.isValid()) {
+                this.map.fitBounds(layer.bounds);
+            }
+        },
+        
+        removeLayer(layerId) {
+            const layerIndex = this.geojsonLayers.findIndex(l => l.id === layerId);
+            if (layerIndex !== -1) {
+                const layer = this.geojsonLayers[layerIndex];
+                this.map.removeLayer(layer.leafletLayer);
+                this.geojsonLayers.splice(layerIndex, 1);
+            }
+        },
+        
+        toggleManualMarkers() {
+            if (this.showManualMarkers) {
+                this.map.addLayer(this.markersLayer);
+            } else {
+                this.map.removeLayer(this.markersLayer);
+            }
+        },
+        
+        // === SALVATAGGIO/CARICAMENTO SERVER ===
+        
+        async saveMapToServer() {
+            if (!this.selectedMapId) {
+                alert('Seleziona prima una mappa');
+                return;
+            }
+            
+            try {
+                // Salva layer GeoJSON
+                for (const layer of this.geojsonLayers) {
+                    const layerData = {
+                        name: layer.name,
+                        layer_type: 'geojson',
+                        geojson_data: layer.data,
+                        is_visible: layer.visible
+                    };
+                    
+                    await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/layers`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(layerData)
+                    });
+                }
+                
+                // Salva marker manuali
+                for (const marker of this.markers) {
+                    const markerData = {
+                        latitude: marker.data.lat,
+                        longitude: marker.data.lng,
+                        title: marker.data.title,
+                        description: marker.data.description,
+                        marker_type: marker.data.type
+                    };
+                    
+                    await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/markers`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(markerData)
+                    });
+                }
+                
+                alert('Mappa salvata con successo sul server!');
+                
+            } catch (error) {
+                console.error('Error saving map:', error);
+                alert('Errore durante il salvataggio');
+            }
+        },
+        
+        loadMapLayers() {
+            // TODO: Carica layer dal server
+            console.log('Loading layers for map:', this.selectedMapId);
+        },
+        
+        loadMapMarkers() {
+            // TODO: Carica marker dal server
+            console.log('Loading markers for map:', this.selectedMapId);
+        },
+        
+        clearMapData() {
+            // Pulisci mappa
+            this.markersLayer.clearLayers();
+            this.markers = [];
+            this.markerCounter = 0;
+            
+            this.geojsonLayers.forEach(layer => {
+                this.map.removeLayer(layer.leafletLayer);
+            });
+            this.geojsonLayers = [];
+            this.layerCounter = 0;
         }
     }));
 });
 
 // Set global site ID for JavaScript
-siteId = '{{ site.id }}';
+let siteId = '{{ site.id }}';
+
+// Expose to global scope for popup callbacks
+window.geographicMapManager = null;
+document.addEventListener('alpine:init', () => {
+    // Wait a bit for component to initialize
+    setTimeout(() => {
+        const element = document.querySelector('[x-data="geographicMapManager"]');
+        if (element && element._x_dataStack) {
+            window.geographicMapManager = element._x_dataStack[0];
+        }
+    }, 100);
+});
+
+if (geojsonData.type !== 'FeatureCollection') {
+                    alert('Il file deve essere una FeatureCollection GeoJSON');
+                    return;
+                }
+                
+                await this.addGeoJSONLayer(geojsonData, file.name);
+                
+                // Reset input
+                event.target.value = '';
+                
+            } catch (error) {
+                console.error('Errore caricamento GeoJSON:', error);
+                alert('Errore nel caricamento del file GeoJSON. Verifica che sia un file JSON valido.');
+            }
+        },
+        
+        cleanJsonContent(text) {
+            // Rimuovi spazi bianchi all'inizio e alla fine
+            text = text.trim();
+            
+            // Cerca pattern come "var json_Nome = " o "const json_Nome = " all'inizio
+            const jsVarPattern = /^(var|const|let)\s+\w+\s*=\s*/;
+            if (jsVarPattern.test(text)) {
+                text = text.replace(jsVarPattern, '');
+            }
+            
+            // Rimuovi punto e virgola finale se presente
+            if (text.endsWith(';')) {
+                text = text.slice(0, -1);
+            }
+            
+            return text.trim();
+        },
+        
+        async addGeoJSONLayer(geojsonData, fileName) {
+            this.layerCounter++;
+            
+            const layerInfo = {
+                id: this.layerCounter,
+                name: fileName.replace(/\.[^/.]+$/, ""), // Remove extension
+                type: geojsonData.type,
+                features: geojsonData.features.length,
+                visible: true,
+                data: geojsonData
+            };
+            
+            // Create Leaflet layer
+            const leafletLayer = L.geoJSON(geojsonData, {
+                style: this.getFeatureStyle,
+                pointToLayer: this.createCustomMarker.bind(this),
+                onEachFeature: this.bindFeaturePopup.bind(this)
+            }).addTo(this.map);
+            
+            layerInfo.leafletLayer = leafletLayer;
+            layerInfo.bounds = leafletLayer.getBounds();
+            
+            this.geojsonLayers.push(layerInfo);
+            
+            // Fit map to new layer
+            if (layerInfo.bounds.isValid()) {
+                this.map.fitBounds(layerInfo.bounds);
+            }
+            
+            console.log('Layer GeoJSON aggiunto:', layerInfo);
+        },
+        
+        getFeatureStyle(feature) {
+            return {
+                color: '#3388ff',
+                weight: 2,
+                opacity: 0.8,
+                fillColor: '#3388ff',
+                fillOpacity: 0.2
+            };
+        },
+        
+        createCustomMarker(feature, latlng) {
+            // Custom icon based on properties
+            const props = feature.properties;
+            let icon = '📍';
+            let color = '#3388ff';
+            
+            // Check for layer name or feature properties
+            const layerName = this.geojsonLayers[this.geojsonLayers.length - 1]?.name?.toLowerCase() || '';
+            const featureName = (props.Name || props.name || '').toLowerCase();
+            const notes = (props.Note || props.Notes || props.note || props.notes || '').toLowerCase();
+            
+            // Water meter detection
+            if (layerName.includes('contatori') || layerName.includes('acqua') || 
+                featureName.includes('contatore') || notes.includes('contatore')) {
+                icon = '💧';
+                color = '#0ea5e9';
+            }
+            // Museum detection
+            else if (featureName.includes('museo')) {
+                icon = '🏛️';
+                color = '#8b5a2b';
+            }
+            // Theater detection
+            else if (featureName.includes('teatro')) {
+                icon = '🎭';
+                color = '#dc2626';
+            }
+            // Bathroom/WC detection
+            else if (featureName.includes('bagni') || featureName.includes('wc')) {
+                icon = '🚽';
+                color = '#059669';
+            }
+            // House detection
+            else if (featureName.includes('casa') || props['N. casa'] || props.N_casa) {
+                icon = '🏠';
+                color = '#d97706';
+            }
+            
+            const customIcon = L.divIcon({
+                className: 'custom-geojson-marker',
+                html: `<div style="background: ${color}; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${icon}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            return L.marker(latlng, { icon: customIcon });
+        },
+        
+        bindFeaturePopup(feature, layer) {
+            const props = feature.properties;
+            let popupContent = '<div class="geojson-popup" style="max-width: 400px;">';
+            
+            // Title
+            const title = props.Name || props.name || props.title || 'Feature';
+            popupContent += `<h4 style="margin: 0 0 10px 0; color: #2c5aa0; font-size: 16px;">${title}</h4>`;
+            
+            // Coordinates
+            if (feature.geometry.type === 'Point') {
+                const coords = feature.geometry.coordinates;
+                popupContent += `<p><strong>Coordinate:</strong><br>Lat: ${coords[1].toFixed(6)}<br>Lng: ${coords[0].toFixed(6)}</p>`;
+            }
+            
+            // Description with images
+            if (props.description) {
+                popupContent += `<div style="margin: 10px 0;">${props.description}</div>`;
+            }
+            
+            // Other properties (excluding technical ones)
+            const excludeProps = ['description', 'Name', 'name', 'title', 'fid', 'timestamp', 'begin', 'end', 'altitudeMode', 'tessellate', 'extrude', 'visibility', 'drawOrder', 'icon', 'gx_media_links', 'auxiliary_storage_callouts_originx', 'auxiliary_storage_callouts_originy', 'auxiliary_storage_callouts_destinationx', 'auxiliary_storage_callouts_destinationy'];
+            
+            for (const [key, value] of Object.entries(props)) {
+                if (!excludeProps.includes(key) && value !== null && value !== undefined && value !== '' && value !== -1) {
+                    popupContent += `<p style="margin: 3px 0; font-size: 14px;"><strong>${key}:</strong> ${value}</p>`;
+                }
+            }
+            
+            popupContent += '</div>';
+            
+            layer.bindPopup(popupContent, {
+                maxWidth: 400,
+                maxHeight: 300
+            });
+        },
+        
+        // === LAYER CONTROLS ===
+        
+        toggleLayer(layer) {
+            if (layer.visible) {
+                this.map.addLayer(layer.leafletLayer);
+            } else {
+                this.map.removeLayer(layer.leafletLayer);
+            }
+        },
+        
+        fitLayerBounds(layer) {
+            if (layer.bounds && layer.bounds.isValid()) {
+                this.map.fitBounds(layer.bounds);
+            }
+        },
+        
+        removeLayer(layerId) {
+            const layerIndex = this.geojsonLayers.findIndex(l => l.id === layerId);
+            if (layerIndex !== -1) {
+                const layer = this.geojsonLayers[layerIndex];
+                this.map.removeLayer(layer.leafletLayer);
+                this.geojsonLayers.splice(layerIndex, 1);
+            }
+        },
+        
+        toggleManualMarkers() {
+            if (this.showManualMarkers) {
+                this.map.addLayer(this.markersLayer);
+            } else {
+                this.map.removeLayer(this.markersLayer);
+            }
+        },
+        
+        // === SALVATAGGIO/CARICAMENTO SERVER ===
+        
+        async saveMapToServer() {
+            if (!this.selectedMapId) {
+                alert('Seleziona prima una mappa');
+                return;
+            }
+            
+            try {
+                // Salva layer GeoJSON
+                for (const layer of this.geojsonLayers) {
+                    const layerData = {
+                        name: layer.name,
+                        layer_type: 'geojson',
+                        geojson_data: layer.data,
+                        is_visible: layer.visible
+                    };
+                    
+                    await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/layers`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(layerData)
+                    });
+                }
+                
+                // Salva marker manuali
+                for (const marker of this.markers) {
+                    const markerData = {
+                        latitude: marker.data.lat,
+                        longitude: marker.data.lng,
+                        title: marker.data.title,
+                        description: marker.data.description,
+                        marker_type: marker.data.type
+                    };
+                    
+                    await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/markers`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(markerData)
+                    });
+                }
+                
+                alert('Mappa salvata con successo sul server!');
+                
+            } catch (error) {
+                console.error('Error saving map:', error);
+                alert('Errore durante il salvataggio');
+            }
+        },
+        
+        loadMapLayers() {
+            // TODO: Carica layer dal server
+            console.log('Loading layers for map:', this.selectedMapId);
+        },
+        
+        loadMapMarkers() {
+            // TODO: Carica marker dal server
+            console.log('Loading markers for map:', this.selectedMapId);
+        },
+        
+        clearMapData() {
+            // Pulisci mappa
+            this.markersLayer.clearLayers();
+            this.markers = [];
+            this.markerCounter = 0;
+            
+            this.geojsonLayers.forEach(layer => {
+                this.map.removeLayer(layer.leafletLayer);
+            });
+            this.geojsonLayers = [];
+            this.layerCounter = 0;
+        }
+    }));
+});
+
+// Set global site ID for JavaScript
+let siteId = '{{ site.id }}';
+
+// Expose to global scope for popup callbacks
+window.geographicMapManager = null;
+document.addEventListener('alpine:init', () => {
+    // Wait a bit for component to initialize
+    setTimeout(() => {
+        const element = document.querySelector('[x-data="geographicMapManager"]');
+        if (element && element._x_dataStack) {
+            window.geographicMapManager = element._x_dataStack[0];
+        }
+    }, 100);
+});
 </script>
 
 {% endblock %}
+
