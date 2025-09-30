@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mappa Geografica - {{ site.name if site else 'Sito Archeologico' }}</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Custom CSS -->
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #2c5aa0;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .controls {
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .controls button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 0 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .controls button:hover {
+            background: #0056b3;
+        }
+        
+        .controls button.active {
+            background: #28a745;
+        }
+        
+        #map {
+            width: 100%;
+            height: 600px;
+        }
+        
+        .info-panel {
+            padding: 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .marker-popup {
+            font-family: Arial, sans-serif;
+        }
+        
+        .marker-popup h4 {
+            margin: 0 0 10px 0;
+            color: #2c5aa0;
+        }
+        
+        .marker-popup p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ Mappa Geografica del Sito</h1>
+            <p>Visualizzazione con coordinate geografiche (Lat/Lng)</p>
+        </div>
+        
+        <div class="controls">
+            <button id="addMarkerBtn">📍 Aggiungi Marker</button>
+            <button id="clearMarkersBtn">🗑️ Pulisci Markers</button>
+            <button id="exportDataBtn">📊 Esporta Dati</button>
+            <button id="loadDataBtn">🔄 Carica Dati dal Server</button>
+            <span style="margin-left: 20px;">
+                <strong>Markers totali:</strong> <span id="markerCount">0</span>
+            </span>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="info-panel">
+            <p><strong>Istruzioni:</strong></p>
+            <ul>
+                <li>Clicca su "Aggiungi Marker" e poi clicca sulla mappa per aggiungere un punto</li>
+                <li>Clicca sui marker esistenti per vedere le informazioni</li>
+                <li>Usa i controlli zoom (+/-) per navigare nella mappa</li>
+                <li>Le coordinate vengono mostrate automaticamente per ogni punto</li>
+            </ul>
+            <p><strong>Coordinate area:</strong> Lat: 41.431-41.436, Lng: 14.614-14.625 (zona Pompei)</p>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script>
+        // Inizializza la mappa con le coordinate fornite
+        var map = L.map('map', {
+            zoomControl: false,
+            maxZoom: 28,
+            minZoom: 1
+        }).fitBounds([
+            [41.431069139716755, 14.613550167117397],
+            [41.43582073892966, 14.625093525136856]
+        ]);
+
+        // Aggiungi controlli zoom personalizzati
+        L.control.zoom({
+            position: 'topright'
+        }).addTo(map);
+
+        // Aggiungi layer di base OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Layer per i marker
+        var markersLayer = L.layerGroup().addTo(map);
+        var markers = [];
+        var isAddingMarker = false;
+        var markerCounter = 0;
+
+        // Elementi DOM
+        var addMarkerBtn = document.getElementById('addMarkerBtn');
+        var clearMarkersBtn = document.getElementById('clearMarkersBtn');
+        var exportDataBtn = document.getElementById('exportDataBtn');
+        var loadDataBtn = document.getElementById('loadDataBtn');
+        var markerCountSpan = document.getElementById('markerCount');
+
+        // Event listeners
+        addMarkerBtn.addEventListener('click', toggleAddMarker);
+        clearMarkersBtn.addEventListener('click', clearAllMarkers);
+        exportDataBtn.addEventListener('click', exportMarkers);
+        loadDataBtn.addEventListener('click', loadDataFromServer);
+
+        // Funzione per attivare/disattivare modalità aggiunta marker
+        function toggleAddMarker() {
+            isAddingMarker = !isAddingMarker;
+            
+            if (isAddingMarker) {
+                addMarkerBtn.textContent = '⏹️ Annulla Aggiunta';
+                addMarkerBtn.classList.add('active');
+                map.getContainer().style.cursor = 'crosshair';
+            } else {
+                addMarkerBtn.textContent = '📍 Aggiungi Marker';
+                addMarkerBtn.classList.remove('active');
+                map.getContainer().style.cursor = '';
+            }
+        }
+
+        // Event listener per click sulla mappa
+        map.on('click', function(e) {
+            if (isAddingMarker) {
+                addMarkerAtCoords(e.latlng);
+                toggleAddMarker(); // Disattiva modalità dopo aver aggiunto
+            }
+        });
+
+        // Funzione per aggiungere marker alle coordinate
+        function addMarkerAtCoords(latlng, data = {}) {
+            markerCounter++;
+            
+            var markerData = {
+                id: data.id || markerCounter,
+                lat: latlng.lat,
+                lng: latlng.lng,
+                title: data.title || `Punto ${markerCounter}`,
+                description: data.description || `Marker aggiunto alle coordinate ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`,
+                timestamp: data.timestamp || new Date().toISOString(),
+                type: data.type || 'generic'
+            };
+
+            // Crea icona personalizzata
+            var customIcon = L.divIcon({
+                className: 'custom-marker',
+                html: '<div style="background: #007bff; color: white; border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">' + markerData.id + '</div>',
+                iconSize: [25, 25],
+                iconAnchor: [12, 12]
+            });
+
+            // Crea marker
+            var marker = L.marker([latlng.lat, latlng.lng], {
+                icon: customIcon
+            }).addTo(markersLayer);
+
+            // Popup con informazioni
+            var popupContent = `
+                <div class="marker-popup">
+                    <h4>${markerData.title}</h4>
+                    <p><strong>ID:</strong> ${markerData.id}</p>
+                    <p><strong>Coordinate:</strong><br>
+                       Lat: ${markerData.lat.toFixed(6)}<br>
+                       Lng: ${markerData.lng.toFixed(6)}</p>
+                    <p><strong>Descrizione:</strong><br>${markerData.description}</p>
+                    <p><strong>Aggiunto:</strong> ${new Date(markerData.timestamp).toLocaleString('it-IT')}</p>
+                    <button onclick="removeMarker(${markerData.id})" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-top: 10px;">🗑️ Rimuovi</button>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent);
+            
+            // Salva riferimento marker
+            marker.markerData = markerData;
+            markers.push(marker);
+            
+            updateMarkerCount();
+            
+            return marker;
+        }
+
+        // Funzione per rimuovere marker
+        function removeMarker(markerId) {
+            var markerIndex = markers.findIndex(m => m.markerData.id === markerId);
+            if (markerIndex !== -1) {
+                var marker = markers[markerIndex];
+                markersLayer.removeLayer(marker);
+                markers.splice(markerIndex, 1);
+                updateMarkerCount();
+            }
+        }
+
+        // Funzione per pulire tutti i marker
+        function clearAllMarkers() {
+            if (confirm('Sei sicuro di voler rimuovere tutti i marker?')) {
+                markersLayer.clearLayers();
+                markers = [];
+                markerCounter = 0;
+                updateMarkerCount();
+            }
+        }
+
+        // Funzione per aggiornare contatore marker
+        function updateMarkerCount() {
+            markerCountSpan.textContent = markers.length;
+        }
+
+        // Funzione per esportare dati marker
+        function exportMarkers() {
+            var data = markers.map(marker => marker.markerData);
+            
+            var exportData = {
+                site_id: "{{ site.id if site else 'unknown' }}",
+                export_date: new Date().toISOString(),
+                total_markers: data.length,
+                bounds: {
+                    north: 41.43582073892966,
+                    south: 41.431069139716755,
+                    east: 14.625093525136856,
+                    west: 14.613550167117397
+                },
+                markers: data
+            };
+
+            // Download come file JSON
+            var blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = `mappa_punti_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Funzione per caricare dati dal server
+        async function loadDataFromServer() {
+            try {
+                // Sostituisci con l'endpoint effettivo quando il server è attivo
+                const siteId = "{{ site.id if site else 'ab0a8d00-3bdf-4978-98db-b6ec91b4004e' }}";
+                const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Dati ricevuti dal server:', data);
+                    
+                    // Se ci sono piani con coordinate geografiche, aggiungili alla mappa
+                    if (data.plans && data.plans.length > 0) {
+                        data.plans.forEach((plan, index) => {
+                            // Esempio: se il piano ha coordinate geografiche
+                            if (plan.geographic_coords) {
+                                addMarkerAtCoords(
+                                    L.latLng(plan.geographic_coords.lat, plan.geographic_coords.lng),
+                                    {
+                                        id: plan.id,
+                                        title: plan.name,
+                                        description: plan.description || 'Piano archeologico',
+                                        type: 'archaeological_plan'
+                                    }
+                                );
+                            }
+                        });
+                    } else {
+                        alert('Nessun dato trovato sul server');
+                    }
+                } else {
+                    throw new Error('Errore nel caricamento dati');
+                }
+            } catch (error) {
+                console.error('Errore nel caricamento:', error);
+                
+                // Dati di esempio per test
+                var sampleData = [
+                    {lat: 41.432, lng: 14.620, title: "Punto A", description: "Esempio punto archeologico A"},
+                    {lat: 41.434, lng: 14.618, title: "Punto B", description: "Esempio punto archeologico B"},
+                    {lat: 41.433, lng: 14.622, title: "Punto C", description: "Esempio punto archeologico C"}
+                ];
+                
+                sampleData.forEach(point => {
+                    addMarkerAtCoords(L.latLng(point.lat, point.lng), point);
+                });
+                
+                alert('Server non disponibile. Caricati dati di esempio.');
+            }
+        }
+
+        // Aggiungi alcuni marker di esempio all'avvio
+        window.addEventListener('load', function() {
+            // Marker centro dell'area
+            addMarkerAtCoords(L.latLng(41.4334, 14.6194), {
+                title: "Centro Area",
+                description: "Punto centrale dell'area di interesse archeologico"
+            });
+        });
+
+        // Esponi funzione removeMarker globalmente per i popup
+        window.removeMarker = removeMarker;
+    </script>
+</body>
+</html>

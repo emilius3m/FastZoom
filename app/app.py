@@ -64,6 +64,13 @@ except ImportError:
     logger.warning("User view route not found")
     USER_ROUTE_EXISTS = False
 
+try:
+    from app.routes.view.geographic_map import geographic_map_router
+    GEOGRAPHIC_MAP_ROUTE_EXISTS = True
+except ImportError:
+    logger.warning("Geographic map view route not found")
+    GEOGRAPHIC_MAP_ROUTE_EXISTS = False
+
 # Configurazione
 settings = get_settings()
 app = FastAPI(
@@ -135,6 +142,12 @@ if UPLOAD_ROUTE_EXISTS:
     app.include_router(upload_view_route, tags=["Pages", "Upload"])
 if USER_ROUTE_EXISTS:
     app.include_router(user_view_route, tags=["Pages", "User Management"])
+if GEOGRAPHIC_MAP_ROUTE_EXISTS:
+    app.include_router(
+        geographic_map_router,
+        tags=["Pages", "Geographic Map"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
 
 # Route principali
 @app.get("/")

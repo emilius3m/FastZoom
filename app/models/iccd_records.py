@@ -37,7 +37,7 @@ class ICCDBaseRecord(Base):
     # Metadati gestione
     created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     status: Mapped[str] = mapped_column(String(20), default='draft')  # draft, validated, published
     
     # Relazioni

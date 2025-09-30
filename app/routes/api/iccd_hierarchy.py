@@ -69,24 +69,24 @@ async def get_iccd_hierarchy(
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
     
-    # Query gerarchica per tutti i tipi di scheda
+    # Query gerarchica per tutti i tipi di scheda (SQLite compatible)
     hierarchy_query = """
     WITH RECURSIVE hierarchy AS (
         -- Radice: Schede SI (sito)
-        SELECT 
+        SELECT
             r.id, r.schema_type, r.nct_region, r.nct_number, r.nct_suffix,
             r.iccd_data, r.parent_id, r.site_id, 0 as level,
-            ARRAY[r.id] as path
-        FROM iccd_base_records r 
+            r.id as path
+        FROM iccd_base_records r
         WHERE r.site_id = :site_id AND r.schema_type = 'SI'
         
         UNION ALL
         
         -- Ricorsiva: tutti i figli
-        SELECT 
+        SELECT
             r.id, r.schema_type, r.nct_region, r.nct_number, r.nct_suffix,
             r.iccd_data, r.parent_id, r.site_id, h.level + 1,
-            h.path || r.id
+            h.path || ',' || r.id
         FROM iccd_base_records r
         INNER JOIN hierarchy h ON r.parent_id = h.id
         WHERE r.site_id = :site_id
@@ -94,7 +94,7 @@ async def get_iccd_hierarchy(
     SELECT * FROM hierarchy ORDER BY level, schema_type, nct_number;
     """
     
-    result = await db.execute(text(hierarchy_query), {"site_id": site_id})
+    result = await db.execute(text(hierarchy_query), {"site_id": str(site_id)})
     records = result.fetchall()
     
     # Organizza per livelli ICCD
@@ -167,8 +167,8 @@ async def create_iccd_record(
             nct_suffix=record_data.get('nct_suffix'),
             schema_type=record_data['schema_type'],
             iccd_data=record_data['data'],
-            parent_id=record_data.get('parent_id'),
-            site_id=record_data['site_id'],
+            parent_id=UUID(record_data['parent_id']) if record_data.get('parent_id') else None,
+            site_id=UUID(record_data['site_id']),
             created_by=current_user_id
         )
         
