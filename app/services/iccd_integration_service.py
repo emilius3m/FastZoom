@@ -10,7 +10,40 @@ from loguru import logger
 
 from app.models.iccd_records import ICCDSchemaTemplate
 from app.models.form_schemas import FormSchema
-from app.data.iccd_templates_fixed import ICCD_TEMPLATES, get_template_by_type
+from app.data.iccd_templates import SCHEMA_SI_300, SCHEMA_RA_300, SCHEMA_CA_300
+
+
+# Template mapping based on complete schemas
+ICCD_TEMPLATES = {
+    "SI": {
+        "name": "ICCD SI 3.00 - Siti Archeologici",
+        "description": "Schema standard ICCD per catalogazione siti archeologici (v. 3.00) - COMPLETO 24 paragrafi",
+        "category": "siti_archeologici",
+        "icon": "🗺️",
+        "schema": SCHEMA_SI_300["schema"],
+        "ui_schema": SCHEMA_SI_300["ui_schema"]
+    },
+    "RA": {
+        "name": "ICCD RA 3.00 - Reperti Archeologici",
+        "description": "Schema standard ICCD per catalogazione reperti archeologici (v. 3.00) - COMPLETO 21 paragrafi",
+        "category": "reperti_archeologici",
+        "icon": "🏺",
+        "schema": SCHEMA_RA_300["schema"],
+        "ui_schema": SCHEMA_RA_300["ui_schema"]
+    },
+    "CA": {
+        "name": "ICCD CA 3.00 - Complessi Archeologici",
+        "description": "Schema standard ICCD per catalogazione complessi archeologici (v. 3.00) - COMPLETO 23 paragrafi",
+        "category": "complessi_archeologici",
+        "icon": "🏛️",
+        "schema": SCHEMA_CA_300["schema"],
+        "ui_schema": SCHEMA_CA_300["ui_schema"]
+    }
+}
+
+def get_template_by_type(schema_type: str):
+    """Recupera template ICCD per tipo schema."""
+    return ICCD_TEMPLATES.get(schema_type.upper())
 
 
 class ICCDIntegrationService:
