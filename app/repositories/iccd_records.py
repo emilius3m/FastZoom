@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.orm import joinedload
 from app.models.iccd_records import ICCDRecord, ICCDSchemaTemplate, ICCDValidationRule
+from app.models.users import User
 from app.repositories.base import BaseRepository
 
 
@@ -27,8 +28,8 @@ class ICCDRecordRepository:
     ) -> tuple[List[ICCDRecord], int]:
         """Get ICCD records for a site with optional filters and pagination."""
         query = select(ICCDRecord).options(
-            joinedload(ICCDRecord.creator),
-            joinedload(ICCDRecord.validator)
+            joinedload(ICCDRecord.creator).joinedload(User.profile),
+            joinedload(ICCDRecord.validator).joinedload(User.profile)
         ).where(ICCDRecord.site_id == site_id)
         
         # Apply filters
@@ -67,8 +68,8 @@ class ICCDRecordRepository:
     async def get_record_by_id(self, record_id: UUID, site_id: UUID) -> Optional[ICCDRecord]:
         """Get a specific ICCD record by ID and site ID."""
         query = select(ICCDRecord).options(
-            joinedload(ICCDRecord.creator),
-            joinedload(ICCDRecord.validator)
+            joinedload(ICCDRecord.creator).joinedload(User.profile),
+            joinedload(ICCDRecord.validator).joinedload(User.profile)
         ).where(
             and_(
                 ICCDRecord.id == record_id,
