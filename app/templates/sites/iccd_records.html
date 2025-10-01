@@ -21,8 +21,8 @@
         </div>
         <div>
             <template x-if="can_write">
-            <a href="/sites/{{ site.id }}/iccd/new" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg inline-flex items-center transition-colors">
-                <i class="fas fa-plus mr-2"></i>
+            <a href="/sites/{{ site.id }}/iccd/new" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 inline-flex items-center">
+                <i class="fas fa-plus me-2"></i>
                 Nuova Scheda ICCD
             </a>
             </template>
@@ -102,7 +102,7 @@
                 </select>
             </div>
             <div>
-                <button class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-2 focus:ring-blue-500 transition-colors" @click="resetFilters()">
+                <button class="w-full text-gray-900 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" @click="resetFilters()">
                     <i class="fas fa-times mr-2"></i>Reset Filtri
                 </button>
             </div>
@@ -124,8 +124,8 @@
             <h4 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nessuna scheda ICCD trovata</h4>
             <p class="text-gray-600 dark:text-gray-400 mb-6">Inizia creando la prima scheda di catalogazione archeologica per questo sito.</p>
             <template x-if="can_write">
-            <a href="/sites/{{ site.id }}/iccd/new" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                <i class="fas fa-plus mr-2"></i>Crea Prima Scheda
+            <a href="/sites/{{ site.id }}/iccd/new" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 inline-flex items-center">
+                <i class="fas fa-plus me-2"></i>Crea Prima Scheda
             </a>
             </template>
         </div>
@@ -139,21 +139,21 @@
                         <div class="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-md font-mono text-sm font-semibold">
                             <span x-text="record.nct"></span>
                         </div>
-                        <div class="flex space-x-2">
-                            <button class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900" @click="viewRecord(record.id)" title="Visualizza scheda">
+                        <div class="flex">
+                            <button class="text-blue-700 border border-blue-700 hover:text-white hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm p-2.5 text-center inline-flex items-center me-2 dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:hover:bg-blue-500 dark:focus:ring-blue-800" @click="viewRecord(record.id)" title="Visualizza scheda">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <template x-if="can_write">
-                            <button class="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900" @click="editRecord(record.id)" title="Modifica scheda">
+                            <!--<template x-if="can_write">-->
+                            <button class="text-gray-900 border border-gray-800 hover:text-white hover:bg-gray-900 focus:ring-4 focus:outline-none focus:ring-gray-300 font-medium rounded-lg text-sm p-2.5 text-center inline-flex items-center me-2 dark:border-gray-500 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-500 dark:focus:ring-gray-800" @click="editRecord(record.id)" title="Modifica scheda">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            </template>
-                            <template x-if="can_admin">
-                            <button class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900" @click="deleteRecord(record.id, record.nct, record.object_name)" title="Elimina scheda">
+                            <!--</template>-->
+                            <!--<template x-if="can_admin">-->
+                            <button class="text-red-700 border border-red-700 hover:text-white hover:bg-red-700 focus:ring-4 focus:outline-none focus:ring-red-300 font-medium rounded-lg text-sm p-2.5 text-center inline-flex items-center me-2 dark:border-red-500 dark:text-red-500 dark:hover:text-white dark:hover:bg-red-500 dark:focus:ring-red-800" @click="deleteRecord(record.id, record.nct, record.object_name)" title="Elimina scheda">
                                 <i class="fas fa-trash"></i>
                             </button>
-                            </template>
-                            <button class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 p-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900" @click="downloadPDF(record.id)" title="Scarica PDF">
+                            <!--</template>-->
+                            <button class="text-green-700 border border-green-700 hover:text-white hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm p-2.5 text-center inline-flex items-center me-2 dark:border-green-500 dark:text-green-500 dark:hover:text-white dark:hover:bg-green-500 dark:focus:ring-green-800" @click="downloadPDF(record.id)" title="Scarica PDF">
                                 <i class="fas fa-file-pdf"></i>
                             </button>
                         </div>
@@ -222,25 +222,31 @@
         <!-- Paginazione -->
         <div class="flex justify-center mt-8" x-show="pagination.pages > 1">
             <nav aria-label="Paginazione schede ICCD">
-                <ul class="flex items-center space-x-1">
+                <ul class="flex items-center -space-x-px h-10 text-base">
                     <li>
-                        <button class="px-3 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-l-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed" @click="changePage(pagination.page - 1)" :disabled="pagination.page <= 1">
-                            <i class="fas fa-chevron-left"></i>
+                        <button class="flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" @click="changePage(pagination.page - 1)" :disabled="pagination.page <= 1">
+                            <span class="sr-only">Previous</span>
+                            <svg class="w-3 h-3 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 9 4-4-4-4"/>
+                            </svg>
                         </button>
                     </li>
 
                     <template x-for="page in getVisiblePages()" :key="page">
                         <li>
-                            <button class="px-3 py-2 text-sm font-medium border-t border-b" :class="page === pagination.page ?
-                                'text-blue-600 bg-blue-50 border-blue-600 dark:bg-blue-600 dark:text-white' :
-                                'text-gray-500 bg-white border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700'"
+                            <button class="flex items-center justify-center px-4 h-10 leading-tight border" :class="page === pagination.page ?
+                                'text-blue-600 border border-gray-300 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 dark:border-gray-700 dark:bg-gray-700 dark:text-white' :
+                                'text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'"
                                 @click="changePage(page)" x-text="page"></button>
                         </li>
                     </template>
 
                     <li>
-                        <button class="px-3 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-r-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed" @click="changePage(pagination.page + 1)" :disabled="pagination.page >= pagination.pages">
-                            <i class="fas fa-chevron-right"></i>
+                        <button class="flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed" @click="changePage(pagination.page + 1)" :disabled="pagination.page >= pagination.pages">
+                            <span class="sr-only">Next</span>
+                            <svg class="w-3 h-3 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 1 1 5l4 4"/>
+                            </svg>
                         </button>
                     </li>
                 </ul>
@@ -254,9 +260,6 @@
         </div>
     </div>
 </div>
-
-
-{% block extra_js %}{% endblock %}
 <script>
 
 
@@ -267,8 +270,8 @@ document.addEventListener('alpine:init', () => {
         statistics: null,
         
         // Permissions
-        can_write: {{ 'true' if can_write else 'false' }},
-        can_admin: {{ 'true' if can_admin else 'false' }},
+        can_write: {{ can_write|tojson }},
+        can_admin: {{ can_admin|tojson }},
 
         // Filtri
         filters: {
