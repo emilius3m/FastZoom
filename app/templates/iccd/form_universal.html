@@ -5,63 +5,64 @@
 {% block head %}
 <style>
     .iccd-section {
-        @apply border-l-4 border-blue-600 bg-white rounded-r-lg shadow-sm mb-6 transition-all;
+        @apply border-l-4 border-blue-600 bg-white dark:bg-gray-800 rounded-r-lg shadow-sm mb-6 transition-all;
     }
-    .iccd-section-required { @apply border-l-red-600; }
-    .iccd-section-complete { @apply border-l-green-600; }
+    .iccd-section-required { @apply border-l-red-600 dark:border-l-red-400; }
+    .iccd-section-complete { @apply border-l-green-600 dark:border-l-green-400; }
     .iccd-field-required label::after {
         content: " *";
-        @apply text-red-600 font-bold;
+        @apply text-red-600 dark:text-red-400 font-bold;
     }
     .iccd-tab {
-        @apply relative px-4 py-3 text-sm font-medium text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-300 transition-colors cursor-pointer whitespace-nowrap;
+        @apply relative px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 border-b-2 border-transparent hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer whitespace-nowrap;
     }
-    .iccd-tab-active { @apply text-blue-600 border-blue-600; }
+    .iccd-tab-active { @apply text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400; }
     .iccd-tab-complete::before {
         content: "✓";
-        @apply absolute -top-1 -right-1 bg-green-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center;
+        @apply absolute -top-1 -right-1 bg-green-500 dark:bg-green-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-6" x-data="iccdFormUniversal('{{ schema_type }}', '{{ site.id }}')">
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div class="container mx-auto px-4 py-6" x-data="iccdFormUniversal('{{ schema_type }}', '{{ site.id }}')">
 
-    <!-- Header universal-->
-    <div class="mb-6">
-        <nav class="flex mb-4 text-sm" aria-label="Breadcrumb">
-            <ol class="inline-flex items-center space-x-1">
-                <li><a href="#" class="text-gray-600 hover:text-blue-600">Dashboard</a></li>
-                <li><span class="mx-2 text-gray-400">/</span></li>
-                <li><a href="#" class="text-gray-600 hover:text-blue-600">{{ site.name }}</a></li>
-                <li><span class="mx-2 text-gray-400">/</span></li>
-                <li class="text-gray-900 font-medium">Scheda ICCD <span x-text="schemaType"></span> 3.00</li>
-            </ol>
-        </nav>
+        <!-- Header universal-->
+        <div class="mb-6">
+            <nav class="flex mb-4 text-sm" aria-label="Breadcrumb">
+                <ol class="inline-flex items-center space-x-1">
+                    <li><a href="#" class="text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400">Dashboard</a></li>
+                    <li><span class="mx-2 text-gray-400 dark:text-gray-500">/</span></li>
+                    <li><a href="#" class="text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400">{{ site.name }}</a></li>
+                    <li><span class="mx-2 text-gray-400 dark:text-gray-500">/</span></li>
+                    <li class="text-gray-900 dark:text-white font-medium">Scheda ICCD <span x-text="schemaType"></span> 3.00</li>
+                </ol>
+            </nav>
 
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                    <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
-                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
-                    </svg>
-                    <span x-text="`Scheda ${schemaType} 3.00 - ${schemaInfo.name || ''}`"></span>
-                </h1>
-                <p class="text-gray-600 mt-2" x-text="`${schemaInfo.description || ''} - Standard ICCD MiC 2025`"></p>
-            </div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                        <svg class="w-8 h-8 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span x-text="`Scheda ${schemaType} 3.00 - ${schemaInfo.name || ''}`"></span>
+                    </h1>
+                    <p class="text-gray-600 dark:text-gray-400 mt-2" x-text="`${schemaInfo.description || ''} - Standard ICCD MiC 2025`"></p>
+                </div>
 
             <!-- Progresso -->
             <div class="text-right">
-                <div class="text-sm text-gray-600 mb-2">Completamento</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">Completamento</div>
                 <div class="flex items-center gap-3">
-                    <div class="w-48 h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="w-48 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                         <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300"
-                             :style="`width: ${completionPercentage}%`"></div>
+                              :style="`width: ${completionPercentage}%`"></div>
                     </div>
-                    <span class="text-2xl font-bold text-blue-600" x-text="completionPercentage + '%'"></span>
+                    <span class="text-2xl font-bold text-blue-600 dark:text-blue-400" x-text="completionPercentage + '%'"></span>
                 </div>
-                <div class="text-xs text-gray-500 mt-1">
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     <span x-text="filledFields"></span>/<span x-text="totalFields"></span> campi
                 </div>
             </div>
@@ -70,27 +71,27 @@
 
     <!-- Alert -->
     <div x-show="alert.show"
-         x-transition
-         :class="{
-             'bg-green-50 border-green-500 text-green-800': alert.type === 'success',
-             'bg-red-50 border-red-500 text-red-800': alert.type === 'error',
-             'bg-yellow-50 border-yellow-500 text-yellow-800': alert.type === 'warning'
-         }"
-         class="border-l-4 p-4 mb-6 rounded-r flex items-start gap-3">
+          x-transition
+          :class="{
+              'bg-green-50 dark:bg-green-900 border-green-500 dark:border-green-400 text-green-800 dark:text-green-200': alert.type === 'success',
+              'bg-red-50 dark:bg-red-900 border-red-500 dark:border-red-400 text-red-800 dark:text-red-200': alert.type === 'error',
+              'bg-yellow-50 dark:bg-yellow-900 border-yellow-500 dark:border-yellow-400 text-yellow-800 dark:text-yellow-200': alert.type === 'warning'
+          }"
+          class="border-l-4 p-4 mb-6 rounded-r flex items-start gap-3">
         <div class="flex-1">
             <p class="font-medium" x-text="alert.message"></p>
         </div>
-        <button @click="alert.show = false" class="text-gray-400 hover:text-gray-600">✕</button>
+        <button @click="alert.show = false" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300">✕</button>
     </div>
 
     <!-- Loading -->
     <div x-show="loading" class="flex items-center justify-center py-12">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <span class="ml-3 text-gray-600">Caricamento schema ICCD...</span>
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
+        <span class="ml-3 text-gray-600 dark:text-gray-400">Caricamento schema ICCD...</span>
     </div>
 
     <!-- Tabs paragrafi -->
-    <div x-show="!loading" class="mb-6 border-b border-gray-200 overflow-x-auto">
+    <div x-show="!loading" class="mb-6 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
         <nav class="flex space-x-1 min-w-max" role="tablist">
             <template x-for="section in sections" :key="section.id">
                 <button @click="currentSection = section.id"
@@ -110,53 +111,53 @@
     <form x-show="!loading" @submit.prevent="saveForm" class="space-y-6">
         <template x-for="section in sections" :key="section.id">
             <div x-show="currentSection === section.id"
-                 x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0 translate-x-4"
-                 x-transition:enter-end="opacity-100 translate-x-0"
-                 :class="{
-                     'iccd-section-required': section.required,
-                     'iccd-section-complete': isSectionComplete(section.id)
-                 }"
-                 class="iccd-section p-6">
+                  x-transition:enter="transition ease-out duration-200"
+                  x-transition:enter-start="opacity-0 translate-x-4"
+                  x-transition:enter-end="opacity-100 translate-x-0"
+                  :class="{
+                      'iccd-section-required': section.required,
+                      'iccd-section-complete': isSectionComplete(section.id)
+                  }"
+                  class="iccd-section p-6 bg-white dark:bg-gray-800">
 
                 <!-- Header sezione -->
-                <div class="mb-6 pb-4 border-b border-gray-200">
-                    <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <div class="mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <span x-text="section.id"></span>
-                        <span class="text-gray-400">-</span>
+                        <span class="text-gray-400 dark:text-gray-500">-</span>
                         <span x-text="section.title"></span>
-                        <span x-show="section.required" class="text-red-600 text-sm">(Obbligatorio)</span>
+                        <span x-show="section.required" class="text-red-600 dark:text-red-400 text-sm">(Obbligatorio)</span>
                     </h2>
-                    <p x-show="section.description" x-text="section.description" class="text-gray-600 mt-2"></p>
+                    <p x-show="section.description" x-text="section.description" class="text-gray-600 dark:text-gray-400 mt-2"></p>
                 </div>
 
                 <!-- Campi dinamici -->
                 <div x-html="renderSectionFields(section)"></div>
 
                 <!-- Navigazione -->
-                <div class="mt-8 pt-6 border-t border-gray-200 flex justify-between">
+                <div class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 flex justify-between">
                     <button type="button" @click="previousSection()"
                             x-show="!isFirstSection()"
-                            class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                            class="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                         ← Precedente
                     </button>
 
                     <div class="flex gap-3">
                         <button type="button" @click="validateCurrentSection()"
-                                class="px-6 py-3 border border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50">
+                                class="px-6 py-3 border border-blue-600 dark:border-blue-400 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900">
                             🔍 Valida
                         </button>
 
                         <button type="button" @click="nextSection()"
                                 x-show="!isLastSection()"
-                                class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                class="px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600">
                             Successiva →
                         </button>
 
                         <button type="submit" x-show="isLastSection()"
                                 :disabled="saving"
                                 class="px-8 py-3 rounded-lg text-white font-semibold"
-                                :class="saving ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'">
+                                :class="saving ? 'bg-gray-400 dark:bg-gray-600' : 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600'">
                             <span x-text="saving ? 'Salvataggio...' : '💾 Salva Scheda'"></span>
                         </button>
                     </div>
@@ -166,9 +167,9 @@
     </form>
 
     <!-- Sidebar riepilogo -->
-    <div class="fixed right-0 top-20 w-80 bg-white shadow-xl rounded-l-xl z-50 transform transition-transform"
-         :class="showSidebar ? 'translate-x-0' : 'translate-x-full'">
-        <div class="p-4 border-b bg-blue-600 text-white rounded-tl-xl flex justify-between items-center">
+    <div class="fixed right-0 top-20 w-80 bg-white dark:bg-gray-800 shadow-xl rounded-l-xl z-50 transform transition-transform"
+          :class="showSidebar ? 'translate-x-0' : 'translate-x-full'">
+        <div class="p-4 border-b bg-blue-600 dark:bg-blue-500 text-white rounded-tl-xl flex justify-between items-center">
             <h3 class="font-semibold">📊 Riepilogo</h3>
             <button @click="showSidebar = false" class="hover:text-gray-200">✕</button>
         </div>
@@ -177,12 +178,12 @@
             <!-- Progresso -->
             <div class="mb-4">
                 <div class="flex justify-between text-sm mb-2">
-                    <span>Progresso</span>
-                    <span class="font-bold text-blue-600" x-text="completionPercentage + '%'"></span>
+                    <span class="text-gray-900 dark:text-white">Progresso</span>
+                    <span class="font-bold text-blue-600 dark:text-blue-400" x-text="completionPercentage + '%'"></span>
                 </div>
-                <div class="w-full h-2 bg-gray-200 rounded-full">
+                <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
                     <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full"
-                         :style="`width: ${completionPercentage}%`"></div>
+                          :style="`width: ${completionPercentage}%`"></div>
                 </div>
             </div>
 
@@ -191,12 +192,12 @@
                 <template x-for="section in sections" :key="section.id">
                     <button @click="currentSection = section.id; showSidebar = false"
                             class="w-full p-3 rounded-lg text-left transition-colors"
-                            :class="isSectionComplete(section.id) ? 'bg-green-50 hover:bg-green-100' : 'bg-gray-50 hover:bg-gray-100'">
+                            :class="isSectionComplete(section.id) ? 'bg-green-50 dark:bg-green-900 hover:bg-green-100 dark:hover:bg-green-800' : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'">
                         <div class="flex justify-between items-center">
-                            <span class="font-medium text-sm" x-text="section.id"></span>
+                            <span class="font-medium text-sm text-gray-900 dark:text-white" x-text="section.id"></span>
                             <div class="flex items-center gap-2">
                                 <span x-show="section.required" class="text-red-500 text-xs">⚠️</span>
-                                <span x-show="isSectionComplete(section.id)" class="text-green-600">✓</span>
+                                <span x-show="isSectionComplete(section.id)" class="text-green-600 dark:text-green-400">✓</span>
                             </div>
                         </div>
                     </button>
@@ -204,32 +205,30 @@
             </div>
 
             <!-- Azioni -->
-            <div class="mt-6 pt-4 border-t space-y-2">
+            <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
                 <button @click="validateAll()"
-                        class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                        class="w-full px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 text-sm">
                     🔍 Valida Tutto
                 </button>
                 <button @click="saveAsDraft()"
-                        class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">
+                        class="w-full px-4 py-2 bg-gray-600 dark:bg-gray-500 text-white rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 text-sm">
                     💾 Salva Bozza
                 </button>
             </div>
         </div>
-    
+
         <!-- Toggle sidebar -->
         <button @click="showSidebar = !showSidebar" x-show="!showSidebar"
-                class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 z-40">
+                class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 dark:bg-blue-500 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 dark:hover:bg-blue-600 z-40">
             📊
         </button>
     </div>
-    
+    </div>
+
     <!-- Pass the existing record data to JavaScript-->
     <script>
         // Define existing record data from the template context
         const existingRecordData = {{ record | tojson }};
-    </script>
-    
-    <script>
 function iccdFormUniversal(schemaType, siteId) {
     return {
         // Config
@@ -249,6 +248,10 @@ function iccdFormUniversal(schemaType, siteId) {
         showSidebar: true,
         alert: { show: false, type: 'info', message: '' },
 
+        // Validation
+        validationErrors: [],
+        sectionErrors: {},
+
         // Stats
         totalFields: 0,
         filledFields: 0,
@@ -267,7 +270,7 @@ function iccdFormUniversal(schemaType, siteId) {
                 if (!response.ok) throw new Error('Schema non trovato');
 
                 const data = await response.json();
-                this.schema = data.schema;
+                this.schema = data.json_schema;
                 this.schemaInfo = {
                     name: data.name,
                     description: data.description,
@@ -286,8 +289,15 @@ function iccdFormUniversal(schemaType, siteId) {
                 // Modalità modifica: usa i dati esistenti
                 this.formData = { ...existingRecordData.iccd_data };
             } else {
-                // Modalità nuovo record: inizializza con valori di default
-                this.formData = {
+                // Modalità nuovo record: inizializza con valori di default per tutte le sezioni
+                this.formData = this.initializeEmptySections();
+            }
+        },
+
+        initializeEmptySections() {
+            if (!this.schema || !this.schema.properties) {
+                // Fallback to basic initialization if schema not loaded
+                return {
                     CD: {
                         TSK: this.schemaType,
                         LIR: 'C',
@@ -298,9 +308,78 @@ function iccdFormUniversal(schemaType, siteId) {
                         },
                         ESC: '',
                         ECP: ''
-                    }
+                    },
+                    OG: {},
+                    LC: {},
+                    DT: {},
+                    AU: {},
+                    MT: {},
+                    DA: {},
+                    NS: {},
+                    RS: {}
                 };
             }
+
+            const formData = {};
+
+            for (const [sectionKey, sectionSchema] of Object.entries(this.schema.properties)) {
+                if (sectionSchema.type === 'object' && sectionSchema.properties) {
+                    formData[sectionKey] = this.initializeEmptyObject(sectionSchema.properties);
+                } else {
+                    formData[sectionKey] = this.getDefaultValue(sectionSchema);
+                }
+            }
+
+            // Imposta valori di default specifici per CD
+            if (formData.CD) {
+                formData.CD.TSK = this.schemaType;
+                formData.CD.LIR = 'C';
+                if (formData.CD.NCT) {
+                    formData.CD.NCT.NCTR = '12';
+                    formData.CD.NCT.NCTN = this.generateNCTN();
+                    formData.CD.NCT.NCTS = '';
+                }
+                formData.CD.ESC = '';
+                formData.CD.ECP = '';
+            }
+
+            return formData;
+        },
+
+        initializeEmptyObject(properties) {
+            const obj = {};
+
+            for (const [key, propSchema] of Object.entries(properties)) {
+                if (propSchema.type === 'object' && propSchema.properties) {
+                    obj[key] = this.initializeEmptyObject(propSchema.properties);
+                } else if (propSchema.type === 'array') {
+                    obj[key] = [];
+                } else {
+                    obj[key] = this.getDefaultValue(propSchema);
+                }
+            }
+
+            return obj;
+        },
+
+        getDefaultValue(schema) {
+            if (schema.default !== undefined) {
+                return schema.default;
+            }
+
+            if (schema.type === 'string') {
+                return '';
+            } else if (schema.type === 'number' || schema.type === 'integer') {
+                return null;
+            } else if (schema.type === 'boolean') {
+                return false;
+            } else if (schema.type === 'array') {
+                return [];
+            } else if (schema.type === 'object') {
+                return {};
+            }
+
+            return null;
         },
 
         parseSections() {
@@ -322,7 +401,7 @@ function iccdFormUniversal(schemaType, siteId) {
 
         renderSectionFields(section) {
             if (!section.properties || Object.keys(section.properties).length === 0) {
-                return '<p class="text-gray-500">Nessun campo in questa sezione</p>';
+                return '<p class="text-gray-500 dark:text-gray-400">Nessun campo in questa sezione</p>';
             }
 
             let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
@@ -370,13 +449,13 @@ function iccdFormUniversal(schemaType, siteId) {
             const isRequired = field.required || false;
             return `
                 <div class="${isRequired ? 'iccd-field-required' : ''}">
-                    <label class="block mb-2 text-sm font-medium text-gray-900">${field.title || path}</label>
+                    <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">${field.title || path}</label>
                     <input type="text"
                            x-model="formData.${path}"
-                           class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                           class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
                            placeholder="${field.description || ''}"
                            ${isRequired ? 'required' : ''}>
-                    ${field.description ? `<p class="mt-1 text-xs text-gray-500">${field.description}</p>` : ''}
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
         },
@@ -389,9 +468,9 @@ function iccdFormUniversal(schemaType, siteId) {
 
             return `
                 <div>
-                    <label class="block mb-2 text-sm font-medium text-gray-900">${field.title || path}</label>
+                    <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">${field.title || path}</label>
                     <select x-model="formData.${path}"
-                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                            class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                         <option value="">Seleziona...</option>
                         ${options}
                     </select>
@@ -402,10 +481,10 @@ function iccdFormUniversal(schemaType, siteId) {
         renderTextareaField(path, field) {
             return `
                 <div class="md:col-span-2">
-                    <label class="block mb-2 text-sm font-medium text-gray-900">${field.title || path}</label>
+                    <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">${field.title || path}</label>
                     <textarea x-model="formData.${path}"
                               rows="4"
-                              class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                              class="block p-2.5 w-full text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
                               placeholder="${field.description || ''}"></textarea>
                 </div>
             `;
@@ -414,10 +493,10 @@ function iccdFormUniversal(schemaType, siteId) {
         renderNumberField(path, field) {
             return `
                 <div>
-                    <label class="block mb-2 text-sm font-medium text-gray-900">${field.title || path}</label>
+                    <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">${field.title || path}</label>
                     <input type="number"
                            x-model.number="formData.${path}"
-                           class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                           class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
                            ${field.minimum !== undefined ? `min="${field.minimum}"` : ''}
                            ${field.maximum !== undefined ? `max="${field.maximum}"` : ''}>
                 </div>
@@ -425,8 +504,8 @@ function iccdFormUniversal(schemaType, siteId) {
         },
 
         renderObjectField(path, field, fieldKey) {
-            let html = `<div class="md:col-span-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h4 class="text-lg font-semibold mb-4">${field.title || fieldKey}</h4>
+            let html = `<div class="md:col-span-2 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                <h4 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">${field.title || fieldKey}</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
 
             for (const [subKey, subField] of Object.entries(field.properties)) {
@@ -439,9 +518,9 @@ function iccdFormUniversal(schemaType, siteId) {
         },
 
         renderArrayField(path, field, fieldKey) {
-            return `<div class="md:col-span-2 p-4 bg-gray-50 rounded-lg">
-                <h4 class="font-semibold mb-2">${field.title || fieldKey}</h4>
-                <p class="text-sm text-gray-500">Campo array - implementazione in corso</p>
+            return `<div class="md:col-span-2 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <h4 class="font-semibold mb-2 text-gray-900 dark:text-white">${field.title || fieldKey}</h4>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Campo array - implementazione in corso</p>
             </div>`;
         },
 
@@ -599,44 +678,41 @@ function iccdFormUniversal(schemaType, siteId) {
                 // Determina se stiamo creando un nuovo record o aggiornando uno esistente
                 const recordId = typeof existingRecordData !== 'undefined' && existingRecordData && existingRecordData.id ? existingRecordData.id : null;
                 
+                // Prepara i dati da inviare - per i nuovi record include i campi richiesti
+                let requestData;
+                
                 if (recordId) {
-                    // Modalità aggiornamento record esistente
-                    endpoint = `/api/iccd/records/${recordId}`;
+                    // Modalità aggiornamento record esistente - invia solo i dati ICCD
+                    endpoint = `/api/iccd/sites/${this.siteId}/records/${recordId}`;
                     method = 'PUT';
-                    response = await fetch(endpoint, {
-                        method: method,
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('access_token') || localStorage.getItem('token')}`
-                        },
-                        body: JSON.stringify({
-                            schema_type: this.schemaType,
-                            level: this.formData.CD?.LIR || 'C',
-                            iccd_data: this.formData,
-                            cataloging_institution: this.formData.CD?.ESC || '',
-                            cataloger_name: this.formData.CD?.RCG?.RCGR || '',
-                            survey_date: this.formData.CD?.RCG?.RCGD || null
-                        })
-                    });
+                    requestData = this.formData;
                 } else {
-                    // Modalità creazione nuovo record
-                    endpoint = '/api/iccd/records';
+                    // Modalità creazione nuovo record - include tutti i campi richiesti
+                    endpoint = `/api/iccd/sites/${this.siteId}/records`;
                     method = 'POST';
-                    response = await fetch(endpoint, {
-                        method: method,
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${localStorage.getItem('access_token') || localStorage.getItem('token')}`
-                        },
-                        body: JSON.stringify({
-                            schema_type: this.schemaType,
-                            site_id: this.siteId,
-                            record_data: this.formData,
-                            cataloging_institution: this.formData.CD?.ESC || 'SSABAP-RM',
-                            level: this.formData.CD?.LIR || 'C'
-                        })
-                    });
+                    
+                    // Estrai il livello dai dati CD, default a 'C' se non trovato
+                    const level = this.formData.CD?.LIR || 'C';
+                    
+                    // Estrai l'istituzione catalogante dai dati CD
+                    const catalogingInstitution = this.formData.CD?.ESC || '';
+                    
+                    requestData = {
+                        schema_type: this.schemaType,
+                        level: level,
+                        iccd_data: this.formData,
+                        cataloging_institution: catalogingInstitution
+                    };
                 }
+                
+                response = await fetch(endpoint, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token') || localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(requestData)
+                });
 
                 if (!response.ok) {
                     const errorResult = await response.json().catch(() => ({
@@ -676,6 +752,36 @@ function iccdFormUniversal(schemaType, siteId) {
             this.alert = { show: true, type, message };
             setTimeout(() => this.alert.show = false, 5000);
         },
+
+        // Enhanced validation methods
+        hasSectionErrors(sectionId) {
+            return this.sectionErrors[sectionId] && this.sectionErrors[sectionId].length > 0;
+        },
+
+        getSectionErrors(sectionId) {
+            return this.sectionErrors[sectionId] || [];
+        },
+
+        getSectionByID(sectionId) {
+            return this.sections.find(s => s.id === sectionId);
+        },
+
+        getSectionStatus(sectionId) {
+            if (this.hasSectionErrors(sectionId)) {
+                return 'Errori trovati';
+            } else if (this.isSectionComplete(sectionId)) {
+                return 'Completa';
+            } else {
+                return 'In compilazione';
+            }
+        },
+
+        getCompletedSectionsCount() {
+            return this.sections.filter(section => this.isSectionComplete(section.id) && !this.hasSectionErrors(section.id)).length;
+        },
+
+
+
 
         get completionPercentage() {
             return this.totalFields > 0 ? Math.round((this.filledFields / this.totalFields) * 100) : 0;

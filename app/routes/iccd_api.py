@@ -17,18 +17,18 @@ Endpoints:
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
 from fastapi.responses import FileResponse, StreamingResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_, or_, func
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from uuid import UUID
 import jsonschema
 import io
 
-from app.database import get_db
-from app.models.iccd_models import ICCDRecord, ICCDRelation, ICCDMedia
-from app.models.auth import User
-from app.auth.dependencies import get_current_user, require_permissions
+from app.database.session import get_async_session
+from app.models.iccd_records import ICCDRecord, ICCDRelation
+from app.models.users import User
+from app.core.security import get_current_user_id
 from app.data.iccd_si_schema_complete import SCHEMA_SI_300, validate_si_record
 from app.data.iccd_ra_schema_complete import SCHEMA_RA_300, validate_ra_record
 from app.data.iccd_ca_schema_complete import SCHEMA_CA_300, validate_ca_record
@@ -53,7 +53,7 @@ class ICCDRecordCreate(BaseModel):
     """Schema per creazione record ICCD"""
     schema_type: str = Field(..., description="Tipo scheda (SI, RA, CA, MA)")
     site_id: UUID = Field(..., description="ID sito archeologico")
-    record_data: Dict[str, Any] = Field(..., description="Dati scheda ICCD completi")
+    iccd_data: Dict[str, Any] = Field(..., description="Dati scheda ICCD completi")
 
     @validator('schema_type')
     def validate_schema_type(cls, v):
@@ -65,7 +65,7 @@ class ICCDRecordCreate(BaseModel):
 
 class ICCDRecordUpdate(BaseModel):
     """Schema per aggiornamento record ICCD"""
-    record_data: Dict[str, Any]
+    iccd_data: Dict[str, Any]
     status: Optional[str] = None
 
     @validator('status')
@@ -80,7 +80,9 @@ class ICCDRecordUpdate(BaseModel):
 class ICCDRecordResponse(BaseModel):
     """Schema risposta record ICCD"""
     id: UUID
-    nct_complete: str
+    nct_region: str
+    nct_number: str
+    nct_suffix: Optional[str]
     schema_type: str
     schema_version: str
     level: str
@@ -98,7 +100,7 @@ class ICCDRecordResponse(BaseModel):
 
 class ICCDRecordDetail(ICCDRecordResponse):
     """Schema dettaglio completo record ICCD"""
-    record_data: Dict[str, Any]
+    iccd_data: Dict[str, Any]
     chronology_generic: Optional[str]
     chronology_from: Optional[int]
     chronology_to: Optional[int]
@@ -190,8 +192,8 @@ async def list_schemas():
 @router.post("/records", response_model=ICCDRecordDetail, status_code=status.HTTP_201_CREATED)
 async def create_record(
         record_data: ICCDRecordCreate,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """
     Crea una nuova scheda ICCD
@@ -201,17 +203,17 @@ async def create_record(
     """
     # Valida dati contro schema
     if record_data.schema_type == "SI":
-        is_valid, errors = validate_si_record(record_data.record_data)
+        is_valid, errors = validate_si_record(record_data.iccd_data)
     elif record_data.schema_type == "RA":
-        is_valid, errors = validate_ra_record(record_data.record_data)
+        is_valid, errors = validate_ra_record(record_data.iccd_data)
     elif record_data.schema_type == "CA":
-        is_valid, errors = validate_ca_record(record_data.record_data)
+        is_valid, errors = validate_ca_record(record_data.iccd_data)
     else:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail=f"Schema {record_data.schema_type} non ancora implementato"
         )
-    
+
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -219,30 +221,35 @@ async def create_record(
         )
 
     # Genera NCT
-    nct_region = record_data.record_data.get('CD', {}).get('NCT', {}).get('NCTR', '12')
+    nct_region = record_data.iccd_data.get('CD', {}).get('NCT', {}).get('NCTR', '12')
     nct_number = _generate_nct_number()
 
     # Estrai campi per query rapide
-    extracted_fields = _extract_fields_from_data(record_data.record_data)
+    extracted_fields = _extract_fields_from_data(record_data.iccd_data)
+
+    # Get current user
+    current_user = await db.execute(select(User).where(User.id == current_user_id))
+    current_user = current_user.scalar_one_or_none()
+    if not current_user:
+        raise HTTPException(status_code=401, detail="User not found")
 
     # Crea record
     new_record = ICCDRecord(
         schema_type=record_data.schema_type,
         schema_version="3.00",
-        level=record_data.record_data.get('CD', {}).get('LIR', 'C'),
+        level=record_data.iccd_data.get('CD', {}).get('LIR', 'C'),
         nct_region=nct_region,
         nct_number=nct_number,
-        nct_suffix=record_data.record_data.get('CD', {}).get('NCT', {}).get('NCTS'),
+        nct_suffix=record_data.iccd_data.get('CD', {}).get('NCT', {}).get('NCTS'),
         site_id=record_data.site_id,
-        record_data=record_data.record_data,
-        created_by=current_user.id,
-        status='draft',
-        **extracted_fields
+        iccd_data=record_data.iccd_data,
+        created_by=current_user_id,
+        status='draft'
     )
 
     db.add(new_record)
-    db.commit()
-    db.refresh(new_record)
+    await db.commit()
+    await db.refresh(new_record)
 
     return new_record
 
@@ -257,8 +264,8 @@ async def list_records(
         chronology_to: Optional[int] = Query(None, description="Filtra cronologia a"),
         skip: int = Query(0, ge=0),
         limit: int = Query(100, ge=1, le=1000),
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """
     Lista schede ICCD con filtri avanzati
@@ -271,17 +278,17 @@ async def list_records(
     - Filtro cronologico
     - Paginazione
     """
-    query = db.query(ICCDRecord).filter(ICCDRecord.deleted_at.is_(None))
+    query = select(ICCDRecord).where(ICCDRecord.deleted_at.is_(None))
 
     # Applica filtri
     if schema_type:
-        query = query.filter(ICCDRecord.schema_type == schema_type.upper())
+        query = query.where(ICCDRecord.schema_type == schema_type.upper())
 
     if site_id:
-        query = query.filter(ICCDRecord.site_id == site_id)
+        query = query.where(ICCDRecord.site_id == site_id)
 
     if status:
-        query = query.filter(ICCDRecord.status == status)
+        query = query.where(ICCDRecord.status == status)
 
     if search:
         # Full-text search su campi indicizzati
@@ -290,17 +297,22 @@ async def list_records(
             ICCDRecord.object_name.ilike(f'%{search}%'),
             ICCDRecord.municipality.ilike(f'%{search}%')
         )
-        query = query.filter(search_filter)
+        query = query.where(search_filter)
 
     if chronology_from is not None:
-        query = query.filter(ICCDRecord.chronology_to >= chronology_from)
+        query = query.where(ICCDRecord.chronology_to >= chronology_from)
 
     if chronology_to is not None:
-        query = query.filter(ICCDRecord.chronology_from <= chronology_to)
+        query = query.where(ICCDRecord.chronology_from <= chronology_to)
 
     # Ordinamento e paginazione
-    total = query.count()
-    records = query.order_by(ICCDRecord.created_at.desc()).offset(skip).limit(limit).all()
+    count_query = select(func.count()).select_from(query.subquery())
+    total = await db.execute(count_query)
+    total = total.scalar()
+
+    records_query = query.order_by(ICCDRecord.created_at.desc()).offset(skip).limit(limit)
+    records = await db.execute(records_query)
+    records = records.scalars().all()
 
     return records
 
@@ -308,14 +320,16 @@ async def list_records(
 @router.get("/records/{record_id}", response_model=ICCDRecordDetail)
 async def get_record(
         record_id: UUID,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """Recupera dettaglio completo di una scheda ICCD"""
-    record = db.query(ICCDRecord).filter(
-        ICCDRecord.id == record_id,
-        ICCDRecord.deleted_at.is_(None)
-    ).first()
+    record = await db.execute(
+        select(ICCDRecord).where(
+            and_(ICCDRecord.id == record_id, ICCDRecord.deleted_at.is_(None))
+        )
+    )
+    record = record.scalar_one_or_none()
 
     if not record:
         raise HTTPException(
@@ -330,8 +344,8 @@ async def get_record(
 async def update_record(
         record_id: UUID,
         update_data: ICCDRecordUpdate,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """
     Aggiorna una scheda ICCD esistente
@@ -339,10 +353,12 @@ async def update_record(
     Validazione automatica dei dati
     Aggiornamento campi estratti per performance
     """
-    record = db.query(ICCDRecord).filter(
-        ICCDRecord.id == record_id,
-        ICCDRecord.deleted_at.is_(None)
-    ).first()
+    record = await db.execute(
+        select(ICCDRecord).where(
+            and_(ICCDRecord.id == record_id, ICCDRecord.deleted_at.is_(None))
+        )
+    )
+    record = record.scalar_one_or_none()
 
     if not record:
         raise HTTPException(
@@ -352,14 +368,14 @@ async def update_record(
 
     # Valida nuovi dati
     if record.schema_type == "SI":
-        is_valid, errors = validate_si_record(update_data.record_data)
+        is_valid, errors = validate_si_record(update_data.iccd_data)
     elif record.schema_type == "RA":
-        is_valid, errors = validate_ra_record(update_data.record_data)
+        is_valid, errors = validate_ra_record(update_data.iccd_data)
     elif record.schema_type == "CA":
-        is_valid, errors = validate_ca_record(update_data.record_data)
+        is_valid, errors = validate_ca_record(update_data.iccd_data)
     else:
         is_valid, errors = True, []
-    
+
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -367,20 +383,15 @@ async def update_record(
         )
 
     # Aggiorna dati
-    record.record_data = update_data.record_data
+    record.iccd_data = update_data.iccd_data
 
     if update_data.status:
         record.status = update_data.status
 
-    # Rigenera campi estratti
-    extracted_fields = _extract_fields_from_data(update_data.record_data)
-    for key, value in extracted_fields.items():
-        setattr(record, key, value)
-
     record.updated_at = datetime.utcnow()
 
-    db.commit()
-    db.refresh(record)
+    await db.commit()
+    await db.refresh(record)
 
     return record
 
@@ -388,18 +399,20 @@ async def update_record(
 @router.delete("/records/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_record(
         record_id: UUID,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """
     Elimina (soft delete) una scheda ICCD
 
     Implementa soft delete per preservare dati
     """
-    record = db.query(ICCDRecord).filter(
-        ICCDRecord.id == record_id,
-        ICCDRecord.deleted_at.is_(None)
-    ).first()
+    record = await db.execute(
+        select(ICCDRecord).where(
+            and_(ICCDRecord.id == record_id, ICCDRecord.deleted_at.is_(None))
+        )
+    )
+    record = record.scalar_one_or_none()
 
     if not record:
         raise HTTPException(
@@ -409,7 +422,7 @@ async def delete_record(
 
     # Soft delete
     record.deleted_at = datetime.utcnow()
-    db.commit()
+    await db.commit()
 
     return None
 
@@ -421,8 +434,8 @@ async def delete_record(
 @router.post("/records/{record_id}/validate", response_model=ICCDValidationResult)
 async def validate_record(
         record_id: UUID,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """
     Valida una scheda ICCD contro lo schema
@@ -430,10 +443,12 @@ async def validate_record(
     Returns:
         Risultato validazione dettagliato con errori e warning
     """
-    record = db.query(ICCDRecord).filter(
-        ICCDRecord.id == record_id,
-        ICCDRecord.deleted_at.is_(None)
-    ).first()
+    record = await db.execute(
+        select(ICCDRecord).where(
+            and_(ICCDRecord.id == record_id, ICCDRecord.deleted_at.is_(None))
+        )
+    )
+    record = record.scalar_one_or_none()
 
     if not record:
         raise HTTPException(
@@ -443,11 +458,11 @@ async def validate_record(
 
     # Valida
     if record.schema_type == "SI":
-        is_valid, errors = validate_si_record(record.record_data)
+        is_valid, errors = validate_si_record(record.iccd_data)
     elif record.schema_type == "RA":
-        is_valid, errors = validate_ra_record(record.record_data)
+        is_valid, errors = validate_ra_record(record.iccd_data)
     elif record.schema_type == "CA":
-        is_valid, errors = validate_ca_record(record.record_data)
+        is_valid, errors = validate_ca_record(record.iccd_data)
     else:
         is_valid, errors = True, []
 
@@ -460,10 +475,10 @@ async def validate_record(
         schema = SCHEMA_CA_300
     else:
         schema = {}
-    completeness = _calculate_completeness(record.record_data, schema)
+    completeness = _calculate_completeness(record.iccd_data, schema)
 
     # Identifica campi obbligatori mancanti
-    missing_required = _find_missing_required_fields(record.record_data, schema)
+    missing_required = _find_missing_required_fields(record.iccd_data, schema)
 
     return ICCDValidationResult(
         is_valid=is_valid,
@@ -477,8 +492,8 @@ async def validate_record(
 @router.post("/records/{record_id}/publish", response_model=ICCDRecordDetail)
 async def publish_record(
         record_id: UUID,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """
     Pubblica una scheda ICCD
@@ -486,10 +501,12 @@ async def publish_record(
     Richiede validazione completa
     Cambia stato a 'published' e is_public=True
     """
-    record = db.query(ICCDRecord).filter(
-        ICCDRecord.id == record_id,
-        ICCDRecord.deleted_at.is_(None)
-    ).first()
+    record = await db.execute(
+        select(ICCDRecord).where(
+            and_(ICCDRecord.id == record_id, ICCDRecord.deleted_at.is_(None))
+        )
+    )
+    record = record.scalar_one_or_none()
 
     if not record:
         raise HTTPException(
@@ -499,14 +516,14 @@ async def publish_record(
 
     # Valida prima di pubblicare
     if record.schema_type == "SI":
-        is_valid, errors = validate_si_record(record.record_data)
+        is_valid, errors = validate_si_record(record.iccd_data)
     elif record.schema_type == "RA":
-        is_valid, errors = validate_ra_record(record.record_data)
+        is_valid, errors = validate_ra_record(record.iccd_data)
     elif record.schema_type == "CA":
-        is_valid, errors = validate_ca_record(record.record_data)
+        is_valid, errors = validate_ca_record(record.iccd_data)
     else:
         is_valid, errors = True, []
-    
+
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -516,11 +533,11 @@ async def publish_record(
     # Pubblica
     record.status = 'published'
     record.is_public = True
-    record.validated_by = current_user.id
+    record.validated_by = current_user_id
     record.validated_at = datetime.utcnow()
 
-    db.commit()
-    db.refresh(record)
+    await db.commit()
+    await db.refresh(record)
 
     return record
 
@@ -533,19 +550,20 @@ async def publish_record(
 async def get_site_records(
         site_id: UUID,
         schema_type: Optional[str] = Query(None),
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """Recupera tutte le schede ICCD di un sito"""
-    query = db.query(ICCDRecord).filter(
-        ICCDRecord.site_id == site_id,
-        ICCDRecord.deleted_at.is_(None)
+    query = select(ICCDRecord).where(
+        and_(ICCDRecord.site_id == site_id, ICCDRecord.deleted_at.is_(None))
     )
 
     if schema_type:
-        query = query.filter(ICCDRecord.schema_type == schema_type.upper())
+        query = query.where(ICCDRecord.schema_type == schema_type.upper())
 
-    records = query.order_by(ICCDRecord.created_at.desc()).all()
+    records_query = query.order_by(ICCDRecord.created_at.desc())
+    records = await db.execute(records_query)
+    records = records.scalars().all()
 
     return records
 
@@ -553,18 +571,20 @@ async def get_site_records(
 @router.get("/sites/{site_id}/statistics")
 async def get_site_statistics(
         site_id: UUID,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """Statistiche schede ICCD per sito"""
-    stats = db.query(
+    stats_query = select(
         ICCDRecord.schema_type,
         func.count(ICCDRecord.id).label('count'),
         func.count(func.nullif(ICCDRecord.status == 'published', False)).label('published')
-    ).filter(
-        ICCDRecord.site_id == site_id,
-        ICCDRecord.deleted_at.is_(None)
-    ).group_by(ICCDRecord.schema_type).all()
+    ).where(
+        and_(ICCDRecord.site_id == site_id, ICCDRecord.deleted_at.is_(None))
+    ).group_by(ICCDRecord.schema_type)
+
+    stats = await db.execute(stats_query)
+    stats = stats.all()
 
     return [
         {
@@ -583,8 +603,8 @@ async def get_site_statistics(
 @router.get("/export/{record_id}/pdf")
 async def export_pdf(
         record_id: UUID,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """
     Esporta scheda ICCD in formato PDF
