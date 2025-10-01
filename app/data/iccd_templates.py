@@ -82,7 +82,6 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                     "required": ["TSK", "LIR", "NCT", "ESC"],
                     "additionalProperties": false
                 },
-
                 "OG": {
                     "type": "object",
                     "title": "OGGETTO", 
@@ -147,7 +146,6 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                     "required": ["OGT"],
                     "additionalProperties": false
                 },
-
                 "LC": {
                     "type": "object",
                     "title": "LOCALIZZAZIONE GEOGRAFICO-AMMINISTRATIVA",
@@ -242,7 +240,6 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                     "required": ["PVC"],
                     "additionalProperties": false
                 },
-
                 "DT": {
                     "type": "object",
                     "title": "CRONOLOGIA",
@@ -311,7 +308,6 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                     ],
                     "additionalProperties": false
                 },
-
                 "MT": {
                     "type": "object",
                     "title": "DATI TECNICI",
@@ -371,25 +367,25 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                                     "minimum": 0,
                                     "multipleOf": 0.01
                                 },
-                                                                },
-                                "MISP": {
+                            },
+                            "MISP": {
                                     "type": "number",
                                     "title": "Profondità",
                                     "description": "Profondità in cm", 
                                     "minimum": 0,
                                     "multipleOf": 0.01
-                                },
-                                "MISD": {
+                            },
+                            "MISD": {
                                     "type": "number",
                                     "title": "Diametro",
                                     "description": "Diametro in cm",
                                     "minimum": 0,
                                     "multipleOf": 0.01
-                                },
-                                                                },
-                                "MISE": {
-                                    "type": "number",
-                                    "title": "Spessore",
+                            },
+                        },
+                        "MISE": {
+                            "type": "number",
+                            "title": "Spessore",
                                     "description": "Spessore in cm",
                                     "minimum": 0,
                                     "multipleOf": 0.01
@@ -433,7 +429,6 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                             },
                             "required": ["DESO"],
                             "additionalProperties": false
-                                                      "additionalProperties": false
                         },
                         "ISR": {
                             "type": "array",
@@ -473,7 +468,6 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                     "required": ["DES"],
                     "additionalProperties": false
                 },
-
                 "AD": {
                     "type": "object",
                     "title": "ACCESSO AI DATI",
@@ -518,18 +512,15 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                     },
                     "required": ["CMP"],
                     "additionalProperties": false
-                }
-            },
-
+                },
             "required": ["CD", "OG", "LC", "DT", "MT", "DA", "AD", "CM"],
-            "additionalProperties": false
-        },
-        
-        "ui_schema": {
-            "CD": {
+            "additionalProperties": false,
+
+    "ui_schema": {
+        "CD": {
                 "ui:order": ["TSK", "LIR", "NCT", "ESC", "ECP"],
                 "TSK": { "ui:readonly": true }
-            },
+        },
             "OG": {
                 "ui:order": ["OGT", "CLS"],
                 "OGT": {
@@ -553,8 +544,8 @@ def get_iccd_ra_300_template() -> Dict[str, Any]:
                     }
                 }
             }
-        }
     }
+}
 
 # Template semplificati per altri schemi
 def get_iccd_ca_template() -> Dict[str, Any]:

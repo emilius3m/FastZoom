@@ -3,177 +3,28 @@
 {% block title %}Catalogazione ICCD - {{ site.name }}{% endblock %}
 
 {% block extra_css %}
-<style>
-.iccd-section {
-    background: white;
-    border-radius: 8px;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
 
-.iccd-section-header {
-    background: #f8f9fa;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #dee2e6;
-    border-radius: 8px 8px 0 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.iccd-section-content {
-    padding: 1.5rem;
-}
-
-.iccd-form-group {
-    margin-bottom: 1rem;
-}
-
-.iccd-form-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-}
-
-.iccd-required {
-    color: #dc3545;
-    font-weight: bold;
-}
-
-.iccd-validation-error {
-    color: #dc3545;
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-}
-
-.iccd-validation-success {
-    color: #28a745;
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-}
-
-.iccd-nct-display {
-    background: #e9ecef;
-    padding: 0.75rem;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
-    border-left: 4px solid #007bff;
-}
-
-.iccd-progress {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 2rem;
-}
-
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: #e9ecef;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #28a745, #20c997);
-    transition: width 0.3s ease;
-}
-
-.iccd-toolbar {
-    position: sticky;
-    top: 70px;
-    background: white;
-    border-bottom: 1px solid #dee2e6;
-    padding: 1rem 0;
-    margin-bottom: 2rem;
-    z-index: 100;
-}
-
-.schema-selector {
-    max-width: 200px;
-}
-
-.level-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.level-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.level-P { background: #ffc107; color: #000; }
-.level-C { background: #17a2b8; color: white; }
-.level-A { background: #28a745; color: white; }
-
-.material-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-.material-chip {
-    background: #e9ecef;
-    padding: 0.25rem 0.75rem;
-    border-radius: 16px;
-    font-size: 0.875rem;
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.material-chip.selected {
-    background: #007bff;
-    color: white;
-    border-color: #0056b3;
-}
-
-.section-toggle {
-    cursor: pointer;
-    user-select: none;
-}
-
-.section-collapsed .iccd-section-content {
-    display: none;
-}
-
-.chronology-input-group {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 0.5rem;
-    align-items: center;
-}
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid" x-data="iccdCatalogation()" x-init="init()">
+<div class="max-w-screen-xl mx-auto p-4" x-data="iccdCatalogation()" x-init="init()">
     
     <!-- Toolbar fisso -->
-    <div class="iccd-toolbar">
-        <div class="row align-items-center">
-            <div class="col-md-3">
-                <label for="schemaType" class="form-label mb-0">Tipo Schema</label>
-                <select id="schemaType" class="form-select schema-selector" 
-                        x-model="formData.schema_type" 
+    <div class="sticky top-20 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 mb-6 z-10 rounded-lg shadow-sm">
+        <div class="flex flex-wrap items-center gap-4">
+            <div class="flex-1 min-w-0">
+                <label for="schemaType" class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Tipo Schema</label>
+                <select id="schemaType" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 max-w-xs"
+                        x-model="formData.schema_type"
                         @change="loadSchemaTemplate()">
                     <option value="RA">🏺 RA - Reperto Archeologico</option>
                     <option value="CA">🏛️ CA - Complesso Archeologico</option>
                     <option value="SI">🗺️ SI - Sito Archeologico</option>
                 </select>
             </div>
-            <div class="col-md-3">
-                <label for="catalogLevel" class="form-label mb-0">Livello Catalogazione</label>
-                <select id="catalogLevel" class="form-select" 
+            <div class="flex-1 min-w-0">
+                <label for="catalogLevel" class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Livello Catalogazione</label>
+                <select id="catalogLevel" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                         x-model="formData.level"
                         @change="updateRequiredSections()">
                     <option value="P">P - Precatalogazione</option>
@@ -181,19 +32,23 @@
                     <option value="A">A - Approfondimento</option>
                 </select>
             </div>
-            <div class="col-md-3">
-                <div class="level-indicator">
-                    <span class="level-badge" :class="'level-' + formData.level" x-text="getLevelName()"></span>
-                    <small class="text-muted" x-text="completedSections + '/' + totalSections + ' sezioni'"></small>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full" :class="{
+                        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200': formData.level === 'P',
+                        'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200': formData.level === 'C',
+                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': formData.level === 'A'
+                    }" x-text="getLevelName()"></span>
+                    <small class="text-gray-600 dark:text-gray-400" x-text="completedSections + '/' + totalSections + ' sezioni'"></small>
                 </div>
             </div>
-            <div class="col-md-3 text-end">
-                <div class="btn-group">
-                    <button type="button" class="btn btn-outline-secondary" @click="validateForm()">
-                        <i class="fas fa-check-circle"></i> Valida
+            <div class="flex-1 min-w-0 flex justify-end">
+                <div class="flex gap-2">
+                    <button type="button" class="text-gray-900 bg-white border border-gray-300 focus:outline-none hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-600 dark:focus:ring-gray-700" @click="validateForm()">
+                        <i class="fas fa-check-circle me-2"></i> Valida
                     </button>
-                    <button type="button" class="btn btn-success" @click="saveRecord()" :disabled="!isValid">
-                        <i class="fas fa-save"></i>
+                    <button type="button" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-green-600 dark:hover:bg-green-700 focus:outline-none dark:focus:ring-green-800" @click="saveRecord()" :disabled="!isValid">
+                        <i class="fas fa-save me-2"></i>
                         <span x-text="editMode ? 'Aggiorna Scheda' : 'Salva Scheda'"></span>
                     </button>
                 </div>
@@ -202,73 +57,73 @@
     </div>
 
     <!-- Progress Bar -->
-    <div class="iccd-progress">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0">Completamento Scheda ICCD</h6>
-            <span class="badge bg-primary" x-text="Math.round(completionPercentage) + '%'"></span>
+    <div class="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <h6 class="text-lg font-semibold text-gray-900 dark:text-white">Completamento Scheda ICCD</h6>
+            <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300" x-text="Math.round(completionPercentage) + '%'"></span>
         </div>
-        <div class="progress-bar">
-            <div class="progress-fill" :style="'width: ' + completionPercentage + '%'"></div>
+        <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+            <div class="bg-gradient-to-r from-green-400 to-blue-500 h-2.5 rounded-full transition-all duration-300" :style="'width: ' + completionPercentage + '%'"></div>
         </div>
-        
+
         <!-- NCT Display -->
-        <div class="iccd-nct-display mt-3" x-show="formData.iccd_data.CD?.NCT">
-            <strong>Codice NCT:</strong> 
-            <span x-text="generateNCTDisplay()"></span>
+        <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg mt-4 border-l-4 border-blue-500" x-show="formData.iccd_data.CD?.NCT">
+            <strong class="text-gray-900 dark:text-white font-mono">Codice NCT:</strong>
+            <span class="font-mono text-gray-700 dark:text-gray-300" x-text="generateNCTDisplay()"></span>
         </div>
     </div>
 
     <!-- Alert per validazioni -->
-    <div x-show="showAlert" class="alert" :class="alertClass" role="alert" x-transition>
-        <div class="d-flex align-items-center">
-            <i :class="alertIcon" class="me-2"></i>
+    <div x-show="showAlert" class="p-4 mb-4 text-sm border rounded-lg" :class="alertClass" role="alert" x-transition>
+        <div class="flex items-center">
+            <i :class="alertIcon" class="me-3 flex-shrink-0 w-4 h-4"></i>
             <span x-text="alertMessage"></span>
         </div>
     </div>
 
     <!-- Sezione CD - CODICI -->
-    <div class="iccd-section">
-        <div class="iccd-section-header section-toggle" @click="toggleSection('CD')">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 border-b border-gray-200 dark:border-gray-600 cursor-pointer flex justify-between items-center" @click="toggleSection('CD')">
             <div>
-                <h5 class="mb-0">CD - CODICI <span class="iccd-required">*</span></h5>
-                <small class="text-muted">Identificativi e metadati della scheda</small>
+                <h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">CD - CODICI <span class="text-red-500">*</span></h5>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Identificativi e metadati della scheda</p>
             </div>
-            <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.CD}"></i>
+            <i class="fas fa-chevron-down transition-transform" :class="{'rotate-180': !collapsedSections.CD}"></i>
         </div>
-        <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.CD}">
-            <div class="iccd-form-row">
-                <div class="iccd-form-group">
-                    <label class="form-label">Tipo Scheda <span class="iccd-required">*</span></label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.CD.TSK" readonly>
+        <div class="p-6" :class="{'hidden': collapsedSections.CD}">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Tipo Scheda <span class="text-red-500">*</span></label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.CD.TSK" readonly>
                 </div>
-                <div class="iccd-form-group">
-                    <label class="form-label">Livello Ricerca <span class="iccd-required">*</span></label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.CD.LIR" readonly>
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Livello Ricerca <span class="text-red-500">*</span></label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.CD.LIR" readonly>
                 </div>
-                <div class="iccd-form-group">
-                    <label class="form-label">Ente Schedatore <span class="iccd-required">*</span></label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.CD.ESC" 
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Ente Schedatore <span class="text-red-500">*</span></label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.CD.ESC"
                            placeholder="SSABAP-RM">
                 </div>
             </div>
             
             <!-- NCT - Codice Univoco -->
-            <div class="mt-4">
-                <h6>NCT - Codice Univoco <span class="iccd-required">*</span></h6>
-                <div class="iccd-form-row">
-                    <div class="iccd-form-group">
-                        <label class="form-label">Codice Regione (NCTR) <span class="iccd-required">*</span></label>
-                        <input type="text" class="form-control" x-model="formData.iccd_data.CD.NCT.NCTR" 
+            <div class="mt-6">
+                <h6 class="text-base font-semibold text-gray-900 dark:text-white mb-4">NCT - Codice Univoco <span class="text-red-500">*</span></h6>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Codice Regione (NCTR) <span class="text-red-500">*</span></label>
+                        <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.CD.NCT.NCTR"
                                pattern="[0-9]{2}" maxlength="2" placeholder="12">
                     </div>
-                    <div class="iccd-form-group">
-                        <label class="form-label">Numero Catalogo (NCTN) <span class="iccd-required">*</span></label>
-                        <input type="text" class="form-control" x-model="formData.iccd_data.CD.NCT.NCTN" 
+                    <div>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Numero Catalogo (NCTN) <span class="text-red-500">*</span></label>
+                        <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.CD.NCT.NCTN"
                                pattern="[0-9]{8}" maxlength="8" placeholder="Generato automaticamente" readonly>
                     </div>
-                    <div class="iccd-form-group">
-                        <label class="form-label">Suffisso (NCTS)</label>
-                        <input type="text" class="form-control" x-model="formData.iccd_data.CD.NCT.NCTS" 
+                    <div>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Suffisso (NCTS)</label>
+                        <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.CD.NCT.NCTS"
                                pattern="[A-Z]{1,2}" maxlength="2" placeholder="A, B, AA...">
                     </div>
                 </div>
@@ -277,19 +132,19 @@
     </div>
 
     <!-- Sezione OG - OGGETTO -->
-    <div class="iccd-section">
-        <div class="iccd-section-header section-toggle" @click="toggleSection('OG')">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 border-b border-gray-200 dark:border-gray-600 cursor-pointer flex justify-between items-center" @click="toggleSection('OG')">
             <div>
-                <h5 class="mb-0">OG - OGGETTO <span class="iccd-required">*</span></h5>
-                <small class="text-muted">Definizione e classificazione dell'oggetto</small>
+                <h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">OG - OGGETTO <span class="text-red-500">*</span></h5>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Definizione e classificazione dell'oggetto</p>
             </div>
-            <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.OG}"></i>
+            <i class="fas fa-chevron-down transition-transform" :class="{'rotate-180': !collapsedSections.OG}"></i>
         </div>
-        <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.OG}">
-            <div class="iccd-form-row">
-                <div class="iccd-form-group">
-                    <label class="form-label">Definizione <span class="iccd-required">*</span></label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGT.OGTD" 
+        <div class="p-6" :class="{'hidden': collapsedSections.OG}">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Definizione <span class="text-red-500">*</span></label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.OG.OGT.OGTD"
                            placeholder="coppa, anfora, lucerna, fibula..." list="object-definitions">
                     <datalist id="object-definitions">
                         <option value="coppa">
@@ -303,30 +158,30 @@
                         <option value="statuetta">
                     </datalist>
                 </div>
-                <div class="iccd-form-group">
-                    <label class="form-label">Tipologia</label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGT.OGTT" 
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Tipologia</label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.OG.OGT.OGTT"
                            placeholder="Specificazione tipologica">
                 </div>
-                <div class="iccd-form-group">
-                    <label class="form-label">Denominazione</label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGT.OGTN" 
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Denominazione</label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.OG.OGT.OGTN"
                            placeholder="Nome proprio se noto">
                 </div>
             </div>
-            
+
             <!-- Numero Inventario -->
-            <div class="mt-4">
-                <h6>Numero d'Inventario</h6>
-                <div class="iccd-form-row">
-                    <div class="iccd-form-group">
-                        <label class="form-label">Numero</label>
-                        <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGN.OGNN" 
+            <div class="mt-6">
+                <h6 class="text-base font-semibold text-gray-900 dark:text-white mb-4">Numero d'Inventario</h6>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Numero</label>
+                        <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.OG.OGN.OGNN"
                                placeholder="Numero d'inventario">
                     </div>
-                    <div class="iccd-form-group">
-                        <label class="form-label">Specifiche</label>
-                        <input type="text" class="form-control" x-model="formData.iccd_data.OG.OGN.OGNS" 
+                    <div>
+                        <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Specifiche</label>
+                        <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.OG.OGN.OGNS"
                                placeholder="Specificazioni">
                     </div>
                 </div>
@@ -335,49 +190,49 @@
     </div>
 
     <!-- Sezione LC - LOCALIZZAZIONE -->
-    <div class="iccd-section">
-        <div class="iccd-section-header section-toggle" @click="toggleSection('LC')">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 border-b border-gray-200 dark:border-gray-600 cursor-pointer flex justify-between items-center" @click="toggleSection('LC')">
             <div>
-                <h5 class="mb-0">LC - LOCALIZZAZIONE <span class="iccd-required">*</span></h5>
-                <small class="text-muted">Localizzazione geografica e amministrativa</small>
+                <h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">LC - LOCALIZZAZIONE <span class="text-red-500">*</span></h5>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Localizzazione geografica e amministrativa</p>
             </div>
-            <i class="fas fa-chevron-down" :class="{'fa-rotate-180': !collapsedSections.LC}"></i>
+            <i class="fas fa-chevron-down transition-transform" :class="{'rotate-180': !collapsedSections.LC}"></i>
         </div>
-        <div class="iccd-section-content" :class="{'section-collapsed': collapsedSections.LC}">
-            <h6>Localizzazione Geografico-Amministrativa <span class="iccd-required">*</span></h6>
-            <div class="iccd-form-row">
-                <div class="iccd-form-group">
-                    <label class="form-label">Stato <span class="iccd-required">*</span></label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVC.PVCS" 
+        <div class="p-6" :class="{'hidden': collapsedSections.LC}">
+            <h6 class="text-base font-semibold text-gray-900 dark:text-white mb-4">Localizzazione Geografico-Amministrativa <span class="text-red-500">*</span></h6>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Stato <span class="text-red-500">*</span></label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.LC.PVC.PVCS"
                            value="Italia" readonly>
                 </div>
-                <div class="iccd-form-group">
-                    <label class="form-label">Regione <span class="iccd-required">*</span></label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVC.PVCR" 
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Regione <span class="text-red-500">*</span></label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.LC.PVC.PVCR"
                            value="Lazio" readonly>
                 </div>
-                <div class="iccd-form-group">
-                    <label class="form-label">Provincia <span class="iccd-required">*</span></label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVC.PVCP" 
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Provincia <span class="text-red-500">*</span></label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.LC.PVC.PVCP"
                            value="RM" readonly>
                 </div>
-                <div class="iccd-form-group">
-                    <label class="form-label">Comune <span class="iccd-required">*</span></label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVC.PVCC" 
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Comune <span class="text-red-500">*</span></label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.LC.PVC.PVCC"
                            value="Roma" readonly>
                 </div>
             </div>
-            
-            <h6 class="mt-4">Localizzazione Specifica</h6>
-            <div class="iccd-form-row">
-                <div class="iccd-form-group">
-                    <label class="form-label">Denominazione</label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVL.PVLN" 
+
+            <h6 class="text-base font-semibold text-gray-900 dark:text-white mb-4 mt-6">Localizzazione Specifica</h6>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Denominazione</label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.LC.PVL.PVLN"
                            placeholder="Domus Flavia">
                 </div>
-                <div class="iccd-form-group">
-                    <label class="form-label">Indirizzo</label>
-                    <input type="text" class="form-control" x-model="formData.iccd_data.LC.PVL.PVLI" 
+                <div>
+                    <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Indirizzo</label>
+                    <input type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" x-model="formData.iccd_data.LC.PVL.PVLI"
                            placeholder="Via o località">
                 </div>
             </div>
@@ -471,8 +326,8 @@
                     <label class="form-label">Materia <span class="iccd-required">*</span></label>
                     <div class="material-chips">
                         <template x-for="material in availableMaterials" :key="material">
-                            <div class="material-chip" 
-                                 :class="{'selected': formData.iccd_data.MT?.MTC?.MTCM?.includes(material)}"
+                            <div class="material-chip"
+                                 :class="{'selected': (formData.iccd_data.MT?.MTC?.MTCM || []).includes(material)}"
                                  @click="toggleMaterial(material)"
                                  x-text="material">
                             </div>
@@ -657,7 +512,45 @@ function iccdCatalogation() {
             schema_type: 'RA',
             level: 'C',
             cataloging_institution: 'SSABAP-RM',
-            iccd_data: {}
+            iccd_data: {
+                CD: {
+                    TSK: 'RA',
+                    LIR: 'C',
+                    NCT: {
+                        NCTR: '12',
+                        NCTN: '',
+                        NCTS: ''
+                    },
+                    ESC: 'SSABAP-RM'
+                },
+                OG: {
+                    OGT: {
+                        OGTD: '',
+                        OGTT: '',
+                        OGTN: ''
+                    },
+                    OGN: {
+                        OGNN: '',
+                        OGNS: ''
+                    }
+                },
+                LC: {
+                    PVC: {
+                        PVCS: 'Italia',
+                        PVCR: 'Lazio',
+                        PVCP: 'RM',
+                        PVCC: 'Roma'
+                    },
+                    PVL: {
+                        PVLN: 'Domus Flavia',
+                        PVLI: 'Palatino'
+                    },
+                    LDC: {
+                        LDCN: '',
+                        LDCU: ''
+                    }
+                }
+            }
         },
         
         // UI state
@@ -731,11 +624,129 @@ function iccdCatalogation() {
                 iccd_data: recordData.iccd_data
             };
 
+            // Assicurati che la struttura dati sia completa
+            this.ensureCompleteDataStructure();
+
             // Carica template per il tipo di schema esistente
             await this.loadSchemaTemplate();
 
             // Aggiorna sezioni richieste per il livello esistente
             this.updateRequiredSections();
+        },
+
+        // Assicurati che la struttura dati sia sempre completa
+        ensureCompleteDataStructure() {
+            const defaultStructure = {
+                CD: {
+                    TSK: this.formData.schema_type,
+                    LIR: this.formData.level,
+                    NCT: {
+                        NCTR: '12',
+                        NCTN: '',
+                        NCTS: ''
+                    },
+                    ESC: this.formData.cataloging_institution
+                },
+                OG: {
+                    OGT: {
+                        OGTD: '',
+                        OGTT: '',
+                        OGTN: ''
+                    },
+                    OGN: {
+                        OGNN: '',
+                        OGNS: ''
+                    }
+                },
+                LC: {
+                    PVC: {
+                        PVCS: 'Italia',
+                        PVCR: 'Lazio',
+                        PVCP: 'RM',
+                        PVCC: 'Roma'
+                    },
+                    PVL: {
+                        PVLN: 'Domus Flavia',
+                        PVLI: 'Palatino'
+                    },
+                    LDC: {
+                        LDCN: '',
+                        LDCU: ''
+                    }
+                }
+            };
+
+            // Aggiungi sezioni condizionali
+            if (['C', 'A'].includes(this.formData.level)) {
+                defaultStructure.DT = {
+                    DTS: {
+                        DTSI: '',
+                        DTSF: '',
+                        DTSV: ''
+                    },
+                    DTM: {
+                        DTMA: null,
+                        DTMB: null,
+                        DTMV: ''
+                    }
+                };
+
+                defaultStructure.MT = {
+                    MTC: {
+                        MTCM: [],
+                        MTCT: ''
+                    },
+                    MIS: {
+                        MISA: null,
+                        MISL: null,
+                        MISP: null,
+                        MISD: null,
+                        MISU: 'cm'
+                    }
+                };
+
+                defaultStructure.DA = {
+                    DES: {
+                        DESO: '',
+                        DESI: ''
+                    },
+                    ISR: {
+                        ISRC: '',
+                        ISRI: '',
+                        ISRL: ''
+                    },
+                    STC: {
+                        STCC: '',
+                        STCS: ''
+                    }
+                };
+            }
+
+            if (this.formData.level === 'A') {
+                defaultStructure.AU = {
+                    AUT: {
+                        AUTM: '',
+                        AUTS: ''
+                    }
+                };
+
+                defaultStructure.NS = {
+                    NSC: {
+                        NSCR: '',
+                        NSCD: ''
+                    }
+                };
+
+                defaultStructure.RS = {
+                    RSE: {
+                        RSER: '',
+                        RSEC: ''
+                    }
+                };
+            }
+
+            // Merge con dati esistenti
+            this.formData.iccd_data = this.deepMerge(defaultStructure, this.formData.iccd_data || {});
         },
         
         // Caricamento template schema
@@ -754,8 +765,8 @@ function iccdCatalogation() {
         
         // Inizializzazione dati form
         initializeFormData(template) {
-            // Inizializza struttura dati ICCD
-            this.formData.iccd_data = {
+            // Struttura dati ICCD di default
+            const defaultData = {
                 CD: {
                     TSK: this.formData.schema_type,
                     LIR: this.formData.level,
@@ -794,10 +805,10 @@ function iccdCatalogation() {
                     }
                 }
             };
-            
+
             // Aggiungi sezioni condizionali
             if (['C', 'A'].includes(this.formData.level)) {
-                this.formData.iccd_data.DT = {
+                defaultData.DT = {
                     DTS: {
                         DTSI: '',
                         DTSF: '',
@@ -809,8 +820,8 @@ function iccdCatalogation() {
                         DTMV: ''
                     }
                 };
-                
-                this.formData.iccd_data.MT = {
+
+                defaultData.MT = {
                     MTC: {
                         MTCM: [],
                         MTCT: ''
@@ -823,8 +834,8 @@ function iccdCatalogation() {
                         MISU: 'cm'
                     }
                 };
-                
-                this.formData.iccd_data.DA = {
+
+                defaultData.DA = {
                     DES: {
                         DESO: '',
                         DESI: ''
@@ -840,31 +851,49 @@ function iccdCatalogation() {
                     }
                 };
             }
-            
+
             if (this.formData.level === 'A') {
-                this.formData.iccd_data.AU = {
+                defaultData.AU = {
                     AUT: {
                         AUTM: '',
                         AUTS: ''
                     }
                 };
-                
-                this.formData.iccd_data.NS = {
+
+                defaultData.NS = {
                     NSC: {
                         NSCR: '',
                         NSCD: ''
                     }
                 };
-                
-                this.formData.iccd_data.RS = {
+
+                defaultData.RS = {
                     RSE: {
                         RSER: '',
                         RSEC: ''
                     }
                 };
             }
-            
+
+            // Merge con dati esistenti (per modalità modifica)
+            this.formData.iccd_data = this.deepMerge(defaultData, this.formData.iccd_data || {});
+
             this.updateRequiredSections();
+        },
+
+        // Utility per merge profondo di oggetti
+        deepMerge(target, source) {
+            const result = { ...target };
+
+            for (const key in source) {
+                if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+                    result[key] = this.deepMerge(target[key] || {}, source[key]);
+                } else {
+                    result[key] = source[key];
+                }
+            }
+
+            return result;
         },
         
         // Aggiornamento sezioni richieste
@@ -874,8 +903,9 @@ function iccdCatalogation() {
                 'C': ['CD', 'OG', 'LC', 'DT', 'MT', 'DA'],
                 'A': ['CD', 'OG', 'LC', 'DT', 'MT', 'DA', 'AU', 'NS', 'RS']
             };
-            
-            this.totalSections = sectionsByLevel[this.formData.level].length;
+
+            const sections = sectionsByLevel[this.formData.level] || sectionsByLevel['C'];
+            this.totalSections = sections.length;
             this.loadSchemaTemplate(); // Ricarica template per nuovo livello
         },
         
