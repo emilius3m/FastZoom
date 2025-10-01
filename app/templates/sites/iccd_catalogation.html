@@ -1028,27 +1028,40 @@ function iccdCatalogation() {
             this.validationErrors = [];
             
             try {
+                // Extract level from formData, with fallback to CD.LIR if available
+                const level = this.formData.level || this.formData.iccd_data?.CD?.LIR || 'C';
+                
                 const response = await fetch('/api/iccd/validate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token') || localStorage.getItem('token')}`
                     },
                     body: JSON.stringify({
                         schema_type: this.formData.schema_type,
-                        level: this.formData.level,
+                        level: level,
                         iccd_data: this.formData.iccd_data
                     })
                 });
                 
                 const result = await response.json();
                 
-                if (result.valid) {
-                    this.isValid = true;
-                    this.showAlertMessage('Scheda ICCD validata con successo!', 'success');
+                if (response.ok) {
+                    if (result.valid) {
+                        this.isValid = true;
+                        this.showAlertMessage('Scheda ICCD validata con successo!', 'success');
+                    } else {
+                        this.isValid = false;
+                        this.validationErrors = result.errors;
+                        this.showAlertMessage(`Trovati ${result.errors.length} errori di validazione`, 'error');
+                    }
                 } else {
-                    this.isValid = false;
-                    this.validationErrors = result.errors;
-                    this.showAlertMessage(`Trovati ${result.errors.length} errori di validazione`, 'error');
+                    // Handle error response that might not be JSON
+                    if (typeof result === 'object' && result.detail) {
+                        this.showAlertMessage(result.detail, 'error');
+                    } else {
+                        this.showAlertMessage(`Errore validazione: ${response.status} - ${response.statusText}`, 'error');
+                    }
                 }
                 
             } catch (error) {

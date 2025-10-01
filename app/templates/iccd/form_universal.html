@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base/site_base.html" %}
 
 {% block title %}Scheda ICCD {{ schema_type }} - {{ site.name }} | FastZoom{% endblock %}
 
@@ -27,13 +27,13 @@
 {% block content %}
 <div class="container mx-auto px-4 py-6" x-data="iccdFormUniversal('{{ schema_type }}', '{{ site.id }}')">
 
-    <!-- Header -->
+    <!-- Header universal-->
     <div class="mb-6">
         <nav class="flex mb-4 text-sm" aria-label="Breadcrumb">
             <ol class="inline-flex items-center space-x-1">
-                <li><a href="{% url 'dashboard' %}" class="text-gray-600 hover:text-blue-600">Dashboard</a></li>
+                <li><a href="#" class="text-gray-600 hover:text-blue-600">Dashboard</a></li>
                 <li><span class="mx-2 text-gray-400">/</span></li>
-                <li><a href="{% url 'site_detail' site.id %}" class="text-gray-600 hover:text-blue-600">{{ site.name }}</a></li>
+                <li><a href="#" class="text-gray-600 hover:text-blue-600">{{ site.name }}</a></li>
                 <li><span class="mx-2 text-gray-400">/</span></li>
                 <li class="text-gray-900 font-medium">Scheda ICCD <span x-text="schemaType"></span> 3.00</li>
             </ol>
@@ -215,16 +215,21 @@
                 </button>
             </div>
         </div>
+    
+        <!-- Toggle sidebar -->
+        <button @click="showSidebar = !showSidebar" x-show="!showSidebar"
+                class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 z-40">
+            📊
+        </button>
     </div>
-
-    <!-- Toggle sidebar -->
-    <button @click="showSidebar = !showSidebar" x-show="!showSidebar"
-            class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 z-40">
-        📊
-    </button>
-</div>
-
-<script>
+    
+    <!-- Pass the existing record data to JavaScript-->
+    <script>
+        // Define existing record data from the template context
+        const existingRecordData = {{ record | tojson }};
+    </script>
+    
+    <script>
 function iccdFormUniversal(schemaType, siteId) {
     return {
         // Config
@@ -258,7 +263,7 @@ function iccdFormUniversal(schemaType, siteId) {
 
         async loadSchema() {
             try {
-                const response = await fetch(`/api/iccd/schemas/${this.schemaType}`);
+                const response = await fetch(`/api/iccd/schema-templates/${this.schemaType}`);
                 if (!response.ok) throw new Error('Schema non trovato');
 
                 const data = await response.json();
@@ -275,20 +280,27 @@ function iccdFormUniversal(schemaType, siteId) {
         },
 
         initializeFormData() {
-            // Inizializza CD di default
-            this.formData = {
-                CD: {
-                    TSK: this.schemaType,
-                    LIR: 'C',
-                    NCT: {
-                        NCTR: '12',
-                        NCTN: this.generateNCTN(),
-                        NCTS: ''
-                    },
-                    ESC: '',
-                    ECP: ''
-                }
-            };
+            // Se abbiamo dati esistenti (modalità modifica), usali
+            // Altrimenti inizializza con valori di default (modalità nuovo record)
+            if (typeof existingRecordData !== 'undefined' && existingRecordData && existingRecordData.iccd_data) {
+                // Modalità modifica: usa i dati esistenti
+                this.formData = { ...existingRecordData.iccd_data };
+            } else {
+                // Modalità nuovo record: inizializza con valori di default
+                this.formData = {
+                    CD: {
+                        TSK: this.schemaType,
+                        LIR: 'C',
+                        NCT: {
+                            NCTR: '12',
+                            NCTN: this.generateNCTN(),
+                            NCTS: ''
+                        },
+                        ESC: '',
+                        ECP: ''
+                    }
+                };
+            }
         },
 
         parseSections() {
@@ -456,46 +468,197 @@ function iccdFormUniversal(schemaType, siteId) {
             if (idx < this.sections.length - 1) this.currentSection = this.sections[idx + 1].id;
         },
 
-        validateCurrentSection() {
+        async validateCurrentSection() {
             this.showAlert('info', 'Validazione in corso...');
+
+            try {
+                const currentSectionData = this.formData[this.currentSection] || {};
+                
+                // Extract level from CD section, defaulting to 'C' if not found
+                const level = this.formData.CD?.LIR || this.schemaInfo?.level || 'C';
+                
+                const response = await fetch('/api/iccd/validate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token') || localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        schema_type: this.schemaType,
+                        level: level,
+                        iccd_data: this.formData
+                    })
+                });
+
+                let result;
+                try {
+                    result = await response.json();
+                } catch (jsonError) {
+                    // Handle case where response is not JSON (like error messages)
+                    if (response.ok) {
+                        // If response is OK but not JSON, there's an issue
+                        throw new Error('Invalid response format from validation endpoint');
+                    } else {
+                        // If response is not OK and not JSON, use status text
+                        throw new Error(`${response.status} - ${response.statusText}`);
+                    }
+                }
+                
+                if (response.ok) {
+                    if (result.valid) {
+                        this.showAlert('success', `✅ Validazione sezione ${this.currentSection} completata - Nessun errore trovato`);
+                    } else {
+                        const errorCount = result.errors.length;
+                        const errorMessage = `⚠️ Validazione sezione ${this.currentSection} - ${errorCount} errore/i trovato/i`;
+                        this.showAlert('error', errorMessage);
+                        
+                        // Log errors to console for debugging
+                        console.log('Validation errors:', result.errors);
+                    }
+                } else {
+                    // Handle error response that might not be JSON
+                    if (typeof result === 'object' && result.detail) {
+                        this.showAlert('error', result.detail);
+                    } else {
+                        this.showAlert('error', `Errore validazione: ${response.status} - ${response.statusText}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Validation error:', error);
+                this.showAlert('error', `Errore durante la validazione: ${error.message || error}`);
+            }
         },
 
-        validateAll() {
-            this.showAlert('info', 'Validazione completa...');
+        async validateAll() {
+            this.showAlert('info', 'Validazione completa in corso...');
+
+            try {
+                // Extract level from CD section, defaulting to 'C' if not found
+                const level = this.formData.CD?.LIR || this.schemaInfo?.level || 'C';
+                
+                const response = await fetch('/api/iccd/validate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token') || localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        schema_type: this.schemaType,
+                        level: level,
+                        iccd_data: this.formData
+                    })
+                });
+
+                let result;
+                try {
+                    result = await response.json();
+                } catch (jsonError) {
+                    // Handle case where response is not JSON (like error messages)
+                    if (response.ok) {
+                        // If response is OK but not JSON, there's an issue
+                        throw new Error('Invalid response format from validation endpoint');
+                    } else {
+                        // If response is not OK and not JSON, use status text
+                        throw new Error(`${response.status} - ${response.statusText}`);
+                    }
+                }
+                
+                if (response.ok) {
+                    if (result.valid) {
+                        this.showAlert('success', '✅ Validazione completa - Nessun errore trovato');
+                    } else {
+                        const errorCount = result.errors.length;
+                        const errorMessage = `⚠️ Validazione completa - ${errorCount} errore/i trovato/i`;
+                        this.showAlert('error', errorMessage);
+                        
+                        // Log errors to console for debugging
+                        console.log('Validation errors:', result.errors);
+                    }
+                } else {
+                    // Handle error response that might not be JSON
+                    if (typeof result === 'object' && result.detail) {
+                        this.showAlert('error', result.detail);
+                    } else {
+                        this.showAlert('error', `Errore validazione: ${response.status} - ${response.statusText}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Validation error:', error);
+                this.showAlert('error', `Errore durante la validazione completa: ${error.message || error}`);
+            }
         },
 
         async saveForm() {
             this.saving = true;
 
             try {
-                const response = await fetch('/api/iccd/records', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
-                    body: JSON.stringify({
-                        schema_type: this.schemaType,
-                        site_id: this.siteId,
-                        record_data: this.formData
-                    })
-                });
+                let response;
+                let endpoint;
+                let method;
+                
+                // Determina se stiamo creando un nuovo record o aggiornando uno esistente
+                const recordId = typeof existingRecordData !== 'undefined' && existingRecordData && existingRecordData.id ? existingRecordData.id : null;
+                
+                if (recordId) {
+                    // Modalità aggiornamento record esistente
+                    endpoint = `/api/iccd/records/${recordId}`;
+                    method = 'PUT';
+                    response = await fetch(endpoint, {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('access_token') || localStorage.getItem('token')}`
+                        },
+                        body: JSON.stringify({
+                            schema_type: this.schemaType,
+                            level: this.formData.CD?.LIR || 'C',
+                            iccd_data: this.formData,
+                            cataloging_institution: this.formData.CD?.ESC || '',
+                            cataloger_name: this.formData.CD?.RCG?.RCGR || '',
+                            survey_date: this.formData.CD?.RCG?.RCGD || null
+                        })
+                    });
+                } else {
+                    // Modalità creazione nuovo record
+                    endpoint = '/api/iccd/records';
+                    method = 'POST';
+                    response = await fetch(endpoint, {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('access_token') || localStorage.getItem('token')}`
+                        },
+                        body: JSON.stringify({
+                            schema_type: this.schemaType,
+                            site_id: this.siteId,
+                            record_data: this.formData,
+                            cataloging_institution: this.formData.CD?.ESC || 'SSABAP-RM',
+                            level: this.formData.CD?.LIR || 'C'
+                        })
+                    });
+                }
 
-                if (!response.ok) throw new Error('Errore salvataggio');
+                if (!response.ok) {
+                    const errorResult = await response.json().catch(() => ({
+                        detail: `Errore salvataggio: ${response.status} - ${response.statusText}`
+                    }));
+                    throw new Error(errorResult.detail || `Errore salvataggio: ${response.status} - ${response.statusText}`);
+                }
 
                 const result = await response.json();
-                this.showAlert('success', `✅ Scheda ${result.nct_complete} salvata!`);
+                this.showAlert('success', `✅ Scheda ${result.nct || result.record?.nct || 'sconosciuta'} salvata!`);
 
                 setTimeout(() => window.location.href = `/sites/${this.siteId}/iccd/`, 2000);
             } catch (error) {
-                this.showAlert('error', 'Errore durante il salvataggio');
+                this.showAlert('error', `Errore durante il salvataggio: ${error.message || 'Errore sconosciuto'}`);
             } finally {
                 this.saving = false;
             }
         },
 
         async saveAsDraft() {
-            this.formData.status = 'draft';
+            // For existing records, we don't need to change status as it's handled by the API
+            // For new records, we can set the status but the API endpoint will handle it appropriately
             await this.saveForm();
         },
 
