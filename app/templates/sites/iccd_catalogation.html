@@ -14,13 +14,14 @@
         <div class="flex flex-wrap items-center gap-4">
             <div class="flex-1 min-w-0">
                 <label for="schemaType" class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Tipo Schema</label>
-                <select id="schemaType" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 max-w-xs"
+                <select id="schemaType" class="bg-gray-50 border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-50 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 max-w-xs"
                         x-model="formData.schema_type"
+                        :disabled="loadingTemplate"
                         @change="loadSchemaTemplate()">
-                    <option value="RA">🏺 RA - Reperto Archeologico</option>
-                    <option value="CA">🏛️ CA - Complesso Archeologico</option>
-                    <option value="SI">🗺️ SI - Sito Archeologico</option>
-                </select>
+                   <option value="RA">🏺 RA - Reperto Archeologico</option>
+                   <option value="CA">🏛️ CA - Complesso Archeologico</option>
+                   <option value="SI">🗺️ SI - Sito Archeologico</option>
+               </select>
             </div>
             <div class="flex-1 min-w-0">
                 <label for="catalogLevel" class="block text-sm font-medium text-gray-900 dark:text-white mb-2">Livello Catalogazione</label>
@@ -553,6 +554,9 @@ function iccdCatalogation() {
             }
         },
         
+        // Stato caricamento template
+        loadingTemplate: false,
+        
         // UI state
         collapsedSections: {
             CD: false,
@@ -604,7 +608,7 @@ function iccdCatalogation() {
 
             this.updateProgress();
 
-            // Watch per aggiornamenti automatici
+            // Watch per aggiornamenti automatici - solo per progresso, non per ricaricare il template
             this.$watch('formData', () => {
                 this.updateProgress();
             }, { deep: true });
@@ -627,10 +631,8 @@ function iccdCatalogation() {
             // Assicurati che la struttura dati sia completa
             this.ensureCompleteDataStructure();
 
-            // Carica template per il tipo di schema esistente
-            await this.loadSchemaTemplate();
-
-            // Aggiorna sezioni richieste per il livello esistente
+            // In modalità modifica, non ricaricare il template per evitare di disabilitare il campo schema_type
+            // Aggiorna solo le sezioni richieste per il livello esistente
             this.updateRequiredSections();
         },
 
@@ -751,6 +753,13 @@ function iccdCatalogation() {
         
         // Caricamento template schema
         async loadSchemaTemplate() {
+            // Prevenzione loop: non caricare se già in corso
+            if (this.loadingTemplate) {
+                return;
+            }
+            
+            this.loadingTemplate = true;
+            
             try {
                 const response = await fetch(`/api/iccd/schema-templates/${this.formData.schema_type}`);
                 if (response.ok) {
@@ -760,6 +769,8 @@ function iccdCatalogation() {
             } catch (error) {
                 console.error('Errore caricamento template:', error);
                 this.showAlertMessage('Errore caricamento template schema', 'error');
+            } finally {
+                this.loadingTemplate = false;
             }
         },
         
@@ -878,6 +889,7 @@ function iccdCatalogation() {
             // Merge con dati esistenti (per modalità modifica)
             this.formData.iccd_data = this.deepMerge(defaultData, this.formData.iccd_data || {});
 
+            // Aggiorna solo il conteggio delle sezioni richieste senza ricaricare il template
             this.updateRequiredSections();
         },
 
@@ -906,7 +918,6 @@ function iccdCatalogation() {
 
             const sections = sectionsByLevel[this.formData.level] || sectionsByLevel['C'];
             this.totalSections = sections.length;
-            this.loadSchemaTemplate(); // Ricarica template per nuovo livello
         },
         
         // Generazione NCT
