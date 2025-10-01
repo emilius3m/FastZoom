@@ -2180,25 +2180,46 @@ async def new_iccd_record(
     user = await db.execute(user_query)
     current_user = user.scalar_one_or_none()
 
+    # Initialize empty record data for new records
+    record_data = {
+        "id": None,
+        "schema_type": schema_type,
+        "nct_region": "12",  # NCT Region (Lazio)
+        "nct_number": "",    # NCT Number (to be generated)
+        "nct_suffix": "",    # NCT Suffix (optional)
+        "nct": "",
+        "iccd_data": {
+            "CD": {  # Common data section
+                "TSK": schema_type,  # Task type
+                "LIR": "C",  # Level (C = Catalogazione)
+                "NCT": {
+                    "NCTR": "12", # NCT Region (Lazio)
+                    "NCTN": "",    # NCT Number (to be generated)
+                    "NCTS": ""     # NCT Suffix (optional)
+                },
+                "ESC": "",  # Ente schedatore (cataloging institution)
+                "ECP": ""   # Ente conservatore (conserving institution)
+            }
+        },
+        "created_at": None,
+        "updated_at": None
+    }
+
     context = {
         "request": request,
         "site": site,
         "user_permission": permission,
         "current_user": current_user,
+        "record": record_data,
+        "record_id": None,  # No record ID for new records
+        "edit_mode": False,
         "schema_type": schema_type,
         "can_read": permission.can_read(),
         "can_write": permission.can_write(),
         "can_admin": permission.can_admin()
     }
 
-    # Seleziona template in base al tipo schema
-    template_name = "sites/iccd_ra_300_form.html"  # Default RA
-    if schema_type == "SI":
-        template_name = "sites/iccd_si_300_form.html"
-    elif schema_type == "CA":
-        template_name = "sites/iccd_ca_300_form.html"  # Per futuro
-
-    return templates.TemplateResponse(template_name, context)
+    return templates.TemplateResponse("iccd/form_universal.html", context)
 
 
 @sites_router.get("/{site_id}/iccd/{record_id}", response_class=HTMLResponse)
@@ -2241,6 +2262,9 @@ async def view_iccd_record(
         record_data = {
             "id": str(record.id),
             "schema_type": record.schema_type,
+            "nct_region": record.nct_region,
+            "nct_number": record.nct_number,
+            "nct_suffix": record.nct_suffix or "",
             "nct": f"{record.nct_region}{record.nct_number}{record.nct_suffix or ''}",
             "iccd_data": record.iccd_data,
             "created_at": record.created_at.isoformat() if record.created_at else None,
@@ -2308,6 +2332,9 @@ async def edit_iccd_record(
         record_data = {
             "id": str(record.id),
             "schema_type": record.schema_type,
+            "nct_region": record.nct_region,
+            "nct_number": record.nct_number,
+            "nct_suffix": record.nct_suffix or "",
             "nct": f"{record.nct_region}{record.nct_number}{record.nct_suffix or ''}",
             "iccd_data": record.iccd_data,
             "created_at": record.created_at.isoformat() if record.created_at else None,
@@ -2328,9 +2355,11 @@ async def edit_iccd_record(
         "record": record_data,
         "record_id": str(record_id),
         "edit_mode": True,
+        "schema_type": record_data["schema_type"],
         "can_read": permission.can_read(),
         "can_write": permission.can_write(),
         "can_admin": permission.can_admin()
     }
-    
-    return templates.TemplateResponse("sites/iccd_catalogation.html", context)
+
+    return templates.TemplateResponse("iccd/form_universal.html", context)
+

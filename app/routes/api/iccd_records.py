@@ -1,6 +1,6 @@
 """API endpoints per gestione schede ICCD - Standard Catalogazione Archeologica."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
@@ -225,17 +225,23 @@ async def get_iccd_statistics(
 
 @iccd_router.post("/validate")
 async def validate_iccd_data(
-    validation_request: dict,
+    validation_request: Dict[str, Any] = Body(...),
     current_user_id: UUID = Depends(get_current_user_id),
     iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
 ):
     """Valida dati ICCD secondo standard ministeriali."""
     try:
+        from loguru import logger
+        logger.info(f"Validate request received: {validation_request}")
+
         schema_type = validation_request.get('schema_type')
         level = validation_request.get('level')
         iccd_data = validation_request.get('iccd_data')
-        
+
+        logger.info(f"Extracted fields - schema_type: {schema_type}, level: {level}, iccd_data present: {iccd_data is not None}")
+
         if not all([schema_type, level, iccd_data]):
+            logger.error(f"Missing required fields: schema_type={schema_type}, level={level}, iccd_data={iccd_data is not None}")
             raise BusinessLogicError("schema_type, level e iccd_data sono obbligatori", 400)
         
         # Create validation service
@@ -254,9 +260,29 @@ async def validate_iccd_data(
         })
         
     except BusinessLogicError as e:
-        raise HTTPException(status_code=e.status_code, detail=e.message)
+        logger.error(f"Business logic error in validation: {e.message}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "valid": False,
+                "errors": [{"field_path": "general", "message": e.message, "value": None}],
+                "schema_type": schema_type if 'schema_type' in locals() else None,
+                "level": level if 'level' in locals() else None,
+                "validation_timestamp": datetime.utcnow().isoformat()
+            }
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Errore validazione: {str(e)}")
+        logger.error(f"Unexpected error in validation: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "valid": False,
+                "errors": [{"field_path": "general", "message": f"Errore validazione: {str(e)}", "value": None}],
+                "schema_type": schema_type if 'schema_type' in locals() else None,
+                "level": level if 'level' in locals() else None,
+                "validation_timestamp": datetime.utcnow().isoformat()
+            }
+        )
 
 
 # === INTEGRAZIONE CON SISTEMA FASTZOOM ===
