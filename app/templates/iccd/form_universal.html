@@ -1,0 +1,523 @@
+{% extends "base.html" %}
+
+{% block title %}Scheda ICCD {{ schema_type }} - {{ site.name }} | FastZoom{% endblock %}
+
+{% block head %}
+<style>
+    .iccd-section {
+        @apply border-l-4 border-blue-600 bg-white rounded-r-lg shadow-sm mb-6 transition-all;
+    }
+    .iccd-section-required { @apply border-l-red-600; }
+    .iccd-section-complete { @apply border-l-green-600; }
+    .iccd-field-required label::after {
+        content: " *";
+        @apply text-red-600 font-bold;
+    }
+    .iccd-tab {
+        @apply relative px-4 py-3 text-sm font-medium text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-300 transition-colors cursor-pointer whitespace-nowrap;
+    }
+    .iccd-tab-active { @apply text-blue-600 border-blue-600; }
+    .iccd-tab-complete::before {
+        content: "✓";
+        @apply absolute -top-1 -right-1 bg-green-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6" x-data="iccdFormUniversal('{{ schema_type }}', '{{ site.id }}')">
+
+    <!-- Header -->
+    <div class="mb-6">
+        <nav class="flex mb-4 text-sm" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1">
+                <li><a href="{% url 'dashboard' %}" class="text-gray-600 hover:text-blue-600">Dashboard</a></li>
+                <li><span class="mx-2 text-gray-400">/</span></li>
+                <li><a href="{% url 'site_detail' site.id %}" class="text-gray-600 hover:text-blue-600">{{ site.name }}</a></li>
+                <li><span class="mx-2 text-gray-400">/</span></li>
+                <li class="text-gray-900 font-medium">Scheda ICCD <span x-text="schemaType"></span> 3.00</li>
+            </ol>
+        </nav>
+
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                    <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span x-text="`Scheda ${schemaType} 3.00 - ${schemaInfo.name || ''}`"></span>
+                </h1>
+                <p class="text-gray-600 mt-2" x-text="`${schemaInfo.description || ''} - Standard ICCD MiC 2025`"></p>
+            </div>
+
+            <!-- Progresso -->
+            <div class="text-right">
+                <div class="text-sm text-gray-600 mb-2">Completamento</div>
+                <div class="flex items-center gap-3">
+                    <div class="w-48 h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300"
+                             :style="`width: ${completionPercentage}%`"></div>
+                    </div>
+                    <span class="text-2xl font-bold text-blue-600" x-text="completionPercentage + '%'"></span>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">
+                    <span x-text="filledFields"></span>/<span x-text="totalFields"></span> campi
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert -->
+    <div x-show="alert.show"
+         x-transition
+         :class="{
+             'bg-green-50 border-green-500 text-green-800': alert.type === 'success',
+             'bg-red-50 border-red-500 text-red-800': alert.type === 'error',
+             'bg-yellow-50 border-yellow-500 text-yellow-800': alert.type === 'warning'
+         }"
+         class="border-l-4 p-4 mb-6 rounded-r flex items-start gap-3">
+        <div class="flex-1">
+            <p class="font-medium" x-text="alert.message"></p>
+        </div>
+        <button @click="alert.show = false" class="text-gray-400 hover:text-gray-600">✕</button>
+    </div>
+
+    <!-- Loading -->
+    <div x-show="loading" class="flex items-center justify-center py-12">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <span class="ml-3 text-gray-600">Caricamento schema ICCD...</span>
+    </div>
+
+    <!-- Tabs paragrafi -->
+    <div x-show="!loading" class="mb-6 border-b border-gray-200 overflow-x-auto">
+        <nav class="flex space-x-1 min-w-max" role="tablist">
+            <template x-for="section in sections" :key="section.id">
+                <button @click="currentSection = section.id"
+                        :class="{
+                            'iccd-tab-active': currentSection === section.id,
+                            'iccd-tab-complete': isSectionComplete(section.id)
+                        }"
+                        class="iccd-tab">
+                    <span x-text="section.id"></span>
+                    <span x-show="section.required" class="text-red-500 ml-1">*</span>
+                </button>
+            </template>
+        </nav>
+    </div>
+
+    <!-- Form -->
+    <form x-show="!loading" @submit.prevent="saveForm" class="space-y-6">
+        <template x-for="section in sections" :key="section.id">
+            <div x-show="currentSection === section.id"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 translate-x-4"
+                 x-transition:enter-end="opacity-100 translate-x-0"
+                 :class="{
+                     'iccd-section-required': section.required,
+                     'iccd-section-complete': isSectionComplete(section.id)
+                 }"
+                 class="iccd-section p-6">
+
+                <!-- Header sezione -->
+                <div class="mb-6 pb-4 border-b border-gray-200">
+                    <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        <span x-text="section.id"></span>
+                        <span class="text-gray-400">-</span>
+                        <span x-text="section.title"></span>
+                        <span x-show="section.required" class="text-red-600 text-sm">(Obbligatorio)</span>
+                    </h2>
+                    <p x-show="section.description" x-text="section.description" class="text-gray-600 mt-2"></p>
+                </div>
+
+                <!-- Campi dinamici -->
+                <div x-html="renderSectionFields(section)"></div>
+
+                <!-- Navigazione -->
+                <div class="mt-8 pt-6 border-t border-gray-200 flex justify-between">
+                    <button type="button" @click="previousSection()"
+                            x-show="!isFirstSection()"
+                            class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        ← Precedente
+                    </button>
+
+                    <div class="flex gap-3">
+                        <button type="button" @click="validateCurrentSection()"
+                                class="px-6 py-3 border border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50">
+                            🔍 Valida
+                        </button>
+
+                        <button type="button" @click="nextSection()"
+                                x-show="!isLastSection()"
+                                class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            Successiva →
+                        </button>
+
+                        <button type="submit" x-show="isLastSection()"
+                                :disabled="saving"
+                                class="px-8 py-3 rounded-lg text-white font-semibold"
+                                :class="saving ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'">
+                            <span x-text="saving ? 'Salvataggio...' : '💾 Salva Scheda'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </form>
+
+    <!-- Sidebar riepilogo -->
+    <div class="fixed right-0 top-20 w-80 bg-white shadow-xl rounded-l-xl z-50 transform transition-transform"
+         :class="showSidebar ? 'translate-x-0' : 'translate-x-full'">
+        <div class="p-4 border-b bg-blue-600 text-white rounded-tl-xl flex justify-between items-center">
+            <h3 class="font-semibold">📊 Riepilogo</h3>
+            <button @click="showSidebar = false" class="hover:text-gray-200">✕</button>
+        </div>
+
+        <div class="p-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+            <!-- Progresso -->
+            <div class="mb-4">
+                <div class="flex justify-between text-sm mb-2">
+                    <span>Progresso</span>
+                    <span class="font-bold text-blue-600" x-text="completionPercentage + '%'"></span>
+                </div>
+                <div class="w-full h-2 bg-gray-200 rounded-full">
+                    <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full"
+                         :style="`width: ${completionPercentage}%`"></div>
+                </div>
+            </div>
+
+            <!-- Lista sezioni -->
+            <div class="space-y-2">
+                <template x-for="section in sections" :key="section.id">
+                    <button @click="currentSection = section.id; showSidebar = false"
+                            class="w-full p-3 rounded-lg text-left transition-colors"
+                            :class="isSectionComplete(section.id) ? 'bg-green-50 hover:bg-green-100' : 'bg-gray-50 hover:bg-gray-100'">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-sm" x-text="section.id"></span>
+                            <div class="flex items-center gap-2">
+                                <span x-show="section.required" class="text-red-500 text-xs">⚠️</span>
+                                <span x-show="isSectionComplete(section.id)" class="text-green-600">✓</span>
+                            </div>
+                        </div>
+                    </button>
+                </template>
+            </div>
+
+            <!-- Azioni -->
+            <div class="mt-6 pt-4 border-t space-y-2">
+                <button @click="validateAll()"
+                        class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                    🔍 Valida Tutto
+                </button>
+                <button @click="saveAsDraft()"
+                        class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">
+                    💾 Salva Bozza
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toggle sidebar -->
+    <button @click="showSidebar = !showSidebar" x-show="!showSidebar"
+            class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 z-40">
+        📊
+    </button>
+</div>
+
+<script>
+function iccdFormUniversal(schemaType, siteId) {
+    return {
+        // Config
+        schemaType: schemaType,
+        siteId: siteId,
+
+        // Data
+        schema: null,
+        schemaInfo: {},
+        formData: {},
+        sections: [],
+        currentSection: 'CD',
+
+        // UI State
+        loading: true,
+        saving: false,
+        showSidebar: true,
+        alert: { show: false, type: 'info', message: '' },
+
+        // Stats
+        totalFields: 0,
+        filledFields: 0,
+
+        async init() {
+            await this.loadSchema();
+            this.initializeFormData();
+            this.parseSections();
+            this.calculateStats();
+            this.loading = false;
+        },
+
+        async loadSchema() {
+            try {
+                const response = await fetch(`/api/iccd/schemas/${this.schemaType}`);
+                if (!response.ok) throw new Error('Schema non trovato');
+
+                const data = await response.json();
+                this.schema = data.schema;
+                this.schemaInfo = {
+                    name: data.name,
+                    description: data.description,
+                    version: data.version
+                };
+            } catch (error) {
+                console.error('Errore caricamento schema:', error);
+                this.showAlert('error', 'Errore caricamento schema ICCD');
+            }
+        },
+
+        initializeFormData() {
+            // Inizializza CD di default
+            this.formData = {
+                CD: {
+                    TSK: this.schemaType,
+                    LIR: 'C',
+                    NCT: {
+                        NCTR: '12',
+                        NCTN: this.generateNCTN(),
+                        NCTS: ''
+                    },
+                    ESC: '',
+                    ECP: ''
+                }
+            };
+        },
+
+        parseSections() {
+            if (!this.schema || !this.schema.properties) return;
+
+            const properties = this.schema.properties;
+            const required = this.schema.required || [];
+
+            this.sections = Object.keys(properties).map(key => ({
+                id: key,
+                title: properties[key].title || key,
+                description: properties[key].description,
+                required: required.includes(key),
+                properties: properties[key].properties || {}
+            }));
+
+            this.currentSection = this.sections[0]?.id || 'CD';
+        },
+
+        renderSectionFields(section) {
+            if (!section.properties || Object.keys(section.properties).length === 0) {
+                return '<p class="text-gray-500">Nessun campo in questa sezione</p>';
+            }
+
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
+
+            for (const [key, field] of Object.entries(section.properties)) {
+                const path = `${section.id}.${key}`;
+                html += this.renderField(path, field, key);
+            }
+
+            html += '</div>';
+            return html;
+        },
+
+        renderField(path, field, fieldKey) {
+            // Campo oggetto con sottocampi
+            if (field.type === 'object' && field.properties) {
+                return this.renderObjectField(path, field, fieldKey);
+            }
+
+            // Campo array
+            if (field.type === 'array') {
+                return this.renderArrayField(path, field, fieldKey);
+            }
+
+            // Select enum
+            if (field.enum) {
+                return this.renderSelectField(path, field);
+            }
+
+            // Textarea
+            if (field.minLength > 100) {
+                return this.renderTextareaField(path, field);
+            }
+
+            // Number
+            if (field.type === 'number' || field.type === 'integer') {
+                return this.renderNumberField(path, field);
+            }
+
+            // Text input default
+            return this.renderTextField(path, field);
+        },
+
+        renderTextField(path, field) {
+            const isRequired = field.required || false;
+            return `
+                <div class="${isRequired ? 'iccd-field-required' : ''}">
+                    <label class="block mb-2 text-sm font-medium text-gray-900">${field.title || path}</label>
+                    <input type="text"
+                           x-model="formData.${path}"
+                           class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                           placeholder="${field.description || ''}"
+                           ${isRequired ? 'required' : ''}>
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500">${field.description}</p>` : ''}
+                </div>
+            `;
+        },
+
+        renderSelectField(path, field) {
+            let options = field.enum.map((val, idx) => {
+                const label = field.enumNames ? field.enumNames[idx] : val;
+                return `<option value="${val}">${label}</option>`;
+            }).join('');
+
+            return `
+                <div>
+                    <label class="block mb-2 text-sm font-medium text-gray-900">${field.title || path}</label>
+                    <select x-model="formData.${path}"
+                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                        <option value="">Seleziona...</option>
+                        ${options}
+                    </select>
+                </div>
+            `;
+        },
+
+        renderTextareaField(path, field) {
+            return `
+                <div class="md:col-span-2">
+                    <label class="block mb-2 text-sm font-medium text-gray-900">${field.title || path}</label>
+                    <textarea x-model="formData.${path}"
+                              rows="4"
+                              class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="${field.description || ''}"></textarea>
+                </div>
+            `;
+        },
+
+        renderNumberField(path, field) {
+            return `
+                <div>
+                    <label class="block mb-2 text-sm font-medium text-gray-900">${field.title || path}</label>
+                    <input type="number"
+                           x-model.number="formData.${path}"
+                           class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                           ${field.minimum !== undefined ? `min="${field.minimum}"` : ''}
+                           ${field.maximum !== undefined ? `max="${field.maximum}"` : ''}>
+                </div>
+            `;
+        },
+
+        renderObjectField(path, field, fieldKey) {
+            let html = `<div class="md:col-span-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 class="text-lg font-semibold mb-4">${field.title || fieldKey}</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
+
+            for (const [subKey, subField] of Object.entries(field.properties)) {
+                const subPath = `${path}.${subKey}`;
+                html += this.renderField(subPath, subField, subKey);
+            }
+
+            html += '</div></div>';
+            return html;
+        },
+
+        renderArrayField(path, field, fieldKey) {
+            return `<div class="md:col-span-2 p-4 bg-gray-50 rounded-lg">
+                <h4 class="font-semibold mb-2">${field.title || fieldKey}</h4>
+                <p class="text-sm text-gray-500">Campo array - implementazione in corso</p>
+            </div>`;
+        },
+
+        isSectionComplete(sectionId) {
+            // TODO: Implementare logica completamento
+            return false;
+        },
+
+        isFirstSection() {
+            return this.sections[0]?.id === this.currentSection;
+        },
+
+        isLastSection() {
+            return this.sections[this.sections.length - 1]?.id === this.currentSection;
+        },
+
+        previousSection() {
+            const idx = this.sections.findIndex(s => s.id === this.currentSection);
+            if (idx > 0) this.currentSection = this.sections[idx - 1].id;
+        },
+
+        nextSection() {
+            const idx = this.sections.findIndex(s => s.id === this.currentSection);
+            if (idx < this.sections.length - 1) this.currentSection = this.sections[idx + 1].id;
+        },
+
+        validateCurrentSection() {
+            this.showAlert('info', 'Validazione in corso...');
+        },
+
+        validateAll() {
+            this.showAlert('info', 'Validazione completa...');
+        },
+
+        async saveForm() {
+            this.saving = true;
+
+            try {
+                const response = await fetch('/api/iccd/records', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        schema_type: this.schemaType,
+                        site_id: this.siteId,
+                        record_data: this.formData
+                    })
+                });
+
+                if (!response.ok) throw new Error('Errore salvataggio');
+
+                const result = await response.json();
+                this.showAlert('success', `✅ Scheda ${result.nct_complete} salvata!`);
+
+                setTimeout(() => window.location.href = `/sites/${this.siteId}/iccd/`, 2000);
+            } catch (error) {
+                this.showAlert('error', 'Errore durante il salvataggio');
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async saveAsDraft() {
+            this.formData.status = 'draft';
+            await this.saveForm();
+        },
+
+        calculateStats() {
+            // TODO: Calcolare statistiche reali
+            this.totalFields = 100;
+            this.filledFields = 20;
+        },
+
+        generateNCTN() {
+            return String(Date.now()).slice(-8);
+        },
+
+        showAlert(type, message) {
+            this.alert = { show: true, type, message };
+            setTimeout(() => this.alert.show = false, 5000);
+        },
+
+        get completionPercentage() {
+            return this.totalFields > 0 ? Math.round((this.filledFields / this.totalFields) * 100) : 0;
+        }
+    };
+}
+</script>
+{% endblock %}
