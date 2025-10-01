@@ -109,6 +109,13 @@ class ICCDRecordDetail(ICCDRecordResponse):
     longitude: Optional[float]
 
 
+class ICCDValidationRequest(BaseModel):
+    """Richiesta validazione scheda ICCD"""
+    schema_type: str = Field(..., description="Tipo scheda (SI, RA, CA)")
+    level: str = Field(..., description="Livello catalogazione (P, C, A)")
+    iccd_data: Dict[str, Any] = Field(..., description="Dati scheda ICCD")
+
+
 class ICCDValidationResult(BaseModel):
     """Risultato validazione scheda"""
     is_valid: bool
@@ -417,6 +424,59 @@ async def delete_record(
 # ============================================================================
 # VALIDATION & WORKFLOW ENDPOINTS
 # ============================================================================
+
+@router.post("/validate", response_model=ICCDValidationResult)
+async def validate_iccd_data(
+        validation_request: ICCDValidationRequest
+):
+    """
+    Valida dati ICCD contro lo schema senza salvare
+
+    Permette validazione preliminare dei dati prima del salvataggio
+    """
+    # Valida schema_type
+    schema_type = validation_request.schema_type.upper()
+    if schema_type not in ['SI', 'RA', 'CA']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tipo schema '{validation_request.schema_type}' non supportato"
+        )
+
+    # Valida level
+    if validation_request.level not in ['P', 'C', 'A']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Livello '{validation_request.level}' non valido"
+        )
+
+    # Valida contro schema appropriato
+    if schema_type == "SI":
+        is_valid, errors = validate_si_record(validation_request.iccd_data)
+        schema = SCHEMA_SI_300
+    elif schema_type == "RA":
+        is_valid, errors = validate_ra_record(validation_request.iccd_data)
+        schema = SCHEMA_RA_300
+    elif schema_type == "CA":
+        is_valid, errors = validate_ca_record(validation_request.iccd_data)
+        schema = SCHEMA_CA_300
+    else:
+        is_valid, errors = True, []
+        schema = {}
+
+    # Calcola completezza
+    completeness = _calculate_completeness(validation_request.iccd_data, schema)
+
+    # Identifica campi obbligatori mancanti
+    missing_required = _find_missing_required_fields(validation_request.iccd_data, schema)
+
+    return ICCDValidationResult(
+        is_valid=is_valid,
+        errors=errors,
+        warnings=[],
+        completeness=completeness,
+        required_fields_missing=missing_required
+    )
+
 
 @router.post("/records/{record_id}/validate", response_model=ICCDValidationResult)
 async def validate_record(
