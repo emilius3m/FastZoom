@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException, Form, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
+from sqlalchemy.orm import selectinload
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 from loguru import logger
@@ -9,6 +10,7 @@ from loguru import logger
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id, get_current_user_sites
 from app.models.users import User
+from app.models.user_profiles import UserProfile
 from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission, PermissionLevel
 from app.models.photos import Photo
@@ -374,8 +376,9 @@ async def admin_users_list(
     
     superuser, base_context = auth_data
     
-    # Query base utenti
-    users = await db.execute(select(User).order_by(User.email))
+    # Query base utenti con eager loading del profilo
+    users_query = select(User).options(selectinload(User.profile)).order_by(User.email)
+    users = await db.execute(users_query)
     users = users.scalars().all()
     
     # Converti in lista serializzabile
