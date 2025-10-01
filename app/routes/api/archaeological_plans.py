@@ -586,7 +586,7 @@ async def get_plan_archaeological_data(
         data_dict.update({
             "module_name": record.module.name if record.module else None,
             "module_category": record.module.category if record.module else None,
-            "collector_name": f"{record.collector.first_name} {record.collector.last_name}" if record.collector else None
+            "collector_name": record.collector.display_name if record.collector else None
         })
         data_list.append(data_dict)
     

@@ -617,8 +617,6 @@ async def get_team_members(
     # Query corretta con JOIN per ottenere dati utente
     query = select(
         UserSitePermission,
-        User.first_name,
-        User.last_name,
         User.email,
         User.profile_data  # Assuming you store additional data here
     ).join(
@@ -2073,7 +2071,7 @@ async def get_site_team(db: AsyncSession, site_id: UUID) -> List[Dict]:
         {
             "user_id": str(user.id),
             "email": user.email,
-            "full_name": getattr(user, 'full_name', f"{user.first_name} {user.last_name}"),
+            "full_name": user.full_name,
             "permission_level": permission.permission_level.value,
             "permission_display": permission.permission_level.value.replace('_', ' ').title(),
             "granted_at": permission.created_at.isoformat()

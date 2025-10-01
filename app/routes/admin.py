@@ -396,8 +396,8 @@ async def admin_users_list(
         user_dict = {
             "id": str(user.id),
             "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
+            "first_name": user.profile.first_name if user.profile else None,
+            "last_name": user.profile.last_name if user.profile else None,
             "is_active": user.is_active,
             "is_verified": user.is_verified,
             "is_superuser": user.is_superuser,

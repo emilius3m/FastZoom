@@ -101,6 +101,11 @@ class ICCDRecordRepository:
         await self.db_session.flush()
         return record
 
+    async def delete_record(self, record: ICCDRecord) -> None:
+        """Delete an ICCD record."""
+        await self.db_session.delete(record)
+        await self.db_session.flush()
+
     async def check_nct_exists(self, nct_region: str, nct_number: str, nct_suffix: Optional[str] = None) -> bool:
         """Check if an NCT code already exists."""
         query = select(ICCDRecord).where(

@@ -70,15 +70,16 @@ async def get_iccd_hierarchy(
         raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
     
     # Query gerarchica per tutti i tipi di scheda (SQLite compatible)
+    # Cerchiamo tutti i record senza genitore come radice
     hierarchy_query = """
     WITH RECURSIVE hierarchy AS (
-        -- Radice: Schede SI (sito)
+        -- Radice: tutti i record senza genitore
         SELECT
             r.id, r.schema_type, r.nct_region, r.nct_number, r.nct_suffix,
             r.iccd_data, r.parent_id, r.site_id, 0 as level,
             r.id as path
         FROM iccd_base_records r
-        WHERE r.site_id = :site_id AND r.schema_type = 'SI'
+        WHERE r.site_id = :site_id AND r.parent_id IS NULL
         
         UNION ALL
         
@@ -109,6 +110,10 @@ async def get_iccd_hierarchy(
         "anthropology": []
     }
     
+    # Prima passata: organizza tutti i record tranne i record SI
+    other_records = []
+    si_records_from_hierarchy = []
+    
     for record in records:
         record_data = {
             "id": record.id,
@@ -121,23 +126,70 @@ async def get_iccd_hierarchy(
             "nct": f"{record.nct_region}{record.nct_number}{record.nct_suffix or ''}"
         }
         
-        # Assegna alla categoria corretta
         if record.schema_type == 'SI':
-            organized["site"] = record_data
-        elif record.schema_type == 'CA':
+            si_records_from_hierarchy.append(record_data)
+        else:
+            other_records.append((record_data, record.schema_type))
+    
+    # Assegna il primo record SI trovato come record del sito (se esiste nella gerarchia)
+    if si_records_from_hierarchy:
+        organized["site"] = si_records_from_hierarchy[0] # Prendi il primo record SI trovato nella gerarchia
+    else:
+        # Se non abbiamo trovato record SI nella gerarchia, cerchiamo esplicitamente
+        # LA scheda SI per questo sito (ogni sito archeologico ha una sola scheda SI)
+        si_query = select(ICCDBaseRecord).where(
+            and_(
+                ICCDBaseRecord.site_id == site_id,
+                ICCDBaseRecord.schema_type == 'SI'
+            )
+        )
+        si_result = await db.execute(si_query)
+        si_db_record = si_result.scalar_one_or_none()  # Ogni sito ha una sola scheda SI
+        
+        if si_db_record:
+            organized["site"] = {
+                "id": str(si_db_record.id),
+                "schema_type": si_db_record.schema_type,
+                "nct_region": si_db_record.nct_region,
+                "nct_number": si_db_record.nct_number,
+                "nct_suffix": si_db_record.nct_suffix,
+                "iccd_data": si_db_record.iccd_data,
+                "level": 0,  # Lo trattiamo come livello 0 anche se ha un genitore
+                "nct": f"{si_db_record.nct_region}{si_db_record.nct_number}{si_db_record.nct_suffix or ''}"
+            }
+    
+    # Assegna gli altri record alle categorie appropriate
+    for record_data, schema_type in other_records:
+        if schema_type == 'CA':
             organized["complexes"].append(record_data)
-        elif record.schema_type == 'MA':
+        elif schema_type == 'MA':
             organized["monuments"].append(record_data)
-        elif record.schema_type == 'SAS':
+        elif schema_type == 'SAS':
             organized["stratigraphic_surveys"].append(record_data)
-        elif record.schema_type == 'RA':
+        elif schema_type == 'RA':
             organized["artifacts"].append(record_data)
-        elif record.schema_type == 'NU':
+        elif schema_type == 'NU':
             organized["numismatics"].append(record_data)
-        elif record.schema_type == 'TMA':
+        elif schema_type == 'TMA':
             organized["material_tables"].append(record_data)
-        elif record.schema_type == 'AT':
+        elif schema_type == 'AT':
             organized["anthropology"].append(record_data)
+    
+    # Se non ci sono record SI, ma ci sono altri record, comunque mostriamo un placeholder
+    # per indicare che il sito esiste, ma potrebbe non avere un record SI
+    if organized["site"] is None and (
+        organized["complexes"] or organized["monuments"] or
+        organized["stratigraphic_surveys"] or organized["artifacts"] or
+        organized["numismatics"] or organized["material_tables"] or
+        organized["anthropology"]
+    ):
+        # Tuttavia, in questo caso non creiamo un record fittizio ma lasciamo come None
+        # permettere al frontend di gestire la situazione
+        pass
+    elif organized["site"] is None:
+        # Se non ci sono proprio record di alcun tipo, possiamo considerare di mostrare
+        # informazioni base sul sito
+        pass
     
     return JSONResponse(organized)
 
@@ -161,14 +213,26 @@ async def create_iccd_record(
         nct_number = generate_nct_number()
         
         # Crea record
+        # Ensure UUID conversion for parent_id and site_id
+        parent_id_value = None
+        if record_data.get('parent_id'):
+            if isinstance(record_data['parent_id'], str):
+                parent_id_value = UUID(record_data['parent_id'])
+            else:
+                parent_id_value = record_data['parent_id']
+        
+        site_id_value = record_data['site_id']
+        if isinstance(site_id_value, str):
+            site_id_value = UUID(site_id_value)
+        
         db_record = ICCDBaseRecord(
             nct_region='12',  # Lazio
             nct_number=nct_number,
             nct_suffix=record_data.get('nct_suffix'),
             schema_type=record_data['schema_type'],
             iccd_data=record_data['data'],
-            parent_id=UUID(record_data['parent_id']) if record_data.get('parent_id') else None,
-            site_id=UUID(record_data['site_id']),
+            parent_id=parent_id_value,
+            site_id=site_id_value,
             created_by=current_user_id
         )
         
@@ -202,9 +266,18 @@ async def create_iccd_relation(
             raise HTTPException(status_code=400, detail=f"Campo obbligatorio mancante: {field}")
     
     try:
+        # Ensure UUID conversion for record IDs
+        source_record_id_value = relation_data['source_record_id']
+        if isinstance(source_record_id_value, str):
+            source_record_id_value = UUID(source_record_id_value)
+        
+        target_record_id_value = relation_data['target_record_id']
+        if isinstance(target_record_id_value, str):
+            target_record_id_value = UUID(target_record_id_value)
+        
         db_relation = ICCDRelation(
-            source_record_id=relation_data['source_record_id'],
-            target_record_id=relation_data['target_record_id'],
+            source_record_id=source_record_id_value,
+            target_record_id=target_record_id_value,
             relation_type=relation_data['relation_type'],
             relation_level=relation_data.get('relation_level', '1'),
             notes=relation_data.get('notes'),
@@ -296,13 +369,18 @@ async def create_authority_file(
         # Genera codice authority
         authority_code = f"{authority_data['authority_type']}-{datetime.now().year}-{datetime.now().microsecond % 1000:03d}"
         
+        # Ensure UUID conversion for site_id
+        site_id_value = authority_data['site_id']
+        if isinstance(site_id_value, str):
+            site_id_value = UUID(site_id_value)
+        
         db_authority = ICCDAuthorityFile(
             authority_type=authority_data['authority_type'],
             authority_code=authority_code,
             name=authority_data['name'],
             description=authority_data.get('description'),
             authority_data=authority_data.get('data', {}),
-            site_id=authority_data['site_id'],
+            site_id=site_id_value,
             created_by=current_user_id
         )
         

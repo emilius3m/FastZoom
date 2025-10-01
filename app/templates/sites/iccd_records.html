@@ -148,6 +148,11 @@
                                 <i class="fas fa-edit"></i>
                             </button>
                             </template>
+                            <template x-if="can_admin">
+                            <button class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900" @click="deleteRecord(record.id, record.nct, record.object_name)" title="Elimina scheda">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            </template>
                             <button class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 p-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900" @click="downloadPDF(record.id)" title="Scarica PDF">
                                 <i class="fas fa-file-pdf"></i>
                             </button>
@@ -260,6 +265,10 @@ document.addEventListener('alpine:init', () => {
         // Dati
         records: [],
         statistics: null,
+        
+        // Permissions
+        can_write: {{ 'true' if can_write else 'false' }},
+        can_admin: {{ 'true' if can_admin else 'false' }},
 
         // Filtri
         filters: {
@@ -423,6 +432,38 @@ document.addEventListener('alpine:init', () => {
             } catch (error) {
                 console.error('Errore download PDF:', error);
                 alert('Errore nel download del PDF');
+            }
+        },
+        
+        // Elimina scheda
+        async deleteRecord(recordId, nct, objectName) {
+            if (!confirm(`Sei sicuro di voler eliminare la scheda ICCD ${nct}?\n\nOggetto: ${objectName || 'Non specificato'}\n\nQuesta azione non può essere annullata.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/iccd/sites/{{ site.id }}/records/${recordId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Scheda eliminata con successo: ${result.deleted_record.nct}`);
+                    
+                    // Ricarica la lista e le statistiche
+                    await this.loadStatistics();
+                    await this.loadRecords();
+                } else {
+                    const error = await response.json();
+                    alert(`Errore nell'eliminazione: ${error.detail}`);
+                }
+                
+            } catch (error) {
+                console.error('Errore eliminazione scheda:', error);
+                alert('Errore nell\'eliminazione della scheda');
             }
         },
         

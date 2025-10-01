@@ -23,12 +23,15 @@ class UserProfile(Base):
         PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
 
-    # Informazioni personali
+    # Informazioni personali - Centralizzate qui (rimosse da User per eliminare ridondanza)
     first_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    
+    # Informazioni aggiuntive
     gender: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     date_of_birth: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     city: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     country: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

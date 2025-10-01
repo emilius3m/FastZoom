@@ -92,6 +92,21 @@ async def update_iccd_record(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
+@iccd_router.delete("/sites/{site_id}/records/{record_id}")
+async def delete_iccd_record(
+    site_id: UUID,
+    record_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id),
+    iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
+):
+    """Elimina una scheda ICCD esistente."""
+    try:
+        result = await iccd_service.delete_record(site_id, record_id, current_user_id)
+        return result
+    except BusinessLogicError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
 @iccd_router.post("/sites/{site_id}/records/{record_id}/validate")
 async def validate_iccd_record(
     site_id: UUID,

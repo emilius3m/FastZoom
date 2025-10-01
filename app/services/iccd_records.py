@@ -82,9 +82,9 @@ class ICCDRecordService:
             record_dict = record.to_dict()
             # Add user information
             if record.creator:
-                record_dict["creator_name"] = f"{record.creator.first_name} {record.creator.last_name}"
+                record_dict["creator_name"] = record.creator.display_name
             if record.validator:
-                record_dict["validator_name"] = f"{record.validator.first_name} {record.validator.last_name}"
+                record_dict["validator_name"] = record.validator.display_name
             records_data.append(record_dict)
         
         return {
@@ -221,9 +221,9 @@ class ICCDRecordService:
         
         # Add user information
         if record.creator:
-            record_data["creator_name"] = f"{record.creator.first_name} {record.creator.last_name}"
+            record_data["creator_name"] = record.creator.display_name
         if record.validator:
-            record_data["validator_name"] = f"{record.validator.first_name} {record.validator.last_name}"
+            record_data["validator_name"] = record.validator.display_name
         
         return record_data
 
@@ -298,7 +298,45 @@ class ICCDRecordService:
             await self.db_session.rollback()
             raise BusinessLogicError(f"Errore aggiornamento scheda: {str(e)}", 500)
 
-    async def validate_record(self, site_id: UUID, record_id: UUID, validation_data: Dict[str, Any], 
+    async def delete_record(self, site_id: UUID, record_id: UUID, current_user_id: UUID) -> Dict[str, Any]:
+        """Delete an ICCD record."""
+        site, permission = await self.check_site_access(site_id, current_user_id)
+        
+        if not permission.can_admin():  # Only admin can delete
+            raise BusinessLogicError("Permessi di amministratore richiesti per eliminare schede", 403)
+        
+        # Get the record
+        record = await self.repository.get_record_by_id(record_id, site_id)
+        
+        if not record:
+            raise BusinessLogicError("Scheda ICCD non trovata", 404)
+        
+        try:
+            # Store record info for response
+            nct = record.get_nct()
+            object_name = record.get_object_name()
+            
+            # Delete the record
+            await self.repository.delete_record(record)
+            await self.db_session.commit()
+            
+            logger.info(f"ICCD record deleted: {nct} from site {site_id} by user {current_user_id}")
+            
+            return {
+                "message": f"Scheda ICCD {nct} eliminata con successo",
+                "deleted_record": {
+                    "id": str(record_id),
+                    "nct": nct,
+                    "object_name": object_name
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error deleting ICCD record: {e}")
+            await self.db_session.rollback()
+            raise BusinessLogicError(f"Errore eliminazione scheda: {str(e)}", 500)
+
+    async def validate_record(self, site_id: UUID, record_id: UUID, validation_data: Dict[str, Any],
                             current_user_id: UUID) -> Dict[str, Any]:
         """Validate an ICCD record."""
         site, permission = await self.check_site_access(site_id, current_user_id)

@@ -34,9 +34,7 @@ class User(Base):
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     
-    # Informazioni base per display
-    first_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    # Informazioni base per display - rimosse ridondanze (ora solo in UserProfile)
     
     # Timestamp - CORREZIONE: nomi standard per compatibilità
     created_at: Mapped[datetime] = mapped_column(
@@ -117,9 +115,7 @@ class User(Base):
     @property
     def display_name(self) -> str:
         """Nome da mostrare nell'interfaccia"""
-        if self.first_name and self.last_name:
-            return f"{self.first_name} {self.last_name}"
-        elif self.profile and self.profile.first_name and self.profile.last_name:
+        if self.profile and self.profile.first_name and self.profile.last_name:
             return self.profile.get_full_name()
         else:
             return self.email.split('@')[0].title()
@@ -127,18 +123,14 @@ class User(Base):
     @property
     def full_name(self) -> str:
         """Nome completo dell'utente"""
-        if self.first_name and self.last_name:
-            return f"{self.first_name} {self.last_name}".strip()
-        elif self.profile:
+        if self.profile:
             return self.profile.get_full_name()
         return self.email
     
     @property
     def initials(self) -> str:
         """Iniziali per avatar"""
-        if self.first_name and self.last_name:
-            return f"{self.first_name[0]}{self.last_name[0]}".upper()
-        elif self.profile and self.profile.first_name and self.profile.last_name:
+        if self.profile and self.profile.first_name and self.profile.last_name:
             return f"{self.profile.first_name[0]}{self.profile.last_name[0]}".upper()
         else:
             return self.email[0].upper()
