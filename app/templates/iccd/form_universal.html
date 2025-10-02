@@ -1274,7 +1274,8 @@ function iccdFormUniversal(schemaType, siteId) {
                     body: JSON.stringify({
                         schema_type: this.schemaType,
                         level: 'C',
-                        iccd_data: this.formData
+                        iccd_data: this.formData,
+                        cataloging_institution: this.formData.CD?.ESC || 'Ente schedatore'
                     })
                 });
                 

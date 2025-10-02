@@ -115,12 +115,14 @@ class ICCDRecordService:
             # Log the data received for debugging
             logger.info(f"Creating ICCD record for site {site_id} by user {current_user_id}")
             logger.info(f"Record data keys: {list(record_data.keys())}")
+            logger.info(f"Full record data: {record_data}")
 
             # Validate required fields
             required_fields = ['schema_type', 'level', 'iccd_data', 'cataloging_institution']
             for field in required_fields:
                 if field not in record_data:
                     logger.error(f"Missing required field: {field}")
+                    logger.error(f"Available fields: {list(record_data.keys())}")
                     raise BusinessLogicError(f"Campo obbligatorio mancante: {field}", 400)
 
             # Additional validation of ICCD data
