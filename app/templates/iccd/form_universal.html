@@ -76,11 +76,20 @@
              'bg-red-50 border-red-500 text-red-800': alert.type === 'error',
              'bg-yellow-50 border-yellow-500 text-yellow-800': alert.type === 'warning'
          }"
-         class="border-l-4 p-4 mb-6 rounded-r flex items-start gap-3">
-        <div class="flex-1">
-            <p class="font-medium" x-text="alert.message"></p>
+         class="border-l-4 p-4 mb-6 rounded-r">
+        <div class="flex justify-between items-start">
+            <div class="flex-1">
+                <p class="font-medium" x-text="alert.title"></p>
+                <div x-show="alert.details && alert.details.length > 0" class="mt-2">
+                    <ul class="list-disc list-inside space-y-1 text-sm">
+                        <template x-for="detail in alert.details" :key="detail">
+                            <li x-text="detail"></li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+            <button @click="alert.show = false" class="text-gray-400 hover:text-gray-600 ml-4">✕</button>
         </div>
-        <button @click="alert.show = false" class="text-gray-400 hover:text-gray-600">✕</button>
     </div>
 
     <!-- Loading -->
@@ -107,7 +116,7 @@
     </div>
 
     <!-- Form -->
-    <form x-show="!loading" @submit.prevent="saveForm" class="space-y-6">
+    <form x-show="!loading" @submit.prevent="saveForm" novalidate class="space-y-6">
         <template x-for="section in sections" :key="section.id">
             <div x-show="currentSection === section.id"
                  x-transition:enter="transition ease-out duration-200"
@@ -428,30 +437,121 @@ function iccdFormUniversal(schemaType, siteId) {
             };
             
             // Inizializza altre sezioni vuote per evitare errori di binding
-            if (this.sections.length > 0) {
+            this.initializeEmptySections();
+        },
+
+        initializeEmptySections() {
+            // Funzione helper per inizializzare sezioni vuote
+            if (this.sections && this.sections.length > 0) {
                 this.sections.forEach(section => {
                     if (!this.formData[section.id]) {
                         this.formData[section.id] = {};
+                    }
+                    
+                    // Inizializza anche sottooggetti comuni per evitare errori
+                    if (section.id === 'OG') {
+                        if (!this.formData[section.id].OGT) {
+                            this.formData[section.id].OGT = {};
+                        }
+                        if (!this.formData[section.id].OGN) {
+                            this.formData[section.id].OGN = {};
+                        }
+                    }
+                    
+                    if (section.id === 'LC') {
+                        if (!this.formData[section.id].PVC) {
+                            this.formData[section.id].PVC = {};
+                        }
+                        if (!this.formData[section.id].PVL) {
+                            this.formData[section.id].PVL = {};
+                        }
+                        if (!this.formData[section.id].LDC) {
+                            this.formData[section.id].LDC = {};
+                        }
+                    }
+                    
+                    if (section.id === 'DT') {
+                        if (!this.formData[section.id].DTS) this.formData[section.id].DTS = {};
+                        if (!this.formData[section.id].DTM) this.formData[section.id].DTM = {};
+                    }
+                    
+                    if (section.id === 'MT') {
+                        if (!this.formData[section.id].MTC) {
+                            this.formData[section.id].MTC = {};
+                        }
+                        // IMPORTANTE: Inizializza MIS per le misure
+                        if (!this.formData[section.id].MIS) {
+                            this.formData[section.id].MIS = {};
+                        }
+                    }
+                    
+                    if (section.id === 'DA') {
+                        if (!this.formData[section.id].DES) this.formData[section.id].DES = {};
+                        if (!this.formData[section.id].STC) this.formData[section.id].STC = {};
+                        if (!this.formData[section.id].ISR) this.formData[section.id].ISR = {};
+                    }
+                    
+                    if (section.id === 'AU') {
+                        if (!this.formData[section.id].AUT) {
+                            this.formData[section.id].AUT = {};
+                        }
+                    }
+                    
+                    if (section.id === 'NS') {
+                        if (!this.formData[section.id].NSC) {
+                            this.formData[section.id].NSC = {};
+                        }
+                    }
+                    
+                    if (section.id === 'RS') {
+                        if (!this.formData[section.id].RSE) {
+                            this.formData[section.id].RSE = {};
+                        }
                     }
                 });
             }
         },
 
+        // Funzione helper per assicurare che i path annidati esistano
+        ensureNestedObject(path) {
+            const keys = path.split('.');
+            let current = this.formData;
+            
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i];
+                if (!current[key]) {
+                    current[key] = {};
+                }
+                current = current[key];
+            }
+            
+            return current;
+        },
+
         parseSections() {
-            if (!this.schema || !this.schema.properties) return;
+            try {
+                if (!this.schema || !this.schema.properties) return;
 
-            const properties = this.schema.properties;
-            const required = this.schema.required || [];
+                const properties = this.schema.properties;
+                const required = this.schema.required || [];
 
-            this.sections = Object.keys(properties).map(key => ({
-                id: key,
-                title: properties[key].title || key,
-                description: properties[key].description,
-                required: required.includes(key),
-                properties: properties[key].properties || {}
-            }));
+                this.sections = Object.keys(properties).map(key => ({
+                    id: key,
+                    title: properties[key].title || key,
+                    description: properties[key].description,
+                    required: required.includes(key),
+                    properties: properties[key].properties || {}
+                }));
 
-            this.currentSection = this.sections[0]?.id || 'CD';
+                this.currentSection = this.sections[0]?.id || 'CD';
+                
+                // Inizializza sezioni vuote dopo aver parsato le sezioni
+                this.initializeEmptySections();
+                
+            } catch (error) {
+                console.error('Errore parsing sezioni:', error);
+                this.sections = [];
+            }
         },
 
         renderSectionFields(section) {
@@ -622,35 +722,54 @@ function iccdFormUniversal(schemaType, siteId) {
         },
 
         updateSectionCompleteness() {
-            console.log('🔍 Aggiornamento completezza sezioni');
+            // Controllo sicurezza: evita errori se sections non è ancora inizializzato
+            if (!this.sections || this.sections.length === 0) {
+                return;
+            }
+            
             this.sections.forEach(section => {
-                const completeness = this.calculateSectionCompleteness(section);
-                this.sectionCompleteness[section.id] = completeness;
+                try {
+                    const completeness = this.calculateSectionCompleteness(section);
+                    this.sectionCompleteness[section.id] = completeness;
+                } catch (error) {
+                    console.warn(`Errore calcolo completezza sezione ${section.id}:`, error);
+                    this.sectionCompleteness[section.id] = false;
+                }
             });
         },
 
         calculateSectionCompleteness(section) {
-            if (!section.properties || Object.keys(section.properties).length === 0) {
-                return true; // Sezione vuota considerata completa
+            try {
+                if (!section || !section.properties || Object.keys(section.properties).length === 0) {
+                    return true; // Sezione vuota considerata completa
+                }
+
+                // Assicurati che la sezione esista nei dati del form
+                if (!this.formData[section.id]) {
+                    this.formData[section.id] = {};
+                }
+
+                const sectionData = this.formData[section.id];
+                const requiredFields = this.getRequiredFields(section);
+                const totalFields = Object.keys(section.properties).length;
+                const filledFields = this.countFilledFields(sectionData, section.properties);
+
+                // Se è una sezione obbligatoria, controlla che tutti i campi required siano compilati
+                if (section.required) {
+                    const allRequiredFilled = requiredFields.every(field => {
+                        const value = this.getFieldValue(sectionData, field);
+                        return this.isFieldFilled(value);
+                    });
+                    // Per sezioni obbligatorie: deve avere almeno il 70% dei campi compilati E tutti i required
+                    return allRequiredFilled && (filledFields / totalFields) >= 0.7;
+                }
+
+                // Per sezioni opzionali: almeno il 30% dei campi compilati
+                return (filledFields / totalFields) >= 0.3;
+            } catch (error) {
+                console.warn('Errore in calculateSectionCompleteness:', error);
+                return false;
             }
-
-            const sectionData = this.formData[section.id] || {};
-            const requiredFields = this.getRequiredFields(section);
-            const totalFields = Object.keys(section.properties).length;
-            const filledFields = this.countFilledFields(sectionData, section.properties);
-
-            // Se è una sezione obbligatoria, controlla che tutti i campi required siano compilati
-            if (section.required) {
-                const allRequiredFilled = requiredFields.every(field => {
-                    const value = this.getFieldValue(sectionData, field);
-                    return this.isFieldFilled(value);
-                });
-                // Per sezioni obbligatorie: deve avere almeno il 70% dei campi compilati E tutti i required
-                return allRequiredFilled && (filledFields / totalFields) >= 0.7;
-            }
-
-            // Per sezioni opzionali: almeno il 30% dei campi compilati
-            return (filledFields / totalFields) >= 0.3;
         },
 
         getRequiredFields(section) {
@@ -680,18 +799,39 @@ function iccdFormUniversal(schemaType, siteId) {
         },
 
         countFilledFields(sectionData, properties) {
-            let count = 0;
-            Object.entries(properties).forEach(([key, field]) => {
-                const value = this.getFieldValue(sectionData, key);
-                if (this.isFieldFilled(value)) {
-                    count++;
+            try {
+                if (!sectionData || !properties) {
+                    return 0;
                 }
-            });
-            return count;
+                
+                let count = 0;
+                Object.entries(properties).forEach(([key, field]) => {
+                    try {
+                        const value = this.getFieldValue(sectionData, key);
+                        if (this.isFieldFilled(value)) {
+                            count++;
+                        }
+                    } catch (error) {
+                        console.warn(`Errore verifica campo ${key}:`, error);
+                    }
+                });
+                return count;
+            } catch (error) {
+                console.warn('Errore in countFilledFields:', error);
+                return 0;
+            }
         },
 
         getFieldValue(sectionData, fieldKey) {
-            return sectionData[fieldKey];
+            try {
+                if (!sectionData || !fieldKey) {
+                    return null;
+                }
+                return sectionData[fieldKey] || null;
+            } catch (error) {
+                console.warn(`Errore accesso campo ${fieldKey}:`, error);
+                return null;
+            }
         },
 
         isFieldFilled(value) {
@@ -897,6 +1037,8 @@ function iccdFormUniversal(schemaType, siteId) {
 
         async validateWithServer(sectionId, sectionData) {
             try {
+                // Per validazione sezione singola, inviamo tutti i dati del form
+                // ma filtriamo gli errori solo per la sezione richiesta
                 const response = await fetch('/api/iccd/validate', {
                     method: 'POST',
                     headers: {
@@ -905,7 +1047,7 @@ function iccdFormUniversal(schemaType, siteId) {
                     body: JSON.stringify({
                         schema_type: this.schemaType,
                         level: 'C',
-                        iccd_data: { [sectionId]: sectionData }
+                        iccd_data: this.formData  // Invia tutti i dati invece che solo la sezione
                     })
                 });
                 
@@ -914,7 +1056,12 @@ function iccdFormUniversal(schemaType, siteId) {
                 if (result.valid) {
                     return [];
                 } else {
-                    return result.errors || [];
+                    // Filtra solo gli errori relativi alla sezione corrente
+                    const sectionErrors = (result.errors || []).filter(error =>
+                        error.field_path && error.field_path.startsWith(sectionId + '.')
+                    );
+                    console.log(`Errori sezione ${sectionId}:`, sectionErrors);
+                    return sectionErrors;
                 }
                 
             } catch (error) {
@@ -951,19 +1098,34 @@ function iccdFormUniversal(schemaType, siteId) {
             this.saving = true;
 
             try {
-                // Validazione pre-salvataggio
+                // Rimuovi attributi required dai campi hidden per evitare errori di validazione HTML5
+                this.removeRequiredFromHiddenFields();
+                
+                // VALIDAZIONE COMPLETA OBBLIGATORIA prima del salvataggio
+                this.showAlert('info', 'Validazione completa scheda in corso...', []);
                 await this.validateAll();
                 
                 // Controlla se ci sono errori critici
-                const hasErrors = Object.values(this.validationErrors).some(errors =>
-                    errors.some(error => error.severity === 'error')
-                );
+                const allErrors = [];
+                Object.entries(this.validationErrors).forEach(([sectionId, errors]) => {
+                    errors.forEach(error => {
+                        if (error.severity === 'error') {
+                            const fieldName = this.getFieldDisplayName(error.field || error.field_path);
+                            allErrors.push(`${sectionId} - ${fieldName}: ${error.message}`);
+                        }
+                    });
+                });
                 
-                if (hasErrors) {
-                    this.showAlert('warning', '⚠️ Ci sono errori di validazione. Salvare comunque come bozza?');
-                    // Potresti voler mostrare un modal di conferma qui
+                if (allErrors.length > 0) {
+                    this.showAlert('error',
+                        `❌ Impossibile salvare: ${allErrors.length} errori da correggere:`,
+                        allErrors.slice(0, 10) // Mostra massimo 10 errori
+                    );
+                    this.saving = false;
+                    return; // Blocca il salvataggio se ci sono errori
                 }
 
+                // Procedi con il salvataggio solo se non ci sono errori
                 const response = await fetch(`/api/iccd/sites/${this.siteId}/records`, {
                     method: 'POST',
                     headers: {
@@ -982,7 +1144,7 @@ function iccdFormUniversal(schemaType, siteId) {
                 }
 
                 const result = await response.json();
-                this.showAlert('success', `✅ Scheda ${result.nct_complete || 'ICCD'} salvata con successo!`);
+                this.showAlert('success', `✅ Scheda ${result.nct_complete || 'ICCD'} salvata con successo!`, []);
 
                 console.log('✅ Scheda salvata:', result);
                 
@@ -993,10 +1155,35 @@ function iccdFormUniversal(schemaType, siteId) {
                 
             } catch (error) {
                 console.error('❌ Errore salvataggio:', error);
-                this.showAlert('error', `❌ Errore durante il salvataggio: ${error.message}`);
+                this.showAlert('error', `❌ Errore durante il salvataggio: ${error.message}`, []);
             } finally {
                 this.saving = false;
             }
+        },
+
+        removeRequiredFromHiddenFields() {
+            // Rimuove l'attributo required dai campi che non sono nella sezione corrente
+            // per evitare errori di validazione HTML5 sui campi hidden
+            this.sections.forEach(section => {
+                if (section.id !== this.currentSection) {
+                    const sectionElement = document.querySelector(`[x-show="currentSection === '${section.id}'"]`);
+                    if (sectionElement && sectionElement.style.display === 'none') {
+                        const requiredFields = sectionElement.querySelectorAll('[required]');
+                        requiredFields.forEach(field => {
+                            field.removeAttribute('required');
+                            field.setAttribute('data-was-required', 'true');
+                        });
+                    }
+                }
+            });
+        },
+
+        restoreRequiredFields() {
+            // Ripristina l'attributo required sui campi che lo avevano
+            document.querySelectorAll('[data-was-required="true"]').forEach(field => {
+                field.setAttribute('required', 'required');
+                field.removeAttribute('data-was-required');
+            });
         },
 
         async saveAsDraft() {
@@ -1007,35 +1194,91 @@ function iccdFormUniversal(schemaType, siteId) {
         },
 
         calculateStats() {
-            console.log('📊 Calcolo statistiche form');
-            
-            let totalFields = 0;
-            let filledFields = 0;
-            
-            this.sections.forEach(section => {
-                if (section.properties) {
-                    const sectionFieldCount = Object.keys(section.properties).length;
-                    totalFields += sectionFieldCount;
-                    
-                    const sectionData = this.formData[section.id] || {};
-                    const sectionFilledCount = this.countFilledFields(sectionData, section.properties);
-                    filledFields += sectionFilledCount;
+            try {
+                // Controllo sicurezza: evita errori se sections non è inizializzato
+                if (!this.sections || this.sections.length === 0) {
+                    this.totalFields = 0;
+                    this.filledFields = 0;
+                    return;
                 }
-            });
-            
-            this.totalFields = totalFields;
-            this.filledFields = filledFields;
-            
-            console.log(`📈 Statistiche: ${filledFields}/${totalFields} campi compilati (${this.completionPercentage}%)`);
+                
+                let totalFields = 0;
+                let filledFields = 0;
+                
+                this.sections.forEach(section => {
+                    try {
+                        if (section && section.properties) {
+                            const sectionFieldCount = Object.keys(section.properties).length;
+                            totalFields += sectionFieldCount;
+                            
+                            // Assicurati che la sezione esista nei formData
+                            if (!this.formData[section.id]) {
+                                this.formData[section.id] = {};
+                            }
+                            
+                            const sectionData = this.formData[section.id];
+                            const sectionFilledCount = this.countFilledFields(sectionData, section.properties);
+                            filledFields += sectionFilledCount;
+                        }
+                    } catch (error) {
+                        console.warn(`Errore calcolo stats sezione ${section.id}:`, error);
+                    }
+                });
+                
+                this.totalFields = totalFields;
+                this.filledFields = filledFields;
+                
+            } catch (error) {
+                console.error('Errore in calculateStats:', error);
+                this.totalFields = 0;
+                this.filledFields = 0;
+            }
         },
 
         generateNCTN() {
             return String(Date.now()).slice(-8);
         },
 
-        showAlert(type, message) {
-            this.alert = { show: true, type, message };
-            setTimeout(() => this.alert.show = false, 5000);
+        showAlert(type, title, details = []) {
+            this.alert = {
+                show: true,
+                type,
+                title,
+                details: Array.isArray(details) ? details : []
+            };
+            
+            // Alert più lunghi per errori con dettagli
+            const timeout = details.length > 0 ? 10000 : 5000;
+            setTimeout(() => this.alert.show = false, timeout);
+        },
+
+        getFieldDisplayName(fieldPath) {
+            if (!fieldPath) return 'Campo sconosciuto';
+            
+            // Mappa i percorsi dei campi ai nomi user-friendly
+            const fieldNames = {
+                'CD.TSK': 'Tipo scheda',
+                'CD.LIR': 'Livello ricerca',
+                'CD.NCT.NCTR': 'Codice regione',
+                'CD.NCT.NCTN': 'Numero catalogo',
+                'CD.NCT.NCTS': 'Suffisso catalogo',
+                'CD.ESC': 'Ente schedatore',
+                'CD.ECP': 'Ente competente',
+                'OG.OGT.OGTD': 'Definizione oggetto',
+                'LC.PVC.PVCS': 'Stato',
+                'LC.PVC.PVCR': 'Regione',
+                'LC.PVC.PVCP': 'Provincia',
+                'LC.PVC.PVCC': 'Comune',
+                'MT.MTC.MTCM': 'Materia',
+                'MT.MIS.MISA': 'Altezza',
+                'MT.MIS.MISL': 'Larghezza',
+                'MT.MIS.MISP': 'Profondità',
+                'MT.MIS.MISD': 'Diametro',
+                'DA.DES.DESO': 'Descrizione oggetto',
+                'DA.STC.STCC': 'Stato di conservazione'
+            };
+            
+            return fieldNames[fieldPath] || fieldPath.split('.').pop();
         },
 
         get completionPercentage() {
