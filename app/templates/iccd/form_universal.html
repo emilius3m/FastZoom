@@ -419,6 +419,118 @@ function iccdFormUniversal(schemaType, siteId) {
             };
         },
 
+        // Funzione per inizializzare i campi array
+        initializeArrayFields() {
+            // Inizializza i campi array con array vuoti
+            if (this.schema && this.schema.properties) {
+                Object.entries(this.schema.properties).forEach(([sectionKey, section]) => {
+                    if (section.properties) {
+                        Object.entries(section.properties).forEach(([fieldKey, field]) => {
+                            if (field.type === 'array') {
+                                if (!this.formData[sectionKey]) {
+                                    this.formData[sectionKey] = {};
+                                }
+                                if (!this.formData[sectionKey][fieldKey]) {
+                                    this.formData[sectionKey][fieldKey] = [];
+                                }
+                            } else if (field.type === 'object' && field.properties) {
+                                // Ricorsivamente controlla i sottocampi per array
+                                Object.entries(field.properties).forEach(([subFieldKey, subField]) => {
+                                    if (subField.type === 'array') {
+                                        if (!this.formData[sectionKey]) {
+                                            this.formData[sectionKey] = {};
+                                        }
+                                        if (!this.formData[sectionKey][fieldKey]) {
+                                            this.formData[sectionKey][fieldKey] = {};
+                                        }
+                                        if (!this.formData[sectionKey][fieldKey][subFieldKey]) {
+                                            this.formData[sectionKey][fieldKey][subFieldKey] = [];
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        },
+
+        initializeEmptySections() {
+            // Funzione helper per inizializzare sezioni vuote
+            if (this.sections && this.sections.length > 0) {
+                this.sections.forEach(section => {
+                    if (!this.formData[section.id]) {
+                        this.formData[section.id] = {};
+                    }
+                    
+                    // Inizializza anche sottooggetti comuni per evitare errori
+                    if (section.id === 'OG') {
+                        if (!this.formData[section.id].OGT) {
+                            this.formData[section.id].OGT = {};
+                        }
+                        if (!this.formData[section.id].OGN) {
+                            this.formData[section.id].OGN = {};
+                        }
+                    }
+                    
+                    if (section.id === 'LC') {
+                        if (!this.formData[section.id].PVC) {
+                            this.formData[section.id].PVC = {};
+                        }
+                        if (!this.formData[section.id].PVL) {
+                            this.formData[section.id].PVL = {};
+                        }
+                        if (!this.formData[section.id].LDC) {
+                            this.formData[section.id].LDC = {};
+                        }
+                    }
+                    
+                    if (section.id === 'DT') {
+                        if (!this.formData[section.id].DTS) this.formData[section.id].DTS = {};
+                        if (!this.formData[section.id].DTM) this.formData[section.id].DTM = {};
+                    }
+                    
+                    if (section.id === 'MT') {
+                        if (!this.formData[section.id].MTC) {
+                            this.formData[section.id].MTC = {};
+                        }
+                        // Inizializza MTCM come array vuoto se non esiste
+                        if (!this.formData[section.id].MTC.MTCM) {
+                            this.formData[section.id].MTC.MTCM = [];
+                        }
+                        // IMPORTANTE: Inizializza MIS per le misure
+                        if (!this.formData[section.id].MIS) {
+                            this.formData[section.id].MIS = {};
+                        }
+                    }
+                    
+                    if (section.id === 'DA') {
+                        if (!this.formData[section.id].DES) this.formData[section.id].DES = {};
+                        if (!this.formData[section.id].STC) this.formData[section.id].STC = {};
+                        if (!this.formData[section.id].ISR) this.formData[section.id].ISR = {};
+                    }
+                    
+                    if (section.id === 'AU') {
+                        if (!this.formData[section.id].AUT) {
+                            this.formData[section.id].AUT = {};
+                        }
+                    }
+                    
+                    if (section.id === 'NS') {
+                        if (!this.formData[section.id].NSC) {
+                            this.formData[section.id].NSC = {};
+                        }
+                    }
+                    
+                    if (section.id === 'RS') {
+                        if (!this.formData[section.id].RSE) {
+                            this.formData[section.id].RSE = {};
+                        }
+                    }
+                });
+            }
+        },
+
         initializeFormData() {
             console.log('📝 Inizializzazione dati form con valori predefiniti');
             // Inizializza CD di default con tutti i campi obbligatori
@@ -478,6 +590,10 @@ function iccdFormUniversal(schemaType, siteId) {
                     if (section.id === 'MT') {
                         if (!this.formData[section.id].MTC) {
                             this.formData[section.id].MTC = {};
+                        }
+                        // Inizializza MTCM come array vuoto se non esiste
+                        if (!this.formData[section.id].MTC.MTCM) {
+                            this.formData[section.id].MTC.MTCM = [];
                         }
                         // IMPORTANTE: Inizializza MIS per le misure
                         if (!this.formData[section.id].MIS) {
@@ -711,10 +827,52 @@ function iccdFormUniversal(schemaType, siteId) {
         },
 
         renderArrayField(path, field, fieldKey) {
+            // Handle array fields - for now, support for enum arrays (checkboxes)
+            if (field.items && field.items.enum) {
+                return this.renderEnumArrayField(path, field, fieldKey);
+            }
+            
+            // Default array field implementation
             return `<div class="md:col-span-2 p-4 bg-gray-50 rounded-lg">
                 <h4 class="font-semibold mb-2">${field.title || fieldKey}</h4>
-                <p class="text-sm text-gray-500">Campo array - implementazione in corso</p>
+                <p class="text-sm text-gray-500">Campo array non ancora implementato</p>
             </div>`;
+        },
+        
+        renderEnumArrayField(path, field, fieldKey) {
+            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+            const fieldId = `field_${path.replace(/\./g, '_')}`;
+            const items = field.items;
+            
+            let options = '';
+            if (items.enum) {
+                items.enum.forEach((val, idx) => {
+                    const label = items.enumNames ? items.enumNames[idx] : val;
+                    const optionId = `${fieldId}_${val}`;
+                    options += `
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="${optionId}"
+                                   x-model="formData.${path}"
+                                   value="${val}"
+                                   @change="calculateStats(); updateSectionCompleteness()"
+                                   class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                            <label for="${optionId}" class="ms-2 text-sm font-medium text-gray-900">${label}</label>
+                        </div>`;
+                });
+            }
+            
+            return `
+                <div class="${isRequired ? 'iccd-field-required' : ''}">
+                    <label class="block mb-2 text-sm font-medium text-gray-900">
+                        ${field.title || path}
+                        ${isRequired ? ' <span class="text-red-600">*</span>' : ''}
+                    </label>
+                    <div class="grid grid-cols-2 gap-2 p-3 bg-white border border-gray-300 rounded-lg">
+                        ${options}
+                    </div>
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500">${field.description}</p>` : ''}
+                </div>`;
         },
 
         isSectionComplete(sectionId) {
@@ -843,6 +1001,20 @@ function iccdFormUniversal(schemaType, siteId) {
             }
             if (Array.isArray(value)) return value.length > 0;
             return true;
+        },
+
+        // Funzione specifica per gestire il valore di array
+        getArrayFieldValue(sectionData, fieldKey) {
+            try {
+                if (!sectionData || !fieldKey) {
+                    return [];
+                }
+                const value = sectionData[fieldKey] || [];
+                return Array.isArray(value) ? value : [];
+            } catch (error) {
+                console.warn(`Errore accesso campo array ${fieldKey}:`, error);
+                return [];
+            }
         },
 
         isFirstSection() {
