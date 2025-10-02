@@ -40,7 +40,7 @@ from app.routes.api.archaeological_plans import plans_router as archaeological_p
 # 🏺 NUOVO IMPORT - Router ICCD Records API
 from app.routes.api.iccd_records import iccd_router
 # 🏺 NUOVO IMPORT - Router ICCD API (draft)
-from app.routes.iccd_api import router as iccd_api_router
+#from app.routes.iccd_api import router as iccd_api_router
 # 🌍 NUOVO IMPORT - Router Geographic Maps API
 from app.routes.api.geographic_maps import geographic_maps_router
 
@@ -134,11 +134,11 @@ app.include_router(
 )
 
 # 🏺 INCLUSIONE ROUTER ICCD API (draft) - API ICCD draft
-app.include_router(
-    iccd_api_router,
-    tags=["iccd-api-draft"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-)
+#app.include_router(
+#    iccd_api_router,
+#    tags=["iccd-api-draft"],
+#    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+#)
 
 # 🌍 INCLUSIONE ROUTER GEOGRAPHIC MAPS - API per mappe geografiche
 app.include_router(

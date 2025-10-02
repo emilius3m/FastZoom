@@ -197,7 +197,6 @@ async def create_record(
 ):
     """
     Crea una nuova scheda ICCD
-
     Validazione automatica dei dati secondo schema
     Generazione automatica NCT
     """
@@ -443,6 +442,7 @@ async def validate_record(
     Returns:
         Risultato validazione dettagliato con errori e warning
     """
+    logger.info(f"validate_records")
     record = await db.execute(
         select(ICCDRecord).where(
             and_(ICCDRecord.id == record_id, ICCDRecord.deleted_at.is_(None))

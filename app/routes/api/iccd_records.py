@@ -232,6 +232,7 @@ async def validate_iccd_data(
     """Valida dati ICCD secondo standard ministeriali."""
     try:
         from loguru import logger
+        logger.warning(f"file Position api\iccd_records.py")
         logger.info(f"Validate request received: {validation_request}")
 
         schema_type = validation_request.get('schema_type')
