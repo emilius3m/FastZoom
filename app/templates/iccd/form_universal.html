@@ -889,7 +889,17 @@ function iccdFormUniversal(schemaType, siteId) {
                     this.validationErrors[this.currentSection] = [];
                 } else {
                     this.validationErrors[this.currentSection] = allErrors;
-                    this.showAlert('error', `❌ Trovati ${allErrors.length} errori nella sezione ${this.currentSection}`);
+                    
+                    // Mostra errori specifici all'utente
+                    const errorDetails = allErrors.map(error => {
+                        const fieldName = this.getFieldDisplayName(error.field || error.field_path);
+                        return `${fieldName}: ${error.message}`;
+                    });
+                    
+                    this.showAlert('error',
+                        `❌ Trovati ${allErrors.length} errori nella sezione ${this.currentSection}:`,
+                        errorDetails
+                    );
                     console.warn('Errori validazione:', allErrors);
                 }
                 
@@ -926,7 +936,19 @@ function iccdFormUniversal(schemaType, siteId) {
                 if (totalErrors === 0) {
                     this.showAlert('success', '✅ Tutte le sezioni validate correttamente');
                 } else {
-                    this.showAlert('error', `❌ Trovati ${totalErrors} errori totali nella scheda`);
+                    // Mostra errori specifici di tutte le sezioni all'utente
+                    const allErrorDetails = [];
+                    Object.entries(this.validationErrors).forEach(([sectionId, errors]) => {
+                        errors.forEach(error => {
+                            const fieldName = this.getFieldDisplayName(error.field || error.field_path);
+                            allErrorDetails.push(`${sectionId} - ${fieldName}: ${error.message}`);
+                        });
+                    });
+                    
+                    this.showAlert('error',
+                        `❌ Trovati ${totalErrors} errori totali nella scheda:`,
+                        allErrorDetails.slice(0, 10) // Mostra massimo 10 errori
+                    );
                 }
                 
                 this.updateSectionCompleteness();
