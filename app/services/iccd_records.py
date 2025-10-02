@@ -118,12 +118,20 @@ class ICCDRecordService:
             logger.info(f"Full record data: {record_data}")
 
             # Validate required fields
-            required_fields = ['schema_type', 'level', 'iccd_data', 'cataloging_institution']
+            required_fields = ['schema_type', 'level', 'iccd_data']
             for field in required_fields:
                 if field not in record_data:
                     logger.error(f"Missing required field: {field}")
                     logger.error(f"Available fields: {list(record_data.keys())}")
                     raise BusinessLogicError(f"Campo obbligatorio mancante: {field}", 400)
+            
+            # Extract cataloging_institution from ICCD data if not provided separately
+            cataloging_institution = record_data.get('cataloging_institution')
+            if not cataloging_institution:
+                cataloging_institution = record_data.get('iccd_data', {}).get('CD', {}).get('ESC')
+                if not cataloging_institution:
+                    cataloging_institution = 'SSABAP-RM'  # Default fallback
+                    logger.info(f"Using default cataloging institution: {cataloging_institution}")
 
             # Additional validation of ICCD data
             if not isinstance(record_data['iccd_data'], dict):
@@ -160,17 +168,19 @@ class ICCDRecordService:
             if 'CD' not in iccd_data:
                 iccd_data['CD'] = {}
             if 'ESC' not in iccd_data['CD']:
-                iccd_data['CD']['ESC'] = record_data['cataloging_institution']
+                iccd_data['CD']['ESC'] = cataloging_institution
             
-            # Add cataloger and survey date if provided
-            if record_data.get('cataloger_name') or record_data.get('survey_date'):
+            # Add cataloger and survey date if provided (either as separate fields or in ICCD data)
+            cataloger_name = record_data.get('cataloger_name') or iccd_data.get('CD', {}).get('RCG', {}).get('RCGR')
+            survey_date = record_data.get('survey_date') or iccd_data.get('CD', {}).get('RCG', {}).get('RCGD')
+            
+            if cataloger_name or survey_date:
                 if 'RCG' not in iccd_data['CD']:
                     iccd_data['CD']['RCG'] = {}
-                if record_data.get('cataloger_name'):
-                    iccd_data['CD']['RCG']['RCGR'] = record_data['cataloger_name']
-                if record_data.get('survey_date'):
+                if cataloger_name:
+                    iccd_data['CD']['RCG']['RCGR'] = cataloger_name
+                if survey_date:
                     # Convert datetime to ISO format string for storage
-                    survey_date = record_data['survey_date']
                     if isinstance(survey_date, str):
                         iccd_data['CD']['RCG']['RCGD'] = survey_date
                     else:

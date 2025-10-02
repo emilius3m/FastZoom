@@ -1321,16 +1321,23 @@ function iccdFormUniversal(schemaType, siteId) {
                 }
 
                 // Procedi con il salvataggio solo se non ci sono errori
+                const requestData = {
+                    schema_type: this.schemaType,
+                    level: 'C',
+                    iccd_data: this.formData
+                };
+                
+                // Aggiungi cataloging_institution se disponibile
+                if (this.formData.CD?.ESC) {
+                    requestData.cataloging_institution = this.formData.CD.ESC;
+                }
+                
                 const response = await fetch(`/api/iccd/sites/${this.siteId}/records`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        schema_type: this.schemaType,
-                        level: 'C',
-                        iccd_data: this.formData
-                    })
+                    body: JSON.stringify(requestData)
                 });
 
                 if (!response.ok) {
