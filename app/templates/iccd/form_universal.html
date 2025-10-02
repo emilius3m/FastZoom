@@ -3,117 +3,187 @@
 {% block title %}Scheda ICCD {{ schema_type }} - {{ site.name }} | FastZoom{% endblock %}
 
 {% block head %}
+<!-- Dark Mode Script -->
+
 <style>
+    /* Custom styles for ICCD form with dark mode support */
     .iccd-section {
-        @apply border-l-4 border-blue-600 bg-white rounded-r-lg shadow-sm mb-6 transition-all;
+        @apply border-l-4 border-blue-500 dark:border-blue-400 bg-white dark:bg-gray-800 rounded-r-lg shadow-sm mb-6 transition-all;
     }
-    .iccd-section-required { @apply border-l-red-600; }
-    .iccd-section-complete { @apply border-l-green-600; }
+    .iccd-section-required {
+        @apply border-l-red-500 dark:border-red-400;
+    }
+    .iccd-section-complete {
+        @apply border-l-green-500 dark:border-green-400;
+    }
+    .iccd-section-error {
+        @apply border-l-red-600 dark:border-red-400 bg-red-50 dark:bg-red-900/20;
+    }
     .iccd-field-required label::after {
         content: " *";
-        @apply text-red-600 font-bold;
+        @apply text-red-600 dark:text-red-400 font-bold;
     }
-    .iccd-tab {
-        @apply relative px-4 py-3 text-sm font-medium text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-300 transition-colors cursor-pointer whitespace-nowrap;
+    .iccd-field-error {
+        @apply border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/20;
     }
-    .iccd-tab-active { @apply text-blue-600 border-blue-600; }
-    .iccd-tab-complete::before {
-        content: "✓";
-        @apply absolute -top-1 -right-1 bg-green-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center;
+    .error-message {
+        @apply text-red-600 dark:text-red-400 text-sm mt-1;
+    }
+    .completion-bar {
+        background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+    }
+    .dark .completion-bar {
+        background: linear-gradient(90deg, #60a5fa 0%, #34d399 100%);
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-6" x-data="iccdFormUniversal('{{ schema_type }}', '{{ site.id }}')">
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div class="container mx-auto px-4 py-6"
+         x-data="iccdFormUniversal()"
+         data-schema-type="{{ schema_type }}"
+         data-site-id="{{ site.id }}"
+         data-edit-mode="{{ edit_mode|tojson if edit_mode else 'false' }}">
+         
+    <!-- Record data in a hidden script tag to avoid attribute parsing issues -->
+    {% if record %}
+    <script type="application/json" id="record-data">{{ record|tojson }}</script>
+    {% endif %}
 
-    <!-- Header -->
-    <div class="mb-6">
-        <nav class="flex mb-4 text-sm" aria-label="Breadcrumb">
-            <ol class="inline-flex items-center space-x-1">
-                <li><a href="#" class="text-gray-600 hover:text-blue-600">Dashboard</a></li>
-                <li><span class="mx-2 text-gray-400">/</span></li>
-                <li><a href="#" class="text-gray-600 hover:text-blue-600">{{ site.name }}</a></li>
-                <li><span class="mx-2 text-gray-400">/</span></li>
-                <li class="text-gray-900 font-medium">Scheda ICCD <span x-text="schemaType"></span> 3.00</li>
-            </ol>
-        </nav>
+        <!-- Header -->
+        <div class="mb-6">
+            <!-- Breadcrumb -->
+            <nav class="flex mb-4 text-sm" aria-label="Breadcrumb">
+                <ol class="inline-flex items-center space-x-1">
+                    <li><a href="/sites/{{ site.id }}/dashboard" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">Dashboard</a></li>
+                    <li><span class="mx-2 text-gray-400 dark:text-gray-500">/</span></li>
+                    <li><a href="/sites/{{ site.id }}/iccd" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">{{ site.name }}</a></li>
+                    <li><span class="mx-2 text-gray-400 dark:text-gray-500">/</span></li>
+                    <li class="text-gray-900 dark:text-white font-medium">
+                        <span x-text="editMode ? 'Modifica' : 'Nuova'"></span> Scheda ICCD <span x-text="schemaType"></span> 3.00
+                    </li>
+                </ol>
+            </nav>
 
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                    <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
-                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
-                    </svg>
-                    <span x-text="`Scheda ${schemaType} 3.00 - ${schemaInfo.name || ''}`"></span>
-                </h1>
-                <p class="text-gray-600 mt-2" x-text="`${schemaInfo.description || ''} - Standard ICCD MiC 2025`"></p>
-            </div>
-
-            <!-- Progresso -->
-            <div class="text-right">
-                <div class="text-sm text-gray-600 mb-2">Completamento</div>
-                <div class="flex items-center gap-3">
-                    <div class="w-48 h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300"
-                             :style="`width: ${completionPercentage}%`"></div>
+            <!-- Main Header -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
+                            <svg class="w-8 h-8 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                                <span x-text="editMode ? 'Modifica' : 'Nuova'"></span> Scheda <span x-text="schemaType"></span> 3.00
+                            </h1>
+                            <p class="text-gray-600 dark:text-gray-400 mt-1">
+                                <span x-text="schemaInfo.description || 'Catalogazione Archeologica Standard ICCD'"></span>
+                                <span x-show="editMode && existingRecord" class="ml-2 text-sm font-medium text-blue-600 dark:text-blue-400">
+                                    NCT: <span x-text="existingRecord?.nct || 'N/A'"></span>
+                                </span>
+                            </p>
+                        </div>
                     </div>
-                    <span class="text-2xl font-bold text-blue-600" x-text="completionPercentage + '%'"></span>
-                </div>
-                <div class="text-xs text-gray-500 mt-1">
-                    <span x-text="filledFields"></span>/<span x-text="totalFields"></span> campi
+
+                    <!-- Progress -->
+                    <div class="text-right">
+                        <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">Completamento</div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-48 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div class="h-full completion-bar transition-all duration-300"
+                                     :style="`width: ${completionPercentage}%`"></div>
+                            </div>
+                            <span class="text-2xl font-bold text-blue-600 dark:text-blue-400" x-text="completionPercentage + '%'"></span>
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <span x-text="filledFields"></span>/<span x-text="totalFields"></span> campi
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Alert -->
-    <div x-show="alert.show"
-         x-transition
-         :class="{
-             'bg-green-50 border-green-500 text-green-800': alert.type === 'success',
-             'bg-red-50 border-red-500 text-red-800': alert.type === 'error',
-             'bg-yellow-50 border-yellow-500 text-yellow-800': alert.type === 'warning'
-         }"
-         class="border-l-4 p-4 mb-6 rounded-r">
-        <div class="flex justify-between items-start">
+        <!-- Alert with Flowbite styling -->
+        <div x-show="alert.show"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform -translate-y-2"
+             x-transition:enter-end="opacity-100 transform translate-y-0"
+             :class="{
+                 'text-green-800 border-green-300 bg-green-50 dark:text-green-400 dark:bg-gray-800 dark:border-green-800': alert.type === 'success',
+                 'text-red-800 border-red-300 bg-red-50 dark:text-red-400 dark:bg-gray-800 dark:border-red-800': alert.type === 'error',
+                 'text-yellow-800 border-yellow-300 bg-yellow-50 dark:text-yellow-300 dark:bg-gray-800 dark:border-yellow-800': alert.type === 'warning',
+                 'text-blue-800 border-blue-300 bg-blue-50 dark:text-blue-400 dark:bg-gray-800 dark:border-blue-800': alert.type === 'info'
+             }"
+             class="flex items-center p-4 mb-4 text-sm border rounded-lg" role="alert">
             <div class="flex-1">
-                <p class="font-medium" x-text="alert.title"></p>
+                <div class="flex items-center">
+                    <svg x-show="alert.type === 'success'" class="flex-shrink-0 w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
+                    </svg>
+                    <svg x-show="alert.type === 'error'" class="flex-shrink-0 w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
+                    </svg>
+                    <span class="font-medium" x-text="alert.title"></span>
+                </div>
                 <div x-show="alert.details && alert.details.length > 0" class="mt-2">
-                    <ul class="list-disc list-inside space-y-1 text-sm">
+                    <ul class="mt-1.5 list-disc list-inside">
                         <template x-for="detail in alert.details" :key="detail">
                             <li x-text="detail"></li>
                         </template>
                     </ul>
                 </div>
             </div>
-            <button @click="alert.show = false" class="text-gray-400 hover:text-gray-600 ml-4">✕</button>
+            <button @click="alert.show = false" class="ms-auto -mx-1.5 -my-1.5 rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 inline-flex items-center justify-center h-8 w-8" type="button">
+                <span class="sr-only">Chiudi</span>
+                <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                </svg>
+            </button>
         </div>
-    </div>
 
-    <!-- Loading -->
-    <div x-show="loading" class="flex items-center justify-center py-12">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <span class="ml-3 text-gray-600">Caricamento schema ICCD...</span>
-    </div>
+        <!-- Loading with Flowbite Spinner -->
+        <div x-show="loading" class="flex flex-col items-center justify-center py-12">
+            <svg aria-hidden="true" class="w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
+                <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
+            </svg>
+            <span class="ml-3 text-gray-600 dark:text-gray-400 mt-3">Caricamento schema ICCD...</span>
+        </div>
 
-    <!-- Tabs paragrafi -->
-    <div x-show="!loading" class="mb-6 border-b border-gray-200 overflow-x-auto">
-        <nav class="flex space-x-1 min-w-max" role="tablist">
-            <template x-for="section in sections" :key="section.id">
-                <button @click="currentSection = section.id"
-                        :class="{
-                            'iccd-tab-active': currentSection === section.id,
-                            'iccd-tab-complete': isSectionComplete(section.id)
-                        }"
-                        class="iccd-tab">
-                    <span x-text="section.id"></span>
-                    <span x-show="section.required" class="text-red-500 ml-1">*</span>
-                </button>
-            </template>
-        </nav>
-    </div>
+        <!-- Section Tabs with Flowbite styling -->
+        <div x-show="!loading" class="mb-6">
+            <div class="text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700">
+                <ul class="flex flex-wrap -mb-px overflow-x-auto">
+                    <template x-for="section in sections" :key="section.id">
+                        <li class="me-2">
+                            <button @click="currentSection = section.id"
+                                    :class="{
+                                        'text-blue-600 border-blue-600 dark:text-blue-500 dark:border-blue-500': currentSection === section.id,
+                                        'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300': currentSection !== section.id
+                                    }"
+                                    class="inline-block p-4 border-b-2 rounded-t-lg relative transition-colors">
+                                <span x-text="section.id"></span>
+                                <span x-show="section.required" class="text-red-500 dark:text-red-400 ml-1">*</span>
+                                <!-- Completion indicator -->
+                                <span x-show="isSectionComplete(section.id)"
+                                      class="absolute -top-1 -right-1 bg-green-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                                    ✓
+                                </span>
+                                <!-- Error indicator -->
+                                <span x-show="validationErrors[section.id] && validationErrors[section.id].length > 0"
+                                      class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                                    !
+                                </span>
+                            </button>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
 
     <!-- Form -->
     <form x-show="!loading" @submit.prevent="saveForm" novalidate class="space-y-6">
@@ -234,11 +304,13 @@
 </div>
 
 <script>
-function iccdFormUniversal(schemaType, siteId) {
+function iccdFormUniversal() {
     return {
-        // Config
-        schemaType: schemaType,
-        siteId: siteId,
+        // Config - will be initialized from data attributes
+        schemaType: '',
+        siteId: '',
+        existingRecord: null,
+        editMode: false,
 
         // Data
         schema: null,
@@ -260,7 +332,33 @@ function iccdFormUniversal(schemaType, siteId) {
         sectionCompleteness: {},
 
         async init() {
-            console.log('🚀 Inizializzazione form ICCD universale per schema:', schemaType);
+            // Leggi i parametri dai data attributes
+            const container = this.$el;
+            this.schemaType = container.dataset.schemaType || 'RA';
+            this.siteId = container.dataset.siteId;
+            this.editMode = container.dataset.editMode === 'true';
+            
+            // Parse del record esistente se presente (da script tag)
+            const recordScript = document.getElementById('record-data');
+            if (recordScript) {
+                try {
+                    this.existingRecord = JSON.parse(recordScript.textContent);
+                    console.log('✅ Record esistente caricato correttamente:', this.existingRecord.id || 'N/A');
+                } catch (error) {
+                    console.warn('Errore parsing record esistente:', error);
+                    console.warn('Contenuto script:', recordScript.textContent);
+                    this.existingRecord = null;
+                }
+            }
+            
+            console.log('🚀 Inizializzazione form ICCD universale per schema:', this.schemaType);
+            console.log('📊 Configurazione:', {
+                schemaType: this.schemaType,
+                siteId: this.siteId,
+                editMode: this.editMode,
+                hasExistingRecord: !!this.existingRecord
+            });
+            
             await this.loadSchema();
             this.initializeFormData();
             this.parseSections();
@@ -532,21 +630,44 @@ function iccdFormUniversal(schemaType, siteId) {
         },
 
         initializeFormData() {
-            console.log('📝 Inizializzazione dati form con valori predefiniti');
-            // Inizializza CD di default con tutti i campi obbligatori
-            this.formData = {
-                CD: {
-                    TSK: this.schemaType,
-                    LIR: 'C', // Livello Catalogazione
-                    NCT: {
-                        NCTR: '12', // Codice regione Lazio
-                        NCTN: this.generateNCTN(),
-                        NCTS: ''
-                    },
-                    ESC: '', // Ente schedatore
-                    ECP: ''  // Ente competente per tutela
+            console.log('📝 Inizializzazione dati form', this.editMode ? 'con dati esistenti' : 'con valori predefiniti');
+            
+            if (this.editMode && this.existingRecord) {
+                console.log('🔄 Caricamento dati esistenti:', this.existingRecord);
+                // Usa i dati esistenti se in modalità modifica
+                this.formData = this.existingRecord.iccd_data || {};
+                
+                // Assicurati che le sezioni base esistano
+                if (!this.formData.CD) {
+                    this.formData.CD = {
+                        TSK: this.schemaType,
+                        LIR: 'C',
+                        NCT: {
+                            NCTR: '12',
+                            NCTN: this.generateNCTN(),
+                            NCTS: ''
+                        },
+                        ESC: '',
+                        ECP: ''
+                    };
                 }
-            };
+            } else {
+                console.log('🆕 Creazione nuova scheda con valori predefiniti');
+                // Inizializza CD di default con tutti i campi obbligatori
+                this.formData = {
+                    CD: {
+                        TSK: this.schemaType,
+                        LIR: 'C', // Livello Catalogazione
+                        NCT: {
+                            NCTR: '12', // Codice regione Lazio
+                            NCTN: this.generateNCTN(),
+                            NCTS: ''
+                        },
+                        ESC: '', // Ente schedatore
+                        ECP: ''  // Ente competente per tutela
+                    }
+                };
+            }
             
             // Inizializza altre sezioni vuote per evitare errori di binding
             this.initializeEmptySections();
@@ -719,21 +840,23 @@ function iccdFormUniversal(schemaType, siteId) {
         renderTextField(path, field) {
             const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
             const fieldId = `field_${path.replace(/\./g, '_')}`;
+            const hasError = this.hasFieldError(path);
             return `
                 <div class="${isRequired ? 'iccd-field-required' : ''}">
-                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900">
+                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || path}
-                        ${isRequired ? ' <span class="text-red-600">*</span>' : ''}
+                        ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
                     </label>
                     <input type="text"
                            id="${fieldId}"
                            name="${path}"
                            x-model="formData.${path}"
                            @input="calculateStats(); updateSectionCompleteness()"
-                           class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                           class="bg-gray-50 dark:bg-gray-700 border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'} text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 block w-full p-2.5 dark:placeholder-gray-400"
                            placeholder="${field.description || ''}"
                            ${isRequired ? 'required' : ''}>
-                    ${field.description ? `<p class="mt-1 text-xs text-gray-500">${field.description}</p>` : ''}
+                    ${hasError ? `<p class="error-message">${this.getFieldError(path)}</p>` : ''}
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
         },
@@ -741,6 +864,7 @@ function iccdFormUniversal(schemaType, siteId) {
         renderSelectField(path, field) {
             const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
             const fieldId = `field_${path.replace(/\./g, '_')}`;
+            const hasError = this.hasFieldError(path);
             let options = field.enum.map((val, idx) => {
                 const label = field.enumNames ? field.enumNames[idx] : val;
                 return `<option value="${val}">${label}</option>`;
@@ -748,20 +872,21 @@ function iccdFormUniversal(schemaType, siteId) {
 
             return `
                 <div class="${isRequired ? 'iccd-field-required' : ''}">
-                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900">
+                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || path}
-                        ${isRequired ? ' <span class="text-red-600">*</span>' : ''}
+                        ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
                     </label>
                     <select id="${fieldId}"
                             name="${path}"
                             x-model="formData.${path}"
                             @change="calculateStats(); updateSectionCompleteness()"
-                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                            class="bg-gray-50 dark:bg-gray-700 border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'} text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 block w-full p-2.5"
                             ${isRequired ? 'required' : ''}>
                         <option value="">Seleziona...</option>
                         ${options}
                     </select>
-                    ${field.description ? `<p class="mt-1 text-xs text-gray-500">${field.description}</p>` : ''}
+                    ${hasError ? `<p class="error-message">${this.getFieldError(path)}</p>` : ''}
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
         },
@@ -769,21 +894,23 @@ function iccdFormUniversal(schemaType, siteId) {
         renderTextareaField(path, field) {
             const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
             const fieldId = `field_${path.replace(/\./g, '_')}`;
+            const hasError = this.hasFieldError(path);
             return `
                 <div class="md:col-span-2 ${isRequired ? 'iccd-field-required' : ''}">
-                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900">
+                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || path}
-                        ${isRequired ? ' <span class="text-red-600">*</span>' : ''}
+                        ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
                     </label>
                     <textarea id="${fieldId}"
                               name="${path}"
                               x-model="formData.${path}"
                               @input="calculateStats(); updateSectionCompleteness()"
                               rows="4"
-                              class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                              class="block p-2.5 w-full text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 rounded-lg border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'} focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 dark:placeholder-gray-400"
                               placeholder="${field.description || ''}"
                               ${isRequired ? 'required' : ''}></textarea>
-                    ${field.description ? `<p class="mt-1 text-xs text-gray-500">${field.description}</p>` : ''}
+                    ${hasError ? `<p class="error-message">${this.getFieldError(path)}</p>` : ''}
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
         },
@@ -791,22 +918,24 @@ function iccdFormUniversal(schemaType, siteId) {
         renderNumberField(path, field) {
             const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
             const fieldId = `field_${path.replace(/\./g, '_')}`;
+            const hasError = this.hasFieldError(path);
             return `
                 <div class="${isRequired ? 'iccd-field-required' : ''}">
-                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900">
+                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || path}
-                        ${isRequired ? ' <span class="text-red-600">*</span>' : ''}
+                        ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
                     </label>
                     <input type="number"
                            id="${fieldId}"
                            name="${path}"
                            x-model.number="formData.${path}"
                            @input="calculateStats(); updateSectionCompleteness()"
-                           class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                           class="bg-gray-50 dark:bg-gray-700 border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'} text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 block w-full p-2.5 dark:placeholder-gray-400"
                            ${field.minimum !== undefined ? `min="${field.minimum}"` : ''}
                            ${field.maximum !== undefined ? `max="${field.maximum}"` : ''}
                            ${isRequired ? 'required' : ''}>
-                    ${field.description ? `<p class="mt-1 text-xs text-gray-500">${field.description}</p>` : ''}
+                    ${hasError ? `<p class="error-message">${this.getFieldError(path)}</p>` : ''}
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
         },
@@ -1332,8 +1461,15 @@ function iccdFormUniversal(schemaType, siteId) {
                     requestData.cataloging_institution = this.formData.CD.ESC;
                 }
                 
-                const response = await fetch(`/api/iccd/sites/${this.siteId}/records`, {
-                    method: 'POST',
+                // Determina URL e metodo in base alla modalità
+                const url = this.editMode && this.existingRecord
+                    ? `/api/iccd/sites/${this.siteId}/records/${this.existingRecord.id}`
+                    : `/api/iccd/sites/${this.siteId}/records`;
+                    
+                const method = this.editMode && this.existingRecord ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
                     headers: {
                         'Content-Type': 'application/json'
                     },
@@ -1346,9 +1482,10 @@ function iccdFormUniversal(schemaType, siteId) {
                 }
 
                 const result = await response.json();
-                this.showAlert('success', `✅ Scheda ${result.nct_complete || 'ICCD'} salvata con successo!`, []);
+                const action = this.editMode ? 'aggiornata' : 'salvata';
+                this.showAlert('success', `✅ Scheda ${result.nct_complete || 'ICCD'} ${action} con successo!`, []);
 
-                console.log('✅ Scheda salvata:', result);
+                console.log(`✅ Scheda ${action}:`, result);
                 
                 // Reindirizza dopo un breve delay
                 setTimeout(() => {
@@ -1485,6 +1622,32 @@ function iccdFormUniversal(schemaType, siteId) {
 
         get completionPercentage() {
             return this.totalFields > 0 ? Math.round((this.filledFields / this.totalFields) * 100) : 0;
+        },
+
+        hasFieldError(fieldPath) {
+            // Verifica se un campo specifico ha errori di validazione
+            const parts = fieldPath.split('.');
+            const sectionId = parts[0];
+            
+            if (!this.validationErrors[sectionId]) return false;
+            
+            return this.validationErrors[sectionId].some(error =>
+                error.field === fieldPath || error.field_path === fieldPath
+            );
+        },
+
+        getFieldError(fieldPath) {
+            // Restituisce il messaggio di errore per un campo specifico
+            const parts = fieldPath.split('.');
+            const sectionId = parts[0];
+            
+            if (!this.validationErrors[sectionId]) return '';
+            
+            const error = this.validationErrors[sectionId].find(error =>
+                error.field === fieldPath || error.field_path === fieldPath
+            );
+            
+            return error ? error.message : '';
         }
     };
 }
