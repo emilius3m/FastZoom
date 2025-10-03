@@ -319,25 +319,20 @@ class ICCDValidator:
             des = da_data["DES"]
             
             # DESO - Descrizione oggetto
-            if "DESO" not in des:
-                self.add_error("DA.DES.DESO", "Descrizione oggetto obbligatoria")
-            elif len(des["DESO"].strip()) < 10:
-                self.add_error("DA.DES.DESO", "Descrizione oggetto troppo breve (minimo 10 caratteri)")
+            if "DESA" not in des:
+                self.add_error("DA.DES.DESA", "Descrizione oggetto obbligatoria")
+            elif len(des["DESA"].strip()) < 10:
+                self.add_error("DA.DES.DESA", "Descrizione oggetto troppo breve (minimo 10 caratteri)")
         
         # STC - Stato di conservazione (obbligatorio)
-        if "STC" not in da_data:
-            self.add_error("DA.STC", "Stato di conservazione STC obbligatorio")
-        else:
-            stc = da_data["STC"]
-            
-            # STCC - Stato di conservazione
-            if "STCC" not in stc:
-                self.add_error("DA.STC.STCC", "Stato di conservazione obbligatorio")
-            else:
-                valid_states = ["ottimo", "buono", "discreto", "cattivo", "pessimo"]
-                if stc["STCC"] not in valid_states:
-                    self.add_error("DA.STC.STCC", f"Stato di conservazione non valido: {stc['STCC']}")
-        
+        #if "STC" not in da_data:
+        #    self.add_error("CO.STC", "Stato di conservazione STC obbligatorio")
+        #else:
+        #    stc = da_data["STC"]
+        #    # STCC - Stato di conservazione
+        #    if "STCC" not in stc:
+        #        self.add_error("CO.STC.STCC", "Stato di conservazione obbligatorio")
+
         # Validazione iscrizioni se presenti
         if "ISR" in da_data:
             isr = da_data["ISR"]

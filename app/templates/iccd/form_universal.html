@@ -553,82 +553,6 @@ function iccdFormUniversal() {
             }
         },
 
-        initializeEmptySections() {
-            // Funzione helper per inizializzare sezioni vuote
-            if (this.sections && this.sections.length > 0) {
-                this.sections.forEach(section => {
-                    if (!this.formData[section.id]) {
-                        this.formData[section.id] = {};
-                    }
-                    
-                    // Inizializza anche sottooggetti comuni per evitare errori
-                    if (section.id === 'OG') {
-                        if (!this.formData[section.id].OGT) {
-                            this.formData[section.id].OGT = {};
-                        }
-                        if (!this.formData[section.id].OGN) {
-                            this.formData[section.id].OGN = {};
-                        }
-                    }
-                    
-                    if (section.id === 'LC') {
-                        if (!this.formData[section.id].PVC) {
-                            this.formData[section.id].PVC = {};
-                        }
-                        if (!this.formData[section.id].PVL) {
-                            this.formData[section.id].PVL = {};
-                        }
-                        if (!this.formData[section.id].LDC) {
-                            this.formData[section.id].LDC = {};
-                        }
-                    }
-                    
-                    if (section.id === 'DT') {
-                        if (!this.formData[section.id].DTS) this.formData[section.id].DTS = {};
-                        if (!this.formData[section.id].DTM) this.formData[section.id].DTM = {};
-                    }
-                    
-                    if (section.id === 'MT') {
-                        if (!this.formData[section.id].MTC) {
-                            this.formData[section.id].MTC = {};
-                        }
-                        // Inizializza MTCM come array vuoto se non esiste
-                        if (!this.formData[section.id].MTC.MTCM) {
-                            this.formData[section.id].MTC.MTCM = [];
-                        }
-                        // IMPORTANTE: Inizializza MIS per le misure
-                        if (!this.formData[section.id].MIS) {
-                            this.formData[section.id].MIS = {};
-                        }
-                    }
-                    
-                    if (section.id === 'DA') {
-                        if (!this.formData[section.id].DES) this.formData[section.id].DES = {};
-                        if (!this.formData[section.id].STC) this.formData[section.id].STC = {};
-                        if (!this.formData[section.id].ISR) this.formData[section.id].ISR = {};
-                    }
-                    
-                    if (section.id === 'AU') {
-                        if (!this.formData[section.id].AUT) {
-                            this.formData[section.id].AUT = {};
-                        }
-                    }
-                    
-                    if (section.id === 'NS') {
-                        if (!this.formData[section.id].NSC) {
-                            this.formData[section.id].NSC = {};
-                        }
-                    }
-                    
-                    if (section.id === 'RS') {
-                        if (!this.formData[section.id].RSE) {
-                            this.formData[section.id].RSE = {};
-                        }
-                    }
-                });
-            }
-        },
-
         initializeFormData() {
             console.log('📝 Inizializzazione dati form', this.editMode ? 'con dati esistenti' : 'con valori predefiniti');
             
@@ -681,45 +605,27 @@ function iccdFormUniversal() {
                         this.formData[section.id] = {};
                     }
                     
-                    // Inizializza anche sottooggetti comuni per evitare errori
+                    // Inizializza sottooggetti comuni per evitare errori AlpineJS
                     if (section.id === 'OG') {
-                        if (!this.formData[section.id].OGT) {
-                            this.formData[section.id].OGT = {};
-                        }
-                        if (!this.formData[section.id].OGN) {
-                            this.formData[section.id].OGN = {};
-                        }
+                        if (!this.formData[section.id].OGT) this.formData[section.id].OGT = {};
+                        if (!this.formData[section.id].OGN) this.formData[section.id].OGN = {};
                     }
                     
                     if (section.id === 'LC') {
-                        if (!this.formData[section.id].PVC) {
-                            this.formData[section.id].PVC = {};
-                        }
-                        if (!this.formData[section.id].PVL) {
-                            this.formData[section.id].PVL = {};
-                        }
-                        if (!this.formData[section.id].LDC) {
-                            this.formData[section.id].LDC = {};
-                        }
+                        if (!this.formData[section.id].PVC) this.formData[section.id].PVC = {};
+                        if (!this.formData[section.id].PVL) this.formData[section.id].PVL = {};
+                        if (!this.formData[section.id].LDC) this.formData[section.id].LDC = {};
                     }
                     
                     if (section.id === 'DT') {
-                        if (!this.formData[section.id].DTS) this.formData[section.id].DTS = {};
-                        if (!this.formData[section.id].DTM) this.formData[section.id].DTM = {};
+                        // DT contiene array, lascia che initializeNestedObjects() li gestisca
+                        // Non inizializzare manualmente per evitare conflitti tipo oggetto vs array
                     }
                     
                     if (section.id === 'MT') {
-                        if (!this.formData[section.id].MTC) {
-                            this.formData[section.id].MTC = {};
-                        }
-                        // Inizializza MTCM come array vuoto se non esiste
-                        if (!this.formData[section.id].MTC.MTCM) {
-                            this.formData[section.id].MTC.MTCM = [];
-                        }
-                        // IMPORTANTE: Inizializza MIS per le misure
-                        if (!this.formData[section.id].MIS) {
-                            this.formData[section.id].MIS = {};
-                        }
+                        if (!this.formData[section.id].MTC) this.formData[section.id].MTC = {};
+                        if (!this.formData[section.id].MTC.MTCM) this.formData[section.id].MTC.MTCM = [];
+                        if (!this.formData[section.id].MIS) this.formData[section.id].MIS = {};
                     }
                     
                     if (section.id === 'DA') {
@@ -729,24 +635,65 @@ function iccdFormUniversal() {
                     }
                     
                     if (section.id === 'AU') {
-                        if (!this.formData[section.id].AUT) {
-                            this.formData[section.id].AUT = {};
-                        }
+                        if (!this.formData[section.id].AUT) this.formData[section.id].AUT = {};
                     }
                     
                     if (section.id === 'NS') {
-                        if (!this.formData[section.id].NSC) {
-                            this.formData[section.id].NSC = {};
-                        }
+                        if (!this.formData[section.id].NSC) this.formData[section.id].NSC = {};
                     }
                     
                     if (section.id === 'RS') {
-                        if (!this.formData[section.id].RSE) {
-                            this.formData[section.id].RSE = {};
-                        }
+                        if (!this.formData[section.id].RSE) this.formData[section.id].RSE = {};
+                    }
+                    
+                    // GP - Georeferenziazione
+                    if (section.id === 'GP') {
+                        if (!this.formData[section.id].GPP) this.formData[section.id].GPP = {};
+                        // GPL è una stringa, non un oggetto - lascia che initializeNestedObjects lo gestisca
+                    }
+                    
+                    // Inizializza ricorsivamente tutti i sottooggetti definiti nello schema
+                    if (section.properties) {
+                        this.initializeNestedObjects(section.id, section.properties);
                     }
                 });
             }
+        },
+        
+        initializeNestedObjects(basePath, properties) {
+            // Inizializza ricorsivamente tutti gli oggetti nested per evitare errori undefined
+            Object.entries(properties).forEach(([key, field]) => {
+                if (field.type === 'object' && field.properties) {
+                    // Assicura che il path esista
+                    const pathParts = basePath.split('.');
+                    let current = this.formData;
+                    
+                    for (const part of pathParts) {
+                        if (!current[part]) current[part] = {};
+                        current = current[part];
+                    }
+                    
+                    if (!current[key]) {
+                        current[key] = {};
+                    }
+                    
+                    // Ricorsione per oggetti nested
+                    this.initializeNestedObjects(`${basePath}.${key}`, field.properties);
+                } else if (field.type === 'array') {
+                    // Inizializza array vuoti
+                    const pathParts = basePath.split('.');
+                    let current = this.formData;
+                    
+                    for (const part of pathParts) {
+                        if (!current[part]) current[part] = {};
+                        current = current[part];
+                    }
+                    
+                    if (!current[key]) {
+                        current[key] = [];
+                    }
+                }
+            });
         },
 
         // Funzione helper per assicurare che i path annidati esistano
@@ -995,7 +942,19 @@ function iccdFormUniversal() {
                     </label>
                     <div class="space-y-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}">
                         <!-- Lista elementi esistenti -->
-                        <div x-data="{ items: formData.${path} || [] }">
+                        <div x-data="{
+                            get items() {
+                                const val = formData.${path};
+                                if (!Array.isArray(val)) {
+                                    formData.${path} = [];
+                                    return [];
+                                }
+                                return val;
+                            },
+                            set items(value) {
+                                formData.${path} = Array.isArray(value) ? value : [];
+                            }
+                        }">
                             <template x-for="(item, index) in items" :key="index">
                                 <div class="flex gap-2 items-center">
                                     <input type="text"
@@ -1037,7 +996,19 @@ function iccdFormUniversal() {
                         ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
                     </label>
                     <div class="space-y-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}">
-                        <div x-data="{ items: formData.${path} || [] }">
+                        <div x-data="{
+                            get items() {
+                                const val = formData.${path};
+                                if (!Array.isArray(val)) {
+                                    formData.${path} = [];
+                                    return [];
+                                }
+                                return val;
+                            },
+                            set items(value) {
+                                formData.${path} = Array.isArray(value) ? value : [];
+                            }
+                        }">
                             <template x-for="(item, index) in items" :key="index">
                                 <div class="flex gap-2 items-center">
                                     <input type="number"
@@ -1080,7 +1051,19 @@ function iccdFormUniversal() {
                         ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
                     </label>
                     <div class="space-y-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}">
-                        <div x-data="{ items: formData.${path} || [] }">
+                        <div x-data="{
+                            get items() {
+                                const val = formData.${path};
+                                if (!Array.isArray(val)) {
+                                    formData.${path} = [];
+                                    return [];
+                                }
+                                return val;
+                            },
+                            set items(value) {
+                                formData.${path} = Array.isArray(value) ? value : [];
+                            }
+                        }">
                             <template x-for="(item, index) in items" :key="index">
                                 <div class="p-4 bg-white dark:bg-gray-600 rounded-lg border border-gray-200 dark:border-gray-500">
                                     <div class="flex justify-between items-center mb-3">
