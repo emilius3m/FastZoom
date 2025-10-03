@@ -47,9 +47,13 @@ class GeographicMapRepository:
 
     async def get_map_with_layers_and_markers(self, map_id: UUID, site_id: UUID) -> Optional[GeographicMap]:
         """Get a map with its layers and markers loaded."""
+        from app.models.photos import Photo
+        
         query = select(GeographicMap).options(
             selectinload(GeographicMap.geojson_layers),
-            selectinload(GeographicMap.manual_markers).selectinload(GeographicMapMarker.photo_associations)
+            selectinload(GeographicMap.manual_markers).selectinload(
+                GeographicMapMarker.photo_associations
+            ).selectinload(GeographicMapMarkerPhoto.photo)
         ).where(
             and_(
                 GeographicMap.id == map_id,

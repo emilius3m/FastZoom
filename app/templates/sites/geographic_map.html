@@ -168,16 +168,6 @@
                         Nuova Mappa
                     </button>
                     
-                    <!-- Save Map Button -->
-                    <button x-show="selectedMapId && (markers.length > 0 || geojsonLayers.length > 0)"
-                            @click="saveMapToServer()"
-                            class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 border border-transparent rounded-lg text-sm font-medium text-white">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
-                        </svg>
-                        Salva
-                    </button>
-                    
                     <!-- Delete Map Button -->
                     <button x-show="selectedMapId && currentMap"
                             @click="deleteMapFromServer()"
@@ -999,9 +989,9 @@ document.addEventListener('alpine:init', () => {
         
         // === EVENT HANDLERS ===
         
-        handleMapClick(e) {
+        async handleMapClick(e) {
             if (this.isAddingMarker) {
-                this.addMarkerAtCoords(e.latlng);
+                await this.addMarkerAtCoords(e.latlng);
                 this.toggleAddMarker();
             }
         },
@@ -1018,11 +1008,18 @@ document.addEventListener('alpine:init', () => {
         
         // === GESTIONE MARKER ===
         
-        addMarkerAtCoords(latlng, data = {}) {
-            this.markerCounter++;
-            
+        async addMarkerAtCoords(latlng, data = {}) {
             // Genera UUID per il marker se non fornito
             const markerId = data.id || this.generateUUID();
+            
+            // Check if marker already exists (avoid duplicates when switching maps)
+            const existingMarker = this.markers.find(m => m.data.id === markerId);
+            if (existingMarker) {
+                console.warn('Marker already exists, skipping:', markerId);
+                return existingMarker.leafletMarker;
+            }
+            
+            this.markerCounter++;
             
             const markerData = {
                 id: markerId,
@@ -1032,7 +1029,8 @@ document.addEventListener('alpine:init', () => {
                 description: data.description || `Marker aggiunto alle coordinate ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`,
                 timestamp: data.timestamp || new Date().toISOString(),
                 type: data.type || 'generic',
-                photos: data.photos || []
+                photos: data.photos || [],
+                saved_to_server: data.id ? true : false  // Mark as saved if ID is provided from server
             };
 
             // Crea icona personalizzata
@@ -1057,6 +1055,11 @@ document.addEventListener('alpine:init', () => {
                 leafletMarker: marker,
                 data: markerData
             });
+            
+            // Salva automaticamente sul server se è un nuovo marker (aggiunto manualmente)
+            if (!data.id && this.selectedMapId) {
+                await this.saveMarkerToServer(markerData);
+            }
             
             return marker;
         },
@@ -1256,35 +1259,77 @@ document.addEventListener('alpine:init', () => {
         },
         
         async addGeoJSONLayer(geojsonData, fileName) {
+            // Verifica che sia selezionata una mappa
+            if (!this.selectedMapId) {
+                alert('Seleziona prima una mappa prima di caricare un layer GeoJSON');
+                return;
+            }
+            
             this.layerCounter++;
             
-            const layerInfo = {
-                id: this.layerCounter,
-                name: fileName.replace(/\.[^/.]+$/, ""), // Remove extension
-                type: geojsonData.type,
-                features: geojsonData.features.length,
-                visible: true,
-                data: geojsonData
-            };
+            const layerName = fileName.replace(/\.[^/.]+$/, ""); // Remove extension
             
-            // Create Leaflet layer
+            // Create Leaflet layer first
             const leafletLayer = L.geoJSON(geojsonData, {
                 style: this.getFeatureStyle,
                 pointToLayer: this.createCustomMarker.bind(this),
                 onEachFeature: this.bindFeaturePopup.bind(this)
             }).addTo(this.map);
             
-            layerInfo.leafletLayer = leafletLayer;
-            layerInfo.bounds = leafletLayer.getBounds();
-            
-            this.geojsonLayers.push(layerInfo);
+            const bounds = leafletLayer.getBounds();
             
             // Fit map to new layer
-            if (layerInfo.bounds.isValid()) {
-                this.map.fitBounds(layerInfo.bounds);
+            if (bounds.isValid()) {
+                this.map.fitBounds(bounds);
             }
             
-            console.log('Layer GeoJSON aggiunto:', layerInfo);
+            try {
+                // Salva layer automaticamente sul server
+                const layerData = {
+                    name: layerName,
+                    layer_type: 'geojson',
+                    geojson_data: geojsonData,
+                    is_visible: true
+                };
+                
+                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/layers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(layerData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    // Crea layer info con ID dal server
+                    const layerInfo = {
+                        id: result.layer_id,  // ID dal server
+                        name: layerName,
+                        type: geojsonData.type,
+                        features: geojsonData.features.length,
+                        visible: true,
+                        data: geojsonData,
+                        leafletLayer: leafletLayer,
+                        bounds: bounds
+                    };
+                    
+                    this.geojsonLayers.push(layerInfo);
+                    
+                    console.log('Layer GeoJSON salvato sul server:', layerInfo);
+                    
+                } else {
+                    const error = await response.json();
+                    alert('Errore durante il salvataggio del layer: ' + error.detail);
+                    // Rimuovi layer dalla mappa se il salvataggio fallisce
+                    this.map.removeLayer(leafletLayer);
+                }
+                
+            } catch (error) {
+                console.error('Error saving layer to server:', error);
+                alert('Errore durante il salvataggio del layer sul server');
+                // Rimuovi layer dalla mappa se il salvataggio fallisce
+                this.map.removeLayer(leafletLayer);
+            }
         },
         
         getFeatureStyle(feature) {
@@ -1581,16 +1626,25 @@ document.addEventListener('alpine:init', () => {
         },
         
         clearMapData() {
-            // Pulisci mappa
-            this.markersLayer.clearLayers();
+            // Pulisci tutti i marker dal layer
+            if (this.markersLayer) {
+                this.markersLayer.clearLayers();
+            }
+            
+            // Reset array markers e contatore
             this.markers = [];
             this.markerCounter = 0;
             
+            // Rimuovi tutti i layer GeoJSON
             this.geojsonLayers.forEach(layer => {
-                this.map.removeLayer(layer.leafletLayer);
+                if (layer.leafletLayer && this.map.hasLayer(layer.leafletLayer)) {
+                    this.map.removeLayer(layer.leafletLayer);
+                }
             });
             this.geojsonLayers = [];
             this.layerCounter = 0;
+            
+            console.log('Map data cleared - all markers and layers removed');
         },
         
         // === ELIMINAZIONE MAPPA ===

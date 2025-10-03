@@ -237,6 +237,27 @@ class GeographicMapService:
         try:
             if hasattr(map_obj, 'manual_markers') and map_obj.manual_markers:
                 for marker in map_obj.manual_markers:
+                    # Load associated photos
+                    photos_list = []
+                    if hasattr(marker, 'photo_associations') and marker.photo_associations:
+                        for assoc in marker.photo_associations:
+                            if hasattr(assoc, 'photo') and assoc.photo:
+                                photo = assoc.photo
+                                photos_list.append({
+                                    "id": str(photo.id),
+                                    "title": photo.title or photo.original_filename or photo.filename,
+                                    "description": photo.description,
+                                    "filename": photo.filename,
+                                    "thumbnail_url": photo.thumbnail_url,
+                                    "full_url": photo.full_url,
+                                    "width": photo.width,
+                                    "height": photo.height,
+                                    "has_deep_zoom": photo.has_deep_zoom,
+                                    "deep_zoom_status": photo.deep_zoom_status,
+                                    "display_order": assoc.display_order,
+                                    "is_primary": assoc.is_primary
+                                })
+                    
                     marker_data = {
                         "id": str(marker.id),
                         "map_id": str(marker.map_id),
@@ -251,12 +272,13 @@ class GeographicMapService:
                         "metadata": marker.marker_metadata or {},
                         "created_at": marker.created_at.isoformat() if marker.created_at else None,
                         "updated_at": marker.updated_at.isoformat() if marker.updated_at else None,
-                        "photos_count": 0,  # Avoid further relationship access
-                        "photos": []  # Avoid further relationship access
+                        "photos_count": len(photos_list),
+                        "photos": photos_list
                     }
                     map_data["markers"].append(marker_data)
-        except Exception:
+        except Exception as e:
             # If relationship access fails, just leave empty list
+            logger.warning(f"Could not load marker photos: {e}")
             pass
         
         return map_data
