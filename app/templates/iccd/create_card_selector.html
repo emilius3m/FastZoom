@@ -1,0 +1,279 @@
+<!-- ICCD Card Creation Selector with Hierarchy Validation -->
+<div id="iccd-card-selector" x-data="iccdCardSelector()" class="bg-white rounded-lg shadow-lg p-6">
+    <!-- Header -->
+    <div class="border-b border-gray-200 pb-4 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900">Crea Nuova Scheda ICCD</h2>
+        <p class="text-sm text-gray-600 mt-1">
+            Seleziona il tipo di scheda da creare secondo le regole gerarchiche ICCD
+        </p>
+    </div>
+
+    <!-- Hierarchy Status -->
+    <div x-show="hierarchyStatus" class="mb-6">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 class="text-sm font-medium text-blue-900 mb-2">Stato Gerarchia Sito</h3>
+            <div class="grid grid-cols-4 gap-4 text-sm">
+                <div class="text-center">
+                    <div class="text-lg font-bold" :class="hierarchyStatus.record_counts?.SI > 0 ? 'text-green-600' : 'text-red-600'"
+                         x-text="hierarchyStatus.record_counts?.SI || 0"></div>
+                    <div class="text-gray-600">Scheda SI</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-lg font-bold text-blue-600" x-text="hierarchyStatus.record_counts?.CA || 0"></div>
+                    <div class="text-gray-600">Schede CA</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-lg font-bold text-purple-600" x-text="hierarchyStatus.record_counts?.MA || 0"></div>
+                    <div class="text-gray-600">Schede MA</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-lg font-bold text-orange-600" x-text="hierarchyStatus.record_counts?.RA || 0"></div>
+                    <div class="text-gray-600">Schede RA</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Validation Issues -->
+    <div x-show="hierarchyStatus && hierarchyStatus.issues && hierarchyStatus.issues.length > 0" class="mb-6">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h3 class="text-sm font-medium text-red-900 mb-2">⚠️ Problemi Gerarchia</h3>
+            <ul class="text-sm text-red-700 space-y-1">
+                <template x-for="issue in hierarchyStatus.issues">
+                    <li x-text="issue" class="flex items-start">
+                        <span class="text-red-500 mr-2">•</span>
+                        <span x-text="issue"></span>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Creation Options -->
+    <div x-show="creationOptions" class="mb-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Tipi di Scheda Disponibili</h3>
+        
+        <!-- Recommendations -->
+        <div x-show="creationOptions.recommendations && creationOptions.recommendations.length > 0" class="mb-4">
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-yellow-900 mb-2">💡 Raccomandazioni</h4>
+                <ul class="text-sm text-yellow-700 space-y-1">
+                    <template x-for="rec in creationOptions.recommendations">
+                        <li class="flex items-start">
+                            <span class="text-yellow-500 mr-2">•</span>
+                            <span x-text="rec"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Available Card Types -->
+        <div class="grid gap-4" x-show="creationOptions.available_types && creationOptions.available_types.length > 0">
+            <template x-for="cardType in creationOptions.available_types">
+                <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 cursor-pointer transition-colors"
+                     :class="selectedCardType === cardType.type ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'"
+                     @click="selectCardType(cardType)">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center mb-2">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-medium mr-3"
+                                      :class="getCardTypeColor(cardType.type)" x-text="cardType.type"></span>
+                                <div>
+                                    <h4 class="text-md font-medium text-gray-900" x-text="cardType.name"></h4>
+                                    <p class="text-sm text-gray-600" x-text="cardType.description"></p>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-500" x-text="cardType.constraint"></div>
+                        </div>
+                        <div class="ml-4">
+                            <input type="radio" :value="cardType.type" x-model="selectedCardType" 
+                                   class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    
+                    <!-- Parent Selection for RA -->
+                    <div x-show="selectedCardType === cardType.type && cardType.requires_parent"
+                         class="mt-4 border-t border-gray-200 pt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Seleziona Padre</label>
+                        <div x-show="possibleParents.length > 0">
+                            <select x-model="selectedParentId" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                                <option value="">-- Seleziona un padre --</option>
+                                <template x-for="parent in possibleParents">
+                                    <option :value="parent.id">
+                                        <span x-text="parent.schema_type"></span> - <span x-text="parent.nct"></span> - <span x-text="parent.object_name"></span>
+                                    </option>
+                                </template>
+                            </select>
+                        </div>
+                        <div x-show="possibleParents.length === 0" class="text-sm text-red-600">
+                            Caricamento padri disponibili...
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- No Available Types -->
+        <div x-show="!creationOptions.available_types || creationOptions.available_types.length === 0" 
+             class="text-center py-8 text-gray-500">
+            <div class="text-4xl mb-2">🚫</div>
+            <p>Nessun tipo di scheda disponibile al momento</p>
+            <p class="text-sm mt-1">Verificare lo stato della gerarchia del sito</p>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex justify-between items-center pt-6 border-t border-gray-200">
+        <button @click="$dispatch('close-modal')" 
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+            Annulla
+        </button>
+        
+        <button @click="proceedToFormCreation()" 
+                :disabled="!selectedCardType || (selectedCardRequiresParent && !selectedParentId)"
+                :class="canProceed ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'"
+                class="px-6 py-2 text-sm font-medium rounded-md transition-colors">
+            Continua con <span x-text="selectedCardType || 'Selezione'"></span>
+        </button>
+    </div>
+
+    <!-- Loading States -->
+    <div x-show="loading" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p class="text-sm text-gray-600 mt-2">Caricamento...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function iccdCardSelector() {
+    return {
+        loading: true,
+        hierarchyStatus: null,
+        creationOptions: null,
+        selectedCardType: null,
+        selectedParentId: null,
+        possibleParents: [],
+        
+        get selectedCardRequiresParent() {
+            if (!this.selectedCardType || !this.creationOptions) return false;
+            const cardType = this.creationOptions.available_types.find(t => t.type === this.selectedCardType);
+            return cardType?.requires_parent || false;
+        },
+        
+        get canProceed() {
+            if (!this.selectedCardType) return false;
+            if (this.selectedCardRequiresParent && !this.selectedParentId) return false;
+            return true;
+        },
+
+        async init() {
+            await this.loadHierarchyStatus();
+            await this.loadCreationOptions();
+            this.loading = false;
+        },
+
+        async loadHierarchyStatus() {
+            try {
+                const response = await fetch(`/api/iccd/sites/${window.currentSiteId}/hierarchy/validation`);
+                if (response.ok) {
+                    this.hierarchyStatus = await response.json();
+                }
+            } catch (error) {
+                console.error('Error loading hierarchy status:', error);
+            }
+        },
+
+        async loadCreationOptions() {
+            try {
+                const response = await fetch(`/api/iccd/sites/${window.currentSiteId}/hierarchy/creation-options`);
+                if (response.ok) {
+                    this.creationOptions = await response.json();
+                    
+                    // Load possible parents for RA if available
+                    if (this.creationOptions.possible_parents) {
+                        this.possibleParents = this.creationOptions.possible_parents;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading creation options:', error);
+            }
+        },
+
+        async selectCardType(cardType) {
+            this.selectedCardType = cardType.type;
+            this.selectedParentId = null;
+            
+            // Load possible parents for this card type
+            if (cardType.requires_parent) {
+                try {
+                    const response = await fetch(`/api/iccd/sites/${window.currentSiteId}/hierarchy/possible-parents/${cardType.type}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.possibleParents = data.possible_parents || [];
+                    }
+                } catch (error) {
+                    console.error('Error loading possible parents:', error);
+                    this.possibleParents = [];
+                }
+            } else {
+                this.possibleParents = [];
+            }
+        },
+
+        getCardTypeColor(type) {
+            const colors = {
+                'SI': 'bg-green-600',
+                'CA': 'bg-blue-600', 
+                'MA': 'bg-purple-600',
+                'RA': 'bg-orange-600',
+                'SAS': 'bg-gray-600',
+                'NU': 'bg-yellow-600',
+                'TMA': 'bg-red-600',
+                'AT': 'bg-indigo-600'
+            };
+            return colors[type] || 'bg-gray-600';
+        },
+
+        async proceedToFormCreation() {
+            if (!this.canProceed) return;
+            
+            // Validate creation one more time
+            try {
+                const validationData = {
+                    schema_type: this.selectedCardType,
+                    parent_id: this.selectedParentId || null
+                };
+                
+                const response = await fetch(`/api/iccd/sites/${window.currentSiteId}/hierarchy/validate-creation`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(validationData)
+                });
+                
+                if (response.ok) {
+                    const validation = await response.json();
+                    if (validation.is_valid) {
+                        // Proceed to form creation
+                        this.$dispatch('create-iccd-card', {
+                            schema_type: this.selectedCardType,
+                            parent_id: this.selectedParentId
+                        });
+                    } else {
+                        alert('Errore validazione: ' + validation.error_message);
+                    }
+                } else {
+                    alert('Errore durante la validazione');
+                }
+            } catch (error) {
+                console.error('Error validating creation:', error);
+                alert('Errore durante la validazione');
+            }
+        }
+    }
+}
+</script>
