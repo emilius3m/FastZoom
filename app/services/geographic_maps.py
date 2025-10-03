@@ -11,6 +11,7 @@ from app.models.users import User
 from app.models.geographic_maps import GeographicMapMarker
 from app.repositories.geographic_maps import GeographicMapRepository
 from app.exceptions import BusinessLogicError
+from app.services.geojson_minio_service import geojson_minio_service
 
 
 class GeographicMapService:
@@ -208,29 +209,86 @@ class GeographicMapService:
         try:
             if hasattr(map_obj, 'geojson_layers') and map_obj.geojson_layers:
                 for layer in map_obj.geojson_layers:
-                    layer_data = {
-                        "id": str(layer.id),
-                        "map_id": str(layer.map_id),
-                        "site_id": str(layer.site_id),
-                        "name": layer.name,
-                        "description": layer.description,
-                        "layer_type": layer.layer_type,
-                        "geojson_data": layer.geojson_data,
-                        "features_count": layer.features_count,
-                        "style_config": layer.style_config or {},
-                        "is_visible": layer.is_visible,
-                        "display_order": layer.display_order,
-                        "bounds": {
-                            "north": layer.bounds_north,
-                            "south": layer.bounds_south,
-                            "east": layer.bounds_east,
-                            "west": layer.bounds_west
-                        } if layer.bounds_north else None,
-                        "created_at": layer.created_at.isoformat() if layer.created_at else None,
-                        "updated_at": layer.updated_at.isoformat() if layer.updated_at else None
-                    }
+                    # All layers are stored in MinIO, retrieve the actual GeoJSON data from MinIO
+                    try:
+                        from uuid import UUID
+                        layer_id = str(layer.id)
+                        map_id = str(layer.map_id)
+                        site_id = str(layer.site_id)
+                        
+                        # Extract layer ID from the MinIO URL
+                        if isinstance(layer.geojson_data, dict) and 'minio_url' in layer.geojson_data:
+                            # This is a reference to MinIO, retrieve actual data
+                            geojson_data = await geojson_minio_service.get_geojson_layer(
+                                layer_id=layer_id,
+                                site_id=site_id,
+                                map_id=map_id
+                            )
+                            
+                            # If we couldn't retrieve the data from MinIO, use a fallback
+                            if geojson_data is None:
+                                logger.warning(f"Could not retrieve GeoJSON data from MinIO for layer {layer_id}, using empty data")
+                                geojson_data = {
+                                    "type": "FeatureCollection",
+                                    "features": []
+                                }
+                        else:
+                            # Fallback: use the data directly if not stored as MinIO reference
+                            geojson_data = layer.geojson_data
+                        
+                        layer_data = {
+                            "id": str(layer.id),
+                            "map_id": str(layer.map_id),
+                            "site_id": str(layer.site_id),
+                            "name": layer.name,
+                            "description": layer.description,
+                            "layer_type": layer.layer_type,
+                            "geojson_data": geojson_data,
+                            "features_count": layer.features_count,
+                            "style_config": layer.style_config or {},
+                            "is_visible": layer.is_visible,
+                            "display_order": layer.display_order,
+                            "bounds": {
+                                "north": layer.bounds_north,
+                                "south": layer.bounds_south,
+                                "east": layer.bounds_east,
+                                "west": layer.bounds_west
+                            } if layer.bounds_north else None,
+                            "created_at": layer.created_at.isoformat() if layer.created_at else None,
+                            "updated_at": layer.updated_at.isoformat() if layer.updated_at else None,
+                            "minio_url": layer.geojson_data.get('minio_url') if isinstance(layer.geojson_data, dict) and 'minio_url' in layer.geojson_data else None
+                        }
+                    except Exception as e:
+                        logger.error(f"Error retrieving GeoJSON data from MinIO for layer {layer.id}: {e}")
+                        # Fallback to showing the reference with empty geojson_data
+                        layer_data = {
+                            "id": str(layer.id),
+                            "map_id": str(layer.map_id),
+                            "site_id": str(layer.site_id),
+                            "name": layer.name,
+                            "description": layer.description,
+                            "layer_type": layer.layer_type,
+                            "geojson_data": {
+                                "type": "FeatureCollection",
+                                "features": []
+                            },  # Provide empty GeoJSON as fallback
+                            "features_count": layer.features_count,
+                            "style_config": layer.style_config or {},
+                            "is_visible": layer.is_visible,
+                            "display_order": layer.display_order,
+                            "bounds": {
+                                "north": layer.bounds_north,
+                                "south": layer.bounds_south,
+                                "east": layer.bounds_east,
+                                "west": layer.bounds_west
+                            } if layer.bounds_north else None,
+                            "created_at": layer.created_at.isoformat() if layer.created_at else None,
+                            "updated_at": layer.updated_at.isoformat() if layer.updated_at else None,
+                            "minio_url": layer.geojson_data.get('minio_url') if isinstance(layer.geojson_data, dict) and 'minio_url' in layer.geojson_data else None
+                        }
                     map_data["layers"].append(layer_data)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error processing layers in get_map_details: {e}")
             # If relationship access fails, just leave empty list
             pass
         
@@ -311,7 +369,7 @@ class GeographicMapService:
             raise BusinessLogicError(f"Errore eliminazione mappa: {str(e)}", 500)
 
     async def create_layer(self, site_id: UUID, map_id: UUID, layer_data: Dict[str, Any], current_user_id: UUID) -> Dict[str, Any]:
-        """Create a new GeoJSON layer in a map."""
+        """Create a new GeoJSON layer in a map (always stored in MinIO)."""
         site, permission = await self.check_site_access(site_id, current_user_id)
         
         if not permission.can_write():
@@ -346,14 +404,25 @@ class GeographicMapService:
                         'west': min(lngs)
                     }
             
-            # Prepare layer data for creation
+            # Store GeoJSON data in MinIO and save only the reference in database
+            from uuid import uuid4
+            layer_id = str(uuid4())
+            minio_url = await geojson_minio_service.save_geojson_layer(
+                geojson_data=geojson_data,
+                layer_id=layer_id,
+                site_id=str(site_id),
+                map_id=str(map_id),
+                layer_name=layer_data.get('name', f'Layer {layer_id}')
+            )
+            
+            # Prepare layer data for creation (only store reference in database)
             layer = {
                 "map_id": map_id,
                 "site_id": site_id,
                 "name": layer_data['name'],
                 "description": layer_data.get('description'),
                 "layer_type": layer_data.get('layer_type', 'geojson'),
-                "geojson_data": geojson_data,
+                "geojson_data": {"minio_url": minio_url},  # Store only the reference
                 "features_count": len(geojson_data.get('features', [])),
                 "style_config": layer_data.get('style_config', {}),
                 "is_visible": layer_data.get('is_visible', True),
@@ -368,7 +437,7 @@ class GeographicMapService:
             new_layer = await self.repository.create_layer(layer)
             await self.db_session.commit()
             
-            logger.info(f"GeoJSON layer saved: {new_layer.id} for map {map_id}")
+            logger.info(f"GeoJSON layer saved to MinIO: {new_layer.id} for map {map_id}")
             
             # Create dict manually to avoid relationship access issues
             layer_dict = {
@@ -378,7 +447,7 @@ class GeographicMapService:
                 "name": new_layer.name,
                 "description": new_layer.description,
                 "layer_type": new_layer.layer_type,
-                "geojson_data": new_layer.geojson_data,
+                "geojson_data": geojson_data,  # Include the actual data in response
                 "features_count": new_layer.features_count,
                 "style_config": new_layer.style_config or {},
                 "is_visible": new_layer.is_visible,
@@ -390,7 +459,8 @@ class GeographicMapService:
                     "west": new_layer.bounds_west
                 } if new_layer.bounds_north else None,
                 "created_at": new_layer.created_at.isoformat() if new_layer.created_at else None,
-                "updated_at": new_layer.updated_at.isoformat() if new_layer.updated_at else None
+                "updated_at": new_layer.updated_at.isoformat() if new_layer.updated_at else None,
+                "minio_url": minio_url
             }
             
             return {

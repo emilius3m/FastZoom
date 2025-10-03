@@ -95,7 +95,7 @@ async def save_geojson_layer(
     current_user_id: UUID = Depends(get_current_user_id),
     geographic_map_service: GeographicMapService = Depends(get_geographic_map_service)
 ):
-    """Salva un layer GeoJSON nella mappa"""
+    """Salva un layer GeoJSON nella mappa (sempre su MinIO)"""
     try:
         result = await geographic_map_service.create_layer(site_id, map_id, layer_data, current_user_id)
         return result
