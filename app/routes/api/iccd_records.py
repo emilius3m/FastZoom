@@ -401,3 +401,159 @@ async def get_iccd_integration_status(
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore verifica integrazione: {str(e)}")
+
+
+# === GESTIONE GERARCHIA ICCD ===
+
+@iccd_router.get("/sites/{site_id}/hierarchy/validation")
+async def validate_hierarchy_integrity(
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id),
+    iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
+):
+    """Valida l'integrità della gerarchia ICCD del sito."""
+    try:
+        # Check site access
+        site, permission = await iccd_service.check_site_access(site_id, current_user_id)
+        
+        if not permission.can_read():
+            raise BusinessLogicError("Permessi di lettura richiesti", 403)
+        
+        from app.services.iccd_hierarchy_service import ICCDHierarchyService
+        hierarchy_service = ICCDHierarchyService(iccd_service.db_session)
+        
+        result = await hierarchy_service.validate_hierarchy_integrity(site_id)
+        return result
+        
+    except BusinessLogicError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore validazione gerarchia: {str(e)}")
+
+
+@iccd_router.get("/sites/{site_id}/hierarchy/tree")
+async def get_hierarchy_tree(
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id),
+    iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
+):
+    """Ottieni l'albero gerarchico completo delle schede ICCD del sito."""
+    try:
+        # Check site access
+        site, permission = await iccd_service.check_site_access(site_id, current_user_id)
+        
+        if not permission.can_read():
+            raise BusinessLogicError("Permessi di lettura richiesti", 403)
+        
+        from app.services.iccd_hierarchy_service import ICCDHierarchyService
+        hierarchy_service = ICCDHierarchyService(iccd_service.db_session)
+        
+        result = await hierarchy_service.get_hierarchy_tree(site_id)
+        return result
+        
+    except BusinessLogicError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore costruzione albero gerarchia: {str(e)}")
+
+
+@iccd_router.get("/sites/{site_id}/hierarchy/creation-options")
+async def get_creation_options(
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id),
+    iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
+):
+    """Ottieni le opzioni disponibili per la creazione di nuove schede ICCD."""
+    try:
+        # Check site access
+        site, permission = await iccd_service.check_site_access(site_id, current_user_id)
+        
+        if not permission.can_read():
+            raise BusinessLogicError("Permessi di lettura richiesti", 403)
+        
+        from app.services.iccd_hierarchy_service import ICCDHierarchyService
+        hierarchy_service = ICCDHierarchyService(iccd_service.db_session)
+        
+        result = await hierarchy_service.get_creation_options(site_id)
+        return result
+        
+    except BusinessLogicError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore opzioni creazione: {str(e)}")
+
+
+@iccd_router.get("/sites/{site_id}/hierarchy/possible-parents/{schema_type}")
+async def get_possible_parents(
+    site_id: UUID,
+    schema_type: str,
+    current_user_id: UUID = Depends(get_current_user_id),
+    iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
+):
+    """Ottieni i possibili padri per un tipo di scheda ICCD."""
+    try:
+        # Check site access
+        site, permission = await iccd_service.check_site_access(site_id, current_user_id)
+        
+        if not permission.can_read():
+            raise BusinessLogicError("Permessi di lettura richiesti", 403)
+        
+        from app.services.iccd_hierarchy_service import ICCDHierarchyService
+        hierarchy_service = ICCDHierarchyService(iccd_service.db_session)
+        
+        parents = await hierarchy_service.get_possible_parents(site_id, schema_type)
+        
+        return {
+            "site_id": str(site_id),
+            "schema_type": schema_type,
+            "possible_parents": parents,
+            "total": len(parents)
+        }
+        
+    except BusinessLogicError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore ricerca padri: {str(e)}")
+
+
+@iccd_router.post("/sites/{site_id}/hierarchy/validate-creation")
+async def validate_card_creation(
+    site_id: UUID,
+    creation_request: Dict[str, Any] = Body(...),
+    current_user_id: UUID = Depends(get_current_user_id),
+    iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
+):
+    """Valida se è possibile creare una scheda ICCD secondo le regole gerarchiche."""
+    try:
+        # Check site access
+        site, permission = await iccd_service.check_site_access(site_id, current_user_id)
+        
+        if not permission.can_read():
+            raise BusinessLogicError("Permessi di lettura richiesti", 403)
+        
+        schema_type = creation_request.get('schema_type')
+        parent_id = creation_request.get('parent_id')
+        
+        if not schema_type:
+            raise BusinessLogicError("schema_type è obbligatorio", 400)
+        
+        from app.services.iccd_hierarchy_service import ICCDHierarchyService
+        hierarchy_service = ICCDHierarchyService(iccd_service.db_session)
+        
+        is_valid, error_message = await hierarchy_service.validate_card_creation(
+            site_id, schema_type, parent_id
+        )
+        
+        return {
+            "site_id": str(site_id),
+            "schema_type": schema_type,
+            "parent_id": str(parent_id) if parent_id else None,
+            "is_valid": is_valid,
+            "error_message": error_message if not is_valid else None,
+            "validation_timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except BusinessLogicError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore validazione creazione: {str(e)}")

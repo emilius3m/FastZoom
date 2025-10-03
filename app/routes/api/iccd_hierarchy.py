@@ -15,7 +15,7 @@ from app.database.session import get_async_session
 from app.core.security import get_current_user_id
 from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission
-from app.models.iccd_records import ICCDBaseRecord, ICCDRelation, ICCDAuthorityFile
+from app.models.iccd_records import ICCDBaseRecord, ICCDAuthorityFile
 from app.models.users import User
 
 iccd_hierarchy_router = APIRouter(prefix="/api/iccd", tags=["iccd_hierarchy"])
@@ -252,54 +252,7 @@ async def create_iccd_record(
         raise HTTPException(status_code=500, detail=f"Errore creazione scheda ICCD: {str(e)}")
 
 
-@iccd_hierarchy_router.post("/relations")
-async def create_iccd_relation(
-    relation_data: dict,
-    current_user_id: UUID = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """Crea relazione tra schede ICCD."""
-    
-    required_fields = ['source_record_id', 'target_record_id', 'relation_type']
-    for field in required_fields:
-        if field not in relation_data:
-            raise HTTPException(status_code=400, detail=f"Campo obbligatorio mancante: {field}")
-    
-    try:
-        # Ensure UUID conversion for record IDs
-        source_record_id_value = relation_data['source_record_id']
-        if isinstance(source_record_id_value, str):
-            source_record_id_value = UUID(source_record_id_value)
-        
-        target_record_id_value = relation_data['target_record_id']
-        if isinstance(target_record_id_value, str):
-            target_record_id_value = UUID(target_record_id_value)
-        
-        db_relation = ICCDRelation(
-            source_record_id=source_record_id_value,
-            target_record_id=target_record_id_value,
-            relation_type=relation_data['relation_type'],
-            relation_level=relation_data.get('relation_level', '1'),
-            notes=relation_data.get('notes'),
-            created_by=current_user_id
-        )
-        
-        db.add(db_relation)
-        await db.commit()
-        await db.refresh(db_relation)
-        
-        return JSONResponse({
-            "id": str(db_relation.id),
-            "relation_type": db_relation.relation_type,
-            "message": "Relazione creata con successo"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error creating ICCD relation: {e}")
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Errore creazione relazione: {str(e)}")
-
-
+# Endpoint rimosso: le relazioni sono gestite direttamente tramite parent_id in ICCDBaseRecord
 @iccd_hierarchy_router.get("/authority-files")
 async def get_authority_files(
     site_id: UUID,

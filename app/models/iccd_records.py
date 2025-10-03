@@ -247,32 +247,6 @@ class ICCDRecord(ICCDBaseRecord):
         }
 
 
-class ICCDRelation(Base):
-    """Modello per relazioni tra schede ICCD."""
-    
-    __tablename__ = "iccd_relations"
-    
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
-    source_record_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("iccd_base_records.id"))
-    target_record_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("iccd_base_records.id"))
-    
-    relation_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    # Tipi: "contenuto_in", "composto_da", "relazionato_a", "derivato_da",
-    #       "stesso_contesto", "stesso_corredo", "stessa_campagna"
-    
-    relation_level: Mapped[str] = mapped_column(String(1), default='1')  # 1=principale, 2=secondaria, 3=terziaria
-    notes: Mapped[Optional[str]] = mapped_column(Text)
-    
-    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    
-    # Relazioni
-    source_record = relationship("ICCDBaseRecord", foreign_keys=[source_record_id])
-    target_record = relationship("ICCDBaseRecord", foreign_keys=[target_record_id])
-    creator = relationship("User")
-
-
 class ICCDAuthorityFile(Base):
     """Authority Files per campagne di scavo e altri riferimenti."""
     
@@ -347,58 +321,3 @@ class ICCDSchemaTemplate(Base):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
 
-
-class ICCDValidationRule(Base):
-    """Regole di validazione specifiche per standard ICCD."""
-    
-    __tablename__ = "iccd_validation_rules"
-    
-    # Chiave primaria
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    
-    # Tipologia regola
-    schema_type: Mapped[str] = mapped_column(String(5), nullable=False, index=True)  # RA, CA, SI, etc.
-    level: Mapped[str] = mapped_column(String(1), nullable=False, index=True)        # P, C, A
-    field_path: Mapped[str] = mapped_column(String(255), nullable=False)             # Percorso campo (es: "CD.NCT.NCTR")
-    
-    # Configurazione validazione
-    rule_type: Mapped[str] = mapped_column(String(50), nullable=False)  # required, pattern, enum, range, etc.
-    rule_config: Mapped[dict] = mapped_column(JSON, nullable=False)     # Configurazione specifica della regola
-    
-    # Metadati
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=True)
-    error_message: Mapped[str] = mapped_column(Text, nullable=False)
-    
-    # Stato
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    priority: Mapped[int] = mapped_column(Integer, default=1)  # Priorità di esecuzione (1=alta, 10=bassa)
-    
-    # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    
-    # Indici per performance
-    __table_args__ = (
-        Index('idx_validation_schema_level', 'schema_type', 'level'),
-        Index('idx_validation_active', 'is_active', 'priority'),
-    )
-    
-    def __repr__(self):
-        return f"<ICCDValidationRule(type='{self.schema_type}', field='{self.field_path}')>"
-    
-    def to_dict(self) -> dict:
-        """Conversione a dizionario per API."""
-        return {
-            "id": str(self.id),
-            "schema_type": self.schema_type,
-            "level": self.level,
-            "field_path": self.field_path,
-            "rule_type": self.rule_type,
-            "rule_config": self.rule_config,
-            "name": self.name,
-            "description": self.description,
-            "error_message": self.error_message,
-            "is_active": self.is_active,
-            "priority": self.priority,
-            "created_at": self.created_at.isoformat() if self.created_at else None
-        }

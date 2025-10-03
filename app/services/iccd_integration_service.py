@@ -8,16 +8,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from loguru import logger
 
-from app.models.iccd_records import ICCDSchemaTemplate
 from app.models.form_schemas import FormSchema
 from app.data.iccd_templates import SCHEMA_SI_300, SCHEMA_RA_300, SCHEMA_CA_300
+from app.data.iccd_ma_schema_complete import get_iccd_ma_300_schema
 
 
 # Template mapping based on complete schemas
+# Get MA schema
+SCHEMA_MA_300 = get_iccd_ma_300_schema()
+
 ICCD_TEMPLATES = {
     "SI": {
         "name": "ICCD SI 3.00 - Siti Archeologici",
-        "description": "Schema standard ICCD per catalogazione siti archeologici (v. 3.00) - COMPLETO 24 paragrafi",
+        "description": "Schema standard ICCD per catalogazione siti archeologici (v. 3.00) - COMPLETO 15 paragrafi",
         "category": "siti_archeologici",
         "icon": "🗺️",
         "schema": SCHEMA_SI_300["schema"],
@@ -38,6 +41,14 @@ ICCD_TEMPLATES = {
         "icon": "🏛️",
         "schema": SCHEMA_CA_300["schema"],
         "ui_schema": SCHEMA_CA_300["ui_schema"]
+    },
+    "MA": {
+        "name": "ICCD MA 3.00 - Monumenti Archeologici",
+        "description": "Schema standard ICCD per catalogazione monumenti archeologici (v. 3.00) - COMPLETO 23 paragrafi",
+        "category": "monumenti_archeologici",
+        "icon": "🏛️",
+        "schema": SCHEMA_MA_300["schema"],
+        "ui_schema": SCHEMA_MA_300["ui_schema"]
     }
 }
 
@@ -54,7 +65,8 @@ class ICCDIntegrationService:
     
     async def initialize_iccd_templates(self, site_id: UUID, user_id: UUID) -> Dict[str, Any]:
         """
-        Inizializza template ICCD standard nel sistema FastZoom.
+        Inizializza template ICCD standard nel sistema FastZoom (ora solo FormSchema).
+        Gli schemi ICCD sono definiti direttamente nel codice Python.
         
         Args:
             site_id: ID del sito archeologico
@@ -66,54 +78,17 @@ class ICCDIntegrationService:
         
         try:
             created_templates = []
-            updated_templates = []
             errors = []
             
             # Itera sui template ICCD disponibili
             for schema_type, template_data in ICCD_TEMPLATES.items():
                 try:
-                    # Verifica se template esiste già
-                    existing_template = await self.db.execute(
-                        select(ICCDSchemaTemplate).where(
-                            ICCDSchemaTemplate.schema_type == schema_type
-                        )
-                    )
-                    existing_template = existing_template.scalar_one_or_none()
-                    
-                    if existing_template:
-                        # Aggiorna template esistente
-                        existing_template.json_schema = template_data['schema']
-                        existing_template.ui_schema = template_data['ui_schema']
-                        existing_template.name = template_data['name']
-                        existing_template.description = template_data['description']
-                        existing_template.updated_at = datetime.utcnow()
-                        
-                        updated_templates.append(schema_type)
-                        logger.info(f"Updated ICCD template: {schema_type}")
-                        
-                    else:
-                        # Crea nuovo template
-                        new_template = ICCDSchemaTemplate(
-                            schema_type=schema_type,
-                            name=template_data['name'],
-                            description=template_data['description'],
-                            version="4.00",
-                            json_schema=template_data['schema'],
-                            ui_schema=template_data['ui_schema'],
-                            category=template_data['category'],
-                            icon=template_data['icon'],
-                            is_active=True,
-                            standard_compliant=True
-                        )
-                        
-                        self.db.add(new_template)
-                        created_templates.append(schema_type)
-                        logger.info(f"Created ICCD template: {schema_type}")
-                    
-                    # Crea anche FormSchema per compatibilità con sistema esistente
+                    # Crea FormSchema per compatibilità con sistema esistente
                     await self._create_form_schema_from_iccd(
                         template_data, schema_type, site_id, user_id
                     )
+                    created_templates.append(schema_type)
+                    logger.info(f"Created ICCD FormSchema: {schema_type}")
                     
                 except Exception as e:
                     error_msg = f"Error processing template {schema_type}: {str(e)}"
@@ -127,8 +102,8 @@ class ICCDIntegrationService:
             result = {
                 "success": True,
                 "created_templates": created_templates,
-                "updated_templates": updated_templates,
-                "total_processed": len(created_templates) + len(updated_templates),
+                "updated_templates": [],  # Non più necessario
+                "total_processed": len(created_templates),
                 "errors": errors
             }
             
@@ -187,7 +162,7 @@ class ICCDIntegrationService:
     
     async def get_iccd_schema_for_site(self, site_id: UUID, schema_type: str) -> Optional[Dict[str, Any]]:
         """
-        Ottieni schema ICCD configurato per un sito specifico.
+        Ottieni schema ICCD configurato per un sito specifico direttamente dal codice Python.
         
         Args:
             site_id: ID del sito archeologico
@@ -198,23 +173,15 @@ class ICCDIntegrationService:
         """
         
         try:
-            # Ottieni template ICCD
-            template = await self.db.execute(
-                select(ICCDSchemaTemplate).where(
-                    and_(
-                        ICCDSchemaTemplate.schema_type == schema_type,
-                        ICCDSchemaTemplate.is_active == True
-                    )
-                )
-            )
-            template = template.scalar_one_or_none()
+            # Ottieni template direttamente dal codice Python
+            template_data = get_template_by_type(schema_type)
             
-            if not template:
-                logger.warning(f"ICCD template {schema_type} not found")
+            if not template_data:
+                logger.warning(f"ICCD template {schema_type} not found in code")
                 return None
             
             # Personalizza template per il sito (es. valori di default)
-            customized_schema = template.json_schema.copy()
+            customized_schema = template_data["schema"].copy()
             
             # Aggiorna valori di default per il sito
             if "properties" in customized_schema and "LC" in customized_schema["properties"]:
@@ -225,16 +192,16 @@ class ICCDIntegrationService:
                     lc_props["PVL"]["properties"]["PVLN"]["default"] = "Sito Archeologico"
             
             return {
-                "id": str(template.id),
-                "schema_type": template.schema_type,
-                "name": template.name,
-                "description": template.description,
-                "version": template.version,
-                "category": template.category,
-                "icon": template.icon,
+                "id": f"iccd_{schema_type.lower()}",
+                "schema_type": schema_type,
+                "name": template_data["name"],
+                "description": template_data["description"],
+                "version": "3.00",
+                "category": template_data["category"],
+                "icon": template_data["icon"],
                 "json_schema": customized_schema,
-                "ui_schema": template.ui_schema,
-                "standard_compliant": template.standard_compliant
+                "ui_schema": template_data["ui_schema"],
+                "standard_compliant": True
             }
             
         except Exception as e:
@@ -374,7 +341,7 @@ class ICCDIntegrationService:
             errors = []
             
             # Schemi ICCD da creare per default
-            default_schemas = ["RA", "CA", "SI"]
+            default_schemas = ["RA", "CA", "SI", "MA"]
             
             for schema_type in default_schemas:
                 try:
@@ -517,19 +484,13 @@ class ICCDIntegrationService:
         try:
             validation_results = {
                 "site_id": str(site_id),
-                "iccd_templates_available": 0,
+                "iccd_templates_available": len(ICCD_TEMPLATES),  # Sempre disponibili dal codice
                 "form_schemas_available": 0,
                 "iccd_records_count": 0,
                 "integration_status": "unknown",
                 "issues": [],
                 "recommendations": []
             }
-            
-            # Verifica template ICCD
-            templates_count = await self.db.execute(
-                select(ICCDSchemaTemplate).where(ICCDSchemaTemplate.is_active == True)
-            )
-            validation_results["iccd_templates_available"] = len(templates_count.scalars().all())
             
             # Verifica FormSchema ICCD per il sito
             iccd_schemas = await self.get_iccd_compatible_schemas(site_id)
@@ -542,13 +503,8 @@ class ICCDIntegrationService:
             )
             validation_results["iccd_records_count"] = len(records_count.scalars().all())
             
-            # Determina status integrazione
-            if validation_results["iccd_templates_available"] == 0:
-                validation_results["integration_status"] = "missing_templates"
-                validation_results["issues"].append("Template ICCD non inizializzati")
-                validation_results["recommendations"].append("Eseguire inizializzazione template ICCD")
-                
-            elif validation_results["form_schemas_available"] == 0:
+            # Determina status integrazione (template sempre disponibili dal codice)
+            if validation_results["form_schemas_available"] == 0:
                 validation_results["integration_status"] = "missing_form_schemas"
                 validation_results["issues"].append("FormSchema ICCD non creati per questo sito")
                 validation_results["recommendations"].append("Creare FormSchema ICCD per il sito")
@@ -680,35 +636,11 @@ class ICCDIntegrationService:
 
 # Funzioni di utilità globali
 async def ensure_iccd_templates_exist(db: AsyncSession) -> bool:
-    """Assicura che i template ICCD esistano nel database."""
+    """Assicura che i template ICCD siano disponibili (ora dal codice Python)."""
     
     try:
-        service = ICCDIntegrationService(db)
-        
-        # Verifica se template esistono
-        existing_count = await db.execute(
-            select(ICCDSchemaTemplate).where(ICCDSchemaTemplate.is_active == True)
-        )
-        existing_count = len(existing_count.scalars().all())
-        
-        if existing_count == 0:
-            logger.info("No ICCD templates found, initializing...")
-            # Crea template con utente sistema (primo user disponibile)
-            from app.models.users import User
-            first_user = await db.execute(select(User).limit(1))
-            first_user = first_user.scalar_one_or_none()
-            
-            if first_user:
-                # Crea site temporaneo per inizializzazione
-                from app.models.sites import ArchaeologicalSite
-                temp_site = await db.execute(select(ArchaeologicalSite).limit(1))
-                temp_site = temp_site.scalar_one_or_none()
-                
-                if temp_site:
-                    result = await service.initialize_iccd_templates(temp_site.id, first_user.id)
-                    return result["success"]
-        
-        return True
+        # I template sono sempre disponibili dal codice Python
+        return len(ICCD_TEMPLATES) > 0
         
     except Exception as e:
         logger.error(f"Error ensuring ICCD templates exist: {e}")
@@ -730,8 +662,8 @@ async def auto_setup_iccd_for_new_site(site_id: UUID, user_id: UUID, db: AsyncSe
     try:
         service = ICCDIntegrationService(db)
         
-        # 1. Assicura che template ICCD esistano
-        await ensure_iccd_templates_exist(db)
+        # 1. Template ICCD sempre disponibili dal codice Python
+        templates_available = await ensure_iccd_templates_exist(db)
         
         # 2. Crea FormSchema ICCD per il sito
         setup_result = await service.create_default_iccd_schemas_for_site(site_id, user_id)
@@ -740,7 +672,7 @@ async def auto_setup_iccd_for_new_site(site_id: UUID, user_id: UUID, db: AsyncSe
         validation_result = await service.validate_iccd_integration(site_id)
         
         return {
-            "success": setup_result["success"],
+            "success": setup_result["success"] and templates_available,
             "setup_result": setup_result,
             "validation_result": validation_result,
             "iccd_enabled": validation_result["integration_status"] in ["ready_for_cataloging", "active"]

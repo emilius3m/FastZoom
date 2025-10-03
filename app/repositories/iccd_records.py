@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.orm import joinedload
-from app.models.iccd_records import ICCDRecord, ICCDSchemaTemplate, ICCDValidationRule
+from app.models.iccd_records import ICCDRecord, ICCDSchemaTemplate
 from app.models.users import User
 from app.repositories.base import BaseRepository
 

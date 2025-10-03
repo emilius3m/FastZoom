@@ -956,16 +956,213 @@ function iccdFormUniversal() {
         },
 
         renderArrayField(path, field, fieldKey) {
-            // Handle array fields - for now, support for enum arrays (checkboxes)
+            // Handle different types of array fields
+            
+            // 1. Array di enum (checkboxes multipli)
             if (field.items && field.items.enum) {
                 return this.renderEnumArrayField(path, field, fieldKey);
             }
             
-            // Default array field implementation
-            return `<div class="md:col-span-2 p-4 bg-gray-50 rounded-lg">
-                <h4 class="font-semibold mb-2">${field.title || fieldKey}</h4>
-                <p class="text-sm text-gray-500">Campo array non ancora implementato</p>
-            </div>`;
+            // 2. Array di stringhe semplici
+            if (field.items && field.items.type === 'string') {
+                return this.renderStringArrayField(path, field, fieldKey);
+            }
+            
+            // 3. Array di oggetti
+            if (field.items && field.items.type === 'object') {
+                return this.renderObjectArrayField(path, field, fieldKey);
+            }
+            
+            // 4. Array di numeri
+            if (field.items && (field.items.type === 'number' || field.items.type === 'integer')) {
+                return this.renderNumberArrayField(path, field, fieldKey);
+            }
+            
+            // 5. Array generico (default a stringhe)
+            return this.renderStringArrayField(path, field, fieldKey);
+        },
+        
+        renderStringArrayField(path, field, fieldKey) {
+            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+            const fieldId = `field_${path.replace(/\./g, '_')}`;
+            const hasError = this.hasFieldError(path);
+            
+            return `
+                <div class="md:col-span-2 ${isRequired ? 'iccd-field-required' : ''}">
+                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                        ${field.title || fieldKey}
+                        ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
+                    </label>
+                    <div class="space-y-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}">
+                        <!-- Lista elementi esistenti -->
+                        <div x-data="{ items: formData.${path} || [] }">
+                            <template x-for="(item, index) in items" :key="index">
+                                <div class="flex gap-2 items-center">
+                                    <input type="text"
+                                           x-model="items[index]"
+                                           @input="formData.${path} = items; calculateStats(); updateSectionCompleteness()"
+                                           class="flex-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                                           placeholder="Inserisci valore...">
+                                    <button type="button"
+                                            @click="items.splice(index, 1); formData.${path} = items; calculateStats(); updateSectionCompleteness()"
+                                            class="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg border border-red-300 dark:border-red-600">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </template>
+                            
+                            <!-- Pulsante aggiungi nuovo -->
+                            <button type="button"
+                                    @click="items.push(''); formData.${path} = items"
+                                    class="w-full px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-600">
+                                + Aggiungi elemento
+                            </button>
+                        </div>
+                    </div>
+                    ${hasError ? `<p class="error-message">${this.getFieldError(path)}</p>` : ''}
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
+                </div>
+            `;
+        },
+        
+        renderNumberArrayField(path, field, fieldKey) {
+            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+            const fieldId = `field_${path.replace(/\./g, '_')}`;
+            const hasError = this.hasFieldError(path);
+            
+            return `
+                <div class="md:col-span-2 ${isRequired ? 'iccd-field-required' : ''}">
+                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                        ${field.title || fieldKey}
+                        ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
+                    </label>
+                    <div class="space-y-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}">
+                        <div x-data="{ items: formData.${path} || [] }">
+                            <template x-for="(item, index) in items" :key="index">
+                                <div class="flex gap-2 items-center">
+                                    <input type="number"
+                                           x-model.number="items[index]"
+                                           @input="formData.${path} = items; calculateStats(); updateSectionCompleteness()"
+                                           class="flex-1 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                                           ${field.items?.minimum !== undefined ? `min="${field.items.minimum}"` : ''}
+                                           ${field.items?.maximum !== undefined ? `max="${field.items.maximum}"` : ''}
+                                           placeholder="Inserisci numero...">
+                                    <button type="button"
+                                            @click="items.splice(index, 1); formData.${path} = items; calculateStats(); updateSectionCompleteness()"
+                                            class="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg border border-red-300 dark:border-red-600">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </template>
+                            
+                            <button type="button"
+                                    @click="items.push(0); formData.${path} = items"
+                                    class="w-full px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-600">
+                                + Aggiungi numero
+                            </button>
+                        </div>
+                    </div>
+                    ${hasError ? `<p class="error-message">${this.getFieldError(path)}</p>` : ''}
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
+                </div>
+            `;
+        },
+        
+        renderObjectArrayField(path, field, fieldKey) {
+            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+            const fieldId = `field_${path.replace(/\./g, '_')}`;
+            const hasError = this.hasFieldError(path);
+            
+            return `
+                <div class="md:col-span-2 ${isRequired ? 'iccd-field-required' : ''}">
+                    <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                        ${field.title || fieldKey}
+                        ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
+                    </label>
+                    <div class="space-y-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border ${hasError ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}">
+                        <div x-data="{ items: formData.${path} || [] }">
+                            <template x-for="(item, index) in items" :key="index">
+                                <div class="p-4 bg-white dark:bg-gray-600 rounded-lg border border-gray-200 dark:border-gray-500">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <h5 class="font-medium text-gray-900 dark:text-white">Elemento #<span x-text="index + 1"></span></h5>
+                                        <button type="button"
+                                                @click="items.splice(index, 1); formData.${path} = items; calculateStats(); updateSectionCompleteness()"
+                                                class="px-2 py-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded">
+                                            🗑️ Rimuovi
+                                        </button>
+                                    </div>
+                                    ${this.renderObjectFields(field.items, `${path}[index]`)}
+                                </div>
+                            </template>
+                            
+                            <button type="button"
+                                    @click="items.push({}); formData.${path} = items"
+                                    class="w-full px-4 py-3 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-600">
+                                + Aggiungi nuovo elemento
+                            </button>
+                        </div>
+                    </div>
+                    ${hasError ? `<p class="error-message">${this.getFieldError(path)}</p>` : ''}
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
+                </div>
+            `;
+        },
+        
+        renderObjectFields(objectSchema, basePath) {
+            if (!objectSchema.properties) {
+                return '<p class="text-gray-500 dark:text-gray-400 text-sm">Nessun campo definito</p>';
+            }
+            
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+            
+            Object.entries(objectSchema.properties).forEach(([key, field]) => {
+                const fieldPath = `${basePath}.${key}`;
+                
+                if (field.type === 'string') {
+                    html += `
+                        <div>
+                            <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">${field.title || key}</label>
+                            <input type="text"
+                                   x-model="item.${key}"
+                                   @input="formData.${basePath.replace('[index]', '')}[index] = item; calculateStats(); updateSectionCompleteness()"
+                                   class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-xs rounded p-2"
+                                   placeholder="${field.description || ''}">
+                        </div>
+                    `;
+                } else if (field.type === 'number' || field.type === 'integer') {
+                    html += `
+                        <div>
+                            <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">${field.title || key}</label>
+                            <input type="number"
+                                   x-model.number="item.${key}"
+                                   @input="formData.${basePath.replace('[index]', '')}[index] = item; calculateStats(); updateSectionCompleteness()"
+                                   class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-xs rounded p-2"
+                                   ${field.minimum !== undefined ? `min="${field.minimum}"` : ''}
+                                   ${field.maximum !== undefined ? `max="${field.maximum}"` : ''}>
+                        </div>
+                    `;
+                } else if (field.enum) {
+                    const options = field.enum.map((val, idx) => {
+                        const label = field.enumNames ? field.enumNames[idx] : val;
+                        return `<option value="${val}">${label}</option>`;
+                    }).join('');
+                    
+                    html += `
+                        <div>
+                            <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">${field.title || key}</label>
+                            <select x-model="item.${key}"
+                                    @change="formData.${basePath.replace('[index]', '')}[index] = item; calculateStats(); updateSectionCompleteness()"
+                                    class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-xs rounded p-2">
+                                <option value="">Seleziona...</option>
+                                ${options}
+                            </select>
+                        </div>
+                    `;
+                }
+            });
+            
+            html += '</div>';
+            return html;
         },
         
         renderEnumArrayField(path, field, fieldKey) {

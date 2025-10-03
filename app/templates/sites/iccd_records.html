@@ -3,8 +3,9 @@
 {% block title %}Schede ICCD - {{ site.name }}{% endblock %}
 
 {% block extra_css %}
-
-
+<style>
+[x-cloak] { display: none !important; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -21,10 +22,10 @@
         </div>
         <div>
             <template x-if="can_write">
-            <a href="/sites/{{ site.id }}/iccd/new" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 inline-flex items-center">
+            <button @click="showCardSelector = true" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 inline-flex items-center">
                 <i class="fas fa-plus me-2"></i>
                 Nuova Scheda ICCD
-            </a>
+            </button>
             </template>
         </div>
     </div>
@@ -56,9 +57,10 @@
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo Schema</label>
                 <select class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500" x-model="filters.schema_type" @change="loadRecords()">
                     <option value="">Tutti</option>
-                    <option value="RA">🏺 RA - Reperto Archeologico</option>
-                    <option value="CA">🏛️ CA - Complesso Archeologico</option>
                     <option value="SI">🗺️ SI - Sito Archeologico</option>
+                    <option value="CA">🏛️ CA - Complesso Archeologico</option>
+                    <option value="MA">🏛️ MA - Monumento Archeologico</option>
+                    <option value="RA">🏺 RA - Reperto Archeologico</option>
                 </select>
             </div>
             <div>
@@ -124,9 +126,9 @@
             <h4 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nessuna scheda ICCD trovata</h4>
             <p class="text-gray-600 dark:text-gray-400 mb-6">Inizia creando la prima scheda di catalogazione archeologica per questo sito.</p>
             <template x-if="can_write">
-            <a href="/sites/{{ site.id }}/iccd/new" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 inline-flex items-center">
+            <button @click="showCardSelector = true" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 inline-flex items-center">
                 <i class="fas fa-plus me-2"></i>Crea Prima Scheda
-            </a>
+            </button>
             </template>
         </div>
 
@@ -259,6 +261,18 @@
             di <span x-text="pagination.total"></span> schede
         </div>
     </div>
+
+    <!-- Modal Selettore Schede ICCD -->
+    <div x-show="showCardSelector"
+         class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+         x-cloak
+         @click.self="showCardSelector = false">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white dark:bg-gray-800"
+             @create-iccd-card.window="handleCreateCard($event.detail)"
+             @close-modal.window="showCardSelector = false">
+            {% include "iccd/create_card_selector.html" %}
+        </div>
+    </div>
 </div>
 <script>
 
@@ -295,9 +309,12 @@ document.addEventListener('alpine:init', () => {
 
         // UI State
         loading: true,
+        showCardSelector: false,
 
         // Inizializzazione
         async init() {
+            // Make site ID available globally for the card selector
+            window.currentSiteId = '{{ site.id }}';
             await this.loadStatistics();
             await this.loadRecords();
         },
@@ -482,6 +499,22 @@ document.addEventListener('alpine:init', () => {
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        },
+
+        // Gestione creazione scheda dal selettore
+        handleCreateCard(cardData) {
+            this.showCardSelector = false;
+            
+            // Naviga al form di creazione con i parametri della gerarchia
+            const params = new URLSearchParams({
+                schema_type: cardData.schema_type
+            });
+            
+            if (cardData.parent_id) {
+                params.append('parent_id', cardData.parent_id);
+            }
+            
+            window.location.href = `/sites/{{ site.id }}/iccd/new?${params}`;
         }
     }));
 });

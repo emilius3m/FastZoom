@@ -320,38 +320,10 @@ class ICCDValidationResult(ICCDBaseModel):
 
 
 # ============================================================================
-# RELATION MODELS
+# RELATION MODELS - RIMOSSI: LE RELAZIONI SONO GESTITE TRAMITE PARENT_ID
 # ============================================================================
-
-class ICCDRelationType(str, Enum):
-    """Tipi di relazione tra schede"""
-    PARTE_DI = "parte di"
-    CONTIENE = "contiene"
-    CORRELATO_A = "correlato a"
-    DERIVATO_DA = "derivato da"
-    STESSO_CONTESTO = "stesso contesto"
-    STESSO_SCAVO = "stesso scavo"
-
-
-class ICCDRelationCreate(ICCDBaseModel):
-    """Schema per creazione relazione"""
-    source_id: UUID
-    target_id: UUID
-    relation_type: ICCDRelationType
-    relation_level: str = Field("1", pattern="^[1-3]$")
-    notes: Optional[str] = None
-
-
-class ICCDRelationResponse(ICCDBaseModel):
-    """Schema risposta relazione"""
-    id: UUID
-    source_id: UUID
-    target_id: UUID
-    relation_type: ICCDRelationType
-    relation_level: str
-    notes: Optional[str]
-    created_at: datetime
-
+# Le relazioni tra schede ICCD sono ora gestite direttamente tramite il campo
+# parent_id in ICCDBaseRecord, seguendo la gerarchia ICCD standard.
 
 # ============================================================================
 # MEDIA MODELS

@@ -125,6 +125,20 @@ class ICCDRecordService:
                     logger.error(f"Available fields: {list(record_data.keys())}")
                     raise BusinessLogicError(f"Campo obbligatorio mancante: {field}", 400)
             
+            # HIERARCHY VALIDATION - Check if card can be created according to ICCD rules
+            from app.services.iccd_hierarchy_service import ICCDHierarchyService
+            hierarchy_service = ICCDHierarchyService(self.db_session)
+            
+            schema_type = record_data['schema_type']
+            parent_id = record_data.get('parent_id')
+            
+            is_valid, error_message = await hierarchy_service.validate_card_creation(
+                site_id, schema_type, parent_id
+            )
+            
+            if not is_valid:
+                raise BusinessLogicError(error_message, 400)
+            
             # Extract cataloging_institution from ICCD data if not provided separately
             cataloging_institution = record_data.get('cataloging_institution')
             if not cataloging_institution:
@@ -195,7 +209,8 @@ class ICCDRecordService:
                 "level": record_data['level'],
                 "iccd_data": iccd_data,
                 "site_id": site_id,
-                "created_by": current_user_id
+                "created_by": current_user_id,
+                "parent_id": parent_id  # Add parent_id to the record
             }
             
             new_record = await self.repository.create_record(record)
@@ -397,10 +412,10 @@ class ICCDRecordService:
             await self.db_session.rollback()
             raise BusinessLogicError(f"Errore validazione scheda: {str(e)}", 500)
 
-    async def get_schema_templates(self, current_user_id: UUID, 
-                                 schema_type: Optional[str] = None, 
+    async def get_schema_templates(self, current_user_id: UUID,
+                                 schema_type: Optional[str] = None,
                                  category: Optional[str] = None) -> Dict[str, Any]:
-        """Get available ICCD schema templates."""
+        """Get available ICCD schema templates from Python code."""
         # Verify user exists
         from sqlalchemy import select
         from app.models.users import User
@@ -411,8 +426,30 @@ class ICCDRecordService:
         if not user:
             raise BusinessLogicError("Utente non trovato", 404)
         
-        templates = await self.repository.get_schema_templates(schema_type, category)
-        templates_data = [template.to_dict() for template in templates]
+        # Get templates from Python code
+        from app.services.iccd_integration_service import ICCD_TEMPLATES
+        
+        templates_data = []
+        for schema_key, template_data in ICCD_TEMPLATES.items():
+            # Apply filters if provided
+            if schema_type and schema_key != schema_type.upper():
+                continue
+            if category and template_data.get("category") != category:
+                continue
+                
+            templates_data.append({
+                "id": f"iccd_{schema_key.lower()}",
+                "schema_type": schema_key,
+                "name": template_data["name"],
+                "description": template_data["description"],
+                "version": "3.00",
+                "category": template_data["category"],
+                "icon": template_data["icon"],
+                "is_active": True,
+                "standard_compliant": True,
+                "json_schema": template_data["schema"],
+                "ui_schema": template_data["ui_schema"]
+            })
         
         return {
             "templates": templates_data,
@@ -420,7 +457,7 @@ class ICCDRecordService:
         }
 
     async def get_schema_template_by_type(self, current_user_id: UUID, schema_type: str) -> Dict[str, Any]:
-        """Get a specific ICCD schema template by type."""
+        """Get a specific ICCD schema template by type from Python code."""
         # Verify user exists
         from sqlalchemy import select
         from app.models.users import User
@@ -431,12 +468,27 @@ class ICCDRecordService:
         if not user:
             raise BusinessLogicError("Utente non trovato", 404)
         
-        template = await self.repository.get_schema_template_by_type(schema_type)
+        # Get template from Python code
+        from app.services.iccd_integration_service import get_template_by_type
         
-        if not template:
+        template_data = get_template_by_type(schema_type)
+        
+        if not template_data:
             raise BusinessLogicError("Template schema ICCD non trovato", 404)
         
-        return template.to_dict()
+        return {
+            "id": f"iccd_{schema_type.lower()}",
+            "schema_type": schema_type,
+            "name": template_data["name"],
+            "description": template_data["description"],
+            "version": "3.00",
+            "category": template_data["category"],
+            "icon": template_data["icon"],
+            "is_active": True,
+            "standard_compliant": True,
+            "json_schema": template_data["schema"],
+            "ui_schema": template_data["ui_schema"]
+        }
 
     async def get_record_statistics(self, site_id: UUID, current_user_id: UUID) -> Dict[str, Any]:
         """Get statistics for ICCD records in a site."""
