@@ -126,6 +126,12 @@ class GeographicMapRepository:
         result = await self.db_session.execute(query)
         return result.scalar_one_or_none()
 
+    async def delete_marker(self, marker_id: UUID) -> bool:
+        """Delete a geographic map marker (CASCADE will handle photo associations)."""
+        stmt = delete(GeographicMapMarker).where(GeographicMapMarker.id == marker_id)
+        result = await self.db_session.execute(stmt)
+        return result.rowcount > 0
+
     async def get_site_photos(self, site_id: UUID, search: Optional[str] = None, 
                              skip: int = 0, limit: int = 50) -> tuple[List[Photo], int]:
         """Get photos for a site with optional search and pagination."""

@@ -121,6 +121,22 @@ async def save_manual_marker(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
+@geographic_maps_router.delete("/sites/{site_id}/maps/{map_id}/markers/{marker_id}")
+async def delete_manual_marker(
+    site_id: UUID,
+    map_id: UUID,
+    marker_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id),
+    geographic_map_service: GeographicMapService = Depends(get_geographic_map_service)
+):
+    """Elimina un marker manuale dalla mappa"""
+    try:
+        result = await geographic_map_service.delete_marker(site_id, map_id, marker_id, current_user_id)
+        return result
+    except BusinessLogicError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
 # === GESTIONE ASSOCIAZIONI FOTO ===
 
 from pydantic import BaseModel

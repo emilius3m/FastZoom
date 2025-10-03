@@ -685,6 +685,9 @@ document.addEventListener('alpine:init', () => {
             }
             
             try {
+                // Prima pulisci tutti i dati esistenti
+                this.clearMapData();
+                
                 const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}`);
                 if (response.ok) {
                     this.currentMap = await response.json();
@@ -697,8 +700,8 @@ document.addEventListener('alpine:init', () => {
                     this.map.fitBounds(bounds);
                     
                     // Carica dati salvati
-                    this.loadMapLayers();
-                    this.loadMapMarkers();
+                    await this.loadMapLayers();
+                    await this.loadMapMarkers();
                 }
             } catch (error) {
                 console.error('Error switching map:', error);
@@ -851,7 +854,7 @@ document.addEventListener('alpine:init', () => {
             // Crea icona personalizzata
             const customIcon = L.divIcon({
                 className: 'custom-marker',
-                html: '<div style="background: #007bff; color: white; border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">' + markerData.id + '</div>',
+                html: '<div style="background: #007bff; color: white; border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">📍</div>',
                 iconSize: [25, 25],
                 iconAnchor: [12, 12]
             });
@@ -881,8 +884,8 @@ document.addEventListener('alpine:init', () => {
                     <div style="margin: 10px 0;">
                         <strong>Foto Associate (${markerData.photos.length}):</strong>
                         <div style="display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap;">
-                            ${markerData.photos.map(photo => 
-                                `<img src="${photo.thumbnail_url}" alt="${photo.title}" 
+                            ${markerData.photos.map(photo =>
+                                `<img src="${photo.thumbnail_url}" alt="${photo.title}"
                                       style="width: 40px; height: 30px; object-fit: cover; border-radius: 3px; cursor: pointer;"
                                       onclick="window.open('${photo.full_url}', '_blank')">`
                             ).join('')}
@@ -901,10 +904,14 @@ document.addEventListener('alpine:init', () => {
                     <p><strong>Descrizione:</strong><br>${markerData.description}</p>
                     <p><strong>Aggiunto:</strong> ${new Date(markerData.timestamp).toLocaleString('it-IT')}</p>
                     ${photosHtml}
-                    <div style="margin-top: 10px;">
-                        <button onclick="window.geographicMapManager.selectMarkerForPhotos('${markerData.id}')" 
-                                style="background: #3b82f6; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-right: 5px;">
+                    <div style="margin-top: 10px; display: flex; gap: 5px;">
+                        <button onclick="window.geographicMapManager.selectMarkerForPhotos('${markerData.id}')"
+                                style="background: #3b82f6; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
                             📷 Gestisci Foto
+                        </button>
+                        <button onclick="window.geographicMapManager.deleteMarker('${markerData.id}')"
+                                style="background: #dc2626; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">
+                            🗑️ Elimina
                         </button>
                     </div>
                 </div>
@@ -1248,7 +1255,8 @@ document.addEventListener('alpine:init', () => {
                     console.log('Marker salvato sul server:', markerData.id);
                     return true;
                 } else {
-                    console.error('Errore nel salvare marker:', await response.text());
+                    const errorText = await response.text();
+                    console.error('Errore nel salvare marker:', errorText);
                     return false;
                 }
             } catch (error) {
@@ -1307,14 +1315,84 @@ document.addEventListener('alpine:init', () => {
             }
         },
         
-        loadMapLayers() {
-            // TODO: Carica layer dal server
+        async loadMapLayers() {
+            if (!this.selectedMapId || !this.currentMap) return;
+            
             console.log('Loading layers for map:', this.selectedMapId);
+            
+            // I layer sono già inclusi in currentMap dalla chiamata get_map_details
+            if (this.currentMap.layers && this.currentMap.layers.length > 0) {
+                console.log(`Found ${this.currentMap.layers.length} layers to load`);
+                
+                for (const layerData of this.currentMap.layers) {
+                    try {
+                        // Aggiungi il layer GeoJSON alla mappa
+                        await this.addGeoJSONLayerFromServer(layerData);
+                    } catch (error) {
+                        console.error('Error loading layer:', layerData.name, error);
+                    }
+                }
+            }
         },
         
-        loadMapMarkers() {
-            // TODO: Carica marker dal server
+        async loadMapMarkers() {
+            if (!this.selectedMapId || !this.currentMap) return;
+            
             console.log('Loading markers for map:', this.selectedMapId);
+            
+            // I marker sono già inclusi in currentMap dalla chiamata get_map_details
+            if (this.currentMap.markers && this.currentMap.markers.length > 0) {
+                console.log(`Found ${this.currentMap.markers.length} markers to load`);
+                
+                for (const markerData of this.currentMap.markers) {
+                    try {
+                        // Crea marker sulla mappa
+                        const latlng = { lat: markerData.latitude, lng: markerData.longitude };
+                        this.addMarkerAtCoords(latlng, {
+                            id: markerData.id,
+                            title: markerData.title,
+                            description: markerData.description,
+                            type: markerData.marker_type,
+                            timestamp: markerData.created_at,
+                            photos: markerData.photos || []
+                        });
+                    } catch (error) {
+                        console.error('Error loading marker:', markerData.id, error);
+                    }
+                }
+            }
+        },
+        
+        async addGeoJSONLayerFromServer(layerData) {
+            this.layerCounter++;
+            
+            const layerInfo = {
+                id: layerData.id,  // Usa l'ID dal server invece di un counter locale
+                name: layerData.name,
+                type: layerData.layer_type,
+                features: layerData.features_count,
+                visible: layerData.is_visible,
+                data: layerData.geojson_data
+            };
+            
+            // Create Leaflet layer
+            const leafletLayer = L.geoJSON(layerData.geojson_data, {
+                style: this.getFeatureStyle,
+                pointToLayer: this.createCustomMarker.bind(this),
+                onEachFeature: this.bindFeaturePopup.bind(this)
+            });
+            
+            // Aggiungi alla mappa solo se visibile
+            if (layerInfo.visible) {
+                leafletLayer.addTo(this.map);
+            }
+            
+            layerInfo.leafletLayer = leafletLayer;
+            layerInfo.bounds = leafletLayer.getBounds();
+            
+            this.geojsonLayers.push(layerInfo);
+            
+            console.log('Layer GeoJSON caricato dal server:', layerInfo);
         },
         
         clearMapData() {

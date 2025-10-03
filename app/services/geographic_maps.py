@@ -445,7 +445,35 @@ class GeographicMapService:
             await self.db_session.rollback()
             raise BusinessLogicError(f"Errore salvataggio marker: {str(e)}", 500)
 
-    async def associate_photos_to_marker(self, site_id: UUID, map_id: UUID, marker_id: UUID, 
+    async def delete_marker(self, site_id: UUID, map_id: UUID, marker_id: UUID, current_user_id: UUID) -> Dict[str, str]:
+        """Delete a manual marker from a map."""
+        site, permission = await self.check_site_access(site_id, current_user_id)
+        
+        if not permission.can_write():
+            raise BusinessLogicError("Permessi di scrittura richiesti", 403)
+        
+        try:
+            # Verify marker exists
+            marker = await self.repository.get_marker_by_id(marker_id, map_id, site_id)
+            
+            if not marker:
+                raise BusinessLogicError("Marker non trovato", 404)
+            
+            # Delete marker (CASCADE will handle photo associations)
+            success = await self.repository.delete_marker(marker_id)
+            if success:
+                await self.db_session.commit()
+                logger.info(f"Geographic marker deleted: {marker_id}")
+                return {"message": "Marker eliminato con successo"}
+            else:
+                raise BusinessLogicError("Errore eliminazione marker", 500)
+                
+        except Exception as e:
+            logger.error(f"Error deleting geographic marker: {e}")
+            await self.db_session.rollback()
+            raise BusinessLogicError(f"Errore eliminazione marker: {str(e)}", 500)
+
+    async def associate_photos_to_marker(self, site_id: UUID, map_id: UUID, marker_id: UUID,
                                        photo_ids: List[UUID], current_user_id: UUID) -> Dict[str, int]:
         """Associate photos to a geographic marker."""
         site, permission = await self.check_site_access(site_id, current_user_id)
