@@ -517,42 +517,6 @@ function iccdFormUniversal() {
             };
         },
 
-        // Funzione per inizializzare i campi array
-        initializeArrayFields() {
-            // Inizializza i campi array con array vuoti
-            if (this.schema && this.schema.properties) {
-                Object.entries(this.schema.properties).forEach(([sectionKey, section]) => {
-                    if (section.properties) {
-                        Object.entries(section.properties).forEach(([fieldKey, field]) => {
-                            if (field.type === 'array') {
-                                if (!this.formData[sectionKey]) {
-                                    this.formData[sectionKey] = {};
-                                }
-                                if (!this.formData[sectionKey][fieldKey]) {
-                                    this.formData[sectionKey][fieldKey] = [];
-                                }
-                            } else if (field.type === 'object' && field.properties) {
-                                // Ricorsivamente controlla i sottocampi per array
-                                Object.entries(field.properties).forEach(([subFieldKey, subField]) => {
-                                    if (subField.type === 'array') {
-                                        if (!this.formData[sectionKey]) {
-                                            this.formData[sectionKey] = {};
-                                        }
-                                        if (!this.formData[sectionKey][fieldKey]) {
-                                            this.formData[sectionKey][fieldKey] = {};
-                                        }
-                                        if (!this.formData[sectionKey][fieldKey][subFieldKey]) {
-                                            this.formData[sectionKey][fieldKey][subFieldKey] = [];
-                                        }
-                                    }
-                                });
-                            }
-                        });
-                    }
-                });
-            }
-        },
-
         initializeFormData() {
             console.log('📝 Inizializzazione dati form', this.editMode ? 'con dati esistenti' : 'con valori predefiniti');
             
@@ -598,61 +562,16 @@ function iccdFormUniversal() {
         },
 
         initializeEmptySections() {
-            // Funzione helper per inizializzare sezioni vuote
+            // Funzione helper per inizializzare sezioni vuote basandosi completamente sullo schema
             if (this.sections && this.sections.length > 0) {
                 this.sections.forEach(section => {
+                    // Crea la sezione se non esiste
                     if (!this.formData[section.id]) {
                         this.formData[section.id] = {};
                     }
                     
-                    // Inizializza sottooggetti comuni per evitare errori AlpineJS
-                    if (section.id === 'OG') {
-                        if (!this.formData[section.id].OGT) this.formData[section.id].OGT = {};
-                        if (!this.formData[section.id].OGN) this.formData[section.id].OGN = {};
-                    }
-                    
-                    if (section.id === 'LC') {
-                        if (!this.formData[section.id].PVC) this.formData[section.id].PVC = {};
-                        if (!this.formData[section.id].PVL) this.formData[section.id].PVL = {};
-                        if (!this.formData[section.id].LDC) this.formData[section.id].LDC = {};
-                    }
-                    
-                    if (section.id === 'DT') {
-                        // DT contiene array, lascia che initializeNestedObjects() li gestisca
-                        // Non inizializzare manualmente per evitare conflitti tipo oggetto vs array
-                    }
-                    
-                    if (section.id === 'MT') {
-                        if (!this.formData[section.id].MTC) this.formData[section.id].MTC = {};
-                        if (!this.formData[section.id].MTC.MTCM) this.formData[section.id].MTC.MTCM = [];
-                        if (!this.formData[section.id].MIS) this.formData[section.id].MIS = {};
-                    }
-                    
-                    if (section.id === 'DA') {
-                        if (!this.formData[section.id].DES) this.formData[section.id].DES = {};
-                        if (!this.formData[section.id].STC) this.formData[section.id].STC = {};
-                        if (!this.formData[section.id].ISR) this.formData[section.id].ISR = {};
-                    }
-                    
-                    if (section.id === 'AU') {
-                        if (!this.formData[section.id].AUT) this.formData[section.id].AUT = {};
-                    }
-                    
-                    if (section.id === 'NS') {
-                        if (!this.formData[section.id].NSC) this.formData[section.id].NSC = {};
-                    }
-                    
-                    if (section.id === 'RS') {
-                        if (!this.formData[section.id].RSE) this.formData[section.id].RSE = {};
-                    }
-                    
-                    // GP - Georeferenziazione
-                    if (section.id === 'GP') {
-                        if (!this.formData[section.id].GPP) this.formData[section.id].GPP = {};
-                        // GPL è una stringa, non un oggetto - lascia che initializeNestedObjects lo gestisca
-                    }
-                    
-                    // Inizializza ricorsivamente tutti i sottooggetti definiti nello schema
+                    // Inizializza ricorsivamente TUTTI i sottocampi basandosi sullo schema
+                    // Nessuna inizializzazione manuale hardcoded - tutto schema-driven
                     if (section.properties) {
                         this.initializeNestedObjects(section.id, section.properties);
                     }
