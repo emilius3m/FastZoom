@@ -23,9 +23,9 @@ class ICCDHierarchyService:
         self.db_session = db_session
     
     async def validate_card_creation(
-        self, 
-        site_id: UUID, 
-        schema_type: str, 
+        self,
+        site_id: UUID,
+        schema_type: str,
         parent_id: Optional[UUID] = None
     ) -> Tuple[bool, str]:
         """
@@ -40,6 +40,15 @@ class ICCDHierarchyService:
             Tuple of (is_valid, error_message)
         """
         try:
+            # Validate input types
+            if not isinstance(site_id, UUID):
+                logger.error(f"site_id is not UUID: {type(site_id)} - {site_id}")
+                return False, "site_id deve essere un UUID valido"
+            
+            if parent_id is not None and not isinstance(parent_id, UUID):
+                logger.error(f"parent_id is not UUID: {type(parent_id)} - {parent_id}")
+                return False, "parent_id deve essere un UUID valido"
+            
             # Rule 1: SI can only be created once per site
             if schema_type == 'SI':
                 return await self._validate_si_creation(site_id)

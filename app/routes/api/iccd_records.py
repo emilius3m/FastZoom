@@ -532,10 +532,21 @@ async def validate_card_creation(
             raise BusinessLogicError("Permessi di lettura richiesti", 403)
         
         schema_type = creation_request.get('schema_type')
-        parent_id = creation_request.get('parent_id')
+        parent_id_raw = creation_request.get('parent_id')
         
         if not schema_type:
             raise BusinessLogicError("schema_type è obbligatorio", 400)
+        
+        # Convert parent_id to UUID if it's a string
+        parent_id = None
+        if parent_id_raw:
+            if isinstance(parent_id_raw, str):
+                try:
+                    parent_id = UUID(parent_id_raw)
+                except ValueError:
+                    raise BusinessLogicError("parent_id deve essere un UUID valido", 400)
+            else:
+                parent_id = parent_id_raw
         
         from app.services.iccd_hierarchy_service import ICCDHierarchyService
         hierarchy_service = ICCDHierarchyService(iccd_service.db_session)
