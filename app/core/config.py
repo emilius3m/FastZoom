@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     catalog_version: str = "1.0"
 
     # Configurazioni Archeologiche
-    default_historical_periods: str = "Preistorico,Romano,Medievale,Rinascimentale,Moderno"
-    default_material_types: str = "Ceramica,Metallo,Pietra,Osso,Vetro,Legno,Tessuto"
+    #default_historical_periods: str = "Preistorico,Romano,Medievale,Rinascimentale,Moderno"
+    #default_material_types: str = "Ceramica,Metallo,Pietra,Osso,Vetro,Legno,Tessuto"
 
     DEBUG: bool = False
 
@@ -89,9 +89,9 @@ class Settings(BaseSettings):
     def thumbnail_sizes_list(self) -> List[int]:
         return [int(size.strip()) for size in self.thumbnail_sizes.split(",")]
 
-    @property
-    def historical_periods_list(self) -> List[str]:
-        return [period.strip() for period in self.default_historical_periods.split(",")]
+    #@property
+    #def historical_periods_list(self) -> List[str]:
+    #    return [period.strip() for period in self.default_historical_periods.split(",")]
 
 
 @lru_cache()
