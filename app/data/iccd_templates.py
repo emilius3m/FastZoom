@@ -1,16 +1,21 @@
 """
-Scheda ICCD SI 3.00 - Siti Archeologici COMPLETA
+Template ICCD Completi - Schema 3.00
 Conforme a normativa ufficiale ICCD MiC 2025
 
-Basato su:
-- ICCD_SI_3.00-2.xls (normativa ufficiale)
-- ICCD_La-scheda-SI-Siti-archeologici_versione-3.00-1.pdf
-
-Tutti i 24 paragrafi implementati
-Paragrafi obbligatori: CD, OG, LC, DT, TU, DO, AD, CM
+Tutti gli schema ICCD supportati con validazione completa
 """
 
+# Import di tutti gli schema completi
 from app.data.iccd_si_schema_complete import SCHEMA_SI_300, get_iccd_si_300_schema, validate_si_record
+from app.data.iccd_ra_schema_complete import SCHEMA_RA_300, get_iccd_ra_300_schema, validate_ra_record
+from app.data.iccd_ca_schema_complete import SCHEMA_CA_300, get_iccd_ca_300_schema, validate_ca_record
+from app.data.iccd_ma_schema_complete import SCHEMA_MA_300, get_iccd_ma_300_schema, validate_ma_record
 
-# Esporta lo schema aggiornato
-__all__ = ['SCHEMA_SI_300', 'get_iccd_si_300_schema', 'validate_si_record']
+
+# Esporta tutti gli schema
+__all__ = [
+    'SCHEMA_SI_300', 'get_iccd_si_300_schema', 'validate_si_record',
+    'SCHEMA_RA_300', 'get_iccd_ra_300_schema', 'validate_ra_record',
+    'SCHEMA_CA_300', 'get_iccd_ca_300_schema', 'validate_ca_record',
+    'SCHEMA_MA_300', 'get_iccd_ma_300_schema', 'validate_ma_record'
+]
