@@ -1462,6 +1462,56 @@ document.addEventListener('alpine:init', () => {
             }
         },
         
+        // === ELIMINAZIONE MARKER ===
+        
+        async deleteMarker(markerId) {
+            if (!this.selectedMapId) {
+                alert('Seleziona una mappa prima di eliminare marker');
+                return;
+            }
+            
+            // Conferma eliminazione
+            const confirmDelete = confirm('Sei sicuro di voler eliminare questo marker?');
+            if (!confirmDelete) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/markers/${markerId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    // Rimuovi marker dalla mappa
+                    const markerIndex = this.markers.findIndex(m => m.data.id === markerId);
+                    if (markerIndex !== -1) {
+                        const marker = this.markers[markerIndex];
+                        this.markersLayer.removeLayer(marker.leafletMarker);
+                        this.markers.splice(markerIndex, 1);
+                    }
+                    
+                    // Chiudi sidebar foto se il marker eliminato era selezionato
+                    if (this.selectedMarkerForPhotos && this.selectedMarkerForPhotos.id === markerId) {
+                        this.selectedMarkerForPhotos = null;
+                        this.showPhotosSidebar = false;
+                    }
+                    
+                    console.log('Marker eliminato con successo');
+                    
+                } else {
+                    const error = await response.json();
+                    alert('Errore durante l\'eliminazione: ' + error.detail);
+                }
+                
+            } catch (error) {
+                console.error('Error deleting marker:', error);
+                alert('Errore durante l\'eliminazione del marker');
+            }
+        },
+        
         // === UTILITY FUNCTIONS ===
         
         generateUUID() {
