@@ -65,6 +65,64 @@
     .photo-thumbnail.selected {
         border: 3px solid #3b82f6;
     }
+    
+    /* OpenSeadragon Photo Modal */
+    #photo-viewer-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        z-index: 9999;
+        display: none;
+    }
+    
+    #photo-viewer-modal.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    #openseadragon-viewer {
+        width: 90vw;
+        height: 90vh;
+        background: #000;
+    }
+    
+    .viewer-close-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.9);
+        color: #000;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        font-size: 24px;
+        cursor: pointer;
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .viewer-close-btn:hover {
+        background: #fff;
+    }
+    
+    .viewer-photo-info {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        max-width: 400px;
+        z-index: 10000;
+    }
 </style>
 {% endblock %}
 
@@ -540,8 +598,134 @@
 
 </div>
 
+<!-- OpenSeadragon Photo Viewer Modal -->
+<div id="photo-viewer-modal">
+    <button class="viewer-close-btn" onclick="window.closePhotoViewer()">&times;</button>
+    <div id="openseadragon-viewer"></div>
+    <div class="viewer-photo-info" id="viewer-photo-info" style="display: none;">
+        <h4 id="viewer-photo-title" style="margin: 0 0 5px 0; color: white;"></h4>
+        <p id="viewer-photo-description" style="margin: 0; font-size: 14px; color: #ccc;"></p>
+    </div>
+</div>
+
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- OpenSeadragon JS -->
+<script src="/static/js/openseadragon.min.js"></script>
+
+<!-- OpenSeadragon Photo Viewer Functions -->
+<script>
+let osdViewer = null;
+
+// Open photo in OpenSeadragon viewer with Deep Zoom tiles
+window.openPhotoViewer = async function(photoId) {
+    const modal = document.getElementById('photo-viewer-modal');
+    const viewerElement = document.getElementById('openseadragon-viewer');
+    const infoElement = document.getElementById('viewer-photo-info');
+    
+    // Find photo data
+    const photoData = window.geographicMapManager.availablePhotos.find(p => p.id === photoId);
+    
+    if (!photoData) {
+        console.error('Photo not found:', photoId);
+        return;
+    }
+    
+    // Show modal
+    modal.classList.add('active');
+    
+    // Update photo info
+    document.getElementById('viewer-photo-title').textContent = photoData.title || photoData.filename;
+    document.getElementById('viewer-photo-description').textContent = photoData.description || '';
+    infoElement.style.display = 'block';
+    
+    // Initialize OpenSeadragon if not already initialized
+    if (!osdViewer) {
+        osdViewer = OpenSeadragon({
+            id: 'openseadragon-viewer',
+            prefixUrl: '/static/img/openseadragon/',
+            showNavigationControl: true,
+            navigationControlAnchor: OpenSeadragon.ControlAnchor.TOP_RIGHT,
+            showZoomControl: true,
+            showHomeControl: true,
+            showFullPageControl: true,
+            showRotationControl: true,
+            gestureSettingsTouch: {
+                pinchRotate: true
+            },
+            minZoomLevel: 0.5,
+            maxZoomLevel: 10,
+            visibilityRatio: 0.5,
+            constrainDuringPan: false
+        });
+    }
+    
+    try {
+        // Check if photo has Deep Zoom tiles available
+        const deepZoomInfoUrl = `/sites/${siteId}/photos/${photoId}/deepzoom/info`;
+        const response = await fetch(deepZoomInfoUrl);
+        
+        if (response.ok) {
+            const deepZoomInfo = await response.json();
+            
+            // Check if tiles are actually available
+            if (deepZoomInfo.available && deepZoomInfo.total_tiles > 0) {
+                console.log('Loading with Deep Zoom tiles:', deepZoomInfo);
+                
+                // Use custom tile source for your Deep Zoom tiles
+                osdViewer.open({
+                    tileSource: {
+                        height: deepZoomInfo.height,
+                        width: deepZoomInfo.width,
+                        tileSize: deepZoomInfo.tile_size || 256,
+                        tileOverlap: deepZoomInfo.overlap || 0,
+                        minLevel: 0,
+                        maxLevel: deepZoomInfo.levels - 1,
+                        getTileUrl: function(level, x, y) {
+                            // Use your existing tile endpoint
+                            const format = deepZoomInfo.tile_format || 'jpg';
+                            return `/sites/${siteId}/photos/${photoId}/deepzoom/tiles/${level}/${x}_${y}.${format}`;
+                        }
+                    }
+                });
+                
+                console.log('Opened photo with Deep Zoom tiles:', photoData.title);
+                return;
+            }
+        }
+    } catch (error) {
+        console.warn('Deep Zoom tiles not available, falling back to regular image:', error);
+    }
+    
+    // Fallback to regular image if Deep Zoom not available
+    osdViewer.open({
+        type: 'image',
+        url: photoData.full_url,
+        buildPyramid: true,  // OpenSeadragon will create tiles on the fly
+        crossOriginPolicy: 'Anonymous'
+    });
+    
+    console.log('Opened photo with fallback image:', photoData.title);
+};
+
+// Close photo viewer
+window.closePhotoViewer = function() {
+    const modal = document.getElementById('photo-viewer-modal');
+    modal.classList.remove('active');
+    
+    if (osdViewer) {
+        osdViewer.close();
+    }
+};
+
+// Close viewer on ESC key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        window.closePhotoViewer();
+    }
+});
+</script>
 
 <!-- Alpine.js Geographic Map Component -->
 <script>
@@ -887,7 +1071,8 @@ document.addEventListener('alpine:init', () => {
                             ${markerData.photos.map(photo =>
                                 `<img src="${photo.thumbnail_url}" alt="${photo.title}"
                                       style="width: 40px; height: 30px; object-fit: cover; border-radius: 3px; cursor: pointer;"
-                                      onclick="window.open('${photo.full_url}', '_blank')">`
+                                      onclick="window.openPhotoViewer('${photo.id}')"
+                                      title="Clicca per visualizzare con zoom">`
                             ).join('')}
                         </div>
                     </div>

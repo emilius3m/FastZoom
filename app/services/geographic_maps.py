@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission
 from app.models.users import User
+from app.models.geographic_maps import GeographicMapMarker
 from app.repositories.geographic_maps import GeographicMapRepository
 from app.exceptions import BusinessLogicError
 
@@ -453,11 +454,28 @@ class GeographicMapService:
             raise BusinessLogicError("Permessi di scrittura richiesti", 403)
         
         try:
-            # Verify marker exists
-            marker = await self.repository.get_marker_by_id(marker_id, map_id, site_id)
+            # First, verify marker exists with detailed diagnostics
+            from sqlalchemy import select
             
-            if not marker:
-                raise BusinessLogicError("Marker non trovato", 404)
+            # Check if marker exists at all
+            marker_check = await self.db_session.execute(
+                select(GeographicMapMarker).where(GeographicMapMarker.id == marker_id)
+            )
+            marker_basic = marker_check.scalar_one_or_none()
+            
+            if not marker_basic:
+                logger.warning(f"Marker not found with ID: {marker_id}")
+                raise BusinessLogicError(f"Marker non trovato con ID: {marker_id}", 404)
+            
+            # Check if marker belongs to the correct map
+            if marker_basic.map_id != map_id:
+                logger.warning(f"Marker {marker_id} belongs to map {marker_basic.map_id}, not {map_id}")
+                raise BusinessLogicError(f"Marker non appartiene alla mappa specificata", 400)
+            
+            # Check if marker belongs to the correct site
+            if marker_basic.site_id != site_id:
+                logger.warning(f"Marker {marker_id} belongs to site {marker_basic.site_id}, not {site_id}")
+                raise BusinessLogicError(f"Marker non appartiene al sito specificato", 400)
             
             # Delete marker (CASCADE will handle photo associations)
             success = await self.repository.delete_marker(marker_id)
@@ -468,6 +486,10 @@ class GeographicMapService:
             else:
                 raise BusinessLogicError("Errore eliminazione marker", 500)
                 
+        except BusinessLogicError:
+            # Re-raise business logic errors as-is
+            await self.db_session.rollback()
+            raise
         except Exception as e:
             logger.error(f"Error deleting geographic marker: {e}")
             await self.db_session.rollback()
