@@ -52,6 +52,18 @@ class ICCDBaseRecord(Base):
         Index('idx_hierarchy', 'parent_id', 'schema_type'),
         UniqueConstraint('nct_region', 'nct_number', 'nct_suffix', name='uq_nct_complete')
     )
+    
+    def get_nct(self) -> str:
+        """Restituisce il codice NCT completo."""
+        suffix = self.nct_suffix or ""
+        return f"{self.nct_region}{self.nct_number}{suffix}"
+    
+    def get_object_name(self) -> str:
+        """Estrae il nome dell'oggetto dai dati ICCD."""
+        try:
+            return self.iccd_data.get("OG", {}).get("OGT", {}).get("OGTD", "Oggetto sconosciuto")
+        except (AttributeError, KeyError):
+            return "Oggetto sconosciuto"
 
 
 # Mantengo ICCDRecord per compatibilità con il codice esistente

@@ -421,8 +421,8 @@ class ICCDHierarchyService:
                 possible_parents = await self.get_possible_parents(site_id, "RA")
                 if possible_parents:
                     options["possible_parents"] = possible_parents
-                else:
-                    options["recommendations"].append("Nessun padre disponibile per schede RA")
+                    # Non mostrare raccomandazione se ci sono padri disponibili
+                # La raccomandazione "nessun padre" viene gestita dal frontend quando l'utente seleziona RA
                     
             else:
                 # Multiple SI - error state
