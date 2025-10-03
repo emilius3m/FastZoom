@@ -84,9 +84,9 @@ class GeoJSONMinIOService:
             logger.error(f"Error saving GeoJSON layer to MinIO: {e}")
             raise HTTPException(status_code=500, detail=f"Errore salvataggio GeoJSON: {str(e)}")
     
-    async def get_geojson_layer(self, layer_id: str, site_id: str, map_id: str) -> Optional[Dict[str, Any]]:
+    async def get_geojson_layer(self, layer_id: str, site_id: str, map_id: str, db_session: Optional[Any] = None) -> Optional[Dict[str, Any]]:
         """
-        Recupera un file GeoJSON da MinIO provando prima il percorso standard, poi quello legacy.
+        Recupera un file GeoJSON da MinIO, checking database for the actual MinIO URL first.
 
         Args:
             layer_id: ID del layer da recuperare
@@ -96,7 +96,56 @@ class GeoJSONMinIOService:
         Returns:
             Dict: Dati GeoJSON o None se non trovato
         """
-        # Prima prova il percorso standard: geojson_layers/{site_id}/{map_id}/{layer_id}.geojson
+        # First, check if we can get the MinIO URL from the database
+        minio_url = None
+        if db_session is not None:
+            try:
+                from sqlalchemy import select, and_
+                from app.models.geographic_maps import GeographicMapLayer
+                from uuid import UUID
+
+                # Query the database for the layer
+                stmt = select(GeographicMapLayer).where(
+                    and_(
+                        GeographicMapLayer.id == UUID(layer_id),
+                        GeographicMapLayer.site_id == UUID(site_id),
+                        GeographicMapLayer.map_id == UUID(map_id)
+                    )
+                )
+                result = await db_session.execute(stmt)
+                layer = result.scalar_one_or_none()
+
+                if layer and layer.geojson_data:
+                    # Check if the geojson_data contains a MinIO URL reference
+                    if isinstance(layer.geojson_data, dict) and 'minio_url' in layer.geojson_data:
+                        minio_url = layer.geojson_data['minio_url']
+                        logger.debug(f"Found MinIO URL in database for layer {layer_id}: {minio_url}")
+                    elif isinstance(layer.geojson_data, dict) and 'minio_url' not in layer.geojson_data:
+                        # The database contains the actual GeoJSON data, not a reference
+                        logger.debug(f"GeoJSON layer retrieved directly from database: {layer_id}")
+                        return layer.geojson_data
+
+            except Exception as e:
+                logger.debug(f"Could not query database for layer {layer_id}: {e}")
+
+        # If we have a MinIO URL from the database, try to use it directly
+        if minio_url:
+            try:
+                geojson_content = await archaeological_minio_service.get_file(minio_url)
+
+                if isinstance(geojson_content, bytes):
+                    geojson_content = geojson_content.decode('utf-8')
+
+                # Parse del JSON
+                geojson_data = json.loads(geojson_content)
+
+                logger.debug(f"GeoJSON layer retrieved from MinIO using database URL: {minio_url}")
+                return geojson_data
+
+            except Exception as e:
+                logger.debug(f"Failed to retrieve from database MinIO URL {minio_url}: {e}")
+
+        # Fallback: try standard path (for newly created layers with consistent IDs)
         object_name = f"{self.base_path}/{site_id}/{map_id}/{layer_id}.geojson"
 
         try:
@@ -111,12 +160,13 @@ class GeoJSONMinIOService:
             # Parse del JSON
             geojson_data = json.loads(geojson_content)
 
-            logger.info(f"GeoJSON layer retrieved from MinIO: {object_name}")
+            logger.debug(f"GeoJSON layer retrieved from MinIO: {object_name}")
             return geojson_data
 
         except Exception as e:
-            logger.debug(f"Path not found: {object_name} - {e}")
-            # Se il percorso standard fallisce, prova il percorso legacy senza map_id
+            logger.debug(f"Standard path not found: {object_name} - {e}")
+
+            # Try legacy path without map_id
             legacy_object_name = f"{self.base_path}/{site_id}/{layer_id}.geojson"
 
             try:
@@ -132,12 +182,12 @@ class GeoJSONMinIOService:
                 # Parse del JSON
                 geojson_data = json.loads(geojson_content)
 
-                logger.info(f"GeoJSON layer retrieved from MinIO (legacy path): {legacy_object_name}")
+                logger.debug(f"GeoJSON layer retrieved from MinIO (legacy path): {legacy_object_name}")
                 return geojson_data
 
             except Exception as e2:
-                logger.debug(f"Path not found: {legacy_object_name} - {e2}")
-                logger.warning(f"GeoJSON layer not found for layer_id: {layer_id}, site_id: {site_id}, map_id: {map_id}")
+                logger.debug(f"Legacy path not found: {legacy_object_name} - {e2}")
+                logger.debug(f"GeoJSON layer not found in MinIO or database for layer_id: {layer_id}, site_id: {site_id}, map_id: {map_id}")
                 return None
     
     

@@ -222,12 +222,13 @@ class GeographicMapService:
                             geojson_data = await geojson_minio_service.get_geojson_layer(
                                 layer_id=layer_id,
                                 site_id=site_id,
-                                map_id=map_id
+                                map_id=map_id,
+                                db_session=self.db_session
                             )
                             
                             # If we couldn't retrieve the data from MinIO, use a fallback
                             if geojson_data is None:
-                                logger.warning(f"Could not retrieve GeoJSON data from MinIO for layer {layer_id}, using empty data")
+                                logger.debug(f"Could not retrieve GeoJSON data from MinIO for layer {layer_id}, using empty data")
                                 geojson_data = {
                                     "type": "FeatureCollection",
                                     "features": []
@@ -259,7 +260,7 @@ class GeographicMapService:
                             "minio_url": layer.geojson_data.get('minio_url') if isinstance(layer.geojson_data, dict) and 'minio_url' in layer.geojson_data else None
                         }
                     except Exception as e:
-                        logger.error(f"Error retrieving GeoJSON data from MinIO for layer {layer.id}: {e}")
+                        logger.debug(f"Error retrieving GeoJSON data from MinIO for layer {layer.id}: {e}")
                         # Fallback to showing the reference with empty geojson_data
                         layer_data = {
                             "id": str(layer.id),
@@ -404,25 +405,19 @@ class GeographicMapService:
                         'west': min(lngs)
                     }
             
-            # Store GeoJSON data in MinIO and save only the reference in database
+            # Generate layer ID first to ensure consistency between MinIO and database
             from uuid import uuid4
-            layer_id = str(uuid4())
-            minio_url = await geojson_minio_service.save_geojson_layer(
-                geojson_data=geojson_data,
-                layer_id=layer_id,
-                site_id=str(site_id),
-                map_id=str(map_id),
-                layer_name=layer_data.get('name', f'Layer {layer_id}')
-            )
+            layer_id = uuid4()
             
-            # Prepare layer data for creation (only store reference in database)
+            # Prepare layer data for creation first
             layer = {
+                "id": layer_id,  # Use the same ID for both MinIO and database
                 "map_id": map_id,
                 "site_id": site_id,
                 "name": layer_data['name'],
                 "description": layer_data.get('description'),
                 "layer_type": layer_data.get('layer_type', 'geojson'),
-                "geojson_data": {"minio_url": minio_url},  # Store only the reference
+                "geojson_data": {},  # Placeholder, will be updated after MinIO upload
                 "features_count": len(geojson_data.get('features', [])),
                 "style_config": layer_data.get('style_config', {}),
                 "is_visible": layer_data.get('is_visible', True),
@@ -434,6 +429,19 @@ class GeographicMapService:
                 "created_by": current_user_id
             }
             
+            # Store GeoJSON data in MinIO using the same layer_id
+            minio_url = await geojson_minio_service.save_geojson_layer(
+                geojson_data=geojson_data,
+                layer_id=str(layer_id),
+                site_id=str(site_id),
+                map_id=str(map_id),
+                layer_name=layer_data.get('name', f'Layer {layer_id}')
+            )
+            
+            # Update layer data with MinIO reference
+            layer["geojson_data"] = {"minio_url": minio_url}
+            
+            # Create the layer in database with the pre-generated ID
             new_layer = await self.repository.create_layer(layer)
             await self.db_session.commit()
             
