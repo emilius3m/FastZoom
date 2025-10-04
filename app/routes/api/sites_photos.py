@@ -15,6 +15,7 @@ from app.database.session import get_async_session
 from app.core.security import get_current_user_id
 from app.models.photos import Photo, PhotoType, MaterialType, ConservationStatus
 from app.models.users import UserActivity
+from app.routes.api.dependencies import get_site_access
 from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service
 from app.services.archaeological_minio_service import archaeological_minio_service
@@ -31,7 +32,7 @@ async def get_site_photos_api(
         per_page: int = 100,
         category: str = None,
         search: str = None,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """API per ottenere lista foto del sito in formato JSON"""
@@ -83,7 +84,7 @@ async def upload_photo(
         description: Optional[str] = Form(None),
         photo_type: Optional[str] = Form(None),
         photographer: Optional[str] = Form(None),
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
@@ -288,7 +289,7 @@ async def upload_photo(
 async def stream_photo_from_minio(
         site_id: UUID,
         photo_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Stream foto da MinIO con URL pre-firmato"""
@@ -319,7 +320,7 @@ async def stream_photo_from_minio(
 async def get_photo_thumbnail(
         site_id: UUID,
         photo_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni thumbnail foto da MinIO"""
@@ -350,7 +351,7 @@ async def get_photo_thumbnail(
 async def get_photo_full(
         site_id: UUID,
         photo_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni immagine completa foto da MinIO"""
@@ -384,7 +385,7 @@ async def search_photos_by_metadata(
         inventory_number: Optional[str] = None,
         excavation_area: Optional[str] = None,
         chronology_period: Optional[str] = None,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Cerca foto per metadati archeologici"""
@@ -412,7 +413,7 @@ async def update_photo(
         site_id: UUID,
         photo_id: UUID,
         request: Request,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
@@ -567,7 +568,7 @@ async def update_photo(
 async def delete_photo(
         site_id: UUID,
         photo_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
@@ -665,7 +666,7 @@ async def delete_photo(
 async def bulk_delete_photos(
         site_id: UUID,
         delete_data: dict,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
@@ -778,7 +779,7 @@ async def bulk_delete_photos(
 async def bulk_update_photos(
         site_id: UUID,
         update_data: dict,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):

@@ -11,6 +11,7 @@ from app.database.session import get_async_session
 from app.models.photos import Photo
 from app.models.user_sites import UserSitePermission
 from app.models.users import UserActivity, User
+from app.routes.api.dependencies import get_site_access
 from sqlalchemy import select, func, and_
 
 dashboard_router = APIRouter()
@@ -19,7 +20,7 @@ dashboard_router = APIRouter()
 @dashboard_router.get("/{site_id}/api/stats")
 async def get_site_stats_api(
         site_id: UUID,
-        site_access: tuple,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """API per statistiche del sito (per aggiornamenti real-time)"""

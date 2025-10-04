@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from app.database.session import get_async_session
+from app.routes.api.dependencies import get_site_access
 from app.services.archaeological_minio_service import archaeological_minio_service
 from app.services.storage_management_service import storage_management_service
 
@@ -16,7 +17,7 @@ storage_router = APIRouter()
 @storage_router.get("/{site_id}/api/storage/stats")
 async def get_site_storage_stats(
         site_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni statistiche storage del sito con gestione avanzata"""
@@ -65,7 +66,7 @@ async def get_site_storage_stats(
 @storage_router.post("/{site_id}/api/storage/cleanup")
 async def emergency_storage_cleanup(
         site_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Cleanup di emergenza dello storage MinIO"""
@@ -104,7 +105,7 @@ async def emergency_storage_cleanup(
 @storage_router.get("/{site_id}/api/storage/health")
 async def check_storage_health(
         site_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Controlla lo stato di salute dello storage MinIO"""

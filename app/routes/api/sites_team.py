@@ -14,6 +14,7 @@ import json
 from app.database.session import get_async_session
 from app.models.user_sites import UserSitePermission, PermissionLevel
 from app.models.users import User
+from app.routes.api.dependencies import get_site_access
 
 team_router = APIRouter()
 
@@ -21,7 +22,7 @@ team_router = APIRouter()
 @team_router.get("/{site_id}/api/team")
 async def get_team_members(
         site_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Get team members for a site"""
@@ -86,7 +87,7 @@ async def update_team_member_permissions(
         site_id: UUID,
         user_id: UUID,
         permission_data: dict,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Update team member permissions"""

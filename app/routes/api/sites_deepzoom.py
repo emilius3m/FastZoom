@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from app.database.session import get_async_session
 from app.models.photos import Photo
+from app.routes.api.dependencies import get_site_access
 from app.services.archaeological_minio_service import archaeological_minio_service
 from app.services.deep_zoom_minio_service import deep_zoom_minio_service
 
@@ -20,7 +21,7 @@ deepzoom_router = APIRouter()
 async def get_deep_zoom_info(
         site_id: UUID,
         photo_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni informazioni deep zoom per una foto"""
@@ -57,7 +58,7 @@ async def get_deep_zoom_tile(
         x: int,
         y: int,
         format: str,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """FIXED: Ottieni singolo tile deep zoom con supporto formato dinamico (jpg/png)"""
@@ -88,7 +89,7 @@ async def get_deep_zoom_tile_jpg(
         level: int,
         x: int,
         y: int,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Legacy endpoint per tile JPG - redirect al nuovo endpoint dinamico"""
@@ -102,7 +103,7 @@ async def get_deep_zoom_tile_png(
         level: int,
         x: int,
         y: int,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Legacy endpoint per tile PNG - redirect al nuovo endpoint dinamico"""
@@ -113,7 +114,7 @@ async def get_deep_zoom_tile_png(
 async def process_deep_zoom(
         site_id: UUID,
         photo_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Processa foto esistente per generare deep zoom tiles"""
@@ -181,7 +182,7 @@ async def process_deep_zoom(
 async def get_deep_zoom_processing_status(
         site_id: UUID,
         photo_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni status di elaborazione deep zoom per una foto"""
@@ -219,7 +220,7 @@ async def get_deep_zoom_processing_status(
 @deepzoom_router.get("/{site_id}/api/photos/processing-queue")
 async def get_processing_queue_status(
         site_id: UUID,
-        site_access: tuple = None,
+        site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
     """
