@@ -98,51 +98,70 @@
 
     <!-- Theme Toggle Script -->
     <script>
-      // Simple theme toggle functionality
-      document.addEventListener('DOMContentLoaded', function() {
-        const htmlElement = document.documentElement;
-        const themeToggleBtn = document.getElementById('theme-toggle');
-        const lightIcon = document.getElementById('theme-toggle-light-icon');
-        const darkIcon = document.getElementById('theme-toggle-dark-icon');
+       // Simple theme toggle functionality
+       document.addEventListener('DOMContentLoaded', function() {
+         const htmlElement = document.documentElement;
+         const themeToggleBtn = document.getElementById('theme-toggle');
+         const themeToggleMobileBtn = document.getElementById('theme-toggle-mobile');
+         const lightIcon = document.getElementById('theme-toggle-light-icon');
+         const darkIcon = document.getElementById('theme-toggle-dark-icon');
+         const mobileLightIcon = document.getElementById('theme-toggle-mobile-light-icon');
+         const mobileDarkIcon = document.getElementById('theme-toggle-mobile-dark-icon');
 
-        // Check for saved theme preference or default to light mode
-        let currentTheme = localStorage.getItem('theme') || 'light';
+         // Check for saved theme preference or default to light mode
+         let currentTheme = localStorage.getItem('theme') || 'light';
 
-        // Apply initial theme
-        function applyTheme(theme) {
-          const htmlElement = document.documentElement;
+         // Apply initial theme
+         function applyTheme(theme) {
+           const htmlElement = document.documentElement;
 
-          if (theme === 'dark') {
-            htmlElement.classList.add('dark');
-            if (lightIcon) lightIcon.classList.add('hidden');
-            if (darkIcon) darkIcon.classList.remove('hidden');
-          } else {
-            htmlElement.classList.remove('dark');
-            if (lightIcon) lightIcon.classList.remove('hidden');
-            if (darkIcon) darkIcon.classList.add('hidden');
-          }
+           if (theme === 'dark') {
+             htmlElement.classList.add('dark');
+             // Desktop icons
+             if (lightIcon) lightIcon.classList.add('hidden');
+             if (darkIcon) darkIcon.classList.remove('hidden');
+             // Mobile icons
+             if (mobileLightIcon) mobileLightIcon.classList.add('hidden');
+             if (mobileDarkIcon) mobileDarkIcon.classList.remove('hidden');
+           } else {
+             htmlElement.classList.remove('dark');
+             // Desktop icons
+             if (lightIcon) lightIcon.classList.remove('hidden');
+             if (darkIcon) darkIcon.classList.add('hidden');
+             // Mobile icons
+             if (mobileLightIcon) mobileLightIcon.classList.remove('hidden');
+             if (mobileDarkIcon) mobileDarkIcon.classList.add('hidden');
+           }
 
-          currentTheme = theme;
-          localStorage.setItem('theme', theme);
+           currentTheme = theme;
+           localStorage.setItem('theme', theme);
 
-          console.log('Theme applied:', theme);
-        }
+           console.log('Theme applied:', theme);
+         }
 
-        // Apply initial theme
-        applyTheme(currentTheme);
+         // Apply initial theme
+         applyTheme(currentTheme);
 
-        // Toggle theme on button click (if button exists)
-        if (themeToggleBtn) {
-          themeToggleBtn.addEventListener('click', function() {
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            applyTheme(newTheme);
-            console.log('Theme toggled to:', newTheme);
-          });
-        }
+         // Toggle theme function
+         function toggleTheme() {
+           const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+           applyTheme(newTheme);
+           console.log('Theme toggled to:', newTheme);
+         }
 
-        console.log('Theme initialization completed');
-      });
-    </script>
+         // Desktop theme toggle button
+         if (themeToggleBtn) {
+           themeToggleBtn.addEventListener('click', toggleTheme);
+         }
+
+         // Mobile theme toggle button
+         if (themeToggleMobileBtn) {
+           themeToggleMobileBtn.addEventListener('click', toggleTheme);
+         }
+
+         console.log('Theme initialization completed');
+       });
+     </script>
 
 
 
