@@ -134,9 +134,9 @@ async def upload_archaeological_plan(
         if not plan_file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="Solo file immagine sono supportati")
         
-        # Salva file su storage
+        # Salva file su storage (passa solo site_id, non "plans/{site_id}")
         filename, file_path, file_size = await storage_service.save_upload_file(
-            plan_file, f"plans/{site_id}", str(current_user_id)
+            plan_file, str(site_id), str(current_user_id)
         )
         
         # Ottieni dimensioni immagine
@@ -202,6 +202,135 @@ async def upload_archaeological_plan(
         logger.error(f"Error uploading archaeological plan: {e}")
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Errore caricamento pianta: {str(e)}")
+
+@plans_router.put("/sites/{site_id}/plans/{plan_id}")
+async def update_archaeological_plan(
+    site_id: UUID,
+    plan_id: UUID,
+    plan_data: dict,
+    site_access: tuple = Depends(get_site_access_for_plans),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Aggiorna una pianta archeologica"""
+    site, permission = site_access
+    
+    if not permission.can_write():
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+    
+    # Trova pianta
+    plan = await db.execute(
+        select(ArchaeologicalPlan).where(
+            and_(
+                ArchaeologicalPlan.id == plan_id,
+                ArchaeologicalPlan.site_id == site_id
+            )
+        )
+    )
+    plan = plan.scalar_one_or_none()
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Pianta non trovata")
+    
+    try:
+        # Aggiorna campi modificabili
+        updatable_fields = [
+            'name', 'description', 'plan_type', 'coordinate_system',
+            'origin_x', 'origin_y', 'scale_factor', 'bounds_north',
+            'bounds_south', 'bounds_east', 'bounds_west', 'drawing_scale',
+            'surveyor', 'notes', 'is_primary'
+        ]
+        
+        for field in updatable_fields:
+            if field in plan_data:
+                setattr(plan, field, plan_data[field])
+        
+        # Se sta diventando pianta primaria, rimuovi flag da altre piante
+        if plan_data.get('is_primary') and not plan.is_primary:
+            from sqlalchemy import update
+            await db.execute(
+                update(ArchaeologicalPlan).where(
+                    and_(
+                        ArchaeologicalPlan.site_id == site_id,
+                        ArchaeologicalPlan.id != plan_id,
+                        ArchaeologicalPlan.is_primary == True
+                    )
+                ).values(is_primary=False)
+            )
+        
+        # Aggiorna grid_config se presente
+        if 'grid_config' in plan_data:
+            plan.grid_config = plan_data['grid_config']
+        
+        plan.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        await db.refresh(plan)
+        
+        logger.info(f"Archaeological plan updated: {plan_id}")
+        
+        return JSONResponse({
+            "message": "Pianta archeologica aggiornata con successo",
+            "plan_data": plan.to_dict()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating archaeological plan: {e}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore aggiornamento pianta: {str(e)}")
+
+
+@plans_router.delete("/sites/{site_id}/plans/{plan_id}")
+async def delete_archaeological_plan(
+    site_id: UUID,
+    plan_id: UUID,
+    site_access: tuple = Depends(get_site_access_for_plans),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Elimina una pianta archeologica (soft delete)"""
+    site, permission = site_access
+    
+    if not permission.can_delete():
+        raise HTTPException(status_code=403, detail="Permessi di cancellazione richiesti")
+    
+    # Trova pianta
+    plan = await db.execute(
+        select(ArchaeologicalPlan).where(
+            and_(
+                ArchaeologicalPlan.id == plan_id,
+                ArchaeologicalPlan.site_id == site_id
+            )
+        )
+    )
+    plan = plan.scalar_one_or_none()
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Pianta non trovata")
+    
+    try:
+        # Soft delete - marca come non attiva
+        plan.is_active = False
+        plan.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        
+        # Opzionalmente elimina il file da MinIO
+        try:
+            if plan.image_path:
+                await storage_service.delete_file(plan.image_path)
+        except Exception as storage_error:
+            logger.warning(f"Could not delete plan file from storage: {storage_error}")
+        
+        logger.info(f"Archaeological plan deleted (soft): {plan_id}")
+        
+        return JSONResponse({
+            "message": "Pianta archeologica eliminata con successo"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting archaeological plan: {e}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore eliminazione pianta: {str(e)}")
+
 
 
 @plans_router.get("/sites/{site_id}/plans/{plan_id}")
@@ -553,6 +682,52 @@ async def update_excavation_unit(
         raise HTTPException(status_code=500, detail=f"Errore aggiornamento unità: {str(e)}")
 
 
+@plans_router.delete("/sites/{site_id}/plans/{plan_id}/excavation-units/{unit_id}")
+async def delete_excavation_unit(
+    site_id: UUID,
+    plan_id: UUID,
+    unit_id: str,
+    site_access: tuple = Depends(get_site_access_for_plans),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Elimina una unità di scavo"""
+    site, permission = site_access
+    
+    if not permission.can_delete():
+        raise HTTPException(status_code=403, detail="Permessi di cancellazione richiesti")
+    
+    # Trova unità
+    unit = await db.execute(
+        select(ExcavationUnit).where(
+            and_(
+                ExcavationUnit.id == unit_id,
+                ExcavationUnit.plan_id == plan_id,
+                ExcavationUnit.site_id == site_id
+            )
+        )
+    )
+    unit = unit.scalar_one_or_none()
+    
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unità di scavo non trovata")
+    
+    try:
+        # Elimina unità e dati associati (cascade delete)
+        await db.delete(unit)
+        await db.commit()
+        
+        logger.info(f"Excavation unit deleted: {unit_id}")
+        
+        return JSONResponse({
+            "message": "Unità di scavo eliminata con successo"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting excavation unit: {e}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore eliminazione unità: {str(e)}")
+
+
 # === DATI ARCHEOLOGICI ===
 
 @plans_router.get("/sites/{site_id}/plans/{plan_id}/archaeological-data")
@@ -672,6 +847,125 @@ async def create_archaeological_data(
     except Exception as e:
         logger.error(f"Error creating archaeological data: {e}")
         await db.rollback()
+
+@plans_router.put("/sites/{site_id}/plans/{plan_id}/archaeological-data/{data_id}")
+async def update_archaeological_data(
+    site_id: UUID,
+    plan_id: UUID,
+    data_id: UUID,
+    data_payload: dict,
+    site_access: tuple = Depends(get_site_access_for_plans),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Aggiorna un dato archeologico georeferenziato"""
+    site, permission = site_access
+    
+    if not permission.can_write():
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+    
+    # Trova dato archeologico
+    data_record = await db.execute(
+        select(ArchaeologicalData).where(
+            and_(
+                ArchaeologicalData.id == data_id,
+                ArchaeologicalData.plan_id == plan_id,
+                ArchaeologicalData.site_id == site_id
+            )
+        )
+    )
+    data_record = data_record.scalar_one_or_none()
+    
+    if not data_record:
+        raise HTTPException(status_code=404, detail="Dato archeologico non trovato")
+    
+    try:
+        # Aggiorna coordinate se presenti
+        if 'coordinates' in data_payload:
+            coordinates = data_payload['coordinates']
+            if 'x' in coordinates:
+                data_record.coordinates_x = coordinates['x']
+            if 'y' in coordinates:
+                data_record.coordinates_y = coordinates['y']
+            if 'elevation' in coordinates:
+                data_record.elevation = coordinates['elevation']
+        
+        # Aggiorna dati
+        if 'data' in data_payload:
+            data_record.data = data_payload['data']
+        
+        # Aggiorna altri campi
+        updatable_fields = ['collection_method', 'accuracy']
+        for field in updatable_fields:
+            if field in data_payload:
+                setattr(data_record, field, data_payload[field])
+        
+        # Aggiorna unità di scavo se specificata
+        if 'excavation_unit_id' in data_payload:
+            data_record.excavation_unit_id = data_payload['excavation_unit_id']
+        
+        data_record.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        await db.refresh(data_record)
+        
+        logger.info(f"Archaeological data updated: {data_id}")
+        
+        return JSONResponse({
+            "message": "Dato archeologico aggiornato con successo",
+            "data": data_record.to_dict()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating archaeological data: {e}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore aggiornamento dato: {str(e)}")
+
+
+@plans_router.delete("/sites/{site_id}/plans/{plan_id}/archaeological-data/{data_id}")
+async def delete_archaeological_data(
+    site_id: UUID,
+    plan_id: UUID,
+    data_id: UUID,
+    site_access: tuple = Depends(get_site_access_for_plans),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Elimina un dato archeologico georeferenziato"""
+    site, permission = site_access
+    
+    if not permission.can_delete():
+        raise HTTPException(status_code=403, detail="Permessi di cancellazione richiesti")
+    
+    # Trova dato archeologico
+    data_record = await db.execute(
+        select(ArchaeologicalData).where(
+            and_(
+                ArchaeologicalData.id == data_id,
+                ArchaeologicalData.plan_id == plan_id,
+                ArchaeologicalData.site_id == site_id
+            )
+        )
+    )
+    data_record = data_record.scalar_one_or_none()
+    
+    if not data_record:
+        raise HTTPException(status_code=404, detail="Dato archeologico non trovato")
+    
+    try:
+        # Elimina dato
+        await db.delete(data_record)
+        await db.commit()
+        
+        logger.info(f"Archaeological data deleted: {data_id}")
+        
+        return JSONResponse({
+            "message": "Dato archeologico eliminato con successo"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting archaeological data: {e}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore eliminazione dato: {str(e)}")
+
         raise HTTPException(status_code=500, detail=f"Errore creazione dato: {str(e)}")
 
 

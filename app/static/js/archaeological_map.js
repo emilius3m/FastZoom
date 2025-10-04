@@ -273,6 +273,51 @@ document.addEventListener('alpine:init', () => {
             };
         },
         
+        async deletePlan() {
+            if (!this.currentPlan) {
+                alert('Nessuna pianta selezionata');
+                return;
+            }
+            
+            if (confirm(`Sei sicuro di voler eliminare la pianta "${this.currentPlan.name}"? Questa azione non può essere annullata.`)) {
+                try {
+                    const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        console.log('Plan deleted:', this.currentPlan.id);
+                        
+                        // Reset current plan
+                        this.currentPlan = null;
+                        this.selectedPlanId = '';
+                        
+                        // Clear map
+                        this.map.eachLayer((layer) => {
+                            if (layer instanceof L.ImageOverlay) {
+                                this.map.removeLayer(layer);
+                            }
+                        });
+                        this.unitsLayer.clearLayers();
+                        this.markersLayer.clearLayers();
+                        this.gridLayer.clearLayers();
+                        this.gridLabels.clearLayers();
+                        
+                        // Reload plans
+                        await this.loadAvailablePlans();
+                        
+                        alert('Pianta eliminata con successo');
+                    } else {
+                        const error = await response.json();
+                        alert('Errore durante l\'eliminazione: ' + error.detail);
+                    }
+                } catch (error) {
+                    console.error('Error deleting plan:', error);
+                    alert('Errore durante l\'eliminazione');
+                }
+            }
+        },
+        
         // === GESTIONE GRIGLIA ===
         
         createGridOverlay() {
@@ -713,10 +758,25 @@ document.addEventListener('alpine:init', () => {
             // TODO: Implementare visualizzazione dati unità
         },
         
-        removeUnit(unitId) {
+        async removeUnit(unitId) {
             if (confirm('Sei sicuro di voler eliminare questa unità di scavo?')) {
-                console.log('Remove unit:', unitId);
-                // TODO: Implementare eliminazione unità
+                try {
+                    const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/excavation-units/${unitId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        console.log('Unit deleted:', unitId);
+                        // Ricarica unità
+                        await this.loadExcavationUnits();
+                    } else {
+                        const error = await response.json();
+                        alert('Errore durante l\'eliminazione: ' + error.detail);
+                    }
+                } catch (error) {
+                    console.error('Error deleting unit:', error);
+                    alert('Errore durante l\'eliminazione');
+                }
             }
         },
         
