@@ -11,11 +11,13 @@ from loguru import logger
 from app.models.form_schemas import FormSchema
 from app.data.iccd_templates import SCHEMA_SI_300, SCHEMA_RA_300, SCHEMA_CA_300
 from app.data.iccd_ma_schema_complete import get_iccd_ma_300_schema
+from app.data.iccd_f_schema_complete import get_iccd_f_400_schema
 
 
 # Template mapping based on complete schemas
-# Get MA schema
+# Get MA and F schemas
 SCHEMA_MA_300 = get_iccd_ma_300_schema()
+SCHEMA_F_400 = get_iccd_f_400_schema()
 
 ICCD_TEMPLATES = {
     "SI": {
@@ -49,6 +51,14 @@ ICCD_TEMPLATES = {
         "icon": "🏛️",
         "schema": SCHEMA_MA_300["schema"],
         "ui_schema": SCHEMA_MA_300["ui_schema"]
+    },
+    "F": {
+        "name": "ICCD F 4.00 - Fotografia",
+        "description": "Schema standard ICCD per catalogazione fotografia storica e contemporanea (v. 4.00) - COMPLETO 23 paragrafi",
+        "category": "fotografia",
+        "icon": "📷",
+        "schema": SCHEMA_F_400["schema"],
+        "ui_schema": SCHEMA_F_400["ui_schema"]
     }
 }
 
@@ -341,7 +351,7 @@ class ICCDIntegrationService:
             errors = []
             
             # Schemi ICCD da creare per default
-            default_schemas = ["RA", "CA", "SI", "MA"]
+            default_schemas = ["RA", "CA", "SI", "MA", "F"]
             
             for schema_type in default_schemas:
                 try:

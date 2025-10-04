@@ -401,7 +401,7 @@ class ICCDHierarchyService:
                 options["recommendations"].append("Creare prima la Scheda SI (Sito Archeologico)")
                 
             elif si_count == 1:
-                # SI exists - can create CA, MA, RA
+                # SI exists - can create CA, MA, RA, F
                 options["available_types"].extend([
                     {
                         "type": "CA",
@@ -423,6 +423,13 @@ class ICCDHierarchyService:
                         "description": "Per reperti mobili",
                         "requires_parent": True,
                         "constraint": "Richiede un padre (SI, CA o MA)"
+                    },
+                    {
+                        "type": "F",
+                        "name": "Scheda Fotografia",
+                        "description": "Per fotografie storiche e contemporanee",
+                        "requires_parent": False,
+                        "constraint": "Richiede scheda SI esistente"
                     }
                 ])
                 

@@ -20,6 +20,7 @@ class SchemaType(str, Enum):
     RA = "RA"  # Reperti Archeologici
     CA = "CA"  # Complessi Archeologici
     MA = "MA"  # Monumenti Archeologici
+    F = "F"  # Fotografia
     NU = "NU"  # Numismatica
     TMA = "TMA"  # Tabula Peutingeriana
 
