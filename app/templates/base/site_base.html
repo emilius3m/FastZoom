@@ -100,16 +100,10 @@
     <script>
       // Simple theme toggle functionality
       document.addEventListener('DOMContentLoaded', function() {
-                    const htmlElement = document.documentElement;
-                    htmlElement.classList.add('dark');
+        const htmlElement = document.documentElement;
         const themeToggleBtn = document.getElementById('theme-toggle');
         const lightIcon = document.getElementById('theme-toggle-light-icon');
         const darkIcon = document.getElementById('theme-toggle-dark-icon');
-
-        if (!themeToggleBtn || !lightIcon || !darkIcon) {
-          //console.error('Theme toggle elements not found');
-          return;
-        }
 
         // Check for saved theme preference or default to light mode
         let currentTheme = localStorage.getItem('theme') || 'light';
@@ -120,12 +114,12 @@
 
           if (theme === 'dark') {
             htmlElement.classList.add('dark');
-            lightIcon.classList.add('hidden');
-            darkIcon.classList.remove('hidden');
+            if (lightIcon) lightIcon.classList.add('hidden');
+            if (darkIcon) darkIcon.classList.remove('hidden');
           } else {
             htmlElement.classList.remove('dark');
-            lightIcon.classList.remove('hidden');
-            darkIcon.classList.add('hidden');
+            if (lightIcon) lightIcon.classList.remove('hidden');
+            if (darkIcon) darkIcon.classList.add('hidden');
           }
 
           currentTheme = theme;
@@ -137,14 +131,16 @@
         // Apply initial theme
         applyTheme(currentTheme);
 
-        // Toggle theme on button click
-        themeToggleBtn.addEventListener('click', function() {
-          const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-          applyTheme(newTheme);
-          console.log('Theme toggled to:', newTheme);
-        });
+        // Toggle theme on button click (if button exists)
+        if (themeToggleBtn) {
+          themeToggleBtn.addEventListener('click', function() {
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            applyTheme(newTheme);
+            console.log('Theme toggled to:', newTheme);
+          });
+        }
 
-        console.log('Theme toggle initialized');
+        console.log('Theme initialization completed');
       });
     </script>
 
