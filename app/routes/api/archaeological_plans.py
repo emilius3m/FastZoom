@@ -150,13 +150,14 @@ async def upload_archaeological_plan(
         
         # Se è pianta primaria, rimuovi flag da altre piante
         if is_primary:
+            from sqlalchemy import update
             await db.execute(
-                select(ArchaeologicalPlan).where(
+                update(ArchaeologicalPlan).where(
                     and_(
                         ArchaeologicalPlan.site_id == site_id,
                         ArchaeologicalPlan.is_primary == True
                     )
-                ).update({ArchaeologicalPlan.is_primary: False})
+                ).values(is_primary=False)
             )
         
         # Crea record pianta
