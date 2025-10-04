@@ -25,19 +25,35 @@ class ThemeManager {
     setupEventListeners() {
         // Get theme toggle elements
         this.themeToggleBtn = document.getElementById('theme-toggle');
+        this.themeToggleMobileBtn = document.getElementById('theme-toggle-mobile');
         this.lightIcon = document.getElementById('theme-toggle-light-icon');
         this.darkIcon = document.getElementById('theme-toggle-dark-icon');
+        this.mobileLightIcon = document.getElementById('theme-toggle-mobile-light-icon');
+        this.mobileDarkIcon = document.getElementById('theme-toggle-mobile-dark-icon');
 
-        if (!this.themeToggleBtn || !this.lightIcon || !this.darkIcon) {
-            console.warn('Theme toggle elements not found in DOM');
+        // Check if any theme toggle elements exist
+        if (!this.themeToggleBtn && !this.themeToggleMobileBtn) {
+            console.warn('No theme toggle elements found in DOM');
+            return;
+        }
+
+        if ((!this.lightIcon || !this.darkIcon) && (!this.mobileLightIcon || !this.mobileDarkIcon)) {
+            console.warn('No theme toggle icons found in DOM');
             return;
         }
 
         // Apply initial theme
         this.applyTheme(this.currentTheme);
 
-        // Add click event listener
-        this.themeToggleBtn.addEventListener('click', () => this.toggleTheme());
+        // Add click event listener to desktop button if it exists
+        if (this.themeToggleBtn) {
+            this.themeToggleBtn.addEventListener('click', () => this.toggleTheme());
+        }
+
+        // Add click event listener to mobile button if it exists
+        if (this.themeToggleMobileBtn) {
+            this.themeToggleMobileBtn.addEventListener('click', () => this.toggleTheme());
+        }
 
         // Listen for system theme changes
         this.watchSystemTheme();
@@ -76,6 +92,12 @@ class ThemeManager {
         if (this.darkIcon) {
             this.darkIcon.classList.add('hidden');
         }
+        if (this.mobileLightIcon) {
+            this.mobileLightIcon.classList.remove('hidden');
+        }
+        if (this.mobileDarkIcon) {
+            this.mobileDarkIcon.classList.add('hidden');
+        }
     }
 
     showDarkIcon() {
@@ -84,6 +106,12 @@ class ThemeManager {
         }
         if (this.darkIcon) {
             this.darkIcon.classList.remove('hidden');
+        }
+        if (this.mobileLightIcon) {
+            this.mobileLightIcon.classList.add('hidden');
+        }
+        if (this.mobileDarkIcon) {
+            this.mobileDarkIcon.classList.remove('hidden');
         }
     }
 

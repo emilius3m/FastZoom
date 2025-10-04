@@ -11,7 +11,6 @@
       rel="stylesheet"
     />
 
-
     <!-- Custom Theme Styles -->
     <link href="/static/css/themes.css" rel="stylesheet">
 
@@ -34,137 +33,45 @@
   </head>
 
   <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
-    {% if current_page not in ["register", "login"] %}
+    <!-- Theme Toggle Button (Fixed Position - Always Available) -->
+    <div class="fixed top-4 right-4 z-50 flex space-x-2">
+      <button
+        id="theme-toggle"
+        type="button"
+        class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5"
+        aria-label="Toggle theme"
+        title="Cambia tema"
+      >
+        <!-- Light mode icon -->
+        <svg id="theme-toggle-light-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 2L13.09 8.26L20 9L14 14.74L15.18 21.02L10 17.77L4.82 21.02L6 14.74L0 9L6.91 8.26L10 2Z"></path>
+        </svg>
+        <!-- Dark mode icon -->
+        <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+        </svg>
+      </button>
+    </div>
+
+    {% if (current_page is not defined) or (current_page not in ["register", "login"]) %}
       {% include "partials/auth_navigation.html" %}
     {% endif %}
-      <div class="flex flex-wrap justify-between items-center max-w-screen-xl mx-auto">
-        <div class="flex justify-start items-center">
-          <!-- Logo -->
-          <a href="/" class="flex items-center space-x-3 rtl:space-x-reverse mr-4">
-            <img class="h-8 w-8" src="/static/img/logo/logo.jpg" alt="Logo">
-            <span class="self-center text-2xl font-semibold whitespace-nowrap text-gray-900 dark:text-white">Sistema Archeologico</span>
-          </a>
-        </div>
 
-        <div class="flex items-center lg:order-2 space-x-3">
-          <!-- Mobile search toggle -->
-          <button id="toggleSidebarMobileSearch" type="button" class="p-2 text-gray-500 rounded-lg lg:hidden hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">
-              <span class="sr-only">Cerca</span>
-              <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-              <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
-              </svg>
-          </button>
-
-          <!-- Notifications -->
-          <button type="button" data-dropdown-toggle="notification-dropdown" class="p-2 mr-1 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600">
-              <span class="sr-only">Visualizza notifiche</span>
-              <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 14 20"><path d="M12.133 10.632v-1.8A5.406 5.406 0 0 0 7.979 3.57.946.946 0 0 0 8 3.464V1.1a1 1 0 0 0-2 0v2.364a.946.946 0 0 0 .021.106 5.406 5.406 0 0 0-4.154 5.262v1.8C1.867 13.018 0 13.614 0 14.807 0 15.4 0 16 .538 16h12.924C14 16 14 15.4 14 14.807c0-1.193-1.867-1.789-1.867-4.175ZM3.823 17a3.453 3.453 0 0 0 6.354 0H3.823Z"/></svg>
-          </button>
-
-          <!-- User Menu -->
-          <div class="flex items-center space-x-3">
-            <span class="hidden md:block text-sm text-gray-700 dark:text-gray-300">{{ current_user.email if current_user else 'Guest' }}</span>
-            <button type="button" class="flex text-sm bg-gray-800 rounded-full md:me-0 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600" id="user-menu-button" aria-expanded="false" data-dropdown-toggle="user-dropdown" data-dropdown-placement="bottom">
-              <span class="sr-only">Open user menu</span>
-              <div class="h-8 w-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <span class="text-sm font-medium text-white">
-                  {{ current_user.email[0].upper() if current_user else 'G' }}
-                </span>
-              </div>
-            </button>
-          </div>
-
-          <!-- Desktop Navigation Menu -->
-          <div class="hidden md:flex items-center space-x-8 ml-auto">
-            <a href="/dashboard" class="text-gray-900 hover:text-blue-700 px-3 py-2 rounded-md text-sm font-medium dark:text-white md:dark:hover:text-blue-500">Dashboard</a>
-          </div>
-
-          <!-- Mobile menu button -->
-          <button data-drawer-target="logo-sidebar" data-drawer-toggle="logo-sidebar" type="button" class="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-500 rounded-lg md:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600" aria-controls="logo-sidebar" aria-expanded="false">
-            <span class="sr-only">Open main menu</span>
-            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 17 14">
-              <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 1h15M1 7h15M1 13h15"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-    <!-- Main content with proper padding for sidebar -->
-    <main class="flex-1 p-4 pt-20 sm:ml-64">
+    <!-- Main content -->
+    <main class="pt-20 {% if layout_type == 'sidebar' %}flex-1 p-4 pt-20 sm:ml-64{% else %}min-h-screen{% endif %}">
       {% block content %}{% endblock %}
     </main>
 
     <!-- Components -->
     <script type="text/javascript" src="/static/js/components.js"></script>
 
-    <!-- Theme Toggle Script -->
-    <script>
-       // Simple theme toggle functionality
-       document.addEventListener('DOMContentLoaded', function() {
-         const htmlElement = document.documentElement;
-         const themeToggleBtn = document.getElementById('theme-toggle');
-         const themeToggleMobileBtn = document.getElementById('theme-toggle-mobile');
-         const lightIcon = document.getElementById('theme-toggle-light-icon');
-         const darkIcon = document.getElementById('theme-toggle-dark-icon');
-         const mobileLightIcon = document.getElementById('theme-toggle-mobile-light-icon');
-         const mobileDarkIcon = document.getElementById('theme-toggle-mobile-dark-icon');
-
-         // Check for saved theme preference or default to light mode
-         let currentTheme = localStorage.getItem('theme') || 'light';
-
-         // Apply initial theme
-         function applyTheme(theme) {
-           const htmlElement = document.documentElement;
-
-           if (theme === 'dark') {
-             htmlElement.classList.add('dark');
-             // Desktop icons
-             if (lightIcon) lightIcon.classList.add('hidden');
-             if (darkIcon) darkIcon.classList.remove('hidden');
-             // Mobile icons
-             if (mobileLightIcon) mobileLightIcon.classList.add('hidden');
-             if (mobileDarkIcon) mobileDarkIcon.classList.remove('hidden');
-           } else {
-             htmlElement.classList.remove('dark');
-             // Desktop icons
-             if (lightIcon) lightIcon.classList.remove('hidden');
-             if (darkIcon) darkIcon.classList.add('hidden');
-             // Mobile icons
-             if (mobileLightIcon) mobileLightIcon.classList.remove('hidden');
-             if (mobileDarkIcon) mobileDarkIcon.classList.add('hidden');
-           }
-
-           currentTheme = theme;
-           localStorage.setItem('theme', theme);
-
-           console.log('Theme applied:', theme);
-         }
-
-         // Apply initial theme
-         applyTheme(currentTheme);
-
-         // Toggle theme function
-         function toggleTheme() {
-           const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-           applyTheme(newTheme);
-           console.log('Theme toggled to:', newTheme);
-         }
-
-         // Desktop theme toggle button
-         if (themeToggleBtn) {
-           themeToggleBtn.addEventListener('click', toggleTheme);
-         }
-
-         // Mobile theme toggle button
-         if (themeToggleMobileBtn) {
-           themeToggleMobileBtn.addEventListener('click', toggleTheme);
-         }
-
-         console.log('Theme initialization completed');
-       });
-     </script>
-
-
+    <!-- Theme Management -->
+    <script type="text/javascript" src="/static/js/theme.js"></script>
 
     {% block additional_scripts %}{% endblock %}
+
+    {% if current_user %}
+    {% include "partials/profile_modal.html" %}
+    {% endif %}
   </body>
 </html>
