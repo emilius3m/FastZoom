@@ -37,7 +37,30 @@ sites_router.include_router(storage_router, tags=["storage"])
 sites_router.include_router(deepzoom_router, tags=["deepzoom"])
 sites_router.include_router(team_router, tags=["team"])
 
+# === UTILITIES ===
 
+def get_base_context(
+    request: Request,
+    site: ArchaeologicalSite,
+    permission: UserSitePermission,
+    current_user: User,
+    user_sites: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Restituisce il context base comune a tutti gli endpoint dei siti"""
+    return {
+        "request": request,
+        "site": site,
+        "user_permission": permission,
+        "current_user": current_user,
+        "sites": user_sites,
+        "sites_count": len(user_sites),
+        "current_site_name": site.name if site else None,
+        "user_email": current_user.email if current_user else None,
+        "user_type": "superuser" if current_user and current_user.is_superuser else "user",
+        "can_read": permission.can_read(),
+        "can_write": permission.can_write(),
+        "can_admin": permission.can_admin()
+    }
 # === SHARED DEPENDENCY ===
 
 async def get_site_access(
@@ -111,24 +134,14 @@ async def site_dashboard(
     # Team del sito
     team_members = await get_site_team(db, site_id)
 
+    base_context = get_base_context(request, site, permission, current_user, user_sites)
+
     context = {
-        "request": request,
-        "site": site,
-        "user_permission": permission,
-        "current_user": current_user,
+        **base_context,
         "stats": stats,
         "recent_activities": recent_activities,
         "recent_photos": recent_photos,
-        "team_members": team_members,
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin(),
-        "sites": user_sites,
-        "sites_count": len(user_sites),
-        "current_site_name": site.name if site else None,
-        "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user"
-
+        "team_members": team_members
     }
 
 
@@ -187,11 +200,10 @@ async def site_photos(
     user = await db.execute(user_query)
     current_user = user.scalar_one_or_none()
 
+    base_context = get_base_context(request, site, permission, current_user, user_sites)
+
     context = {
-        "request": request,
-        "site": site,
-        "user_permission": permission,
-        "current_user": current_user,
+        **base_context,
         "user_role": permission.permission_level.value,
         "photos": [photo.to_dict() for photo in photos],
         "current_page": page,
@@ -199,13 +211,8 @@ async def site_photos(
         "total_photos": total_photos,
         "total_pages": (total_photos + per_page - 1) // per_page,
         "current_photo_type": category,
-        "categories": categories,
-        "can_write": permission.can_write(),
-        "sites": user_sites,
-        "sites_count": len(user_sites),
-        "current_site_name": site.name if site else None,
-        "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user"
+        "categories": categories
+
     }
 
     return templates.TemplateResponse("sites/photos.html", context)
