@@ -21,6 +21,7 @@ from app.services.photo_service import photo_metadata_service
 from app.services.archaeological_minio_service import archaeological_minio_service
 from app.services.deep_zoom_minio_service import deep_zoom_minio_service
 from app.services.storage_management_service import storage_management_service
+from app.services.photo_serving_service import photo_serving_service
 
 photos_router = APIRouter()
 
@@ -292,28 +293,14 @@ async def stream_photo_from_minio(
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Stream foto da MinIO con URL pre-firmato"""
+    """Stream foto da MinIO con URL pre-firmato - CONSOLIDATED"""
     site, permission = site_access
 
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi richiesti")
 
-    photo = await db.execute(
-        select(Photo).where(
-            and_(Photo.id == photo_id, Photo.site_id == site_id)
-        )
-    )
-    photo = photo.scalar_one_or_none()
-
-    if not photo or not photo.file_path.startswith('minio://'):
-        raise HTTPException(status_code=404, detail="Foto non trovata")
-
-    stream_url = await archaeological_minio_service.get_photo_stream_url(photo.file_path)
-
-    if not stream_url:
-        raise HTTPException(status_code=500, detail="Errore generazione URL")
-
-    return RedirectResponse(url=stream_url, status_code=302)
+    # Use consolidated photo serving service for consistent behavior
+    return await photo_serving_service.serve_photo_full(photo_id, db)
 
 
 @photos_router.get("/{site_id}/photos/{photo_id}/thumbnail")
@@ -323,28 +310,14 @@ async def get_photo_thumbnail(
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Ottieni thumbnail foto da MinIO"""
+    """Ottieni thumbnail foto da MinIO - CONSOLIDATED"""
     site, permission = site_access
 
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi richiesti")
 
-    photo = await db.execute(
-        select(Photo).where(
-            and_(Photo.id == photo_id, Photo.site_id == site_id)
-        )
-    )
-    photo = photo.scalar_one_or_none()
-
-    if not photo:
-        raise HTTPException(status_code=404, detail="Foto non trovata")
-
-    thumbnail_url = await archaeological_minio_service.get_thumbnail_url(str(photo_id))
-
-    if not thumbnail_url:
-        raise HTTPException(status_code=500, detail="Errore generazione URL thumbnail")
-
-    return RedirectResponse(url=thumbnail_url, status_code=302)
+    # Use consolidated photo serving service
+    return await photo_serving_service.serve_photo_thumbnail(photo_id, db)
 
 
 @photos_router.get("/{site_id}/photos/{photo_id}/full")
@@ -354,28 +327,14 @@ async def get_photo_full(
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Ottieni immagine completa foto da MinIO"""
+    """Ottieni immagine completa foto da MinIO - CONSOLIDATED"""
     site, permission = site_access
 
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi richiesti")
 
-    photo = await db.execute(
-        select(Photo).where(
-            and_(Photo.id == photo_id, Photo.site_id == site_id)
-        )
-    )
-    photo = photo.scalar_one_or_none()
-
-    if not photo:
-        raise HTTPException(status_code=404, detail="Foto non trovata")
-
-    full_url = await archaeological_minio_service.get_photo_stream_url(photo.file_path)
-
-    if not full_url:
-        raise HTTPException(status_code=500, detail="Errore generazione URL immagine")
-
-    return RedirectResponse(url=full_url, status_code=302)
+    # Use consolidated photo serving service
+    return await photo_serving_service.serve_photo_full(photo_id, db)
 
 
 @photos_router.get("/{site_id}/api/photos/search")

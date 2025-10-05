@@ -26,7 +26,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from loguru import logger
 
 from app.database.session import get_async_session
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
 from app.models.users import User
 from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission
@@ -45,7 +45,6 @@ sites_router = APIRouter(prefix="/sites", tags=["sites"])
 
 # Include hierarchical ICCD API endpoints
 sites_router.include_router(iccd_hierarchy_router, prefix="/{site_id}")
-from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
 
 # Include refactored API sub-routers
 sites_router.include_router(dashboard_router, tags=["dashboard"])
@@ -58,181 +57,15 @@ sites_router.include_router(team_router, tags=["team"])
 # Helper functions to reduce code duplication and improve maintainability
 # These functions centralize common operations used across multiple endpoints
 
-def get_base_context(
-    request: Request,
-    site: ArchaeologicalSite,
-    permission: UserSitePermission,
-    current_user: User,
-    user_sites: List[Dict[str, Any]]
-) -> Dict[str, Any]:
-    """Create comprehensive base context for site endpoints.
-
-    This function centralizes all common context data needed across
-    all site-related endpoints, reducing code duplication and ensuring
-    consistency.
-
-    Args:
-        request: FastAPI request object
-        site: Archaeological site object
-        permission: User's site permissions
-        current_user: Authenticated user object
-        user_sites: List of user's accessible sites
-
-    Returns:
-        Dictionary containing all base context data for templates
-    """
-    return {
-        "request": request,
-        "site": site,
-        "user_permission": permission,
-        "current_user": current_user,
-        "sites": user_sites,
-        "sites_count": len(user_sites),
-        "current_site_name": site.name if site else None,
-        "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user",
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin()
-    }
-
-
-async def get_current_user_with_context(
-    current_user_id: UUID,
-    db: AsyncSession
-) -> User:
-    """Retrieve current user with centralized error handling.
-
-    Args:
-        current_user_id: UUID of the current user
-        db: Database session
-
-    Returns:
-        User object with error handling for not found cases
-
-    Raises:
-        HTTPException: If user is not found
-    """
-    """Helper function to get current user with error handling"""
-    user_query = select(User).where(User.id == current_user_id)
-    user = await db.execute(user_query)
-    current_user = user.scalar_one_or_none()
-
-    if not current_user:
-        raise HTTPException(status_code=404, detail="Utente non trovato")
-
-    return current_user
-
-
-def create_user_context(
-    current_user: User,
-    user_sites: List[Dict[str, Any]]
-) -> Dict[str, Any]:
-    """Create standardized user context for templates.
-
-    Args:
-        current_user: The authenticated user object
-        user_sites: List of accessible sites for the user
-
-    Returns:
-        Dictionary containing user context information for templates
-    """
-    return {
-        "sites": user_sites,
-        "sites_count": len(user_sites),
-        "current_site_name": None,  # Will be set by caller if needed
-        "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user"
-    }
-
-
-def handle_permission_denied(action: str = "eseguire questa operazione") -> HTTPException:
-    """Create standardized permission denied error response.
-
-    Args:
-        action: Description of the action that was denied
-
-    Returns:
-        HTTPException with 403 status code and localized message
-    """
-    return HTTPException(
-        status_code=403,
-        detail=f"Permessi insufficienti per {action}"
-    )
-
-
-def handle_resource_not_found(resource: str = "Risorsa") -> HTTPException:
-    """Create standardized resource not found error response.
-
-    Args:
-        resource: Name of the resource that was not found
-
-    Returns:
-        HTTPException with 404 status code and localized message
-    """
-    return HTTPException(
-        status_code=404,
-        detail=f"{resource} non trovato"
-    )
-# === SHARED DEPENDENCY ===
-# Centralized dependency for site access validation
-# This dependency is used across all site endpoints to ensure consistent access control
-
-async def get_site_access(
-        site_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
-) -> tuple[ArchaeologicalSite, UserSitePermission]:
-    """Validate user access to site and return site with permissions.
-
-    This dependency function performs comprehensive access validation:
-    1. Verifies site exists
-    2. Checks user permissions for the site
-    3. Validates permission is active and not expired
-
-    Args:
-        site_id: UUID of the site to access
-        current_user_id: UUID of the current user (injected)
-        db: Database session (injected)
-
-    Returns:
-        Tuple of (ArchaeologicalSite, UserSitePermission)
-
-    Raises:
-        HTTPException: If site not found (404) or access denied (403)
-    """
-
-    # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
-    site = await db.execute(site_query)
-    site = site.scalar_one_or_none()
-
-    if not site:
-        raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
-
-    # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
-            UserSitePermission.is_active == True,
-            or_(
-                UserSitePermission.expires_at.is_(None),
-                UserSitePermission.expires_at > func.now()
-            )
-        )
-    )
-
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
-
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
-        )
-
-    return site, permission
+# Import shared utilities for consolidated router patterns
+from app.routes.shared.router_utils import (
+    get_base_context,
+    get_current_user_with_context,
+    create_user_context,
+    handle_permission_denied,
+    handle_resource_not_found,
+    get_site_access
+)
 
 
 # === HTML VIEW ENDPOINTS ===
