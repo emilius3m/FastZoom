@@ -273,10 +273,60 @@ async def get_site_photos_api(
 async def upload_photo(
         site_id: UUID,
         photos: List[UploadFile] = File(...),
+        # Basic metadata
         title: Optional[str] = Form(None),
         description: Optional[str] = Form(None),
         photo_type: Optional[str] = Form(None),
         photographer: Optional[str] = Form(None),
+        keywords: Optional[str] = Form(None),
+        
+        # Archaeological metadata
+        inventory_number: Optional[str] = Form(None),
+        old_inventory_number: Optional[str] = Form(None),
+        catalog_number: Optional[str] = Form(None),
+        excavation_area: Optional[str] = Form(None),
+        stratigraphic_unit: Optional[str] = Form(None),
+        grid_square: Optional[str] = Form(None),
+        depth_level: Optional[float] = Form(None),
+        find_date: Optional[str] = Form(None),
+        finder: Optional[str] = Form(None),
+        excavation_campaign: Optional[str] = Form(None),
+        
+        # Material and object
+        material: Optional[str] = Form(None),
+        material_details: Optional[str] = Form(None),
+        object_type: Optional[str] = Form(None),
+        object_function: Optional[str] = Form(None),
+        
+        # Dimensions
+        length_cm: Optional[float] = Form(None),
+        width_cm: Optional[float] = Form(None),
+        height_cm: Optional[float] = Form(None),
+        diameter_cm: Optional[float] = Form(None),
+        weight_grams: Optional[float] = Form(None),
+        
+        # Chronology
+        chronology_period: Optional[str] = Form(None),
+        chronology_culture: Optional[str] = Form(None),
+        dating_from: Optional[str] = Form(None),
+        dating_to: Optional[str] = Form(None),
+        dating_notes: Optional[str] = Form(None),
+        
+        # Conservation
+        conservation_status: Optional[str] = Form(None),
+        conservation_notes: Optional[str] = Form(None),
+        restoration_history: Optional[str] = Form(None),
+        
+        # References
+        bibliography: Optional[str] = Form(None),
+        comparative_references: Optional[str] = Form(None),
+        external_links: Optional[str] = Form(None),
+        
+        # Rights
+        copyright_holder: Optional[str] = Form(None),
+        license_type: Optional[str] = Form(None),
+        usage_rights: Optional[str] = Form(None),
+        
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
@@ -314,7 +364,110 @@ async def upload_photo(
                     file, filename
                 )
 
-                # 4. Crea record nel database
+                # 4. Prepara TUTTI i metadati archeologici da form utente
+                archaeological_metadata_from_form = {}
+                
+                # Basic metadata
+                if title:
+                    archaeological_metadata_from_form['title'] = title
+                if description:
+                    archaeological_metadata_from_form['description'] = description
+                if photographer:
+                    archaeological_metadata_from_form['photographer'] = photographer
+                if keywords:
+                    archaeological_metadata_from_form['keywords'] = keywords
+                if photo_type:
+                    archaeological_metadata_from_form['photo_type'] = photo_type
+                
+                # Archaeological context
+                if inventory_number:
+                    archaeological_metadata_from_form['inventory_number'] = inventory_number
+                if old_inventory_number:
+                    archaeological_metadata_from_form['old_inventory_number'] = old_inventory_number
+                if catalog_number:
+                    archaeological_metadata_from_form['catalog_number'] = catalog_number
+                if excavation_area:
+                    archaeological_metadata_from_form['excavation_area'] = excavation_area
+                if stratigraphic_unit:
+                    archaeological_metadata_from_form['stratigraphic_unit'] = stratigraphic_unit
+                if grid_square:
+                    archaeological_metadata_from_form['grid_square'] = grid_square
+                if depth_level is not None:
+                    archaeological_metadata_from_form['depth_level'] = depth_level
+                if find_date:
+                    try:
+                        archaeological_metadata_from_form['find_date'] = datetime.fromisoformat(find_date.replace('Z', '+00:00'))
+                    except ValueError:
+                        try:
+                            archaeological_metadata_from_form['find_date'] = datetime.strptime(find_date, '%Y-%m-%d')
+                        except ValueError:
+                            logger.warning(f"Invalid find_date format: {find_date}")
+                if finder:
+                    archaeological_metadata_from_form['finder'] = finder
+                if excavation_campaign:
+                    archaeological_metadata_from_form['excavation_campaign'] = excavation_campaign
+                
+                # Material and object
+                if material:
+                    archaeological_metadata_from_form['material'] = material
+                if material_details:
+                    archaeological_metadata_from_form['material_details'] = material_details
+                if object_type:
+                    archaeological_metadata_from_form['object_type'] = object_type
+                if object_function:
+                    archaeological_metadata_from_form['object_function'] = object_function
+                
+                # Dimensions
+                if length_cm is not None:
+                    archaeological_metadata_from_form['length_cm'] = length_cm
+                if width_cm is not None:
+                    archaeological_metadata_from_form['width_cm'] = width_cm
+                if height_cm is not None:
+                    archaeological_metadata_from_form['height_cm'] = height_cm
+                if diameter_cm is not None:
+                    archaeological_metadata_from_form['diameter_cm'] = diameter_cm
+                if weight_grams is not None:
+                    archaeological_metadata_from_form['weight_grams'] = weight_grams
+                
+                # Chronology
+                if chronology_period:
+                    archaeological_metadata_from_form['chronology_period'] = chronology_period
+                if chronology_culture:
+                    archaeological_metadata_from_form['chronology_culture'] = chronology_culture
+                if dating_from:
+                    archaeological_metadata_from_form['dating_from'] = dating_from
+                if dating_to:
+                    archaeological_metadata_from_form['dating_to'] = dating_to
+                if dating_notes:
+                    archaeological_metadata_from_form['dating_notes'] = dating_notes
+                
+                # Conservation
+                if conservation_status:
+                    archaeological_metadata_from_form['conservation_status'] = conservation_status
+                if conservation_notes:
+                    archaeological_metadata_from_form['conservation_notes'] = conservation_notes
+                if restoration_history:
+                    archaeological_metadata_from_form['restoration_history'] = restoration_history
+                
+                # References
+                if bibliography:
+                    archaeological_metadata_from_form['bibliography'] = bibliography
+                if comparative_references:
+                    archaeological_metadata_from_form['comparative_references'] = comparative_references
+                if external_links:
+                    archaeological_metadata_from_form['external_links'] = external_links
+                
+                # Rights
+                if copyright_holder:
+                    archaeological_metadata_from_form['copyright_holder'] = copyright_holder
+                if license_type:
+                    archaeological_metadata_from_form['license_type'] = license_type
+                if usage_rights:
+                    archaeological_metadata_from_form['usage_rights'] = usage_rights
+                
+                logger.info(f"📋 Complete metadata for {file.filename}: {list(archaeological_metadata_from_form.keys())}")
+                
+                # 5. Crea record nel database CON metadati archeologici
                 photo_record = await photo_metadata_service.create_photo_record(
                     filename=filename,
                     original_filename=file.filename,
@@ -322,21 +475,9 @@ async def upload_photo(
                     file_size=file_size,
                     site_id=str(site_id),
                     uploaded_by=str(current_user_id),
-                    metadata=metadata
+                    metadata=metadata,
+                    archaeological_metadata=archaeological_metadata_from_form
                 )
-
-                # 5. Sovrascrivi metadati forniti dall'utente
-                if title:
-                    photo_record.title = title
-                if description:
-                    photo_record.description = description
-                if photographer:
-                    photo_record.photographer = photographer
-                if photo_type:
-                    try:
-                        photo_record.photo_type = PhotoType(photo_type)
-                    except ValueError:
-                        logger.warning(f"Tipo foto non valido: {photo_type}")
 
                 # 6. Salva nel database PRIMA di generare il thumbnail
                 db.add(photo_record)
@@ -467,10 +608,17 @@ async def upload_photo(
             
             logger.info(f"✅ Batch tiles processing schedulato per {len(photos_needing_tiles)} foto")
 
-        return JSONResponse({
+        # Ritorna risposta con info foto E ID per batch processing
+        response_data = {
             "message": f"{len(uploaded_photos)} foto caricate con successo",
-            "uploaded_photos": uploaded_photos
-        })
+            "uploaded_photos": uploaded_photos,
+            "total_uploaded": len(uploaded_photos),
+            "photos_needing_tiles": len(photos_needing_tiles)
+        }
+        
+        logger.info(f"✅ Upload API response: {len(uploaded_photos)} foto caricate, {len(photos_needing_tiles)} necessitano tiles")
+        
+        return JSONResponse(response_data)
 
     except HTTPException:
         raise

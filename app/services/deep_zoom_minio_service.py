@@ -171,6 +171,7 @@ class DeepZoomMinIOService:
         """
         Processa un batch di foto SEQUENZIALMENTE (una alla volta)
         DOPO che tutti gli upload sono completati
+        Invia notifiche WebSocket per ogni foto completata
         
         Args:
             photos_list: Lista di dict con photo_id, file_path, archaeological_metadata
@@ -178,6 +179,14 @@ class DeepZoomMinIOService:
         """
         total_photos = len(photos_list)
         logger.info(f"🚀 BATCH PROCESSING STARTED: {total_photos} foto da processare sequenzialmente")
+        
+        # Import notification manager
+        try:
+            from app.routes.api.notifications_ws import notification_manager
+            has_websocket = True
+        except ImportError:
+            logger.warning("Notification manager not available")
+            has_websocket = False
         
         completed_count = 0
         failed_count = 0
@@ -189,8 +198,23 @@ class DeepZoomMinIOService:
             width = photo_info.get('width', 0)
             height = photo_info.get('height', 0)
             
+            # Estrai filename dall'ultimo segmento del file_path
+            filename = file_path.split('/')[-1] if '/' in file_path else file_path
+            
             try:
                 logger.info(f"🔄 [{idx}/{total_photos}] Processing tiles for photo {photo_id} ({width}x{height})")
+                
+                # Invia notifica inizio processing
+                if has_websocket:
+                    await notification_manager.broadcast_tiles_progress(
+                        site_id=site_id,
+                        photo_id=photo_id,
+                        status='processing',
+                        progress=0,
+                        photo_filename=filename,
+                        current_photo=idx,
+                        total_photos=total_photos
+                    )
                 
                 # Carica file da MinIO
                 from app.services.archaeological_minio_service import archaeological_minio_service
@@ -207,6 +231,25 @@ class DeepZoomMinIOService:
                 completed_count += 1
                 logger.info(f"✅ [{idx}/{total_photos}] Tiles completati per photo {photo_id} - Progresso: {completed_count}/{total_photos}")
                 
+                # Ottieni info finali sui tiles
+                tile_info = await self.get_deep_zoom_info(site_id, photo_id)
+                tile_count = tile_info.get('total_tiles', 0) if tile_info else 0
+                levels = tile_info.get('levels', 0) if tile_info else 0
+                
+                # Invia notifica completamento
+                if has_websocket:
+                    await notification_manager.broadcast_tiles_progress(
+                        site_id=site_id,
+                        photo_id=photo_id,
+                        status='completed',
+                        progress=100,
+                        photo_filename=filename,
+                        tile_count=tile_count,
+                        levels=levels,
+                        current_photo=idx,
+                        total_photos=total_photos
+                    )
+                
             except Exception as e:
                 failed_count += 1
                 logger.error(f"❌ [{idx}/{total_photos}] Tiles falliti per photo {photo_id}: {e}")
@@ -216,6 +259,19 @@ class DeepZoomMinIOService:
                 await self._update_processing_status(
                     photo_id, site_id, "failed", 0, error=str(e)
                 )
+                
+                # Invia notifica errore
+                if has_websocket:
+                    await notification_manager.broadcast_tiles_progress(
+                        site_id=site_id,
+                        photo_id=photo_id,
+                        status='failed',
+                        progress=0,
+                        photo_filename=filename,
+                        current_photo=idx,
+                        total_photos=total_photos,
+                        error=str(e)
+                    )
         
         logger.info(
             f"🎉 BATCH PROCESSING COMPLETED: {completed_count} successi, {failed_count} fallimenti su {total_photos} foto totali"

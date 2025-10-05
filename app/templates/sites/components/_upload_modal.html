@@ -465,44 +465,92 @@ document.addEventListener('alpine:init', () => {
             this.uploadResults = [];
             
             const totalFiles = this.selectedFiles.length;
-            console.log(`🚀 Starting upload of ${totalFiles} files`);
+            console.log(`🚀 Starting BATCH upload of ${totalFiles} files`);
             
-            for (let i = 0; i < this.selectedFiles.length; i++) {
-                const fileData = this.selectedFiles[i];
+            try {
+                // NUOVO: Carica TUTTE le foto in UNA SOLA chiamata API
+                const uploadResponse = await this.uploadAllFilesInBatch();
                 
-                // Update progress to show current file being uploaded
-                const baseProgress = Math.round((i / totalFiles) * 100);
-                this.uploadProgress = baseProgress;
-                
-                console.log(`📤 Uploading file ${i + 1}/${totalFiles}: ${fileData.name}`);
-                
-                try {
-                    const uploadResponse = await this.uploadSingleFileWithProgress(fileData, i, totalFiles);
-                    this.uploadResults.push({
-                        filename: fileData.name,
-                        success: true,
-                        photo_id: uploadResponse?.photo_id || uploadResponse?.id // ID della foto caricata
+                // Process results
+                if (uploadResponse && uploadResponse.uploaded_photos) {
+                    uploadResponse.uploaded_photos.forEach(photoData => {
+                        this.uploadResults.push({
+                            filename: photoData.filename,
+                            success: true,
+                            photo_id: photoData.photo_id
+                        });
                     });
-                    console.log(`✅ Successfully uploaded: ${fileData.name}`);
-                } catch (error) {
+                    
+                    this.uploadedFiles = uploadResponse.uploaded_photos.length;
+                    this.uploadProgress = 100;
+                    
+                    console.log(`✅ Batch upload successful: ${this.uploadedFiles}/${totalFiles} files`);
+                } else {
+                    throw new Error('Invalid response from server');
+                }
+                
+            } catch (error) {
+                console.error(`❌ Batch upload failed:`, error);
+                // Mark all as failed if batch fails
+                this.selectedFiles.forEach(fileData => {
                     this.uploadResults.push({
                         filename: fileData.name,
                         success: false,
                         error: error.message
                     });
-                    console.error(`❌ Failed to upload: ${fileData.name}`, error);
-                }
-                
-                this.uploadedFiles++;
-                this.uploadProgress = Math.round((this.uploadedFiles / totalFiles) * 100);
-                
-                // Small delay to show progress visually
-                await new Promise(resolve => setTimeout(resolve, 100));
+                });
             }
             
             this.isUploading = false;
             this.uploadComplete = true;
             console.log(`🎉 Upload completed: ${this.uploadResults.filter(r => r.success).length}/${totalFiles} successful`);
+        },
+        
+        async uploadAllFilesInBatch() {
+            // Create FormData with ALL files
+            const formData = new FormData();
+            
+            // Add ALL files to the same FormData
+            this.selectedFiles.forEach(fileData => {
+                formData.append('photos', fileData.file);
+            });
+            
+            // Add metadata from form component (applied to all photos)
+            const metadataFormComponent = this.$refs.metadataForm?.querySelector('[x-data]')?._x_dataStack?.[0];
+            const currentMetadata = metadataFormComponent ? metadataFormComponent.getMetadata() : this.metadata;
+            
+            console.log('📋 Metadata to send:', currentMetadata);
+            
+            // Append metadata fields to FormData
+            Object.keys(currentMetadata).forEach(key => {
+                const value = currentMetadata[key];
+                if (value !== null && value !== undefined && value !== '') {
+                    // Convert arrays (like keywords) to comma-separated strings
+                    if (Array.isArray(value)) {
+                        formData.append(key, value.join(', '));
+                    } else {
+                        formData.append(key, value);
+                    }
+                    console.log(`  ${key}: ${value}`);
+                }
+            });
+            
+            console.log(`📦 Sending batch request with ${this.selectedFiles.length} files + metadata`);
+            
+            // Single API call with all files
+            const response = await fetch(`/sites/{{ site.id }}/api/photos/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${response.statusText}`);
+            }
+            
+            const responseData = await response.json();
+            console.log('📤 Batch upload response:', responseData);
+            
+            return responseData;
         },
         
         async uploadSingleFileWithProgress(fileData, index, total) {
@@ -584,30 +632,26 @@ document.addEventListener('alpine:init', () => {
             return responseData;
         },
         
-        // 🔧 FUNZIONE FINISHUPLOAD CORRETTA CON AVVIO PROCESSI BACKGROUND
+        // 🔧 FUNZIONE FINISHUPLOAD CORRETTA CON RESET STATO
         finishUpload() {
+            // Raccogli gli ID delle foto caricate con successo
+            const uploadedPhotoIds = this.uploadResults
+                .filter(result => result.success && result.photo_id)
+                .map(result => result.photo_id);
+            
+            console.log('📸 Finishing upload for photos:', uploadedPhotoIds);
+            
             // Accesso sicuro al parent component
             const parent = this.getParentComponent();
             if (parent) {
-                if (parent.showUploadModal !== undefined) {
-                    parent.showUploadModal = false;
-                }
-                
-                // Avvia processi background per le foto caricate
-                const uploadedPhotoIds = this.uploadResults
-                    .filter(result => result.success && result.photo_id)
-                    .map(result => result.photo_id);
-                
-                console.log('📸 Starting background processes for uploaded photos:', uploadedPhotoIds);
-                
                 // Avvia il refresh con gli ID delle foto caricate
                 if (parent.refreshPhotos && typeof parent.refreshPhotos === 'function') {
                     parent.refreshPhotos(uploadedPhotoIds);
                 }
                 
-                // Avvia monitoraggio processi background
-                if (uploadedPhotoIds.length > 0 && parent.startMonitoringNewPhotos) {
-                    parent.startMonitoringNewPhotos(uploadedPhotoIds);
+                // Chiudi modal
+                if (parent.showUploadModal !== undefined) {
+                    parent.showUploadModal = false;
                 }
             }
             
@@ -615,11 +659,12 @@ document.addEventListener('alpine:init', () => {
             this.$dispatch('close-upload-modal');
             this.$dispatch('photos-uploaded', { photoIds: uploadedPhotoIds });
             
-            // Reset stato
-            this.resetUploadState();
+            // IMPORTANTE: Reset stato DOPO aver comunicato con parent
+            setTimeout(() => {
+                this.resetUploadState();
+            }, 100);
             
-            // Non fare reload automatico per permettere il monitoraggio dei processi
-            console.log('✅ Upload completed successfully, background processing started');
+            console.log('✅ Upload modal closed, background processing will start');
         }
     }));
 });

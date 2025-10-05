@@ -43,6 +43,8 @@ from app.routes.api.iccd_records import iccd_router
 #from app.routes.iccd_api import router as iccd_api_router
 # 🌍 NUOVO IMPORT - Router Geographic Maps API
 from app.routes.api.geographic_maps import geographic_maps_router
+# 📡 NUOVO IMPORT - Router WebSocket Notifications
+from app.routes.api.notifications_ws import notifications_router
 
 
 
@@ -145,6 +147,12 @@ app.include_router(
     geographic_maps_router,
     tags=["geographic-maps"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+)
+
+# 📡 INCLUSIONE ROUTER WEBSOCKET NOTIFICATIONS - WebSocket per notifiche real-time
+app.include_router(
+    notifications_router,
+    tags=["websocket-notifications"]
 )
 
 # Router esistenti
