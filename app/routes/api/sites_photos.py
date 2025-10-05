@@ -29,39 +29,225 @@ photos_router = APIRouter()
 @photos_router.get("/{site_id}/api/photos")
 async def get_site_photos_api(
         site_id: UUID,
-        page: int = 1,
-        per_page: int = 100,
-        category: str = None,
+        # Basic filters
         search: str = None,
+        photo_type: str = None,
+        
+        # Archaeological filters
+        material: str = None,
+        conservation_status: str = None,
+        excavation_area: str = None,
+        stratigraphic_unit: str = None,
+        chronology_period: str = None,
+        object_type: str = None,
+        
+        # Status filters
+        is_published: bool = None,
+        is_validated: bool = None,
+        has_deep_zoom: bool = None,
+        
+        # Date filters
+        upload_date_from: str = None,
+        upload_date_to: str = None,
+        photo_date_from: str = None,
+        photo_date_to: str = None,
+        find_date_from: str = None,
+        find_date_to: str = None,
+        
+        # Dimension filters
+        min_width: int = None,
+        max_width: int = None,
+        min_height: int = None,
+        max_height: int = None,
+        min_file_size_mb: float = None,
+        max_file_size_mb: float = None,
+        
+        # Metadata presence filters
+        has_inventory: bool = None,
+        has_description: bool = None,
+        has_photographer: bool = None,
+        
+        # Sorting
+        sort_by: str = "created_desc",
+        
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """API per ottenere lista foto del sito in formato JSON"""
+    """
+    API avanzata per ottenere foto del sito con filtri archeologici completi
+    
+    Filtri disponibili:
+    - Basic: search, photo_type
+    - Archaeological: material, conservation_status, excavation_area, chronology_period
+    - Status: is_published, is_validated, has_deep_zoom
+    - Date ranges: upload_date, photo_date, find_date
+    - Dimensions: width, height, file_size
+    - Metadata presence: has_inventory, has_description, has_photographer
+    """
     site, permission = site_access
 
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi insufficienti")
 
-    # Query foto
+    # Base query
     photos_query = select(Photo).where(Photo.site_id == site_id)
 
-    if category:
-        photos_query = photos_query.where(Photo.photo_type == category)
-
+    # Apply filters
     if search:
         search_term = f"%{search}%"
         photos_query = photos_query.where(
             or_(
                 Photo.filename.ilike(search_term),
                 Photo.title.ilike(search_term),
-                Photo.description.ilike(search_term)
+                Photo.description.ilike(search_term),
+                Photo.inventory_number.ilike(search_term),
+                Photo.keywords.ilike(search_term)
             )
         )
 
-    # Ordina per data di upload (più recenti prima)
-    photos_query = photos_query.order_by(Photo.created.desc())
+    if photo_type:
+        try:
+            photos_query = photos_query.where(Photo.photo_type == PhotoType(photo_type))
+        except ValueError:
+            pass
 
-    # Get all photos (we'll handle pagination on frontend if needed)
+    if material:
+        try:
+            photos_query = photos_query.where(Photo.material == MaterialType(material))
+        except ValueError:
+            pass
+
+    if conservation_status:
+        try:
+            photos_query = photos_query.where(Photo.conservation_status == ConservationStatus(conservation_status))
+        except ValueError:
+            pass
+
+    if excavation_area:
+        photos_query = photos_query.where(Photo.excavation_area.ilike(f"%{excavation_area}%"))
+
+    if stratigraphic_unit:
+        photos_query = photos_query.where(Photo.stratigraphic_unit.ilike(f"%{stratigraphic_unit}%"))
+
+    if chronology_period:
+        photos_query = photos_query.where(Photo.chronology_period.ilike(f"%{chronology_period}%"))
+
+    if object_type:
+        photos_query = photos_query.where(Photo.object_type.ilike(f"%{object_type}%"))
+
+    # Status filters
+    if is_published is not None:
+        photos_query = photos_query.where(Photo.is_published == is_published)
+
+    if is_validated is not None:
+        photos_query = photos_query.where(Photo.is_validated == is_validated)
+
+    if has_deep_zoom is not None:
+        photos_query = photos_query.where(Photo.has_deep_zoom == has_deep_zoom)
+
+    # Date range filters
+    if upload_date_from:
+        try:
+            date_from = datetime.fromisoformat(upload_date_from)
+            photos_query = photos_query.where(Photo.created >= date_from)
+        except ValueError:
+            pass
+
+    if upload_date_to:
+        try:
+            date_to = datetime.fromisoformat(upload_date_to)
+            photos_query = photos_query.where(Photo.created <= date_to)
+        except ValueError:
+            pass
+
+    if photo_date_from:
+        try:
+            date_from = datetime.fromisoformat(photo_date_from)
+            photos_query = photos_query.where(Photo.photo_date >= date_from)
+        except ValueError:
+            pass
+
+    if photo_date_to:
+        try:
+            date_to = datetime.fromisoformat(photo_date_to)
+            photos_query = photos_query.where(Photo.photo_date <= date_to)
+        except ValueError:
+            pass
+
+    if find_date_from:
+        try:
+            date_from = datetime.fromisoformat(find_date_from)
+            photos_query = photos_query.where(Photo.find_date >= date_from)
+        except ValueError:
+            pass
+
+    if find_date_to:
+        try:
+            date_to = datetime.fromisoformat(find_date_to)
+            photos_query = photos_query.where(Photo.find_date <= date_to)
+        except ValueError:
+            pass
+
+    # Dimension filters
+    if min_width:
+        photos_query = photos_query.where(Photo.width >= min_width)
+
+    if max_width:
+        photos_query = photos_query.where(Photo.width <= max_width)
+
+    if min_height:
+        photos_query = photos_query.where(Photo.height >= min_height)
+
+    if max_height:
+        photos_query = photos_query.where(Photo.height <= max_height)
+
+    if min_file_size_mb:
+        photos_query = photos_query.where(Photo.file_size >= int(min_file_size_mb * 1024 * 1024))
+
+    if max_file_size_mb:
+        photos_query = photos_query.where(Photo.file_size <= int(max_file_size_mb * 1024 * 1024))
+
+    # Metadata presence filters
+    if has_inventory:
+        if has_inventory:
+            photos_query = photos_query.where(Photo.inventory_number.isnot(None))
+        else:
+            photos_query = photos_query.where(Photo.inventory_number.is_(None))
+
+    if has_description:
+        if has_description:
+            photos_query = photos_query.where(Photo.description.isnot(None))
+        else:
+            photos_query = photos_query.where(Photo.description.is_(None))
+
+    if has_photographer:
+        if has_photographer:
+            photos_query = photos_query.where(Photo.photographer.isnot(None))
+        else:
+            photos_query = photos_query.where(Photo.photographer.is_(None))
+
+    # Sorting
+    sort_mapping = {
+        "created_desc": Photo.created.desc(),
+        "created_asc": Photo.created.asc(),
+        "filename_asc": Photo.filename.asc(),
+        "filename_desc": Photo.filename.desc(),
+        "size_desc": Photo.file_size.desc(),
+        "size_asc": Photo.file_size.asc(),
+        "photo_date_desc": Photo.photo_date.desc().nullslast(),
+        "photo_date_asc": Photo.photo_date.asc().nullslast(),
+        "inventory_asc": Photo.inventory_number.asc().nullslast(),
+        "inventory_desc": Photo.inventory_number.desc().nullslast(),
+        "material_asc": Photo.material.asc().nullslast(),
+        "find_date_desc": Photo.find_date.desc().nullslast(),
+    }
+    
+    if sort_by in sort_mapping:
+        photos_query = photos_query.order_by(sort_mapping[sort_by])
+    else:
+        photos_query = photos_query.order_by(Photo.created.desc())
+
+    # Execute query
     photos = await db.execute(photos_query)
     photos = photos.scalars().all()
 
@@ -69,10 +255,15 @@ async def get_site_photos_api(
     photos_data = []
     for photo in photos:
         photo_dict = photo.to_dict()
-        # Add proper URLs for frontend
         photo_dict['file_url'] = f"/photos/{photo.id}/full"
         photo_dict['thumbnail_url'] = f"/photos/{photo.id}/thumbnail"
+        # Add tags property for compatibility
+        photo_dict['tags'] = photo.get_keywords_list()
         photos_data.append(photo_dict)
+
+    logger.info(f"Photos API: Returned {len(photos_data)} photos with filters: "
+                f"search={search}, photo_type={photo_type}, material={material}, "
+                f"conservation_status={conservation_status}, sort_by={sort_by}")
 
     return JSONResponse(photos_data)
 
