@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from uuid import UUID
+from typing import List, Dict, Any
 from loguru import logger
 
 from app.database.session import get_async_session
@@ -27,6 +28,7 @@ sites_router = APIRouter(prefix="/sites", tags=["sites"])
 
 # Include hierarchical ICCD API endpoints
 sites_router.include_router(iccd_hierarchy_router, prefix="/{site_id}")
+from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
 
 # Include refactored API sub-routers
 sites_router.include_router(dashboard_router, tags=["dashboard"])
@@ -86,6 +88,7 @@ async def site_dashboard(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
+        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Dashboard principale per gestione sito archeologico"""
@@ -119,8 +122,16 @@ async def site_dashboard(
         "team_members": team_members,
         "can_read": permission.can_read(),
         "can_write": permission.can_write(),
-        "can_admin": permission.can_admin()
+        "can_admin": permission.can_admin(),
+        "sites": user_sites,
+        "sites_count": len(user_sites),
+        "current_site_name": site.name if site else None,
+        "user_email": current_user.email if current_user else None,
+        "user_type": "superuser" if current_user and current_user.is_superuser else "user"
+
     }
+
+
 
     return templates.TemplateResponse("sites/dashboard.html", context)
 
@@ -134,6 +145,7 @@ async def site_photos(
         category: str = None,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
+        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Gestione collezione fotografica del sito"""
@@ -188,7 +200,12 @@ async def site_photos(
         "total_pages": (total_photos + per_page - 1) // per_page,
         "current_photo_type": category,
         "categories": categories,
-        "can_write": permission.can_write()
+        "can_write": permission.can_write(),
+        "sites": user_sites,
+        "sites_count": len(user_sites),
+        "current_site_name": site.name if site else None,
+        "user_email": current_user.email if current_user else None,
+        "user_type": "superuser" if current_user and current_user.is_superuser else "user"
     }
 
     return templates.TemplateResponse("sites/photos.html", context)
@@ -359,6 +376,7 @@ async def site_iccd_records_list(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
+        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Lista schede ICCD del sito archeologico (legacy endpoint)."""
@@ -379,7 +397,12 @@ async def site_iccd_records_list(
         "current_user": current_user,
         "can_read": permission.can_read(),
         "can_write": permission.can_write(),
-        "can_admin": permission.can_admin()
+        "can_admin": permission.can_admin(),
+        "sites": user_sites,
+        "sites_count": len(user_sites),
+        "current_site_name": site.name if site else None,
+        "user_email": current_user.email if current_user else None,
+        "user_type": "superuser" if current_user and current_user.is_superuser else "user"
     }
     
     return templates.TemplateResponse("sites/iccd_records.html", context)
@@ -524,6 +547,7 @@ async def edit_iccd_record(
         record_id: UUID,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
+        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Form per modificare scheda ICCD esistente."""
@@ -583,7 +607,12 @@ async def edit_iccd_record(
         "schema_type": record_data["schema_type"],
         "can_read": permission.can_read(),
         "can_write": permission.can_write(),
-        "can_admin": permission.can_admin()
+        "can_admin": permission.can_admin(),
+        "sites": user_sites,
+        "sites_count": len(user_sites),
+        "current_site_name": site.name if site else None,
+        "user_email": current_user.email if current_user else None,
+        "user_type": "superuser" if current_user and current_user.is_superuser else "user"
     }
 
     return templates.TemplateResponse("iccd/form_universal.html", context)
