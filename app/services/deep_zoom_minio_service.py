@@ -163,6 +163,99 @@ class DeepZoomMinIOService:
             'scheduled_at': datetime.now().isoformat()
         }
 
+    async def process_tiles_batch_sequential(
+        self,
+        photos_list: List[Dict[str, Any]],
+        site_id: str
+    ):
+        """
+        Processa un batch di foto SEQUENZIALMENTE (una alla volta)
+        DOPO che tutti gli upload sono completati
+        
+        Args:
+            photos_list: Lista di dict con photo_id, file_path, archaeological_metadata
+            site_id: ID del sito archeologico
+        """
+        total_photos = len(photos_list)
+        logger.info(f"🚀 BATCH PROCESSING STARTED: {total_photos} foto da processare sequenzialmente")
+        
+        completed_count = 0
+        failed_count = 0
+        
+        for idx, photo_info in enumerate(photos_list, 1):
+            photo_id = photo_info['photo_id']
+            file_path = photo_info['file_path']
+            archaeological_metadata = photo_info.get('archaeological_metadata', {})
+            width = photo_info.get('width', 0)
+            height = photo_info.get('height', 0)
+            
+            try:
+                logger.info(f"🔄 [{idx}/{total_photos}] Processing tiles for photo {photo_id} ({width}x{height})")
+                
+                # Carica file da MinIO
+                from app.services.archaeological_minio_service import archaeological_minio_service
+                original_file_content = await archaeological_minio_service.get_file(file_path)
+                
+                # Processa tiles per questa foto
+                await self._process_tiles_background(
+                    photo_id,
+                    original_file_content,
+                    site_id,
+                    archaeological_metadata
+                )
+                
+                completed_count += 1
+                logger.info(f"✅ [{idx}/{total_photos}] Tiles completati per photo {photo_id} - Progresso: {completed_count}/{total_photos}")
+                
+            except Exception as e:
+                failed_count += 1
+                logger.error(f"❌ [{idx}/{total_photos}] Tiles falliti per photo {photo_id}: {e}")
+                
+                # Update database with failed status
+                await self._update_photo_database_status(photo_id, "failed")
+                await self._update_processing_status(
+                    photo_id, site_id, "failed", 0, error=str(e)
+                )
+        
+        logger.info(
+            f"🎉 BATCH PROCESSING COMPLETED: {completed_count} successi, {failed_count} fallimenti su {total_photos} foto totali"
+        )
+
+    async def _schedule_and_process_tiles(
+        self,
+        photo_id: str,
+        site_id: str,
+        file_path: str,
+        archaeological_metadata: Optional[Dict[str, Any]] = None
+    ):
+        """
+        NUOVO METODO: Carica il file da MinIO in background e processa tiles
+        Questo evita di bloccare l'upload principale
+        """
+        try:
+            logger.info(f"🔄 Background task started: Loading file from MinIO for photo {photo_id}")
+            
+            # Carica file da MinIO in background
+            from app.services.archaeological_minio_service import archaeological_minio_service
+            original_file_content = await archaeological_minio_service.get_file(file_path)
+            
+            logger.info(f"✅ File loaded from MinIO, starting tiles generation for photo {photo_id}")
+            
+            # Processa tiles
+            await self._process_tiles_background(
+                photo_id,
+                original_file_content,
+                site_id,
+                archaeological_metadata
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Background file loading failed for photo {photo_id}: {e}")
+            await self._update_photo_database_status(photo_id, "failed")
+            await self._update_processing_status(
+                photo_id, site_id, "failed", 0, error=f"File loading failed: {str(e)}"
+            )
+
     async def _process_tiles_background(
         self,
         photo_id: str,

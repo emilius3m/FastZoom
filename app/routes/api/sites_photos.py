@@ -10,6 +10,7 @@ from uuid import UUID
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import asyncio
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id
@@ -406,59 +407,65 @@ async def upload_photo(
                 }
             })
 
-        # 8. FIXED: Schedule deep zoom processing AFTER all uploads are complete
+        # 8. COMPLETAMENTE RIVISTO: Prepara lista foto per tiles MA NON inizia processing
+        # Il processing inizierà DOPO che tutte le foto sono state caricate
+        photos_needing_tiles = []
+        
         for photo_data in uploaded_photos:
             photo_id = photo_data["photo_id"]
             try:
-                photo_query = select(Photo).where(Photo.id == UUID(photo_id))
-                result = await db.execute(photo_query)
-                photo_record = result.scalar_one_or_none()
+                # Use already extracted dimensions from metadata
+                width = photo_data.get("metadata", {}).get("width", 0)
+                height = photo_data.get("metadata", {}).get("height", 0)
+                max_dimension = max(width, height) if width and height else 0
                 
-                if not photo_record:
-                    logger.warning(f"Photo record not found for deep zoom scheduling: {photo_id}")
-                    continue
-
-                try:
-                    photo_content = await archaeological_minio_service.get_file(photo_record.file_path)
+                if max_dimension > 2000:
+                    logger.info(f"📋 Photo {photo_id} needs tiles: {width}x{height}")
                     
-                    from PIL import Image
-                    import io
+                    # Update status in database to 'scheduled' (but don't start yet)
+                    photo_query = select(Photo).where(Photo.id == UUID(photo_id))
+                    result = await db.execute(photo_query)
+                    photo_record = result.scalar_one_or_none()
                     
-                    with Image.open(io.BytesIO(photo_content)) as img:
-                        width, height = img.size
-                        max_dimension = max(width, height)
+                    if photo_record:
+                        photo_record.deep_zoom_status = 'scheduled'
+                        await db.commit()
                         
-                        if max_dimension > 2000:
-                            logger.info(f"Scheduling deep zoom processing for large image {photo_id}: {width}x{height}")
-                            
-                            photo_record.deep_zoom_status = 'scheduled'
-                            await db.commit()
-                            
-                            await deep_zoom_minio_service.schedule_tiles_generation_async(
-                                photo_id=photo_id,
-                                original_file_content=photo_content,
-                                site_id=str(site_id),
-                                archaeological_metadata={
-                                    'inventory_number': photo_record.inventory_number,
-                                    'excavation_area': photo_record.excavation_area,
-                                    'material': photo_record.material.value if photo_record.material else None,
-                                    'chronology_period': photo_record.chronology_period,
-                                    'photo_type': photo_record.photo_type.value if photo_record.photo_type else None,
-                                    'photographer': photo_record.photographer,
-                                    'description': photo_record.description,
-                                    'keywords': photo_record.keywords
-                                }
-                            )
-                            
-                            logger.info(f"✅ Deep zoom processing scheduled for photo {photo_id}")
-                        else:
-                            logger.info(f"Skipping deep zoom for small image {photo_id}: {width}x{height}")
-                            
-                except Exception as img_error:
-                    logger.warning(f"Could not determine image dimensions for {photo_id}: {img_error}")
+                        photos_needing_tiles.append({
+                            'photo_id': photo_id,
+                            'file_path': photo_record.file_path,
+                            'width': width,
+                            'height': height,
+                            'archaeological_metadata': {
+                                'inventory_number': photo_record.inventory_number,
+                                'excavation_area': photo_record.excavation_area,
+                                'material': photo_record.material.value if photo_record.material else None,
+                                'chronology_period': photo_record.chronology_period,
+                                'photo_type': photo_record.photo_type.value if photo_record.photo_type else None,
+                                'photographer': photo_record.photographer,
+                                'description': photo_record.description,
+                                'keywords': photo_record.keywords
+                            }
+                        })
+                else:
+                    logger.info(f"Skipping tiles for small image {photo_id}: {width}x{height}")
 
             except Exception as e:
-                logger.error(f"❌ Deep zoom scheduling failed for photo {photo_id}: {e}")
+                logger.error(f"❌ Error checking tile requirements for photo {photo_id}: {e}")
+        
+        # 9. DOPO tutti gli upload: avvia UNICO task background per processare TUTTE le foto sequenzialmente
+        if photos_needing_tiles:
+            logger.info(f"🎯 {len(photos_needing_tiles)} foto richiedono tiles - avvio batch processing in background")
+            
+            # Avvia UN SOLO task che processerà tutte le foto una alla volta
+            asyncio.create_task(
+                deep_zoom_minio_service.process_tiles_batch_sequential(
+                    photos_list=photos_needing_tiles,
+                    site_id=str(site_id)
+                )
+            )
+            
+            logger.info(f"✅ Batch tiles processing schedulato per {len(photos_needing_tiles)} foto")
 
         return JSONResponse({
             "message": f"{len(uploaded_photos)} foto caricate con successo",

@@ -232,13 +232,23 @@ class PhotoMetadataService:
                 if gps_data:
                     extracted_data['gps_data'] = gps_data
 
-                # Crea EXIF JSON serializzabile
+                # Crea EXIF JSON serializzabile - gestisce IFDRational
                 serializable_exif = {}
                 for key, value in exif_dict.items():
                     try:
-                        json.dumps(value)  # Test serializzazione
-                        serializable_exif[key] = value
+                        # Gestione speciale per IFDRational di PIL
+                        if hasattr(value, '__class__') and 'IFDRational' in value.__class__.__name__:
+                            # Converti IFDRational in float o stringa
+                            try:
+                                serializable_exif[key] = float(value)
+                            except (ValueError, TypeError):
+                                serializable_exif[key] = str(value)
+                        else:
+                            # Test serializzazione normale
+                            json.dumps(value)
+                            serializable_exif[key] = value
                     except (TypeError, ValueError):
+                        # Fallback a stringa per qualsiasi altro tipo non serializzabile
                         serializable_exif[key] = str(value)
 
                 extracted_data['exif_data'] = serializable_exif
