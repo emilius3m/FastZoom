@@ -1,11 +1,28 @@
 # app/routes/sites_router.py - DASHBOARD GESTIONE SITO ARCHEOLOGICO (REFACTORED)
+#
+# Main router for archaeological site management with optimized endpoints.
+# Features:
+# - Centralized context management for consistent template data
+# - Helper functions to reduce code duplication
+# - Comprehensive error handling with localized messages
+# - Optimized database queries with parallel execution where beneficial
+# - Full ICCD cataloging system integration
+#
+# Endpoints are organized by functionality:
+# - Dashboard: Main site overview with statistics and recent activity
+# - Photos: Photographic collection management with pagination
+# - Documentation: Site documentation and form schemas
+# - Team: Site team management (admin only)
+# - Archaeological Plans: Excavation grids and site mapping
+# - ICCD: Hierarchical archaeological cataloging system
 
+import asyncio
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from uuid import UUID
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Tuple
 from loguru import logger
 
 from app.database.session import get_async_session
@@ -38,6 +55,8 @@ sites_router.include_router(deepzoom_router, tags=["deepzoom"])
 sites_router.include_router(team_router, tags=["team"])
 
 # === UTILITIES ===
+# Helper functions to reduce code duplication and improve maintainability
+# These functions centralize common operations used across multiple endpoints
 
 def get_base_context(
     request: Request,
@@ -46,7 +65,22 @@ def get_base_context(
     current_user: User,
     user_sites: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
-    """Restituisce il context base comune a tutti gli endpoint dei siti"""
+    """Create comprehensive base context for site endpoints.
+
+    This function centralizes all common context data needed across
+    all site-related endpoints, reducing code duplication and ensuring
+    consistency.
+
+    Args:
+        request: FastAPI request object
+        site: Archaeological site object
+        permission: User's site permissions
+        current_user: Authenticated user object
+        user_sites: List of user's accessible sites
+
+    Returns:
+        Dictionary containing all base context data for templates
+    """
     return {
         "request": request,
         "site": site,
@@ -61,14 +95,112 @@ def get_base_context(
         "can_write": permission.can_write(),
         "can_admin": permission.can_admin()
     }
+
+
+async def get_current_user_with_context(
+    current_user_id: UUID,
+    db: AsyncSession
+) -> User:
+    """Retrieve current user with centralized error handling.
+
+    Args:
+        current_user_id: UUID of the current user
+        db: Database session
+
+    Returns:
+        User object with error handling for not found cases
+
+    Raises:
+        HTTPException: If user is not found
+    """
+    """Helper function to get current user with error handling"""
+    user_query = select(User).where(User.id == current_user_id)
+    user = await db.execute(user_query)
+    current_user = user.scalar_one_or_none()
+
+    if not current_user:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+
+    return current_user
+
+
+def create_user_context(
+    current_user: User,
+    user_sites: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Create standardized user context for templates.
+
+    Args:
+        current_user: The authenticated user object
+        user_sites: List of accessible sites for the user
+
+    Returns:
+        Dictionary containing user context information for templates
+    """
+    return {
+        "sites": user_sites,
+        "sites_count": len(user_sites),
+        "current_site_name": None,  # Will be set by caller if needed
+        "user_email": current_user.email if current_user else None,
+        "user_type": "superuser" if current_user and current_user.is_superuser else "user"
+    }
+
+
+def handle_permission_denied(action: str = "eseguire questa operazione") -> HTTPException:
+    """Create standardized permission denied error response.
+
+    Args:
+        action: Description of the action that was denied
+
+    Returns:
+        HTTPException with 403 status code and localized message
+    """
+    return HTTPException(
+        status_code=403,
+        detail=f"Permessi insufficienti per {action}"
+    )
+
+
+def handle_resource_not_found(resource: str = "Risorsa") -> HTTPException:
+    """Create standardized resource not found error response.
+
+    Args:
+        resource: Name of the resource that was not found
+
+    Returns:
+        HTTPException with 404 status code and localized message
+    """
+    return HTTPException(
+        status_code=404,
+        detail=f"{resource} non trovato"
+    )
 # === SHARED DEPENDENCY ===
+# Centralized dependency for site access validation
+# This dependency is used across all site endpoints to ensure consistent access control
 
 async def get_site_access(
         site_id: UUID,
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ) -> tuple[ArchaeologicalSite, UserSitePermission]:
-    """Verifica accesso utente al sito e restituisce sito e permessi"""
+    """Validate user access to site and return site with permissions.
+
+    This dependency function performs comprehensive access validation:
+    1. Verifies site exists
+    2. Checks user permissions for the site
+    3. Validates permission is active and not expired
+
+    Args:
+        site_id: UUID of the site to access
+        current_user_id: UUID of the current user (injected)
+        db: Database session (injected)
+
+    Returns:
+        Tuple of (ArchaeologicalSite, UserSitePermission)
+
+    Raises:
+        HTTPException: If site not found (404) or access denied (403)
+    """
 
     # Verifica esistenza sito
     site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
@@ -104,9 +236,12 @@ async def get_site_access(
 
 
 # === HTML VIEW ENDPOINTS ===
+# Main site management endpoints with optimized context handling
+# All endpoints use centralized helper functions for consistency and maintainability
 
 @sites_router.get("/{site_id}/dashboard", response_class=HTMLResponse)
 async def site_dashboard(
+        # Main dependencies
         request: Request,
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
@@ -116,11 +251,7 @@ async def site_dashboard(
 ):
     """Dashboard principale per gestione sito archeologico"""
     site, permission = site_access
-
-    # Get current user info
-    user_query = select(User).where(User.id == current_user_id)
-    user = await db.execute(user_query)
-    current_user = user.scalar_one_or_none()
+    current_user = await get_current_user_with_context(current_user_id, db)
 
     # Statistiche del sito
     stats = await get_site_statistics(db, site_id)
@@ -134,6 +265,8 @@ async def site_dashboard(
     # Team del sito
     team_members = await get_site_team(db, site_id)
 
+    # Crea context ottimizzato
+    user_context = create_user_context(current_user, user_sites)
     base_context = get_base_context(request, site, permission, current_user, user_sites)
 
     context = {
@@ -144,13 +277,12 @@ async def site_dashboard(
         "team_members": team_members
     }
 
-
-
     return templates.TemplateResponse("sites/dashboard.html", context)
 
 
 @sites_router.get("/{site_id}/photos", response_class=HTMLResponse)
 async def site_photos(
+        # Query parameters for filtering and pagination
         request: Request,
         site_id: UUID,
         page: int = 1,
@@ -165,41 +297,35 @@ async def site_photos(
     site, permission = site_access
 
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi insufficienti")
+        raise handle_permission_denied("visualizzare le foto")
 
     from app.models.photos import Photo
-    
-    # Query foto con paginazione
+    current_user = await get_current_user_with_context(current_user_id, db)
+
+    # Query foto con paginazione e categorie
     photos_query = select(Photo).where(Photo.site_id == site_id)
+    total_query = select(func.count(Photo.id)).where(Photo.site_id == site_id)
 
     if category:
         photos_query = photos_query.where(Photo.photo_type == category)
-
-    # Conta totale
-    total_query = select(func.count(Photo.id)).where(Photo.site_id == site_id)
-    if category:
         total_query = total_query.where(Photo.photo_type == category)
 
-    total_photos = await db.execute(total_query)
-    total_photos = total_photos.scalar()
+    # Esegui query in parallelo per ottimizzazione
+    total_photos_result, photos_result, categories_result = await asyncio.gather(
+        db.execute(total_query),
+        db.execute(photos_query.offset((page - 1) * per_page).limit(per_page)),
+        db.execute(
+            select(Photo.photo_type, func.count(Photo.id))
+            .where(Photo.site_id == site_id)
+            .group_by(Photo.photo_type)
+        )
+    )
 
-    # Foto paginate
-    photos_query = photos_query.offset((page - 1) * per_page).limit(per_page)
-    photos = await db.execute(photos_query)
-    photos = photos.scalars().all()
+    total_photos = total_photos_result.scalar()
+    photos = photos_result.scalars().all()
+    categories = categories_result.all()
 
-    # Categorie disponibili
-    categories_query = select(Photo.photo_type, func.count(Photo.id)).where(
-        Photo.site_id == site_id
-    ).group_by(Photo.photo_type)
-    categories = await db.execute(categories_query)
-    categories = categories.all()
-
-    # Get current user info
-    user_query = select(User).where(User.id == current_user_id)
-    user = await db.execute(user_query)
-    current_user = user.scalar_one_or_none()
-
+    # Crea context ottimizzato
     base_context = get_base_context(request, site, permission, current_user, user_sites)
 
     context = {
@@ -212,7 +338,6 @@ async def site_photos(
         "total_pages": (total_photos + per_page - 1) // per_page,
         "current_photo_type": category,
         "categories": categories
-
     }
 
     return templates.TemplateResponse("sites/photos.html", context)
@@ -220,79 +345,112 @@ async def site_photos(
 
 @sites_router.get("/{site_id}/documentation", response_class=HTMLResponse)
 async def site_documentation(
+        # Dependencies for site access and user context
         request: Request,
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Gestione documentazione e rapporti del sito"""
     site, permission = site_access
 
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi insufficienti")
+        raise handle_permission_denied("visualizzare la documentazione")
 
-    # Documenti del sito
+    current_user = await get_current_user_with_context(current_user_id, db)
+
+    # Documenti del sito (placeholder per ora)
     documents = []
-    
-    # Form schemas del sito
-    form_schemas_query = select(FormSchema).where(
-        and_(FormSchema.site_id == site_id, FormSchema.is_active == True)
-    ).order_by(FormSchema.created_at.desc())
-    
-    form_schemas = await db.execute(form_schemas_query)
-    form_schemas = form_schemas.scalars().all()
-    
-    # Prepara i form schema per il template
-    import json
-    schemas_list = []
-    for schema in form_schemas:
-        try:
-            schema_json = json.loads(schema.schema_json)
-            schemas_list.append({
-                "id": str(schema.id),
-                "name": schema.name,
-                "description": schema.description,
-                "category": schema.category,
-                "created_at": schema.created_at.isoformat(),
-                "updated_at": schema.updated_at.isoformat(),
-                "schema": schema_json
-            })
-        except json.JSONDecodeError:
-            logger.warning(f"Invalid JSON in schema {schema.id}")
-            continue
+
+    # Form schemas del sito con gestione errori centralizzata
+    form_schemas = await _get_form_schemas_safe(db, site_id)
+
+    # Crea context ottimizzato
+    base_context = get_base_context(request, site, permission, current_user, user_sites)
 
     context = {
-        "request": request,
-        "site": site,
-        "user_permission": permission,
+        **base_context,
         "documents": documents,
-        "form_schemas": schemas_list,
+        "form_schemas": form_schemas,
         "can_write": permission.can_write()
     }
 
     return templates.TemplateResponse("sites/documentation.html", context)
 
 
+async def _get_form_schemas_safe(db: AsyncSession, site_id: UUID) -> List[Dict[str, Any]]:
+    """Safely retrieve form schemas with centralized error handling.
+
+    Args:
+        db: Database session
+        site_id: UUID of the archaeological site
+
+    Returns:
+        List of form schema dictionaries with safe error handling
+    """
+    """Recupera form schemas con gestione errori centralizzata"""
+    try:
+        import json
+
+        form_schemas_query = select(FormSchema).where(
+            and_(FormSchema.site_id == site_id, FormSchema.is_active == True)
+        ).order_by(FormSchema.created_at.desc())
+
+        form_schemas = await db.execute(form_schemas_query)
+        form_schemas = form_schemas.scalars().all()
+
+        schemas_list = []
+        for schema in form_schemas:
+            try:
+                schema_json = json.loads(schema.schema_json)
+                schemas_list.append({
+                    "id": str(schema.id),
+                    "name": schema.name,
+                    "description": schema.description,
+                    "category": schema.category,
+                    "created_at": schema.created_at.isoformat(),
+                    "updated_at": schema.updated_at.isoformat(),
+                    "schema": schema_json
+                })
+            except json.JSONDecodeError:
+                logger.warning(f"Invalid JSON in schema {schema.id}")
+                continue
+
+        return schemas_list
+
+    except Exception as e:
+        logger.error(f"Error loading form schemas for site {site_id}: {e}")
+        return []
+
+
 @sites_router.get("/{site_id}/team", response_class=HTMLResponse)
 async def site_team_management(
+        # Dependencies for admin-only site team management
         request: Request,
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Gestione team del sito (solo per admin sito)"""
     site, permission = site_access
 
     if not permission.can_admin():
-        raise HTTPException(status_code=403, detail="Solo amministratori del sito")
+        raise handle_permission_denied("gestire il team del sito")
+
+    current_user = await get_current_user_with_context(current_user_id, db)
 
     # Team completo del sito
     team_members = await get_site_team(db, site_id)
 
+    # Crea context ottimizzato
+    base_context = get_base_context(request, site, permission, current_user, user_sites)
+
     context = {
-        "request": request,
-        "site": site,
-        "user_permission": permission,
+        **base_context,
         "team_members": team_members
     }
 
@@ -301,37 +459,38 @@ async def site_team_management(
 
 @sites_router.get("/{site_id}/archaeological-plans", response_class=HTMLResponse)
 async def site_archaeological_plans(
+        # Dependencies for archaeological plans management
         request: Request,
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
+        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Gestione piante archeologiche e griglie di scavo"""
     site, permission = site_access
-    
+
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi insufficienti")
-    
-    # Get current user info
-    user_query = select(User).where(User.id == current_user_id)
-    user = await db.execute(user_query)
-    current_user = user.scalar_one_or_none()
-    
+        raise handle_permission_denied("visualizzare le piante archeologiche")
+
+    current_user = await get_current_user_with_context(current_user_id, db)
+
+    # Crea context ottimizzato
+    base_context = get_base_context(request, site, permission, current_user, user_sites)
+
     context = {
-        "request": request,
-        "site": site,
-        "user_permission": permission,
-        "current_user": current_user,
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin()
+        **base_context,
+        # Informazioni specifiche per piante archeologiche
+        "archaeological_plans": [],  # Placeholder per piante future
+        "grid_systems": [],  # Placeholder per sistemi di griglia
     }
-    
+
     return templates.TemplateResponse("sites/archaeological_plans.html", context)
 
 
-# === ROUTES ICCD - CATALOGAZIONE ARCHEOLOGICA STANDARDIZZATA ===
+# === ICCD ROUTES - CATALOGAZIONE ARCHEOLOGICA STANDARDIZZATA ===
+# Sistema di catalogazione archeologica secondo standard ICCD
+# Archaeological cataloging system with hierarchical structure and legacy support
 
 @sites_router.get("/{site_id}/iccd", response_class=HTMLResponse)
 async def site_iccd_records(
@@ -347,33 +506,33 @@ async def site_iccd_records(
 
 @sites_router.get("/{site_id}/iccd/hierarchy", response_class=HTMLResponse)
 async def site_iccd_hierarchy(
+        # Dependencies for hierarchical ICCD cataloging system
         request: Request,
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
+        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Sistema gerarchico ICCD completo del sito archeologico."""
     site, permission = site_access
-    
+
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi insufficienti")
-    
-    # Get current user info
-    user_query = select(User).where(User.id == current_user_id)
-    user = await db.execute(user_query)
-    current_user = user.scalar_one_or_none()
-    
+        raise handle_permission_denied("accedere al sistema ICCD")
+
+    current_user = await get_current_user_with_context(current_user_id, db)
+
+    # Crea context ottimizzato con tutte le informazioni necessarie per ICCD
+    base_context = get_base_context(request, site, permission, current_user, user_sites)
+
     context = {
-        "request": request,
-        "site": site,
-        "user_permission": permission,
-        "current_user": current_user,
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin()
+        **base_context,
+        # Informazioni specifiche per il template ICCD hierarchy
+        "hierarchy_data": None,  # Placeholder per dati gerarchici futuri
+        "schema_types": ["RA", "SI", "MI", "MA"],  # Tipologie schemi ICCD
+        "regions": ["12"],  # Regione Lazio per default
     }
-    
+
     return templates.TemplateResponse("sites/iccd_hierarchy.html", context)
 
 

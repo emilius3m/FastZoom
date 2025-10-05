@@ -5,35 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Sistema Archeologico{% endblock %}</title>
 
-    <!-- Include the CSS for Flowbite -->
+    <!-- CSS and JavaScript resources organized by category for better maintainability -->
+
+    <!-- External CSS Libraries -->
     <link
       href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.8.1/flowbite.min.css"
       rel="stylesheet"
     />
-
-    <!-- Custom Theme Styles -->
     <link href="/static/css/themes.css" rel="stylesheet">
 
-    <!-- Include the Flowbite JavaScript -->
+    <!-- External JavaScript Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.0.0/flowbite.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <!-- OpenSeadragon Library for deep zoom image viewing -->
+    <script src="/static/js/openseadragon.min.js"></script>
+
+    <!-- Initialize Libraries -->
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         initFlowbite();
       });
     </script>
-    <script
-      defer
-      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
-    ></script>
 
-    <!-- OpenSeadragon Library -->
-    <script src="/static/js/openseadragon.min.js"></script>
-
+    <!-- Additional head content from child templates -->
     {% block additional_head %}{% endblock %}
   </head>
 
   <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
     <!-- Theme Toggle Button (Fixed Position - Always Available) -->
+    <!-- Global UI controls that persist across all pages -->
     <div class="fixed top-4 right-4 z-50 flex space-x-2">
       <button
         id="theme-toggle"
@@ -57,21 +57,21 @@
       {% include "partials/auth_navigation.html" %}
     {% endif %}
 
-    <!-- Main content -->
+    <!-- Main content area with responsive layout support -->
     <main class="pt-20 {% if layout_type == 'sidebar' %}flex-1 p-4 pt-20 sm:ml-64{% else %}min-h-screen{% endif %}">
       {% block content %}{% endblock %}
     </main>
 
-    <!-- Components -->
+    <!-- Application-specific JavaScript modules -->
     <script type="text/javascript" src="/static/js/components.js"></script>
-
-    <!-- Theme Management -->
     <script type="text/javascript" src="/static/js/theme.js"></script>
 
+    <!-- Additional scripts from child templates -->
     {% block additional_scripts %}{% endblock %}
 
+    <!-- User-specific components (only shown when authenticated) -->
     {% if current_user %}
-    {% include "partials/profile_modal.html" %}
+      {% include "partials/profile_modal.html" %}
     {% endif %}
   </body>
 </html>
