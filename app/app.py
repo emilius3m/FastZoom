@@ -113,7 +113,7 @@ from app.core.middleware import (
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(AuditMiddleware)
 app.add_middleware(PerformanceMonitoringMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
+#app.add_middleware(SecurityHeadersMiddleware)
 
 
 

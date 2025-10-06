@@ -356,11 +356,11 @@ class PhotoMetadataService:
             "excavation_area": archaeological_metadata.get('excavation_area'),
             "stratigraphic_unit": archaeological_metadata.get('stratigraphic_unit'),
             "find_date": archaeological_metadata.get('find_date'),
-            "material": archaeological_metadata.get('material'),
+            "material": self._convert_to_enum(MaterialType, archaeological_metadata.get('material')),
             "object_type": archaeological_metadata.get('object_type'),
             "chronology_period": archaeological_metadata.get('chronology_period'),
-            "conservation_status": archaeological_metadata.get('conservation_status'),
-            "photo_type": archaeological_metadata.get('photo_type'),
+            "conservation_status": self._convert_to_enum(ConservationStatus, archaeological_metadata.get('conservation_status')),
+            "photo_type": self._convert_to_enum(PhotoType, archaeological_metadata.get('photo_type')),
             "description": archaeological_metadata.get('description'),
             "keywords": archaeological_metadata.get('keywords'),
 
@@ -377,6 +377,18 @@ class PhotoMetadataService:
 
         photo = Photo(**photo_data)
         return photo
+
+    def _convert_to_enum(self, enum_class, value):
+        """Converte stringa in enum se possibile"""
+        if value is None:
+            return None
+        if isinstance(value, enum_class):
+            return value
+        try:
+            return enum_class(value)
+        except ValueError:
+            logger.warning(f"Invalid value for {enum_class.__name__}: {value}")
+            return None
 
     def _guess_mime_type(self, filename: str) -> str:
         """Determina MIME type da estensione file"""
