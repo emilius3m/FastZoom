@@ -94,8 +94,10 @@ class BaseRepository(Generic[ModelType]):
 
     async def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
         """Count records with optional filtering."""
-        query = select(self.model)
-        
+        from sqlalchemy import func
+
+        query = select(func.count(self.model.id))
+
         if filters:
             conditions = []
             for key, value in filters.items():
@@ -106,8 +108,6 @@ class BaseRepository(Generic[ModelType]):
                         conditions.append(getattr(self.model, key) == value)
             if conditions:
                 query = query.where(and_(*conditions))
-        
-        result = await self.db_session.execute(select(self.model).select_from(query.subquery()))
-        count_query = select(result.subquery().c.count())
-        count_result = await self.db_session.execute(count_query)
-        return count_result.scalar_one()
+
+        result = await self.db_session.execute(query)
+        return result.scalar_one()
