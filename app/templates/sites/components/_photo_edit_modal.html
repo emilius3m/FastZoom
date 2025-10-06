@@ -20,7 +20,7 @@
                 </h3>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
                     <span x-show="!isMultipleSelection && typeof selectedPhoto !== 'undefined' && selectedPhoto">
-                        Modifica i metadati archeologici per: <span x-text="selectedPhoto.original_filename || selectedPhoto.filename"></span>
+                        Modifica i metadati archeologici per: <span x-text="(selectedPhoto && (selectedPhoto.original_filename || selectedPhoto.filename)) || 'Caricamento...'"></span>
                     </span>
                     <span x-show="isMultipleSelection" x-text="'Modifica metadati per ' + selectedPhotos.length + ' foto selezionate'"></span>
                     <span x-show="!isMultipleSelection && (typeof selectedPhoto === 'undefined' || !selectedPhoto)">Caricamento dati foto...</span>
@@ -37,23 +37,23 @@
         <!-- Photo Preview - Single Photo -->
         <div x-show="!isMultipleSelection && typeof selectedPhoto !== 'undefined' && selectedPhoto" class="mb-6 flex items-start space-x-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div class="flex-shrink-0">
-                <img :src="typeof selectedPhoto !== 'undefined' && selectedPhoto ? (selectedPhoto.thumbnail_url || selectedPhoto.file_url) : ''"
-                     :alt="typeof selectedPhoto !== 'undefined' && selectedPhoto ? selectedPhoto.filename : ''"
+                <img :src="(selectedPhoto && (selectedPhoto.thumbnail_url || selectedPhoto.file_url)) || ''"
+                     :alt="(selectedPhoto && selectedPhoto.filename) || ''"
                      class="w-24 h-24 object-cover rounded-lg">
             </div>
             <div class="flex-1 min-w-0">
-                <h4 class="text-lg font-medium text-gray-900 dark:text-white" x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? (selectedPhoto.original_filename || selectedPhoto.filename) : 'Caricamento...'"></h4>
+                <h4 class="text-lg font-medium text-gray-900 dark:text-white" x-text="(selectedPhoto && (selectedPhoto.original_filename || selectedPhoto.filename)) || 'Caricamento...'"></h4>
                 <div class="mt-1 flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                    <span x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? ((selectedPhoto.width || 'N/A') + ' x ' + (selectedPhoto.height || 'N/A') + ' px') : 'Caricamento...'"></span>
-                    <span x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? formatFileSize(selectedPhoto.file_size) : 'Caricamento...'"></span>
-                    <span x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? formatDate(selectedPhoto.upload_date) : 'Caricamento...'"></span>
+                    <span x-text="selectedPhoto ? ((selectedPhoto.width || 'N/A') + ' x ' + (selectedPhoto.height || 'N/A') + ' px') : 'Caricamento...'"></span>
+                    <span x-text="selectedPhoto ? formatFileSize(selectedPhoto.file_size) : 'Caricamento...'"></span>
+                    <span x-text="selectedPhoto ? formatDate(selectedPhoto.upload_date) : 'Caricamento...'"></span>
                 </div>
                 <div class="mt-2 flex items-center space-x-2">
-                    <span x-show="typeof selectedPhoto !== 'undefined' && selectedPhoto && selectedPhoto.tags && selectedPhoto.tags.length > 0"
+                    <span x-show="selectedPhoto && selectedPhoto.tags && selectedPhoto.tags.length > 0"
                           class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                        <span x-text="typeof selectedPhoto !== 'undefined' && selectedPhoto ? selectedPhoto.tags.length + ' tag' : ''"></span>
+                        <span x-text="selectedPhoto ? selectedPhoto.tags.length + ' tag' : ''"></span>
                     </span>
-                    <span x-show="typeof selectedPhoto !== 'undefined' && selectedPhoto && selectedPhoto.deep_zoom_status === 'completed'"
+                    <span x-show="selectedPhoto && selectedPhoto.deep_zoom_status === 'completed'"
                           class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
                         Deep zoom disponibile
                     </span>
@@ -91,9 +91,8 @@
              @submit-metadata-form="submitEditForm()"
              @reset-metadata-form="resetEditForm()"
              :data-mode="isMultipleSelection ? 'bulk-edit' : 'edit'"
-             :data-photo="typeof selectedPhoto !== 'undefined' && selectedPhoto ? JSON.stringify(selectedPhoto) : '{}'"
-             :data-photos="isMultipleSelection ? JSON.stringify(selectedPhotos) : '[]'"
-             x-init="$watch('selectedPhoto', photo => { if(photo && !isMultipleSelection) $dispatch('photo-selected', {photo}) })">
+             :data-photo="selectedPhoto ? JSON.stringify(selectedPhoto) : '{}'"
+             :data-photos="isMultipleSelection ? JSON.stringify(selectedPhotos) : '[]'">
 
             {% include 'sites/components/_metadata_form.html' %}
         </div>

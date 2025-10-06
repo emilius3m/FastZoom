@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from pydantic import BaseModel
+from loguru import logger
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id
@@ -17,6 +18,7 @@ from app.routes.api.dependencies import get_site_access
 from app.services.photo_upload_service import PhotoUploadService, get_photo_upload_service
 from app.repositories.photo_repository import PhotoRepository
 from app.schema.photo_schemas import PhotoResponse, PhotoCreateRequest, PhotoMetadataUpdate
+from app.routes.api.notifications_ws import notification_manager
 
 # Router V2
 v2_photos_router = APIRouter(prefix="/photos", tags=["photos-v2"])
@@ -132,6 +134,19 @@ async def get_site_photos_v2(
 
     # Conta totale per paginazione
     total_photos = await photo_repo.count({"site_id": site_id})
+
+    # Invia notifica WebSocket per i filtri applicati
+    try:
+        await notification_manager.broadcast_photo_filters_applied(
+            site_id=str(site_id),
+            filters=filters,
+            total_results=len(photos_data),
+            search_query=filters.get('search'),
+            applied_filters_count=len([k for k, v in filters.items() if v and v != ''])
+        )
+    except Exception as e:
+        # Non bloccare la risposta se la notifica fallisce
+        logger.warning(f"Failed to send photo filters notification: {e}")
 
     return PhotoListResponse(
         photos=photos_data,

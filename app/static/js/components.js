@@ -142,13 +142,18 @@ document.addEventListener("alpine:init", () => {
           console.log("Response headers:", response.headers);
           
           if (response.status === 204) {
-            
+
             // Successful login, navigate to /dashboard
             console.log("Login successful, redirecting...");
-        
+
             // Test che il cookie sia settato
             console.log("Document cookies:", document.cookie);
-        
+
+            // Store authentication token for WebSocket and API calls
+            // Since we're using cookie-based auth, we'll use a placeholder
+            // In a real implementation, you might want to extract token from response
+            localStorage.setItem('access_token', 'authenticated'); // Placeholder token
+
             window.location.href = "/dashboard";
 
           } else if (response.status === 400) {

@@ -2362,6 +2362,7 @@ function photosManager() {
         
         // Cleanup method called when component is destroyed
         destroy() {
+            console.log('🗑️ Destroying photos manager, cleaning up WebSocket');
             this.disconnectWebSocket();
         },
 
@@ -2879,59 +2880,120 @@ function photosManager() {
         // WebSocket for real-time notifications
         ws: null,
         wsConnected: false,
+        wsReconnectAttempts: 0,
+        wsMaxReconnectAttempts: 5,
+        wsReconnectDelay: 5000,
+        wsReconnectTimer: null,
+        wsAuthFailed: false,
         photosBeingProcessed: new Set(),
         
         connectWebSocket() {
             const siteId = this.getCurrentSiteId();
             if (!siteId) {
-                logger.error('Cannot connect WebSocket: site ID not available');
+                console.error('❌ Cannot connect WebSocket: site ID not available');
                 return;
             }
-            
-            // Close existing connection
-            if (this.ws) {
-                this.ws.close();
+
+            // Don't attempt to reconnect if authentication previously failed
+            if (this.wsAuthFailed) {
+                console.warn('⚠️ WebSocket authentication previously failed, not reconnecting');
+                return;
             }
-            
+
+            // Check if we've exceeded max reconnection attempts
+            if (this.wsReconnectAttempts >= this.wsMaxReconnectAttempts) {
+                console.error('❌ Max WebSocket reconnection attempts exceeded');
+                this.showAlertMessage('Impossibile connettersi alle notifiche in tempo reale');
+                return;
+            }
+
+            // Close existing connection if any
+            this.disconnectWebSocket();
+
             // Determine WebSocket URL (ws or wss based on protocol)
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/sites/${siteId}/ws/notifications`;
-            
-            console.log('🔌 Connecting WebSocket:', wsUrl);
-            
+
+            console.log(`🔌 Connecting WebSocket (attempt ${this.wsReconnectAttempts + 1}/${this.wsMaxReconnectAttempts}):`, wsUrl);
+
             try {
                 this.ws = new WebSocket(wsUrl);
-                
+
                 this.ws.onopen = () => {
-                    this.wsConnected = true;
-                    console.log('✅ WebSocket connected');
+                    console.log('✅ WebSocket connected, sending auth token...');
+                    this.wsReconnectAttempts = 0; // Reset reconnection attempts on successful connection
+
+                    // For cookie-based authentication, we don't need to send token manually
+                    // The WebSocket will inherit cookies from the browser automatically
+                    console.log('📤 WebSocket connected - authentication via cookies');
                 };
-                
+
+                // Set up authentication response handler
+                let authConfirmed = false;
                 this.ws.onmessage = (event) => {
                     try {
-                        const notification = JSON.parse(event.data);
-                        this.handleWebSocketNotification(notification);
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'connected') {
+                            authConfirmed = true;
+                            this.wsConnected = true;
+                            console.log('✅ WebSocket authenticated and ready');
+                            // Switch to normal message handling
+                            this.ws.onmessage = (event) => {
+                                try {
+                                    const notification = JSON.parse(event.data);
+                                    this.handleWebSocketNotification(notification);
+                                } catch (e) {
+                                    console.error('Error parsing WebSocket message:', e);
+                                }
+                            };
+                        } else if (data.type === 'error') {
+                            console.error('❌ WebSocket authentication failed:', data.message);
+                            this.wsAuthFailed = true; // Mark auth as failed to prevent reconnection
+                            this.ws.close();
+                            this.showAlertMessage(`Errore autenticazione WebSocket: ${data.message}`);
+                            return;
+                        } else if (!authConfirmed) {
+                            // If we get a message before auth confirmation, treat it as an error
+                            console.error('❌ Received message before authentication:', data);
+                            this.ws.close();
+                            return;
+                        } else {
+                            // Handle normal messages after auth
+                            this.handleWebSocketNotification(data);
+                        }
                     } catch (e) {
-                        console.error('Error parsing WebSocket message:', e);
+                        console.error('Error parsing WebSocket auth response:', e);
+                        this.ws.close();
+                        return;
                     }
                 };
                 
                 this.ws.onerror = (error) => {
                     console.error('❌ WebSocket error:', error);
                     this.wsConnected = false;
+                    this.wsReconnectAttempts++;
                 };
-                
-                this.ws.onclose = () => {
-                    console.log('🔌 WebSocket closed');
+
+                this.ws.onclose = (event) => {
+                    console.log(`🔌 WebSocket closed (code: ${event.code}, reason: ${event.reason})`);
                     this.wsConnected = false;
-                    
-                    // Reconnect after 5 seconds
-                    setTimeout(() => {
-                        if (!this.wsConnected) {
-                            console.log('🔄 Reconnecting WebSocket...');
+
+                    // Don't reconnect if authentication failed or connection was closed intentionally
+                    if (this.wsAuthFailed || event.code === 1000) {
+                        console.log('🔌 WebSocket closed intentionally or auth failed, not reconnecting');
+                        return;
+                    }
+
+                    // Implement exponential backoff for reconnection
+                    const delay = Math.min(this.wsReconnectDelay * Math.pow(2, this.wsReconnectAttempts - 1), 30000); // Max 30 seconds
+
+                    console.log(`🔄 Scheduling WebSocket reconnection in ${delay}ms (attempt ${this.wsReconnectAttempts})`);
+
+                    this.wsReconnectTimer = setTimeout(() => {
+                        if (!this.wsConnected && !this.wsAuthFailed) {
                             this.connectWebSocket();
                         }
-                    }, 5000);
+                    }, delay);
                 };
                 
             } catch (error) {
@@ -2942,7 +3004,19 @@ function photosManager() {
         handleWebSocketNotification(notification) {
             console.log('📡 WebSocket notification:', notification);
 
-            if (notification.type === 'tiles_progress') {
+            if (notification.type === 'photo_filters_applied') {
+                // Handle photo filters applied notification
+                console.log(`🔍 Filters applied: ${notification.total_results} photos found`);
+
+                // Update statistics if needed
+                this.totalPhotos = notification.total_results;
+
+                // Show a brief notification if filters were applied
+                if (notification.applied_filters_count > 0) {
+                    this.showAlertMessage(`Filtri applicati: ${notification.total_results} foto trovate`);
+                }
+
+            } else if (notification.type === 'tiles_progress') {
                 const photo = this.photos.find(p => p && p.id === notification.photo_id);
                 
                 if (notification.status === 'processing') {
@@ -2994,11 +3068,22 @@ function photosManager() {
         },
         
         disconnectWebSocket() {
+            // Clear any pending reconnection timer
+            if (this.wsReconnectTimer) {
+                clearTimeout(this.wsReconnectTimer);
+                this.wsReconnectTimer = null;
+            }
+
             if (this.ws) {
-                this.ws.close();
+                console.log('🔌 Disconnecting WebSocket');
+                this.ws.close(1000, 'Client disconnect'); // Send normal closure code
                 this.ws = null;
                 this.wsConnected = false;
             }
+
+            // Reset connection state
+            this.wsAuthFailed = false;
+            this.wsReconnectAttempts = 0;
         },
         
         async checkAllProcessingPhotos() {
