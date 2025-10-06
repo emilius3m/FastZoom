@@ -51,7 +51,8 @@ class NotificationManager:
 
         # Then check the actual WebSocket state
         try:
-            return hasattr(websocket, 'client_state') and websocket.client_state == 1  # WebSocketState.CONNECTED
+            # Check if websocket is in connected state - WebSocketState.CONNECTED is typically value 1
+            return websocket.client_state.value == 1  # WebSocketState.CONNECTED is 1
         except Exception:
             # If we can't check the state, mark it as dead
             self.connection_states[websocket] = False
@@ -262,6 +263,27 @@ class NotificationManager:
 
         return recommendations
 
+    async def broadcast_photo_updated(
+        self,
+        site_id: str,
+        photo_id: str,
+        updated_fields: list,
+        photo_filename: str,
+        user_id: str
+    ):
+        """Invia notifica aggiornamento foto"""
+        notification = {
+            'type': 'photo_updated',
+            'site_id': site_id,
+            'photo_id': photo_id,
+            'updated_fields': updated_fields,
+            'photo_filename': photo_filename,
+            'user_id': user_id,
+            'timestamp': str(asyncio.get_event_loop().time())
+        }
+
+        await self.send_notification(site_id, notification)
+
 # Istanza globale del manager
 notification_manager = NotificationManager()
 
@@ -297,6 +319,17 @@ async def websocket_notifications(
         "total_results": 12,
         "search_query": "test",
         "applied_filters_count": 2
+    }
+
+    3. Notifiche aggiornamento foto:
+    {
+        "type": "photo_updated",
+        "site_id": "xxx",
+        "photo_id": "xxx",
+        "updated_fields": ["description", "inventory_number", "material"],
+        "photo_filename": "foto.jpg",
+        "user_id": "xxx",
+        "timestamp": "1234567890.123"
     }
     """
     site_id_str = str(site_id)
@@ -380,15 +413,15 @@ async def websocket_notifications(
             return
 
         # Mantieni connessione attiva (senza gestione heartbeat per semplicità)
-        while notification_manager.is_connection_alive(websocket):
+        while True:
             try:
                 # Ricevi eventuali messaggi dal client
                 data = await websocket.receive_text()
-
+                
                 # Gestisci messaggi specifici se necessario
                 if data == 'ping':
                     await websocket.send_text('pong')
-
+                    
             except WebSocketDisconnect:
                 logger.info(f"WebSocket disconnected by client for site {site_id_str}")
                 break
@@ -396,10 +429,9 @@ async def websocket_notifications(
                 error_str = str(e).lower()
                 if any(err in error_str for err in ['closed', 'disconnect', 'connection']):
                     logger.warning(f"WebSocket connection error for site {site_id_str}: {e}")
-                    break
                 else:
                     logger.error(f"Unexpected error in WebSocket loop for site {site_id_str}: {e}")
-                    break
+                break
                 
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected for site {site_id_str}")

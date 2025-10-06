@@ -2881,7 +2881,7 @@ function photosManager() {
             }
         },
         
-        handleWebSocketNotification(notification) {
+        async handleWebSocketNotification(notification) {
             console.log('📡 WebSocket notification:', notification);
 
             if (notification.type === 'photo_filters_applied') {
@@ -2898,16 +2898,16 @@ function photosManager() {
 
             } else if (notification.type === 'tiles_progress') {
                 const photo = this.photos.find(p => p && p.id === notification.photo_id);
-                
+
                 if (notification.status === 'processing') {
                     // Update photo status
                     if (photo) {
                         photo.deep_zoom_status = 'processing';
                     }
                     this.photosBeingProcessed.add(notification.photo_id);
-                    
+
                     console.log(`🔄 [${notification.current_photo}/${notification.total_photos}] Processing: ${notification.photo_filename}`);
-                    
+
                 } else if (notification.status === 'completed') {
                     // Update photo with completion data
                     if (photo) {
@@ -2917,15 +2917,15 @@ function photosManager() {
                         photo.deep_zoom_levels = notification.levels;
                     }
                     this.photosBeingProcessed.delete(notification.photo_id);
-                    
+
                     // Show success notification
                     this.showAlertMessage(
                         `🎉 [${notification.current_photo}/${notification.total_photos}] Deep Zoom completato: ${notification.photo_filename} ` +
                         `(${notification.tile_count} tiles, ${notification.levels} livelli)`
                     );
-                    
+
                     console.log(`✅ [${notification.current_photo}/${notification.total_photos}] Completed: ${notification.photo_filename}`);
-                    
+
                 } else if (notification.status === 'failed') {
                     // Update photo with error status
                     if (photo) {
@@ -2933,17 +2933,55 @@ function photosManager() {
                         photo.has_deep_zoom = false;
                     }
                     this.photosBeingProcessed.delete(notification.photo_id);
-                    
+
                     // Show error notification
                     this.showAlertMessage(
                         `⚠️ [${notification.current_photo}/${notification.total_photos}] Errore Deep Zoom: ${notification.photo_filename}`
                     );
-                    
+
                     console.log(`❌ [${notification.current_photo}/${notification.total_photos}] Failed: ${notification.photo_filename}`);
                 }
-                
+
                 // Update UI
                 this.applyFilters();
+
+            } else if (notification.type === 'photo_updated') {
+                console.log('📝 Photo updated notification:', notification);
+
+                // Find and update the photo in the local array
+                const photoIndex = this.photos.findIndex(p => p && p.id === notification.photo_id);
+                if (photoIndex !== -1) {
+                    // Refresh photo data from server to get updated fields
+                    try {
+                        const response = await fetch(`/sites/{{ site.id }}/api/photos`, {
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        if (response.ok) {
+                            const updatedPhotos = await response.json();
+                            const updatedPhoto = updatedPhotos.find(p => p.id === notification.photo_id);
+
+                            if (updatedPhoto) {
+                                // Update the photo in our local array
+                                this.photos[photoIndex] = updatedPhoto;
+
+                                // Show notification about what was updated
+                                const fieldsText = notification.updated_fields.join(', ');
+                                this.showAlertMessage(
+                                    `📝 Foto aggiornata: ${notification.photo_filename} ` +
+                                    `(${fieldsText})`
+                                );
+
+                                console.log(`✅ Photo ${notification.photo_id} updated with fields: ${fieldsText}`);
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Error refreshing photo data after update:', error);
+                    }
+                }
             }
         },
         

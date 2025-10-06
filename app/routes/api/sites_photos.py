@@ -857,14 +857,29 @@ async def update_photo(
     
     logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Photo successfully committed to database")
     logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Updated fields: {list(filtered_data.keys())}")
-    
+
+    # Broadcast WebSocket notification for photo update
+    try:
+        from app.routes.api.notifications_ws import notification_manager
+        await notification_manager.broadcast_photo_updated(
+            site_id=str(site_id),
+            photo_id=str(photo_id),
+            updated_fields=list(filtered_data.keys()),
+            photo_filename=photo.filename,
+            user_id=str(current_user_id)
+        )
+        logger.info(f"WebSocket notification sent for photo update: {photo_id}")
+    except Exception as ws_error:
+        logger.warning(f"Failed to send WebSocket notification for photo update: {ws_error}")
+        # Don't fail the update if WebSocket notification fails
+
     response_data = {
         "message": "Foto aggiornata con successo",
         "photo_id": str(photo_id),
         "updated_fields": list(filtered_data.keys()),
         "photo_data": photo.to_dict()
     }
-    
+
     logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Response: {response_data}")
     return response_data
 
