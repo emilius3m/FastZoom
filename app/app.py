@@ -46,6 +46,9 @@ from app.routes.api.geographic_maps import geographic_maps_router
 # 📡 NUOVO IMPORT - Router WebSocket Notifications
 from app.routes.api.notifications_ws import notifications_router
 
+from app.routes import photo_metadata
+
+
 
 
 # Import condizionali delle route view
@@ -97,6 +100,33 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Include route API
 app.include_router(auth_api_router, tags=["Authentication Multi-Sito"])
 
+
+
+from app.core.middleware import (
+    RequestLoggingMiddleware,
+    AuditMiddleware,
+    PerformanceMonitoringMiddleware,
+    SecurityHeadersMiddleware
+)
+
+# Aggiungi middleware all'app
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(AuditMiddleware)
+app.add_middleware(PerformanceMonitoringMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
+
+
+from app.routes.photo_metadata import router as photo_metadata_router
+
+# Registra router
+app.include_router(
+    photo_metadata_router,
+    tags=["Photo Metadata"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
+
+
 # Include admin routes
 #####app.include_router(admin_router, tags=["Administration"])
 # 🏛️ INCLUSIONE ROUTER SITES - CONFIGURAZIONE PRINCIPALE
@@ -106,6 +136,7 @@ app.include_router(
     tags=["sites"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
+
 
 # 🖼️ INCLUSIONE ROUTER PHOTOS - Endpoints foto senza prefisso /sites
 app.include_router(
