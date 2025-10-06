@@ -587,10 +587,10 @@
                     <!-- Photo Thumbnail -->
                     <div class="aspect-square bg-gray-200 relative overflow-hidden">
                         <img :src="photo.thumbnail_url || photo.file_url"
-                             :alt="photo.filename"
-                             class="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-200"
-                             @click="openPhotoModal(photos.indexOf(photo))"
-                             loading="lazy">
+                              :alt="photo.filename"
+                              class="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-200"
+                              @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))"
+                              loading="lazy">
 
                         <!-- Deep Zoom Status Indicators -->
                         <div class="absolute top-2 right-2 flex space-x-1">
@@ -625,7 +625,7 @@
                         <!-- Overlay Actions -->
                         <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                             <div class="flex space-x-2">
-                                <button @click="openPhotoModal(photos.indexOf(photo))"
+                                <button @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))"
                                         class="p-2 bg-white rounded-full text-gray-700 hover:text-blue-600 transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -716,7 +716,7 @@
                                 <img :src="photo.thumbnail_url || photo.file_url"
                                      :alt="photo.filename"
                                      class="h-16 w-16 object-cover rounded-lg cursor-pointer"
-                                     @click="openPhotoModal(photos.indexOf(photo))">
+                                     @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))">
                                 
                                 <!-- Deep Zoom Status Indicators (List View) -->
                                 <div class="absolute -top-1 -right-1 flex space-x-1">
@@ -754,7 +754,7 @@
                                 <div class="flex items-center justify-between">
                                     <div class="flex-1 min-w-0">
                                         <h3 class="text-sm font-medium text-gray-900 break-words cursor-pointer hover:text-blue-600 transition-colors"
-                                            @click="openPhotoModal(photos.indexOf(photo))"
+                                            @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))"
                                             x-text="photo.original_filename"></h3>
 
                                         <div class="mt-1 flex items-center text-sm text-gray-500">
@@ -783,7 +783,7 @@
                                     <!-- Actions -->
                                     <div class="flex-shrink-0 ml-4">
                                         <div class="flex space-x-2">
-                                            <button @click="openPhotoModal(photos.indexOf(photo))"
+                                            <button @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))"
                                                     class="text-gray-400 hover:text-blue-600 transition-colors">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -1132,8 +1132,8 @@
                     <!-- Thumbnails Navigation -->
                     <div class="flex space-x-2 max-w-lg overflow-x-auto px-2">
                         <template x-for="(photo, index) in photos.slice(Math.max(0, currentPhotoIndex - 3), currentPhotoIndex + 4)" :key="photo.id">
-                            <div @click="setCurrentPhoto(photos.indexOf(photo))"
-                                 :class="photos.indexOf(photo) === currentPhotoIndex ? 'ring-2 ring-blue-500 scale-110' : 'opacity-70 hover:opacity-100 hover:scale-105'"
+                            <div @click="setCurrentPhoto(photos.findIndex(p => p && p.id === photo.id))"
+                                 :class="photos.findIndex(p => p && p.id === photo.id) === currentPhotoIndex ? 'ring-2 ring-blue-500 scale-110' : 'opacity-70 hover:opacity-100 hover:scale-105'"
                                  class="flex-shrink-0 w-14 h-14 bg-gray-800 rounded-lg cursor-pointer transition-all duration-200 overflow-hidden shadow-lg hover:shadow-xl"
                                  :aria-label="`Vai a ${photo.filename}`">
                                 <img :src="photo.thumbnail_url || photo.file_url"
@@ -1607,7 +1607,7 @@ function photosManager() {
                 }
 
                 const data = await response.json();
-                this.photos = Array.isArray(data) ? data : [];
+                this.photos = Array.isArray(data) ? data.filter(photo => photo && photo.id) : [];
 
             } catch (error) {
                 console.error('Errore nel caricamento foto:', error);
@@ -1620,15 +1620,15 @@ function photosManager() {
         // Statistics
         updateStatistics() {
             this.totalPhotos = this.photos.length;
-            this.totalSize = this.photos.reduce((sum, photo) => sum + (photo.file_size || 0), 0);
+            this.totalSize = this.photos.reduce((sum, photo) => sum + ((photo && photo.file_size) || 0), 0);
             this.lastUpload = this.photos.length > 0 ?
-                Math.max(...this.photos.map(p => new Date(p.upload_date).getTime())) : null;
+                Math.max(...this.photos.filter(p => p && p.upload_date).map(p => new Date(p.upload_date).getTime())) : null;
         },
 
         extractAvailableTags() {
             const tagSet = new Set();
             this.photos.forEach(photo => {
-                if (photo.tags) {
+                if (photo && photo.tags) {
                     photo.tags.forEach(tag => tagSet.add(tag));
                 }
             });
@@ -1699,7 +1699,7 @@ function photosManager() {
                 }
                 
                 const data = await response.json();
-                this.photos = Array.isArray(data) ? data : [];
+                this.photos = Array.isArray(data) ? data.filter(photo => photo && photo.id) : [];
                 this.filteredPhotos = this.photos;
                 this.currentPage = 1;
                 this.updatePagination();
@@ -1878,11 +1878,26 @@ function photosManager() {
         openPhotoModal(index) {
             console.log('openPhotoModal called with index:', index);
 
+            // Validate index
+            if (index < 0 || index >= this.photos.length) {
+                console.error('Invalid photo index:', index);
+                this.showAlertMessage('Errore: indice foto non valido');
+                return;
+            }
+
             // Store the currently focused element for later return
             this.previouslyFocusedElement = document.activeElement;
 
             this.currentPhotoIndex = index;
             this.currentPhoto = this.photos[index];
+
+            // Validate current photo
+            if (!this.currentPhoto || !this.currentPhoto.id) {
+                console.error('Invalid photo at index:', index, this.currentPhoto);
+                this.showAlertMessage('Errore: foto non valida');
+                return;
+            }
+
             this.showPhotoModal = true;
             this.photoViewMode = 'openseadragon'; // Always use OpenSeadragon only
             this.showSidebar = false; // Hide sidebar initially
@@ -2275,8 +2290,14 @@ function photosManager() {
         setCurrentPhoto(index) {
             console.log('setCurrentPhoto called with index:', index);
             if (index >= 0 && index < this.photos.length) {
+                const photo = this.photos[index];
+                if (!photo || !photo.id) {
+                    console.error('Invalid photo at index:', index, photo);
+                    return;
+                }
+
                 this.currentPhotoIndex = index;
-                this.currentPhoto = this.photos[index];
+                this.currentPhoto = photo;
                 // Keep OpenSeadragon mode - no reset to standard
                 this.imageLoaded = false;
                 this.imageError = false;
@@ -2306,7 +2327,11 @@ function photosManager() {
 
         openEditModal() {
             console.log('openEditModal called');
-            if (!this.currentPhoto) return;
+            if (!this.currentPhoto || !this.currentPhoto.id) {
+                console.error('No valid current photo for edit modal');
+                this.showAlertMessage('Errore: nessuna foto valida selezionata');
+                return;
+            }
             this.editPhoto(this.currentPhoto);
         },
 
@@ -2359,7 +2384,7 @@ function photosManager() {
                     
                     // Check if any photos are large enough for tiles
                     const photosNeedingTiles = this.photos.filter(p =>
-                        newPhotoIds.includes(p.id) &&
+                        p && newPhotoIds.includes(p.id) &&
                         (p.width > 2000 || p.height > 2000)
                     );
                     
@@ -2384,7 +2409,14 @@ function photosManager() {
         // Edit Methods
         editPhoto(photo) {
             console.log('editPhoto called with photo:', photo);
-            
+
+            // Validate photo object
+            if (!photo || !photo.id) {
+                console.error('Invalid photo object passed to editPhoto:', photo);
+                this.showAlertMessage('Errore: foto non valida per modifica');
+                return;
+            }
+
             // Check if this is a single photo edit or if we should open multi-edit
             if (this.selectedPhotos.length > 1) {
                 // Multi-edit mode: don't set selectedPhoto, use selectedPhotos array
@@ -2397,7 +2429,7 @@ function photosManager() {
                     this.selectedPhotos = [photo.id];
                 }
             }
-            
+
             this.showEditModal = true;
 
             // Initialize the metadata form with the photo data
@@ -2441,6 +2473,22 @@ function photosManager() {
         // Submit edit form programmatically
         submitEditForm() {
             console.log('submitEditForm called');
+
+            // Validate that we have a photo to edit
+            if (this.isMultipleSelection) {
+                if (!this.selectedPhotos || this.selectedPhotos.length === 0) {
+                    console.error('No photos selected for bulk edit');
+                    this.showAlertMessage('Errore: nessuna foto selezionata per modifica di massa');
+                    return;
+                }
+            } else {
+                if (!this.selectedPhoto || !this.selectedPhoto.id) {
+                    console.error('No photo selected for edit');
+                    this.showAlertMessage('Errore: nessuna foto selezionata per modifica');
+                    return;
+                }
+            }
+
             const editFormContainer = this.$refs.editMetadataForm;
             if (editFormContainer) {
                 // Find the Alpine component inside the container
@@ -2471,18 +2519,25 @@ function photosManager() {
         resetEditForm() {
             console.log('resetEditForm called');
             const editFormContainer = this.$refs.editMetadataForm;
-            if (editFormContainer && this.selectedPhoto) {
+            if (editFormContainer) {
                 // Find the Alpine component inside the container
                 const metadataComponent = Alpine.$data(editFormContainer.querySelector('[x-data*="metadataFormComponent"]'));
-                if (metadataComponent && metadataComponent.loadPhotoData) {
-                    console.log('Resetting form with current photo data');
-                    metadataComponent.loadPhotoData(this.selectedPhoto);
+                if (metadataComponent) {
+                    if (this.selectedPhoto && !this.isMultipleSelection) {
+                        // Single photo edit: reset with current photo data
+                        if (metadataComponent.loadPhotoData) {
+                            console.log('Resetting form with current photo data');
+                            metadataComponent.loadPhotoData(this.selectedPhoto);
+                        }
+                    } else {
+                        // Multiple selection or no photo: clear form
+                        if (metadataComponent.resetForm) {
+                            console.log('Resetting form to empty state');
+                            metadataComponent.resetForm();
+                        }
+                    }
                 } else {
                     console.warn('Metadata component not found for reset');
-                    // Fallback: try to trigger re-initialization
-                    if (metadataComponent && metadataComponent.initializeForm) {
-                        metadataComponent.initializeForm();
-                    }
                 }
             }
         },
@@ -2514,8 +2569,9 @@ function photosManager() {
         
         // Single photo edit method
         async saveSinglePhotoEdit(metadata) {
-            if (!this.selectedPhoto || !metadata) {
-                console.error('No photo selected or metadata provided');
+            if (!this.selectedPhoto || !this.selectedPhoto.id || !metadata) {
+                console.error('No valid photo selected or metadata provided');
+                this.showAlertMessage('Errore: foto o metadati non validi');
                 return;
             }
 
@@ -2541,7 +2597,7 @@ function photosManager() {
                 const updatedPhoto = await response.json();
 
                 // Update local data
-                const photoIndex = this.photos.findIndex(p => p.id === this.selectedPhoto.id);
+                const photoIndex = this.photos.findIndex(p => p && p.id === this.selectedPhoto.id);
                 if (photoIndex !== -1) {
                     this.photos[photoIndex] = { ...this.photos[photoIndex], ...updatedPhoto };
                 }
@@ -2644,12 +2700,21 @@ function photosManager() {
 
         // Delete Methods
         confirmDeletePhoto(photo) {
+            if (!photo || !photo.id) {
+                console.error('Invalid photo for deletion:', photo);
+                this.showAlertMessage('Errore: foto non valida per eliminazione');
+                return;
+            }
             this.photoToDelete = photo;
             this.showDeleteModal = true;
         },
 
         async deletePhoto() {
-            if (!this.photoToDelete) return;
+            if (!this.photoToDelete || !this.photoToDelete.id) {
+                console.error('No valid photo to delete');
+                this.showAlertMessage('Errore: nessuna foto valida da eliminare');
+                return;
+            }
 
             this.isDeleting = true;
 
@@ -2666,7 +2731,7 @@ function photosManager() {
                 }
 
                 // Remove from local data
-                this.photos = this.photos.filter(p => p.id !== this.photoToDelete.id);
+                this.photos = this.photos.filter(p => p && p.id !== this.photoToDelete.id);
 
                 // Close photo modal if showing deleted photo
                 if (this.currentPhoto && this.currentPhoto.id === this.photoToDelete.id) {
@@ -2876,9 +2941,9 @@ function photosManager() {
         
         handleWebSocketNotification(notification) {
             console.log('📡 WebSocket notification:', notification);
-            
+
             if (notification.type === 'tiles_progress') {
-                const photo = this.photos.find(p => p.id === notification.photo_id);
+                const photo = this.photos.find(p => p && p.id === notification.photo_id);
                 
                 if (notification.status === 'processing') {
                     // Update photo status
@@ -2938,8 +3003,10 @@ function photosManager() {
         
         async checkAllProcessingPhotos() {
             const processingPhotos = this.photos.filter(photo =>
-                photo.deep_zoom_status === 'processing' ||
-                photo.deep_zoom_status === 'scheduled'
+                photo && (
+                    photo.deep_zoom_status === 'processing' ||
+                    photo.deep_zoom_status === 'scheduled'
+                )
             );
             
             if (processingPhotos.length === 0) {
@@ -3012,9 +3079,11 @@ function photosManager() {
         // Metodo per verificare lo stato iniziale delle foto dopo il caricamento
         async initializeDeepZoomStatus() {
             const photosNeedingStatusCheck = this.photos.filter(photo =>
-                photo.deep_zoom_status === 'processing' ||
-                photo.deep_zoom_status === 'scheduled' ||
-                (!photo.deep_zoom_status && photo.width > 2000) // Foto grandi che potrebbero aver bisogno di tiles
+                photo && (
+                    photo.deep_zoom_status === 'processing' ||
+                    photo.deep_zoom_status === 'scheduled' ||
+                    (!photo.deep_zoom_status && photo.width > 2000) // Foto grandi che potrebbero aver bisogno di tiles
+                )
             );
             
             if (photosNeedingStatusCheck.length > 0) {
@@ -3048,7 +3117,7 @@ function photosManager() {
             // Marca le foto come in elaborazione se sono grandi abbastanza
             let photosScheduled = 0;
             photoIds.forEach(photoId => {
-                const photo = this.photos.find(p => p.id === photoId);
+                const photo = this.photos.find(p => p && p.id === photoId);
                 if (photo && photo.width > 2000 && !photo.deep_zoom_status) {
                     photo.deep_zoom_status = 'scheduled';
                     this.photosBeingProcessed.add(photoId);

@@ -250,18 +250,18 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.formData = {
-                inventory_number: photo.inventory_number || '',
-                excavation_area: photo.excavation_area || '',
-                stratigraphic_unit: photo.stratigraphic_unit || '',
-                find_date: photo.find_date ? photo.find_date.split('T')[0] : '', // Convert ISO date to YYYY-MM-DD format
-                material: photo.material || '',
-                object_type: photo.object_type || '',
-                chronology_period: photo.chronology_period || '',
-                conservation_status: photo.conservation_status || '',
-                photo_type: photo.photo_type || '',
-                photographer: photo.photographer || '',
-                description: photo.description || '',
-                keywords: Array.isArray(photo.tags) ? photo.tags.join(', ') : (photo.keywords || '')
+                inventory_number: (photo && photo.inventory_number) || '',
+                excavation_area: (photo && photo.excavation_area) || '',
+                stratigraphic_unit: (photo && photo.stratigraphic_unit) || '',
+                find_date: (photo && photo.find_date) ? photo.find_date.split('T')[0] : '', // Convert ISO date to YYYY-MM-DD format
+                material: (photo && photo.material) || '',
+                object_type: (photo && photo.object_type) || '',
+                chronology_period: (photo && photo.chronology_period) || '',
+                conservation_status: (photo && photo.conservation_status) || '',
+                photo_type: (photo && photo.photo_type) || '',
+                photographer: (photo && photo.photographer) || '',
+                description: (photo && photo.description) || '',
+                keywords: (photo && Array.isArray(photo.tags)) ? photo.tags.join(', ') : ((photo && photo.keywords) || '')
             };
             console.log('Form data loaded:', this.formData);
         },
