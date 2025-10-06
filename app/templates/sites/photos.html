@@ -82,13 +82,13 @@
                             Modifica Metadati (<span x-text="selectedPhotos.length"></span>)
                         </button>
                         
-                        <!-- Other Bulk Actions -->
-                        <button @click="showBulkModal = true"
-                                class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <!-- Delete Selected Photos -->
+                        <button @click="confirmBulkDelete()"
+                                class="inline-flex items-center px-4 py-2 bg-red-600 dark:bg-red-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                             </svg>
-                            Altri (<span x-text="selectedPhotos.length"></span>)
+                            Elimina (<span x-text="selectedPhotos.length"></span>)
                         </button>
                     </div>
                     {% endif %}
@@ -1319,71 +1319,6 @@
         </div>
     </div>
 
-    <!-- Bulk Actions Modal -->
-    <div x-show="showBulkModal"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50"
-         x-cloak>
-
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                    Azioni di Massa (<span x-text="selectedPhotos.length"></span> foto selezionate)
-                </h3>
-                <button @click="closeBulkModal()" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-
-            <div class="space-y-4">
-                <!-- Add Tags -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Aggiungi Tag</label>
-                    <input type="text"
-                           x-model="bulkActions.addTags"
-                           placeholder="Nuovi tag (separati da virgole)"
-                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                </div>
-
-                <!-- Remove Tags -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Rimuovi Tag</label>
-                    <input type="text"
-                           x-model="bulkActions.removeTags"
-                           placeholder="Tag da rimuovere (separati da virgole)"
-                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                </div>
-            </div>
-
-            <div class="flex justify-between mt-6">
-                <button @click="bulkDeletePhotos()"
-                        class="px-4 py-2 bg-red-600 dark:bg-red-700 text-white rounded-md hover:bg-red-700 dark:hover:bg-red-800 transition-colors">
-                    Elimina Selezionate
-                </button>
-
-                <div class="flex space-x-3">
-                    <button @click="closeBulkModal()"
-                            class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                        Annulla
-                    </button>
-                    <button @click="applyBulkActions()"
-                            :disabled="isBulkProcessing"
-                            :class="isBulkProcessing ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : 'bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800'"
-                            class="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors">
-                        <span x-show="!isBulkProcessing">Applica Modifiche</span>
-                        <span x-show="isBulkProcessing">Elaborazione...</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
     {% endif %}
 </div>
 
@@ -1416,7 +1351,6 @@ function photosManager() {
         showUploadModal: false,
         showEditModal: false,
         showDeleteModal: false,
-        showBulkModal: false,
         showAlert: false,
         alertMessage: '',
 
@@ -1459,12 +1393,8 @@ function photosManager() {
         isUploading: false,
         uploadProgress: 0,
 
-        // Bulk Actions Data
-        isBulkProcessing: false,
-        bulkActions: {
-            addTags: '',
-            removeTags: ''
-        },
+        // Bulk Delete Processing
+        isBulkDeleting: false,
 
         // Enhanced Filters
         filters: {
@@ -2754,70 +2684,21 @@ function photosManager() {
             }
         },
 
-        // Bulk Actions
-        closeBulkModal() {
-            this.showBulkModal = false;
-            this.bulkActions = {
-                addTags: '',
-                removeTags: ''
-            };
-        },
-
-        async applyBulkActions() {
+        // Bulk Delete
+        confirmBulkDelete() {
             if (!this.selectedPhotos.length) return;
 
-            this.isBulkProcessing = true;
+            const confirmMessage = `Sei sicuro di voler eliminare ${this.selectedPhotos.length} foto selezionate? Questa azione non può essere annullata.`;
 
-            try {
-                const addTags = this.bulkActions.addTags
-                    ? this.bulkActions.addTags.split(',').map(tag => tag.trim()).filter(tag => tag)
-                    : [];
-
-                const removeTags = this.bulkActions.removeTags
-                    ? this.bulkActions.removeTags.split(',').map(tag => tag.trim()).filter(tag => tag)
-                    : [];
-
-                const response = await fetch(`/sites/{{ site.id }}/photos/bulk-update`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        photo_ids: this.selectedPhotos,
-                        add_tags: addTags,
-                        remove_tags: removeTags
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Errore durante l\'aggiornamento di massa');
-                }
-
-                // Refresh data
-                await this.loadPhotos();
-                this.updateStatistics();
-                this.extractAvailableTags();
-                this.applyFilters();
-
-                this.showAlertMessage(`${this.selectedPhotos.length} foto aggiornate con successo!`);
-                this.selectedPhotos = [];
-                this.closeBulkModal();
-
-            } catch (error) {
-                console.error('Errore durante l\'aggiornamento di massa:', error);
-                this.showAlertMessage('Errore durante l\'aggiornamento delle foto');
-            } finally {
-                this.isBulkProcessing = false;
+            if (confirm(confirmMessage)) {
+                this.bulkDeletePhotos();
             }
         },
 
         async bulkDeletePhotos() {
-            if (!this.selectedPhotos.length || !confirm(`Sei sicuro di voler eliminare ${this.selectedPhotos.length} foto? Questa azione non può essere annullata.`)) {
-                return;
-            }
+            if (!this.selectedPhotos.length) return;
 
-            this.isBulkProcessing = true;
+            this.isBulkDeleting = true;
 
             try {
                 const response = await fetch(`/sites/{{ site.id }}/api/photos/bulk-delete`, {
@@ -2842,14 +2723,13 @@ function photosManager() {
                 this.applyFilters();
 
                 this.showAlertMessage(`${this.selectedPhotos.length} foto eliminate con successo!`);
-                this.selectedPhotos = [];
-                this.closeBulkModal();
+                this.selectedPhotos = []; // Clear selection
 
             } catch (error) {
                 console.error('Errore durante l\'eliminazione di massa:', error);
                 this.showAlertMessage('Errore durante l\'eliminazione delle foto');
             } finally {
-                this.isBulkProcessing = false;
+                this.isBulkDeleting = false;
             }
         },
 
