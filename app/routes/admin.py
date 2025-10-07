@@ -17,15 +17,10 @@ from app.models.photos import Photo
 from app.services.auth_service import AuthService
 from app.templates import templates
 
-
-
 from pydantic import BaseModel
 from datetime import datetime
 from sqlalchemy import text, func, update
 from fastapi.responses import JSONResponse
-
-
-
 
 
 
