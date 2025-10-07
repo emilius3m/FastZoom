@@ -533,18 +533,15 @@ async def post_update_user(
                     # Sanitize string fields
                     sanitized_data[field] = nh3.clean(str(value))
 
-        # Fetch the user being updated
-        user_to_update = await user_crud.read_by_primary_key(db, target_user_id)
+        # Check if user already has a profile
+        existing_profile = await user_profile_crud.read_by_column(db, "user_id", target_user_id)
 
-        if user_to_update.profile_id is None:
+        if existing_profile is None:
             # Create new UserProfile
             new_profile = await user_profile_crud.create({
                 "user_id": target_user_id,
                 **sanitized_data
             }, db)
-
-            # Update user profile_id
-            await user_crud.update(db, target_user_id, {"profile_id": new_profile.id})
 
             return JSONResponse(
                 status_code=status.HTTP_201_CREATED,
@@ -558,7 +555,7 @@ async def post_update_user(
         else:
             # Update existing user profile
             updated_profile = await user_profile_crud.update(
-                db, user_to_update.profile_id, sanitized_data
+                db, existing_profile.id, sanitized_data
             )
 
             return JSONResponse(

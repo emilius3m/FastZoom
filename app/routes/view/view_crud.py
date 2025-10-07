@@ -176,7 +176,7 @@ class SQLAlchemyCRUD(Generic[ModelType]):
 
     async def update(
         self, db: CurrentAsyncSession, id: uuid.UUID, data: dict[str, Any]
-    ) -> ModelType | None:
+    ) -> ModelType:
         """
         Updates a single record in the database by its primary key.
 
@@ -186,20 +186,18 @@ class SQLAlchemyCRUD(Generic[ModelType]):
             data (dict[str, Any]): The data to be updated in the record.
 
         Returns:
-            ModelType | None: The updated database record,
-            or None if the record could not be found.
+            ModelType: The updated database record.
         """
         stmt = select(self.db_model).where(self.db_model.id == id)
-        query = await db.execute(stmt)
-        if not query:
+        result = await db.execute(stmt)
+        db_item = result.scalar_one_or_none()
+        if db_item is None:
             raise HTTPException(status_code=404, detail=f"Record with {id} not found")
-        db_item = query.scalar_one()
-        if db_item:
-            for key, value in data.items():
-                setattr(db_item, key, value)
-            await db.commit()
-            await db.refresh(db_item)
-            return db_item
+        for key, value in data.items():
+            setattr(db_item, key, value)
+        await db.commit()
+        await db.refresh(db_item)
+        return db_item
 
     async def delete(
         self,
@@ -217,15 +215,13 @@ class SQLAlchemyCRUD(Generic[ModelType]):
             bool: True if the record was deleted, False if the record could not be found.
         """
         stmt = select(self.db_model).where(self.db_model.id == id)
-        query = await db.execute(stmt)
-        if not query:
-            raise HTTPException(status_code=404, detail=f"Record with {id} not found")
-        db_item = query.scalar_one()
-        if db_item:
-            await db.delete(db_item)
-            await db.commit()
-            return True
-        return False
+        result = await db.execute(stmt)
+        db_item = result.scalar_one_or_none()
+        if db_item is None:
+            return False
+        await db.delete(db_item)
+        await db.commit()
+        return True
 
     async def check_associated_records(
         self,
