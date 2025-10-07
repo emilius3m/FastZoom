@@ -56,6 +56,9 @@ async def login(
         
         print(f"User authenticated: {user.id}")
 
+        # Aggiorna ultimo accesso
+        await user.update_last_login(db)
+
         # Ottieni siti accessibili per l'utente
         sites_data = await AuthService.get_user_sites_with_permissions(db, user.id)
         print(f"User sites: {len(sites_data) if sites_data else 0}")
@@ -215,6 +218,9 @@ async def login_oauth2(
             )
         
         print(f"User authenticated: {user.id}, superuser: {user.is_superuser}")
+
+        # Aggiorna ultimo accesso
+        await user.update_last_login(db)
 
         # Ottieni siti per l'utente usando il metodo unificato
         sites_data = await AuthService.get_user_sites_with_permissions(db, user.id)
