@@ -61,10 +61,10 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
-                    {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
+                    {% if can_write %}
                     <!-- Upload Button -->
                     <button @click="showUploadModal = true"
-                            class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                         </svg>
@@ -632,7 +632,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                                     </svg>
                                 </button>
-                                {% if user_role in ['admin', 'curator'] %}
+                                {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
                                 <button @click="editPhoto(photo)"
                                         class="p-2 bg-white rounded-full text-gray-700 hover:text-green-600 transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -644,7 +644,7 @@
                         </div>
 
                         <!-- Selection Checkbox -->
-                        {% if user_role in ['admin', 'curator'] %}
+                        {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
                         <div class="absolute top-2 left-2">
                             <input type="checkbox"
                                    :value="photo.id"
@@ -702,7 +702,7 @@
                     <li class="hover:bg-gray-50 transition-colors duration-150">
                         <div class="px-4 py-4 sm:px-6 flex items-center">
                             <!-- Selection Checkbox -->
-                            {% if user_role in ['admin', 'curator'] %}
+                            {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
                             <div class="flex-shrink-0 mr-4">
                                 <input type="checkbox"
                                        :value="photo.id"
@@ -790,7 +790,7 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                                                 </svg>
                                             </button>
-                                            {% if user_role in ['admin', 'curator'] %}
+                                            {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
                                             <button @click="editPhoto(photo)"
                                                     class="text-gray-400 hover:text-green-600 transition-colors">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1267,7 +1267,8 @@
     </script>
 
     <!-- Upload Modal with Archaeological Metadata -->
-    {% if user_role in ['admin', 'curator'] %}
+    {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
+
     {% include 'sites/components/_upload_modal.html' %}
 
     <!-- Edit Photo Modal with Reusable Metadata Form -->

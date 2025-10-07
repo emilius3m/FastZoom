@@ -23,7 +23,6 @@ async def get_photo_thumbnail(
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
-    print("dffffffffffffffffffff")
     """Serve thumbnail foto (endpoint senza prefisso /sites/) - CONSOLIDATED"""
     return await photo_serving_service.serve_photo_thumbnail(photo_id, db)
 
