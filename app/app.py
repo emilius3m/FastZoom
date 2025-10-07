@@ -80,6 +80,48 @@ except ImportError:
     logger.warning("Geographic map view route not found")
     GEOGRAPHIC_MAP_ROUTE_EXISTS = False
 
+try:
+    from app.routes.view.dashboard import dashboard_router
+    DASHBOARD_ROUTE_EXISTS = True
+except ImportError:
+    logger.warning("Dashboard view route not found")
+    DASHBOARD_ROUTE_EXISTS = False
+
+try:
+    from app.routes.view.photos import photos_router
+    PHOTOS_ROUTE_EXISTS = True
+except ImportError:
+    logger.warning("Photos view route not found")
+    PHOTOS_ROUTE_EXISTS = False
+
+try:
+    from app.routes.view.team import team_router
+    TEAM_ROUTE_EXISTS = True
+except ImportError:
+    logger.warning("Team view route not found")
+    TEAM_ROUTE_EXISTS = False
+
+try:
+    from app.routes.view.documentation import documentation_router
+    DOCUMENTATION_ROUTE_EXISTS = True
+except ImportError:
+    logger.warning("Documentation view route not found")
+    DOCUMENTATION_ROUTE_EXISTS = False
+
+try:
+    from app.routes.view.archaeological_plans import archaeological_plans_router
+    ARCHAEOLOGICAL_PLANS_ROUTE_EXISTS = True
+except ImportError:
+    logger.warning("Archaeological plans view route not found")
+    ARCHAEOLOGICAL_PLANS_ROUTE_EXISTS = False
+
+try:
+    from app.routes.view.iccd import iccd_router
+    ICCD_ROUTE_EXISTS = True
+except ImportError:
+    logger.warning("ICCD view route not found")
+    ICCD_ROUTE_EXISTS = False
+
 # Configurazione
 settings = get_settings()
 app = FastAPI(
@@ -202,6 +244,48 @@ if GEOGRAPHIC_MAP_ROUTE_EXISTS:
     app.include_router(
         geographic_map_router,
         tags=["Pages", "Geographic Map"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+if DASHBOARD_ROUTE_EXISTS:
+    app.include_router(
+        dashboard_router,
+        tags=["Pages", "Dashboard"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+if PHOTOS_ROUTE_EXISTS:
+    app.include_router(
+        photos_router,
+        tags=["Pages", "Photos"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+if TEAM_ROUTE_EXISTS:
+    app.include_router(
+        team_router,
+        tags=["Pages", "Team"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+if DOCUMENTATION_ROUTE_EXISTS:
+    app.include_router(
+        documentation_router,
+        tags=["Pages", "Documentation"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+if ARCHAEOLOGICAL_PLANS_ROUTE_EXISTS:
+    app.include_router(
+        archaeological_plans_router,
+        tags=["Pages", "Archaeological Plans"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+if ICCD_ROUTE_EXISTS:
+    app.include_router(
+        iccd_router,
+        tags=["Pages", "ICCD Cataloging"],
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
