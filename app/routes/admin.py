@@ -627,6 +627,8 @@ async def admin_users_update(
     user_id: UUID,
     email: str = Form(),
     password: Optional[str] = Form(None),
+    first_name: Optional[str] = Form(None),
+    last_name: Optional[str] = Form(None),
     is_superuser: bool = Form(False),
     is_active: bool = Form(True),
     is_verified: bool = Form(False),
@@ -665,6 +667,24 @@ async def admin_users_update(
         if password and password.strip():
             from app.core.security import SecurityService
             user.hashed_password = SecurityService.get_password_hash(password)
+        
+        # Aggiorna o crea il profilo utente
+        stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+        result = await db.execute(stmt)
+        existing_profile = result.scalar_one_or_none()
+        
+        if existing_profile is None:
+            # Crea nuovo profilo
+            profile = UserProfile(
+                user_id=user_id,
+                first_name=first_name,
+                last_name=last_name
+            )
+            db.add(profile)
+        else:
+            # Aggiorna profilo esistente
+            existing_profile.first_name = first_name
+            existing_profile.last_name = last_name
         
         await db.commit()
         

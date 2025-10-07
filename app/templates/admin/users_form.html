@@ -6,19 +6,19 @@
 {% block content %}
 <div class="mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="userForm">
     <!-- Header Section -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div class="border-b border-gray-200 px-6 py-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         {{ 'Modifica Utente' if user_data else 'Nuovo Utente' }}
                     </h1>
-                    <p class="mt-1 text-sm text-gray-600">
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         {{ 'Modifica i dettagli dell\'utente e gestisci i permessi per i siti archeologici' if user_data else 'Crea un nuovo utente del sistema archeologico' }}
                     </p>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <a href="/admin/users/" 
+                    <a href="/admin/users/"
                        class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
@@ -60,15 +60,15 @@
         
         <!-- User Details Form - 2/3 width -->
         <div class="lg:col-span-2">
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h2 class="text-lg font-semibold text-gray-900">Informazioni Account</h2>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Informazioni Account</h2>
                 </div>
                 
                 <form @submit.prevent="submitUserForm" class="p-6 space-y-6">
                     <!-- Email Field -->
                     <div>
-                        <label for="email" class="block mb-2 text-sm font-medium text-gray-900">
+                        <label for="email" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                             Email *
                         </label>
                         <input type="email" 
@@ -85,7 +85,7 @@
 
                     <!-- Password Field -->
                     <div>
-                        <label for="password" class="block mb-2 text-sm font-medium text-gray-900">
+                        <label for="password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                             {{ 'Nuova Password (lascia vuoto per non modificare)' if user_data else 'Password *' }}
                         </label>
                         <div class="relative">
@@ -115,7 +115,7 @@
                     <!-- Name Fields Row -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="first_name" class="block mb-2 text-sm font-medium text-gray-900">Nome</label>
+                            <label for="first_name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Nome</label>
                             <input type="text" 
                                    id="first_name" 
                                    name="first_name"
@@ -124,7 +124,7 @@
                                    placeholder="Mario">
                         </div>
                         <div>
-                            <label for="last_name" class="block mb-2 text-sm font-medium text-gray-900">Cognome</label>
+                            <label for="last_name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Cognome</label>
                             <input type="text" 
                                    id="last_name" 
                                    name="last_name"
@@ -136,14 +136,14 @@
 
                     <!-- User Status Checkboxes -->
                     <div class="space-y-4">
-                        <h3 class="text-sm font-medium text-gray-900">Stato Account</h3>
+                        <h3 class="text-sm font-medium text-gray-900 dark:text-white">Stato Account</h3>
                         
                         <div class="flex items-center">
                             <input id="is_active" 
                                    type="checkbox" 
                                    x-model="formData.is_active"
                                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
-                            <label for="is_active" class="ml-2 text-sm font-medium text-gray-900">
+                            <label for="is_active" class="ml-2 text-sm font-medium text-gray-900 dark:text-white">
                                 Account Attivo
                             </label>
                         </div>
@@ -153,7 +153,7 @@
                                    type="checkbox" 
                                    x-model="formData.is_verified"
                                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
-                            <label for="is_verified" class="ml-2 text-sm font-medium text-gray-900">
+                            <label for="is_verified" class="ml-2 text-sm font-medium text-gray-900 dark:text-white">
                                 Account Verificato
                             </label>
                         </div>
@@ -164,19 +164,19 @@
                                    x-model="formData.is_superuser"
                                    class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2">
                             <div class="ml-2">
-                                <label for="is_superuser" class="text-sm font-medium text-red-600">
+                                <label for="is_superuser" class="text-sm font-medium text-red-600 dark:text-red-400">
                                     Superadmin
                                 </label>
-                                <p class="text-xs text-gray-500">Accesso completo a tutti i siti e funzioni amministrative</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Accesso completo a tutti i siti e funzioni amministrative</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Form Actions -->
-                    <div class="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
+                    <div class="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
                         <button type="button"
                                 @click="resetForm"
-                                class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300">
+                                class="px-4 py-2 text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-4 focus:outline-none focus:ring-blue-300">
                             Reset
                         </button>
                         <button type="submit"
@@ -201,26 +201,26 @@
         {% if user_data %}
         <div class="space-y-6">
             <!-- Current Permissions -->
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div class="px-4 py-3 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">Permessi Siti</h3>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Permessi Siti</h3>
                 </div>
                 
                 <div class="p-4">
                     {% if user_permissions %}
                     <div class="space-y-3 mb-6">
                         {% for permission, site in user_permissions %}
-                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 truncate">{{ site.name }}</p>
-                                <p class="text-xs text-gray-500">{{ site.code }}</p>
+                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ site.name }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ site.code }}</p>
                             </div>
                             <div class="flex items-center space-x-2">
                                 <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {{ permission.status_badge_class }}">
                                     {{ permission.permission_display_name }}
                                 </span>
                                 <button @click="removePermission('{{ permission.id }}')"
-                                        class="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-100">
+                                        class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 rounded-full hover:bg-red-100 dark:hover:bg-gray-600">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>
@@ -231,53 +231,53 @@
                     </div>
                     {% else %}
                     <div class="text-center py-6">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
-                        <p class="mt-2 text-sm text-gray-500">Nessun permesso assegnato</p>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Nessun permesso assegnato</p>
                     </div>
                     {% endif %}
 
                     <!-- Add Permission Form -->
-                    <div class="border-t border-gray-200 pt-4">
-                        <h4 class="text-sm font-medium text-gray-900 mb-3">Aggiungi Permesso</h4>
+                    <div class="border-t border-gray-200 dark:border-gray-70 pt-4">
+                        <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Aggiungi Permesso</h4>
                         
                         <form @submit.prevent="addPermission" class="space-y-3">
                             <div>
-                                <select x-model="newPermission.site_id" 
+                                <select x-model="newPermission.site_id"
                                         required
-                                        class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                    <option value="">Seleziona sito...</option>
+                                        class="bg-gray-50 dark:bg-gray-700 border border-gray-30 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                    <option value="" class="dark:bg-gray-700 dark:text-white">Seleziona sito...</option>
                                     {% for site in available_sites %}
-                                    <option value="{{ site.id }}">{{ site.name }}</option>
+                                    <option value="{{ site.id }}" class="dark:bg-gray-700 dark:text-white">{{ site.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
 
                             <div>
-                                <select x-model="newPermission.permission_level" 
+                                <select x-model="newPermission.permission_level"
                                         required
-                                        class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                    <option value="">Livello permesso...</option>
-                                    <option value="read">Visualizzatore</option>
-                                    <option value="write">Curatore</option>
-                                    <option value="admin">Amministratore Sito</option>
-                                    <option value="regional_admin">Amministratore Regionale</option>
+                                        class="bg-gray-50 dark:bg-gray-700 border border-gray-30 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                    <option value="" class="dark:bg-gray-700 dark:text-white">Livello permesso...</option>
+                                    <option value="read" class="dark:bg-gray-700 dark:text-white">Visualizzatore</option>
+                                    <option value="write" class="dark:bg-gray-700 dark:text-white">Curatore</option>
+                                    <option value="admin" class="dark:bg-gray-700 dark:text-white">Amministratore Sito</option>
+                                    <option value="regional_admin" class="dark:bg-gray-700 dark:text-white">Amministratore Regionale</option>
                                 </select>
                             </div>
 
                             <div x-show="showExpiryDate">
-                                <input type="datetime-local" 
+                                <input type="datetime-local"
                                        x-model="newPermission.expires_at"
-                                       class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                       class="bg-gray-50 dark:bg-gray-700 border border-gray-30 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                             </div>
 
                             <div class="flex items-center mb-3">
-                                <input id="has_expiry" 
-                                       type="checkbox" 
+                                <input id="has_expiry"
+                                       type="checkbox"
                                        x-model="showExpiryDate"
                                        class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
-                                <label for="has_expiry" class="ml-2 text-sm text-gray-600">
+                                <label for="has_expiry" class="ml-2 text-sm text-gray-600 dark:text-gray-400">
                                     Imposta scadenza
                                 </label>
                             </div>
@@ -289,7 +289,7 @@
 
                             <button type="submit"
                                     :disabled="isAddingPermission"
-                                    class="w-full text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center">
+                                    class="w-full text-white bg-green-700 hover:bg-green-800 dark:bg-green-600 dark:hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center">
                                 <span x-show="!isAddingPermission">Aggiungi Permesso</span>
                                 <span x-show="isAddingPermission">Aggiungendo...</span>
                             </button>
@@ -299,18 +299,18 @@
             </div>
 
             <!-- User Stats -->
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div class="px-4 py-3 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">Statistiche</h3>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Statistiche</h3>
                 </div>
                 <div class="p-4 space-y-3">
                     <div class="flex justify-between">
-                        <span class="text-sm text-gray-600">Siti accessibili:</span>
-                        <span class="text-sm font-medium text-gray-900">{{ user_permissions|length }}</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Siti accessibili:</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ user_permissions|length }}</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-sm text-gray-600">Ultimo accesso:</span>
-                        <span class="text-sm font-medium text-gray-900">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Ultimo accesso:</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">
                             {% if user_data.last_login %}
                                 {{ user_data.last_login.strftime('%d/%m/%Y %H:%M') }}
                             {% else %}
@@ -319,8 +319,8 @@
                         </span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-sm text-gray-600">Account creato:</span>
-                        <span class="text-sm font-medium text-gray-900">{{ user_data.created_at.strftime('%d/%m/%Y') }}</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Account creato:</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ user_data.created_at.strftime('%d/%m/%Y') }}</span>
                     </div>
                 </div>
             </div>
