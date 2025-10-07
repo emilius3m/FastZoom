@@ -59,12 +59,12 @@ except ImportError:
     logger.warning("Login view route not found")
     LOGIN_ROUTE_EXISTS = False
 
-try:
-    from app.routes.view.upload import upload_view_route
-    UPLOAD_ROUTE_EXISTS = True
-except ImportError:
-    logger.warning("Upload view route not found")
-    UPLOAD_ROUTE_EXISTS = False
+#try:
+#    from app.routes.view.upload import upload_view_route
+#    UPLOAD_ROUTE_EXISTS = True
+#except ImportError:
+#    logger.warning("Upload view route not found")
+#    UPLOAD_ROUTE_EXISTS = False
 
 try:
     from app.routes.view.user import user_view_route
@@ -195,8 +195,7 @@ app.include_router(
 # Include route view condizionali
 if LOGIN_ROUTE_EXISTS:
     app.include_router(login_view_route, tags=["Pages", "Authentication"])
-if UPLOAD_ROUTE_EXISTS:
-    app.include_router(upload_view_route, tags=["Pages", "Upload"])
+
 if USER_ROUTE_EXISTS:
     app.include_router(user_view_route, tags=["Pages", "User Management"])
 if GEOGRAPHIC_MAP_ROUTE_EXISTS:

@@ -583,7 +583,7 @@
         <div x-show="!isLoading && filteredPhotos.length > 0"
              class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <template x-for="photo in paginatedPhotos" :key="photo.id">
-                <div class="bg-white rounded-lg shadow overflow-hidden group hover:shadow-lg transition-shadow duration-200">
+                <div class="flex flex-col h-full bg-white rounded-lg shadow overflow-hidden group hover:shadow-lg transition-shadow duration-200">
                     <!-- Photo Thumbnail -->
                     <div class="aspect-square bg-gray-200 relative overflow-hidden">
                         <img :src="photo.thumbnail_url || photo.file_url"
@@ -655,7 +655,7 @@
                     </div>
 
                     <!-- Photo Info -->
-                    <div class="p-3">
+                    <div class="p-3 flex flex-col justify-end flex-grow">
                         <h3 class="text-sm font-medium text-gray-900 break-words" x-text="photo.original_filename"></h3>
                         <p class="text-xs text-gray-500 mt-1">
                             <span x-text="formatFileSize(photo.file_size)"></span>
