@@ -33,8 +33,7 @@ async def login(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Login endpoint con redirect intelligente multi-sito
-    Comportamento:
+    Login endpoint con redirect intelligente multi-sito Comportamento:
     - 1 sito: redirect diretto a dashboard
     - Più siti: redirect a selezione sito
     - 0 siti: errore accesso negato

@@ -59,13 +59,6 @@ except ImportError:
     logger.warning("Login view route not found")
     LOGIN_ROUTE_EXISTS = False
 
-#try:
-#    from app.routes.view.upload import upload_view_route
-#    UPLOAD_ROUTE_EXISTS = True
-#except ImportError:
-#    logger.warning("Upload view route not found")
-#    UPLOAD_ROUTE_EXISTS = False
-
 try:
     from app.routes.view.user import user_view_route
     USER_ROUTE_EXISTS = True
@@ -88,7 +81,7 @@ except ImportError:
     DASHBOARD_ROUTE_EXISTS = False
 
 try:
-    from app.routes.view.photos import photos_router
+    from app.routes.view.photos import photos_view_router
     PHOTOS_ROUTE_EXISTS = True
 except ImportError:
     logger.warning("Photos view route not found")
@@ -127,7 +120,7 @@ settings = get_settings()
 app = FastAPI(
     title="Sistema Archeologico Multi-Sito",
     description="Catalogazione digitale per siti archeologici",
-    version="1.0.0",
+    version="1.0.1",
     exception_handlers={HTTPException: http_exception_handler}
 )
 
@@ -141,7 +134,6 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Include route API
 app.include_router(auth_api_router, tags=["Authentication Multi-Sito"])
-
 
 
 from app.core.middleware import (
@@ -178,7 +170,6 @@ app.include_router(
     tags=["sites"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
-
 
 # 🖼️ INCLUSIONE ROUTER PHOTOS - Endpoints foto senza prefisso /sites
 app.include_router(
@@ -272,6 +263,13 @@ if ARCHAEOLOGICAL_PLANS_ROUTE_EXISTS:
     app.include_router(
         archaeological_plans_router,
         tags=["Pages", "Archaeological Plans"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+if PHOTOS_ROUTE_EXISTS:
+    app.include_router(
+        photos_view_router,
+        tags=["Pages", "Photos"],
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
@@ -428,82 +426,6 @@ async def dashboard_view(
             detail="Errore interno dashboard"
         )
 
-# DASHBOARD API SEMPLICE (mantieni per compatibility)
-@app.get("/dashboardauth")
-async def archaeological_dashboard(
-    request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
-):
-    """
-    Dashboard API semplice (JSON response)
-    """
-    try:
-        logger.info(f"Dashboard API access: user_id={current_user_id}, sites={len(user_sites)}")
-        return {
-            "message": "Benvenuto nel sistema archeologico!",
-            "user_id": str(current_user_id),
-            "sites_accessible": len(user_sites),
-            "sites": user_sites,
-            "museum_name": getattr(settings, 'museum_name', 'Museo Archeologico'),
-            "authenticated": True,
-            "system": "archaeological_catalog"
-        }
-    except Exception as e:
-        logger.error(f"Dashboard API error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore interno dashboard"
-        )
-
-@app.get("/dashboard2", response_class=HTMLResponse)
-async def dashboard_view_csrf(
-    request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-):
-    """
-    Dashboard con CSRF (backup endpoint)
-    """
-    # CSRF opzionale
-    csrf_token, signed_token, csrf = _csrf_tokens_optional()
-    
-    # Determina tipo utente
-    user_type = "superuser" if any(s.get("permission_level") == "regional_admin" for s in user_sites) else "user"
-    
-    context = {
-        "request": request,
-        "title": "FastZoom",
-        "message": f"Welcome to FastAPI! {user_type}",
-        "cookie_value": "[access_token cookie]",
-        "csrf_token": csrf_token,
-        "user_type": user_type,
-        "sites_count": len(user_sites),
-        "sites": user_sites,
-        "user_email": "",  # Placeholder
-        "current_site_name": user_sites[0]["name"] if user_sites else None,
-        "current_page": "dashboard2"
-    }
-
-    response = templates.TemplateResponse("pages/dashboard.html", context)
-    
-    # Se CSRF disponibile, imposta cookie firmato
-    if csrf and signed_token:
-        csrf.set_csrf_cookie(signed_token, response)
-    
-    return response
-
-# Dashboard di debug senza autenticazione
-@app.get("/dashboard-debug")
-async def dashboard_debug():
-    """Dashboard senza autenticazione per test"""
-    return {
-        "message": "Dashboard accessibile senza auth",
-        "status": "debug",
-        "timestamp": "2025-09-19 20:43",
-        "system": "archaeological_catalog",
-        "note": "Questo endpoint non richiede autenticazione"
-    }
 
 # Test cookie e autenticazione
 @app.get("/auth-test")

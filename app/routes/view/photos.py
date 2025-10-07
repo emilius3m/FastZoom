@@ -16,7 +16,7 @@ from app.models.user_sites import UserSitePermission
 from app.models.users import User
 from app.templates import templates
 
-photos_router = APIRouter(prefix="/sites", tags=["photos"])
+photos_view_router = APIRouter(prefix="/sites", tags=["photos"])
 
 async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
     """Recupera informazioni utente corrente"""
@@ -25,7 +25,7 @@ async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession)
     return user.scalar_one_or_none()
 
 
-@photos_router.get("/{site_id}/photos", response_class=HTMLResponse)
+@photos_view_router.get("/{site_id}/photos", response_class=HTMLResponse)
 async def site_photos(
         # Query parameters for filtering and pagination
         request: Request,
