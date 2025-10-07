@@ -18,7 +18,7 @@ from app.routes.view.view_crud import SQLAlchemyCRUD
 
 settings = get_settings()
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # CRUD instances for user operations
 user_crud = SQLAlchemyCRUD[User](User)

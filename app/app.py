@@ -133,7 +133,7 @@ def get_csrf_config():
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Include route API
-app.include_router(auth_api_router, tags=["Authentication Multi-Sito"])
+app.include_router(auth_api_router, tags=["Authentication"])
 
 
 from app.core.middleware import (
