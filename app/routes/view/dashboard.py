@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
+from sqlalchemy.orm import selectinload
 from uuid import UUID
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
@@ -70,6 +71,7 @@ async def get_recent_activities(db: AsyncSession, site_id: UUID, limit: int = 10
     activities_query = (
         select(UserActivity, User)
         .outerjoin(User, UserActivity.user_id == User.id)
+        .options(selectinload(User.profile))
         .where(UserActivity.site_id == site_id)
         .order_by(UserActivity.activity_date.desc())
         .limit(limit)
@@ -119,6 +121,7 @@ async def get_team_members(db: AsyncSession, site_id: UUID, limit: int = 10) -> 
     team_query = (
         select(User, UserSitePermission)
         .join(UserSitePermission, User.id == UserSitePermission.user_id)
+        .options(selectinload(User.profile))
         .where(
             and_(
                 UserSitePermission.site_id == site_id,
