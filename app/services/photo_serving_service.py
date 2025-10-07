@@ -135,11 +135,25 @@ class PhotoServingService:
 
                 # Se thumbnail è su MinIO
                 if photo.thumbnail_path.startswith("thumbnails/") or not photo.thumbnail_path.startswith("storage/"):
-                    return await PhotoServingService.serve_file_from_minio(photo.thumbnail_path)
+                    try:
+                        return await PhotoServingService.serve_file_from_minio(photo.thumbnail_path)
+                    except HTTPException as e:
+                        if e.status_code == 404:
+                            logger.warning(f"Thumbnail file not found in MinIO: {photo.thumbnail_path}, using fallback")
+                        else:
+                            logger.error(f"Error serving thumbnail from MinIO: {e}")
+                        # Fall through to fallback
 
                 # Se thumbnail è su filesystem locale
                 elif photo.thumbnail_path.startswith("storage/thumbnails/"):
-                    return PhotoServingService.serve_file_from_local(photo.thumbnail_path)
+                    try:
+                        return PhotoServingService.serve_file_from_local(photo.thumbnail_path)
+                    except HTTPException as e:
+                        if e.status_code == 404:
+                            logger.warning(f"Thumbnail file not found locally: {photo.thumbnail_path}, using fallback")
+                        else:
+                            logger.error(f"Error serving thumbnail from local: {e}")
+                        # Fall through to fallback
 
             # Fallback: restituisci thumbnail di default
             logger.warning(f"All thumbnail retrieval methods failed for photo {photo_id}, using fallback")

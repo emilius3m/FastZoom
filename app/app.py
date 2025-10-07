@@ -254,13 +254,6 @@ if DASHBOARD_ROUTE_EXISTS:
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
-if PHOTOS_ROUTE_EXISTS:
-    app.include_router(
-        photos_router,
-        tags=["Pages", "Photos"],
-        dependencies=[Depends(get_current_user_id_with_blacklist)]
-    )
-
 if TEAM_ROUTE_EXISTS:
     app.include_router(
         team_router,
