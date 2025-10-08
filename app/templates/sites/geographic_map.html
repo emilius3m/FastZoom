@@ -653,7 +653,7 @@ window.openPhotoViewer = async function(photoId) {
     
     try {
         // Check if photo has Deep Zoom tiles available
-        const deepZoomInfoUrl = `/sites/${siteId}/photos/${photoId}/deepzoom/info`;
+        const deepZoomInfoUrl = `/api/site/${siteId}/photos/${photoId}/deepzoom/info`;
         const response = await fetch(deepZoomInfoUrl);
         
         if (response.ok) {
