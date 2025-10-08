@@ -15,7 +15,7 @@ from app.models.users import User
 from app.models.form_schemas import FormSchema
 from app.templates import templates
 
-documentation_router = APIRouter(prefix="/sites", tags=["documentation"])
+documentation_router = APIRouter(prefix="/view", tags=["documentation"])
 
 async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
     """Recupera informazioni utente corrente"""

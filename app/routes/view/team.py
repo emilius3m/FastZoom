@@ -17,7 +17,7 @@ from app.templates import templates
 # Import team API functions
 from app.routes.api.sites_team import get_site_team
 
-team_router = APIRouter(prefix="/sites", tags=["team"])
+team_router = APIRouter(prefix="/view", tags=["team"])
 
 async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
     """Recupera informazioni utente corrente"""

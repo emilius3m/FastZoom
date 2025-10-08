@@ -17,12 +17,12 @@ def get_geographic_map_service(db: AsyncSession = Depends(get_async_session)) ->
     return GeographicMapService(db)
 
 
-geographic_maps_router = APIRouter(prefix="/api/geographic-maps", tags=["geographic_maps"])
+geographic_maps_router = APIRouter(prefix="/api/geographic-maps", tags=["geographic-map"])
 
 
 # === GESTIONE MAPPE GEOGRAFICHE ===
 
-@geographic_maps_router.get("/sites/{site_id}/maps")
+@geographic_maps_router.get("/site/{site_id}/maps")
 async def get_site_geographic_maps(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
@@ -40,7 +40,7 @@ async def get_site_geographic_maps(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@geographic_maps_router.post("/sites/{site_id}/maps")
+@geographic_maps_router.post("/site/{site_id}/maps")
 async def create_geographic_map(
     site_id: UUID,
     map_data: dict,
@@ -55,7 +55,7 @@ async def create_geographic_map(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@geographic_maps_router.get("/sites/{site_id}/maps/{map_id}")
+@geographic_maps_router.get("/site/{site_id}/maps/{map_id}")
 async def get_geographic_map_details(
     site_id: UUID,
     map_id: UUID,
@@ -70,7 +70,7 @@ async def get_geographic_map_details(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@geographic_maps_router.delete("/sites/{site_id}/maps/{map_id}")
+@geographic_maps_router.delete("/site/{site_id}/maps/{map_id}")
 async def delete_geographic_map(
     site_id: UUID,
     map_id: UUID,
@@ -87,7 +87,7 @@ async def delete_geographic_map(
 
 # === GESTIONE LAYER GEOJSON ===
 
-@geographic_maps_router.post("/sites/{site_id}/maps/{map_id}/layers")
+@geographic_maps_router.post("/site/{site_id}/maps/{map_id}/layers")
 async def save_geojson_layer(
     site_id: UUID,
     map_id: UUID,
@@ -105,7 +105,7 @@ async def save_geojson_layer(
 
 # === GESTIONE MARKER MANUALI ===
 
-@geographic_maps_router.post("/sites/{site_id}/maps/{map_id}/markers")
+@geographic_maps_router.post("/site/{site_id}/maps/{map_id}/markers")
 async def save_manual_marker(
     site_id: UUID,
     map_id: UUID,
@@ -121,7 +121,7 @@ async def save_manual_marker(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@geographic_maps_router.delete("/sites/{site_id}/maps/{map_id}/markers/{marker_id}")
+@geographic_maps_router.delete("/site/{site_id}/maps/{map_id}/markers/{marker_id}")
 async def delete_manual_marker(
     site_id: UUID,
     map_id: UUID,
@@ -145,7 +145,7 @@ class PhotoAssociationRequest(BaseModel):
     photo_ids: List[UUID]
 
 
-@geographic_maps_router.post("/sites/{site_id}/maps/{map_id}/markers/{marker_id}/photos")
+@geographic_maps_router.post("/site/{site_id}/maps/{map_id}/markers/{marker_id}/photos")
 async def associate_photos_to_marker(
     site_id: UUID,
     map_id: UUID,
@@ -164,7 +164,7 @@ async def associate_photos_to_marker(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@geographic_maps_router.get("/sites/{site_id}/photos")
+@geographic_maps_router.get("/site/{site_id}/photos")
 async def get_site_photos_for_association(
     site_id: UUID,
     search: Optional[str] = None,

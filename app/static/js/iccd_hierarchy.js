@@ -56,7 +56,7 @@ function iccdHierarchicalSystem() {
         
         async loadSiteHierarchy() {
             try {
-                const response = await fetch(`/sites/${window.siteId}/api/iccd/hierarchy`);
+                const response = await fetch(`/api/${window.siteId}/iccd/hierarchy`);
                 if (response.ok) {
                     this.hierarchyTree = await response.json();
                     this.buildHierarchicalView();

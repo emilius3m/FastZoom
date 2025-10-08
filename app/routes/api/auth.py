@@ -100,7 +100,7 @@ async def login(
             # Un solo sito: redirect diretto alla dashboard
             site_id = sites_data[0]["id"]
             from fastapi.responses import RedirectResponse
-            return RedirectResponse(url=f"/sites/{site_id}/dashboard", status_code=303)
+            return RedirectResponse(url=f"/site/{site_id}/dashboard", status_code=303)
         elif len(sites_data) > 1:
             # Più siti: redirect a selezione sito
             from fastapi.responses import RedirectResponse
@@ -333,7 +333,7 @@ async def select_site(
         
         # Redirect alla dashboard del sito selezionato
         from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=f"/sites/{site_id}/dashboard", status_code=303)
+        return RedirectResponse(url=f"/site/{site_id}/dashboard", status_code=303)
         
     except Exception as e:
         print(f"Site selection error: {e}")

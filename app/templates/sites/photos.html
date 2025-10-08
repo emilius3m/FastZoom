@@ -1518,7 +1518,7 @@ function photosManager() {
         // Data Loading
         async loadPhotos() {
             try {
-                const response = await fetch(`/sites/{{ site.id }}/api/photos`, {
+                const response = await fetch(`/api/site/{{ site.id }}/photos`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -1617,7 +1617,7 @@ function photosManager() {
                 
                 // Fetch filtered photos from API
                 const queryString = params.toString();
-                const url = `/sites/{{ site.id }}/api/photos${queryString ? '?' + queryString : ''}`;
+                const url = `/api/site/{{ site.id }}/photos${queryString ? '?' + queryString : ''}`;
                 
                 const response = await fetch(url, {
                     headers: {

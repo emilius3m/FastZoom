@@ -50,7 +50,7 @@ async def test_get_site_geographic_maps_success(client, mock_geographic_map_serv
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.get(f"/api/geographic-maps/sites/{site_id}/maps")
+            response = client.get(f"/api/geographic-map/site/{site_id}/maps")
             
             # Assert
             assert response.status_code == 200
@@ -79,7 +79,7 @@ async def test_get_site_geographic_maps_business_error(client, mock_geographic_m
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.get(f"/api/geographic-maps/sites/{site_id}/maps")
+            response = client.get(f"/api/geographic-map/site/{site_id}/maps")
             
             # Assert
             assert response.status_code == 403
@@ -127,7 +127,7 @@ async def test_create_geographic_map_success(client, mock_geographic_map_service
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.post(f"/api/geographic-maps/sites/{site_id}/maps", json=map_data)
+            response = client.post(f"/api/geographic-map/site/{site_id}/maps", json=map_data)
             
             # Assert
             assert response.status_code == 200
@@ -169,7 +169,7 @@ async def test_create_geographic_map_business_error(client, mock_geographic_map_
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.post(f"/api/geographic-maps/sites/{site_id}/maps", json=map_data)
+            response = client.post(f"/api/geographic-map/site/{site_id}/maps", json=map_data)
             
             # Assert
             assert response.status_code == 403
@@ -204,7 +204,7 @@ async def test_get_geographic_map_details_success(client, mock_geographic_map_se
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.get(f"/api/geographic-maps/sites/{site_id}/maps/{map_id}")
+            response = client.get(f"/api/geographic-map/site/{site_id}/maps/{map_id}")
             
             # Assert
             assert response.status_code == 200
@@ -235,7 +235,7 @@ async def test_delete_geographic_map_success(client, mock_geographic_map_service
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.delete(f"/api/geographic-maps/sites/{site_id}/maps/{map_id}")
+            response = client.delete(f"/api/geographic-map/site/{site_id}/maps/{map_id}")
             
             # Assert
             assert response.status_code == 200
@@ -276,7 +276,7 @@ async def test_create_marker_success(client, mock_geographic_map_service):
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.post(f"/api/geographic-maps/sites/{site_id}/maps/{map_id}/markers", json=marker_data)
+            response = client.post(f"/api/geographic-map/site/{site_id}/maps/{map_id}/markers", json=marker_data)
             
             # Assert
             assert response.status_code == 200

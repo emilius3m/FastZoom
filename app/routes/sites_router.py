@@ -41,7 +41,7 @@ from app.routes.api.sites_storage import storage_router
 from app.routes.api.sites_deepzoom import deepzoom_router
 from app.routes.api.sites_team import team_router, get_site_team
 
-sites_router = APIRouter(prefix="/sites", tags=["sites"])
+sites_router = APIRouter(prefix="/api", tags=["sites"])
 
 # Include hierarchical ICCD API endpoints
 sites_router.include_router(iccd_hierarchy_router, prefix="/{site_id}")

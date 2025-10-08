@@ -58,7 +58,7 @@ async def test_get_site_iccd_records_success(client, mock_iccd_record_service):
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.get(f"/api/iccd/sites/{site_id}/records")
+            response = client.get(f"/api/iccd/site/{site_id}/records")
             
             # Assert
             assert response.status_code == 200
@@ -87,7 +87,7 @@ async def test_get_site_iccd_records_business_error(client, mock_iccd_record_ser
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.get(f"/api/iccd/sites/{site_id}/records")
+            response = client.get(f"/api/iccd/site/{site_id}/records")
             
             # Assert
             assert response.status_code == 403
@@ -136,7 +136,7 @@ async def test_create_iccd_record_success(client, mock_iccd_record_service):
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.post(f"/api/iccd/sites/{site_id}/records", json=record_data)
+            response = client.post(f"/api/iccd/site/{site_id}/records", json=record_data)
             
             # Assert
             assert response.status_code == 200
@@ -178,7 +178,7 @@ async def test_create_iccd_record_business_error(client, mock_iccd_record_servic
             mock_get_current_user.return_value = user_id
             
             # Act
-            response = client.post(f"/api/iccd/sites/{site_id}/records", json=record_data)
+            response = client.post(f"/api/iccd/site/{site_id}/records", json=record_data)
             
             # Assert
             assert response.status_code == 403

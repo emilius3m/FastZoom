@@ -288,7 +288,7 @@ class NotificationManager:
 notification_manager = NotificationManager()
 
 
-@notifications_router.websocket("/sites/{site_id}/ws/notifications")
+@notifications_router.websocket("/site/{site_id}/ws/notifications")
 async def websocket_notifications(
     websocket: WebSocket,
     site_id: UUID

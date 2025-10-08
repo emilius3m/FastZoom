@@ -770,7 +770,7 @@ class PhotoModal {
                 document.getElementById('deep-zoom-status').textContent = 'Deep Zoom Disponibile';
                 toggleBtn.disabled = false;
             } else {
-                const response = await fetch(`/sites/${siteId}/api/photos/${photoId}/deep-zoom-status`);
+                const response = await fetch(`/api/site/${siteId}/api/photos/${photoId}/deep-zoom-status`);
                 if (response.ok) {
                     const status = await response.json();
                     
@@ -812,7 +812,7 @@ class PhotoModal {
         const intervalId = setInterval(async () => {
             try {
                 const siteId = window.photoCollection?.siteId || window.siteId;
-                const response = await fetch(`/sites/${siteId}/api/background-tasks/${taskId}/progress`);
+                const response = await fetch(`/api/site/${siteId}/api/background-tasks/${taskId}/progress`);
                 
                 if (response.ok) {
                     const progress = await response.json();
@@ -934,7 +934,7 @@ class PhotoModal {
             // Try Deep Zoom first, fallback to regular image if not available
             let tileSource;
             if (photo.has_deep_zoom) {
-                tileSource = `/sites/${siteId}/photos/${photoId}/deepzoom/info`;
+                tileSource = `/api/site/${siteId}/photos/${photoId}/deepzoom/info`;
                 console.log('Using deep zoom source:', tileSource);
             } else {
                 // Fallback to display regular image in OpenSeadragon
@@ -1016,7 +1016,7 @@ class PhotoModal {
             const photoId = photo.photo_id || photo.id;
             const siteId = window.photoCollection?.siteId || window.siteId;
             
-            const response = await fetch(`/sites/${siteId}/photos/${photoId}/deepzoom/process`, {
+            const response = await fetch(`/api/site/${siteId}/photos/${photoId}/deepzoom/process`, {
                 method: 'POST'
             });
             
@@ -1063,7 +1063,7 @@ class PhotoModal {
             const siteId = window.photoCollection?.siteId || window.siteId;
             const formData = this.getFormData();
             
-            const response = await fetch(`/sites/${siteId}/photos/${photoId}/update`, {
+            const response = await fetch(`/api/site/${siteId}/photos/${photoId}/update`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -1090,7 +1090,7 @@ class PhotoModal {
             const siteId = window.photoCollection?.siteId || window.siteId;
             const formData = this.getFormData();
             
-            const response = await fetch(`/sites/${siteId}/photos/${photoId}/update`, {
+            const response = await fetch(`/api/site/${siteId}/photos/${photoId}/update`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
@@ -1158,7 +1158,7 @@ class PhotoModal {
         
         try {
             const link = document.createElement('a');
-            link.href = photo.file_url || `/sites/${siteId}/photos/${photoId}/stream`;
+            link.href = photo.file_url || `/api/site/${siteId}/photos/${photoId}/stream`;
             link.download = photo.filename || `photo_${photoId}.jpg`;
             
             document.body.appendChild(link);
@@ -1181,7 +1181,7 @@ class PhotoModal {
         }
         
         try {
-            const response = await fetch(`/sites/${siteId}/photos/${photoId}`, {
+            const response = await fetch(`/api/site/${siteId}/photos/${photoId}`, {
                 method: 'DELETE'
             });
             

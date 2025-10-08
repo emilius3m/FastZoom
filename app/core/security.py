@@ -359,7 +359,7 @@ def require_site_access(
     Usa cookie-based authentication
     
     Usage:
-        @app.get("/sites/{site_id}/photos")
+        @app.get("/site/{site_id}/photos")
         async def get_photos(
             authorized: bool = Depends(require_site_access(site_id, PermissionLevel.READ))
         ):

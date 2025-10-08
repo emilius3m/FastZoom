@@ -24,7 +24,7 @@ iccd_router = APIRouter(prefix="/api/iccd", tags=["iccd_records"])
 
 # === GESTIONE SCHEDE ICCD ===
 
-@iccd_router.get("/sites/{site_id}/records")
+@iccd_router.get("/site/{site_id}/records")
 async def get_site_iccd_records(
     site_id: UUID,
     schema_type: Optional[str] = Query(None, description="Filtro per tipo schema (RA, CA, SI, etc.)"),
@@ -46,7 +46,7 @@ async def get_site_iccd_records(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@iccd_router.post("/sites/{site_id}/records")
+@iccd_router.post("/site/{site_id}/records")
 async def create_iccd_record(
     site_id: UUID,
     record_data: dict,
@@ -61,7 +61,7 @@ async def create_iccd_record(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@iccd_router.get("/sites/{site_id}/records/{record_id}")
+@iccd_router.get("/site/{site_id}/records/{record_id}")
 async def get_iccd_record(
     site_id: UUID,
     record_id: UUID,
@@ -76,7 +76,7 @@ async def get_iccd_record(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@iccd_router.put("/sites/{site_id}/records/{record_id}")
+@iccd_router.put("/site/{site_id}/records/{record_id}")
 async def update_iccd_record(
     site_id: UUID,
     record_id: UUID,
@@ -92,7 +92,7 @@ async def update_iccd_record(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@iccd_router.delete("/sites/{site_id}/records/{record_id}")
+@iccd_router.delete("/site/{site_id}/records/{record_id}")
 async def delete_iccd_record(
     site_id: UUID,
     record_id: UUID,
@@ -107,7 +107,7 @@ async def delete_iccd_record(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@iccd_router.post("/sites/{site_id}/records/{record_id}/validate")
+@iccd_router.post("/site/{site_id}/records/{record_id}/validate")
 async def validate_iccd_record(
     site_id: UUID,
     record_id: UUID,
@@ -156,7 +156,7 @@ async def get_iccd_schema_template(
 
 # === GENERAZIONE PDF ===
 
-@iccd_router.get("/sites/{site_id}/records/{record_id}/pdf")
+@iccd_router.get("/site/{site_id}/records/{record_id}/pdf")
 async def generate_iccd_pdf(
     site_id: UUID,
     record_id: UUID,
@@ -207,7 +207,7 @@ async def generate_iccd_pdf(
 
 # === STATISTICHE ICCD ===
 
-@iccd_router.get("/sites/{site_id}/statistics")
+@iccd_router.get("/site/{site_id}/statistics")
 async def get_iccd_statistics(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
@@ -232,7 +232,7 @@ async def validate_iccd_data(
     """Valida dati ICCD secondo standard ministeriali."""
     try:
         from loguru import logger
-        logger.warning(f"file Position api\iccd_records.py")
+
         logger.info(f"Validate request received: {validation_request}")
 
         schema_type = validation_request.get('schema_type')
@@ -288,7 +288,7 @@ async def validate_iccd_data(
 
 # === INTEGRAZIONE CON SISTEMA FASTZOOM ===
 
-@iccd_router.post("/sites/{site_id}/initialize")
+@iccd_router.post("/site/{site_id}/initialize")
 async def initialize_iccd_for_site(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
@@ -351,7 +351,7 @@ async def initialize_iccd_for_site(
         raise HTTPException(status_code=500, detail=f"Errore inizializzazione: {str(e)}")
 
 
-@iccd_router.get("/sites/{site_id}/integration-status")
+@iccd_router.get("/site/{site_id}/integration-status")
 async def get_iccd_integration_status(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
@@ -405,7 +405,7 @@ async def get_iccd_integration_status(
 
 # === GESTIONE GERARCHIA ICCD ===
 
-@iccd_router.get("/sites/{site_id}/hierarchy/validation")
+@iccd_router.get("/site/{site_id}/hierarchy/validation")
 async def validate_hierarchy_integrity(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
@@ -431,7 +431,7 @@ async def validate_hierarchy_integrity(
         raise HTTPException(status_code=500, detail=f"Errore validazione gerarchia: {str(e)}")
 
 
-@iccd_router.get("/sites/{site_id}/hierarchy/tree")
+@iccd_router.get("/site/{site_id}/hierarchy/tree")
 async def get_hierarchy_tree(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
@@ -457,7 +457,7 @@ async def get_hierarchy_tree(
         raise HTTPException(status_code=500, detail=f"Errore costruzione albero gerarchia: {str(e)}")
 
 
-@iccd_router.get("/sites/{site_id}/hierarchy/creation-options")
+@iccd_router.get("/site/{site_id}/hierarchy/creation-options")
 async def get_creation_options(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
@@ -483,7 +483,7 @@ async def get_creation_options(
         raise HTTPException(status_code=500, detail=f"Errore opzioni creazione: {str(e)}")
 
 
-@iccd_router.get("/sites/{site_id}/hierarchy/possible-parents/{schema_type}")
+@iccd_router.get("/site/{site_id}/hierarchy/possible-parents/{schema_type}")
 async def get_possible_parents(
     site_id: UUID,
     schema_type: str,
@@ -516,7 +516,7 @@ async def get_possible_parents(
         raise HTTPException(status_code=500, detail=f"Errore ricerca padri: {str(e)}")
 
 
-@iccd_router.post("/sites/{site_id}/hierarchy/validate-creation")
+@iccd_router.post("/site/{site_id}/hierarchy/validate-creation")
 async def validate_card_creation(
     site_id: UUID,
     creation_request: Dict[str, Any] = Body(...),

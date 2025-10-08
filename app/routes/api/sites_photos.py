@@ -27,7 +27,7 @@ from app.services.photo_serving_service import photo_serving_service
 photos_router = APIRouter()
 
 
-@photos_router.get("/{site_id}/api/photos")
+@photos_router.get("/site/{site_id}/photos")
 async def get_site_photos_api(
         site_id: UUID,
         # Basic filters
@@ -269,7 +269,7 @@ async def get_site_photos_api(
     return JSONResponse(photos_data)
 
 
-@photos_router.post("/{site_id}/api/photos/upload")
+@photos_router.post("/site/{site_id}/photos/upload")
 async def upload_photo(
         site_id: UUID,
         photos: List[UploadFile] = File(...),
@@ -632,7 +632,7 @@ async def upload_photo(
         )
 
 
-@photos_router.get("/{site_id}/photos/{photo_id}/stream")
+@photos_router.get("/site/{site_id}/photos/{photo_id}/stream")
 async def stream_photo_from_minio(
         site_id: UUID,
         photo_id: UUID,
@@ -649,7 +649,7 @@ async def stream_photo_from_minio(
     return await photo_serving_service.serve_photo_full(photo_id, db)
 
 
-@photos_router.get("/{site_id}/photos/{photo_id}/thumbnail")
+@photos_router.get("/site/{site_id}/photos/{photo_id}/thumbnail")
 async def get_photo_thumbnail(
         site_id: UUID,
         photo_id: UUID,
@@ -666,7 +666,7 @@ async def get_photo_thumbnail(
     return await photo_serving_service.serve_photo_thumbnail(photo_id, db)
 
 
-@photos_router.get("/{site_id}/photos/{photo_id}/full")
+@photos_router.get("/site/{site_id}/photos/{photo_id}/full")
 async def get_photo_full(
         site_id: UUID,
         photo_id: UUID,
@@ -683,7 +683,7 @@ async def get_photo_full(
     return await photo_serving_service.serve_photo_full(photo_id, db)
 
 
-@photos_router.get("/{site_id}/api/photos/search")
+@photos_router.get("/site/{site_id}/api/photos/search")
 async def search_photos_by_metadata(
         site_id: UUID,
         material: Optional[str] = None,
@@ -713,7 +713,7 @@ async def search_photos_by_metadata(
     })
 
 
-@photos_router.put("/{site_id}/photos/{photo_id}/update")
+@photos_router.put("/site/{site_id}/photos/{photo_id}/update")
 async def update_photo(
         site_id: UUID,
         photo_id: UUID,
@@ -730,9 +730,9 @@ async def update_photo(
 
     try:
         update_data = await request.json()
-        logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Received data: {update_data}")
+        logger.info(f"PUT /site/{site_id}/photos/{photo_id}/update - Received data: {update_data}")
     except Exception as e:
-        logger.error(f"PUT /sites/{site_id}/photos/{photo_id}/update - JSON parsing error: {str(e)}")
+        logger.error(f"PUT /site/{site_id}/photos/{photo_id}/update - JSON parsing error: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Invalid JSON data: {str(e)}")
 
     photo_query = select(Photo).where(
@@ -825,7 +825,7 @@ async def update_photo(
     if 'external_links' in filtered_data and isinstance(filtered_data['external_links'], list):
         filtered_data['external_links'] = json.dumps(filtered_data['external_links'])
 
-    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Filtered data to apply: {filtered_data}")
+    logger.info(f"PUT /site/{site_id}/photos/{photo_id}/update - Filtered data to apply: {filtered_data}")
     
     for field, value in filtered_data.items():
         old_value = getattr(photo, field, None)
@@ -837,7 +837,7 @@ async def update_photo(
             logger.info(f"PUT - Field '{field}': '{old_value}' -> '{value}'")
 
     photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
-    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Photo updated timestamp: {photo.updated}")
+    logger.info(f"PUT /site/{site_id}/photos/{photo_id}/update - Photo updated timestamp: {photo.updated}")
 
     # Log activity
     await log_user_activity(
@@ -855,8 +855,8 @@ async def update_photo(
     await db.commit()
     await db.refresh(photo)
     
-    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Photo successfully committed to database")
-    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Updated fields: {list(filtered_data.keys())}")
+
+    logger.info(f"PUT /site/{site_id}/photos/{photo_id}/update - Updated fields: {list(filtered_data.keys())}")
 
     # Broadcast WebSocket notification for photo update
     try:
@@ -880,11 +880,11 @@ async def update_photo(
         "photo_data": photo.to_dict()
     }
 
-    logger.info(f"PUT /sites/{site_id}/photos/{photo_id}/update - Response: {response_data}")
+    logger.info(f"PUT /site/{site_id}/photos/{photo_id}/update - Response: {response_data}")
     return response_data
 
 
-@photos_router.delete("/{site_id}/photos/{photo_id}")
+@photos_router.delete("/site/{site_id}/photos/{photo_id}")
 async def delete_photo(
         site_id: UUID,
         photo_id: UUID,
@@ -982,7 +982,7 @@ async def delete_photo(
         )
 
 
-@photos_router.post("/{site_id}/api/photos/bulk-delete")
+@photos_router.post("/site/{site_id}/api/photos/bulk-delete")
 async def bulk_delete_photos(
         site_id: UUID,
         delete_data: dict,
@@ -1095,7 +1095,7 @@ async def bulk_delete_photos(
         raise HTTPException(status_code=500, detail=f"Errore eliminazione in blocco: {str(e)}")
 
 
-@photos_router.post("/{site_id}/api/photos/bulk-update")
+@photos_router.post("/site/{site_id}/api/photos/bulk-update")
 async def bulk_update_photos(
         site_id: UUID,
         update_data: dict,

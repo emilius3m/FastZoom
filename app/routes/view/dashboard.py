@@ -17,7 +17,7 @@ from app.models.users import UserActivity, User
 from app.models.sites import ArchaeologicalSite
 from app.templates import templates
 
-dashboard_router = APIRouter(prefix="/sites", tags=["dashboard"])
+dashboard_router = APIRouter(prefix="/view", tags=["dashboard"])
 
 async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]:
     """Calcola statistiche del sito"""

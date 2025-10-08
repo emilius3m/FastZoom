@@ -11,7 +11,7 @@ from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission
 from app.templates import templates
 
-geographic_map_router = APIRouter(prefix="/sites", tags=["geographic_map"])
+geographic_map_router = APIRouter(prefix="/view", tags=["geographic-map"])
 
 @geographic_map_router.get("/{site_id}/geographic-map", response_class=HTMLResponse)
 async def geographic_map_view(

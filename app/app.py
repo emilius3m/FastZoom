@@ -102,7 +102,7 @@ except ImportError:
     DOCUMENTATION_ROUTE_EXISTS = False
 
 try:
-    from app.routes.view.archaeological_plans import archaeological_plans_router
+    from app.routes.view.archaeological_plans import archaeological_plans_view_router
     ARCHAEOLOGICAL_PLANS_ROUTE_EXISTS = True
 except ImportError:
     logger.warning("Archaeological plans view route not found")
@@ -188,7 +188,7 @@ app.include_router(
 # 🗺️ INCLUSIONE ROUTER ARCHAEOLOGICAL PLANS - API per piante archeologiche
 app.include_router(
     archaeological_plans_router,
-    tags=["archaeological-plans"],
+    tags=["archaeological_plans"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 
@@ -209,7 +209,7 @@ app.include_router(
 # 🌍 INCLUSIONE ROUTER GEOGRAPHIC MAPS - API per mappe geografiche
 app.include_router(
     geographic_maps_router,
-    tags=["geographic-maps"],
+    tags=["geographic-map"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 
@@ -234,7 +234,7 @@ if USER_ROUTE_EXISTS:
 if GEOGRAPHIC_MAP_ROUTE_EXISTS:
     app.include_router(
         geographic_map_router,
-        tags=["Pages", "Geographic Map"],
+        tags=["Pages", "geographic-map"],
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
@@ -262,7 +262,12 @@ if DOCUMENTATION_ROUTE_EXISTS:
 if ARCHAEOLOGICAL_PLANS_ROUTE_EXISTS:
     app.include_router(
         archaeological_plans_router,
-        tags=["Pages", "Archaeological Plans"],
+        tags=["Archaeological Plans"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+    app.include_router(
+        archaeological_plans_view_router,
+        tags=["Pages", "Archaeological Plans View"],
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
@@ -489,7 +494,7 @@ async def site_selection_page(
     }
 
 # Route per singoli siti
-@app.get("/sites/{site_id}/dashboard")
+@app.get("/site/{site_id}/dashboard")
 async def site_dashboard(
     site_id: UUID,
     request: Request,

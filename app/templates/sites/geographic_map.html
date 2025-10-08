@@ -834,7 +834,7 @@ document.addEventListener('alpine:init', () => {
         
         async loadAvailableMaps() {
             try {
-                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps`);
+                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps`);
                 if (response.ok) {
                     const data = await response.json();
                     this.availableMaps = data.maps;
@@ -862,7 +862,7 @@ document.addEventListener('alpine:init', () => {
                 // Prima pulisci tutti i dati esistenti
                 this.clearMapData();
                 
-                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}`);
+                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps/${this.selectedMapId}`);
                 if (response.ok) {
                     this.currentMap = await response.json();
                     
@@ -906,7 +906,7 @@ document.addEventListener('alpine:init', () => {
                     }
                 };
                 
-                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps`, {
+                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1119,7 +1119,7 @@ document.addEventListener('alpine:init', () => {
         
         async loadAvailablePhotos() {
             try {
-                const response = await fetch(`/api/geographic-maps/sites/${siteId}/photos?limit=100`);
+                const response = await fetch(`/api/geographic-map/sites/${siteId}/photos?limit=100`);
                 if (response.ok) {
                     const data = await response.json();
                     this.availablePhotos = data.photos;
@@ -1175,7 +1175,7 @@ document.addEventListener('alpine:init', () => {
                     photoIds: photoIds
                 });
                 
-                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/markers/${this.selectedMarkerForPhotos.id}/photos`, {
+                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps/${this.selectedMapId}/markers/${this.selectedMarkerForPhotos.id}/photos`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1716,7 +1716,7 @@ document.addEventListener('alpine:init', () => {
             }
             
             try {
-                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/markers/${markerId}`, {
+                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps/${this.selectedMapId}/markers/${markerId}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'

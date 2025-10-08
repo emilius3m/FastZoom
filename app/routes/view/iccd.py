@@ -14,12 +14,12 @@ from app.models.user_sites import UserSitePermission
 from app.models.users import User
 from app.templates import templates
 
-iccd_router = APIRouter(prefix="/sites", tags=["iccd"])
+iccd_router = APIRouter(prefix="/view", tags=["iccd"])
 
 @iccd_router.get("/{site_id}/iccd")
 async def site_iccd_redirect(site_id: UUID):
     """Redirect to hierarchical ICCD system."""
-    return RedirectResponse(url=f"/sites/{site_id}/iccd/hierarchy", status_code=302)
+    return RedirectResponse(url=f"/site/{site_id}/iccd/hierarchy", status_code=302)
 
 
 async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):

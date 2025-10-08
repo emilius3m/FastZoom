@@ -79,7 +79,7 @@
     <ul class="py-2 text-sm text-gray-700 dark:text-gray-200 max-h-64 overflow-y-auto">
       {% for site in sites %}
       <li>
-        <a href="/sites/{{ site.id }}/dashboard/" class="flex items-center px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-b border-gray-100 dark:border-gray-600 last:border-b-0">
+        <a href="/site/{{ site.id }}/dashboard/" class="flex items-center px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-b border-gray-100 dark:border-gray-600 last:border-b-0">
           <i class="fas fa-map-marker-alt me-3 text-blue-600 flex-shrink-0"></i>
           <div class="flex-1 min-w-0">
             <div class="font-medium text-gray-900 dark:text-white truncate">{{ site.name }}</div>
@@ -112,7 +112,7 @@
     <div>
     <a href="#" class="flex py-3 px-4 border-b hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600">
         <div class="flex-shrink-0">
-        <img class="w-11 h-11 rounded-full" src="https://flowbite.s3.amazonaws.com/blocks/marketing-ui/avatars/bonnie-green.png" alt="Bonnie Green avatar">
+        <img class="w-11 h-11 rounded-full" src="" alt="Bonnie Green avatar">
         <div class="flex absolute justify-center items-center ml-6 -mt-5 w-5 h-5 rounded-full border border-white bg-blue-700 dark:border-gray-700">
             <svg class="w-2 h-2 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 18 18"><path d="M15.977.783A1 1 0 0 0 15 0H3a1 1 0 0 0-.977.783L.2 9h4.239a2.99 2.99 0 0 1 2.742 1.8 1.977 1.977 0 0 0 3.638 0A2.99 2.99 0 0 1 13.561 9H17.8L15.977.783ZM6 2h6a1 1 0 1 1 0 2H6a1 1 0 0 1 0-2Zm7 5H5a1 1 0 0 1 0-2h8a1 1 0 1 1 0 2Z"/><path d="M1 18h16a1 1 0 0 0 1-1v-6h-4.439a.99.99 0 0 0-.908.6 3.978 3.978 0 0 1-7.306 0 .99.99 0 0 0-.908-.6H0v6a1 1 0 0 0 1 1Z"/></svg>
         </div>
@@ -124,7 +124,7 @@
     </a>
     <a href="#" class="flex py-3 px-4 border-b hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600">
         <div class="flex-shrink-0">
-        <img class="w-11 h-11 rounded-full" src="https://flowbite.s3.amazonaws.com/blocks/marketing-ui/avatars/jese-leos.png" alt="Jese Leos avatar">
+        <img class="w-11 h-11 rounded-full" src="" alt="Jese Leos avatar">
         <div class="flex absolute justify-center items-center ml-6 -mt-5 w-5 h-5 bg-gray-900 rounded-full border border-white dark:border-gray-700">
             <svg class="w-2 h-2 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 18"><path d="M6.5 9a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9ZM8 10H5a5.006 5.006 0 0 0-5 5v2a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-2a5.006 5.006 0 0 0-5-5Zm11-3h-2V5a1 1 0 0 0-2 0v2h-2a1 1 0 1 0 0 2h2v2a1 1 0 0 0 2 0V9h2a1 1 0 1 0 0-2Z"/></svg>
         </div>
@@ -136,7 +136,7 @@
     </a>
     <a href="#" class="flex py-3 px-4 border-b hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600">
         <div class="flex-shrink-0">
-        <img class="w-11 h-11 rounded-full" src="https://flowbite.s3.amazonaws.com/blocks/marketing-ui/avatars/joseph-mcfall.png" alt="Joseph McFall avatar">
+        <img class="w-11 h-11 rounded-full" src="" alt="Joseph McFall avatar">
         <div class="flex absolute justify-center items-center ml-6 -mt-5 w-5 h-5 bg-red-600 rounded-full border border-white dark:border-gray-700">
           <svg class="w-2 h-2 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 18"> <path d="M17.947 2.053a5.209 5.209 0 0 0-3.793-1.53A6.414 6.414 0 0 0 10 2.311 6.482 6.482 0 0 0 5.824.5a5.2 5.2 0 0 0-3.8 1.521c-1.915 1.916-2.315 5.392.625 8.333l7 7a.5.5 0 0 0 .708 0l7-7a6.6 6.6 0 0 0 2.123-4.508 5.179 5.179 0 0 0-1.533-3.793Z"/> </svg>
         </div>
@@ -211,7 +211,7 @@
                   <li><a href="{% if site and site.id %}/sites/{{ site.id }}/iccd/records{% else %}/catalog/iccd/{% endif %}" class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i class="fas fa-file-invoice me-2 text-red-600"></i>Schede ICCD</a></li>
                   <li><a href="{% if site and site.id %}/sites/{{ site.id }}/iccd{% else %}/catalog/iccd/{% endif %}" class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i class="fas fa-file-invoice me-2 text-red-600"></i>hierarchy ICCD</a></li>
                   <li><a href="{% if site and site.id %}/sites/{{ site.id }}/geographic-map{% else %}/sites/geographic-map/{% endif %}" class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i class="fas fa-map me-2 text-purple-600"></i>geographic map</a></li>
-                  <li><a href="{% if site and site.id %}/sites/{{ site.id }}/archaeological-plans{% else %}/sites/archaeological-plans/{% endif %}" class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i class="fas fa-map me-2 text-purple-600"></i>Piante Archeologiche</a></li>
+                  <li><a href="{% if site and site.id %}/plans/view/{{ site.id }}/archaeological-plans{% else %}/plans/view/archaeological-plans/{% endif %}" class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i class="fas fa-map me-2 text-purple-600"></i>Piante Archeologiche</a></li>
             </ul>
          </li>
 

@@ -111,7 +111,7 @@ document.addEventListener('alpine:init', () => {
         
         async loadAvailablePlans() {
             try {
-                const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans`);
+                const response = await fetch(`/plans/api/archaeological-plans/sites/${siteId}/plans`);
                 if (response.ok) {
                     const data = await response.json();
                     this.availablePlans = data.plans;
@@ -130,7 +130,7 @@ document.addEventListener('alpine:init', () => {
         
         async loadAvailableModules() {
             try {
-                const response = await fetch(`/api/archaeological-plans/sites/${siteId}/data-collection-modules`);
+                const response = await fetch(`/plans/api/archaeological-plans/sites/${siteId}/data-collection-modules`);
                 if (response.ok) {
                     this.availableModules = await response.json();
                 }
@@ -149,7 +149,7 @@ document.addEventListener('alpine:init', () => {
             
             try {
                 // Carica dettagli pianta
-                const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans/${this.selectedPlanId}`);
+                const response = await fetch(`/plans/api/archaeological-plans/sites/${siteId}/plans/${this.selectedPlanId}`);
                 if (response.ok) {
                     this.currentPlan = await response.json();
                     
@@ -185,7 +185,7 @@ document.addEventListener('alpine:init', () => {
                 });
                 
                 // Add new plan overlay
-                const imageUrl = `/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/image`;
+                const imageUrl = `/plans/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/image`;
                 const bounds = [
                     [this.currentPlan.bounds.south || 0, this.currentPlan.bounds.west || 0],
                     [this.currentPlan.bounds.north || 1000, this.currentPlan.bounds.east || 1500]
@@ -226,7 +226,7 @@ document.addEventListener('alpine:init', () => {
                 formData.append('surveyor', this.newPlan.surveyor);
                 formData.append('is_primary', this.newPlan.is_primary);
                 
-                const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans/upload`, {
+                const response = await fetch(`/plans/api/archaeological-plans/sites/${siteId}/plans/upload`, {
                     method: 'POST',
                     body: formData
                 });
@@ -281,7 +281,7 @@ document.addEventListener('alpine:init', () => {
             
             if (confirm(`Sei sicuro di voler eliminare la pianta "${this.currentPlan.name}"? Questa azione non può essere annullata.`)) {
                 try {
-                    const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}`, {
+                    const response = await fetch(`/plans/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}`, {
                         method: 'DELETE'
                     });
                     
@@ -427,7 +427,7 @@ document.addEventListener('alpine:init', () => {
             if (!this.currentPlan) return;
             
             try {
-                const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/excavation-units`);
+                const response = await fetch(`/plans/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/excavation-units`);
                 if (response.ok) {
                     const data = await response.json();
                     this.excavationUnits = data.excavation_units;
@@ -517,7 +517,7 @@ document.addEventListener('alpine:init', () => {
                     notes: this.newUnit.notes
                 };
                 
-                const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/excavation-units`, {
+                const response = await fetch(`/plans/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/excavation-units`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -553,7 +553,7 @@ document.addEventListener('alpine:init', () => {
             if (!this.currentPlan) return;
             
             try {
-                const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/archaeological-data`);
+                const response = await fetch(`/plans/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/archaeological-data`);
                 if (response.ok) {
                     const data = await response.json();
                     this.archaeologicalData = data.archaeological_data;
@@ -761,7 +761,7 @@ document.addEventListener('alpine:init', () => {
         async removeUnit(unitId) {
             if (confirm('Sei sicuro di voler eliminare questa unità di scavo?')) {
                 try {
-                    const response = await fetch(`/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/excavation-units/${unitId}`, {
+                    const response = await fetch(`/plans/api/archaeological-plans/sites/${siteId}/plans/${this.currentPlan.id}/excavation-units/${unitId}`, {
                         method: 'DELETE'
                     });
                     

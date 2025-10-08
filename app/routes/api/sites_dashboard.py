@@ -17,7 +17,7 @@ from sqlalchemy import select, func, and_
 dashboard_router = APIRouter()
 
 
-@dashboard_router.get("/{site_id}/api/stats")
+@dashboard_router.get("/site/{site_id}/dashboard/stats")
 async def get_site_stats_api(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),

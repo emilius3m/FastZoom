@@ -23,7 +23,7 @@ from app.models.form_schemas import FormSchema
 from app.models.users import User
 from app.services.storage_service import storage_service
 
-plans_router = APIRouter(prefix="/api/archaeological-plans", tags=["archaeological_plans"])
+plans_router = APIRouter(prefix="/api/archaeological-plan", tags=["Archaeological Plans"])
 
 
 async def get_site_access_for_plans(
@@ -68,7 +68,7 @@ async def get_site_access_for_plans(
 
 # === PIANTE ARCHEOLOGICHE ===
 
-@plans_router.get("/sites/{site_id}/plans")
+@plans_router.get("/site/{site_id}/plans")
 async def get_site_plans(
     site_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),
@@ -100,7 +100,7 @@ async def get_site_plans(
     })
 
 
-@plans_router.post("/sites/{site_id}/plans/upload")
+@plans_router.post("/site/{site_id}/plan/upload")
 async def upload_archaeological_plan(
     site_id: UUID,
     plan_file: UploadFile = File(...),
@@ -203,7 +203,7 @@ async def upload_archaeological_plan(
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Errore caricamento pianta: {str(e)}")
 
-@plans_router.put("/sites/{site_id}/plans/{plan_id}")
+@plans_router.put("/site/{site_id}/plan/{plan_id}")
 async def update_archaeological_plan(
     site_id: UUID,
     plan_id: UUID,
@@ -279,7 +279,7 @@ async def update_archaeological_plan(
         raise HTTPException(status_code=500, detail=f"Errore aggiornamento pianta: {str(e)}")
 
 
-@plans_router.delete("/sites/{site_id}/plans/{plan_id}")
+@plans_router.delete("/site/{site_id}/plan/{plan_id}")
 async def delete_archaeological_plan(
     site_id: UUID,
     plan_id: UUID,
@@ -333,7 +333,7 @@ async def delete_archaeological_plan(
 
 
 
-@plans_router.get("/sites/{site_id}/plans/{plan_id}")
+@plans_router.get("/site/{site_id}/plan/{plan_id}")
 async def get_plan_details(
     site_id: UUID,
     plan_id: UUID,
@@ -381,7 +381,7 @@ async def get_plan_details(
     return JSONResponse(plan_data)
 
 
-@plans_router.get("/sites/{site_id}/plans/{plan_id}/image")
+@plans_router.get("/site/{site_id}/plan/{plan_id}/image")
 async def get_plan_image(
     site_id: UUID,
     plan_id: UUID,
@@ -495,7 +495,7 @@ async def get_plan_image(
 
 # === UNITÀ DI SCAVO ===
 
-@plans_router.get("/sites/{site_id}/plans/{plan_id}/excavation-units")
+@plans_router.get("/site/{site_id}/plan/{plan_id}/excavation-units")
 async def get_plan_excavation_units(
     site_id: UUID,
     plan_id: UUID,
@@ -527,7 +527,7 @@ async def get_plan_excavation_units(
     })
 
 
-@plans_router.post("/sites/{site_id}/plans/{plan_id}/excavation-units")
+@plans_router.post("/site/{site_id}/plan/{plan_id}/excavation-units")
 async def create_excavation_unit(
     site_id: UUID,
     plan_id: UUID,
@@ -603,7 +603,7 @@ async def create_excavation_unit(
         raise HTTPException(status_code=500, detail=f"Errore creazione unità: {str(e)}")
 
 
-@plans_router.put("/sites/{site_id}/plans/{plan_id}/excavation-units/{unit_id}")
+@plans_router.put("/site/{site_id}/plan/{plan_id}/excavation-units/{unit_id}")
 async def update_excavation_unit(
     site_id: UUID,
     plan_id: UUID,
@@ -682,7 +682,7 @@ async def update_excavation_unit(
         raise HTTPException(status_code=500, detail=f"Errore aggiornamento unità: {str(e)}")
 
 
-@plans_router.delete("/sites/{site_id}/plans/{plan_id}/excavation-units/{unit_id}")
+@plans_router.delete("/site/{site_id}/plan/{plan_id}/excavation-units/{unit_id}")
 async def delete_excavation_unit(
     site_id: UUID,
     plan_id: UUID,
@@ -730,7 +730,7 @@ async def delete_excavation_unit(
 
 # === DATI ARCHEOLOGICI ===
 
-@plans_router.get("/sites/{site_id}/plans/{plan_id}/archaeological-data")
+@plans_router.get("/site/{site_id}/plan/{plan_id}/archaeological-data")
 async def get_plan_archaeological_data(
     site_id: UUID,
     plan_id: UUID,
@@ -773,7 +773,7 @@ async def get_plan_archaeological_data(
     })
 
 
-@plans_router.post("/sites/{site_id}/plans/{plan_id}/archaeological-data")
+@plans_router.post("/site/{site_id}/plan/{plan_id}/archaeological-data")
 async def create_archaeological_data(
     site_id: UUID,
     plan_id: UUID,
@@ -848,7 +848,7 @@ async def create_archaeological_data(
         logger.error(f"Error creating archaeological data: {e}")
         await db.rollback()
 
-@plans_router.put("/sites/{site_id}/plans/{plan_id}/archaeological-data/{data_id}")
+@plans_router.put("/site/{site_id}/plan/{plan_id}/archaeological-data/{data_id}")
 async def update_archaeological_data(
     site_id: UUID,
     plan_id: UUID,
@@ -921,7 +921,7 @@ async def update_archaeological_data(
         raise HTTPException(status_code=500, detail=f"Errore aggiornamento dato: {str(e)}")
 
 
-@plans_router.delete("/sites/{site_id}/plans/{plan_id}/archaeological-data/{data_id}")
+@plans_router.delete("/site/{site_id}/plan/{plan_id}/archaeological-data/{data_id}")
 async def delete_archaeological_data(
     site_id: UUID,
     plan_id: UUID,
@@ -969,7 +969,7 @@ async def delete_archaeological_data(
         raise HTTPException(status_code=500, detail=f"Errore creazione dato: {str(e)}")
 
 
-@plans_router.get("/sites/{site_id}/data-collection-modules")
+@plans_router.get("/site/{site_id}/data-collection-modules")
 async def get_data_collection_modules(
     site_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),

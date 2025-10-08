@@ -213,7 +213,7 @@ async def admin_sites_create(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@admin_router.get("/sites/{site_id}/edit/", response_class=HTMLResponse)
+@admin_router.get("/site/{site_id}/edit/", response_class=HTMLResponse)
 async def admin_sites_edit(
     request: Request,
     site_id: UUID,
@@ -240,7 +240,7 @@ async def admin_sites_edit(
     
     return templates.TemplateResponse("admin/sites_form.html", context)
 
-@admin_router.post("/sites/{site_id}/edit/")
+@admin_router.post("/site/{site_id}/edit/")
 async def admin_sites_update(
     site_id: UUID,
     name: str = Form(),
@@ -955,7 +955,7 @@ async def admin_permissions_create(
 
 # ===== ELIMINAZIONE PERICOLOSA SITI ARCHEOLOGICI =====
 
-@admin_router.post("/sites/{site_id}/dangerous-delete/")
+@admin_router.post("/site/{site_id}/dangerous-delete/")
 async def admin_sites_dangerous_delete(
     site_id: UUID,
     request: Request,

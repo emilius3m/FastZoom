@@ -16,7 +16,7 @@ from app.models.user_sites import UserSitePermission
 from app.models.users import User
 from app.templates import templates
 
-photos_view_router = APIRouter(prefix="/sites", tags=["photos"])
+photos_view_router = APIRouter(prefix="/view", tags=["photos"])
 
 async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
     """Recupera informazioni utente corrente"""

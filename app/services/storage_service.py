@@ -100,7 +100,7 @@ class StorageService:
             logger.warning(f"Archaeological MinIO upload failed: {e}, falling back to local storage")
             # Fallback a storage locale
             return await self._save_file_locally_from_content(
-                file_content, site_id, user_id, unique_filename, f"storage/sites/{site_id}/{unique_filename}"
+                file_content, site_id, user_id, unique_filename, f"storage/site/{site_id}/{unique_filename}"
             )
 
     async def delete_file(self, object_name: str) -> bool:
@@ -307,7 +307,7 @@ class StorageService:
 
             # 🔧 CORREZIONE: Restituisci path che photos_router.py riconoscerà come locale
             # Il photos_router.py controlla: elif photo.file_path.startswith("storage/")
-            relative_path = f"storage/sites/{site_id}/{unique_filename}"
+            relative_path = f"storage/site/{site_id}/{unique_filename}"
 
             logger.info(f"File saved locally: {file_path} ({file_size} bytes)")
             return unique_filename, relative_path, file_size
