@@ -22,7 +22,8 @@ from app.core.minio_settings import settings
 class ArchaeologicalMinIOService:
     """Servizio MinIO ottimizzato per dati archeologici con supporto avanzato"""
 
-    def __init__(self):
+    def _create_minio_client(self) -> Minio:
+        """Crea e configura il client MinIO con supporto fallback"""
         # Supporto sia settings che environment variables per flessibilità
         minio_url = settings.minio_url.replace("http://", "").replace("https://", "")
         access_key = settings.minio_access_key
@@ -36,12 +37,132 @@ class ArchaeologicalMinIOService:
             secret_key = os.getenv("MINIO_SECRET_KEY", "")
             secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
 
-        self.client = Minio(
+        return Minio(
             endpoint=minio_url,
             access_key=access_key,
             secret_key=secret_key,
             secure=secure
         )
+
+    async def _handle_storage_full_error(
+        self,
+        operation_func,
+        operation_name: str,
+        target_freed_mb: int,
+        *args,
+        **kwargs
+    ):
+        """Gestione unificata errori storage full con cleanup automatico"""
+        try:
+            # Prima tentativo
+            return await operation_func(*args, **kwargs)
+
+        except S3Error as e:
+            error_msg = str(e)
+
+            # Verifica se è errore storage full
+            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
+                logger.error(f"MinIO storage full during {operation_name}")
+
+                # Tenta cleanup di emergenza
+                try:
+                    from app.services.storage_management_service import storage_management_service
+                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=target_freed_mb)
+
+                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > (target_freed_mb // 2):
+                        logger.info(f"Emergency cleanup successful for {operation_name}, retrying...")
+
+                        # Riprova operazione dopo cleanup
+                        return await operation_func(*args, **kwargs)
+                    else:
+                        logger.error(f"Emergency cleanup insufficient for {operation_name}")
+                        raise HTTPException(status_code=507, detail="Storage full, cleanup insufficient")
+
+                except Exception as cleanup_error:
+                    logger.error(f"Emergency cleanup failed for {operation_name}: {cleanup_error}")
+                    raise HTTPException(status_code=507, detail="Storage full, cleanup failed")
+            else:
+                logger.error(f"MinIO {operation_name} error: {e}")
+                raise HTTPException(status_code=500, detail=f"{operation_name} failed")
+
+    async def _upload_with_retry(
+        self,
+        bucket_name: str,
+        object_name: str,
+        data: bytes,
+        content_type: str = None,
+        metadata: Dict[str, str] = None,
+        operation_name: str = "upload",
+        target_freed_mb: int = 100
+    ) -> str:
+        """Metodo base per upload con gestione errori unificata"""
+        async def upload_operation():
+            result = await asyncio.to_thread(
+                self.client.put_object,
+                bucket_name=bucket_name,
+                object_name=object_name,
+                data=io.BytesIO(data),
+                length=len(data),
+                content_type=content_type,
+                metadata=metadata
+            )
+            return f"minio://{bucket_name}/{object_name}"
+
+        return await self._handle_storage_full_error(
+            upload_operation,
+            operation_name,
+            target_freed_mb
+        )
+
+    async def _generate_presigned_url(
+        self,
+        bucket_name: str,
+        object_name: str,
+        expires_hours: int = 24,
+        operation_name: str = "URL generation"
+    ) -> Optional[str]:
+        """Metodo base per generazione URL presigned"""
+        try:
+            url = await asyncio.to_thread(
+                self.client.presigned_get_object,
+                bucket_name=bucket_name,
+                object_name=object_name,
+                expires=timedelta(hours=expires_hours)
+            )
+            return url
+
+        except S3Error as e:
+            logger.error(f"MinIO {operation_name} error: {e}")
+            return None
+
+    def _create_base_metadata(self, site_id: str, content_type: str = None) -> Dict[str, str]:
+        """Crea metadati di base comuni a tutti gli oggetti"""
+        metadata = {
+            'x-amz-meta-site-id': site_id,
+            'x-amz-meta-upload-date': str(datetime.now().isoformat())
+        }
+
+        if content_type:
+            metadata['Content-Type'] = content_type
+
+        return metadata
+
+    def _merge_metadata(self, base_metadata: Dict[str, str], additional_metadata: Dict[str, Any]) -> Dict[str, str]:
+        """Unisce metadati di base con metadati aggiuntivi"""
+        merged = base_metadata.copy()
+
+        for field, value in additional_metadata.items():
+            if value is not None:
+                # Converte valori complessi in stringa
+                if isinstance(value, (list, dict)):
+                    merged[f'x-amz-meta-{field}'] = json.dumps(value)
+                else:
+                    merged[f'x-amz-meta-{field}'] = str(value)
+
+        return merged
+
+    def __init__(self):
+        self.client = self._create_minio_client()
 
         # Bucket specializzati per archeologia
         self.buckets = {
@@ -179,82 +300,36 @@ class ArchaeologicalMinIOService:
 
         object_name = f"{site_id}/{photo_id}"
 
-        # Usa il nuovo sistema di mapping metadati
-        metadata = self._map_archaeological_metadata(site_id, archaeological_metadata)
+        # Crea metadati usando il sistema unificato
+        base_metadata = self._create_base_metadata(site_id, 'image/jpeg')
+        metadata = self._merge_metadata(base_metadata, archaeological_metadata)
 
-        try:
-            # Upload con supporto multipart per file grandi (>5MB)
-            result = await asyncio.to_thread(
-                self.client.put_object,
-                bucket_name=self.buckets['photos'],
-                object_name=object_name,
-                data=io.BytesIO(photo_data),
-                length=len(photo_data),
-                content_type='image/jpeg',
-                metadata=metadata
-            )
+        # Usa il metodo di upload unificato
+        result_url = await self._upload_with_retry(
+            bucket_name=self.buckets['photos'],
+            object_name=object_name,
+            data=photo_data,
+            content_type='image/jpeg',
+            metadata=metadata,
+            operation_name="photo upload",
+            target_freed_mb=500
+        )
 
-            logger.info(f"Photo uploaded with metadata: {object_name} ({len(photo_data)} bytes)")
-            return f"minio://{self.buckets['photos']}/{object_name}"
-
-        except S3Error as e:
-            error_msg = str(e)
-            
-            # Check if it's a storage full error
-            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
-                logger.error(f"MinIO storage full during photo upload: {photo_id}")
-                
-                # Try emergency cleanup
-                try:
-                    from app.services.storage_management_service import storage_management_service
-                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=500)
-                    
-                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > 200:
-                        logger.info(f"Emergency cleanup successful, retrying photo upload for {photo_id}")
-                        
-                        # Retry upload after cleanup
-                        result = await asyncio.to_thread(
-                            self.client.put_object,
-                            bucket_name=self.buckets['photos'],
-                            object_name=object_name,
-                            data=io.BytesIO(photo_data),
-                            length=len(photo_data),
-                            content_type='image/jpeg',
-                            metadata=metadata
-                        )
-                        
-                        logger.info(f"Photo uploaded after cleanup: {object_name} ({len(photo_data)} bytes)")
-                        return f"minio://{self.buckets['photos']}/{object_name}"
-                    else:
-                        logger.error(f"Emergency cleanup insufficient for photo {photo_id}")
-                        raise HTTPException(status_code=507, detail="Storage full, cleanup insufficient")
-                        
-                except Exception as cleanup_error:
-                    logger.error(f"Emergency cleanup failed for photo {photo_id}: {cleanup_error}")
-                    raise HTTPException(status_code=507, detail="Storage full, cleanup failed")
-            else:
-                logger.error(f"MinIO upload error: {e}")
-                raise HTTPException(status_code=500, detail="Upload failed")
+        logger.info(f"Photo uploaded with metadata: {object_name} ({len(photo_data)} bytes)")
+        return result_url
 
     async def get_photo_stream_url(self, photo_path: str, expires_hours: int = 24) -> Optional[str]:
         """Genera URL temporaneo per streaming foto grandi"""
 
         bucket, object_name = self._parse_minio_path(photo_path)
 
-        try:
-            # URL pre-firmato con scadenza
-            url = await asyncio.to_thread(
-                self.client.presigned_get_object,
-                bucket_name=bucket,
-                object_name=object_name,
-                expires=timedelta(hours=expires_hours)
-            )
-
-            return url
-
-        except S3Error as e:
-            logger.error(f"MinIO URL generation error: {e}")
-            return None
+        # Usa il metodo base per generazione URL presigned
+        return await self._generate_presigned_url(
+            bucket_name=bucket,
+            object_name=object_name,
+            expires_hours=expires_hours,
+            operation_name="photo stream URL generation"
+        )
 
     async def search_photos_by_metadata(
         self,
@@ -315,75 +390,35 @@ class ArchaeologicalMinIOService:
 
         object_name = f"{photo_id}.jpg"
 
-        try:
-            result = await asyncio.to_thread(
-                self.client.put_object,
-                bucket_name=self.buckets['thumbnails'],
-                object_name=object_name,
-                data=io.BytesIO(thumbnail_data),
-                length=len(thumbnail_data),
-                metadata={'Content-Type': 'image/jpeg'}
-            )
+        # Crea metadati di base per thumbnail
+        metadata = self._create_base_metadata("", 'image/jpeg')
 
-            logger.info(f"Thumbnail uploaded: {object_name}")
-            return f"{self.buckets['thumbnails']}/{object_name}"
+        # Usa il metodo di upload unificato
+        result_url = await self._upload_with_retry(
+            bucket_name=self.buckets['thumbnails'],
+            object_name=object_name,
+            data=thumbnail_data,
+            content_type='image/jpeg',
+            metadata=metadata,
+            operation_name="thumbnail upload",
+            target_freed_mb=100
+        )
 
-        except S3Error as e:
-            error_msg = str(e)
-            
-            # Check if it's a storage full error
-            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
-                logger.error(f"MinIO storage full during thumbnail upload: {photo_id}")
-                
-                # Try to trigger emergency cleanup
-                try:
-                    from app.services.storage_management_service import storage_management_service
-                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=100)
-                    
-                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > 50:
-                        logger.info(f"Emergency cleanup successful, retrying thumbnail upload for {photo_id}")
-                        
-                        # Retry upload after cleanup
-                        result = await asyncio.to_thread(
-                            self.client.put_object,
-                            bucket_name=self.buckets['thumbnails'],
-                            object_name=object_name,
-                            data=io.BytesIO(thumbnail_data),
-                            length=len(thumbnail_data),
-                            metadata={'Content-Type': 'image/jpeg'}
-                        )
-                        
-                        logger.info(f"Thumbnail uploaded after cleanup: {object_name}")
-                        return f"{self.buckets['thumbnails']}/{object_name}"
-                    else:
-                        logger.error(f"Emergency cleanup insufficient for thumbnail {photo_id}")
-                        raise HTTPException(status_code=507, detail="Storage full, cleanup insufficient")
-                        
-                except Exception as cleanup_error:
-                    logger.error(f"Emergency cleanup failed for thumbnail {photo_id}: {cleanup_error}")
-                    raise HTTPException(status_code=507, detail="Storage full, cleanup failed")
-            else:
-                logger.error(f"MinIO thumbnail upload error: {e}")
-                raise HTTPException(status_code=500, detail="Thumbnail upload failed")
+        logger.info(f"Thumbnail uploaded: {object_name}")
+        return result_url
 
     async def get_thumbnail_url(self, photo_id: str, expires_hours: int = 24) -> Optional[str]:
         """Genera URL per thumbnail"""
 
         object_name = f"{photo_id}.jpg"
 
-        try:
-            url = await asyncio.to_thread(
-                self.client.presigned_get_object,
-                bucket_name=self.buckets['thumbnails'],
-                object_name=object_name,
-                expires=timedelta(hours=expires_hours)
-            )
-
-            return url
-
-        except S3Error as e:
-            logger.error(f"MinIO thumbnail URL generation error: {e}")
-            return None
+        # Usa il metodo base per generazione URL presigned
+        return await self._generate_presigned_url(
+            bucket_name=self.buckets['thumbnails'],
+            object_name=object_name,
+            expires_hours=expires_hours,
+            operation_name="thumbnail URL generation"
+        )
 
     async def upload_document(
         self,
@@ -396,57 +431,53 @@ class ArchaeologicalMinIOService:
 
         object_name = f"{site_id}/{document_id}.pdf"
 
-        metadata = {
-            'x-amz-meta-site-id': site_id,
-            'x-amz-meta-document-type': document_metadata.get('document_type', ''),
-            'x-amz-meta-title': document_metadata.get('title', ''),
-            'x-amz-meta-author': document_metadata.get('author', ''),
-            'x-amz-meta-date': document_metadata.get('date', ''),
-            'Content-Type': 'application/pdf'
-        }
+        # Crea metadati usando il sistema unificato
+        base_metadata = self._create_base_metadata(site_id, 'application/pdf')
+        metadata = self._merge_metadata(base_metadata, {
+            'document-type': document_metadata.get('document_type', ''),
+            'title': document_metadata.get('title', ''),
+            'author': document_metadata.get('author', ''),
+            'date': document_metadata.get('date', '')
+        })
 
-        try:
-            result = await asyncio.to_thread(
-                self.client.put_object,
-                bucket_name=self.buckets['documents'],
-                object_name=object_name,
-                data=io.BytesIO(document_data),
-                length=len(document_data),
-                metadata=metadata
-            )
+        # Usa il metodo di upload unificato
+        result_url = await self._upload_with_retry(
+            bucket_name=self.buckets['documents'],
+            object_name=object_name,
+            data=document_data,
+            content_type='application/pdf',
+            metadata=metadata,
+            operation_name="document upload",
+            target_freed_mb=200
+        )
 
-            logger.info(f"Document uploaded: {object_name}")
-            return f"minio://{self.buckets['documents']}/{object_name}"
-
-        except S3Error as e:
-            logger.error(f"MinIO document upload error: {e}")
-            raise HTTPException(status_code=500, detail="Document upload failed")
+        logger.info(f"Document uploaded: {object_name}")
+        return result_url
 
     async def create_backup(self, site_id: str, backup_data: bytes, backup_name: str) -> str:
         """Crea backup del sito"""
 
         object_name = f"{site_id}/{backup_name}"
 
-        try:
-            result = await asyncio.to_thread(
-                self.client.put_object,
-                bucket_name=self.buckets['backups'],
-                object_name=object_name,
-                data=io.BytesIO(backup_data),
-                length=len(backup_data),
-                metadata={
-                    'Content-Type': 'application/zip',
-                    'x-amz-meta-backup-type': 'site_backup',
-                    'x-amz-meta-site-id': site_id
-                }
-            )
+        # Crea metadati per backup
+        base_metadata = self._create_base_metadata(site_id, 'application/zip')
+        metadata = self._merge_metadata(base_metadata, {
+            'backup-type': 'site_backup'
+        })
 
-            logger.info(f"Backup created: {object_name}")
-            return f"minio://{self.buckets['backups']}/{object_name}"
+        # Usa il metodo di upload unificato
+        result_url = await self._upload_with_retry(
+            bucket_name=self.buckets['backups'],
+            object_name=object_name,
+            data=backup_data,
+            content_type='application/zip',
+            metadata=metadata,
+            operation_name="backup creation",
+            target_freed_mb=1000  # I backup possono essere grandi
+        )
 
-        except S3Error as e:
-            logger.error(f"MinIO backup error: {e}")
-            raise HTTPException(status_code=500, detail="Backup creation failed")
+        logger.info(f"Backup created: {object_name}")
+        return result_url
 
     def _parse_minio_path(self, path: str) -> Tuple[str, str]:
         """Parse minio://bucket/object path or legacy path format"""
@@ -542,27 +573,26 @@ class ArchaeologicalMinIOService:
         """Upload tiles per deep zoom viewing"""
         object_name = f"{site_id}/tiles/{photo_id}/tiles.zip"
 
-        try:
-            result = await asyncio.to_thread(
-                self.client.put_object,
-                bucket_name=self.buckets['tiles'],
-                object_name=object_name,
-                data=io.BytesIO(tiles_data),
-                length=len(tiles_data),
-                content_type='application/zip',
-                metadata={
-                    'x-amz-meta-site-id': site_id,
-                    'x-amz-meta-photo-id': photo_id,
-                    'x-amz-meta-tile-type': 'deep-zoom'
-                }
-            )
+        # Crea metadati per tiles
+        base_metadata = self._create_base_metadata(site_id, 'application/zip')
+        metadata = self._merge_metadata(base_metadata, {
+            'photo-id': photo_id,
+            'tile-type': 'deep-zoom'
+        })
 
-            logger.info(f"Tiles uploaded for photo: {photo_id}")
-            return f"minio://{self.buckets['tiles']}/{object_name}"
+        # Usa il metodo di upload unificato
+        result_url = await self._upload_with_retry(
+            bucket_name=self.buckets['tiles'],
+            object_name=object_name,
+            data=tiles_data,
+            content_type='application/zip',
+            metadata=metadata,
+            operation_name="tiles upload",
+            target_freed_mb=300
+        )
 
-        except S3Error as e:
-            logger.error(f"Tiles upload error: {e}")
-            raise HTTPException(status_code=500, detail="Tiles upload failed")
+        logger.info(f"Tiles uploaded for photo: {photo_id}")
+        return result_url
 
     async def stream_large_file(self, object_name: str, range_header: str = None):
         """Stream file grande con supporto Range requests"""
@@ -624,18 +654,18 @@ class ArchaeologicalMinIOService:
         """Genera URL presigned per accesso temporaneo sicuro"""
         object_name = f"{site_id}/{photo_id}"
 
-        try:
-            # URL presigned per download sicuro
-            url = await asyncio.to_thread(
-                self.client.presigned_get_object,
-                bucket_name=self.buckets['photos'],
-                object_name=object_name,
-                expires=timedelta(seconds=expires)
-            )
-            return url
-        except S3Error as e:
-            logger.error(f"Error generating presigned URL: {e}")
-            return None
+        # Converte secondi in ore per il metodo base
+        expires_hours = expires // 3600
+
+        # Usa il metodo base per generazione URL presigned
+        url = await self._generate_presigned_url(
+            bucket_name=self.buckets['photos'],
+            object_name=object_name,
+            expires_hours=expires_hours,
+            operation_name="photo presigned URL generation"
+        )
+
+        return url
 
     async def process_photo_with_deep_zoom(
         self,
