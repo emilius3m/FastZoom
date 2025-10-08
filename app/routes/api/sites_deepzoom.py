@@ -17,7 +17,7 @@ from app.services.deep_zoom_minio_service import deep_zoom_minio_service
 deepzoom_router = APIRouter()
 
 
-@deepzoom_router.get("/{site_id}/photos/{photo_id}/deepzoom/info")
+@deepzoom_router.get("/site/{site_id}/photos/{photo_id}/deepzoom/info")
 async def get_deep_zoom_info(
         site_id: UUID,
         photo_id: UUID,
@@ -217,7 +217,7 @@ async def get_deep_zoom_processing_status(
     })
 
 
-@deepzoom_router.get("/{site_id}/api/photos/processing-queue")
+@deepzoom_router.get("/site/{site_id}/photos/processing-queue")
 async def get_processing_queue_status(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),

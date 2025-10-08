@@ -1959,7 +1959,7 @@ function photosManager() {
                         // Use tile format from deep zoom info (PNG for transparent images, JPG for others)
                         const tileFormat = deepZoomInfo.tile_format || 'jpg';
                         const extension = tileFormat === 'png' ? 'png' : 'jpg';
-                        const url = `/sites/${siteId}/photos/${photoId}/deepzoom/tiles/${level}/${x}_${y}.${extension}`;
+                        const url = `/api/site/${siteId}/photos/${photoId}/deepzoom/tiles/${level}/${x}_${y}.${extension}`;
                         return url;
                     }
                 };
@@ -2141,7 +2141,7 @@ function photosManager() {
         getCurrentSiteId() {
             // Try to get site ID from URL path
             const pathSegments = window.location.pathname.split('/');
-            const sitesIndex = pathSegments.indexOf('sites');
+            const sitesIndex = pathSegments.indexOf('view');
             if (sitesIndex !== -1 && pathSegments[sitesIndex + 1]) {
                 return pathSegments[sitesIndex + 1];
             }
@@ -2794,7 +2794,7 @@ function photosManager() {
 
             // Determine WebSocket URL (ws or wss based on protocol)
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/sites/${siteId}/ws/notifications`;
+            const wsUrl = `${protocol}//${window.location.host}/site/${siteId}/ws/notifications`;
 
             console.log(`🔌 Connecting WebSocket (attempt ${this.wsReconnectAttempts + 1}/${this.wsMaxReconnectAttempts}):`, wsUrl);
 
