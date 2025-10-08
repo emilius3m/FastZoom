@@ -639,7 +639,7 @@ async def stream_photo_from_minio(
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Stream foto da MinIO con URL pre-firmato - CONSOLIDATED"""
+    """Stream foto - CONSOLIDATED"""
     site, permission = site_access
 
     if not permission.can_read():
@@ -656,7 +656,7 @@ async def get_photo_thumbnail(
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Ottieni thumbnail foto da MinIO - CONSOLIDATED"""
+    """Ottieni thumbnail foto - CONSOLIDATED"""
     site, permission = site_access
 
     if not permission.can_read():
@@ -673,7 +673,7 @@ async def get_photo_full(
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Ottieni immagine completa foto da MinIO - CONSOLIDATED"""
+    """Ottieni immagine completa foto - CONSOLIDATED"""
     site, permission = site_access
 
     if not permission.can_read():
