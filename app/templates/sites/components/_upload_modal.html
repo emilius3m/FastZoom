@@ -538,7 +538,7 @@ document.addEventListener('alpine:init', () => {
             console.log(`📦 Sending batch request with ${this.selectedFiles.length} files + metadata`);
             
             // Single API call with all files
-            const response = await fetch(`/api/site/{{ site.id }}/api/photos/upload`, {
+            const response = await fetch(`/api/site/{{ site.id }}/photos/upload`, {
                 method: 'POST',
                 body: formData
             });
@@ -598,7 +598,7 @@ document.addEventListener('alpine:init', () => {
                     reject(new Error('Network error during upload'));
                 });
                 
-                xhr.open('POST', `/api/site/{{ site.id }}/api/photos/upload`);
+                xhr.open('POST', `/api/site/{{ site.id }}/photos/upload`);
                 xhr.send(formData);
             });
         },
@@ -617,7 +617,7 @@ document.addEventListener('alpine:init', () => {
                 }
             });
             
-            const response = await fetch(`/api/site/{{ site.id }}/api/photos/upload`, {
+            const response = await fetch(`/api/site/{{ site.id }}/photos/upload`, {
                 method: 'POST',
                 body: formData
             });

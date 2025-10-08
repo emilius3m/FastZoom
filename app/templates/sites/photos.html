@@ -2106,7 +2106,7 @@ function photosManager() {
                 const siteId = this.getCurrentSiteId();
                 console.log('Getting deep zoom info for:', siteId, this.currentPhoto.id);
                 
-                const response = await fetch(`/sites/${siteId}/photos/${this.currentPhoto.id}/deepzoom/info`, {
+                const response = await fetch(`/api/site/${siteId}/photos/${this.currentPhoto.id}/deepzoom/info`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -2513,7 +2513,7 @@ function photosManager() {
             try {
                 console.log('Saving single photo edit with metadata:', metadata);
 
-                const response = await fetch(`/sites/{{ site.id }}/photos/${this.selectedPhoto.id}/update`, {
+                const response = await fetch(`/api/site/{{ site.id }}/photos/${this.selectedPhoto.id}/update`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -2581,7 +2581,7 @@ function photosManager() {
                     }
                 });
 
-                const response = await fetch(`/sites/{{ site.id }}/photos/bulk-update`, {
+                const response = await fetch(`/api/site/{{ site.id }}/photos/bulk-update`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -2652,7 +2652,7 @@ function photosManager() {
             this.isDeleting = true;
 
             try {
-                const response = await fetch(`/sites/{{ site.id }}/photos/${this.photoToDelete.id}`, {
+                const response = await fetch(`/api/site/{{ site.id }}/photos/${this.photoToDelete.id}`, {
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`
@@ -2703,7 +2703,7 @@ function photosManager() {
             this.isBulkDeleting = true;
 
             try {
-                const response = await fetch(`/sites/{{ site.id }}/api/photos/bulk-delete`, {
+                const response = await fetch(`/api/site/{{ site.id }}/photos/bulk-delete`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -2955,7 +2955,7 @@ function photosManager() {
                 if (photoIndex !== -1) {
                     // Refresh photo data from server to get updated fields
                     try {
-                        const response = await fetch(`/sites/{{ site.id }}/api/photos`, {
+                        const response = await fetch(`/api/site/{{ site.id }}/photos`, {
                             headers: {
                                 'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                                 'Content-Type': 'application/json'
@@ -3035,7 +3035,7 @@ function photosManager() {
             try {
                 const siteId = this.getCurrentSiteId();
                 
-                const response = await fetch(`/sites/${siteId}/photos/${photo.id}/deepzoom/status`, {
+                const response = await fetch(`/api/site/${siteId}/photos/${photo.id}/deepzoom/status`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'

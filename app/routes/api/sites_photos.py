@@ -982,7 +982,7 @@ async def delete_photo(
         )
 
 
-@photos_router.post("/site/{site_id}/api/photos/bulk-delete")
+@photos_router.post("/site/{site_id}/photos/bulk-delete")
 async def bulk_delete_photos(
         site_id: UUID,
         delete_data: dict,
