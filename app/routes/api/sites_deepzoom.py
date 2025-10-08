@@ -50,7 +50,7 @@ async def get_deep_zoom_info(
     return JSONResponse(deep_zoom_info)
 
 
-@deepzoom_router.get("/{site_id}/photos/{photo_id}/deepzoom/tiles/{level}/{x}_{y}.{format}")
+@deepzoom_router.get("/site/{site_id}/photos/{photo_id}/deepzoom/tiles/{level}/{x}_{y}.{format}")
 async def get_deep_zoom_tile(
         site_id: UUID,
         photo_id: UUID,
@@ -82,7 +82,7 @@ async def get_deep_zoom_tile(
 
 
 # FIXED: Aggiungi endpoint legacy per backward compatibility
-@deepzoom_router.get("/{site_id}/photos/{photo_id}/deepzoom/tiles/{level}/{x}_{y}.jpg")
+@deepzoom_router.get("/site/{site_id}/photos/{photo_id}/deepzoom/tiles/{level}/{x}_{y}.jpg")
 async def get_deep_zoom_tile_jpg(
         site_id: UUID,
         photo_id: UUID,
@@ -96,7 +96,7 @@ async def get_deep_zoom_tile_jpg(
     return await get_deep_zoom_tile(site_id, photo_id, level, x, y, "jpg", site_access, db)
 
 
-@deepzoom_router.get("/{site_id}/photos/{photo_id}/deepzoom/tiles/{level}/{x}_{y}.png")
+@deepzoom_router.get("/site/{site_id}/photos/{photo_id}/deepzoom/tiles/{level}/{x}_{y}.png")
 async def get_deep_zoom_tile_png(
         site_id: UUID,
         photo_id: UUID,
@@ -110,7 +110,7 @@ async def get_deep_zoom_tile_png(
     return await get_deep_zoom_tile(site_id, photo_id, level, x, y, "png", site_access, db)
 
 
-@deepzoom_router.post("/{site_id}/photos/{photo_id}/deepzoom/process")
+@deepzoom_router.post("/site/{site_id}/photos/{photo_id}/deepzoom/process")
 async def process_deep_zoom(
         site_id: UUID,
         photo_id: UUID,
@@ -178,7 +178,7 @@ async def process_deep_zoom(
         raise HTTPException(status_code=500, detail=f"Deep zoom processing failed: {str(e)}")
 
 
-@deepzoom_router.get("/{site_id}/photos/{photo_id}/deepzoom/status")
+@deepzoom_router.get("/site/{site_id}/photos/{photo_id}/deepzoom/status")
 async def get_deep_zoom_processing_status(
         site_id: UUID,
         photo_id: UUID,
