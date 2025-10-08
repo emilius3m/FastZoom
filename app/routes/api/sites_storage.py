@@ -14,7 +14,7 @@ from app.services.storage_management_service import storage_management_service
 storage_router = APIRouter()
 
 
-@storage_router.get("/{site_id}/api/storage/stats")
+@storage_router.get("/{site_id}/storage/stats")
 async def get_site_storage_stats(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
@@ -63,46 +63,46 @@ async def get_site_storage_stats(
         })
 
 
-@storage_router.post("/{site_id}/api/storage/cleanup")
-async def emergency_storage_cleanup(
-        site_id: UUID,
-        site_access: tuple = Depends(get_site_access),
-        db: AsyncSession = Depends(get_async_session)
-):
-    """Cleanup di emergenza dello storage MinIO"""
-    site, permission = site_access
+# @storage_router.post("/{site_id}/api/storage/cleanup")
+# async def emergency_storage_cleanup(
+#         site_id: UUID,
+#         site_access: tuple = Depends(get_site_access),
+#         db: AsyncSession = Depends(get_async_session)
+# ):
+#     """Cleanup di emergenza dello storage MinIO"""
+#     site, permission = site_access
+#
+#     if not permission.can_admin():
+#         raise HTTPException(status_code=403, detail="Solo gli amministratori possono eseguire il cleanup")
+#
+#     try:
+#         # Assicurati che tutti i bucket esistano
+#         bucket_check = await storage_management_service.ensure_buckets_exist()
+#         logger.info(f"Bucket check result: {bucket_check}")
+#
+#         # Esegui cleanup di emergenza
+#         cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=500)
+#
+#         return JSONResponse({
+#             'success': cleanup_result['success'],
+#             'total_freed_mb': cleanup_result['total_freed_mb'],
+#             'cleanup_actions': cleanup_result['cleanup_actions'],
+#             'bucket_check': bucket_check,
+#             'message': f"Cleanup completato: {cleanup_result['total_freed_mb']}MB liberati"
+#         })
+#
+#     except Exception as e:
+#         logger.error(f"Emergency cleanup failed: {e}")
+#         return JSONResponse({
+#             'success': False,
+#             'total_freed_mb': 0,
+#             'cleanup_actions': [],
+#             'error': str(e),
+#             'message': f"Cleanup fallito: {str(e)}"
+#         }, status_code=500)
 
-    if not permission.can_admin():
-        raise HTTPException(status_code=403, detail="Solo gli amministratori possono eseguire il cleanup")
 
-    try:
-        # Assicurati che tutti i bucket esistano
-        bucket_check = await storage_management_service.ensure_buckets_exist()
-        logger.info(f"Bucket check result: {bucket_check}")
-        
-        # Esegui cleanup di emergenza
-        cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=500)
-        
-        return JSONResponse({
-            'success': cleanup_result['success'],
-            'total_freed_mb': cleanup_result['total_freed_mb'],
-            'cleanup_actions': cleanup_result['cleanup_actions'],
-            'bucket_check': bucket_check,
-            'message': f"Cleanup completato: {cleanup_result['total_freed_mb']}MB liberati"
-        })
-        
-    except Exception as e:
-        logger.error(f"Emergency cleanup failed: {e}")
-        return JSONResponse({
-            'success': False,
-            'total_freed_mb': 0,
-            'cleanup_actions': [],
-            'error': str(e),
-            'message': f"Cleanup fallito: {str(e)}"
-        }, status_code=500)
-
-
-@storage_router.get("/{site_id}/api/storage/health")
+@storage_router.get("/{site_id}/storage/health")
 async def check_storage_health(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
