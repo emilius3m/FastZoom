@@ -1,11 +1,12 @@
-# app/services/photo_service.py - GESTIONE METADATI FOTO CORRETTA
+# app/services/photo_service.py - GESTIONE METADATI FOTO CORRETTA - REFACTORED
 
 import json
 import io
 import os
 import tempfile
+import functools
 from datetime import datetime
-from typing import Dict, Any, Optional, Tuple, Union
+from typing import Dict, Any, Optional, Tuple, Union, Callable
 from pathlib import Path
 from uuid import uuid4
 
@@ -15,13 +16,19 @@ import piexif
 from loguru import logger
 from fastapi import UploadFile
 
+# ORIENTATION constant - handle different PIL versions
+try:
+    from PIL.ExifTags import ORIENTATION
+except ImportError:
+    # Fallback for older PIL versions
+    ORIENTATION = 274
+
 # 🔧 CORREZIONE: Import del modello Photo corretto
 from app.models.photos import Photo, PhotoType, MaterialType, ConservationStatus
 
 # 🔧 CORREZIONE: Import condizionale di storage_service (se esiste)
 try:
     from app.services.storage_service import storage_service
-
     HAS_STORAGE_SERVICE = True
 except ImportError:
     HAS_STORAGE_SERVICE = False
@@ -35,6 +42,189 @@ try:
 except ImportError:
     HAS_MINIO = False
     logger.warning("minio not available")
+
+
+class PhotoServiceError(Exception):
+    """Eccezione base per errori del servizio foto"""
+    pass
+
+
+class ImageProcessingError(PhotoServiceError):
+    """Errore durante l'elaborazione dell'immagine"""
+    pass
+
+
+class StorageError(PhotoServiceError):
+    """Errore durante le operazioni di storage"""
+    pass
+
+
+def handle_photo_service_errors(operation_name: str) -> Callable:
+    """
+    Decorator per gestire errori centralizzati nei metodi del servizio foto
+
+    Args:
+        operation_name: Nome dell'operazione per logging
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except ImageProcessingError:
+                raise  # Rilancia errori di processamento immagine
+            except StorageError:
+                raise  # Rilancia errori di storage
+            except Exception as e:
+                logger.error(f"Errore in {operation_name}: {e}")
+                raise PhotoServiceError(f"Errore durante {operation_name}: {e}")
+        return wrapper
+    return decorator
+
+
+class ImageUtils:
+    """Utility class per operazioni comuni di processamento immagini"""
+
+    @staticmethod
+    def calculate_thumbnail_dimensions(original_size: Tuple[int, int], max_size: int) -> Tuple[int, int]:
+        """Calcola dimensioni thumbnail mantenendo aspect ratio"""
+        width, height = original_size
+
+        if width > height:
+            new_width = max_size
+            new_height = int((height * max_size) / width)
+        else:
+            new_height = max_size
+            new_width = int((width * max_size) / height)
+
+        return new_width, new_height
+
+    @staticmethod
+    def correct_image_orientation(image: Image.Image) -> Image.Image:
+        """Corregge orientamento immagine basato su EXIF"""
+        try:
+            exif = image.getexif()
+            if exif and ORIENTATION in exif:
+                orientation = exif[ORIENTATION]
+
+                if orientation == 3:
+                    return image.rotate(180, expand=True)
+                elif orientation == 6:
+                    return image.rotate(270, expand=True)
+                elif orientation == 8:
+                    return image.rotate(90, expand=True)
+        except Exception as e:
+            logger.warning(f"Errore correzione orientamento: {e}")
+
+        return image
+
+    @staticmethod
+    def prepare_image_for_thumbnail(image: Image.Image) -> Image.Image:
+        """Prepara immagine per generazione thumbnail"""
+        # Correggi orientamento
+        image = ImageUtils.correct_image_orientation(image)
+
+        # Converti in RGB se necessario
+        if image.mode in ("RGBA", "P", "LA"):
+            image = image.convert("RGB")
+
+        return image
+
+    @staticmethod
+    def create_thumbnail(image: Image.Image, max_size: int) -> Image.Image:
+        """Crea thumbnail da immagine"""
+        original_size = image.size
+        new_size = ImageUtils.calculate_thumbnail_dimensions(original_size, max_size)
+        return image.resize(new_size, Image.Resampling.LANCZOS)
+
+
+class FileUtils:
+    """Utility class per operazioni comuni sui file"""
+
+    @staticmethod
+    async def create_temp_file_from_upload(file: UploadFile) -> str:
+        """Crea file temporaneo da UploadFile"""
+        if not file.filename:
+            raise ImageProcessingError("Nome file mancante")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
+            content = await file.read()
+            if len(content) == 0:
+                raise ImageProcessingError("Contenuto file vuoto")
+
+            tmp_file.write(content)
+            return tmp_file.name
+
+    @staticmethod
+    def cleanup_temp_file(file_path: str):
+        """Pulisce file temporaneo"""
+        try:
+            if os.path.exists(file_path):
+                os.unlink(file_path)
+        except Exception as e:
+            logger.warning(f"Errore pulizia file temporaneo {file_path}: {e}")
+
+
+class StorageUtils:
+    """Utility class per operazioni di storage"""
+
+    @staticmethod
+    async def upload_thumbnail_with_fallback(thumbnail_data: bytes, photo_id: str) -> str:
+        """Upload thumbnail con gestione errori e fallback"""
+        if not HAS_MINIO:
+            raise StorageError("MinIO non disponibile")
+
+        try:
+            # Upload con servizio archeologico
+            thumbnail_url = await archaeological_minio_service.upload_thumbnail(
+                thumbnail_data, photo_id
+            )
+            logger.info(f"Thumbnail uploaded with archaeological service: {photo_id}")
+            return thumbnail_url
+
+        except Exception as upload_error:
+            error_msg = str(upload_error)
+
+            # Check if it's a storage full error
+            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
+                logger.error(f"MinIO storage full - triggering emergency cleanup for thumbnail: {photo_id}")
+
+                # Try emergency cleanup
+                try:
+                    from app.services.storage_management_service import storage_management_service
+                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=100)
+
+                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > 50:
+                        logger.info(f"Emergency cleanup freed {cleanup_result['total_freed_mb']}MB, retrying thumbnail upload")
+
+                        # Retry upload after cleanup
+                        thumbnail_url = await archaeological_minio_service.upload_thumbnail(
+                            thumbnail_data, photo_id
+                        )
+                        logger.info(f"Thumbnail uploaded after emergency cleanup: {photo_id}")
+                        return thumbnail_url
+                    else:
+                        logger.warning(f"Emergency cleanup insufficient, falling back to local storage for thumbnail: {photo_id}")
+                        raise StorageError("Storage full after cleanup attempt")
+
+                except Exception as cleanup_error:
+                    logger.error(f"Emergency cleanup failed: {cleanup_error}")
+                    raise StorageError("Storage full and cleanup failed")
+            else:
+                # Other MinIO error, fallback to local
+                raise upload_error
+
+    @staticmethod
+    def save_thumbnail_locally(thumbnail: Image.Image, photo_id: str) -> str:
+        """Salva thumbnail localmente come fallback"""
+        thumbnail_dir = Path("storage/thumbnails")
+        thumbnail_dir.mkdir(parents=True, exist_ok=True)
+
+        thumbnail_path = thumbnail_dir / f"{photo_id}.jpg"
+        thumbnail.save(thumbnail_path, 'JPEG', quality=85, optimize=True)
+
+        logger.info(f"Thumbnail saved locally: {thumbnail_path}")
+        return str(thumbnail_path)
 
 
 class PhotoMetadataService:
@@ -91,8 +281,11 @@ class PhotoMetadataService:
             logger.info(f"Metadata extracted for {filename}")
             return exif_data, photo_metadata
 
+        except ImageProcessingError as e:
+            logger.error(f"Errore processamento metadati per {filename}: {e}")
+            return {}, {}
         except Exception as e:
-            logger.error(f"Error extracting metadata from {filename}: {e}")
+            logger.error(f"Errore estrazione metadati da {filename}: {e}")
             return {}, {}
 
     async def extract_metadata_from_file(
@@ -104,26 +297,25 @@ class PhotoMetadataService:
         Estrae metadati direttamente da file UploadFile
         Returns: Tuple[exif_data, photo_metadata]
         """
+        temp_file_path = None
         try:
-            # Salva temporaneamente il file per l'analisi
-            # 🔧 CORREZIONE: Creazione file temporaneo corretto
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp_file:
-                content = await file.read()
-                tmp_file.write(content)
-                tmp_file_path = tmp_file.name
+            # Crea file temporaneo
+            temp_file_path = await FileUtils.create_temp_file_from_upload(file)
 
-            try:
-                # Estrai metadati dal file temporaneo
-                exif_data, metadata = await self.extract_metadata(tmp_file_path, filename)
-                return exif_data, metadata
-            finally:
-                # Pulisce file temporaneo
-                if os.path.exists(tmp_file_path):
-                    os.unlink(tmp_file_path)
+            # Estrai metadati dal file temporaneo
+            exif_data, metadata = await self.extract_metadata(temp_file_path, filename)
+            return exif_data, metadata
 
-        except Exception as e:
-            logger.error(f"Error extracting metadata from file {filename}: {e}")
+        except ImageProcessingError as e:
+            logger.error(f"Errore processamento metadati da file {filename}: {e}")
             return {}, {}
+        except Exception as e:
+            logger.error(f"Errore estrazione metadati da file {filename}: {e}")
+            return {}, {}
+        finally:
+            # Pulisce file temporaneo
+            if temp_file_path:
+                FileUtils.cleanup_temp_file(temp_file_path)
 
     async def _extract_technical_metadata(
             self,
@@ -135,129 +327,153 @@ class PhotoMetadataService:
             with Image.open(image_path) as img:
                 width, height = img.size
 
-                # Determina DPI
-                dpi = None
-                if hasattr(img, 'info') and 'dpi' in img.info:
-                    dpi = img.info['dpi'][0] if isinstance(img.info['dpi'], tuple) else img.info['dpi']
-
-                # Profilo colore
-                color_profile = None
-                if img.mode in ['RGB', 'CMYK', 'LAB']:
-                    color_profile = img.mode
-
                 return {
                     "width": width,
                     "height": height,
-                    "dpi": dpi,
-                    "color_profile": color_profile,
+                    "dpi": self._extract_dpi(img),
+                    "color_profile": self._extract_color_profile(img),
                     "image_format": img.format,
                     "image_mode": img.mode
                 }
 
         except Exception as e:
-            logger.warning(f"Could not extract technical metadata: {e}")
+            logger.warning(f"Could not extract technical metadata for {filename}: {e}")
             return {}
+
+    def _extract_dpi(self, image: Image.Image) -> Optional[float]:
+        """Estrae DPI dall'immagine"""
+        try:
+            if hasattr(image, 'info') and 'dpi' in image.info:
+                return image.info['dpi'][0] if isinstance(image.info['dpi'], tuple) else image.info['dpi']
+        except Exception as e:
+            logger.warning(f"Errore estrazione DPI: {e}")
+        return None
+
+    def _extract_color_profile(self, image: Image.Image) -> Optional[str]:
+        """Estrae profilo colore dall'immagine"""
+        try:
+            if image.mode in ['RGB', 'CMYK', 'LAB']:
+                return image.mode
+        except Exception as e:
+            logger.warning(f"Errore estrazione profilo colore: {e}")
+        return None
 
     async def _extract_exif_data(self, image_path: Path) -> Dict[str, Any]:
         """Estrae metadati EXIF"""
         try:
-            # 🔧 CORREZIONE: Metodo EXIF più robusto
             with Image.open(image_path) as img:
-                exif_dict = {}
-                extracted_data = {}
+                exif_dict = await self._extract_exif_dictionary(img)
+                extracted_data = await self._extract_specific_exif_data(exif_dict)
 
-                # Prova con getexif() (più moderno)
-                try:
-                    exif_data = img.getexif()
-                    if exif_data:
-                        for tag_id, value in exif_data.items():
-                            tag = TAGS.get(tag_id, tag_id)
-
-                            # Gestione tipi diversi
-                            if isinstance(value, bytes):
-                                try:
-                                    value = value.decode('utf-8')
-                                except UnicodeDecodeError:
-                                    value = str(value)
-
-                            exif_dict[tag] = value
-                except Exception:
-                    # Fallback al metodo legacy
-                    if hasattr(img, '_getexif') and img._getexif() is not None:
-                        exif_info = img._getexif()
-                        for tag_id, value in exif_info.items():
-                            tag = TAGS.get(tag_id, tag_id)
-
-                            if isinstance(value, bytes):
-                                try:
-                                    value = value.decode('utf-8')
-                                except UnicodeDecodeError:
-                                    value = str(value)
-
-                            exif_dict[tag] = value
-
-                # Estrai informazioni specifiche
-                # Data e ora scatto
-                for date_field in ['DateTime', 'DateTimeOriginal', 'DateTimeDigitized']:
-                    if date_field in exif_dict:
-                        try:
-                            photo_date = datetime.strptime(exif_dict[date_field], '%Y:%m:%d %H:%M:%S')
-                            extracted_data['photo_date'] = photo_date
-                            break
-                        except (ValueError, TypeError):
-                            continue
-
-                # Modello fotocamera
-                if 'Model' in exif_dict:
-                    extracted_data['camera_model'] = str(exif_dict['Model']).strip()
-
-                # Marca fotocamera
-                if 'Make' in exif_dict:
-                    extracted_data['camera_make'] = str(exif_dict['Make']).strip()
-
-                # Obiettivo
-                if 'LensModel' in exif_dict:
-                    extracted_data['lens'] = str(exif_dict['LensModel']).strip()
-
-                # Software
-                if 'Software' in exif_dict:
-                    extracted_data['software'] = str(exif_dict['Software']).strip()
-
-                # Orientamento
-                if 'Orientation' in exif_dict:
-                    extracted_data['orientation'] = exif_dict['Orientation']
-
-                # GPS
-                gps_data = await self._extract_gps_data(exif_dict)
-                if gps_data:
-                    extracted_data['gps_data'] = gps_data
-
-                # Crea EXIF JSON serializzabile - gestisce IFDRational
-                serializable_exif = {}
-                for key, value in exif_dict.items():
-                    try:
-                        # Gestione speciale per IFDRational di PIL
-                        if hasattr(value, '__class__') and 'IFDRational' in value.__class__.__name__:
-                            # Converti IFDRational in float o stringa
-                            try:
-                                serializable_exif[key] = float(value)
-                            except (ValueError, TypeError):
-                                serializable_exif[key] = str(value)
-                        else:
-                            # Test serializzazione normale
-                            json.dumps(value)
-                            serializable_exif[key] = value
-                    except (TypeError, ValueError):
-                        # Fallback a stringa per qualsiasi altro tipo non serializzabile
-                        serializable_exif[key] = str(value)
-
-                extracted_data['exif_data'] = serializable_exif
+                # Crea EXIF JSON serializzabile
+                extracted_data['exif_data'] = self._make_exif_serializable(exif_dict)
 
                 return extracted_data
 
         except Exception as e:
             logger.warning(f"Could not extract EXIF data: {e}")
             return {}
+
+    async def _extract_exif_dictionary(self, image: Image.Image) -> Dict[str, Any]:
+        """Estrae dizionario EXIF dall'immagine"""
+        exif_dict = {}
+
+        # Prova con getexif() (più moderno)
+        try:
+            exif_data = image.getexif()
+            if exif_data:
+                exif_dict = await self._process_exif_tags(exif_data)
+        except Exception:
+            # Fallback al metodo legacy
+            if hasattr(image, '_getexif') and image._getexif() is not None:
+                exif_info = image._getexif()
+                exif_dict = await self._process_exif_tags(exif_info)
+
+        return exif_dict
+
+    async def _process_exif_tags(self, exif_data) -> Dict[str, Any]:
+        """Processa tag EXIF e gestisce tipi diversi"""
+        processed_dict = {}
+
+        for tag_id, value in exif_data.items():
+            tag = TAGS.get(tag_id, tag_id)
+
+            # Gestione tipi diversi
+            if isinstance(value, bytes):
+                try:
+                    value = value.decode('utf-8')
+                except UnicodeDecodeError:
+                    value = str(value)
+
+            processed_dict[tag] = value
+
+        return processed_dict
+
+    async def _extract_specific_exif_data(self, exif_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Estrae informazioni specifiche da dizionario EXIF"""
+        extracted_data = {}
+
+        # Data e ora scatto
+        extracted_data['photo_date'] = self._extract_photo_date(exif_dict)
+
+        # Informazioni fotocamera
+        if 'Model' in exif_dict:
+            extracted_data['camera_model'] = str(exif_dict['Model']).strip()
+
+        if 'Make' in exif_dict:
+            extracted_data['camera_make'] = str(exif_dict['Make']).strip()
+
+        # Obiettivo
+        if 'LensModel' in exif_dict:
+            extracted_data['lens'] = str(exif_dict['LensModel']).strip()
+
+        # Software
+        if 'Software' in exif_dict:
+            extracted_data['software'] = str(exif_dict['Software']).strip()
+
+        # Orientamento
+        if 'Orientation' in exif_dict:
+            extracted_data['orientation'] = exif_dict['Orientation']
+
+        # GPS
+        gps_data = await self._extract_gps_data(exif_dict)
+        if gps_data:
+            extracted_data['gps_data'] = gps_data
+
+        return extracted_data
+
+    def _extract_photo_date(self, exif_dict: Dict[str, Any]) -> Optional[datetime]:
+        """Estrae data foto da dizionario EXIF"""
+        for date_field in ['DateTime', 'DateTimeOriginal', 'DateTimeDigitized']:
+            if date_field in exif_dict:
+                try:
+                    return datetime.strptime(exif_dict[date_field], '%Y:%m:%d %H:%M:%S')
+                except (ValueError, TypeError):
+                    continue
+        return None
+
+    def _make_exif_serializable(self, exif_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Rende EXIF serializzabile in JSON"""
+        serializable_exif = {}
+
+        for key, value in exif_dict.items():
+            try:
+                # Gestione speciale per IFDRational di PIL
+                if hasattr(value, '__class__') and 'IFDRational' in value.__class__.__name__:
+                    # Converti IFDRational in float o stringa
+                    try:
+                        serializable_exif[key] = float(value)
+                    except (ValueError, TypeError):
+                        serializable_exif[key] = str(value)
+                else:
+                    # Test serializzazione normale
+                    json.dumps(value)
+                    serializable_exif[key] = value
+            except (TypeError, ValueError):
+                # Fallback a stringa per qualsiasi altro tipo non serializzabile
+                serializable_exif[key] = str(value)
+
+        return serializable_exif
 
     async def _extract_gps_data(self, exif_dict: Dict) -> Optional[Dict[str, Any]]:
         """Estrae dati GPS da EXIF"""
@@ -429,118 +645,45 @@ class PhotoMetadataService:
             Path thumbnail generato o None se errore
         """
         try:
-            with Image.open(original_path) as img:
-                # 🔧 CORREZIONE: Correggi orientamento se presente
-                try:
-                    from PIL.ExifTags import ORIENTATION
+            # Carica e prepara immagine
+            thumbnail = await self._prepare_thumbnail_image(original_path, max_size)
 
-                    exif = img.getexif()
-                    if exif and ORIENTATION in exif:
-                        orientation = exif[ORIENTATION]
-                        if orientation == 3:
-                            img = img.rotate(180, expand=True)
-                        elif orientation == 6:
-                            img = img.rotate(270, expand=True)
-                        elif orientation == 8:
-                            img = img.rotate(90, expand=True)
-                except Exception:
-                    pass  # Ignora errori orientamento
-
-                # Converti in RGB se necessario
-                if img.mode in ("RGBA", "P", "LA"):
-                    img = img.convert("RGB")
-
-                # Calcola dimensioni mantenendo aspect ratio
-                width, height = img.size
-                if width > height:
-                    new_width = max_size
-                    new_height = int((height * max_size) / width)
-                else:
-                    new_height = max_size
-                    new_width = int((width * max_size) / height)
-
-                # Crea thumbnail
-                thumbnail = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-                # 🔧 CORREZIONE: Gestione storage con fallback
-                try:
-                    # Salva thumbnail in memoria
-                    thumbnail_buffer = io.BytesIO()
-                    thumbnail.save(thumbnail_buffer, 'JPEG', quality=85, optimize=True)
-                    thumbnail_buffer.seek(0)
-
-                    # Crea file UploadFile
-                    thumbnail_file = UploadFile(
-                        filename=f"{photo_id}.jpg",
-                        file=thumbnail_buffer
-                    )
-
-                    # Use archaeological MinIO service for thumbnails
-                    if HAS_MINIO:
-                        # Usa il nuovo servizio archeologico per thumbnail
-                        thumbnail_buffer.seek(0)
-                        thumbnail_data = thumbnail_buffer.read()
-
-                        try:
-                            # Upload con servizio archeologico
-                            thumbnail_url = await archaeological_minio_service.upload_thumbnail(
-                                thumbnail_data, photo_id
-                            )
-
-                            logger.info(f"Thumbnail uploaded with archaeological service: {photo_id}")
-                            return thumbnail_url
-                            
-                        except Exception as upload_error:
-                            error_msg = str(upload_error)
-                            
-                            # Check if it's a storage full error
-                            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
-                                logger.error(f"MinIO storage full - triggering emergency cleanup for thumbnail: {photo_id}")
-                                
-                                # Try emergency cleanup
-                                try:
-                                    from app.services.storage_management_service import storage_management_service
-                                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=100)
-                                    
-                                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > 50:
-                                        logger.info(f"Emergency cleanup freed {cleanup_result['total_freed_mb']}MB, retrying thumbnail upload")
-                                        
-                                        # Retry upload after cleanup
-                                        thumbnail_buffer.seek(0)
-                                        thumbnail_data = thumbnail_buffer.read()
-                                        thumbnail_url = await archaeological_minio_service.upload_thumbnail(
-                                            thumbnail_data, photo_id
-                                        )
-                                        logger.info(f"Thumbnail uploaded after emergency cleanup: {photo_id}")
-                                        return thumbnail_url
-                                    else:
-                                        logger.warning(f"Emergency cleanup insufficient, falling back to local storage for thumbnail: {photo_id}")
-                                        raise Exception("Storage full after cleanup attempt")
-                                        
-                                except Exception as cleanup_error:
-                                    logger.error(f"Emergency cleanup failed: {cleanup_error}")
-                                    raise Exception("Storage full and cleanup failed")
-                            else:
-                                # Other MinIO error, fallback to local
-                                raise upload_error
-                    else:
-                        raise Exception("MinIO not available")
-
-                except Exception as e:
-                    logger.warning(f"MinIO upload failed for thumbnail: {e}, using local storage")
-                    # Fallback a storage locale
-                    thumbnail_dir = Path("storage/thumbnails")
-                    thumbnail_dir.mkdir(parents=True, exist_ok=True)
-
-                    thumbnail_path = thumbnail_dir / f"{photo_id}.jpg"
-                    thumbnail.save(thumbnail_path, 'JPEG', quality=85, optimize=True)
-
-                    logger.info(f"Thumbnail saved locally: {thumbnail_path}")
-                    return str(thumbnail_path)
+            # Salva thumbnail con gestione storage
+            return await self._save_thumbnail(thumbnail, photo_id)
 
         except Exception as e:
             logger.error(f"Error generating thumbnail for {photo_id}: {e}")
             return None
+
+    async def _prepare_thumbnail_image(self, original_path: str, max_size: int) -> Image.Image:
+        """Prepara immagine per generazione thumbnail"""
+        try:
+            with Image.open(original_path) as img:
+                # Prepara immagine (orientamento e conversione)
+                prepared_image = ImageUtils.prepare_image_for_thumbnail(img)
+
+                # Crea thumbnail
+                return ImageUtils.create_thumbnail(prepared_image, max_size)
+
+        except Exception as e:
+            raise ImageProcessingError(f"Errore preparazione thumbnail: {e}")
+
+    async def _save_thumbnail(self, thumbnail: Image.Image, photo_id: str) -> str:
+        """Salva thumbnail con gestione storage e fallback"""
+        # Salva thumbnail in memoria
+        thumbnail_buffer = io.BytesIO()
+        thumbnail.save(thumbnail_buffer, 'JPEG', quality=85, optimize=True)
+        thumbnail_buffer.seek(0)
+        thumbnail_data = thumbnail_buffer.read()
+
+        try:
+            # Prova upload con MinIO
+            return await StorageUtils.upload_thumbnail_with_fallback(thumbnail_data, photo_id)
+
+        except StorageError as e:
+            logger.warning(f"MinIO upload failed for thumbnail: {e}, using local storage")
+            # Fallback a storage locale
+            return StorageUtils.save_thumbnail_locally(thumbnail, photo_id)
 
     async def generate_thumbnail_from_file(
             self,
@@ -559,32 +702,25 @@ class PhotoMetadataService:
         Returns:
             Path/object name thumbnail o None se errore
         """
+        temp_file_path = None
         try:
-            # 🔧 CORREZIONE: Gestione file temporaneo migliorata
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename or "temp.jpg").suffix) as tmp_file:
-                # Legge contenuto file una volta sola
-                content = await file.read()
-                if len(content) == 0:
-                    logger.warning(f"Empty file content for thumbnail generation: {photo_id}")
-                    return None
+            # Crea file temporaneo
+            temp_file_path = await FileUtils.create_temp_file_from_upload(file)
 
-                tmp_file.write(content)
-                tmp_file_path = tmp_file.name
+            # Genera thumbnail dal file temporaneo
+            return await self.generate_thumbnail(temp_file_path, photo_id, max_size)
 
-            try:
-                # Genera thumbnail dal file temporaneo
-                thumbnail_path = await self.generate_thumbnail(tmp_file_path, photo_id, max_size)
-                return thumbnail_path
-            finally:
-                # Pulisce file temporaneo
-                if os.path.exists(tmp_file_path):
-                    os.unlink(tmp_file_path)
-
-        except Exception as e:
-            logger.error(f"Error generating thumbnail from file for {photo_id}: {e}")
+        except ImageProcessingError as e:
+            logger.error(f"Errore processamento immagine per thumbnail {photo_id}: {e}")
             return None
+        except Exception as e:
+            logger.error(f"Errore generazione thumbnail da file per {photo_id}: {e}")
+            return None
+        finally:
+            # Pulisce file temporaneo
+            if temp_file_path:
+                FileUtils.cleanup_temp_file(temp_file_path)
 
-    # 🔧 AGGIUNTA: Metodi di utilità
     async def validate_image_file(self, file: UploadFile) -> Tuple[bool, str]:
         """Valida se il file è un'immagine supportata"""
         try:
@@ -596,24 +732,23 @@ class PhotoMetadataService:
                 return False, f"Formato {extension} non supportato"
 
             # Verifica che sia effettivamente un'immagine
-            content = await file.read()
-            await file.seek(0)  # Reset file pointer
-
+            temp_file_path = None
             try:
-                with tempfile.NamedTemporaryFile() as tmp_file:
-                    tmp_file.write(content)
-                    tmp_file.flush()
+                temp_file_path = await FileUtils.create_temp_file_from_upload(file)
 
-                    with Image.open(tmp_file.name) as img:
-                        # Se arriviamo qui, è un'immagine valida
-                        width, height = img.size
-                        if width < 1 or height < 1:
-                            return False, "Dimensioni immagine non valide"
+                with Image.open(temp_file_path) as img:
+                    # Se arriviamo qui, è un'immagine valida
+                    width, height = img.size
+                    if width < 1 or height < 1:
+                        return False, "Dimensioni immagine non valide"
 
-                        return True, "OK"
+                    return True, "OK"
 
-            except Exception as e:
+            except ImageProcessingError as e:
                 return False, f"File corrotto o non valido: {str(e)}"
+            finally:
+                if temp_file_path:
+                    FileUtils.cleanup_temp_file(temp_file_path)
 
         except Exception as e:
             return False, f"Errore validazione: {str(e)}"
