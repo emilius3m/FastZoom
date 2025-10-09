@@ -14,10 +14,7 @@
 - **MIGLIORIA**: Suddividere metodi lunghi e centralizzare error handling
 - **IMPATTO**: Migliore leggibilità e debug
 
-#### 3. **app/services/archaeological_minio_service.py**
-- **PROBLEMA**: Metodi simili per upload/download con logica duplicata
-- **MIGLIORIA**: Unificare gestione errori e configurazione connessione
-- **IMPATTO**: -30% codice duplicato
+
 
 ### 🔧 **File con Ottimizzazioni Minori**
 
@@ -65,7 +62,7 @@ Il lavoro svolto su `sites_router.py` e `site_base.html` può servire da **model
 
 ## 🚀 **Prossimi Passi**
 
-1. Iniziare da `photos_router.py` (priorità ALTA)
+
 2. Continuare con `photo_service.py`
 3. Applicare pattern consolidati agli altri file
 
