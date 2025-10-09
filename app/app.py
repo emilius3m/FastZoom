@@ -35,6 +35,8 @@ from app.routes.sites_router import sites_router
 from app.routes.photos_router import photos_router
 # 🔧 NUOVO IMPORT - Router Form Schemas
 from app.routes.api.form_schemas import form_schemas_router
+from app.routes.api.documents import documents_router  # NUOVO
+from app.routes.view.documentation import documentation_router
 # 🗺️ NUOVO IMPORT - Router Archaeological Plans API
 from app.routes.api.archaeological_plans import plans_router as archaeological_plans_router
 # 🏺 NUOVO IMPORT - Router ICCD Records API
@@ -184,6 +186,12 @@ app.include_router(
     tags=["form-schemas"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
+app.include_router(
+    documents_router,
+    tags=["documents"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+)
+
 
 # 🗺️ INCLUSIONE ROUTER ARCHAEOLOGICAL PLANS - API per piante archeologiche
 app.include_router(

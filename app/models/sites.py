@@ -53,6 +53,9 @@ class ArchaeologicalSite(Base):
     # Relazione con le mappe geografiche
     geographic_maps = relationship("GeographicMap", back_populates="site", cascade="all, delete-orphan")
     
+    # Relazione con i documenti del sito
+    documents = relationship("Document", back_populates="site", cascade="all, delete-orphan")
+    
     def __repr__(self):
         return f"<ArchaeologicalSite(name='{self.name}', code='{self.code}')>"
     
