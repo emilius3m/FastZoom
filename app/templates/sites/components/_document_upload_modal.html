@@ -1,0 +1,197 @@
+<!-- templates/sites/components/_document_upload_modal.html - UPLOAD DOCUMENTI -->
+<div x-show="showUploadModal"
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50"
+     @click.self="showUploadModal = false">
+
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-4 pb-3 border-b">
+            <h3 class="text-lg font-semibold text-gray-900">
+                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                Carica nuovo documento
+            </h3>
+            <button @click="showUploadModal = false" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Upload Form -->
+        <form @submit.prevent="uploadDocument()" enctype="multipart/form-data">
+            <!-- Drag & Drop Area -->
+            <div class="mb-4">
+                <div @drop.prevent="handleFileDrop($event)"
+                     @dragover.prevent="dragOver = true"
+                     @dragleave.prevent="dragOver = false"
+                     :class="{'border-blue-500 bg-blue-50': dragOver}"
+                     class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-all">
+                    <input type="file"
+                           id="document-file"
+                           @change="handleFileSelect($event)"
+                           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.tif,.tiff,.zip"
+                           class="hidden">
+                    <label for="document-file" class="cursor-pointer">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <p class="text-lg text-gray-700 mb-1">Trascina qui il file oppure clicca per selezionarlo</p>
+                        <p class="text-sm text-gray-500">PDF, DOC, XLS, immagini, ZIP - Max 50MB</p>
+                    </label>
+                </div>
+
+                <!-- Selected File Info -->
+                <div x-show="uploadFile" class="mt-3 p-3 bg-gray-50 rounded flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg class="w-8 h-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-900" x-text="uploadFile ? uploadFile.name : ''"></p>
+                            <p class="text-sm text-gray-500" x-text="uploadFile ? formatFileSize(uploadFile.size) : ''"></p>
+                        </div>
+                    </div>
+                    <button type="button" @click="uploadFile = null" class="text-red-600 hover:text-red-800">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Document Metadata -->
+            <div class="space-y-4 mb-6">
+                <!-- Title -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Titolo documento <span class="text-red-600">*</span>
+                    </label>
+                    <input type="text"
+                           x-model="newDocument.title"
+                           required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="Es: Relazione di scavo 2024">
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Descrizione</label>
+                    <textarea x-model="newDocument.description"
+                              rows="3"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Breve descrizione del contenuto..."></textarea>
+                </div>
+
+                <!-- Category and Type -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Categoria <span class="text-red-600">*</span>
+                        </label>
+                        <select x-model="newDocument.category"
+                                required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Seleziona...</option>
+                            <option value="relazioni">Relazioni di scavo</option>
+                            <option value="documentazione">Documentazione fotografica</option>
+                            <option value="planimetrie">Planimetrie e rilievi</option>
+                            <option value="pubblicazioni">Pubblicazioni</option>
+                            <option value="amministrativi">Documenti amministrativi</option>
+                            <option value="altro">Altro</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo documento</label>
+                        <select x-model="newDocument.doc_type"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Seleziona...</option>
+                            <option value="pdf">PDF</option>
+                            <option value="word">Word</option>
+                            <option value="excel">Excel</option>
+                            <option value="image">Immagine</option>
+                            <option value="cad">CAD/DWG</option>
+                            <option value="gis">GIS</option>
+                            <option value="archive">Archivio</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Tags -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tag</label>
+                    <input type="text"
+                           x-model="newDocument.tags"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           placeholder="scavo, ceramica, us, etc. (separa con virgola)">
+                    <p class="text-xs text-gray-500 mt-1">Inserisci parole chiave separate da virgola</p>
+                </div>
+
+                <!-- Date and Author -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data documento</label>
+                        <input type="date"
+                               x-model="newDocument.doc_date"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Autore</label>
+                        <input type="text"
+                               x-model="newDocument.author"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="Nome autore">
+                    </div>
+                </div>
+
+                <!-- Visibility -->
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox"
+                               x-model="newDocument.is_public"
+                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <span class="ml-2 text-sm text-gray-700">Documento pubblico (visibile a tutti i membri del team)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Upload Progress -->
+            <div x-show="uploadProgress > 0 && uploadProgress < 100" class="mb-4">
+                <div class="flex items-center justify-between text-sm text-gray-700 mb-1">
+                    <span>Caricamento in corso...</span>
+                    <span x-text="`${uploadProgress}%`"></span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                         :style="`width: ${uploadProgress}%`"></div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex justify-end space-x-3 pt-4 border-t">
+                <button type="button"
+                        @click="showUploadModal = false; resetUploadForm()"
+                        class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                    Annulla
+                </button>
+                <button type="submit"
+                        :disabled="!uploadFile || uploadProgress > 0"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    Carica documento
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

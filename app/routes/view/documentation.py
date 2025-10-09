@@ -7,12 +7,13 @@ from sqlalchemy import select, and_
 from uuid import UUID
 from typing import List, Dict, Any
 
-from app.database.session import get_async_session
-from app.core.security import get_current_user_id, get_current_user_sites_with_blacklist
+from app.database.db import get_async_session
+from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission
 from app.models.users import User
 from app.models.form_schemas import FormSchema
+from app.models.documents import Document
 from app.templates import templates
 
 documentation_router = APIRouter(prefix="/view", tags=["documentation"])
@@ -62,7 +63,7 @@ async def get_form_schemas_safe(db: AsyncSession, site_id: UUID) -> List[Dict[st
 async def site_documentation(
         request: Request,
         site_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id),
+        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
@@ -98,8 +99,41 @@ async def site_documentation(
 
     current_user = await get_current_user_with_context(current_user_id, db)
 
-    # Documenti del sito (placeholder per ora)
-    documents = []
+    # Recupera documenti del sito
+    try:
+        documents_query = select(Document).where(
+            and_(
+                Document.site_id == site_id,
+                Document.is_deleted == False
+            )
+        ).order_by(Document.uploaded_at.desc())
+        
+        documents_result = await db.execute(documents_query)
+        documents_list = documents_result.scalars().all()
+        
+        # Formatta documenti per il template
+        documents = []
+        for doc in documents_list:
+            documents.append({
+                "id": str(doc.id),
+                "title": doc.title,
+                "description": doc.description,
+                "category": doc.category,
+                "doc_type": doc.doc_type,
+                "filename": doc.filename,
+                "file_size": doc.file_size,
+                "mime_type": doc.mime_type,
+                "tags": doc.tags.split(",") if doc.tags else [],
+                "doc_date": doc.doc_date.isoformat() if doc.doc_date else None,
+                "author": doc.author,
+                "is_public": doc.is_public,
+                "uploaded_at": doc.uploaded_at.isoformat(),
+                "uploaded_by": str(doc.uploaded_by),
+                "version": doc.version,
+                "created_at": doc.uploaded_at.isoformat()
+            })
+    except Exception as e:
+        documents = []
 
     # Form schemas del sito con gestione errori centralizzata
     form_schemas = await get_form_schemas_safe(db, site_id)

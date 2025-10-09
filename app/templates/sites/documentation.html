@@ -253,7 +253,7 @@
                                 </svg>
                             </button>
 
-                            <a :href="'/documents/' + document.id + '/download'"
+                            <a :href="'/api/site/{{ site.id }}/documents/' + document.id + '/download'"
                                class="p-2 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400"
                                title="Scarica">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -336,15 +336,13 @@
         </div>
     </div>
 
-        <!-- Document Modals - Commented out as they don't exist yet -->
-        {#
+        <!-- Document Modals -->
         {% if can_write %}
         {% include 'sites/components/_document_upload_modal.html' %}
         {% include 'sites/components/_document_edit_modal.html' %}
         {% endif %}
-        
+
         {% include 'sites/components/_document_preview_modal.html' %}
-        #}
     </div>
 
     <!-- Form Builder Tab Content -->
@@ -703,7 +701,7 @@ document.addEventListener('alpine:init', () => {
             if (!confirm('Sei sicuro di voler eliminare questo form?')) return;
             
             try {
-                const response = await fetch(`/sites/{{ site.id }}/api/form-schemas/${schemaId}`, {
+                const response = await fetch(`/api/site/{{ site.id }}/form-schemas/${schemaId}`, {
                     method: 'DELETE'
                 });
                 
@@ -829,7 +827,7 @@ document.addEventListener('alpine:init', () => {
                     return;
                 }
                 
-                const response = await fetch(`/sites/{{ site.id }}/api/form-schemas`, {
+                const response = await fetch(`/api/site/{{ site.id }}/form-schemas`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(this.formSchema)
@@ -1171,7 +1169,7 @@ document.addEventListener('alpine:init', () => {
             if (!confirm(`Vuoi eliminare il documento "${document.title}"?`)) return;
             
             try {
-                const response = await fetch(`/sites/{{ site.id }}/documents/${document.id}/delete`, {
+                const response = await fetch(`/api/site/{{ site.id }}/documents/${document.id}`, {
                     method: 'POST'
                 });
                 
@@ -1268,5 +1266,363 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 });
+</script>
+
+<script>
+function documentationData() {
+    return {
+        // State management
+        documents: [],
+        selectedDocument: null,
+        editDocument: null,
+        uploadFile: null,
+        replaceFile: null,
+        dragOver: false,
+
+        // Modal visibility
+        showUploadModal: false,
+        showEditModal: false,
+        showPreviewModal: false,
+
+        // Upload progress
+        uploadProgress: 0,
+
+        // Filters
+        searchQuery: '',
+        selectedCategory: '',
+        selectedType: '',
+
+        // New document data
+        newDocument: {
+            title: '',
+            description: '',
+            category: '',
+            doc_type: '',
+            tags: '',
+            doc_date: '',
+            author: '',
+            is_public: true
+        },
+
+        // Pagination
+        currentPage: 1,
+        itemsPerPage: 10,
+
+        // Site ID from template
+        siteId: '{{ site.id }}',
+
+        // Initialize
+        async init() {
+            await this.loadDocuments();
+        },
+
+        // Load all documents
+        async loadDocuments() {
+            try {
+                const response = await fetch(`/api/site/${this.siteId}/documents`);
+                if (!response.ok) throw new Error('Errore nel caricamento documenti');
+
+                const data = await response.json();
+                this.documents = data.documents || [];
+            } catch (error) {
+                console.error('Error loading documents:', error);
+                this.showNotification('Errore nel caricamento dei documenti', 'error');
+            }
+        },
+
+        // Upload new document
+        async uploadDocument() {
+            if (!this.uploadFile) {
+                this.showNotification('Seleziona un file', 'warning');
+                return;
+            }
+
+            if (!this.newDocument.title) {
+                this.showNotification('Inserisci un titolo', 'warning');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', this.uploadFile);
+            formData.append('title', this.newDocument.title);
+            formData.append('description', this.newDocument.description || '');
+            formData.append('category', this.newDocument.category);
+            formData.append('doc_type', this.newDocument.doc_type || '');
+            formData.append('tags', this.newDocument.tags || '');
+            formData.append('doc_date', this.newDocument.doc_date || '');
+            formData.append('author', this.newDocument.author || '');
+            formData.append('is_public', this.newDocument.is_public);
+
+            try {
+                const xhr = new XMLHttpRequest();
+
+                // Progress tracking
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        this.uploadProgress = Math.round((e.loaded / e.total) * 100);
+                    }
+                });
+
+                xhr.addEventListener('load', async () => {
+                    if (xhr.status === 200) {
+                        const result = JSON.parse(xhr.responseText);
+                        this.showNotification('Documento caricato con successo', 'success');
+                        await this.loadDocuments();
+                        this.closeUploadModal();
+                    } else {
+                        throw new Error('Upload fallito');
+                    }
+                });
+
+                xhr.addEventListener('error', () => {
+                    this.showNotification('Errore durante il caricamento', 'error');
+                    this.uploadProgress = 0;
+                });
+
+                xhr.open('POST', `/api/site/${this.siteId}/documents`);
+                xhr.send(formData);
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                this.showNotification('Errore nel caricamento del documento', 'error');
+                this.uploadProgress = 0;
+            }
+        },
+
+        // Save document edits
+        async saveDocumentEdits() {
+            if (!this.editDocument || !this.editDocument.title) {
+                this.showNotification('Inserisci un titolo valido', 'warning');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('title', this.editDocument.title);
+                formData.append('description', this.editDocument.description || '');
+                formData.append('category', this.editDocument.category);
+                formData.append('doc_type', this.editDocument.doc_type || '');
+                formData.append('tags', this.editDocument.tags || '');
+                formData.append('doc_date', this.editDocument.doc_date || '');
+                formData.append('author', this.editDocument.author || '');
+                formData.append('is_public', this.editDocument.is_public);
+
+                // Add replace file if selected
+                if (this.replaceFile) {
+                    formData.append('file', this.replaceFile);
+                    formData.append('version_notes', this.editDocument.version_notes || '');
+                }
+
+                const response = await fetch(
+                    `/api/site/${this.siteId}/documents/${this.editDocument.id}`,
+                    {
+                        method: 'PUT',
+                        body: formData
+                    }
+                );
+
+                if (!response.ok) throw new Error('Errore nell\'aggiornamento');
+
+                this.showNotification('Documento aggiornato con successo', 'success');
+                await this.loadDocuments();
+                this.closeEditModal();
+
+            } catch (error) {
+                console.error('Update error:', error);
+                this.showNotification('Errore nell\'aggiornamento del documento', 'error');
+            }
+        },
+
+        // Delete document
+        async deleteDocument(documentId) {
+            if (!confirm('Sei sicuro di voler eliminare questo documento? L\'operazione non può essere annullata.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `/api/site/${this.siteId}/documents/${documentId}`,
+                    { method: 'DELETE' }
+                );
+
+                if (!response.ok) throw new Error('Errore nell\'eliminazione');
+
+                this.showNotification('Documento eliminato con successo', 'success');
+                await this.loadDocuments();
+                this.closeEditModal();
+
+            } catch (error) {
+                console.error('Delete error:', error);
+                this.showNotification('Errore nell\'eliminazione del documento', 'error');
+            }
+        },
+
+        // Download document
+        async downloadDocument(doc) {
+            try {
+                const response = await fetch(`/api/site/${this.siteId}/documents/${doc.id}/download`);
+                if (!response.ok) throw new Error('Download fallito');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = doc.filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+            } catch (error) {
+                console.error('Download error:', error);
+                this.showNotification('Errore nel download del documento', 'error');
+            }
+        },
+
+        // File handling
+        handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 52428800) { // 50MB
+                    this.showNotification('Il file supera i 50MB', 'warning');
+                    return;
+                }
+                this.uploadFile = file;
+                // Auto-populate title if empty
+                if (!this.newDocument.title) {
+                    this.newDocument.title = file.name.replace(/\.[^/.]+$/, "");
+                }
+            }
+        },
+
+        handleFileDrop(event) {
+            this.dragOver = false;
+            const file = event.dataTransfer.files[0];
+            if (file) {
+                if (file.size > 52428800) {
+                    this.showNotification('Il file supera i 50MB', 'warning');
+                    return;
+                }
+                this.uploadFile = file;
+                // Trigger file input
+                const fileInput = document.getElementById('document-file');
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+            }
+        },
+
+        handleReplaceFile(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 52428800) {
+                    this.showNotification('Il file supera i 50MB', 'warning');
+                    return;
+                }
+                this.replaceFile = file;
+            }
+        },
+
+        // Modal management
+        openUploadModal() {
+            this.resetUploadForm();
+            this.showUploadModal = true;
+        },
+
+        closeUploadModal() {
+            this.showUploadModal = false;
+            this.resetUploadForm();
+        },
+
+        openEditModal(doc) {
+            this.editDocument = { ...doc };
+            this.replaceFile = null;
+            this.showEditModal = true;
+        },
+
+        closeEditModal() {
+            this.showEditModal = false;
+            this.editDocument = null;
+            this.replaceFile = null;
+        },
+
+        openPreviewModal(doc) {
+            this.selectedDocument = doc;
+            this.showPreviewModal = true;
+        },
+
+        closePreviewModal() {
+            this.showPreviewModal = false;
+            this.selectedDocument = null;
+        },
+
+        resetUploadForm() {
+            this.newDocument = {
+                title: '',
+                description: '',
+                category: '',
+                doc_type: '',
+                tags: '',
+                doc_date: '',
+                author: '',
+                is_public: true
+            };
+            this.uploadFile = null;
+            this.uploadProgress = 0;
+            const fileInput = document.getElementById('document-file');
+            if (fileInput) fileInput.value = '';
+        },
+
+        confirmDeleteDocument(doc) {
+            this.deleteDocument(doc.id);
+        },
+
+        // Utility functions
+        formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        },
+
+        formatDate(dateString) {
+            if (!dateString) return '-';
+            return new Date(dateString).toLocaleDateString('it-IT');
+        },
+
+        // Filtering
+        get filteredDocuments() {
+            return this.documents.filter(doc => {
+                const matchesSearch = !this.searchQuery ||
+                    doc.title.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                    (doc.description && doc.description.toLowerCase().includes(this.searchQuery.toLowerCase()));
+
+                const matchesCategory = !this.selectedCategory || doc.category === this.selectedCategory;
+                const matchesType = !this.selectedType || doc.doc_type === this.selectedType;
+
+                return matchesSearch && matchesCategory && matchesType;
+            });
+        },
+
+        get paginatedDocuments() {
+            const start = (this.currentPage - 1) * this.itemsPerPage;
+            const end = start + this.itemsPerPage;
+            return this.filteredDocuments.slice(start, end);
+        },
+
+        get totalPages() {
+            return Math.ceil(this.filteredDocuments.length / this.itemsPerPage);
+        },
+
+        // Notifications
+        showNotification(message, type = 'info') {
+            // Implementa la tua logica di notifica
+            // Puoi usare toast, alert, o un sistema custom
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            alert(message); // Sostituisci con sistema migliore
+        }
+    }
+}
 </script>
 {% endblock %}
