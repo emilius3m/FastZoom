@@ -22,10 +22,10 @@ from app.models.users import UserActivity
 # Importa la funzione di verifica accesso dal sites_router
 from app.routes.sites_router import get_site_access
 
-form_schemas_router = APIRouter(prefix="/sites", tags=["form-schemas"])
+form_schemas_router = APIRouter(prefix="/api", tags=["form-schemas"])
 
 
-@form_schemas_router.post("/{site_id}/api/form-schemas")
+@form_schemas_router.post("/site/{site_id}/form-schemas")
 async def save_form_schema(
         site_id: UUID,
         schema_data: dict,
@@ -132,7 +132,7 @@ async def save_form_schema(
         raise HTTPException(status_code=500, detail=f"Errore nel salvataggio: {str(e)}")
 
 
-@form_schemas_router.get("/{site_id}/api/form-schemas")
+@form_schemas_router.get("/site/{site_id}/form-schemas")
 async def get_form_schemas(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
@@ -182,7 +182,7 @@ async def get_form_schemas(
         raise HTTPException(status_code=500, detail=f"Errore nel recupero degli schema: {str(e)}")
 
 
-@form_schemas_router.get("/{site_id}/api/form-schemas/{schema_id}")
+@form_schemas_router.get("/site/{site_id}/form-schemas/{schema_id}")
 async def get_form_schema(
         site_id: UUID,
         schema_id: UUID,
@@ -227,7 +227,7 @@ async def get_form_schema(
         raise HTTPException(status_code=500, detail=f"Errore nel recupero dello schema: {str(e)}")
 
 
-@form_schemas_router.delete("/{site_id}/api/form-schemas/{schema_id}")
+@form_schemas_router.delete("/site/{site_id}/form-schemas/{schema_id}")
 async def delete_form_schema(
         site_id: UUID,
         schema_id: UUID,
