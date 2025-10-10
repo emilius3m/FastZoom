@@ -25,7 +25,7 @@ ICCD_TEMPLATES = {
         "description": "Schema standard ICCD per catalogazione siti archeologici (v. 3.00) - COMPLETO 15 paragrafi",
         "category": "siti_archeologici",
         "icon": "🗺️",
-        "schema": SCHEMA_SI_300["schema"],
+        "schemas": SCHEMA_SI_300["schemas"],
         "ui_schema": SCHEMA_SI_300["ui_schema"]
     },
     "RA": {
@@ -33,7 +33,7 @@ ICCD_TEMPLATES = {
         "description": "Schema standard ICCD per catalogazione reperti archeologici (v. 3.00) - COMPLETO 21 paragrafi",
         "category": "reperti_archeologici",
         "icon": "🏺",
-        "schema": SCHEMA_RA_300["schema"],
+        "schemas": SCHEMA_RA_300["schemas"],
         "ui_schema": SCHEMA_RA_300["ui_schema"]
     },
     "CA": {
@@ -41,7 +41,7 @@ ICCD_TEMPLATES = {
         "description": "Schema standard ICCD per catalogazione complessi archeologici (v. 3.00) - COMPLETO 23 paragrafi",
         "category": "complessi_archeologici",
         "icon": "🏛️",
-        "schema": SCHEMA_CA_300["schema"],
+        "schemas": SCHEMA_CA_300["schemas"],
         "ui_schema": SCHEMA_CA_300["ui_schema"]
     },
     "MA": {
@@ -49,7 +49,7 @@ ICCD_TEMPLATES = {
         "description": "Schema standard ICCD per catalogazione monumenti archeologici (v. 3.00) - COMPLETO 23 paragrafi",
         "category": "monumenti_archeologici",
         "icon": "🏛️",
-        "schema": SCHEMA_MA_300["schema"],
+        "schemas": SCHEMA_MA_300["schemas"],
         "ui_schema": SCHEMA_MA_300["ui_schema"]
     },
     "F": {
@@ -57,13 +57,13 @@ ICCD_TEMPLATES = {
         "description": "Schema standard ICCD per catalogazione fotografia storica e contemporanea (v. 4.00) - COMPLETO 23 paragrafi",
         "category": "fotografia",
         "icon": "📷",
-        "schema": SCHEMA_F_400["schema"],
+        "schemas": SCHEMA_F_400["schemas"],
         "ui_schema": SCHEMA_F_400["ui_schema"]
     }
 }
 
 def get_template_by_type(schema_type: str):
-    """Recupera template ICCD per tipo schema."""
+    """Recupera template ICCD per tipo schemas."""
     return ICCD_TEMPLATES.get(schema_type.upper())
 
 
@@ -158,7 +158,7 @@ class ICCDIntegrationService:
                     name=template_data['name'],
                     description=template_data['description'],
                     category=template_data['category'],
-                    schema_json=json.dumps(template_data['schema']),
+                    schema_json=json.dumps(template_data['schemas']),
                     site_id=site_id,
                     created_by=user_id,
                     is_active=True
@@ -172,14 +172,14 @@ class ICCDIntegrationService:
     
     async def get_iccd_schema_for_site(self, site_id: UUID, schema_type: str) -> Optional[Dict[str, Any]]:
         """
-        Ottieni schema ICCD configurato per un sito specifico direttamente dal codice Python.
+        Ottieni schemas ICCD configurato per un sito specifico direttamente dal codice Python.
         
         Args:
             site_id: ID del sito archeologico
-            schema_type: Tipo schema ICCD (RA, CA, SI, etc.)
+            schema_type: Tipo schemas ICCD (RA, CA, SI, etc.)
             
         Returns:
-            Dict con schema configurato o None se non trovato
+            Dict con schemas configurato o None se non trovato
         """
         
         try:
@@ -191,7 +191,7 @@ class ICCDIntegrationService:
                 return None
             
             # Personalizza template per il sito (es. valori di default)
-            customized_schema = template_data["schema"].copy()
+            customized_schema = template_data["schemas"].copy()
             
             # Aggiorna valori di default per il sito
             if "properties" in customized_schema and "LC" in customized_schema["properties"]:
@@ -215,7 +215,7 @@ class ICCDIntegrationService:
             }
             
         except Exception as e:
-            logger.error(f"Error getting ICCD schema for site {site_id}, type {schema_type}: {e}")
+            logger.error(f"Error getting ICCD schemas for site {site_id}, type {schema_type}: {e}")
             return None
     
     async def convert_iccd_to_form_data(self, iccd_data: Dict[str, Any], schema_type: str) -> Dict[str, Any]:
@@ -224,7 +224,7 @@ class ICCDIntegrationService:
         
         Args:
             iccd_data: Dati ICCD strutturati
-            schema_type: Tipo schema ICCD
+            schema_type: Tipo schemas ICCD
             
         Returns:
             Dict con dati convertiti per form builder
@@ -380,7 +380,7 @@ class ICCDIntegrationService:
                         description=template_data['description'],
                         category=template_data['category'],
                         schema_json=json.dumps({
-                            **template_data['schema'],
+                            **template_data['schemas'],
                             "iccd_metadata": {
                                 "schema_type": schema_type,
                                 "standard_version": "4.00",
@@ -399,7 +399,7 @@ class ICCDIntegrationService:
                     logger.info(f"Created ICCD FormSchema {schema_type} for site {site_id}")
                     
                 except Exception as e:
-                    error_msg = f"Error creating {schema_type} schema: {str(e)}"
+                    error_msg = f"Error creating {schema_type} schemas: {str(e)}"
                     errors.append(error_msg)
                     logger.error(error_msg)
                     continue
@@ -454,7 +454,7 @@ class ICCDIntegrationService:
                 try:
                     schema_json = json.loads(schema.schema_json)
                     
-                    # Verifica se è schema ICCD
+                    # Verifica se è schemas ICCD
                     iccd_metadata = schema_json.get("iccd_metadata")
                     if iccd_metadata and iccd_metadata.get("ministerial_compliant"):
                         iccd_schemas.append({

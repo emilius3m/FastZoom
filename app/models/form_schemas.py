@@ -17,7 +17,7 @@ class FormSchema(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text)
     category = Column(String(50), nullable=False)  # artifact, structure, stratigraphy, sample
-    schema_json = Column(Text, nullable=False)  # JSON string of the form schema
+    schema_json = Column(Text, nullable=False)  # JSON string of the form schemas
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

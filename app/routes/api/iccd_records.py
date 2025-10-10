@@ -27,7 +27,7 @@ iccd_router = APIRouter(prefix="/api/iccd", tags=["iccd_records"])
 @iccd_router.get("/site/{site_id}/records")
 async def get_site_iccd_records(
     site_id: UUID,
-    schema_type: Optional[str] = Query(None, description="Filtro per tipo schema (RA, CA, SI, etc.)"),
+    schema_type: Optional[str] = Query(None, description="Filtro per tipo schemas (RA, CA, SI, etc.)"),
     level: Optional[str] = Query(None, description="Filtro per livello (P, C, A)"),
     status: Optional[str] = Query(None, description="Filtro per status (draft, submitted, approved, published)"),
     is_validated: Optional[bool] = Query(None, description="Filtro per validazione"),
@@ -127,7 +127,7 @@ async def validate_iccd_record(
 
 @iccd_router.get("/schema-templates")
 async def get_iccd_schema_templates(
-    schema_type: Optional[str] = Query(None, description="Filtro per tipo schema"),
+    schema_type: Optional[str] = Query(None, description="Filtro per tipo schemas"),
     category: Optional[str] = Query(None, description="Filtro per categoria"),
     current_user_id: UUID = Depends(get_current_user_id),
     iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
@@ -146,7 +146,7 @@ async def get_iccd_schema_template(
     current_user_id: UUID = Depends(get_current_user_id),
     iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
 ):
-    """Ottieni template schema ICCD specifico."""
+    """Ottieni template schemas ICCD specifico."""
     try:
         result = await iccd_service.get_schema_template_by_type(current_user_id, schema_type)
         return result

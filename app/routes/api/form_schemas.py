@@ -33,14 +33,14 @@ async def save_form_schema(
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Salva un nuovo form schema o aggiorna uno esistente"""
+    """Salva un nuovo form schemas o aggiorna uno esistente"""
     site, permission = site_access
     
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
     
     try:
-        # Valida i dati del schema
+        # Valida i dati del schemas
         if not schema_data.get('name'):
             raise HTTPException(status_code=400, detail="Nome del form richiesto")
         
@@ -51,7 +51,7 @@ async def save_form_schema(
         schema_id = schema_data.get('id')
         
         if schema_id:
-            # Aggiornamento schema esistente
+            # Aggiornamento schemas esistente
             existing_schema_query = select(FormSchema).where(
                 and_(FormSchema.id == UUID(schema_id), FormSchema.site_id == site_id)
             )
@@ -77,7 +77,7 @@ async def save_form_schema(
                 user_id=current_user_id,
                 site_id=site_id,
                 activity_type="UPDATE",
-                activity_desc=f"Aggiornato form schema: {existing_schema.name}",
+                activity_desc=f"Aggiornato form schemas: {existing_schema.name}",
                 extra_data={
                     "schema_id": str(existing_schema.id),
                     "schema_name": existing_schema.name,
@@ -88,10 +88,10 @@ async def save_form_schema(
             return JSONResponse({
                 "message": "Schema aggiornato con successo",
                 "schema_id": str(existing_schema.id),
-                "schema": schema_data
+                "schemas": schema_data
             })
         else:
-            # Nuovo schema
+            # Nuovo schemas
             new_schema = FormSchema(
                 name=schema_data['name'],
                 description=schema_data.get('description', ''),
@@ -111,7 +111,7 @@ async def save_form_schema(
                 user_id=current_user_id,
                 site_id=site_id,
                 activity_type="CREATE",
-                activity_desc=f"Creato form schema: {new_schema.name}",
+                activity_desc=f"Creato form schemas: {new_schema.name}",
                 extra_data={
                     "schema_id": str(new_schema.id),
                     "schema_name": new_schema.name,
@@ -122,13 +122,13 @@ async def save_form_schema(
             return JSONResponse({
                 "message": "Schema salvato con successo",
                 "schema_id": str(new_schema.id),
-                "schema": schema_data
+                "schemas": schema_data
             })
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error saving form schema: {e}")
+        logger.error(f"Error saving form schemas: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nel salvataggio: {str(e)}")
 
 
@@ -138,14 +138,14 @@ async def get_form_schemas(
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Recupera tutti i form schema per il sito"""
+    """Recupera tutti i form schemas per il sito"""
     site, permission = site_access
     
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
     
     try:
-        # Query per ottenere tutti i form schema del sito
+        # Query per ottenere tutti i form schemas del sito
         schemas_query = select(FormSchema).where(
             and_(FormSchema.site_id == site_id, FormSchema.is_active == True)
         ).order_by(FormSchema.created_at.desc())
@@ -166,10 +166,10 @@ async def get_form_schemas(
                     "created_at": schema.created_at.isoformat(),
                     "updated_at": schema.updated_at.isoformat(),
                     "created_by": str(schema.created_by),
-                    "schema": schema_json
+                    "schemas": schema_json
                 })
             except json.JSONDecodeError:
-                logger.warning(f"Invalid JSON in schema {schema.id}")
+                logger.warning(f"Invalid JSON in schemas {schema.id}")
                 continue
         
         return JSONResponse({
@@ -179,7 +179,7 @@ async def get_form_schemas(
         
     except Exception as e:
         logger.error(f"Error fetching form schemas: {e}")
-        raise HTTPException(status_code=500, detail=f"Errore nel recupero degli schema: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore nel recupero degli schemas: {str(e)}")
 
 
 @form_schemas_router.get("/site/{site_id}/form-schemas/{schema_id}")
@@ -189,7 +189,7 @@ async def get_form_schema(
         site_access: tuple = Depends(get_site_access),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Recupera un singolo form schema"""
+    """Recupera un singolo form schemas"""
     site, permission = site_access
     
     if not permission.can_read():
@@ -215,7 +215,7 @@ async def get_form_schema(
                 "created_at": schema.created_at.isoformat(),
                 "updated_at": schema.updated_at.isoformat(),
                 "created_by": str(schema.created_by),
-                "schema": schema_json
+                "schemas": schema_json
             })
         except json.JSONDecodeError:
             raise HTTPException(status_code=500, detail="Schema corrotto nel database")
@@ -223,8 +223,8 @@ async def get_form_schema(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching form schema {schema_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Errore nel recupero dello schema: {str(e)}")
+        logger.error(f"Error fetching form schemas {schema_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel recupero dello schemas: {str(e)}")
 
 
 @form_schemas_router.delete("/site/{site_id}/form-schemas/{schema_id}")
@@ -235,7 +235,7 @@ async def delete_form_schema(
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Elimina un form schema"""
+    """Elimina un form schemas"""
     site, permission = site_access
     
     if not permission.can_write():
@@ -253,7 +253,7 @@ async def delete_form_schema(
         
         schema_name = schema.name
         
-        # Elimina lo schema (soft delete)
+        # Elimina lo schemas (soft delete)
         schema.is_active = False
         await db.commit()
         
@@ -263,7 +263,7 @@ async def delete_form_schema(
             user_id=current_user_id,
             site_id=site_id,
             activity_type="DELETE",
-            activity_desc=f"Eliminato form schema: {schema_name}",
+            activity_desc=f"Eliminato form schemas: {schema_name}",
             extra_data={
                 "schema_id": str(schema_id),
                 "schema_name": schema_name
@@ -278,7 +278,7 @@ async def delete_form_schema(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting form schema {schema_id}: {e}")
+        logger.error(f"Error deleting form schemas {schema_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nell'eliminazione: {str(e)}")
 
 
@@ -290,7 +290,7 @@ async def log_user_activity(
         activity_desc: str,
         extra_data: Dict[str, Any] = None
 ):
-    """Log attività utente per form schema"""
+    """Log attività utente per form schemas"""
     try:
         # Serializza extra_data come JSON string
         extra_data_json = None
@@ -308,9 +308,9 @@ async def log_user_activity(
 
         db.add(activity)
         await db.commit()
-        logger.info(f"Form schema activity logged: {activity_type} by {user_id}")
+        logger.info(f"Form schemas activity logged: {activity_type} by {user_id}")
 
     except Exception as e:
-        logger.error(f"Error logging form schema activity: {e}")
+        logger.error(f"Error logging form schemas activity: {e}")
         # Non bloccare l'operazione principale se il log fallisce
         await db.rollback()

@@ -74,7 +74,7 @@ function iccdHierarchicalSystem() {
             const siteRecord = this.hierarchyTree.site;
             
             if (siteRecord) {
-                // Organizza secondo schema ICCD
+                // Organizza secondo schemas ICCD
                 this.organizeByICCDLevel(this.hierarchyTree);
             }
         },
@@ -107,7 +107,7 @@ function iccdHierarchicalSystem() {
                 return;
             }
             
-            // For other schema types, check if SI exists first
+            // For other schemas types, check if SI exists first
             if (!this.hierarchyTree.organized?.level1?.SI && schemaType !== 'SI') {
                 this.showAlertMessage('È necessario creare prima la Scheda SI (Sito Archeologico)', 'warning');
                 return;

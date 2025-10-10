@@ -464,7 +464,7 @@ FastZoom integra un potente sistema di form builder drag-and-drop con schema JSO
 Il sistema è basato su schema JSON per moduli archeologici specifici:
 
 ```javascript
-// Esempio schema per modulo "Ceramica"
+// Esempio schemas per modulo "Ceramica"
 const ceramicModuleSchema = {
   id: "ceramic_module",
   name: "Rilevamento Ceramico",
@@ -645,7 +645,7 @@ Alpine.data('formBuilder', () => ({
                 this.showSuccessMessage('Schema salvato con successo!');
             }
         } catch (error) {
-            console.error('Error saving schema:', error);
+            console.error('Error saving schemas:', error);
         }
     },
     
@@ -661,7 +661,7 @@ Alpine.data('formBuilder', () => ({
 Component per renderizzare i form dai schema JSON:
 
 ```javascript
-// Component per renderizzare i form dai schema JSON
+// Component per renderizzare i form dai schemas JSON
 Alpine.data('dynamicFormRenderer', (schema) => ({
     schema: schema,
     formData: {},
@@ -740,10 +740,10 @@ Alpine.data('dynamicFormRenderer', (schema) => ({
 Il form builder si integra con gli endpoint API esistenti:
 
 ```python
-# Endpoint per salvare schema form
+# Endpoint per salvare schemas form
 @router.post("/api/form-schemas")
 async def save_form_schema(schema: FormSchema):
-    # Salva schema in database
+    # Salva schemas in database
     pass
 
 # Endpoint per recuperare dati form

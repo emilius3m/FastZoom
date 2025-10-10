@@ -377,7 +377,7 @@ function iccdFormUniversal() {
                 const data = await response.json();
                 console.log('📋 Response data:', data);
                 
-                // Il schema è dentro json_schema, non schema
+                // Il schemas è dentro json_schema, non schemas
                 this.schema = data.json_schema || data.schema;
                 this.schemaInfo = {
                     name: data.name || `Schema ${this.schemaType}`,
@@ -390,7 +390,7 @@ function iccdFormUniversal() {
                 console.error('❌ Errore caricamento schema:', error);
                 this.showAlert('error', 'Errore caricamento schema ICCD. Verifica la connessione.');
                 
-                // Fallback con schema di base per sviluppo
+                // Fallback con schemas di base per sviluppo
                 this.schema = this.getFallbackSchema();
                 this.schemaInfo = {
                     name: `Schema ${this.schemaType} (Fallback)`,
@@ -562,7 +562,7 @@ function iccdFormUniversal() {
         },
 
         initializeEmptySections() {
-            // Funzione helper per inizializzare sezioni vuote basandosi completamente sullo schema
+            // Funzione helper per inizializzare sezioni vuote basandosi completamente sullo schemas
             if (this.sections && this.sections.length > 0) {
                 this.sections.forEach(section => {
                     // Crea la sezione se non esiste
@@ -570,8 +570,8 @@ function iccdFormUniversal() {
                         this.formData[section.id] = {};
                     }
                     
-                    // Inizializza ricorsivamente TUTTI i sottocampi basandosi sullo schema
-                    // Nessuna inizializzazione manuale hardcoded - tutto schema-driven
+                    // Inizializza ricorsivamente TUTTI i sottocampi basandosi sullo schemas
+                    // Nessuna inizializzazione manuale hardcoded - tutto schemas-driven
                     if (section.properties) {
                         this.initializeNestedObjects(section.id, section.properties);
                     }

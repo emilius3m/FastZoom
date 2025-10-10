@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schema.users import RoleBase, RoleCreate
+from app.schemas.users import RoleBase, RoleCreate
 
 
 def test_create_valid_roles():

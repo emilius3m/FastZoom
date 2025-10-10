@@ -23,14 +23,14 @@ Prima di iniziare, assicurati di avere:
 
 Assicurati che il file contenga:
 ```python
-# Funzione principale che restituisce lo schema
+# Funzione principale che restituisce lo schemas
 def get_iccd_[tipo]_[versione]_schema() -> Dict[str, Any]:
     return {
         "id": "iccd_[tipo]_[versione]",
         "name": "ICCD [TIPO] [VERSIONE] - [Nome]",
         "version": "[VERSIONE]",
         "category": "[categoria]",
-        "schema": { ... },
+        "schemas": { ... },
         "ui_schema": { ... }
     }
 
@@ -65,7 +65,7 @@ from app.data.iccd_f_schema_complete import SCHEMA_F_400, get_iccd_f_400_schema,
 
 # Export list
 __all__ = [
-    # ... altri schema
+    # ... altri schemas
     'SCHEMA_F_400', 'get_iccd_f_400_schema', 'validate_f_record',
 ]
 ```
@@ -86,7 +86,7 @@ __all__ = [
 # 1. Import (dopo gli altri import)
 from app.data.iccd_f_schema_complete import get_iccd_f_400_schema
 
-# 2. Crea costante schema (dopo SCHEMA_MA_300)
+# 2. Crea costante schemas (dopo SCHEMA_MA_300)
 SCHEMA_F_400 = get_iccd_f_400_schema()
 
 # 3. Aggiungi al dizionario ICCD_TEMPLATES
@@ -97,7 +97,7 @@ ICCD_TEMPLATES = {
         "description": "Schema standard ICCD per catalogazione fotografia storica e contemporanea (v. 4.00) - COMPLETO 23 paragrafi",
         "category": "fotografia",
         "icon": "📷",
-        "schema": SCHEMA_F_400["schema"],
+        "schemas": SCHEMA_F_400["schemas"],
         "ui_schema": SCHEMA_F_400["ui_schema"]
     }
 }

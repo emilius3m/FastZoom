@@ -17,7 +17,7 @@ from app.core.security import get_current_user_id
 from app.routes.api.dependencies import get_site_access
 from app.services.photo_upload_service import PhotoUploadService, get_photo_upload_service
 from app.repositories.photo_repository import PhotoRepository
-from app.schema.photo_schemas import PhotoResponse, PhotoCreateRequest, PhotoMetadataUpdate
+from app.schemas.photo_schemas import PhotoResponse, PhotoCreateRequest, PhotoMetadataUpdate
 from app.routes.api.notifications_ws import notification_manager
 
 # Router V2
@@ -192,7 +192,7 @@ async def update_photo_metadata_v2(
     """
     Aggiorna metadati foto - Versione V2
 
-    Utilizza schema Pydantic per validazione e repository per persistenza.
+    Utilizza schemas Pydantic per validazione e repository per persistenza.
     """
     site, permission = site_access
 

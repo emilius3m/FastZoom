@@ -334,7 +334,7 @@ async def batch_process_photos(
 ### Schema Ottimizzati
 
 ```python
-# app/schema/photo_schemas.py
+# app/schemas/photo_schemas.py
 
 # Request Schemas (input validation)
 class PhotoCreateRequest(BaseModel):

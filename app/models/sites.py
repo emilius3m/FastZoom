@@ -41,7 +41,7 @@ class ArchaeologicalSite(Base):
     # Relazione con le foto del sito
     photos = relationship("Photo", back_populates="site", cascade="all, delete-orphan")
     
-    # Relazione con i form schema del sito
+    # Relazione con i form schemas del sito
     form_schemas = relationship("FormSchema", back_populates="site", cascade="all, delete-orphan")
     
     # Relazione con le piante archeologiche
@@ -55,7 +55,10 @@ class ArchaeologicalSite(Base):
     
     # Relazione con i documenti del sito
     documents = relationship("Document", back_populates="site", cascade="all, delete-orphan")
-    
+
+    # Relazione con i giornali di cantiere
+    giornali_cantiere = relationship("GiornaleCantiere", back_populates="site", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<ArchaeologicalSite(name='{self.name}', code='{self.code}')>"
     

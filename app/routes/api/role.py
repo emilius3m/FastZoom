@@ -9,7 +9,7 @@ from app.database.security import current_active_user
 from app.models.users import Role as RoleModelDB
 from app.models.users import User as UserModelDB
 from app.routes.api.crud import BaseCRUD
-from app.schema.users import RoleBase, RoleCreate, RoleRead, RoleUpdate
+from app.schemas.users import RoleBase, RoleCreate, RoleRead, RoleUpdate
 
 role_crud = BaseCRUD[RoleModelDB, RoleCreate, RoleUpdate](
     RoleModelDB, RoleCreate, RoleUpdate

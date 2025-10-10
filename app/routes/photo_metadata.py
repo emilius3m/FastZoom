@@ -18,7 +18,7 @@ from app.models.users import User
 from app.core.security import get_current_user_id_with_blacklist
 
 # Schemas Pydantic (da creare separatamente)
-from app.schema.photo_schemas import (
+from app.schemas.photo_schemas import (
     PhotoMetadataUpdate,
     PhotoMetadataResponse,
     PhotoResponse,

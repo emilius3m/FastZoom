@@ -124,7 +124,7 @@ class ICCDRecordRepository:
         schema_type: Optional[str] = None, 
         category: Optional[str] = None
     ) -> List[ICCDSchemaTemplate]:
-        """Get ICCD schema templates with optional filters."""
+        """Get ICCD schemas templates with optional filters."""
         query = select(ICCDSchemaTemplate).where(ICCDSchemaTemplate.is_active == True)
         
         if schema_type:
@@ -138,7 +138,7 @@ class ICCDRecordRepository:
         return result.scalars().all()
 
     async def get_schema_template_by_type(self, schema_type: str) -> Optional[ICCDSchemaTemplate]:
-        """Get a specific schema template by type."""
+        """Get a specific schemas template by type."""
         query = select(ICCDSchemaTemplate).where(
             and_(
                 ICCDSchemaTemplate.schema_type == schema_type,
@@ -157,7 +157,7 @@ class ICCDRecordRepository:
         )
         total_records = total_result.scalar() or 0
         
-        # By schema type
+        # By schemas type
         by_schema_result = await self.db_session.execute(
             select(ICCDRecord.schema_type, func.count(ICCDRecord.id))
             .where(ICCDRecord.site_id == site_id)

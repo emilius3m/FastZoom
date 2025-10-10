@@ -33,8 +33,8 @@ def init_models():
     from ..models.user_sites import UserSitePermission # noqa: F401
     from ..models.photos import Photo # noqa: F401
     from ..models.iccd_records import ICCDRecord, ICCDSchemaTemplate # noqa: F401
-
-
+    # Import giornale di cantiere
+    from ..models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere  # noqa: F401
 
 # Base = declarative_base()
 

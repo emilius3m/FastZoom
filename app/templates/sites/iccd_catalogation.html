@@ -751,7 +751,7 @@ function iccdCatalogation() {
             this.formData.iccd_data = this.deepMerge(defaultStructure, this.formData.iccd_data || {});
         },
         
-        // Caricamento template schema
+        // Caricamento template schemas
         async loadSchemaTemplate() {
             // Prevenzione loop: non caricare se già in corso
             if (this.loadingTemplate) {

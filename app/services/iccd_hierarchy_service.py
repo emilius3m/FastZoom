@@ -61,7 +61,7 @@ class ICCDHierarchyService:
             elif schema_type == 'RA':
                 return await self._validate_ra_creation(site_id, parent_id)
             
-            # Other schema types (SAS, NU, TMA, AT) follow standard rules
+            # Other schemas types (SAS, NU, TMA, AT) follow standard rules
             else:
                 return await self._validate_other_schema_creation(site_id, schema_type, parent_id)
                 
@@ -136,9 +136,9 @@ class ICCDHierarchyService:
         schema_type: str, 
         parent_id: Optional[UUID]
     ) -> Tuple[bool, str]:
-        """Validate creation of other schema types (SAS, NU, TMA, AT)."""
+        """Validate creation of other schemas types (SAS, NU, TMA, AT)."""
         
-        # For other schema types, if parent_id is provided, validate it exists
+        # For other schemas types, if parent_id is provided, validate it exists
         if parent_id:
             query = select(ICCDBaseRecord).where(
                 and_(
@@ -157,7 +157,7 @@ class ICCDHierarchyService:
     
     async def get_possible_parents(self, site_id: UUID, schema_type: str) -> List[Dict[str, Any]]:
         """
-        Get list of possible parent cards for a given schema type.
+        Get list of possible parent cards for a given schemas type.
         
         Args:
             site_id: Site ID

@@ -32,7 +32,7 @@ class Photo(Base):
     # Metadati EXIF (JSON)
     exif_data = Column(JSONB, default={})
 
-    # Metadati archeologici (conforme a schema JSON)
+    # Metadati archeologici (conforme a schemas JSON)
     metadata = Column(JSONB, default={})
 
     # Relazioni

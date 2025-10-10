@@ -251,7 +251,7 @@ class ArchaeologicalData(Base):
     coordinates_y: Mapped[float] = mapped_column(Float, nullable=False)
     elevation: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # Quota altimetrica
     
-    # Dati raccolti (JSON schema-based)
+    # Dati raccolti (JSON schemas-based)
     data: Mapped[dict] = mapped_column(JSON, nullable=False)
     
     # Metadati raccolta

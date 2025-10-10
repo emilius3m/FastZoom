@@ -22,7 +22,7 @@ async def test_iccd_implementation():
             print(f"   ✅ Template {schema_type}: {template['name']}")
             print(f"      - Categoria: {template['category']}")
             print(f"      - Icona: {template['icon']}")
-            print(f"      - Sezioni richieste: {len(template['schema']['required'])}")
+            print(f"      - Sezioni richieste: {len(template['schemas']['required'])}")
         
     except Exception as e:
         print(f"   ❌ Error testing templates: {e}")
@@ -114,7 +114,7 @@ async def test_iccd_implementation():
         "/api/iccd/sites/{site_id}/records/{record_id}",
         "/api/iccd/sites/{site_id}/records/{record_id}/pdf",
         "/api/iccd/sites/{site_id}/statistics",
-        "/api/iccd/schema-templates",
+        "/api/iccd/schemas-templates",
         "/api/iccd/validate",
         "/api/iccd/sites/{site_id}/initialize"
     ]

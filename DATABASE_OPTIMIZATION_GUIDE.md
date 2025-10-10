@@ -152,7 +152,7 @@ ON user_activities (created);
 ### 3. ICCD Records - Catalogazione
 
 ```sql
--- Ricerca per sito + stato + tipo schema
+-- Ricerca per sito + stato + tipo schemas
 CREATE INDEX idx_iccd_site_status_schema 
 ON iccd_base_records (site_id, status, schema_type, level);
 

@@ -54,7 +54,7 @@ class ICCDValidator:
         Valida una scheda ICCD completa.
         
         Args:
-            schema_type: Tipo schema (RA, CA, SI, etc.)
+            schema_type: Tipo schemas (RA, CA, SI, etc.)
             level: Livello catalogazione (P, C, A)
             iccd_data: Dati ICCD da validare
             
@@ -401,7 +401,7 @@ class ICCDValidationService:
         Valida un record ICCD applicando validazioni standard.
         
         Args:
-            schema_type: Tipo schema ICCD
+            schema_type: Tipo schemas ICCD
             level: Livello catalogazione
             iccd_data: Dati da validare
             
@@ -415,7 +415,7 @@ class ICCDValidationService:
         return is_valid, errors
     
     def get_validation_summary(self, schema_type: str, level: str) -> Dict[str, Any]:
-        """Ottieni riassunto regole di validazione standard per schema e livello."""
+        """Ottieni riassunto regole di validazione standard per schemas e livello."""
         
         # Mappa delle sezioni obbligatorie per livello
         required_sections = {

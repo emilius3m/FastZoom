@@ -3,7 +3,7 @@ from typing import Optional
 import pytest
 from pydantic import BaseModel
 
-from ..schema.pydantic_base import pydantic_partial
+from ..schemas.pydantic_base import pydantic_partial
 
 
 class TestPartialModel:

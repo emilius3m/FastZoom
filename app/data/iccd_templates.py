@@ -2,10 +2,10 @@
 Template ICCD Completi - Schema 3.00
 Conforme a normativa ufficiale ICCD MiC 2025
 
-Tutti gli schema ICCD supportati con validazione completa
+Tutti gli schemas ICCD supportati con validazione completa
 """
 
-# Import di tutti gli schema completi
+# Import di tutti gli schemas completi
 from app.data.iccd_si_schema_complete import SCHEMA_SI_300, get_iccd_si_300_schema, validate_si_record
 from app.data.iccd_ra_schema_complete import SCHEMA_RA_300, get_iccd_ra_300_schema, validate_ra_record
 from app.data.iccd_ca_schema_complete import SCHEMA_CA_300, get_iccd_ca_300_schema, validate_ca_record
@@ -13,7 +13,7 @@ from app.data.iccd_ma_schema_complete import SCHEMA_MA_300, get_iccd_ma_300_sche
 from app.data.iccd_f_schema_complete import SCHEMA_F_400, get_iccd_f_400_schema, validate_f_record
 
 
-# Esporta tutti gli schema
+# Esporta tutti gli schemas
 __all__ = [
     'SCHEMA_SI_300', 'get_iccd_si_300_schema', 'validate_si_record',
     'SCHEMA_RA_300', 'get_iccd_ra_300_schema', 'validate_ra_record',

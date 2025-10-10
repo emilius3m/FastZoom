@@ -415,7 +415,7 @@ class ICCDRecordService:
     async def get_schema_templates(self, current_user_id: UUID,
                                  schema_type: Optional[str] = None,
                                  category: Optional[str] = None) -> Dict[str, Any]:
-        """Get available ICCD schema templates from Python code."""
+        """Get available ICCD schemas templates from Python code."""
         # Verify user exists
         from sqlalchemy import select
         from app.models.users import User
@@ -447,7 +447,7 @@ class ICCDRecordService:
                 "icon": template_data["icon"],
                 "is_active": True,
                 "standard_compliant": True,
-                "json_schema": template_data["schema"],
+                "json_schema": template_data["schemas"],
                 "ui_schema": template_data["ui_schema"]
             })
         
@@ -457,7 +457,7 @@ class ICCDRecordService:
         }
 
     async def get_schema_template_by_type(self, current_user_id: UUID, schema_type: str) -> Dict[str, Any]:
-        """Get a specific ICCD schema template by type from Python code."""
+        """Get a specific ICCD schemas template by type from Python code."""
         # Verify user exists
         from sqlalchemy import select
         from app.models.users import User
@@ -474,7 +474,7 @@ class ICCDRecordService:
         template_data = get_template_by_type(schema_type)
         
         if not template_data:
-            raise BusinessLogicError("Template schema ICCD non trovato", 404)
+            raise BusinessLogicError("Template schemas ICCD non trovato", 404)
         
         return {
             "id": f"iccd_{schema_type.lower()}",
@@ -486,7 +486,7 @@ class ICCDRecordService:
             "icon": template_data["icon"],
             "is_active": True,
             "standard_compliant": True,
-            "json_schema": template_data["schema"],
+            "json_schema": template_data["schemas"],
             "ui_schema": template_data["ui_schema"]
         }
 

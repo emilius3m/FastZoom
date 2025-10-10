@@ -134,7 +134,7 @@ def upgrade() -> None:
     # 3. ICCD_BASE_RECORDS - OTTIMIZZAZIONI CATALOGAZIONE
     # ========================================
     
-    # Query comuni: ricerca per sito + stato + schema type
+    # Query comuni: ricerca per sito + stato + schemas type
     op.create_index(
         'idx_iccd_site_status_schema',
         'iccd_base_records',

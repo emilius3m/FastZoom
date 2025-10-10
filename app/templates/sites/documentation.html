@@ -651,7 +651,7 @@ document.addEventListener('alpine:init', () => {
             { type: 'group', label: 'Gruppo Campi', icon: '📦' }
         ],
         
-        // Form schema esistenti (caricati dal server)
+        // Form schemas esistenti (caricati dal server)
         existingSchemas: {{ form_schemas|tojson if form_schemas else '[]' }},
         
         // Form in costruzione
@@ -683,7 +683,7 @@ document.addEventListener('alpine:init', () => {
             this.selectedField = null;
         },
         
-        // Carica schema esistente per modifica
+        // Carica schemas esistente per modifica
         loadExistingSchema(schema) {
             this.formSchema = {
                 id: schema.id,
@@ -696,7 +696,7 @@ document.addEventListener('alpine:init', () => {
             this.selectedField = null;
         },
         
-        // Elimina schema
+        // Elimina schemas
         async deleteSchema(schemaId) {
             if (!confirm('Sei sicuro di voler eliminare questo form?')) return;
             
@@ -709,7 +709,7 @@ document.addEventListener('alpine:init', () => {
                     // Rimuovi dalla lista locale
                     this.existingSchemas = this.existingSchemas.filter(s => s.id !== schemaId);
                     
-                    // Se stava modificando questo schema, reset
+                    // Se stava modificando questo schemas, reset
                     if (this.currentSchemaId === schemaId) {
                         this.createNewForm();
                     }
@@ -837,7 +837,7 @@ document.addEventListener('alpine:init', () => {
                     const result = await response.json();
                     
                     if (this.isEditing) {
-                        // Update existing schema in the list
+                        // Update existing schemas in the list
                         const index = this.existingSchemas.findIndex(s => s.id === this.currentSchemaId);
                         if (index !== -1) {
                             this.existingSchemas[index] = {
@@ -850,7 +850,7 @@ document.addEventListener('alpine:init', () => {
                         }
                         alert('Form aggiornato con successo!');
                     } else {
-                        // Add new schema to the list
+                        // Add new schemas to the list
                         this.existingSchemas.unshift({
                             id: result.schema_id,
                             name: this.formSchema.name,

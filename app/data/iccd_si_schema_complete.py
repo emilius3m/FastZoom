@@ -26,8 +26,8 @@ def get_iccd_si_300_schema() -> Dict[str, Any]:
         "category": "archaeological_site",
         "standard": "MiC-ICCD-2025",
 
-        "schema": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "schemas": {
+            "$schemas": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "title": "SCHEDA SI 3.00 - SITI ARCHEOLOGICI",
 
@@ -436,14 +436,14 @@ def _get_ui_schema() -> Dict[str, Any]:
     }
 
 
-# Export schema
+# Export schemas
 SCHEMA_SI_300 = get_iccd_si_300_schema()
 
 
 # Funzione di validazione
 def validate_si_record(data: Dict[str, Any]) -> tuple[bool, List[str]]:
     """
-    Valida un record SI contro lo schema
+    Valida un record SI contro lo schemas
 
     Returns:
         (is_valid, errors)
@@ -451,7 +451,7 @@ def validate_si_record(data: Dict[str, Any]) -> tuple[bool, List[str]]:
     try:
         import jsonschema
         schema = get_iccd_si_300_schema()
-        jsonschema.validate(instance=data, schema=schema["schema"])
+        jsonschema.validate(instance=data, schema=schema["schemas"])
         return True, []
     except jsonschema.exceptions.ValidationError as e:
         return False, [str(e)]
@@ -460,7 +460,7 @@ def validate_si_record(data: Dict[str, Any]) -> tuple[bool, List[str]]:
 
 
 if __name__ == "__main__":
-    # Test schema
+    # Test schemas
     print("Schema SI 3.00 generato correttamente")
-    print(f"Paragrafi implementati: {len(SCHEMA_SI_300['schema']['properties'])}")
-    print(f"Paragrafi obbligatori: {len(SCHEMA_SI_300['schema']['required'])}")
+    print(f"Paragrafi implementati: {len(SCHEMA_SI_300['schemas']['properties'])}")
+    print(f"Paragrafi obbligatori: {len(SCHEMA_SI_300['schemas']['required'])}")

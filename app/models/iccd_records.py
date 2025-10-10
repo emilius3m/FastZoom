@@ -292,7 +292,7 @@ class ICCDSchemaTemplate(Base):
     # Chiave primaria
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
-    # Identificativo schema
+    # Identificativo schemas
     schema_type: Mapped[str] = mapped_column(String(5), nullable=False, unique=True, index=True)  # RA, CA, SI, etc.
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)

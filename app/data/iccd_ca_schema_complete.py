@@ -35,8 +35,8 @@ def get_iccd_ca_300_schema() -> Dict[str, Any]:
         "standard": "MiC-ICCD-2025",
         "description": "Scheda per complessi archeologici costituiti da più unità edilizie",
 
-        "schema": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "schemas": {
+            "$schemas": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
             "title": "SCHEDA CA 3.00 - COMPLESSI ARCHEOLOGICI",
 
@@ -901,17 +901,17 @@ def _get_ui_schema() -> Dict[str, Any]:
     }
 
 
-# Export schema
+# Export schemas
 SCHEMA_CA_300 = get_iccd_ca_300_schema()
 
 
 # Funzione di validazione
 def validate_ca_record(data: Dict[str, Any]) -> tuple[bool, List[str]]:
-    """Valida un record CA contro lo schema"""
+    """Valida un record CA contro lo schemas"""
     try:
         import jsonschema
         schema = get_iccd_ca_300_schema()
-        jsonschema.validate(instance=data, schema=schema["schema"])
+        jsonschema.validate(instance=data, schema=schema["schemas"])
         return True, []
     except jsonschema.exceptions.ValidationError as e:
         return False, [str(e)]
@@ -921,8 +921,8 @@ def validate_ca_record(data: Dict[str, Any]) -> tuple[bool, List[str]]:
 
 if __name__ == "__main__":
     print("✅ Schema CA 3.00 generato correttamente")
-    print(f"📊 Paragrafi implementati: {len(SCHEMA_CA_300['schema']['properties'])}")
-    print(f"⚠️  Paragrafi obbligatori: {len(SCHEMA_CA_300['schema']['required'])}")
+    print(f"📊 Paragrafi implementati: {len(SCHEMA_CA_300['schemas']['properties'])}")
+    print(f"⚠️  Paragrafi obbligatori: {len(SCHEMA_CA_300['schemas']['required'])}")
 
 
 #Ho implementato la scheda CA 3.00 completa con:
