@@ -188,12 +188,7 @@ class Photo(BaseSQLModel):
 
     validator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[validated_by])
     
-    # Storico modifiche
-    modifications: Mapped[List["PhotoModification"]] = relationship(
-        "PhotoModification",
-        back_populates="photo",
-        cascade="all, delete-orphan"
-    )
+    # Storico modifiche rimosso - ora si usa UserActivity con photo_id
     
     # ===== INDICI =====
     __table_args__ = (
@@ -387,41 +382,6 @@ class Photo(BaseSQLModel):
         }
 
 
-class PhotoModification(BaseSQLModel):
-    """Storico modifiche foto per audit trail"""
-    
-    __tablename__ = "photo_modifications"
-    
-    photo_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
-        ForeignKey("photos.id"),
-        nullable=False,
-        index=True
-    )
-    
-    modified_by: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
-        ForeignKey("users.id"),
-        nullable=False
-    )
-    
-    modification_type: Mapped[str] = mapped_column(String(100), nullable=False)  # CREATE, UPDATE, DELETE, VALIDATE
-    field_changed: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
-    # Relazioni
-    photo: Mapped["Photo"] = relationship("Photo", back_populates="modifications")
-    modifier: Mapped["User"] = relationship("User")
-    
-    # Indici
-    __table_args__ = (
-        Index("idx_modification_photo", "photo_id"),
-        Index("idx_modification_user", "modified_by"),
-        Index("idx_modification_date", "created"),
-        Index("idx_modification_type", "modification_type"),
-    )
-    
-    def __repr__(self):
-        return f"<PhotoModification(photo={self.photo_id!r}, type={self.modification_type!r})>"
+# PhotoModification rimosso - ora si usa UserActivity per tracciare le modifiche
+# Usa UserActivity.photo_id per associare le modifiche alle foto
+# UserActivity include: user_id, activity_type, activity_desc, photo_id, extra_data (JSON)

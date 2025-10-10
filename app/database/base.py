@@ -31,7 +31,7 @@ def init_models():
     # 🆕 NUOVI: Modelli archeologici
     from ..models.sites import ArchaeologicalSite # noqa: F401
     from ..models.user_sites import UserSitePermission # noqa: F401
-    from ..models.photos import Photo, PhotoModification # noqa: F401
+    from ..models.photos import Photo # noqa: F401
     from ..models.iccd_records import ICCDRecord, ICCDSchemaTemplate # noqa: F401
 
 
