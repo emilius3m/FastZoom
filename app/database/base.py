@@ -35,6 +35,8 @@ def init_models():
     from ..models.iccd_records import ICCDRecord, ICCDSchemaTemplate # noqa: F401
     # Import giornale di cantiere
     from ..models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere  # noqa: F401
+    # Import documentazione grafica
+    from ..models.documentazione_grafica import TavolaGrafica, FotografiaArcheologica, MatrixHarris, ElencoConsegna  # noqa: F401
 
 # Base = declarative_base()
 

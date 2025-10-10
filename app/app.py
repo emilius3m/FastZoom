@@ -221,6 +221,40 @@ app.include_router(
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 
+
+
+# Import del router giornale cantiere
+try:
+    from app.routes.api.giornale_cantiere import router as giornale_cantiere_api_router
+    GIORNALE_API_EXISTS = True
+except ImportError:
+    logger.warning("Giornale cantiere API route not found")
+    GIORNALE_API_EXISTS = False
+
+try:
+    from app.routes.view.giornale_cantiere import router as giornale_cantiere_view_router
+    GIORNALE_VIEW_EXISTS = True
+except ImportError:
+    logger.warning("Giornale cantiere view route not found")
+    GIORNALE_VIEW_EXISTS = False
+
+# Registrazione router API
+if GIORNALE_API_EXISTS:
+    app.include_router(
+        giornale_cantiere_api_router,
+        tags=["giornale-cantiere"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+# Registrazione router view
+if GIORNALE_VIEW_EXISTS:
+    app.include_router(
+        giornale_cantiere_view_router,
+        tags=["Pages", "Giornale Cantiere"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+
 # 📡 INCLUSIONE ROUTER WEBSOCKET NOTIFICATIONS - WebSocket per notifiche real-time
 app.include_router(
     notifications_router,

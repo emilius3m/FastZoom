@@ -112,9 +112,10 @@ For Windows, use `setup.ps1` to automate setup.
 
 ### Prerequisites
 
-- Python 3.12+
+- Python 3.12+ (Python 3.13.7 is specified in pyproject.toml)
 - MinIO server (local or cloud) for storage.
 - PostgreSQL/SQLite for database (SQLite for dev).
+- Poetry (optional - if you encounter "Schema poetry-schemas does not exist" error, use pip instead)
 
 ### Steps
 
@@ -131,6 +132,44 @@ For Windows, use `setup.ps1` to automate setup.
    Or with pip:
    ```
    pip install -r requirements.txt
+   ```
+
+   **Note**: If you encounter the error "Schema poetry-schemas does not exist",
+   this indicates Poetry is not properly installed or configured in your environment.
+   You can install the dependencies directly using pip instead of Poetry:
+
+   **Option 1: Use the provided installer script**
+   ```
+   .\install.bat  # Windows
+   # or
+   python install_dependencies.py  # Cross-platform
+   ```
+
+   **Option 2: Manual installation**
+
+   ```
+   pip install python==3.13.7
+   pip install fastapi==0.115.14
+   pip install sqlalchemy==2.0.41
+   pip install uvicorn==0.35.0
+   pip install aiosqlite==0.19.0
+   pip install jinja2==3.1.6
+   pip install httpx==0.28.1
+   pip install nh3==0.2.21
+   pip install alembic==1.16.2
+   pip install pydantic-settings==2.2.1
+   pip install minio==7.2.7
+   pip install fastapi-csrf-protect==1.0.3
+   pip install "fastapi-users[sqlalchemy]==14.0.1"
+   pip install prompt-toolkit==6.25.2
+   pip install pydantic==2.11.7
+   pip install jsonschema==4.23.0
+   pip install loguru==0.7.2
+   pip install ruff==0.0.291
+   pip install black==23.9.1
+   pip install isort==5.12.0
+   pip install ipykernel==6.25.2
+   pip install pytest==7.4.3
    ```
 
 3. **Environment Configuration**:
@@ -403,6 +442,51 @@ erDiagram
 The diagram illustrates relationships between Users, Profiles, Roles, Sites, Permissions, Photos, Modifications, Activities, and Token Blacklist. Key: PK=Primary Key, FK=Foreign Key, UK=Unique Key.
 
 ## Troubleshooting
+
+### Poetry Installation Error
+
+- **Issue**: "Schema poetry-schemas does not exist" when running Poetry commands.
+- **Cause**: Usually caused by invalid `pyproject.toml` configuration or corrupted Poetry installation.
+- **Fix Options**:
+
+  **Option 1: Validate and fix pyproject.toml**
+  ```bash
+  python validate_poetry_config.py  # Validates and fixes common issues
+  ```
+
+  **Option 2: Reset Poetry completely**
+  ```bash
+  .\reset_poetry.bat  # Windows script provided
+  ```
+  Or manually:
+  ```bash
+  # 1. Uninstall Poetry completely
+  curl -sSL https://install.python-poetry.org | python3 - --uninstall
+
+  # 2. Clean Poetry cache and config
+  # Delete these folders if they exist:
+  # %USERPROFILE%\AppData\Local\pypoetry
+  # %USERPROFILE%\AppData\Roaming\pypoetry
+
+  # 3. Reinstall Poetry
+  curl -sSL https://install.python-poetry.org | python3 -
+
+  # 4. Verify installation
+  poetry --version
+  ```
+
+  **Option 3: Use the provided installation script (bypasses Poetry)**
+  ```bash
+  .\install.bat  # Windows
+  # or
+  python install_dependencies.py  # Cross-platform
+  ```
+
+  **Option 4: Install dependencies directly with pip**
+  ```bash
+  pip install -r requirements.txt
+  ```
+  Or install the dependencies individually as listed in the Manual Setup section.
 
 ### Photo Thumbnails and Deep Zoom
 

@@ -1,15 +1,15 @@
 [tool.poetry]
-name = "project management"
-version = "0.1"
-description = "Software to manage between geographical spread teams"
-authors = ["Ahmad"]
+name = "fastzoom"
+version = "0.1.0"
+description = "Archaeological site and photo management system with deep zoom capabilities"
+authors = ["Archaeological Team <info@archeologico.it>"]
 readme = "README.md"
 packages = [
     { include = "app" }
 ]
 
 [tool.poetry.dependencies]
-python = "3.13.7"
+python = "^3.12"
 fastapi = "^0.115.14"
 sqlalchemy = "^2.0.41"
 uvicorn = "^0.35.0"
@@ -25,13 +25,17 @@ fastapi-users = {extras = ["sqlalchemy"], version = "^14.0.1"}
 prompt-toolkit = "^3.0.47"
 pydantic = "^2.11.7"
 jsonschema = "^4.23.0"
+bcrypt = "^4.0.1"
+python-dotenv = "^1.0.0"
+python-multipart = "^0.0.9"
+pillow = "11.3.0"
+loguru = "^0.7.2"
 
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.0.291"
 black = "^23.9.1"
 isort = "^5.12.0"
-loguru = "^0.7.2"
 ipykernel = "^6.25.2"
 pytest = "^7.4.3"
 
@@ -80,8 +84,8 @@ line-length = 88
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.12
-target-version = "py312"
+# Match Python version requirement
+target-version = "python3.12"
 
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.

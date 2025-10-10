@@ -56,8 +56,25 @@ class ArchaeologicalSite(Base):
     # Relazione con i documenti del sito
     documents = relationship("Document", back_populates="site", cascade="all, delete-orphan")
 
-    # Relazione con i giornali di cantiere
+    # GIORNALE DI CANTIERE
     giornali_cantiere = relationship("GiornaleCantiere", back_populates="site", cascade="all, delete-orphan")
+
+    # ARCHEOLOGIA AVANZATA
+    unita_stratigrafiche = relationship("UnitaStratigrafica", back_populates="site", cascade="all, delete-orphan")
+    schede_tombe = relationship("SchedaTomba", back_populates="site", cascade="all, delete-orphan")
+    inventario_reperti = relationship("InventarioReperto", back_populates="site", cascade="all, delete-orphan")
+    campioni_scientifici = relationship("CampioneScientifico", back_populates="site", cascade="all, delete-orphan")
+
+    # DOCUMENTAZIONE GRAFICA
+    tavole_grafiche = relationship("TavolaGrafica", back_populates="site", cascade="all, delete-orphan")
+    fotografie_archeologiche = relationship("FotografiaArcheologica", back_populates="site",
+                                            cascade="all, delete-orphan")
+    matrix_harris = relationship("MatrixHarris", back_populates="site", cascade="all, delete-orphan")
+    elenchi_consegna = relationship("ElencoConsegna", back_populates="site", cascade="all, delete-orphan")
+
+    # REPORT FINALE
+    relazioni_finali = relationship("RelazioneFinaleSca vo", back_populates="site", cascade="all, delete-orphan")
+    configurazioni_export = relationship("ConfigurazioneExport", back_populates="site", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<ArchaeologicalSite(name='{self.name}', code='{self.code}')>"

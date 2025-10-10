@@ -33,6 +33,12 @@ try:
 except ImportError:
     print("WARNING: ArchaeologicalSite model not found - create it if needed")
 
+try:
+    from app.models.documentazione_grafica import TavolaGrafica, FotografiaArcheologica, MatrixHarris, ElencoConsegna
+    print("SUCCESS: Documentazione grafica models imported")
+except ImportError:
+    print("WARNING: Documentazione grafica models not found - create them if needed")
+
 # Verifica che tutti i modelli siano stati importati
 print("Imported models:")
 for cls in Base.registry._class_registry.values():

@@ -1,0 +1,483 @@
+# app/templates/pages/archeologia/modals/create_us_modal.html
+<!-- Modal Creazione US -->
+<div x-show="showCreateModal" x-cloak 
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+     @click.self="showCreateModal = false">
+    <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-semibold text-gray-900">
+                <i class="fas fa-layer-group mr-2 text-blue-600"></i>
+                Nuova Unità Stratigrafica
+            </h3>
+            <button @click="closeCreateModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <!-- Form creazione US -->
+        <form @submit.prevent="submitCreateUS()" id="createUSForm">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <!-- Colonna sinistra: Dati base -->
+                <div class="space-y-4">
+                    <h4 class="text-lg font-semibold text-gray-900 border-b pb-2">Identificazione</h4>
+                    
+                    <!-- Numero US -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Numero US <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" x-model="newUS.numero_us" required
+                               placeholder="es: US001, US015"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Formato suggerito: US + numero progressivo</p>
+                    </div>
+                    
+                    <!-- Tipo US -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Tipo US <span class="text-red-500">*</span>
+                        </label>
+                        <select x-model="newUS.tipo_us" required
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Seleziona tipo...</option>
+                            <option value="strato">Strato</option>
+                            <option value="taglio">Taglio</option>
+                            <option value="riempimento">Riempimento</option>
+                            <option value="struttura">Struttura</option>
+                            <option value="interfaccia">Interfaccia</option>
+                            <option value="deposito">Deposito</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Denominazione -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Denominazione</label>
+                        <input type="text" x-model="newUS.denominazione"
+                               placeholder="es: Strato di terra bruna"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <!-- Descrizione -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Descrizione <span class="text-red-500">*</span>
+                        </label>
+                        <textarea x-model="newUS.descrizione" rows="4" required
+                                  placeholder="Descrizione dettagliata dell'unità stratigrafica..."
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    
+                    <!-- Cronologia -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Fase</label>
+                            <select x-model="newUS.fase"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Seleziona fase...</option>
+                                <option value="I">Fase I</option>
+                                <option value="II">Fase II</option>
+                                <option value="III">Fase III</option>
+                                <option value="IV">Fase IV</option>
+                                <option value="V">Fase V</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Periodo</label>
+                            <input type="text" x-model="newUS.periodo"
+                                   placeholder="es: Romano, Medievale"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    
+                    <!-- Cronologia dettagliata -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cronologia</label>
+                        <input type="text" x-model="newUS.cronologia"
+                               placeholder="es: I-II sec. d.C."
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                
+                <!-- Colonna destra: Caratteristiche fisiche -->
+                <div class="space-y-4">
+                    <h4 class="text-lg font-semibold text-gray-900 border-b pb-2">Caratteristiche Fisiche</h4>
+                    
+                    <!-- Formazione e consistenza -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Formazione</label>
+                            <select x-model="newUS.formazione"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Seleziona...</option>
+                                <option value="naturale">Naturale</option>
+                                <option value="artificiale">Artificiale</option>
+                                <option value="mista">Mista</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Consistenza</label>
+                            <select x-model="newUS.consistenza"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Seleziona...</option>
+                                <option value="compatta">Compatta</option>
+                                <option value="semicompatta">Semicompatta</option>
+                                <option value="sciolta">Sciolta</option>
+                                <option value="pulverulenta">Pulverulenta</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Colore -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Colore Munsell</label>
+                            <input type="text" x-model="newUS.colore_munsell"
+                                   placeholder="es: 10YR 4/4"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Descrizione Colore</label>
+                            <input type="text" x-model="newUS.colore_descrizione"
+                                   placeholder="es: Bruno scuro"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    
+                    <!-- Dimensioni -->
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-700 mb-2">Dimensioni (in metri)</h5>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Lunghezza max</label>
+                                <input type="number" step="0.01" x-model="newUS.lunghezza_max"
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Larghezza max</label>
+                                <input type="number" step="0.01" x-model="newUS.larghezza_max"
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Spessore max</label>
+                                <input type="number" step="0.01" x-model="newUS.spessore_max"
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Spessore min</label>
+                                <input type="number" step="0.01" x-model="newUS.spessore_min"
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quote -->
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-700 mb-2">Quote assolute (in metri)</h5>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Quota superiore</label>
+                                <input type="number" step="0.01" x-model="newUS.quota_superiore"
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Quota inferiore</label>
+                                <input type="number" step="0.01" x-model="newUS.quota_inferiore"
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Componenti -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Componenti principali</label>
+                        <textarea x-model="newUS.componenti_principali" rows="2"
+                                  placeholder="es: Terra, frammenti ceramici, carboni"
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Inclusi</label>
+                        <textarea x-model="newUS.inclusi" rows="2"
+                                  placeholder="es: Pietre, malta, frammenti laterizio"
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sezione completa: Interpretazione e documentazione -->
+            <div class="mt-6 space-y-4">
+                <h4 class="text-lg font-semibold text-gray-900 border-b pb-2">Interpretazione e Documentazione</h4>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Interpretazione -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Interpretazione</label>
+                        <textarea x-model="newUS.interpretazione" rows="3"
+                                  placeholder="Interpretazione funzionale dell'US..."
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    
+                    <!-- Scavo -->
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Data scavo</label>
+                            <input type="date" x-model="newUS.data_scavo"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Responsabile scavo</label>
+                            <input type="text" x-model="newUS.responsabile_scavo"
+                                   placeholder="Nome responsabile"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Metodo scavo</label>
+                            <select x-model="newUS.metodo_scavo"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Seleziona metodo...</option>
+                                <option value="manuale">Manuale</option>
+                                <option value="meccanico">Meccanico</option>
+                                <option value="misto">Misto</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Documentazione -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Numeri foto</label>
+                        <input type="text" x-model="newUS.foto_numeri"
+                               placeholder="es: 001-015, 045-050"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Numeri disegni</label>
+                        <input type="text" x-model="newUS.disegni_numeri"
+                               placeholder="es: DIS001, DIS005"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="flex items-center mt-6">
+                            <input type="checkbox" x-model="newUS.campioni_prelevati" class="mr-2">
+                            <span class="text-sm font-medium text-gray-700">Campioni prelevati</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Note -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Note generali</label>
+                        <textarea x-model="newUS.note_generali" rows="2"
+                                  placeholder="Osservazioni generali..."
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Note tecniche</label>
+                        <textarea x-model="newUS.note_tecniche" rows="2"
+                                  placeholder="Note tecniche e metodologiche..."
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer con azioni -->
+            <div class="flex justify-between items-center mt-8 pt-4 border-t border-gray-200">
+                <div class="text-sm text-gray-500">
+                    <span class="text-red-500">*</span> Campi obbligatori
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" @click="closeCreateModal()" 
+                            class="bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400 transition">
+                        <i class="fas fa-times mr-2"></i>Annulla
+                    </button>
+                    <button type="button" @click="saveAsDraft()" 
+                            class="bg-yellow-500 text-white px-6 py-2 rounded-md hover:bg-yellow-600 transition">
+                        <i class="fas fa-save mr-2"></i>Salva Bozza
+                    </button>
+                    <button type="submit" :disabled="isSubmitting"
+                            :class="isSubmitting ? 'opacity-50 cursor-not-allowed' : ''"
+                            class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition">
+                        <i class="fas fa-plus mr-2" :class="{'fa-spin': isSubmitting}"></i>
+                        <span x-text="isSubmitting ? 'Creando...' : 'Crea US'"></span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Estensione per il componente US con modal
+function createUSModal() {
+    return {
+        // Stato modal
+        showCreateModal: false,
+        isSubmitting: false,
+        
+        // Dati nuova US
+        newUS: {
+            numero_us: '',
+            tipo_us: '',
+            denominazione: '',
+            descrizione: '',
+            
+            // Caratteristiche fisiche
+            formazione: '',
+            consistenza: '',
+            colore_munsell: '',
+            colore_descrizione: '',
+            
+            // Dimensioni
+            lunghezza_max: null,
+            larghezza_max: null,
+            spessore_max: null,
+            spessore_min: null,
+            quota_superiore: null,
+            quota_inferiore: null,
+            
+            // Composizione
+            componenti_principali: '',
+            componenti_secondari: '',
+            inclusi: '',
+            
+            // Interpretazione
+            interpretazione: '',
+            cronologia: '',
+            periodo: '',
+            fase: '',
+            
+            // Scavo
+            data_scavo: new Date().toISOString().split('T')[0], // Data odierna
+            metodo_scavo: '',
+            responsabile_scavo: '',
+            
+            // Documentazione
+            foto_numeri: '',
+            disegni_numeri: '',
+            campioni_prelevati: false,
+            
+            // Note
+            note_generali: '',
+            note_tecniche: ''
+        },
+        
+        // Apertura modal
+        openCreateModal() {
+            this.showCreateModal = true;
+            this.resetForm();
+        },
+        
+        // Chiusura modal
+        closeCreateModal() {
+            this.showCreateModal = false;
+            this.resetForm();
+        },
+        
+        // Reset form
+        resetForm() {
+            this.newUS = {
+                numero_us: '',
+                tipo_us: '',
+                denominazione: '',
+                descrizione: '',
+                formazione: '',
+                consistenza: '',
+                colore_munsell: '',
+                colore_descrizione: '',
+                lunghezza_max: null,
+                larghezza_max: null,
+                spessore_max: null,
+                spessore_min: null,
+                quota_superiore: null,
+                quota_inferiore: null,
+                componenti_principali: '',
+                componenti_secondari: '',
+                inclusi: '',
+                interpretazione: '',
+                cronologia: '',
+                periodo: '',
+                fase: '',
+                data_scavo: new Date().toISOString().split('T')[0],
+                metodo_scavo: '',
+                responsabile_scavo: '',
+                foto_numeri: '',
+                disegni_numeri: '',
+                campioni_prelevati: false,
+                note_generali: '',
+                note_tecniche: ''
+            };
+            this.isSubmitting = false;
+        },
+        
+        // Submit creazione US
+        async submitCreateUS() {
+            this.isSubmitting = true;
+            try {
+                // Prepara dati per l'invio
+                const usData = {
+                    ...this.newUS,
+                    site_id: '{{ site.id }}' // Viene sostituito dal template
+                };
+                
+                // Rimuovi campi null/vuoti
+                Object.keys(usData).forEach(key => {
+                    if (usData[key] === null || usData[key] === '') {
+                        delete usData[key];
+                    }
+                });
+                
+                const response = await fetch('/api/archeologia/us', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    },
+                    body: JSON.stringify(usData)
+                });
+                
+                if (response.ok) {
+                    const createdUS = await response.json();
+                    this.closeCreateModal();
+                    
+                    // Ricarica la lista
+                    if (typeof this.loadUS === 'function') {
+                        await this.loadUS();
+                    }
+                    
+                    // Notifica successo
+                    this.showNotification(`US ${createdUS.numero_us} creata con successo!`, 'success');
+                    
+                    // Opzionale: naviga alla US creata
+                    // window.location.href = `/archeologia/us/${createdUS.id}`;
+                    
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore nella creazione della US');
+                }
+                
+            } catch (error) {
+                console.error('Errore creazione US:', error);
+                this.showNotification('Errore nella creazione della US: ' + error.message, 'error');
+            } finally {
+                this.isSubmitting = false;
+            }
+        },
+        
+        // Salva come bozza (implementazione futura)
+        async saveAsDraft() {
+            // TODO: Implementare salvataggio bozza
+            this.showNotification('Salvataggio bozza non ancora implementato', 'info');
+        },
+        
+        // Utility notification
+        showNotification(message, type = 'info') {
+            // TODO: Implementare sistema notifiche toast
+            // Per ora usa alert
+            alert(message);
+        }
+    }
+}
+</script>

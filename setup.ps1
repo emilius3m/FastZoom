@@ -273,11 +273,9 @@ function Start-FastAPIApp {
     Show-Credentials
     
     try {
-        if (Get-Command poetry -ErrorAction SilentlyContinue) {
-            poetry run uvicorn app.app:app --host 127.0.0.1 --port $FASTAPI_PORT
-        } else {
+
             uvicorn app.app:app --host 127.0.0.1 --port $FASTAPI_PORT
-        }
+
     } catch {
         Write-Host "❌ Failed to start FastAPI: $($_.Exception.Message)" -ForegroundColor Red
         return $false
