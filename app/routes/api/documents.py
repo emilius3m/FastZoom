@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from typing import Optional
 from uuid import UUID
+import uuid
 from datetime import datetime
-import os
 import json
 from pathlib import Path
 
@@ -22,9 +22,7 @@ from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission
 from app.models.users import UserActivity
 from app.routes.sites_router import get_site_access
-from app.core.config import get_settings
-
-settings = get_settings()
+from app.services.archaeological_minio_service import archaeological_minio_service
 
 documents_router = APIRouter(prefix="/api", tags=["documents"])
 
@@ -53,23 +51,51 @@ async def upload_document(
 
     try:
         # Validazione file
-        if file.size > 52428800:  # 50MB
+        file_size = await archaeological_minio_service._get_file_size(file)
+        if file_size > 52428800:  # 50MB
             raise HTTPException(status_code=400, detail="File troppo grande (max 50MB)")
 
-        # Genera path sicuro per il file
-        upload_dir = Path(settings.upload_dir) / "documents" / str(site_id)
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
-        # Nome file univoco
+        # Leggi contenuto file
+        content = await file.read()
+        
+        # Determina content type e estensione
         file_extension = Path(file.filename).suffix
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        safe_filename = f"{timestamp}_{file.filename}"
-        file_path = upload_dir / safe_filename
-
-        # Salva file su disco
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
+        content_type = file.content_type or 'application/octet-stream'
+        
+        # Genera ID univoco per il documento (usato solo per il nome file in MinIO)
+        temp_document_id = str(uuid.uuid4())
+        
+        logger.info(f"Uploading document: {file.filename}, size: {len(content)}, type: {content_type}")
+        
+        # Prepara metadati per MinIO
+        document_metadata = {
+            'title': title,
+            'description': description or '',
+            'category': category,
+            'doc_type': doc_type or content_type,
+            'filename': file.filename,
+            'tags': tags or '',
+            'author': author or '',
+            'doc_date': doc_date or '',
+            'uploaded_by': str(current_user_id)
+        }
+        
+        # Upload su MinIO
+        object_name = f"{site_id}/{temp_document_id}{file_extension}"
+        logger.info(f"MinIO object_name: {object_name}")
+        
+        minio_path = await archaeological_minio_service._upload_with_retry(
+            bucket_name=archaeological_minio_service.buckets['documents'],
+            object_name=object_name,
+            data=content,
+            content_type=content_type,
+            metadata=archaeological_minio_service._merge_metadata(
+                archaeological_minio_service._create_base_metadata(str(site_id), content_type),
+                document_metadata
+            ),
+            operation_name="document upload",
+            target_freed_mb=200
+        )
 
         # Crea record nel database
         new_document = Document(
@@ -77,11 +103,11 @@ async def upload_document(
             title=title,
             description=description,
             category=category,
-            doc_type=doc_type or file.content_type,
+            doc_type=doc_type or content_type,
             filename=file.filename,
-            file_path=str(file_path),
-            file_size=file.size,
-            mime_type=file.content_type,
+            file_path=minio_path,  # Salva path MinIO
+            file_size=len(content),
+            mime_type=content_type,
             tags=tags,
             doc_date=datetime.fromisoformat(doc_date) if doc_date else None,
             author=author,
@@ -103,9 +129,12 @@ async def upload_document(
             extra_data={
                 "document_id": str(new_document.id),
                 "filename": file.filename,
-                "category": category
+                "category": category,
+                "minio_path": minio_path
             }
         )
+
+        logger.info(f"Document uploaded to MinIO: {minio_path}")
 
         return JSONResponse({
             "message": "Documento caricato con successo",
@@ -121,10 +150,9 @@ async def upload_document(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
         logger.error(f"Error uploading document: {e}")
-        # Cleanup file if exists
-        if 'file_path' in locals() and file_path.exists():
-            file_path.unlink()
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Errore nel caricamento: {str(e)}")
 
 
@@ -296,28 +324,45 @@ async def update_document(
 
         # Se c'è un nuovo file, sostituisci
         if file:
-            # Elimina vecchio file
-            old_path = Path(doc.file_path)
-            if old_path.exists():
-                old_path.unlink()
+            # Elimina vecchio file da MinIO
+            if doc.file_path:
+                await archaeological_minio_service.remove_file(doc.file_path)
 
-            # Salva nuovo file
-            upload_dir = Path(settings.upload_dir) / "documents" / str(site_id)
-            upload_dir.mkdir(parents=True, exist_ok=True)
-
+            # Leggi nuovo file
+            content = await file.read()
             file_extension = Path(file.filename).suffix
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-            safe_filename = f"{timestamp}_{file.filename}"
-            file_path = upload_dir / safe_filename
-
-            with open(file_path, "wb") as buffer:
-                content = await file.read()
-                buffer.write(content)
+            content_type = file.content_type or 'application/octet-stream'
+            
+            # Upload nuovo file su MinIO
+            document_id = str(doc.id)
+            object_name = f"{site_id}/{document_id}{file_extension}"
+            
+            document_metadata = {
+                'title': title,
+                'description': description or '',
+                'category': category,
+                'filename': file.filename,
+                'version': str(doc.version + 1),
+                'version_notes': version_notes or ''
+            }
+            
+            minio_path = await archaeological_minio_service._upload_with_retry(
+                bucket_name=archaeological_minio_service.buckets['documents'],
+                object_name=object_name,
+                data=content,
+                content_type=content_type,
+                metadata=archaeological_minio_service._merge_metadata(
+                    archaeological_minio_service._create_base_metadata(str(site_id), content_type),
+                    document_metadata
+                ),
+                operation_name="document update",
+                target_freed_mb=200
+            )
 
             doc.filename = file.filename
-            doc.file_path = str(file_path)
-            doc.file_size = file.size
-            doc.mime_type = file.content_type
+            doc.file_path = minio_path
+            doc.file_size = len(content)
+            doc.mime_type = content_type
             doc.version += 1
             doc.version_notes = version_notes
 
@@ -437,21 +482,20 @@ async def download_document(
         if not doc:
             raise HTTPException(status_code=404, detail="Documento non trovato")
 
-        file_path = Path(doc.file_path)
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="File non trovato su disco")
-
-        def file_iterator():
-            with open(file_path, "rb") as f:
-                yield from f
-
-        return StreamingResponse(
-            file_iterator(),
-            media_type=doc.mime_type or "application/octet-stream",
-            headers={
-                "Content-Disposition": f"attachment; filename={doc.filename}"
-            }
-        )
+        # Scarica file da MinIO
+        try:
+            file_data = await archaeological_minio_service.get_file(doc.file_path)
+            
+            return StreamingResponse(
+                iter([file_data]),
+                media_type=doc.mime_type or "application/octet-stream",
+                headers={
+                    "Content-Disposition": f"attachment; filename={doc.filename}"
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error downloading from MinIO: {e}")
+            raise HTTPException(status_code=404, detail="File non trovato su storage")
 
     except HTTPException:
         raise

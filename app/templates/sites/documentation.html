@@ -1092,6 +1092,28 @@ document.addEventListener('alpine:init', () => {
         showEditModal: false,
         showPreviewModal: false,
         selectedDocument: null,
+        editDocument: null,
+        
+        // File handling
+        uploadFile: null,
+        replaceFile: null,
+        dragOver: false,
+        uploadProgress: 0,
+        
+        // New document data
+        newDocument: {
+            title: '',
+            description: '',
+            category: '',
+            doc_type: '',
+            tags: '',
+            doc_date: '',
+            author: '',
+            is_public: true
+        },
+        
+        // Site ID from template
+        siteId: '{{ site.id }}',
         
         // Computed
         get paginatedDocuments() {
@@ -1263,82 +1285,17 @@ document.addEventListener('alpine:init', () => {
         formatDate(dateString) {
             if (!dateString) return '';
             return new Date(dateString).toLocaleDateString('it-IT');
-        }
-    }));
-});
-</script>
-
-<script>
-function documentationData() {
-    return {
-        // State management
-        documents: [],
-        selectedDocument: null,
-        editDocument: null,
-        uploadFile: null,
-        replaceFile: null,
-        dragOver: false,
-
-        // Modal visibility
-        showUploadModal: false,
-        showEditModal: false,
-        showPreviewModal: false,
-
-        // Upload progress
-        uploadProgress: 0,
-
-        // Filters
-        searchQuery: '',
-        selectedCategory: '',
-        selectedType: '',
-
-        // New document data
-        newDocument: {
-            title: '',
-            description: '',
-            category: '',
-            doc_type: '',
-            tags: '',
-            doc_date: '',
-            author: '',
-            is_public: true
         },
-
-        // Pagination
-        currentPage: 1,
-        itemsPerPage: 10,
-
-        // Site ID from template
-        siteId: '{{ site.id }}',
-
-        // Initialize
-        async init() {
-            await this.loadDocuments();
-        },
-
-        // Load all documents
-        async loadDocuments() {
-            try {
-                const response = await fetch(`/api/site/${this.siteId}/documents`);
-                if (!response.ok) throw new Error('Errore nel caricamento documenti');
-
-                const data = await response.json();
-                this.documents = data.documents || [];
-            } catch (error) {
-                console.error('Error loading documents:', error);
-                this.showNotification('Errore nel caricamento dei documenti', 'error');
-            }
-        },
-
+        
         // Upload new document
         async uploadDocument() {
             if (!this.uploadFile) {
-                this.showNotification('Seleziona un file', 'warning');
+                alert('Seleziona un file');
                 return;
             }
 
             if (!this.newDocument.title) {
-                this.showNotification('Inserisci un titolo', 'warning');
+                alert('Inserisci un titolo');
                 return;
             }
 
@@ -1366,16 +1323,28 @@ function documentationData() {
                 xhr.addEventListener('load', async () => {
                     if (xhr.status === 200) {
                         const result = JSON.parse(xhr.responseText);
-                        this.showNotification('Documento caricato con successo', 'success');
-                        await this.loadDocuments();
-                        this.closeUploadModal();
+                        alert('Documento caricato con successo');
+                        
+                        // Aggiungi il documento alla lista locale
+                        const newDoc = result.document;
+                        newDoc.created_at = newDoc.uploaded_at;
+                        this.documents.unshift(newDoc);
+                        
+                        // Aggiorna filtri e stats
+                        this.filterDocuments();
+                        this.calculateStats();
+                        
+                        // Chiudi modal e reset
+                        this.showUploadModal = false;
+                        this.resetUploadForm();
                     } else {
-                        throw new Error('Upload fallito');
+                        alert('Errore durante il caricamento');
+                        this.uploadProgress = 0;
                     }
                 });
 
                 xhr.addEventListener('error', () => {
-                    this.showNotification('Errore durante il caricamento', 'error');
+                    alert('Errore durante il caricamento');
                     this.uploadProgress = 0;
                 });
 
@@ -1384,7 +1353,7 @@ function documentationData() {
 
             } catch (error) {
                 console.error('Upload error:', error);
-                this.showNotification('Errore nel caricamento del documento', 'error');
+                alert('Errore nel caricamento del documento');
                 this.uploadProgress = 0;
             }
         },
@@ -1484,7 +1453,7 @@ function documentationData() {
             const file = event.target.files[0];
             if (file) {
                 if (file.size > 52428800) { // 50MB
-                    this.showNotification('Il file supera i 50MB', 'warning');
+                    alert('Il file supera i 50MB');
                     return;
                 }
                 this.uploadFile = file;
@@ -1500,7 +1469,7 @@ function documentationData() {
             const file = event.dataTransfer.files[0];
             if (file) {
                 if (file.size > 52428800) {
-                    this.showNotification('Il file supera i 50MB', 'warning');
+                    alert('Il file supera i 50MB');
                     return;
                 }
                 this.uploadFile = file;
@@ -1572,11 +1541,7 @@ function documentationData() {
             const fileInput = document.getElementById('document-file');
             if (fileInput) fileInput.value = '';
         },
-
-        confirmDeleteDocument(doc) {
-            this.deleteDocument(doc.id);
-        },
-
+        
         // Utility functions
         formatFileSize(bytes) {
             if (bytes === 0) return '0 Bytes';
@@ -1584,45 +1549,8 @@ function documentationData() {
             const sizes = ['Bytes', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-        },
-
-        formatDate(dateString) {
-            if (!dateString) return '-';
-            return new Date(dateString).toLocaleDateString('it-IT');
-        },
-
-        // Filtering
-        get filteredDocuments() {
-            return this.documents.filter(doc => {
-                const matchesSearch = !this.searchQuery ||
-                    doc.title.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                    (doc.description && doc.description.toLowerCase().includes(this.searchQuery.toLowerCase()));
-
-                const matchesCategory = !this.selectedCategory || doc.category === this.selectedCategory;
-                const matchesType = !this.selectedType || doc.doc_type === this.selectedType;
-
-                return matchesSearch && matchesCategory && matchesType;
-            });
-        },
-
-        get paginatedDocuments() {
-            const start = (this.currentPage - 1) * this.itemsPerPage;
-            const end = start + this.itemsPerPage;
-            return this.filteredDocuments.slice(start, end);
-        },
-
-        get totalPages() {
-            return Math.ceil(this.filteredDocuments.length / this.itemsPerPage);
-        },
-
-        // Notifications
-        showNotification(message, type = 'info') {
-            // Implementa la tua logica di notifica
-            // Puoi usare toast, alert, o un sistema custom
-            console.log(`[${type.toUpperCase()}] ${message}`);
-            alert(message); // Sostituisci con sistema migliore
         }
-    }
-}
+    }));
+});
 </script>
 {% endblock %}
