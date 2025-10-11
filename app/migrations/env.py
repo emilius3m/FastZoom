@@ -39,6 +39,13 @@ try:
 except ImportError:
     print("WARNING: Documentazione grafica models not found - create them if needed")
 
+# 🆕 AGGIUNTO: Import modelli Giornale di Cantiere
+try:
+    from app.models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere
+    print("SUCCESS: Giornale di cantiere models imported")
+except ImportError:
+    print("WARNING: Giornale di cantiere models not found - create them if needed")
+
 # Verifica che tutti i modelli siano stati importati
 print("Imported models:")
 for cls in Base.registry._class_registry.values():
