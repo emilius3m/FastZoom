@@ -23,8 +23,8 @@ from app.models.users import User
 
 # Import modelli giornale cantiere (dai file esistenti)
 from app.models.giornale_cantiere import (
-    GiornaleCantiere, OperatoreCantiere, 
-    CondizioniMeteoEnum
+    GiornaleCantiere, OperatoreCantiere,
+    CondizioniMeteoEnum, giornale_operatori_association
 )
 
 # Import schemas from existing schema file
@@ -504,8 +504,13 @@ async def create_giornale(
             )
             operatori = operatori_result.scalars().all()
             
-            # Associa operatori al giornale
-            db_giornale.operatori = operatori
+            # Associa operatori al giornale usando l'associazione diretta
+            for operatore in operatori:
+                stmt = giornale_operatori_association.insert().values(
+                    giornale_id=db_giornale.id,
+                    operatore_id=operatore.id
+                )
+                await db.execute(stmt)
         
         await db.commit()
         await db.refresh(db_giornale)
@@ -656,14 +661,25 @@ async def update_giornale(
         
         # Aggiorna operatori se specificati
         if giornale_data.operatori_ids:
+            # Prima elimina le associazioni esistenti
+            delete_stmt = giornale_operatori_association.delete().where(
+                giornale_operatori_association.c.giornale_id == db_giornale.id
+            )
+            await db.execute(delete_stmt)
+            
             # Carica operatori
             operatori_result = await db.execute(
                 select(OperatoreCantiere).where(OperatoreCantiere.id.in_(giornale_data.operatori_ids))
             )
             operatori = operatori_result.scalars().all()
             
-            # Associa operatori al giornale
-            db_giornale.operatori = operatori
+            # Associa operatori al giornale usando l'associazione diretta
+            for operatore in operatori:
+                stmt = giornale_operatori_association.insert().values(
+                    giornale_id=db_giornale.id,
+                    operatore_id=operatore.id
+                )
+                await db.execute(stmt)
         
         await db.commit()
         
