@@ -316,21 +316,9 @@ async def get_current_user_sites_with_blacklist(
         )
     
     # Interroga il database per ottenere i siti accessibili in tempo reale
-    site_service = SiteService(db)
-    user_sites = await site_service.get_user_sites_with_permissions(user_id)
-    
-    # Converti in formato dizionario per compatibilità
-    sites_data = []
-    for site_permission in user_sites:
-        sites_data.append({
-            "id": str(site_permission.site.id),
-            "name": site_permission.site.name,
-            "code": site_permission.site.code,
-            "location": site_permission.site.location,
-            "description": site_permission.site.description,
-            "permission_level": site_permission.permission_level.value,
-            "is_active": site_permission.is_active
-        })
+    # Import locale per evitare circular import
+    from app.services.auth_service import AuthService
+    sites_data = await AuthService.get_user_sites_with_permissions(db, user_id)
     
     return sites_data
 

@@ -112,7 +112,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             # Ottieni sessione DB
             # Nota: In middleware non abbiamo accesso diretto a Depends,
             # quindi creiamo una sessione temporanea
-            from app.database.session import async_session_factory
+            from app.database.base import async_session_maker as async_session_factory
 
             async with async_session_factory() as db:
                 activity = UserActivity(

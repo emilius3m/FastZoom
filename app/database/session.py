@@ -20,6 +20,9 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
 )
 
+# Alias per compatibilità con middleware
+async_session_factory = AsyncSessionLocal
+
 # Dependency FastAPI
 async def get_async_session() -> AsyncSession:
     async with AsyncSessionLocal() as session:
