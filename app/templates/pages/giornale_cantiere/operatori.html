@@ -572,6 +572,9 @@ function operatoriApp() {
                 
                 const method = this.modalMode === 'create' ? 'POST' : 'PUT';
                 
+                // Log the data being sent for debugging
+                console.log('Sending data:', this.formData);
+                
                 const response = await fetch(url, {
                     method: method,
                     headers: {
@@ -590,6 +593,7 @@ function operatoriApp() {
                     alert(this.modalMode === 'create' ? 'Operatore creato con successo!' : 'Operatore aggiornato con successo!');
                 } else {
                     const error = await response.json();
+                    console.error('Error response:', error);
                     this.errorMessage = error.detail || 'Errore durante il salvataggio';
                 }
             } catch (error) {

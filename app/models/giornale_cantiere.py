@@ -79,7 +79,6 @@ class OperatoreCantiere(Base):
     
     # Stato e statistiche
     is_active = Column(Boolean, default=True, nullable=False)
-    attivo = Column(Boolean, default=True, nullable=False)  # Alias per compatibilità API
     ore_totali = Column(Integer, default=0, nullable=False)  # Ore totali lavorate
     
     # Timestamp automatici
@@ -104,6 +103,7 @@ class OperatoreCantiere(Base):
     def nome_completo(self) -> str:
         """Restituisce nome e cognome completi"""
         return f"{self.nome} {self.cognome}"
+    
 
 
 # ===== MODELLO GIORNALE DI CANTIERE =====

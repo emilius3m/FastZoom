@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, desc, distinct
 from sqlalchemy.orm import selectinload
@@ -100,6 +100,57 @@ class ReportDataResponse(BaseModel):
 
 # ===== ROUTER =====
 router = APIRouter(prefix="/api/giornale-cantiere", tags=["giornale-cantiere-api"])
+
+
+# ===== TEST ENDPOINTS =====
+
+@router.post("/operatori/test")
+async def test_operatore_creation(
+        db: AsyncSession = Depends(get_async_session),
+        current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """Test endpoint for creating an operator with fixed data"""
+    try:
+        # Create test data
+        test_data = {
+            "nome": "Test",
+            "cognome": "Operator",
+            "qualifica": "Test Qualification",
+            "ruolo": "test_role",
+            "specializzazione": "test_specialization",
+            "email": "test@example.com",
+            "telefono": "1234567890",
+            "is_active": True,
+            "note": "Test operator created via test endpoint"
+        }
+        
+        logger.info(f"Creating test operator with data: {test_data}")
+        
+        # Create new operatore
+        db_operatore = OperatoreCantiere(**test_data)
+
+        db.add(db_operatore)
+        await db.commit()
+        await db.refresh(db_operatore)
+
+        logger.info(f"Test operator created: {db_operatore.nome_completo} from user {current_user_id}")
+
+        return {
+            "message": "Test operator created successfully",
+            "operator_id": str(db_operatore.id),
+            "operator_name": db_operatore.nome_completo
+        }
+
+    except Exception as e:
+        # Log the full exception with traceback for debugging
+        import traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"Error creating test operator: {str(e)}\nTraceback: {error_traceback}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Error creating test operator: {str(e)}"
+        )
 
 # ===== HELPER FUNCTIONS =====
 
@@ -714,7 +765,7 @@ async def get_operatori(
         if specializzazione:
             query = query.where(OperatoreCantiere.specializzazione == specializzazione)
         if stato:
-            query = query.where(OperatoreCantiere.attivo == (stato == "attivo"))
+            query = query.where(OperatoreCantiere.is_active == (stato == "attivo"))
         
         # Ordinamento e paginazione
         query = query.order_by(OperatoreCantiere.cognome, OperatoreCantiere.nome)
@@ -736,7 +787,7 @@ async def get_operatori(
                 "ruolo": op.ruolo,
                 "specializzazione": op.specializzazione,
                 "qualifiche": op.qualifica.split(",") if op.qualifica else [],
-                "stato": "attivo" if op.attivo else "inattivo",
+                "stato": "attivo" if op.is_active else "inattivo",
                 "ore_totali": op.ore_totali or 0,
                 "giornali_count": 0,  # TODO: Calcolare dai giornali collegati
                 "note": op.note
@@ -772,17 +823,23 @@ async def create_operatore(
         # Prepara dati operatore
         operatore_data = operatore.model_dump()
         
-        # Sincronizza campi is_active e attivo
-        if 'is_active' in operatore_data:
-            operatore_data['attivo'] = operatore_data['is_active']
-            # Ensure is_active is also set for the response model
-        else:
-            # Default to True if not provided
-            operatore_data['attivo'] = True
+        # Ensure is_active is set if not provided
+        if 'is_active' not in operatore_data:
             operatore_data['is_active'] = True
         
         # Debug: Log the data that will be saved
         logger.info(f"Dati che verranno salvati: {operatore_data}")
+        
+        # Validate required fields
+        required_fields = ['nome', 'cognome', 'qualifica']
+        missing_fields = [field for field in required_fields if not operatore_data.get(field)]
+        if missing_fields:
+            error_msg = f"Campi obbligatori mancanti: {', '.join(missing_fields)}"
+            logger.error(error_msg)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=error_msg
+            )
         
         # Crea nuovo operatore
         db_operatore = OperatoreCantiere(**operatore_data)
@@ -795,11 +852,17 @@ async def create_operatore(
 
         return db_operatore
 
+    except HTTPException:
+        # Re-raise HTTP exceptions without modification
+        raise
     except Exception as e:
-        logger.error(f"Errore creazione operatore: {str(e)}")
+        # Log the full exception with traceback for debugging
+        import traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"Errore creazione operatore: {str(e)}\nTraceback: {error_traceback}")
         await db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Errore nella creazione dell'operatore: {str(e)}"
         )
 
@@ -830,9 +893,6 @@ async def update_operatore(
         # Aggiorna campi
         update_data = operatore.model_dump(exclude_unset=True)
         
-        # Sincronizza campi is_active e attivo
-        if 'is_active' in update_data:
-            update_data['attivo'] = update_data['is_active']
         
         for field, value in update_data.items():
             setattr(db_operatore, field, value)

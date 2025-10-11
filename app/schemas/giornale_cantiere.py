@@ -78,12 +78,6 @@ class OperatoreCantiereOut(OperatoreCantiereBase):
     
     model_config = ConfigDict(from_attributes=True)
     
-    # Ensure is_active is properly synced with attivo field from the model
-    def __init__(self, **data):
-        super().__init__(**data)
-        # If attivo is in the data but is_active is not, sync them
-        if 'attivo' in data and 'is_active' not in data:
-            self.is_active = data['attivo']
 
 
 # ===== SCHEMI GIORNALE DI CANTIERE =====
