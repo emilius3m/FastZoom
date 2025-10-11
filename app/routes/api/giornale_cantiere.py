@@ -469,6 +469,7 @@ async def create_giornale(
             data=giornale_data.data,
             ora_inizio=giornale_data.ora_inizio,
             ora_fine=giornale_data.ora_fine,
+            responsabile_id=current_user_id,  # FIX: Set responsabile_id from current user
             responsabile_nome=giornale_data.responsabile_nome,
             compilatore=giornale_data.compilatore,
             condizioni_meteo=giornale_data.condizioni_meteo,
@@ -478,9 +479,8 @@ async def create_giornale(
             descrizione_lavori=giornale_data.descrizione_lavori,
             note_generali=giornale_data.note_generali,
             problematiche=giornale_data.problematiche,
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
             validato=False
+            # created_at and updated_at will be set automatically by server_default
         )
         
         # Processa US elaborate
@@ -641,7 +641,7 @@ async def update_giornale(
         db_giornale.descrizione_lavori = giornale_data.descrizione_lavori
         db_giornale.note_generali = giornale_data.note_generali
         db_giornale.problematiche = giornale_data.problematiche
-        db_giornale.updated_at = datetime.now()
+        # updated_at will be set automatically by onupdate
         db_giornale.version = (db_giornale.version or 1) + 1
         
         # Processa US elaborate
@@ -1192,8 +1192,9 @@ async def validate_giornale(
         
         # Validazione
         giornale.validato = True
-        giornale.data_validazione = datetime.now()
-        giornale.updated_at = datetime.now()
+        # Use func.now() for timezone-aware current timestamp
+        giornale.data_validazione = func.now()
+        # updated_at will be set automatically by onupdate
         
         # TODO: Aggiungere campo validato_da se esiste nel modello
         # giornale.validato_da_id = current_user_id
