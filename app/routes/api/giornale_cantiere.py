@@ -766,12 +766,23 @@ async def create_operatore(
     Disponibile solo per utenti autenticati
     """
     try:
+        # Debug: Log the received data
+        logger.info(f"Dati operatore ricevuti: {operatore.model_dump()}")
+        
         # Prepara dati operatore
         operatore_data = operatore.model_dump()
         
         # Sincronizza campi is_active e attivo
         if 'is_active' in operatore_data:
             operatore_data['attivo'] = operatore_data['is_active']
+            # Ensure is_active is also set for the response model
+        else:
+            # Default to True if not provided
+            operatore_data['attivo'] = True
+            operatore_data['is_active'] = True
+        
+        # Debug: Log the data that will be saved
+        logger.info(f"Dati che verranno salvati: {operatore_data}")
         
         # Crea nuovo operatore
         db_operatore = OperatoreCantiere(**operatore_data)

@@ -1,4 +1,4 @@
-# app/models/giornale_cantiere.py.old
+# app/models/giornale_cantiere.py
 """
 Modelli per il Giornale di Cantiere Archeologico
 Conforme alle normative italiane per la documentazione di scavo
