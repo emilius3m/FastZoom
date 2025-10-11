@@ -1,4 +1,4 @@
-# app/routes/view/giornale_cantiere.py
+# app/routes/view/giornale_cantiere.py.old
 """
 View Routes HTML per il Giornale di Cantiere Archeologico
 Pagine web con template Jinja2 e Alpine.js per interfaccia utente

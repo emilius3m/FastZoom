@@ -1,4 +1,4 @@
-# app/models/giornale_cantiere.py
+# app/models/giornale_cantiere.py.old
 """
 Modelli per il Giornale di Cantiere Archeologico
 Conforme alle normative italiane per la documentazione di scavo
@@ -55,10 +55,13 @@ class OperatoreCantiere(Base):
     cognome = Column(String(100), nullable=False, index=True)
     codice_fiscale = Column(String(16), nullable=True, unique=True)  # Opzionale per privacy
     
-    # Qualifica professionale
-    qualifica = Column(String(150), nullable=False, index=True)  
-    # Es: "Archeologo", "Operaio specializzato", "Tecnico del rilievo", 
+    # Qualifica e ruolo professionale
+    qualifica = Column(String(150), nullable=False, index=True)
+    # Es: "Archeologo", "Operaio specializzato", "Tecnico del rilievo",
     #     "Responsabile di cantiere", "Restauratore", "Topografo", etc.
+    
+    ruolo = Column(String(100), nullable=True, index=True)
+    # Es: "responsabile_scavo", "assistente", "operatore", "specialista", "tecnico"
     
     # Specializzazione
     specializzazione = Column(String(200), nullable=True)
@@ -71,8 +74,13 @@ class OperatoreCantiere(Base):
     # Abilitazioni e certificazioni
     abilitazioni = Column(Text, nullable=True)  # JSON o testo libero
     
-    # Stato
+    # Note aggiuntive
+    note = Column(Text, nullable=True)
+    
+    # Stato e statistiche
     is_active = Column(Boolean, default=True, nullable=False)
+    attivo = Column(Boolean, default=True, nullable=False)  # Alias per compatibilità API
+    ore_totali = Column(Integer, default=0, nullable=False)  # Ore totali lavorate
     
     # Timestamp automatici
     created_at = Column(DateTime(timezone=True), server_default=func.now())

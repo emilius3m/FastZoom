@@ -1,4 +1,6 @@
-# app/templates/pages/giornale_cantiere/operatori.html
+# app/templates/pages/giornale_cantiere/operatori_updated.html
+# AGGIORNAMENTO TEMPLATE OPERATORI CON API REALI
+
 {% extends "base/site_base.html" %}
 
 {% block title %}{{ title or "Operatori di Cantiere" }}{% endblock %}
@@ -140,7 +142,6 @@
                     <option value="">Tutti</option>
                     <option value="attivo">Attivo</option>
                     <option value="inattivo">Inattivo</option>
-                    <option value="sospeso">Sospeso</option>
                 </select>
             </div>
             <div class="flex items-end">
@@ -271,32 +272,6 @@
         <p class="text-gray-600">Caricamento operatori...</p>
     </div>
 
-    <!-- Paginazione -->
-    <div x-show="totalPages > 1" class="mt-6 flex justify-center">
-        <nav class="flex items-center space-x-2">
-            <button @click="changePage(currentPage - 1)" 
-                    :disabled="currentPage <= 1"
-                    :class="currentPage <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'"
-                    class="px-3 py-2 text-sm border rounded-md">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            
-            <template x-for="page in getPageNumbers()" :key="page">
-                <button @click="changePage(page)"
-                        :class="page === currentPage ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'"
-                        class="px-3 py-2 text-sm border rounded-md"
-                        x-text="page"></button>
-            </template>
-            
-            <button @click="changePage(currentPage + 1)" 
-                    :disabled="currentPage >= totalPages"
-                    :class="currentPage >= totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'"
-                    class="px-3 py-2 text-sm border rounded-md">
-                <i class="fas fa-chevron-right"></i>
-            </button>
-        </nav>
-    </div>
-
 </div>
 
 <script>
@@ -315,11 +290,6 @@ function operatoriApp() {
             ore_totali: 0
         },
         
-        // Paginazione
-        currentPage: 1,
-        pageSize: 12,
-        totalPages: 1,
-        
         // Filtri
         filters: {
             search: '',
@@ -330,40 +300,65 @@ function operatoriApp() {
         
         // Inizializzazione
         async init() {
-            await this.loadOperatori();
             await this.loadStats();
+            await this.loadOperatori();
         },
         
-        // Caricamento operatori (mock)
-        async loadOperatori() {
-            this.loading = true;
+        // *** REAL API ENDPOINTS *** - No more mock data!
+        
+        // Caricamento statistiche operatori
+        async loadStats() {
             try {
-                // TODO: Implementare endpoint API
-                // const response = await fetch('/api/giornale-cantiere/operatori');
-                // this.operatoriList = await response.json();
+                const response = await fetch('/api/giornale-cantiere/stats/operatori', {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
                 
-                // Mock data per ora
-                this.operatoriList = [];
+                if (response.ok) {
+                    this.stats = await response.json();
+                } else {
+                    console.error('Errore caricamento statistiche operatori:', response.statusText);
+                }
                 
             } catch (error) {
-                console.error('Errore caricamento operatori:', error);
-            } finally {
-                this.loading = false;
+                console.error('Errore caricamento statistiche operatori:', error);
             }
         },
         
-        // Caricamento statistiche (mock)
-        async loadStats() {
+        // Caricamento operatori dal database reale
+        async loadOperatori() {
+            this.loading = true;
             try {
-                // TODO: Implementare endpoint statistiche
-                this.stats = {
-                    totali: 0,
-                    attivi: 0,
-                    specialisti: 0,
-                    ore_totali: 0
-                };
+                const params = new URLSearchParams();
+                
+                // Aggiungi filtri
+                if (this.filters.search) params.append('search', this.filters.search);
+                if (this.filters.ruolo) params.append('ruolo', this.filters.ruolo);
+                if (this.filters.specializzazione) params.append('specializzazione', this.filters.specializzazione);
+                if (this.filters.stato) params.append('stato', this.filters.stato);
+                
+                const url = `/api/giornale-cantiere/operatori?${params.toString()}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (response.ok) {
+                    this.operatoriList = await response.json();
+                } else {
+                    console.error('Errore caricamento operatori:', response.statusText);
+                    this.operatoriList = [];
+                }
+                
             } catch (error) {
-                console.error('Errore caricamento statistiche:', error);
+                console.error('Errore caricamento operatori:', error);
+                this.operatoriList = [];
+            } finally {
+                this.loading = false;
             }
         },
         
@@ -386,7 +381,6 @@ function operatoriApp() {
         
         // Filtri
         async applyFilters() {
-            this.currentPage = 1;
             await this.loadOperatori();
         },
         
@@ -397,30 +391,10 @@ function operatoriApp() {
                 specializzazione: '',
                 stato: ''
             };
-            this.currentPage = 1;
             await this.loadOperatori();
         },
         
-        // Paginazione
-        changePage(page) {
-            if (page >= 1 && page <= this.totalPages) {
-                this.currentPage = page;
-                this.loadOperatori();
-            }
-        },
-        
-        getPageNumbers() {
-            const pages = [];
-            const start = Math.max(1, this.currentPage - 2);
-            const end = Math.min(this.totalPages, this.currentPage + 2);
-            
-            for (let i = start; i <= end; i++) {
-                pages.push(i);
-            }
-            return pages;
-        },
-        
-        // Utility styling
+        // Utility styling (invariate)
         getRoleBorderColor(ruolo) {
             const colors = {
                 'responsabile_scavo': 'border-red-500',
@@ -457,8 +431,7 @@ function operatoriApp() {
         getStatoBadge(stato) {
             const badges = {
                 'attivo': 'bg-green-100 text-green-800',
-                'inattivo': 'bg-gray-100 text-gray-800',
-                'sospeso': 'bg-red-100 text-red-800'
+                'inattivo': 'bg-gray-100 text-gray-800'
             };
             return badges[stato] || 'bg-gray-100 text-gray-800';
         },

@@ -1,4 +1,4 @@
-# app/schemas/giornale_cantiere.py
+# app/schemas/giornale_cantiere.py.old
 """
 Schemi Pydantic per il Giornale di Cantiere Archeologico
 Input/Output validation per le API REST

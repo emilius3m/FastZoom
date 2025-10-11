@@ -1,13 +1,14 @@
+# app/templates/pages/giornale_cantiere/home_updated.html
+# AGGIORNAMENTO TEMPLATE HOME CON API REALI
+# Sostituisci il template home.html esistente con questa versione
 
 {% extends "base/site_base.html" %}
-# app/templates/pages/giornale_cantiere/home.html
-
 
 {% block title %}{{ title or "Giornale di Cantiere - FastZoom" }}{% endblock %}
 
 {% block content %}
 <div x-data="giornaleCantiereDashboard()" x-init="init()" class="container mx-auto px-4 py-6">
-
+    
     <!-- Header -->
     <div class="mb-8">
         <div class="flex items-center justify-between">
@@ -18,9 +19,9 @@
                 </h1>
                 <p class="text-xl text-gray-600 mt-2">Documentazione quotidiana delle attività di scavo</p>
             </div>
-
+            
             <div class="flex gap-3">
-                <a href="/giornale-cantiere/operatori"
+                <a href="/giornale-cantiere/operatori" 
                    class="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition">
                     <i class="fas fa-users mr-2"></i>Gestione Operatori
                 </a>
@@ -93,13 +94,13 @@
             <i class="fas fa-map-marked-alt mr-2 text-orange-600"></i>
             Seleziona Sito Archeologico
         </h2>
-
+        
         {% if sites and sites|length > 0 %}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {% for site in sites %}
                 <div class="group relative bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-all duration-200 cursor-pointer"
                      onclick="window.location.href='/giornale-cantiere/site/{{ site.id }}'">
-
+                    
                     <!-- Header sito -->
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex-1">
@@ -112,7 +113,7 @@
                             <i class="fas fa-excavator text-orange-500"></i>
                         </div>
                     </div>
-
+                    
                     <!-- Informazioni sito -->
                     <div class="space-y-2 text-sm text-gray-600 mb-4">
                         {% if site.location %}
@@ -121,7 +122,7 @@
                             <span>{{ site.location }}</span>
                         </div>
                         {% endif %}
-
+                        
                         {% if site.description %}
                         <div class="flex items-start">
                             <i class="fas fa-info-circle mr-2 mt-0.5 text-gray-400"></i>
@@ -129,19 +130,19 @@
                         </div>
                         {% endif %}
                     </div>
-
-                    <!-- Stats sito (placeholder) -->
+                    
+                    <!-- Stats sito (caricato via API) -->
                     <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
                         <div class="bg-white p-3 rounded border">
                             <div class="text-gray-500">Giornali</div>
-                            <div class="font-semibold text-gray-900">--</div>
+                            <div class="font-semibold text-gray-900" x-text="siteStats['{{ site.id }}']?.total || 0"></div>
                         </div>
                         <div class="bg-white p-3 rounded border">
                             <div class="text-gray-500">Validati</div>
-                            <div class="font-semibold text-green-600">--</div>
+                            <div class="font-semibold text-green-600" x-text="siteStats['{{ site.id }}']?.validated || 0"></div>
                         </div>
                     </div>
-
+                    
                     <!-- Action button -->
                     <div class="flex items-center justify-between">
                         <span class="text-xs text-gray-500">Click per aprire</span>
@@ -165,35 +166,6 @@
         {% endif %}
     </div>
 
-    <!-- Attività recenti (placeholder) -->
-    <div class="bg-white rounded-lg shadow-lg p-6" x-show="recentActivities.length > 0" style="display: none;">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-lg font-semibold text-gray-900">
-                <i class="fas fa-clock mr-2 text-gray-500"></i>
-                Attività Recenti
-            </h3>
-            <button @click="loadRecentActivities()"
-                    class="text-orange-600 hover:text-orange-800 text-sm">
-                <i class="fas fa-sync-alt mr-1"></i>Aggiorna
-            </button>
-        </div>
-
-        <div class="space-y-3">
-            <template x-for="activity in recentActivities" :key="activity.id">
-                <div class="flex items-center p-3 bg-gray-50 rounded-lg">
-                    <div class="p-2 bg-orange-100 rounded-full mr-4">
-                        <i class="fas fa-edit text-orange-600 text-sm"></i>
-                    </div>
-                    <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-900" x-text="activity.description"></p>
-                        <p class="text-xs text-gray-500" x-text="formatDateTime(activity.created_at)"></p>
-                    </div>
-                    <div class="text-xs text-gray-400" x-text="activity.author"></div>
-                </div>
-            </template>
-        </div>
-    </div>
-
 </div>
 
 <script>
@@ -206,62 +178,74 @@ function giornaleCantiereDashboard() {
             giornali_validati: 0,
             giornali_pendenti: 0
         },
-        recentActivities: [],
+        siteStats: {}, // Stats per ogni sito
         loading: false,
-
+        
         // Inizializzazione
         async init() {
             await this.loadStats();
-            // await this.loadRecentActivities(); // TODO: implementare
+            await this.loadSiteStats();
         },
-
+        
+        // *** REAL API ENDPOINTS *** - No more mock data!
+        
         // Caricamento statistiche generali
         async loadStats() {
             this.loading = true;
             try {
-                // TODO: Implementare endpoint per statistiche generali
-                // const response = await fetch('/api/giornale-cantiere/stats/general');
-                // if (response.ok) {
-                //     this.stats = await response.json();
-                // }
-
-                // Mock data per ora
-                this.stats = {
-                    siti_totali: {{ sites|length if sites else 0 }},
-                    giornali_totali: 0,
-                    giornali_validati: 0,
-                    giornali_pendenti: 0
-                };
+                const response = await fetch('/api/giornale-cantiere/stats/general', {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (response.ok) {
+                    this.stats = await response.json();
+                } else {
+                    console.error('Errore caricamento statistiche generali:', response.statusText);
+                }
+                
             } catch (error) {
                 console.error('Errore caricamento statistiche:', error);
             } finally {
                 this.loading = false;
             }
         },
-
-        // Caricamento attività recenti
-        async loadRecentActivities() {
-            // TODO: Implementare endpoint per attività recenti
-            // this.recentActivities = await fetch('/api/giornale-cantiere/activities/recent');
-        },
-
-        // Utility
-        formatDateTime(dateString) {
-            return new Date(dateString).toLocaleDateString('it-IT', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+        
+        // Caricamento statistiche per sito
+        async loadSiteStats() {
+            try {
+                const sites = {{ sites|tojson|safe if sites else '[]' }};
+                
+                for (const site of sites) {
+                    const response = await fetch(`/api/giornale-cantiere/stats/site/${site.id}`, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const siteData = await response.json();
+                        this.siteStats[site.id] = {
+                            total: siteData.total_giornali,
+                            validated: siteData.validated_giornali
+                        };
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Errore caricamento statistiche siti:', error);
+            }
         }
     }
 }
 </script>
 
 <style>
-.transition {
-    transition: all 0.2s ease-in-out;
+.transition { 
+    transition: all 0.2s ease-in-out; 
 }
 
 .line-clamp-2 {

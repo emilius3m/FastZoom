@@ -1,7 +1,5 @@
 # app/templates/pages/giornale_cantiere/reports.html
-# AGGIORNAMENTO TEMPLATE REPORTS CON API REALI
-
-{% extends "base/site_base.html" %}
+{% extends "base.html" %}
 
 {% block title %}{{ title or "Report Giornali di Cantiere" }}{% endblock %}
 
@@ -80,9 +78,7 @@
                 <select x-model="filters.sito_id" 
                         class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <option value="">Tutti i siti</option>
-                    {% for site in sites %}
-                    <option value="{{ site.id }}">{{ site.name }}</option>
-                    {% endfor %}
+                    <!-- TODO: Popolato dinamicamente da user_sites -->
                 </select>
             </div>
             <div class="flex items-end">
@@ -100,7 +96,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Giornali Totali</p>
-                    <p class="text-3xl font-bold text-indigo-600" x-text="reportData.stats.totali || 0"></p>
+                    <p class="text-3xl font-bold text-indigo-600" x-text="stats.totali || 0"></p>
                     <p class="text-sm text-gray-500 mt-1">Nel periodo</p>
                 </div>
                 <div class="p-3 bg-indigo-100 rounded-full">
@@ -113,7 +109,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Validati</p>
-                    <p class="text-3xl font-bold text-green-600" x-text="reportData.stats.validati || 0"></p>
+                    <p class="text-3xl font-bold text-green-600" x-text="stats.validati || 0"></p>
                     <p class="text-sm text-gray-500 mt-1" x-text="getValidationPercentage()"></p>
                 </div>
                 <div class="p-3 bg-green-100 rounded-full">
@@ -126,7 +122,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">In Attesa</p>
-                    <p class="text-3xl font-bold text-yellow-600" x-text="reportData.stats.in_attesa || 0"></p>
+                    <p class="text-3xl font-bold text-yellow-600" x-text="stats.in_attesa || 0"></p>
                     <p class="text-sm text-gray-500 mt-1">Da validare</p>
                 </div>
                 <div class="p-3 bg-yellow-100 rounded-full">
@@ -139,7 +135,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Ore Lavorate</p>
-                    <p class="text-3xl font-bold text-blue-600" x-text="reportData.stats.ore_totali || 0"></p>
+                    <p class="text-3xl font-bold text-blue-600" x-text="stats.ore_totali || 0"></p>
                     <p class="text-sm text-gray-500 mt-1">Somma totale</p>
                 </div>
                 <div class="p-3 bg-blue-100 rounded-full">
@@ -152,7 +148,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Operatori</p>
-                    <p class="text-3xl font-bold text-purple-600" x-text="reportData.stats.operatori_unici || 0"></p>
+                    <p class="text-3xl font-bold text-purple-600" x-text="stats.operatori_unici || 0"></p>
                     <p class="text-sm text-gray-500 mt-1">Coinvolti</p>
                 </div>
                 <div class="p-3 bg-purple-100 rounded-full">
@@ -164,6 +160,32 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         
+        <!-- Grafico andamento temporale -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-chart-line mr-2 text-indigo-600"></i>
+                    Andamento Temporale
+                </h3>
+                <div class="flex gap-2">
+                    <button @click="chartPeriod = 'settimana'" 
+                            :class="chartPeriod === 'settimana' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'"
+                            class="px-3 py-1 text-sm rounded">Settimana</button>
+                    <button @click="chartPeriod = 'mese'" 
+                            :class="chartPeriod === 'mese' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'"
+                            class="px-3 py-1 text-sm rounded">Mese</button>
+                </div>
+            </div>
+            
+            <div class="h-64 flex items-center justify-center bg-gray-50 rounded">
+                <div class="text-center text-gray-500">
+                    <i class="fas fa-chart-line text-4xl mb-2"></i>
+                    <p>Grafico andamento giornali</p>
+                    <p class="text-sm">(Da implementare con Chart.js)</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Distribuzione per sito -->
         <div class="bg-white p-6 rounded-lg shadow-lg">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">
@@ -172,7 +194,7 @@
             </h3>
             
             <div class="space-y-4">
-                <template x-for="sito in reportData.site_stats" :key="sito.id">
+                <template x-for="sito in siteStats" :key="sito.id">
                     <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div class="flex items-center">
                             <div class="p-2 bg-green-100 rounded mr-3">
@@ -190,13 +212,17 @@
                     </div>
                 </template>
                 
-                <div x-show="reportData.site_stats.length === 0" class="text-center py-8 text-gray-500">
+                <div x-show="siteStats.length === 0" class="text-center py-8 text-gray-500">
                     <i class="fas fa-map-marked-alt text-2xl mb-2"></i>
                     <p>Nessun dato disponibile</p>
                 </div>
             </div>
         </div>
+    </div>
 
+    <!-- Tabelle dettagliate -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
         <!-- Top operatori -->
         <div class="bg-white p-6 rounded-lg shadow-lg">
             <div class="flex justify-between items-center mb-4">
@@ -208,7 +234,7 @@
             </div>
             
             <div class="space-y-3">
-                <template x-for="(operatore, index) in reportData.top_operatori" :key="operatore.id">
+                <template x-for="(operatore, index) in topOperatori" :key="operatore.id">
                     <div class="flex items-center justify-between p-3 rounded-lg"
                          :class="index < 3 ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'">
                         <div class="flex items-center">
@@ -230,43 +256,43 @@
                     </div>
                 </template>
                 
-                <div x-show="reportData.top_operatori.length === 0" class="text-center py-8 text-gray-500">
+                <div x-show="topOperatori.length === 0" class="text-center py-8 text-gray-500">
                     <i class="fas fa-users text-2xl mb-2"></i>
                     <p>Nessun dato disponibile</p>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Condizioni meteo -->
-    <div class="bg-white p-6 rounded-lg shadow-lg mb-8">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-            <i class="fas fa-cloud-sun mr-2 text-blue-600"></i>
-            Condizioni Meteorologiche
-        </h3>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <template x-for="meteo in reportData.meteo_stats" :key="meteo.condizione">
-                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div class="flex items-center">
-                        <i :class="getWeatherIcon(meteo.condizione)" 
-                           class="text-blue-600 text-xl mr-3"></i>
-                        <span class="font-medium text-gray-900" x-text="formatMeteo(meteo.condizione)"></span>
-                    </div>
-                    <div class="flex items-center">
-                        <div class="w-20 bg-gray-200 rounded-full h-2 mr-3">
-                            <div class="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                 :style="`width: ${getMeteoPercentage(meteo.count)}%`"></div>
-                        </div>
-                        <span class="text-sm text-gray-600 w-8 text-right" 
-                              x-text="meteo.count"></span>
-                    </div>
-                </div>
-            </template>
+        <!-- Condizioni meteo -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-cloud-sun mr-2 text-blue-600"></i>
+                Condizioni Meteorologiche
+            </h3>
             
-            <div x-show="reportData.meteo_stats.length === 0" class="col-span-full text-center py-8 text-gray-500">
-                <i class="fas fa-cloud-sun text-2xl mb-2"></i>
-                <p>Nessun dato meteo disponibile</p>
+            <div class="space-y-4">
+                <template x-for="meteo in meteoStats" :key="meteo.condizione">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i :class="getWeatherIcon(meteo.condizione)" 
+                               class="text-blue-600 text-xl mr-3"></i>
+                            <span class="font-medium text-gray-900" x-text="formatMeteo(meteo.condizione)"></span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
+                                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                     :style="`width: ${(meteo.count / stats.totali * 100)}%`"></div>
+                            </div>
+                            <span class="text-sm text-gray-600 w-12 text-right" 
+                                  x-text="meteo.count"></span>
+                        </div>
+                    </div>
+                </template>
+                
+                <div x-show="meteoStats.length === 0" class="text-center py-8 text-gray-500">
+                    <i class="fas fa-cloud-sun text-2xl mb-2"></i>
+                    <p>Nessun dato meteo disponibile</p>
+                </div>
             </div>
         </div>
     </div>
@@ -288,20 +314,21 @@ function giornaleReportsApp() {
         // Dati
         loading: false,
         showFilters: false,
+        chartPeriod: 'settimana',
         
-        // Report data from API
-        reportData: {
-            stats: {
-                totali: 0,
-                validati: 0,
-                in_attesa: 0,
-                ore_totali: 0,
-                operatori_unici: 0
-            },
-            site_stats: [],
-            top_operatori: [],
-            meteo_stats: []
+        // Statistiche principali
+        stats: {
+            totali: 0,
+            validati: 0,
+            in_attesa: 0,
+            ore_totali: 0,
+            operatori_unici: 0
         },
+        
+        // Dati per grafici
+        siteStats: [],
+        topOperatori: [],
+        meteoStats: [],
         
         // Filtri
         filters: {
@@ -322,42 +349,32 @@ function giornaleReportsApp() {
             await this.loadReports();
         },
         
-        // *** REAL API ENDPOINTS *** - No more mock data!
-        
-        // Caricamento report dal database reale
+        // Caricamento report (mock)
         async loadReports() {
             this.loading = true;
             try {
-                const response = await fetch('/api/giornale-cantiere/reports', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
-                    },
-                    body: JSON.stringify(this.filters)
-                });
+                // TODO: Implementare endpoint API per report
+                // const response = await fetch('/api/giornale-cantiere/reports', {
+                //     method: 'POST',
+                //     body: JSON.stringify(this.filters)
+                // });
+                // const data = await response.json();
                 
-                if (response.ok) {
-                    this.reportData = await response.json();
-                } else {
-                    console.error('Errore caricamento report:', response.statusText);
-                    // Mantieni dati vuoti in caso di errore
-                    this.reportData = {
-                        stats: { totali: 0, validati: 0, in_attesa: 0, ore_totali: 0, operatori_unici: 0 },
-                        site_stats: [],
-                        top_operatori: [],
-                        meteo_stats: []
-                    };
-                }
+                // Mock data per ora
+                this.stats = {
+                    totali: 0,
+                    validati: 0,
+                    in_attesa: 0,
+                    ore_totali: 0,
+                    operatori_unici: 0
+                };
+                
+                this.siteStats = [];
+                this.topOperatori = [];
+                this.meteoStats = [];
                 
             } catch (error) {
                 console.error('Errore caricamento report:', error);
-                this.reportData = {
-                    stats: { totali: 0, validati: 0, in_attesa: 0, ore_totali: 0, operatori_unici: 0 },
-                    site_stats: [],
-                    top_operatori: [],
-                    meteo_stats: []
-                };
             } finally {
                 this.loading = false;
             }
@@ -374,7 +391,14 @@ function giornaleReportsApp() {
         
         async exportReport(format) {
             try {
-                // TODO: Implementare export reale
+                // TODO: Implementare export
+                // const response = await fetch(`/api/giornale-cantiere/export/${format}`, {
+                //     method: 'POST',
+                //     body: JSON.stringify(this.filters)
+                // });
+                // const blob = await response.blob();
+                // // Download file...
+                
                 alert(`Export ${format.toUpperCase()} - da implementare`);
             } catch (error) {
                 console.error('Errore export:', error);
@@ -384,14 +408,9 @@ function giornaleReportsApp() {
         
         // Utility
         getValidationPercentage() {
-            if (!this.reportData.stats.totali) return '0%';
-            const percentage = Math.round((this.reportData.stats.validati / this.reportData.stats.totali) * 100);
+            if (!this.stats.totali) return '0%';
+            const percentage = Math.round((this.stats.validati / this.stats.totali) * 100);
             return `${percentage}%`;
-        },
-        
-        getMeteoPercentage(count) {
-            if (!this.reportData.stats.totali) return 0;
-            return Math.round((count / this.reportData.stats.totali) * 100);
         },
         
         getWeatherIcon(condizione) {

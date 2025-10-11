@@ -1,110 +1,417 @@
 # app/routes/api/giornale_cantiere.py
 """
-API Routes per il Giornale di Cantiere Archeologico
-Gestione CRUD completa con autenticazione e controllo accessi per siti
+API Routes complete per Giornale di Cantiere
+Sostituisce tutti i mock data con endpoint reali per i template
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, or_
+from sqlalchemy import select, func, and_, or_, desc, distinct
 from sqlalchemy.orm import selectinload
 from loguru import logger
 
-# Import del sistema esistente
+# Import sistema esistente
 from app.database.db import get_async_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.models.sites import ArchaeologicalSite
 from app.models.users import User
 
-# Import dei nuovi modelli
-from app.models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere, CondizioniMeteoEnum
-
-# Import degli schemi Pydantic (da creare nel prossimo file)
-from app.schemas.giornale_cantiere import (
-    GiornaleCantiereCreate,
-    GiornaleCantiereUpdate, 
-    GiornaleCantiereOut,
-    OperatoreCantiereCreate,
-    OperatoreCantiereOut,
-    GiornaleCantiereFilter
+# Import modelli giornale cantiere (dai file esistenti)
+from app.models.giornale_cantiere import (
+    GiornaleCantiere, OperatoreCantiere, 
+    CondizioniMeteoEnum
 )
 
-# Router con prefisso API
-router = APIRouter(prefix="/api/giornale-cantiere", tags=["giornale-cantiere"])
+# Import schemas from existing schema file
+from app.schemas.giornale_cantiere import (
+    OperatoreCantiereCreate,
+    OperatoreCantiereOut,
+    OperatoreCantiereUpdate
+)
 
+# Pydantic schemas
+from pydantic import BaseModel, Field
+from datetime import time
 
-# ===== GESTIONE OPERATORI DI CANTIERE =====
+# ===== SCHEMAS PYDANTIC =====
 
-@router.post("/operatori", response_model=OperatoreCantiereOut, status_code=status.HTTP_201_CREATED)
-async def create_operatore(
-    operatore: OperatoreCantiereCreate,
+class GiornaleStatsResponse(BaseModel):
+    """Statistiche per dashboard"""
+    siti_totali: int = 0
+    giornali_totali: int = 0
+    giornali_validati: int = 0
+    giornali_pendenti: int = 0
+
+class SiteStatsResponse(BaseModel):
+    """Statistiche per sito specifico"""
+    total_giornali: int = 0
+    validated_giornali: int = 0
+    pending_giornali: int = 0
+    operatori_attivi: int = 0
+    validation_percentage: int = 0
+
+class OperatoreStatsResponse(BaseModel):
+    """Statistiche operatori"""
+    totali: int = 0
+    attivi: int = 0
+    specialisti: int = 0
+    ore_totali: int = 0
+
+class TopOperatore(BaseModel):
+    """Top operatore per report"""
+    id: UUID
+    nome: str
+    cognome: str
+    ruolo: str
+    ore_lavorate: int
+    giornali_count: int
+
+class SiteStat(BaseModel):
+    """Statistiche per sito nei report"""
+    id: UUID
+    name: str
+    location: str
+    giornali_count: int
+
+class MeteoStat(BaseModel):
+    """Statistiche meteo"""
+    condizione: str
+    count: int
+
+class ReportStatsResponse(BaseModel):
+    """Response per report completi"""
+    totali: int = 0
+    validati: int = 0
+    in_attesa: int = 0
+    ore_totali: int = 0
+    operatori_unici: int = 0
+
+class ReportDataResponse(BaseModel):
+    """Dati completi per report"""
+    stats: ReportStatsResponse
+    site_stats: List[SiteStat]
+    top_operatori: List[TopOperatore]
+    meteo_stats: List[MeteoStat]
+
+# ===== ROUTER =====
+router = APIRouter(prefix="/api/giornale-cantiere", tags=["giornale-cantiere-api"])
+
+# ===== HELPER FUNCTIONS =====
+
+async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> bool:
+    """Verifica accesso utente al sito"""
+    return any(site['id'] == str(site_id) for site in user_sites)
+
+async def get_site_with_verification(
+    site_id: UUID, 
+    db: AsyncSession, 
+    user_sites: List[Dict[str, Any]]
+) -> ArchaeologicalSite:
+    """Ottieni sito con verifica accesso"""
+    if not await verify_site_access(site_id, user_sites):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Accesso negato al sito {site_id}"
+        )
+    
+    result = await db.execute(
+        select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    )
+    site = result.scalar_one_or_none()
+    
+    if not site:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sito {site_id} non trovato"
+        )
+    
+    return site
+
+# ===== ENDPOINTS STATISTICHE =====
+
+@router.get("/stats/general", response_model=GiornaleStatsResponse)
+async def get_general_stats(
     db: AsyncSession = Depends(get_async_session),
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    """
-    Crea un nuovo operatore di cantiere
-    Disponibile solo per utenti autenticati
-    """
+    """Statistiche generali per dashboard home"""
     try:
-        # Crea nuovo operatore
-        db_operatore = OperatoreCantiere(**operatore.model_dump())
+        # Ottieni ID siti accessibili
+        site_ids = [UUID(site['id']) for site in user_sites]
         
-        db.add(db_operatore)
-        await db.commit()
-        await db.refresh(db_operatore)
+        if not site_ids:
+            return GiornaleStatsResponse()
         
-        logger.info(f"Operatore creato: {db_operatore.nome_completo} da user {current_user_id}")
+        # Siti con giornali
+        siti_result = await db.execute(
+            select(distinct(GiornaleCantiere.site_id))
+            .where(GiornaleCantiere.site_id.in_(site_ids))
+        )
+        siti_totali = len(siti_result.fetchall())
         
-        return db_operatore
+        # Giornali totali
+        totali_result = await db.execute(
+            select(func.count(GiornaleCantiere.id))
+            .where(GiornaleCantiere.site_id.in_(site_ids))
+        )
+        giornali_totali = totali_result.scalar() or 0
+        
+        # Giornali validati
+        validati_result = await db.execute(
+            select(func.count(GiornaleCantiere.id))
+            .where(and_(
+                GiornaleCantiere.site_id.in_(site_ids),
+                GiornaleCantiere.validato == True
+            ))
+        )
+        giornali_validati = validati_result.scalar() or 0
+        
+        return GiornaleStatsResponse(
+            siti_totali=siti_totali,
+            giornali_totali=giornali_totali,
+            giornali_validati=giornali_validati,
+            giornali_pendenti=giornali_totali - giornali_validati
+        )
         
     except Exception as e:
-        logger.error(f"Errore creazione operatore: {str(e)}")
-        await db.rollback()
+        logger.error(f"Errore statistiche generali: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Errore nella creazione dell'operatore: {str(e)}"
+            detail="Errore nel calcolo delle statistiche generali"
         )
 
+@router.get("/stats/site/{site_id}", response_model=SiteStatsResponse)
+async def get_site_stats(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Statistiche per sito specifico"""
+    try:
+        # Verifica accesso
+        await get_site_with_verification(site_id, db, user_sites)
+        
+        # Giornali totali
+        totali_result = await db.execute(
+            select(func.count(GiornaleCantiere.id))
+            .where(GiornaleCantiere.site_id == site_id)
+        )
+        total_giornali = totali_result.scalar() or 0
+        
+        # Giornali validati
+        validati_result = await db.execute(
+            select(func.count(GiornaleCantiere.id))
+            .where(and_(
+                GiornaleCantiere.site_id == site_id,
+                GiornaleCantiere.validato == True
+            ))
+        )
+        validated_giornali = validati_result.scalar() or 0
+        
+        # Operatori unici coinvolti nel sito
+        # Assumendo relazione many-to-many tra giornali e operatori
+        operatori_result = await db.execute(
+            select(func.count(distinct(OperatoreCantiere.id)))
+            .join(GiornaleCantiere.operatori)
+            .where(GiornaleCantiere.site_id == site_id)
+        )
+        operatori_attivi = operatori_result.scalar() or 0
+        
+        # Calcola percentuale validazione
+        validation_percentage = 0
+        if total_giornali > 0:
+            validation_percentage = round((validated_giornali / total_giornali) * 100)
+        
+        return SiteStatsResponse(
+            total_giornali=total_giornali,
+            validated_giornali=validated_giornali,
+            pending_giornali=total_giornali - validated_giornali,
+            operatori_attivi=operatori_attivi,
+            validation_percentage=validation_percentage
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore statistiche sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel calcolo delle statistiche del sito"
+        )
 
-@router.get("/operatori", response_model=List[OperatoreCantiereOut])
-async def list_operatori(
-    skip: int = 0,
-    limit: int = 100,
-    search: Optional[str] = None,
-    qualifica_filter: Optional[str] = None,
-    active_only: bool = True,
+@router.get("/stats/operatori", response_model=OperatoreStatsResponse)
+async def get_operatori_stats(
     db: AsyncSession = Depends(get_async_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
 ):
-    """
-    Lista tutti gli operatori di cantiere con filtri opzionali
-    """
+    """Statistiche operatori"""
     try:
+        # Operatori totali
+        totali_result = await db.execute(
+            select(func.count(OperatoreCantiere.id))
+        )
+        totali = totali_result.scalar() or 0
+        
+        # Operatori attivi (con almeno un giornale)
+        attivi_result = await db.execute(
+            select(func.count(distinct(OperatoreCantiere.id)))
+            .join(GiornaleCantiere.operatori)
+        )
+        attivi = attivi_result.scalar() or 0
+        
+        # Specialisti (assumendo campo specializzazione not null)
+        specialisti_result = await db.execute(
+            select(func.count(OperatoreCantiere.id))
+            .where(OperatoreCantiere.specializzazione.isnot(None))
+        )
+        specialisti = specialisti_result.scalar() or 0
+        
+        # Ore totali (assumendo campo ore_lavorate in OperatoreCantiere o calcolo dai giornali)
+        ore_result = await db.execute(
+            select(func.sum(OperatoreCantiere.ore_totali))
+            .where(OperatoreCantiere.ore_totali.isnot(None))
+        )
+        ore_totali = int(ore_result.scalar() or 0)
+        
+        return OperatoreStatsResponse(
+            totali=totali,
+            attivi=attivi,
+            specialisti=specialisti,
+            ore_totali=ore_totali
+        )
+        
+    except Exception as e:
+        logger.error(f"Errore statistiche operatori: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel calcolo delle statistiche operatori"
+        )
+
+# ===== ENDPOINTS GIORNALI =====
+
+@router.get("/site/{site_id}")
+async def get_giornali_by_site(
+    site_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    data_da: Optional[date] = Query(None),
+    data_a: Optional[date] = Query(None),
+    responsabile: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Lista giornali per sito con filtri"""
+    try:
+        # Verifica accesso
+        await get_site_with_verification(site_id, db, user_sites)
+        
+        # Query base
+        query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == site_id)
+        
+        # Applica filtri
+        if data_da:
+            query = query.where(GiornaleCantiere.data >= data_da)
+        if data_a:
+            query = query.where(GiornaleCantiere.data <= data_a)
+        if responsabile:
+            query = query.where(GiornaleCantiere.responsabile_nome.ilike(f"%{responsabile}%"))
+        if stato:
+            if stato == "validato":
+                query = query.where(GiornaleCantiere.validato == True)
+            elif stato == "in_attesa":
+                query = query.where(GiornaleCantiere.validato == False)
+        
+        # Include relazioni
+        query = query.options(
+            selectinload(GiornaleCantiere.site),
+            selectinload(GiornaleCantiere.responsabile),
+            selectinload(GiornaleCantiere.operatori)
+        )
+        
+        # Ordinamento e paginazione
+        query = query.order_by(desc(GiornaleCantiere.data), desc(GiornaleCantiere.created_at))
+        query = query.offset(skip).limit(limit)
+        
+        result = await db.execute(query)
+        giornali = result.scalars().all()
+        
+        # Converti in dizionari per il frontend
+        giornali_data = []
+        for g in giornali:
+            giornale_dict = {
+                "id": str(g.id),
+                "data": g.data.isoformat() if g.data else None,
+                "ora_inizio": g.ora_inizio.strftime("%H:%M") if g.ora_inizio else None,
+                "ora_fine": g.ora_fine.strftime("%H:%M") if g.ora_fine else None,
+                "responsabile_scavo": g.responsabile_nome or (g.responsabile.email if g.responsabile else None),
+                "descrizione_lavori": g.descrizione_lavori,
+                "condizioni_meteo": g.condizioni_meteo,
+                "stato": "validato" if g.validato else "in_attesa",
+                "us_elaborate": g.get_us_list(),
+                "operatori_presenti": [
+                    {"nome": op.nome, "cognome": op.cognome, "ruolo": op.ruolo}
+                    for op in g.operatori
+                ] if g.operatori else [],
+                "note_generali": g.note_generali,
+                "problematiche": g.problematiche,
+                "compilatore": g.responsabile_nome,
+                "created_at": g.created_at.isoformat() if g.created_at else None,
+                "updated_at": g.updated_at.isoformat() if g.updated_at else None,
+                "version": g.version or 1
+            }
+            giornali_data.append(giornale_dict)
+        
+        return giornali_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore lista giornali sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel recupero dei giornali"
+        )
+
+@router.get("/operatori")
+async def get_operatori(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    ruolo: Optional[str] = Query(None),
+    specializzazione: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """Lista operatori con filtri"""
+    try:
+        # Query base
         query = select(OperatoreCantiere)
         
-        # Filtro attivi/inattivi
-        if active_only:
-            query = query.where(OperatoreCantiere.is_active == True)
-        
-        # Filtro per ricerca testuale (nome, cognome, qualifica)
+        # Applica filtri
         if search:
             search_pattern = f"%{search}%"
-            query = query.where(
-                or_(
-                    OperatoreCantiere.nome.ilike(search_pattern),
-                    OperatoreCantiere.cognome.ilike(search_pattern),
-                    OperatoreCantiere.qualifica.ilike(search_pattern)
-                )
-            )
+            query = query.where(or_(
+                OperatoreCantiere.nome.ilike(search_pattern),
+                OperatoreCantiere.cognome.ilike(search_pattern),
+                OperatoreCantiere.codice_fiscale.ilike(search_pattern)
+            ))
         
-        # Filtro per qualifica specifica
-        if qualifica_filter:
-            query = query.where(OperatoreCantiere.qualifica.ilike(f"%{qualifica_filter}%"))
+        if ruolo:
+            query = query.where(OperatoreCantiere.ruolo == ruolo)
+        if specializzazione:
+            query = query.where(OperatoreCantiere.specializzazione == specializzazione)
+        if stato:
+            query = query.where(OperatoreCantiere.attivo == (stato == "attivo"))
         
         # Ordinamento e paginazione
         query = query.order_by(OperatoreCantiere.cognome, OperatoreCantiere.nome)
@@ -113,9 +420,27 @@ async def list_operatori(
         result = await db.execute(query)
         operatori = result.scalars().all()
         
-        logger.info(f"Lista operatori: {len(operatori)} trovati (user: {current_user_id})")
+        # Converti per frontend
+        operatori_data = []
+        for op in operatori:
+            operatore_dict = {
+                "id": str(op.id),
+                "nome": op.nome,
+                "cognome": op.cognome,
+                "codice_fiscale": op.codice_fiscale,
+                "email": op.email,
+                "telefono": op.telefono,
+                "ruolo": op.ruolo,
+                "specializzazione": op.specializzazione,
+                "qualifiche": op.qualifica.split(",") if op.qualifica else [],
+                "stato": "attivo" if op.attivo else "inattivo",
+                "ore_totali": op.ore_totali or 0,
+                "giornali_count": 0,  # TODO: Calcolare dai giornali collegati
+                "note": op.note
+            }
+            operatori_data.append(operatore_dict)
         
-        return operatori
+        return operatori_data
         
     except Exception as e:
         logger.error(f"Errore lista operatori: {str(e)}")
@@ -125,14 +450,146 @@ async def list_operatori(
         )
 
 
-@router.get("/operatori/{operatore_id}", response_model=OperatoreCantiereOut)
-async def get_operatore(
-    operatore_id: UUID,
-    db: AsyncSession = Depends(get_async_session),
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+# ===== GESTIONE OPERATORI DI CANTIERE =====
+
+@router.post("/operatori", response_model=OperatoreCantiereOut, status_code=status.HTTP_201_CREATED)
+async def create_operatore(
+        operatore: OperatoreCantiereCreate,
+        db: AsyncSession = Depends(get_async_session),
+        current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
 ):
     """
-    Ottieni dettagli di un operatore specifico
+    Crea un nuovo operatore di cantiere
+    Disponibile solo per utenti autenticati
+    """
+    try:
+        # Prepara dati operatore
+        operatore_data = operatore.model_dump()
+        
+        # Sincronizza campi is_active e attivo
+        if 'is_active' in operatore_data:
+            operatore_data['attivo'] = operatore_data['is_active']
+        
+        # Crea nuovo operatore
+        db_operatore = OperatoreCantiere(**operatore_data)
+
+        db.add(db_operatore)
+        await db.commit()
+        await db.refresh(db_operatore)
+
+        logger.info(f"Operatore creato: {db_operatore.nome_completo} da user {current_user_id}")
+
+        return db_operatore
+
+    except Exception as e:
+        logger.error(f"Errore creazione operatore: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nella creazione dell'operatore: {str(e)}"
+        )
+
+
+@router.put("/operatori/{operatore_id}", response_model=OperatoreCantiereOut)
+async def update_operatore(
+        operatore_id: UUID,
+        operatore: OperatoreCantiereUpdate,
+        db: AsyncSession = Depends(get_async_session),
+        current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """
+    Aggiorna un operatore di cantiere esistente
+    """
+    try:
+        # Trova operatore
+        result = await db.execute(
+            select(OperatoreCantiere).where(OperatoreCantiere.id == operatore_id)
+        )
+        db_operatore = result.scalar_one_or_none()
+        
+        if not db_operatore:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Operatore {operatore_id} non trovato"
+            )
+        
+        # Aggiorna campi
+        update_data = operatore.model_dump(exclude_unset=True)
+        
+        # Sincronizza campi is_active e attivo
+        if 'is_active' in update_data:
+            update_data['attivo'] = update_data['is_active']
+        
+        for field, value in update_data.items():
+            setattr(db_operatore, field, value)
+        
+        await db.commit()
+        await db.refresh(db_operatore)
+        
+        logger.info(f"Operatore {operatore_id} aggiornato da user {current_user_id}")
+        
+        return db_operatore
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore aggiornamento operatore {operatore_id}: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nell'aggiornamento dell'operatore: {str(e)}"
+        )
+
+
+@router.delete("/operatori/{operatore_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_operatore(
+        operatore_id: UUID,
+        db: AsyncSession = Depends(get_async_session),
+        current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """
+    Elimina un operatore di cantiere
+    """
+    try:
+        # Trova operatore
+        result = await db.execute(
+            select(OperatoreCantiere).where(OperatoreCantiere.id == operatore_id)
+        )
+        db_operatore = result.scalar_one_or_none()
+        
+        if not db_operatore:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Operatore {operatore_id} non trovato"
+            )
+        
+        # Elimina operatore
+        await db.delete(db_operatore)
+        await db.commit()
+        
+        logger.info(f"Operatore {operatore_id} eliminato da user {current_user_id}")
+        
+        return None
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore eliminazione operatore {operatore_id}: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nell'eliminazione dell'operatore: {str(e)}"
+        )
+
+
+@router.get("/operatori/{operatore_id}", response_model=OperatoreCantiereOut)
+async def get_operatore(
+        operatore_id: UUID,
+        db: AsyncSession = Depends(get_async_session),
+        current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """
+    Ottiene dettagli di un singolo operatore
     """
     try:
         result = await db.execute(
@@ -151,549 +608,276 @@ async def get_operatore(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Errore get operatore {operatore_id}: {str(e)}")
+        logger.error(f"Errore recupero operatore {operatore_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel recupero dell'operatore"
+            detail=f"Errore nel recupero dell'operatore: {str(e)}"
         )
 
 
-# ===== GESTIONE GIORNALE DI CANTIERE =====
+# ===== ENDPOINTS REPORT =====
 
-@router.post("/", response_model=GiornaleCantiereOut, status_code=status.HTTP_201_CREATED)
-async def create_giornale(
-    giornale: GiornaleCantiereCreate,
+@router.post("/reports", response_model=ReportDataResponse)
+async def get_reports_data(
+    filters: Dict[str, Any],
     db: AsyncSession = Depends(get_async_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    """
-    Crea una nuova voce nel giornale di cantiere
-    L'utente deve avere accesso al sito specifico
-    """
+    """Genera dati per report con filtri"""
     try:
-        # Verifica accesso al sito
-        site_access = any(site['id'] == str(giornale.site_id) for site in user_sites)
-        if not site_access:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Accesso negato al sito {giornale.site_id}"
+        # Ottieni ID siti accessibili
+        site_ids = [UUID(site['id']) for site in user_sites]
+        
+        if not site_ids:
+            return ReportDataResponse(
+                stats=ReportStatsResponse(),
+                site_stats=[],
+                top_operatori=[],
+                meteo_stats=[]
             )
         
-        # Verifica esistenza sito
-        site_result = await db.execute(
-            select(ArchaeologicalSite).where(ArchaeologicalSite.id == giornale.site_id)
+        # Query base con filtri
+        base_query = select(GiornaleCantiere).where(GiornaleCantiere.site_id.in_(site_ids))
+        
+        # Applica filtri temporali
+        if filters.get("data_da"):
+            base_query = base_query.where(GiornaleCantiere.data >= datetime.fromisoformat(filters["data_da"]).date())
+        if filters.get("data_a"):
+            base_query = base_query.where(GiornaleCantiere.data <= datetime.fromisoformat(filters["data_a"]).date())
+        if filters.get("sito_id"):
+            base_query = base_query.where(GiornaleCantiere.site_id == UUID(filters["sito_id"]))
+        
+        # Statistiche principali
+        totali_result = await db.execute(
+            select(func.count(GiornaleCantiere.id)).select_from(base_query.subquery())
         )
-        site = site_result.scalar_one_or_none()
+        totali = totali_result.scalar() or 0
         
-        if not site:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Sito archeologico {giornale.site_id} non trovato"
-            )
+        validati_result = await db.execute(
+            base_query.where(GiornaleCantiere.validato == True)
+        )
+        validati = len(validati_result.fetchall())
         
-        # Verifica che non esista già un giornale per la stessa data e sito
-        existing_result = await db.execute(
-            select(GiornaleCantiere).where(
-                and_(
-                    GiornaleCantiere.site_id == giornale.site_id,
-                    GiornaleCantiere.data == giornale.data
-                )
+        # Ore totali (calcolo approssimativo)
+        ore_result = await db.execute(
+            select(func.sum(
+                func.extract('epoch', GiornaleCantiere.ora_fine - GiornaleCantiere.ora_inizio) / 3600
+            )).select_from(
+                base_query.where(and_(
+                    GiornaleCantiere.ora_inizio.isnot(None),
+                    GiornaleCantiere.ora_fine.isnot(None)
+                )).subquery()
             )
         )
-        existing_giornale = existing_result.scalar_one_or_none()
+        ore_totali = int(ore_result.scalar() or 0)
         
-        if existing_giornale:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Giornale per il sito {site.name} in data {giornale.data} già esistente"
-            )
+        # Operatori unici
+        operatori_result = await db.execute(
+            select(func.count(distinct(OperatoreCantiere.id)))
+            .join(GiornaleCantiere.operatori)
+            .select_from(base_query.subquery())
+        )
+        operatori_unici = operatori_result.scalar() or 0
         
-        # Verifica operatori esistenti
-        if giornale.operatori_ids:
-            operatori_result = await db.execute(
-                select(OperatoreCantiere).where(
-                    OperatoreCantiere.id.in_(giornale.operatori_ids)
-                )
-            )
-            operatori = operatori_result.scalars().all()
-            
-            if len(operatori) != len(giornale.operatori_ids):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Uno o più operatori specificati non esistono"
-                )
-        
-        # Ottieni nome responsabile
-        user_result = await db.execute(select(User).where(User.id == current_user_id))
-        user = user_result.scalar_one_or_none()
-        responsabile_nome = user.email if user else "Utente sconosciuto"
-        
-        # Crea il giornale
-        giornale_data = giornale.model_dump(exclude={'operatori_ids'})
-        db_giornale = GiornaleCantiere(
-            **giornale_data,
-            responsabile_id=current_user_id,
-            responsabile_nome=responsabile_nome
+        stats = ReportStatsResponse(
+            totali=totali,
+            validati=validati,
+            in_attesa=totali - validati,
+            ore_totali=ore_totali,
+            operatori_unici=operatori_unici
         )
         
-        # Associa operatori se specificati
-        if giornale.operatori_ids:
-            db_giornale.operatori = operatori
+        # Statistiche per sito
+        site_stats_query = await db.execute(
+            select(
+                ArchaeologicalSite.id,
+                ArchaeologicalSite.name,
+                ArchaeologicalSite.location,
+                func.count(GiornaleCantiere.id).label('giornali_count')
+            )
+            .join(GiornaleCantiere, ArchaeologicalSite.id == GiornaleCantiere.site_id)
+            .where(ArchaeologicalSite.id.in_(site_ids))
+            .group_by(ArchaeologicalSite.id, ArchaeologicalSite.name, ArchaeologicalSite.location)
+            .order_by(desc('giornali_count'))
+        )
         
-        db.add(db_giornale)
-        await db.commit()
-        await db.refresh(db_giornale, ['site', 'responsabile', 'operatori'])
+        site_stats = [
+            SiteStat(
+                id=row.id,
+                name=row.name,
+                location=row.location or "",
+                giornali_count=row.giornali_count
+            )
+            for row in site_stats_query.fetchall()
+        ]
         
-        logger.info(f"Giornale cantiere creato: sito {site.name}, data {giornale.data} da user {current_user_id}")
+        # Top operatori
+        top_operatori_query = await db.execute(
+            select(
+                OperatoreCantiere.id,
+                OperatoreCantiere.nome,
+                OperatoreCantiere.cognome,
+                OperatoreCantiere.ruolo,
+                OperatoreCantiere.ore_totali,
+                func.count(distinct(GiornaleCantiere.id)).label('giornali_count')
+            )
+            .join(GiornaleCantiere.operatori)
+            .where(GiornaleCantiere.site_id.in_(site_ids))
+            .group_by(
+                OperatoreCantiere.id,
+                OperatoreCantiere.nome,
+                OperatoreCantiere.cognome,
+                OperatoreCantiere.ruolo,
+                OperatoreCantiere.ore_totali
+            )
+            .order_by(desc(OperatoreCantiere.ore_totali))
+            .limit(10)
+        )
         
-        return db_giornale
+        top_operatori = [
+            TopOperatore(
+                id=row.id,
+                nome=row.nome,
+                cognome=row.cognome,
+                ruolo=row.ruolo or "Operatore",
+                ore_lavorate=row.ore_totali or 0,
+                giornali_count=row.giornali_count
+            )
+            for row in top_operatori_query.fetchall()
+        ]
         
-    except HTTPException:
-        await db.rollback()
-        raise
+        # Statistiche meteo
+        meteo_query = await db.execute(
+            select(
+                GiornaleCantiere.condizioni_meteo,
+                func.count(GiornaleCantiere.id).label('count')
+            )
+            .select_from(base_query.subquery())
+            .where(GiornaleCantiere.condizioni_meteo.isnot(None))
+            .group_by(GiornaleCantiere.condizioni_meteo)
+            .order_by(desc('count'))
+        )
+        
+        meteo_stats = [
+            MeteoStat(condizione=row.condizioni_meteo, count=row.count)
+            for row in meteo_query.fetchall()
+        ]
+        
+        return ReportDataResponse(
+            stats=stats,
+            site_stats=site_stats,
+            top_operatori=top_operatori,
+            meteo_stats=meteo_stats
+        )
+        
     except Exception as e:
-        logger.error(f"Errore creazione giornale: {str(e)}")
-        await db.rollback()
+        logger.error(f"Errore generazione report: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Errore nella creazione del giornale: {str(e)}"
+            detail="Errore nella generazione dei report"
         )
 
+# ===== ENDPOINT VALIDAZIONE =====
 
-@router.get("/site/{site_id}", response_model=List[GiornaleCantiereOut])
-async def list_giornali_by_site(
-    site_id: UUID,
-    filters: GiornaleCantiereFilter = Depends(),
-    skip: int = 0,
-    limit: int = 100,
-    db: AsyncSession = Depends(get_async_session),
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
-):
-    """
-    Lista tutte le voci del giornale di cantiere per un sito specifico con filtri
-    """
-    try:
-        # Verifica accesso al sito
-        site_access = any(site['id'] == str(site_id) for site in user_sites)
-        if not site_access:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Accesso negato al sito {site_id}"
-            )
-        
-        # Costruisci query base
-        query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == site_id)
-        
-        # Applica filtri
-        if filters.data_inizio:
-            query = query.where(GiornaleCantiere.data >= filters.data_inizio)
-        
-        if filters.data_fine:
-            query = query.where(GiornaleCantiere.data <= filters.data_fine)
-        
-        if filters.condizioni_meteo:
-            query = query.where(GiornaleCantiere.condizioni_meteo == filters.condizioni_meteo)
-        
-        if filters.responsabile_id:
-            query = query.where(GiornaleCantiere.responsabile_id == filters.responsabile_id)
-        
-        if filters.validato is not None:
-            query = query.where(GiornaleCantiere.validato == filters.validato)
-        
-        # Include relazioni
-        query = query.options(
-            selectinload(GiornaleCantiere.site),
-            selectinload(GiornaleCantiere.responsabile),
-            selectinload(GiornaleCantiere.operatori)
-        )
-        
-        # Ordinamento e paginazione
-        query = query.order_by(GiornaleCantiere.data.desc(), GiornaleCantiere.created_at.desc())
-        query = query.offset(skip).limit(limit)
-        
-        result = await db.execute(query)
-        giornali = result.scalars().all()
-        
-        logger.info(f"Lista giornali sito {site_id}: {len(giornali)} trovati (user: {current_user_id})")
-        
-        return giornali
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Errore lista giornali sito {site_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel recupero dei giornali di cantiere"
-        )
-
-
-@router.get("/{giornale_id}", response_model=GiornaleCantiereOut)
-async def get_giornale(
+@router.post("/validate/{giornale_id}")
+async def validate_giornale(
     giornale_id: UUID,
     db: AsyncSession = Depends(get_async_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    """
-    Ottieni dettagli di una voce specifica del giornale di cantiere
-    """
+    """Valida un giornale di cantiere"""
     try:
-        # Query con relazioni
-        query = select(GiornaleCantiere).where(GiornaleCantiere.id == giornale_id).options(
-            selectinload(GiornaleCantiere.site),
-            selectinload(GiornaleCantiere.responsabile),
-            selectinload(GiornaleCantiere.operatori)
+        # Carica giornale
+        result = await db.execute(
+            select(GiornaleCantiere)
+            .where(GiornaleCantiere.id == giornale_id)
+            .options(selectinload(GiornaleCantiere.site))
         )
-        
-        result = await db.execute(query)
         giornale = result.scalar_one_or_none()
         
         if not giornale:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Giornale {giornale_id} non trovato"
+                detail="Giornale non trovato"
             )
         
         # Verifica accesso al sito
-        site_access = any(site['id'] == str(giornale.site_id) for site in user_sites)
-        if not site_access:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Accesso negato al sito del giornale"
-            )
-        
-        return giornale
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Errore get giornale {giornale_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel recupero del giornale"
-        )
-
-
-@router.put("/{giornale_id}", response_model=GiornaleCantiereOut)
-async def update_giornale(
-    giornale_id: UUID,
-    giornale_update: GiornaleCantiereUpdate,
-    db: AsyncSession = Depends(get_async_session),
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
-):
-    """
-    Aggiorna una voce del giornale di cantiere
-    Solo il responsabile o un superuser può modificare
-    Non è possibile modificare un giornale già validato
-    """
-    try:
-        # Ottieni giornale esistente
-        result = await db.execute(
-            select(GiornaleCantiere).where(GiornaleCantiere.id == giornale_id).options(
-                selectinload(GiornaleCantiere.operatori)
-            )
-        )
-        db_giornale = result.scalar_one_or_none()
-        
-        if not db_giornale:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Giornale {giornale_id} non trovato"
-            )
-        
-        # Verifica accesso al sito
-        site_access = any(site['id'] == str(db_giornale.site_id) for site in user_sites)
-        if not site_access:
+        if not await verify_site_access(giornale.site_id, user_sites):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Accesso negato al sito del giornale"
             )
         
-        # Verifica permessi di modifica
-        user_result = await db.execute(select(User).where(User.id == current_user_id))
-        current_user = user_result.scalar_one_or_none()
+        # Validazione
+        giornale.validato = True
+        giornale.data_validazione = datetime.now()
+        giornale.updated_at = datetime.now()
         
-        is_owner = db_giornale.responsabile_id == current_user_id
-        is_superuser = current_user and current_user.is_superuser
-        
-        if not (is_owner or is_superuser):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Solo il responsabile del giornale o un superuser può modificarlo"
-            )
-        
-        # Non permettere modifiche se già validato (solo superuser può)
-        if db_giornale.validato and not is_superuser:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Impossibile modificare un giornale già validato"
-            )
-        
-        # Aggiorna campi
-        update_data = giornale_update.model_dump(exclude_unset=True)
-        
-        # Gestione operatori
-        if 'operatori_ids' in update_data:
-            operatori_ids = update_data.pop('operatori_ids')
-            if operatori_ids is not None:
-                operatori_result = await db.execute(
-                    select(OperatoreCantiere).where(
-                        OperatoreCantiere.id.in_(operatori_ids)
-                    )
-                )
-                operatori = operatori_result.scalars().all()
-                
-                if len(operatori) != len(operatori_ids):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Uno o più operatori specificati non esistono"
-                    )
-                
-                db_giornale.operatori = operatori
-        
-        # Aggiorna altri campi
-        for field, value in update_data.items():
-            setattr(db_giornale, field, value)
-        
-        # Incrementa versione se modificato
-        if update_data:
-            db_giornale.version += 1
-        
-        await db.commit()
-        await db.refresh(db_giornale, ['site', 'responsabile', 'operatori'])
-        
-        logger.info(f"Giornale {giornale_id} aggiornato da user {current_user_id}")
-        
-        return db_giornale
-        
-    except HTTPException:
-        await db.rollback()
-        raise
-    except Exception as e:
-        logger.error(f"Errore update giornale {giornale_id}: {str(e)}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Errore nell'aggiornamento del giornale: {str(e)}"
-        )
-
-
-@router.post("/{giornale_id}/valida")
-async def valida_giornale(
-    giornale_id: UUID,
-    db: AsyncSession = Depends(get_async_session),
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
-):
-    """
-    Valida un giornale di cantiere (firma digitale)
-    Solo il responsabile può validare il proprio giornale
-    """
-    try:
-        # Ottieni giornale
-        result = await db.execute(
-            select(GiornaleCantiere).where(GiornaleCantiere.id == giornale_id)
-        )
-        db_giornale = result.scalar_one_or_none()
-        
-        if not db_giornale:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Giornale {giornale_id} non trovato"
-            )
-        
-        # Verifica accesso al sito
-        site_access = any(site['id'] == str(db_giornale.site_id) for site in user_sites)
-        if not site_access:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accesso negato al sito del giornale"
-            )
-        
-        # Verifica che sia il responsabile
-        if db_giornale.responsabile_id != current_user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Solo il responsabile può validare il giornale"
-            )
-        
-        # Verifica che non sia già validato
-        if db_giornale.validato:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Il giornale è già stato validato"
-            )
-        
-        # Valida il giornale
-        db_giornale.validato = True
-        db_giornale.data_validazione = datetime.now()
-        # TODO: Implementare firma digitale hash se necessario
-        # db_giornale.firma_digitale_hash = generate_digital_signature_hash(...)
+        # TODO: Aggiungere campo validato_da se esiste nel modello
+        # giornale.validato_da_id = current_user_id
         
         await db.commit()
         
         logger.info(f"Giornale {giornale_id} validato da user {current_user_id}")
         
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={"message": "Giornale validato con successo", "validated_at": db_giornale.data_validazione.isoformat()}
-        )
+        return {"message": "Giornale validato con successo", "id": str(giornale_id)}
         
     except HTTPException:
-        await db.rollback()
         raise
     except Exception as e:
         logger.error(f"Errore validazione giornale {giornale_id}: {str(e)}")
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Errore nella validazione del giornale: {str(e)}"
+            detail="Errore nella validazione del giornale"
         )
 
+# ===== ENDPOINT REFERENCE DATA =====
 
-@router.delete("/{giornale_id}")
-async def delete_giornale(
-    giornale_id: UUID,
-    db: AsyncSession = Depends(get_async_session),
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
-):
-    """
-    Elimina un giornale di cantiere
-    Solo superuser può eliminare
-    Non è possibile eliminare giornali validati
-    """
+@router.get("/reference-data")
+async def get_reference_data():
+    """Dati di riferimento per dropdown e enum"""
     try:
-        # Verifica che l'utente sia superuser
-        user_result = await db.execute(select(User).where(User.id == current_user_id))
-        current_user = user_result.scalar_one_or_none()
+        # Condizioni meteo (da enum)
+        condizioni_meteo = [
+            {"value": "sereno", "label": "Sereno"},
+            {"value": "nuvoloso", "label": "Nuvoloso"}, 
+            {"value": "piovoso", "label": "Piovoso"},
+            {"value": "nevoso", "label": "Nevoso"},
+            {"value": "ventoso", "label": "Ventoso"}
+        ]
         
-        if not current_user or not current_user.is_superuser:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Solo i superuser possono eliminare i giornali"
-            )
+        # Ruoli operatori
+        ruoli_operatori = [
+            {"value": "responsabile_scavo", "label": "Responsabile Scavo"},
+            {"value": "assistente", "label": "Assistente"},
+            {"value": "operatore", "label": "Operatore"},
+            {"value": "specialista", "label": "Specialista"},
+            {"value": "tecnico", "label": "Tecnico"}
+        ]
         
-        # Ottieni giornale
-        result = await db.execute(
-            select(GiornaleCantiere).where(GiornaleCantiere.id == giornale_id)
-        )
-        db_giornale = result.scalar_one_or_none()
-        
-        if not db_giornale:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Giornale {giornale_id} non trovato"
-            )
-        
-        # Verifica accesso al sito
-        site_access = any(site['id'] == str(db_giornale.site_id) for site in user_sites)
-        if not site_access:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accesso negato al sito del giornale"
-            )
-        
-        # Non permettere eliminazione di giornali validati
-        if db_giornale.validato:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Impossibile eliminare un giornale validato"
-            )
-        
-        await db.delete(db_giornale)
-        await db.commit()
-        
-        logger.info(f"Giornale {giornale_id} eliminato da superuser {current_user_id}")
-        
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={"message": "Giornale eliminato con successo"}
-        )
-        
-    except HTTPException:
-        await db.rollback()
-        raise
-    except Exception as e:
-        logger.error(f"Errore eliminazione giornale {giornale_id}: {str(e)}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Errore nell'eliminazione del giornale: {str(e)}"
-        )
-
-
-# ===== ENDPOINT UTILITY E STATISTICHE =====
-
-@router.get("/site/{site_id}/stats")
-async def get_giornale_stats(
-    site_id: UUID,
-    db: AsyncSession = Depends(get_async_session),
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
-):
-    """
-    Ottieni statistiche sui giornali di cantiere per un sito
-    """
-    try:
-        # Verifica accesso al sito
-        site_access = any(site['id'] == str(site_id) for site in user_sites)
-        if not site_access:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Accesso negato al sito {site_id}"
-            )
-        
-        # Statistiche base
-        total_result = await db.execute(
-            select(func.count(GiornaleCantiere.id)).where(GiornaleCantiere.site_id == site_id)
-        )
-        total_giornali = total_result.scalar()
-        
-        validated_result = await db.execute(
-            select(func.count(GiornaleCantiere.id)).where(
-                and_(GiornaleCantiere.site_id == site_id, GiornaleCantiere.validato == True)
-            )
-        )
-        validated_giornali = validated_result.scalar()
-        
-        # Ultimo giornale
-        last_result = await db.execute(
-            select(GiornaleCantiere.data).where(GiornaleCantiere.site_id == site_id).order_by(GiornaleCantiere.data.desc()).limit(1)
-        )
-        last_date = last_result.scalar_one_or_none()
+        # Specializzazioni
+        specializzazioni = [
+            {"value": "ceramica", "label": "Ceramica"},
+            {"value": "numismatica", "label": "Numismatica"},
+            {"value": "antropologia", "label": "Antropologia"},
+            {"value": "archeozoologia", "label": "Archeozoologia"},
+            {"value": "topografia", "label": "Topografia"},
+            {"value": "disegno", "label": "Disegno"},
+            {"value": "fotografia", "label": "Fotografia"}
+        ]
         
         return {
-            "site_id": str(site_id),
-            "total_giornali": total_giornali,
-            "validated_giornali": validated_giornali,
-            "pending_validation": total_giornali - validated_giornali,
-            "last_entry_date": last_date.isoformat() if last_date else None,
-            "validation_percentage": round((validated_giornali / total_giornali * 100) if total_giornali > 0 else 0, 2)
+            "condizioni_meteo": condizioni_meteo,
+            "ruoli_operatori": ruoli_operatori,
+            "specializzazioni": specializzazioni
         }
         
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Errore stats giornale sito {site_id}: {str(e)}")
+        logger.error(f"Errore reference data: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel recupero delle statistiche"
+            detail="Errore nel recupero dei dati di riferimento"
         )
-
-
-@router.get("/condizioni-meteo")
-async def get_condizioni_meteo():
-    """
-    Restituisce l'elenco delle condizioni meteorologiche disponibili
-    """
-    return {
-        "condizioni_meteo": [
-            {"value": condition.value, "label": condition.value.replace("_", " ").title()}
-            for condition in CondizioniMeteoEnum
-        ]
-    }
