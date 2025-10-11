@@ -1,4 +1,6 @@
-# app/templates/pages/giornale_cantiere/site.html
+# app/templates/pages/giornale_cantiere/site_updated.html
+# AGGIORNAMENTO TEMPLATE SITE CON API REALI
+
 {% extends "base/site_base.html" %}
 
 {% block title %}{{ title or ("Giornale - " ~ (site.name if site else "")) }}{% endblock %}
@@ -127,11 +129,8 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Responsabile</label>
-                <select x-model="filters.responsabile" 
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                    <option value="">Tutti</option>
-                    <!-- TODO: Popolato dinamicamente -->
-                </select>
+                <input type="text" x-model="filters.responsabile" placeholder="Nome responsabile"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Stato</label>
@@ -140,7 +139,6 @@
                     <option value="">Tutti</option>
                     <option value="validato">Validato</option>
                     <option value="in_attesa">In Attesa</option>
-                    <option value="bozza">Bozza</option>
                 </select>
             </div>
             <div class="flex items-end">
@@ -311,32 +309,6 @@
         <p class="text-gray-600">Caricamento giornali...</p>
     </div>
 
-    <!-- Paginazione -->
-    <div x-show="totalPages > 1" class="mt-6 flex justify-center">
-        <nav class="flex items-center space-x-2">
-            <button @click="changePage(currentPage - 1)" 
-                    :disabled="currentPage <= 1"
-                    :class="currentPage <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'"
-                    class="px-3 py-2 text-sm border rounded-md">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            
-            <template x-for="page in getPageNumbers()" :key="page">
-                <button @click="changePage(page)"
-                        :class="page === currentPage ? 'bg-orange-600 text-white' : 'hover:bg-gray-100'"
-                        class="px-3 py-2 text-sm border rounded-md"
-                        x-text="page"></button>
-            </template>
-            
-            <button @click="changePage(currentPage + 1)" 
-                    :disabled="currentPage >= totalPages"
-                    :class="currentPage >= totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'"
-                    class="px-3 py-2 text-sm border rounded-md">
-                <i class="fas fa-chevron-right"></i>
-            </button>
-        </nav>
-    </div>
-
 </div>
 
 <script>
@@ -356,11 +328,6 @@ function giornaleSitoApp() {
             validation_percentage: 0
         },
         
-        // Paginazione
-        currentPage: 1,
-        pageSize: 10,
-        totalPages: 1,
-        
         // Filtri
         filters: {
             data_da: '',
@@ -371,41 +338,101 @@ function giornaleSitoApp() {
         
         // Inizializzazione
         async init() {
-            await this.loadGiornali();
             await this.loadStats();
+            await this.loadGiornali();
         },
         
-        // Caricamento giornali (mock)
+        // *** REAL API ENDPOINTS *** - No more mock data!
+        
+        // Caricamento statistiche sito
+        async loadStats() {
+            try {
+                const siteId = '{{ site.id if site else "unknown" }}';
+                const response = await fetch(`/api/giornale-cantiere/stats/site/${siteId}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (response.ok) {
+                    this.stats = await response.json();
+                } else {
+                    console.error('Errore caricamento statistiche sito:', response.statusText);
+                }
+                
+            } catch (error) {
+                console.error('Errore caricamento statistiche:', error);
+            }
+        },
+        
+        // Caricamento giornali dal database reale
         async loadGiornali() {
             this.loading = true;
             try {
-                // TODO: Implementare endpoint API
-                // const response = await fetch(`/api/giornale-cantiere/site/{{ site.id if site else 'unknown' }}`);
-                // this.giornaliList = await response.json();
+                const siteId = '{{ site.id if site else "unknown" }}';
+                const params = new URLSearchParams();
                 
-                // Mock data per ora
-                this.giornaliList = [];
+                // Aggiungi filtri
+                if (this.filters.data_da) params.append('data_da', this.filters.data_da);
+                if (this.filters.data_a) params.append('data_a', this.filters.data_a);
+                if (this.filters.responsabile) params.append('responsabile', this.filters.responsabile);
+                if (this.filters.stato) params.append('stato', this.filters.stato);
+                
+                const url = `/api/giornale-cantiere/site/${siteId}?${params.toString()}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (response.ok) {
+                    this.giornaliList = await response.json();
+                } else {
+                    console.error('Errore caricamento giornali:', response.statusText);
+                    this.giornaliList = [];
+                }
                 
             } catch (error) {
                 console.error('Errore caricamento giornali:', error);
+                this.giornaliList = [];
             } finally {
                 this.loading = false;
             }
         },
         
-        // Caricamento statistiche (mock)
-        async loadStats() {
+        // Validazione giornale con API reale
+        async validateGiornale(giornale) {
+            if (!confirm(`Sei sicuro di voler validare il giornale del ${this.formatDate(giornale.data)}?`)) {
+                return;
+            }
+            
             try {
-                // TODO: Implementare endpoint statistiche
-                this.stats = {
-                    total_giornali: 0,
-                    validated_giornali: 0,
-                    pending_giornali: 0,
-                    operatori_attivi: 0,
-                    validation_percentage: 0
-                };
+                const response = await fetch(`/api/giornale-cantiere/validate/${giornale.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (response.ok) {
+                    // Aggiorna stato locale
+                    giornale.stato = 'validato';
+                    
+                    // Ricarica statistiche
+                    await this.loadStats();
+                    
+                    alert('Giornale validato con successo!');
+                } else {
+                    const error = await response.json();
+                    alert('Errore nella validazione: ' + (error.detail || 'Errore sconosciuto'));
+                }
+                
             } catch (error) {
-                console.error('Errore caricamento statistiche:', error);
+                console.error('Errore validazione giornale:', error);
+                alert('Errore di rete durante la validazione');
             }
         },
         
@@ -418,10 +445,6 @@ function giornaleSitoApp() {
             alert(`Modifica giornale del ${this.formatDate(giornale.data)} - da implementare`);
         },
         
-        validateGiornale(giornale) {
-            alert(`Validazione giornale del ${this.formatDate(giornale.data)} - da implementare`);
-        },
-        
         duplicateGiornale(giornale) {
             alert(`Duplicazione giornale del ${this.formatDate(giornale.data)} - da implementare`);
         },
@@ -432,7 +455,6 @@ function giornaleSitoApp() {
         
         // Filtri
         async applyFilters() {
-            this.currentPage = 1;
             await this.loadGiornali();
         },
         
@@ -443,35 +465,14 @@ function giornaleSitoApp() {
                 responsabile: '',
                 stato: ''
             };
-            this.currentPage = 1;
             await this.loadGiornali();
         },
         
-        // Paginazione
-        changePage(page) {
-            if (page >= 1 && page <= this.totalPages) {
-                this.currentPage = page;
-                this.loadGiornali();
-            }
-        },
-        
-        getPageNumbers() {
-            const pages = [];
-            const start = Math.max(1, this.currentPage - 2);
-            const end = Math.min(this.totalPages, this.currentPage + 2);
-            
-            for (let i = start; i <= end; i++) {
-                pages.push(i);
-            }
-            return pages;
-        },
-        
-        // Utility styling
+        // Utility styling (invariate)
         getStateBorderColor(stato) {
             const colors = {
                 'validato': 'border-green-500',
-                'in_attesa': 'border-yellow-500',
-                'bozza': 'border-gray-500'
+                'in_attesa': 'border-yellow-500'
             };
             return colors[stato] || 'border-orange-500';
         },
@@ -479,8 +480,7 @@ function giornaleSitoApp() {
         getStateBadge(stato) {
             const badges = {
                 'validato': 'bg-green-100 text-green-800',
-                'in_attesa': 'bg-yellow-100 text-yellow-800',
-                'bozza': 'bg-gray-100 text-gray-800'
+                'in_attesa': 'bg-yellow-100 text-yellow-800'
             };
             return badges[stato] || 'bg-orange-100 text-orange-800';
         },
@@ -488,8 +488,7 @@ function giornaleSitoApp() {
         getStateIcon(stato) {
             const icons = {
                 'validato': 'fas fa-check-circle',
-                'in_attesa': 'fas fa-clock',
-                'bozza': 'fas fa-edit'
+                'in_attesa': 'fas fa-clock'
             };
             return icons[stato] || 'fas fa-circle';
         },
@@ -507,8 +506,7 @@ function giornaleSitoApp() {
         formatStato(stato) {
             const labels = {
                 'validato': 'Validato',
-                'in_attesa': 'In Attesa',
-                'bozza': 'Bozza'
+                'in_attesa': 'In Attesa'
             };
             return labels[stato] || stato;
         },

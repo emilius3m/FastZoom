@@ -1,12 +1,10 @@
-# app/templates/pages/giornale_cantiere/site_updated.html
-# AGGIORNAMENTO TEMPLATE SITE CON API REALI
-
+# app/templates/pages/giornale_cantiere/site.html
 {% extends "base/site_base.html" %}
 
 {% block title %}{{ title or ("Giornale - " ~ (site.name if site else "")) }}{% endblock %}
 
 {% block content %}
-<div x-data="giornaleSitoApp()" x-init="init()" class="container mx-auto px-4 py-6">
+<div x-data="giornaleSitoAppCompleto()" x-init="init()" class="container mx-auto px-4 py-6">
     
     <!-- Header con breadcrumb -->
     <div class="mb-6">
@@ -254,6 +252,7 @@
                             </a>
                             
                             <button @click="editGiornale(giornale)"
+                                    x-show="giornale.stato !== 'validato'"
                                     class="inline-flex items-center px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition">
                                 <i class="fas fa-edit mr-1"></i>Modifica
                             </button>
@@ -266,6 +265,12 @@
                             <button @click="duplicateGiornale(giornale)"
                                     class="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition">
                                 <i class="fas fa-copy mr-1"></i>Duplica
+                            </button>
+                            
+                            <button @click="deleteGiornale(giornale)"
+                                    x-show="giornale.stato !== 'validato'"
+                                    class="inline-flex items-center px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition">
+                                <i class="fas fa-trash mr-1"></i>Elimina
                             </button>
                         </div>
                     </div>
@@ -309,12 +314,15 @@
         <p class="text-gray-600">Caricamento giornali...</p>
     </div>
 
+    <!-- INCLUSIONE MODAL -->
+    {% include "pages/giornale_cantiere/modal_create_giornale.html" %}
+
 </div>
 
 <script>
-function giornaleSitoApp() {
+function giornaleSitoAppCompleto() {
     return {
-        // Dati
+        // Dati base
         giornaliList: [],
         loading: false,
         showFilters: false,
@@ -336,13 +344,48 @@ function giornaleSitoApp() {
             stato: ''
         },
         
+        // *** MODAL STATE ***
+        showCreateModal: false,
+        editingGiornale: null,
+        saving: false,
+        errorMessage: '',
+        
+        // Form Data
+        formData: {
+            data: new Date().toISOString().split('T')[0],
+            ora_inizio: '08:00',
+            ora_fine: '17:00',
+            responsabile_nome: '',
+            compilatore: '',
+            condizioni_meteo: '',
+            temperatura_min: null,
+            temperatura_max: null,
+            descrizione_lavori: '',
+            operatori_ids: [],
+            us_elaborate_input: '',
+            note_generali: '',
+            problematiche: '',
+            apparecchiature_input: ''
+        },
+        
+        // Reference Data
+        condizioni_meteo: [
+            { value: 'sereno', label: 'Sereno' },
+            { value: 'nuvoloso', label: 'Nuvoloso' },
+            { value: 'piovoso', label: 'Piovoso' },
+            { value: 'nevoso', label: 'Nevoso' },
+            { value: 'ventoso', label: 'Ventoso' }
+        ],
+        
+        operatori_disponibili: [],
+        
         // Inizializzazione
         async init() {
             await this.loadStats();
             await this.loadGiornali();
         },
         
-        // *** REAL API ENDPOINTS *** - No more mock data!
+        // *** API CALLS ***
         
         // Caricamento statistiche sito
         async loadStats() {
@@ -436,15 +479,172 @@ function giornaleSitoApp() {
             }
         },
         
-        // Azioni
-        openCreateModal() {
-            alert('Modal creazione giornale - da implementare');
+        // *** MODAL ACTIONS ***
+        async openCreateModal() {
+            this.editingGiornale = null;
+            this.resetForm();
+            await this.loadOperatoriDisponibili();
+            this.showCreateModal = true;
         },
         
-        editGiornale(giornale) {
-            alert(`Modifica giornale del ${this.formatDate(giornale.data)} - da implementare`);
+        async editGiornale(giornale) {
+            this.editingGiornale = giornale;
+            this.populateForm(giornale);
+            await this.loadOperatoriDisponibili();
+            this.showCreateModal = true;
         },
         
+        closeModal() {
+            this.showCreateModal = false;
+            this.editingGiornale = null;
+            this.errorMessage = '';
+            this.resetForm();
+        },
+        
+        resetForm() {
+            this.formData = {
+                data: new Date().toISOString().split('T')[0],
+                ora_inizio: '08:00',
+                ora_fine: '17:00',
+                responsabile_nome: '',
+                compilatore: '',
+                condizioni_meteo: '',
+                temperatura_min: null,
+                temperatura_max: null,
+                descrizione_lavori: '',
+                operatori_ids: [],
+                us_elaborate_input: '',
+                note_generali: '',
+                problematiche: '',
+                apparecchiature_input: ''
+            };
+        },
+        
+        populateForm(giornale) {
+            this.formData = {
+                data: giornale.data || '',
+                ora_inizio: giornale.ora_inizio || '',
+                ora_fine: giornale.ora_fine || '',
+                responsabile_nome: giornale.responsabile_scavo || '',
+                compilatore: giornale.compilatore || '',
+                condizioni_meteo: giornale.condizioni_meteo || '',
+                temperatura_min: giornale.temperatura_min || null,
+                temperatura_max: giornale.temperatura_max || null,
+                descrizione_lavori: giornale.descrizione_lavori || '',
+                operatori_ids: giornale.operatori_presenti ? giornale.operatori_presenti.map(op => op.id) : [],
+                us_elaborate_input: giornale.us_elaborate ? giornale.us_elaborate.join(', ') : '',
+                note_generali: giornale.note_generali || '',
+                problematiche: giornale.problematiche || '',
+                apparecchiature_input: giornale.apparecchiature_utilizzate ? giornale.apparecchiature_utilizzate.join(', ') : ''
+            };
+        },
+        
+        // API Calls per Modal
+        async loadOperatoriDisponibili() {
+            try {
+                const response = await fetch('/api/giornale-cantiere/operatori?limit=100', {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (response.ok) {
+                    this.operatori_disponibili = await response.json();
+                } else {
+                    this.operatori_disponibili = [];
+                }
+                
+            } catch (error) {
+                console.error('Errore caricamento operatori:', error);
+                this.operatori_disponibili = [];
+            }
+        },
+        
+        async saveGiornale() {
+            this.saving = true;
+            this.errorMessage = '';
+            
+            try {
+                const payload = {
+                    ...this.formData,
+                    site_id: '{{ site.id if site else "unknown" }}',
+                    us_elaborate: this.formData.us_elaborate_input ? 
+                        this.formData.us_elaborate_input.split(',').map(us => us.trim()).filter(us => us) : [],
+                    apparecchiature_utilizzate: this.formData.apparecchiature_input ?
+                        this.formData.apparecchiature_input.split(/[,\n]/).map(app => app.trim()).filter(app => app) : []
+                };
+                
+                delete payload.us_elaborate_input;
+                delete payload.apparecchiature_input;
+                
+                const url = this.editingGiornale ? 
+                    `/api/giornale-cantiere/giornali/${this.editingGiornale.id}` :
+                    '/api/giornale-cantiere/giornali';
+                
+                const method = this.editingGiornale ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (response.ok) {
+                    const action = this.editingGiornale ? 'modificato' : 'creato';
+                    alert(`Giornale ${action} con successo!`);
+                    
+                    this.closeModal();
+                    await this.loadGiornali();
+                    await this.loadStats();
+                    
+                } else {
+                    const error = await response.json();
+                    this.errorMessage = error.detail || 'Errore nel salvataggio del giornale';
+                }
+                
+            } catch (error) {
+                console.error('Errore salvataggio giornale:', error);
+                this.errorMessage = 'Errore di rete durante il salvataggio';
+            } finally {
+                this.saving = false;
+            }
+        },
+        
+        // Azione eliminazione
+        async deleteGiornale(giornale) {
+            if (!confirm(`Sei sicuro di voler eliminare il giornale del ${this.formatDate(giornale.data)}?\n\nQuesta azione non può essere annullata.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/giornale-cantiere/giornali/${giornale.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (response.ok) {
+                    alert('Giornale eliminato con successo!');
+                    await this.loadGiornali();
+                    await this.loadStats();
+                } else {
+                    const error = await response.json();
+                    alert('Errore nell\'eliminazione: ' + (error.detail || 'Errore sconosciuto'));
+                }
+                
+            } catch (error) {
+                console.error('Errore eliminazione giornale:', error);
+                alert('Errore di rete durante l\'eliminazione');
+            }
+        },
+        
+        // *** OTHER ACTIONS ***
         duplicateGiornale(giornale) {
             alert(`Duplicazione giornale del ${this.formatDate(giornale.data)} - da implementare`);
         },
@@ -468,7 +668,7 @@ function giornaleSitoApp() {
             await this.loadGiornali();
         },
         
-        // Utility styling (invariate)
+        // Utility styling
         getStateBorderColor(stato) {
             const colors = {
                 'validato': 'border-green-500',
@@ -539,6 +739,28 @@ function giornaleSitoApp() {
 
 .transition { 
     transition: all 0.2s ease-in-out; 
+}
+
+.max-h-95vh { max-height: 95vh; }
+.max-h-80vh { max-height: 80vh; }
+
+/* Focus states per form */
+.focus\:ring-orange-500:focus {
+    --tw-ring-color: rgba(234, 88, 12, 0.5);
+}
+
+/* Custom scrollbar */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
 }
 </style>
 {% endblock %}

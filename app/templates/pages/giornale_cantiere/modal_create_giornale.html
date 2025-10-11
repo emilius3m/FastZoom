@@ -1,0 +1,312 @@
+<!-- app/templates/pages/giornale_cantiere/modal_create_giornale.html -->
+<!-- Modal Creazione/Modifica Giornale di Cantiere -->
+<div x-show="showCreateModal" x-cloak 
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
+     @click.self="closeModal()">
+    
+    <div class="bg-white rounded-lg max-w-5xl w-full mx-4 my-8 max-h-95vh overflow-hidden">
+        
+        <!-- Header Modal -->
+        <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-10">
+            <h3 class="text-xl font-semibold" x-text="editingGiornale ? 'Modifica Giornale' : 'Nuovo Giornale di Cantiere'"></h3>
+            <button @click="closeModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <!-- Form Content -->
+        <div class="max-h-80vh overflow-y-auto">
+            <form @submit.prevent="saveGiornale()" class="p-6">
+                
+                <!-- Alert Errori -->
+                <div x-show="errorMessage" class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+                    <div class="flex">
+                        <i class="fas fa-exclamation-triangle text-red-400 mr-3 mt-1"></i>
+                        <div class="text-red-700" x-text="errorMessage"></div>
+                    </div>
+                </div>
+                
+                <!-- Informazioni Base -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-calendar mr-2 text-orange-600"></i>
+                        Informazioni Base
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Data <span class="text-red-500">*</span>
+                            </label>
+                            <input type="date" 
+                                   x-model="formData.data" 
+                                   required 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Ora Inizio</label>
+                            <input type="time" 
+                                   x-model="formData.ora_inizio" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Ora Fine</label>
+                            <input type="time" 
+                                   x-model="formData.ora_fine" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Responsabile Scavo <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" 
+                                   x-model="formData.responsabile_nome" 
+                                   required
+                                   placeholder="Nome del responsabile"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Compilatore</label>
+                            <input type="text" 
+                                   x-model="formData.compilatore" 
+                                   placeholder="Nome del compilatore"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Condizioni Meteo -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-cloud-sun mr-2 text-blue-600"></i>
+                        Condizioni Meteorologiche
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Condizioni Meteo <span class="text-red-500">*</span>
+                            </label>
+                            <select x-model="formData.condizioni_meteo" 
+                                    required 
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="">Seleziona condizioni</option>
+                                <template x-for="condition in condizioni_meteo" :key="condition.value">
+                                    <option :value="condition.value" x-text="condition.label"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Temperatura Min (°C)</label>
+                            <input type="number" 
+                                   x-model="formData.temperatura_min" 
+                                   min="-30" 
+                                   max="50" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Temperatura Max (°C)</label>
+                            <input type="number" 
+                                   x-model="formData.temperatura_max" 
+                                   min="-30" 
+                                   max="50" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Descrizione Lavori -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-tools mr-2 text-orange-600"></i>
+                        Descrizione Attività
+                    </h4>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Descrizione Lavori <span class="text-red-500">*</span>
+                        </label>
+                        <textarea x-model="formData.descrizione_lavori" 
+                                  required
+                                  rows="4"
+                                  placeholder="Descrizione dettagliata delle attività svolte durante la giornata..."
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Operatori Presenti -->
+                <div class="mb-8" x-show="operatori_disponibili.length > 0">
+                    <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-users mr-2 text-green-600"></i>
+                        Operatori Presenti
+                    </h4>
+                    
+                    <div class="max-h-48 overflow-y-auto border border-gray-300 rounded-md p-4 bg-gray-50">
+                        <template x-for="operatore in operatori_disponibili" :key="operatore.id">
+                            <label class="flex items-center p-2 hover:bg-white rounded cursor-pointer">
+                                <input type="checkbox" 
+                                       :value="operatore.id"
+                                       x-model="formData.operatori_ids"
+                                       class="rounded border-gray-300 text-orange-600 focus:ring-orange-500">
+                                <div class="ml-3 flex-1">
+                                    <div class="flex items-center justify-between">
+                                        <span class="font-medium" x-text="`${operatore.nome} ${operatore.cognome}`"></span>
+                                        <span class="text-sm text-gray-500" x-text="operatore.ruolo"></span>
+                                    </div>
+                                    <div class="text-xs text-gray-400" x-text="operatore.specializzazione"></div>
+                                </div>
+                            </label>
+                        </template>
+                        
+                        <div x-show="operatori_disponibili.length === 0" class="text-center text-gray-500 py-4">
+                            Nessun operatore disponibile
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Seleziona gli operatori presenti nel cantiere per questa giornata
+                    </p>
+                </div>
+                
+                <!-- Unità Stratigrafiche -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-layer-group mr-2 text-blue-600"></i>
+                        Unità Stratigrafiche
+                    </h4>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">US Elaborate</label>
+                        <input type="text" 
+                               x-model="formData.us_elaborate_input" 
+                               placeholder="Es: US001, US002, US003 (separate da virgole)"
+                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        <p class="text-xs text-gray-500 mt-1">
+                            Inserisci i codici delle unità stratigrafiche elaborate, separati da virgole
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Note e Problematiche -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-sticky-note mr-2 text-yellow-600"></i>
+                        Note e Problematiche
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Note Generali</label>
+                            <textarea x-model="formData.note_generali" 
+                                      rows="4"
+                                      placeholder="Note e osservazioni generali..."
+                                      class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Problematiche</label>
+                            <textarea x-model="formData.problematiche" 
+                                      rows="4"
+                                      placeholder="Problematiche incontrate durante i lavori..."
+                                      class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 border-red-300"></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Apparecchiature -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-tools mr-2 text-purple-600"></i>
+                        Attrezzature e Apparecchiature
+                    </h4>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Apparecchiature Utilizzate</label>
+                        <textarea x-model="formData.apparecchiature_input" 
+                                  rows="3"
+                                  placeholder="Es: Piccone, Cazzuola, Pennellino, Metal detector (separate da virgole o a capo)"
+                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex justify-end space-x-3 pt-6 border-t">
+                    <button type="button" 
+                            @click="closeModal()"
+                            :disabled="saving"
+                            class="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                        Annulla
+                    </button>
+                    
+                    <button type="submit" 
+                            :disabled="saving"
+                            class="px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 flex items-center">
+                        <i x-show="saving" class="fas fa-spinner fa-spin mr-2"></i>
+                        <span x-text="saving ? 'Salvataggio...' : (editingGiornale ? 'Salva Modifiche' : 'Crea Giornale')"></span>
+                    </button>
+                </div>
+                
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Stili per il modal */
+[x-cloak] { display: none !important; }
+
+.max-h-95vh { max-height: 95vh; }
+.max-h-80vh { max-height: 80vh; }
+
+/* Styling per checkbox custom */
+input[type="checkbox"]:checked {
+    background-color: #ea580c;
+    border-color: #ea580c;
+}
+
+/* Scrollbar custom per liste lunghe */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+/* Focus states migliorati */
+.focus\:ring-orange-500:focus {
+    --tw-ring-color: rgba(234, 88, 12, 0.5);
+}
+
+/* Miglioramenti responsive */
+@media (max-width: 640px) {
+    .max-w-5xl {
+        max-width: calc(100vw - 2rem);
+    }
+    
+    .grid-cols-1.md\:grid-cols-3 {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+    
+    .grid-cols-1.md\:grid-cols-2 {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+}
+</style>
