@@ -73,7 +73,7 @@ class ArchaeologicalSite(Base):
     elenchi_consegna = relationship("ElencoConsegna", back_populates="site", cascade="all, delete-orphan")
 
     # REPORT FINALE
-    relazioni_finali = relationship("RelazioneFinaleSca vo", back_populates="site", cascade="all, delete-orphan")
+    relazioni_finali = relationship("RelazioneFinaleScavo", back_populates="site", cascade="all, delete-orphan")
     configurazioni_export = relationship("ConfigurazioneExport", back_populates="site", cascade="all, delete-orphan")
 
     def __repr__(self):

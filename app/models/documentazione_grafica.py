@@ -11,10 +11,9 @@ from uuid import uuid4
 from typing import List, Optional
 from decimal import Decimal
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Integer, ForeignKey, Numeric, JSON
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Integer, ForeignKey, Numeric, JSON, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql.schema import func
 
 from app.database.base import Base
 

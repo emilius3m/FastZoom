@@ -231,7 +231,7 @@ class GiornaleExportFilter(BaseModel):
     site_id: UUID = Field(..., description="ID sito archeologico")
     data_inizio: Optional[date] = None
     data_fine: Optional[date] = None
-    formato: str = Field("pdf", regex="^(pdf|excel|csv)$", description="Formato export")
+    formato: str = Field("pdf", pattern="^(pdf|excel|csv)$", description="Formato export")
     include_allegati: bool = Field(False, description="Includi riferimenti agli allegati")
 
 

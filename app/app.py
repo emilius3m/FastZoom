@@ -254,6 +254,39 @@ if GIORNALE_VIEW_EXISTS:
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
+# Import delle nuove routes archeologia
+try:
+    from app.routes.api.archeologia_avanzata import router as archeologia_api_router
+    ARCHEOLOGIA_API_EXISTS = True
+except ImportError:
+    logger.warning("Archeologia avanzata API route not found")
+    ARCHEOLOGIA_API_EXISTS = False
+
+try:
+    import importlib
+    archeologia_view_module = importlib.import_module('app.routes.view.archeologia-view-routes')
+    archeologia_view_router = archeologia_view_module.router
+
+    ARCHEOLOGIA_VIEW_EXISTS = True
+except ImportError:
+    logger.warning("Archeologia avanzata view route not found")
+    ARCHEOLOGIA_VIEW_EXISTS = False
+
+
+# Registra archeologia routes
+if ARCHEOLOGIA_API_EXISTS:
+    app.include_router(
+        archeologia_api_router,
+        tags=["archeologia-api"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+if ARCHEOLOGIA_VIEW_EXISTS:
+    app.include_router(
+        archeologia_view_router,
+        tags=["Pages", "Archeologia"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
 
 # 📡 INCLUSIONE ROUTER WEBSOCKET NOTIFICATIONS - WebSocket per notifiche real-time
 app.include_router(

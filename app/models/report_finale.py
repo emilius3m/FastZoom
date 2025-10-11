@@ -10,10 +10,9 @@ from enum import Enum as PyEnum
 from uuid import uuid4
 from typing import List, Optional, Dict, Any
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Integer, ForeignKey, JSON
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Integer, ForeignKey, JSON, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql.schema import func
 
 from app.database.base import Base
 
@@ -210,7 +209,7 @@ class RelazioneFinaleScavo(Base):
     site = relationship("ArchaeologicalSite", back_populates="relazioni_finali")
     
     def __repr__(self):
-        return f"<RelazioneFinaleSca vo(numero='{self.numero_relazione}', stato='{self.stato}')>"
+        return f"<RelazioneFinaleScavo(numero='{self.numero_relazione}', stato='{self.stato}')>"
     
     # ===== METODI UTILITY =====
     @property
@@ -354,6 +353,6 @@ class ConfigurazioneExport(Base):
 AGGIUNGERE QUESTE RELAZIONI in app/models/sites.py nella classe ArchaeologicalSite:
 
 # Relazioni con report finale
-relazioni_finali = relationship("RelazioneFinaleSca vo", back_populates="site", cascade="all, delete-orphan")
+relazioni_finali = relationship("RelazioneFinaleScavo", back_populates="site", cascade="all, delete-orphan")
 configurazioni_export = relationship("ConfigurazioneExport", back_populates="site", cascade="all, delete-orphan")
 """

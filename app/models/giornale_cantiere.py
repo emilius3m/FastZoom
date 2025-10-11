@@ -9,10 +9,9 @@ from enum import Enum as PyEnum
 from uuid import uuid4
 from typing import List
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Time, Integer, ForeignKey, Table
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Time, Integer, ForeignKey, Table, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql.schema import func
 
 from app.database.base import Base
 

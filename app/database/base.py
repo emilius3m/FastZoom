@@ -33,10 +33,32 @@ def init_models():
     from ..models.user_sites import UserSitePermission # noqa: F401
     from ..models.photos import Photo # noqa: F401
     from ..models.iccd_records import ICCDRecord, ICCDSchemaTemplate # noqa: F401
-    # Import giornale di cantiere
-    from ..models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere  # noqa: F401
+    # Import giornale di cantiere (nota: file con trattini richiede importlib)
+    import importlib
+    giornale_module = importlib.import_module('app.models.giornale_cantiere')
+    GiornaleCantiere = giornale_module.GiornaleCantiere  # noqa: F401
+    OperatoreCantiere = giornale_module.OperatoreCantiere  # noqa: F401
+    
     # Import documentazione grafica
-    from ..models.documentazione_grafica import TavolaGrafica, FotografiaArcheologica, MatrixHarris, ElencoConsegna  # noqa: F401
+    doc_grafica_module = importlib.import_module('app.models.documentazione_grafica')
+    TavolaGrafica = doc_grafica_module.TavolaGrafica  # noqa: F401
+    FotografiaArcheologica = doc_grafica_module.FotografiaArcheologica  # noqa: F401
+    MatrixHarris = doc_grafica_module.MatrixHarris  # noqa: F401
+    ElencoConsegna = doc_grafica_module.ElencoConsegna  # noqa: F401
+    
+    # Import archeologia avanzata
+    archeologia_module = importlib.import_module('app.models.archeologia_avanzata')
+    UnitaStratigrafica = archeologia_module.UnitaStratigrafica  # noqa: F401
+    SchedaTomba = archeologia_module.SchedaTomba  # noqa: F401
+    InventarioReperto = archeologia_module.InventarioReperto  # noqa: F401
+    MaterialeArcheologico = archeologia_module.MaterialeArcheologico  # noqa: F401
+    CampioneScientifico = archeologia_module.CampioneScientifico  # noqa: F401
+    
+    # Import report finale
+    report_module = importlib.import_module('app.models.report_finale')
+    RelazioneFinaleScavo = report_module.RelazioneFinaleScavo  # noqa: F401
+    TemplateRelazione = report_module.TemplateRelazione  # noqa: F401
+    ConfigurazioneExport = report_module.ConfigurazioneExport  # noqa: F401
 
 # Base = declarative_base()
 

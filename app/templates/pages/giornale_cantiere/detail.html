@@ -1,0 +1,449 @@
+# app/templates/pages/giornale_cantiere/detail.html
+{% extends "base/site_base.html" %}
+
+{% block title %}{{ title or "Dettaglio Giornale" }}{% endblock %}
+
+{% block content %}
+<div x-data="giornaleDetailApp()" x-init="init()" class="container mx-auto px-4 py-6">
+    
+    <!-- Header con breadcrumb -->
+    <div class="mb-6">
+        <nav class="flex mb-4" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                <li class="inline-flex items-center">
+                    <a href="/dashboard" class="text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </a>
+                </li>
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <a href="/giornale-cantiere" class="text-gray-700 hover:text-blue-600">Giornale</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <a href="/giornale-cantiere/site/{{ site.id if site else 'unknown' }}" class="text-gray-700 hover:text-blue-600">
+                            {{ site.name if site else "Sito" }}
+                        </a>
+                    </div>
+                </li>
+                <li aria-current="page">
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <span class="text-gray-500">
+                            {{ giornale.data.strftime('%d/%m/%Y') if giornale and giornale.data else "Dettaglio" }}
+                        </span>
+                    </div>
+                </li>
+            </ol>
+        </nav>
+        
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">
+                    <i class="fas fa-file-alt mr-3 text-orange-600"></i>
+                    Giornale • {{ giornale.data.strftime('%d/%m/%Y') if giornale and giornale.data else "Dettaglio" }}
+                </h1>
+                {% if site %}
+                <p class="text-xl text-gray-600 mt-1">{{ site.name }} ({{ site.code }})</p>
+                <p class="text-sm text-gray-500 mt-1">{{ site.location }}</p>
+                {% endif %}
+            </div>
+            
+            <div class="flex gap-3">
+                <button @click="printGiornale()"
+                        class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition">
+                    <i class="fas fa-print mr-2"></i>Stampa
+                </button>
+                <button @click="exportPDF()"
+                        class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-200 transition">
+                    <i class="fas fa-file-pdf mr-2"></i>Esporta PDF
+                </button>
+                <button @click="editGiornale()" x-show="canEdit"
+                        class="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition">
+                    <i class="fas fa-edit mr-2"></i>Modifica
+                </button>
+                <button @click="validateGiornale()" x-show="canValidate && giornale.stato !== 'validato'"
+                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                    <i class="fas fa-check mr-2"></i>Valida
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {% if giornale %}
+    <!-- Status badge -->
+    <div class="mb-6">
+        <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium"
+              :class="getStateBadge('{{ giornale.stato if giornale.stato else "bozza" }}')">
+            <i :class="getStateIcon('{{ giornale.stato if giornale.stato else "bozza" }}')" class="mr-2"></i>
+            {{ giornale.stato|title if giornale.stato else "Bozza" }}
+        </span>
+        
+        {% if giornale.data_validazione and giornale.validato_da %}
+        <span class="ml-4 text-sm text-gray-600">
+            Validato da {{ giornale.validato_da }} il {{ giornale.data_validazione.strftime('%d/%m/%Y %H:%M') }}
+        </span>
+        {% endif %}
+    </div>
+
+    <!-- Contenuto principale -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Colonna principale: Dettagli giornale -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- Informazioni generali -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-info-circle mr-2 text-blue-600"></i>
+                    Informazioni Generali
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Data</label>
+                            <p class="mt-1 text-lg font-semibold text-gray-900">
+                                {{ giornale.data.strftime('%A, %d %B %Y') if giornale.data else "Non specificata" }}
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Orario Lavori</label>
+                            <p class="mt-1 text-gray-900">
+                                {% if giornale.ora_inizio and giornale.ora_fine %}
+                                    Dalle {{ giornale.ora_inizio.strftime('%H:%M') }} alle {{ giornale.ora_fine.strftime('%H:%M') }}
+                                    <span class="text-sm text-gray-500 ml-2">
+                                        ({{ ((giornale.ora_fine.hour - giornale.ora_inizio.hour) * 60 + (giornale.ora_fine.minute - giornale.ora_inizio.minute))|round|int // 60 }}h {{ ((giornale.ora_fine.hour - giornale.ora_inizio.hour) * 60 + (giornale.ora_fine.minute - giornale.ora_inizio.minute))|round|int % 60 }}m)
+                                    </span>
+                                {% else %}
+                                    Non specificato
+                                {% endif %}
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Responsabile Scavo</label>
+                            <p class="mt-1 text-gray-900">{{ giornale.responsabile_scavo or "Non specificato" }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Condizioni Meteo</label>
+                            <div class="mt-1 flex items-center">
+                                <i :class="getWeatherIcon('{{ giornale.condizioni_meteo or '' }}')" class="mr-2 text-blue-600"></i>
+                                <span class="text-gray-900">{{ giornale.condizioni_meteo or "Non specificate" }}</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Temperatura</label>
+                            <p class="mt-1 text-gray-900">
+                                {% if giornale.temperatura_min and giornale.temperatura_max %}
+                                    {{ giornale.temperatura_min }}°C - {{ giornale.temperatura_max }}°C
+                                {% elif giornale.temperatura_media %}
+                                    {{ giornale.temperatura_media }}°C (media)
+                                {% else %}
+                                    Non specificata
+                                {% endif %}
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Compilatore</label>
+                            <p class="mt-1 text-gray-900">{{ giornale.compilatore or "Non specificato" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Descrizione lavori -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-tools mr-2 text-orange-600"></i>
+                    Descrizione Lavori
+                </h2>
+                
+                <div class="prose max-w-none">
+                    {% if giornale.descrizione_lavori %}
+                        <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">{{ giornale.descrizione_lavori }}</p>
+                    {% else %}
+                        <p class="text-gray-500 italic">Nessuna descrizione inserita</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- US elaborate -->
+            {% if giornale.us_elaborate %}
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-layer-group mr-2 text-blue-600"></i>
+                    Unità Stratigrafiche Elaborate
+                </h2>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {% for us in giornale.us_elaborate %}
+                    <div class="flex items-center justify-between p-3 bg-blue-50 rounded border border-blue-200">
+                        <span class="font-medium text-blue-900">{{ us }}</span>
+                        <a href="/archeologia/us/{{ us }}" class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-external-link-alt text-sm"></i>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Note e problematiche -->
+            {% if giornale.note_generali or giornale.problematiche %}
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-sticky-note mr-2 text-yellow-600"></i>
+                    Note e Problematiche
+                </h2>
+                
+                {% if giornale.note_generali %}
+                <div class="mb-4">
+                    <h3 class="font-medium text-gray-900 mb-2">Note Generali</h3>
+                    <p class="text-gray-700 whitespace-pre-wrap">{{ giornale.note_generali }}</p>
+                </div>
+                {% endif %}
+                
+                {% if giornale.problematiche %}
+                <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h3 class="font-medium text-red-900 mb-2 flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        Problematiche
+                    </h3>
+                    <p class="text-red-800 whitespace-pre-wrap">{{ giornale.problematiche }}</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+        </div>
+
+        <!-- Sidebar: Operatori e metadata -->
+        <div class="space-y-6">
+            
+            <!-- Operatori presenti -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-users mr-2 text-green-600"></i>
+                    Operatori Presenti
+                </h3>
+                
+                {% if giornale.operatori_presenti and giornale.operatori_presenti|length > 0 %}
+                    <div class="space-y-3">
+                        {% for operatore in giornale.operatori_presenti %}
+                        <div class="flex items-center justify-between p-3 bg-green-50 rounded border border-green-200">
+                            <div>
+                                <div class="font-medium text-green-900">{{ operatore.nome }} {{ operatore.cognome }}</div>
+                                <div class="text-sm text-green-700">{{ operatore.ruolo or "Operatore" }}</div>
+                            </div>
+                            {% if operatore.ore_lavorate %}
+                            <div class="text-sm text-green-600">
+                                {{ operatore.ore_lavorate }}h
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 italic">Nessun operatore registrato</p>
+                {% endif %}
+            </div>
+
+            <!-- Apparecchiature utilizzate -->
+            {% if giornale.apparecchiature_utilizzate %}
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-tools mr-2 text-purple-600"></i>
+                    Apparecchiature
+                </h3>
+                
+                <div class="space-y-2">
+                    {% for apparecchiatura in giornale.apparecchiature_utilizzate %}
+                    <div class="p-2 bg-purple-50 rounded border border-purple-200">
+                        <span class="text-purple-900 font-medium">{{ apparecchiatura }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Metadata -->
+            <div class="bg-gray-50 rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-info mr-2 text-gray-600"></i>
+                    Informazioni Sistema
+                </h3>
+                
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Creato:</span>
+                        <span class="text-gray-900">{{ giornale.created_at.strftime('%d/%m/%Y %H:%M') if giornale.created_at else "N/A" }}</span>
+                    </div>
+                    
+                    {% if giornale.updated_at %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Aggiornato:</span>
+                        <span class="text-gray-900">{{ giornale.updated_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if giornale.version and giornale.version > 1 %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Versione:</span>
+                        <span class="text-gray-900">{{ giornale.version }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">ID Sistema:</span>
+                        <span class="text-gray-400 font-mono text-xs">{{ giornale.id if giornale.id else "N/A" }}</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Messaggio giornale non trovato -->
+    <div class="text-center py-12">
+        <i class="fas fa-file-alt text-6xl text-gray-300 mb-4"></i>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Giornale non trovato</h3>
+        <p class="text-gray-500 mb-4">Il giornale richiesto non è stato trovato o non hai i permessi per visualizzarlo.</p>
+        <a href="/giornale-cantiere/site/{{ site.id if site else '' }}" 
+           class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition">
+            <i class="fas fa-arrow-left mr-2"></i>Torna alla lista
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+function giornaleDetailApp() {
+    return {
+        // Stato
+        canEdit: true,  // TODO: Controllare permessi utente
+        canValidate: true,  // TODO: Controllare ruolo utente
+        
+        // Inizializzazione
+        init() {
+            // TODO: Caricare eventuali dati aggiuntivi
+        },
+        
+        // Azioni
+        editGiornale() {
+            // TODO: Aprire modal di modifica o navigare a pagina edit
+            alert('Modifica giornale - da implementare');
+        },
+        
+        async validateGiornale() {
+            if (!confirm('Sei sicuro di voler validare questo giornale?')) {
+                return;
+            }
+            
+            try {
+                // TODO: Implementare API di validazione
+                // const response = await fetch(`/api/giornale-cantiere/validate/${giornale.id}`, {
+                //     method: 'POST'
+                // });
+                
+                alert('Giornale validato con successo!');
+                location.reload(); // Ricarica per mostrare stato aggiornato
+                
+            } catch (error) {
+                console.error('Errore validazione:', error);
+                alert('Errore durante la validazione del giornale');
+            }
+        },
+        
+        printGiornale() {
+            window.print();
+        },
+        
+        async exportPDF() {
+            try {
+                // TODO: Implementare export PDF
+                // const response = await fetch(`/api/giornale-cantiere/export/pdf/${giornale.id}`);
+                // const blob = await response.blob();
+                // const url = window.URL.createObjectURL(blob);
+                // const a = document.createElement('a');
+                // a.href = url;
+                // a.download = `giornale_{{ giornale.data.strftime('%Y%m%d') if giornale and giornale.data else 'export' }}.pdf`;
+                // a.click();
+                
+                alert('Export PDF - da implementare');
+            } catch (error) {
+                console.error('Errore export PDF:', error);
+                alert('Errore durante l\'export PDF');
+            }
+        },
+        
+        // Utility styling
+        getStateBadge(stato) {
+            const badges = {
+                'validato': 'bg-green-100 text-green-800 border border-green-200',
+                'in_attesa': 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+                'bozza': 'bg-gray-100 text-gray-800 border border-gray-200'
+            };
+            return badges[stato] || 'bg-orange-100 text-orange-800 border border-orange-200';
+        },
+        
+        getStateIcon(stato) {
+            const icons = {
+                'validato': 'fas fa-check-circle',
+                'in_attesa': 'fas fa-clock',
+                'bozza': 'fas fa-edit'
+            };
+            return icons[stato] || 'fas fa-circle';
+        },
+        
+        getWeatherIcon(meteo) {
+            const icons = {
+                'sereno': 'fas fa-sun',
+                'nuvoloso': 'fas fa-cloud',
+                'piovoso': 'fas fa-cloud-rain',
+                'nevoso': 'fas fa-snowflake',
+                'ventoso': 'fas fa-wind'
+            };
+            return icons[meteo] || 'fas fa-cloud';
+        }
+    }
+}
+</script>
+
+<style>
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .container {
+        max-width: none !important;
+        padding: 0 !important;
+    }
+    
+    .shadow-lg {
+        box-shadow: none !important;
+        border: 1px solid #e5e7eb !important;
+    }
+}
+
+.prose {
+    line-height: 1.6;
+}
+
+.prose p {
+    margin-bottom: 1em;
+}
+</style>
+{% endblock %}

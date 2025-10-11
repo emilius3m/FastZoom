@@ -223,7 +223,7 @@ async def get_unita_stratigrafica(
 async def create_harris_relation(
     us_id: UUID,
     target_us_id: UUID,
-    relation_type: str = Query(..., regex="^(copre|taglia|riempie|è_contemporaneo_a)$"),
+    relation_type: str = Query(..., pattern="^(copre|taglia|riempie|è_contemporaneo_a)$"),
     db: AsyncSession = Depends(get_async_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)

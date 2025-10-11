@@ -202,7 +202,7 @@ class SchedaTomba_Base(BaseModel):
     
     # Antropologia
     numero_individui: int = Field(1, ge=1, le=10, description="Numero individui")
-    sesso: Optional[str] = Field(None, regex="^(M|F|I)$", description="M/F/I (indeterminabile)")
+    sesso: Optional[str] = Field(None, pattern="^(M|F|I)$", description="M/F/I (indeterminabile)")
     eta_morte: Optional[str] = Field(None, max_length=50, description="Età alla morte")
     statura_stimata: Optional[Decimal] = Field(None, ge=0, le=300, description="Statura in cm")
     
@@ -265,7 +265,7 @@ class SchedaTomba_Update(BaseModel):
     rito_sepolcrale: Optional[RitoSepolcrale] = None
     orientamento_tomba: Optional[str] = Field(None, max_length=20)
     orientamento_inumato: Optional[str] = Field(None, max_length=50)
-    sesso: Optional[str] = Field(None, regex="^(M|F|I)$")
+    sesso: Optional[str] = Field(None, pattern="^(M|F|I)$")
     eta_morte: Optional[str] = Field(None, max_length=50)
     presenza_corredo: Optional[bool] = None
     interpretazione: Optional[str] = Field(None, max_length=2000)
@@ -333,7 +333,7 @@ class InventarioReperto_Base(BaseModel):
     datazione_proposta: Optional[str] = Field(None, max_length=100)
     
     # Significatività
-    rilevanza_scientifica: Optional[str] = Field(None, regex="^(alta|media|bassa)$")
+    rilevanza_scientifica: Optional[str] = Field(None, pattern="^(alta|media|bassa)$")
     note_interpretative: Optional[str] = Field(None, max_length=2000)
     
     # Documentazione
@@ -361,7 +361,7 @@ class InventarioReperto_Update(BaseModel):
     tipo: Optional[str] = Field(None, max_length=100)
     descrizione_breve: Optional[str] = Field(None, min_length=5, max_length=500)
     stato_conservazione: Optional[StatoConservazione] = None
-    rilevanza_scientifica: Optional[str] = Field(None, regex="^(alta|media|bassa)$")
+    rilevanza_scientifica: Optional[str] = Field(None, pattern="^(alta|media|bassa)$")
     posizione: Optional[str] = Field(None, max_length=50)
 
 
@@ -385,7 +385,7 @@ class RepertoFilter(BaseModel):
     categoria_materiale: Optional[TipoMateriale] = None
     stato_conservazione: Optional[StatoConservazione] = None
     numero_cassa: Optional[str] = None
-    rilevanza_scientifica: Optional[str] = Field(None, regex="^(alta|media|bassa)$")
+    rilevanza_scientifica: Optional[str] = Field(None, pattern="^(alta|media|bassa)$")
     search: Optional[str] = Field(None, max_length=100)
 
 

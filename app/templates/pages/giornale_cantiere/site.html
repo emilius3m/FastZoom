@@ -1,0 +1,546 @@
+# app/templates/pages/giornale_cantiere/site.html
+{% extends "base/site_base.html" %}
+
+{% block title %}{{ title or ("Giornale - " ~ (site.name if site else "")) }}{% endblock %}
+
+{% block content %}
+<div x-data="giornaleSitoApp()" x-init="init()" class="container mx-auto px-4 py-6">
+    
+    <!-- Header con breadcrumb -->
+    <div class="mb-6">
+        <nav class="flex mb-4" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                <li class="inline-flex items-center">
+                    <a href="/dashboard" class="text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </a>
+                </li>
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <a href="/giornale-cantiere" class="text-gray-700 hover:text-blue-600">Giornale Cantiere</a>
+                    </div>
+                </li>
+                <li aria-current="page">
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <span class="text-gray-500">{{ site.name if site else "Sito" }}</span>
+                    </div>
+                </li>
+            </ol>
+        </nav>
+        
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">
+                    <i class="fas fa-hard-hat mr-3 text-orange-600"></i>
+                    Giornale • {{ site.name if site else "Sito" }}
+                </h1>
+                {% if site %}
+                <p class="text-xl text-gray-600 mt-1">{{ site.code }}</p>
+                <p class="text-sm text-gray-500 mt-1">{{ site.location }}</p>
+                {% endif %}
+            </div>
+            
+            <div class="flex gap-3">
+                <button @click="showFilters = !showFilters"
+                        class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition">
+                    <i class="fas fa-filter mr-2"></i>Filtri
+                </button>
+                <button @click="exportGiornali()"
+                        class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-200 transition">
+                    <i class="fas fa-download mr-2"></i>Export
+                </button>
+                <button @click="openCreateModal()" 
+                        class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition">
+                    <i class="fas fa-plus mr-2"></i>Nuovo Giornale
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche sito -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-orange-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Totale Giornali</p>
+                    <p class="text-2xl font-bold text-orange-600" x-text="stats.total_giornali || 0"></p>
+                </div>
+                <i class="fas fa-book text-orange-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Validati</p>
+                    <p class="text-2xl font-bold text-green-600" x-text="stats.validated_giornali || 0"></p>
+                </div>
+                <i class="fas fa-check-circle text-green-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">In Attesa</p>
+                    <p class="text-2xl font-bold text-yellow-600" x-text="stats.pending_giornali || 0"></p>
+                </div>
+                <i class="fas fa-clock text-yellow-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">Operatori Attivi</p>
+                    <p class="text-2xl font-bold text-blue-600" x-text="stats.operatori_attivi || 0"></p>
+                </div>
+                <i class="fas fa-users text-blue-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600">% Completamento</p>
+                    <p class="text-2xl font-bold text-purple-600" x-text="stats.validation_percentage || 0"></p>
+                </div>
+                <i class="fas fa-chart-pie text-purple-500 text-xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri avanzati -->
+    <div x-show="showFilters" x-cloak class="bg-white p-4 rounded-lg shadow mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data Da</label>
+                <input type="date" x-model="filters.data_da"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data A</label>
+                <input type="date" x-model="filters.data_a"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Responsabile</label>
+                <select x-model="filters.responsabile" 
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    <option value="">Tutti</option>
+                    <!-- TODO: Popolato dinamicamente -->
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Stato</label>
+                <select x-model="filters.stato" 
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    <option value="">Tutti</option>
+                    <option value="validato">Validato</option>
+                    <option value="in_attesa">In Attesa</option>
+                    <option value="bozza">Bozza</option>
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button @click="applyFilters()" 
+                        class="w-full bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition">
+                    <i class="fas fa-filter mr-2"></i>Applica
+                </button>
+            </div>
+        </div>
+        
+        <div class="flex justify-end mt-4">
+            <button @click="resetFilters()" 
+                    class="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition">
+                <i class="fas fa-undo mr-2"></i>Reset Filtri
+            </button>
+        </div>
+    </div>
+
+    <!-- Lista Giornali -->
+    <div class="space-y-4" x-show="!loading">
+        <template x-for="giornale in giornaliList" :key="giornale.id">
+            <div class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow duration-200 border-l-4"
+                 :class="getStateBorderColor(giornale.stato)">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex-1">
+                            <!-- Header giornale -->
+                            <div class="flex items-center gap-3 mb-3">
+                                <h3 class="text-xl font-semibold text-gray-900" 
+                                    x-text="formatDate(giornale.data) || 'Data non specificata'"></h3>
+                                
+                                <!-- Badge stato -->
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                                      :class="getStateBadge(giornale.stato)">
+                                    <i :class="getStateIcon(giornale.stato)" class="mr-1"></i>
+                                    <span x-text="formatStato(giornale.stato)"></span>
+                                </span>
+                                
+                                <!-- Badge condizioni meteo -->
+                                <span x-show="giornale.condizioni_meteo" 
+                                      class="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                    <i :class="getWeatherIcon(giornale.condizioni_meteo)" class="mr-1"></i>
+                                    <span x-text="giornale.condizioni_meteo"></span>
+                                </span>
+                            </div>
+                            
+                            <!-- Orari e responsabile -->
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600 mb-3">
+                                <div x-show="giornale.ora_inizio">
+                                    <i class="fas fa-clock mr-1 text-gray-400"></i>
+                                    <span class="font-medium">Inizio:</span>
+                                    <span x-text="giornale.ora_inizio"></span>
+                                </div>
+                                <div x-show="giornale.ora_fine">
+                                    <i class="fas fa-clock mr-1 text-gray-400"></i>
+                                    <span class="font-medium">Fine:</span>
+                                    <span x-text="giornale.ora_fine"></span>
+                                </div>
+                                <div x-show="giornale.responsabile_scavo">
+                                    <i class="fas fa-user mr-1 text-gray-400"></i>
+                                    <span class="font-medium">Responsabile:</span>
+                                    <span x-text="giornale.responsabile_scavo"></span>
+                                </div>
+                                <div x-show="giornale.operatori_presenti && giornale.operatori_presenti.length > 0">
+                                    <i class="fas fa-users mr-1 text-gray-400"></i>
+                                    <span class="font-medium">Operatori:</span>
+                                    <span x-text="giornale.operatori_presenti.length"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Descrizione lavori -->
+                            <div x-show="giornale.descrizione_lavori" class="mb-3">
+                                <p class="text-sm font-medium text-orange-700">
+                                    <i class="fas fa-tools mr-1"></i>
+                                    <span x-text="truncateText(giornale.descrizione_lavori, 200)"></span>
+                                </p>
+                            </div>
+                            
+                            <!-- US elaborate -->
+                            <div x-show="giornale.us_elaborate && giornale.us_elaborate.length > 0" class="mb-3">
+                                <div class="flex flex-wrap gap-1">
+                                    <span class="text-sm text-gray-600">US elaborate:</span>
+                                    <template x-for="us in giornale.us_elaborate.slice(0, 5)" :key="us">
+                                        <span class="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                                              x-text="us"></span>
+                                    </template>
+                                    <span x-show="giornale.us_elaborate.length > 5" 
+                                          class="text-xs text-gray-500"
+                                          x-text="'+ altre ' + (giornale.us_elaborate.length - 5)"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Note e problematiche -->
+                            <div x-show="giornale.note_generali || giornale.problematiche" class="text-sm text-gray-600">
+                                <div x-show="giornale.note_generali" class="mb-1">
+                                    <i class="fas fa-sticky-note mr-1 text-gray-400"></i>
+                                    <span class="font-medium">Note:</span>
+                                    <span x-text="truncateText(giornale.note_generali, 100)"></span>
+                                </div>
+                                <div x-show="giornale.problematiche" class="text-red-600">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    <span class="font-medium">Problematiche:</span>
+                                    <span x-text="truncateText(giornale.problematiche, 100)"></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Azioni -->
+                        <div class="flex flex-col gap-2 ml-4">
+                            <a :href="`/giornale-cantiere/site/{{ site.id if site else 'unknown' }}/entry/${giornale.id}`" 
+                               class="inline-flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition">
+                                <i class="fas fa-eye mr-1"></i>Visualizza
+                            </a>
+                            
+                            <button @click="editGiornale(giornale)"
+                                    class="inline-flex items-center px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition">
+                                <i class="fas fa-edit mr-1"></i>Modifica
+                            </button>
+                            
+                            <button @click="validateGiornale(giornale)" x-show="giornale.stato !== 'validato'"
+                                    class="inline-flex items-center px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 transition">
+                                <i class="fas fa-check mr-1"></i>Valida
+                            </button>
+                            
+                            <button @click="duplicateGiornale(giornale)"
+                                    class="inline-flex items-center px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition">
+                                <i class="fas fa-copy mr-1"></i>Duplica
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer con metadati -->
+                    <div class="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center text-sm text-gray-500">
+                        <div class="flex gap-4">
+                            <span x-show="giornale.compilatore">
+                                <i class="fas fa-user-edit mr-1"></i>
+                                Compilatore: <span x-text="giornale.compilatore"></span>
+                            </span>
+                        </div>
+                        <div>
+                            <span>Aggiornato: </span>
+                            <span x-text="formatDateTime(giornale.updated_at || giornale.created_at)"></span>
+                            <span x-show="giornale.version > 1" class="ml-2">
+                                (v<span x-text="giornale.version"></span>)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Messaggio vuoto -->
+        <div x-show="giornaliList.length === 0 && !loading" 
+             class="text-center py-12 bg-white rounded-lg shadow">
+            <i class="fas fa-book text-6xl text-gray-300 mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">Nessun giornale trovato</h3>
+            <p class="text-gray-500 mb-4">Non ci sono giornali per i filtri selezionati.</p>
+            <button @click="openCreateModal()" 
+                    class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition">
+                <i class="fas fa-plus mr-2"></i>Crea il primo giornale
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading spinner -->
+    <div x-show="loading" class="text-center py-12">
+        <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
+        <p class="text-gray-600">Caricamento giornali...</p>
+    </div>
+
+    <!-- Paginazione -->
+    <div x-show="totalPages > 1" class="mt-6 flex justify-center">
+        <nav class="flex items-center space-x-2">
+            <button @click="changePage(currentPage - 1)" 
+                    :disabled="currentPage <= 1"
+                    :class="currentPage <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'"
+                    class="px-3 py-2 text-sm border rounded-md">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            
+            <template x-for="page in getPageNumbers()" :key="page">
+                <button @click="changePage(page)"
+                        :class="page === currentPage ? 'bg-orange-600 text-white' : 'hover:bg-gray-100'"
+                        class="px-3 py-2 text-sm border rounded-md"
+                        x-text="page"></button>
+            </template>
+            
+            <button @click="changePage(currentPage + 1)" 
+                    :disabled="currentPage >= totalPages"
+                    :class="currentPage >= totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'"
+                    class="px-3 py-2 text-sm border rounded-md">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </nav>
+    </div>
+
+</div>
+
+<script>
+function giornaleSitoApp() {
+    return {
+        // Dati
+        giornaliList: [],
+        loading: false,
+        showFilters: false,
+        
+        // Statistiche
+        stats: {
+            total_giornali: 0,
+            validated_giornali: 0,
+            pending_giornali: 0,
+            operatori_attivi: 0,
+            validation_percentage: 0
+        },
+        
+        // Paginazione
+        currentPage: 1,
+        pageSize: 10,
+        totalPages: 1,
+        
+        // Filtri
+        filters: {
+            data_da: '',
+            data_a: '',
+            responsabile: '',
+            stato: ''
+        },
+        
+        // Inizializzazione
+        async init() {
+            await this.loadGiornali();
+            await this.loadStats();
+        },
+        
+        // Caricamento giornali (mock)
+        async loadGiornali() {
+            this.loading = true;
+            try {
+                // TODO: Implementare endpoint API
+                // const response = await fetch(`/api/giornale-cantiere/site/{{ site.id if site else 'unknown' }}`);
+                // this.giornaliList = await response.json();
+                
+                // Mock data per ora
+                this.giornaliList = [];
+                
+            } catch (error) {
+                console.error('Errore caricamento giornali:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        // Caricamento statistiche (mock)
+        async loadStats() {
+            try {
+                // TODO: Implementare endpoint statistiche
+                this.stats = {
+                    total_giornali: 0,
+                    validated_giornali: 0,
+                    pending_giornali: 0,
+                    operatori_attivi: 0,
+                    validation_percentage: 0
+                };
+            } catch (error) {
+                console.error('Errore caricamento statistiche:', error);
+            }
+        },
+        
+        // Azioni
+        openCreateModal() {
+            alert('Modal creazione giornale - da implementare');
+        },
+        
+        editGiornale(giornale) {
+            alert(`Modifica giornale del ${this.formatDate(giornale.data)} - da implementare`);
+        },
+        
+        validateGiornale(giornale) {
+            alert(`Validazione giornale del ${this.formatDate(giornale.data)} - da implementare`);
+        },
+        
+        duplicateGiornale(giornale) {
+            alert(`Duplicazione giornale del ${this.formatDate(giornale.data)} - da implementare`);
+        },
+        
+        async exportGiornali() {
+            alert('Export giornali - da implementare');
+        },
+        
+        // Filtri
+        async applyFilters() {
+            this.currentPage = 1;
+            await this.loadGiornali();
+        },
+        
+        async resetFilters() {
+            this.filters = {
+                data_da: '',
+                data_a: '',
+                responsabile: '',
+                stato: ''
+            };
+            this.currentPage = 1;
+            await this.loadGiornali();
+        },
+        
+        // Paginazione
+        changePage(page) {
+            if (page >= 1 && page <= this.totalPages) {
+                this.currentPage = page;
+                this.loadGiornali();
+            }
+        },
+        
+        getPageNumbers() {
+            const pages = [];
+            const start = Math.max(1, this.currentPage - 2);
+            const end = Math.min(this.totalPages, this.currentPage + 2);
+            
+            for (let i = start; i <= end; i++) {
+                pages.push(i);
+            }
+            return pages;
+        },
+        
+        // Utility styling
+        getStateBorderColor(stato) {
+            const colors = {
+                'validato': 'border-green-500',
+                'in_attesa': 'border-yellow-500',
+                'bozza': 'border-gray-500'
+            };
+            return colors[stato] || 'border-orange-500';
+        },
+        
+        getStateBadge(stato) {
+            const badges = {
+                'validato': 'bg-green-100 text-green-800',
+                'in_attesa': 'bg-yellow-100 text-yellow-800',
+                'bozza': 'bg-gray-100 text-gray-800'
+            };
+            return badges[stato] || 'bg-orange-100 text-orange-800';
+        },
+        
+        getStateIcon(stato) {
+            const icons = {
+                'validato': 'fas fa-check-circle',
+                'in_attesa': 'fas fa-clock',
+                'bozza': 'fas fa-edit'
+            };
+            return icons[stato] || 'fas fa-circle';
+        },
+        
+        getWeatherIcon(meteo) {
+            const icons = {
+                'sereno': 'fas fa-sun',
+                'nuvoloso': 'fas fa-cloud',
+                'piovoso': 'fas fa-cloud-rain',
+                'nevoso': 'fas fa-snowflake'
+            };
+            return icons[meteo] || 'fas fa-cloud';
+        },
+        
+        formatStato(stato) {
+            const labels = {
+                'validato': 'Validato',
+                'in_attesa': 'In Attesa',
+                'bozza': 'Bozza'
+            };
+            return labels[stato] || stato;
+        },
+        
+        formatDate(dateString) {
+            if (!dateString) return '';
+            return new Date(dateString).toLocaleDateString('it-IT');
+        },
+        
+        formatDateTime(dateString) {
+            return new Date(dateString).toLocaleDateString('it-IT', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        },
+        
+        truncateText(text, length) {
+            if (!text) return '';
+            return text.length > length ? text.substring(0, length) + '...' : text;
+        }
+    }
+}
+</script>
+
+<style>
+[x-cloak] { display: none !important; }
+
+.transition { 
+    transition: all 0.2s ease-in-out; 
+}
+</style>
+{% endblock %}

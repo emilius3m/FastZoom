@@ -1,0 +1,453 @@
+# app/templates/pages/giornale_cantiere/reports.html
+{% extends "base.html" %}
+
+{% block title %}{{ title or "Report Giornali di Cantiere" }}{% endblock %}
+
+{% block content %}
+<div x-data="giornaleReportsApp()" x-init="init()" class="container mx-auto px-4 py-6">
+    
+    <!-- Header con breadcrumb -->
+    <div class="mb-6">
+        <nav class="flex mb-4" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                <li class="inline-flex items-center">
+                    <a href="/dashboard" class="text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </a>
+                </li>
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <a href="/giornale-cantiere" class="text-gray-700 hover:text-blue-600">Giornale Cantiere</a>
+                    </div>
+                </li>
+                <li aria-current="page">
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <span class="text-gray-500">Report</span>
+                    </div>
+                </li>
+            </ol>
+        </nav>
+        
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">
+                    <i class="fas fa-chart-bar mr-3 text-indigo-600"></i>
+                    Report Giornali di Cantiere
+                </h1>
+                <p class="text-xl text-gray-600 mt-1">Statistiche e analisi aggregate</p>
+            </div>
+            
+            <div class="flex gap-3">
+                <button @click="showFilters = !showFilters"
+                        class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition">
+                    <i class="fas fa-filter mr-2"></i>Periodo
+                </button>
+                <button @click="exportReport('pdf')"
+                        class="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition">
+                    <i class="fas fa-file-pdf mr-2"></i>Export PDF
+                </button>
+                <button @click="exportReport('excel')"
+                        class="bg-green-100 text-green-700 px-4 py-2 rounded-lg hover:bg-green-200 transition">
+                    <i class="fas fa-file-excel mr-2"></i>Export Excel
+                </button>
+                <button @click="refreshReports()"
+                        class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+                    <i class="fas fa-sync-alt mr-2"></i>Aggiorna
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri periodo -->
+    <div x-show="showFilters" x-cloak class="bg-white p-4 rounded-lg shadow mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data Da</label>
+                <input type="date" x-model="filters.data_da"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data A</label>
+                <input type="date" x-model="filters.data_a"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Sito</label>
+                <select x-model="filters.sito_id" 
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">Tutti i siti</option>
+                    <!-- TODO: Popolato dinamicamente da user_sites -->
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button @click="applyFilters()" 
+                        class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
+                    <i class="fas fa-filter mr-2"></i>Applica
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiche generali -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-indigo-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Giornali Totali</p>
+                    <p class="text-3xl font-bold text-indigo-600" x-text="stats.totali || 0"></p>
+                    <p class="text-sm text-gray-500 mt-1">Nel periodo</p>
+                </div>
+                <div class="p-3 bg-indigo-100 rounded-full">
+                    <i class="fas fa-book text-indigo-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Validati</p>
+                    <p class="text-3xl font-bold text-green-600" x-text="stats.validati || 0"></p>
+                    <p class="text-sm text-gray-500 mt-1" x-text="getValidationPercentage()"></p>
+                </div>
+                <div class="p-3 bg-green-100 rounded-full">
+                    <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-yellow-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">In Attesa</p>
+                    <p class="text-3xl font-bold text-yellow-600" x-text="stats.in_attesa || 0"></p>
+                    <p class="text-sm text-gray-500 mt-1">Da validare</p>
+                </div>
+                <div class="p-3 bg-yellow-100 rounded-full">
+                    <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Ore Lavorate</p>
+                    <p class="text-3xl font-bold text-blue-600" x-text="stats.ore_totali || 0"></p>
+                    <p class="text-sm text-gray-500 mt-1">Somma totale</p>
+                </div>
+                <div class="p-3 bg-blue-100 rounded-full">
+                    <i class="fas fa-clock text-blue-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Operatori</p>
+                    <p class="text-3xl font-bold text-purple-600" x-text="stats.operatori_unici || 0"></p>
+                    <p class="text-sm text-gray-500 mt-1">Coinvolti</p>
+                </div>
+                <div class="p-3 bg-purple-100 rounded-full">
+                    <i class="fas fa-users text-purple-600 text-xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        
+        <!-- Grafico andamento temporale -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-chart-line mr-2 text-indigo-600"></i>
+                    Andamento Temporale
+                </h3>
+                <div class="flex gap-2">
+                    <button @click="chartPeriod = 'settimana'" 
+                            :class="chartPeriod === 'settimana' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'"
+                            class="px-3 py-1 text-sm rounded">Settimana</button>
+                    <button @click="chartPeriod = 'mese'" 
+                            :class="chartPeriod === 'mese' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'"
+                            class="px-3 py-1 text-sm rounded">Mese</button>
+                </div>
+            </div>
+            
+            <div class="h-64 flex items-center justify-center bg-gray-50 rounded">
+                <div class="text-center text-gray-500">
+                    <i class="fas fa-chart-line text-4xl mb-2"></i>
+                    <p>Grafico andamento giornali</p>
+                    <p class="text-sm">(Da implementare con Chart.js)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Distribuzione per sito -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-map-marked-alt mr-2 text-green-600"></i>
+                Distribuzione per Sito
+            </h3>
+            
+            <div class="space-y-4">
+                <template x-for="sito in siteStats" :key="sito.id">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center">
+                            <div class="p-2 bg-green-100 rounded mr-3">
+                                <i class="fas fa-excavator text-green-600"></i>
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-900" x-text="sito.name"></div>
+                                <div class="text-sm text-gray-500" x-text="sito.location"></div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold text-gray-900" x-text="sito.giornali_count"></div>
+                            <div class="text-sm text-gray-500">giornali</div>
+                        </div>
+                    </div>
+                </template>
+                
+                <div x-show="siteStats.length === 0" class="text-center py-8 text-gray-500">
+                    <i class="fas fa-map-marked-alt text-2xl mb-2"></i>
+                    <p>Nessun dato disponibile</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabelle dettagliate -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Top operatori -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-trophy mr-2 text-yellow-600"></i>
+                    Top Operatori
+                </h3>
+                <span class="text-sm text-gray-500">Per ore lavorate</span>
+            </div>
+            
+            <div class="space-y-3">
+                <template x-for="(operatore, index) in topOperatori" :key="operatore.id">
+                    <div class="flex items-center justify-between p-3 rounded-lg"
+                         :class="index < 3 ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center mr-3"
+                                 :class="index === 0 ? 'bg-yellow-500 text-white' : 
+                                         index === 1 ? 'bg-gray-400 text-white' : 
+                                         index === 2 ? 'bg-orange-500 text-white' : 'bg-blue-100 text-blue-600'">
+                                <span class="text-sm font-bold" x-text="index + 1"></span>
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-900" x-text="`${operatore.nome} ${operatore.cognome}`"></div>
+                                <div class="text-sm text-gray-500" x-text="operatore.ruolo"></div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold text-gray-900" x-text="operatore.ore_lavorate + 'h'"></div>
+                            <div class="text-sm text-gray-500" x-text="operatore.giornali_count + ' giornali'"></div>
+                        </div>
+                    </div>
+                </template>
+                
+                <div x-show="topOperatori.length === 0" class="text-center py-8 text-gray-500">
+                    <i class="fas fa-users text-2xl mb-2"></i>
+                    <p>Nessun dato disponibile</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Condizioni meteo -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                <i class="fas fa-cloud-sun mr-2 text-blue-600"></i>
+                Condizioni Meteorologiche
+            </h3>
+            
+            <div class="space-y-4">
+                <template x-for="meteo in meteoStats" :key="meteo.condizione">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i :class="getWeatherIcon(meteo.condizione)" 
+                               class="text-blue-600 text-xl mr-3"></i>
+                            <span class="font-medium text-gray-900" x-text="formatMeteo(meteo.condizione)"></span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-32 bg-gray-200 rounded-full h-2 mr-3">
+                                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                     :style="`width: ${(meteo.count / stats.totali * 100)}%`"></div>
+                            </div>
+                            <span class="text-sm text-gray-600 w-12 text-right" 
+                                  x-text="meteo.count"></span>
+                        </div>
+                    </div>
+                </template>
+                
+                <div x-show="meteoStats.length === 0" class="text-center py-8 text-gray-500">
+                    <i class="fas fa-cloud-sun text-2xl mb-2"></i>
+                    <p>Nessun dato meteo disponibile</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div x-show="loading" x-cloak 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-indigo-600 mb-4"></i>
+            <p class="text-gray-600">Generazione report in corso...</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function giornaleReportsApp() {
+    return {
+        // Dati
+        loading: false,
+        showFilters: false,
+        chartPeriod: 'settimana',
+        
+        // Statistiche principali
+        stats: {
+            totali: 0,
+            validati: 0,
+            in_attesa: 0,
+            ore_totali: 0,
+            operatori_unici: 0
+        },
+        
+        // Dati per grafici
+        siteStats: [],
+        topOperatori: [],
+        meteoStats: [],
+        
+        // Filtri
+        filters: {
+            data_da: '',
+            data_a: '',
+            sito_id: ''
+        },
+        
+        // Inizializzazione
+        async init() {
+            // Imposta periodo predefinito (ultimo mese)
+            const today = new Date();
+            const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+            
+            this.filters.data_da = lastMonth.toISOString().split('T')[0];
+            this.filters.data_a = today.toISOString().split('T')[0];
+            
+            await this.loadReports();
+        },
+        
+        // Caricamento report (mock)
+        async loadReports() {
+            this.loading = true;
+            try {
+                // TODO: Implementare endpoint API per report
+                // const response = await fetch('/api/giornale-cantiere/reports', {
+                //     method: 'POST',
+                //     body: JSON.stringify(this.filters)
+                // });
+                // const data = await response.json();
+                
+                // Mock data per ora
+                this.stats = {
+                    totali: 0,
+                    validati: 0,
+                    in_attesa: 0,
+                    ore_totali: 0,
+                    operatori_unici: 0
+                };
+                
+                this.siteStats = [];
+                this.topOperatori = [];
+                this.meteoStats = [];
+                
+            } catch (error) {
+                console.error('Errore caricamento report:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        // Azioni
+        async applyFilters() {
+            await this.loadReports();
+        },
+        
+        async refreshReports() {
+            await this.loadReports();
+        },
+        
+        async exportReport(format) {
+            try {
+                // TODO: Implementare export
+                // const response = await fetch(`/api/giornale-cantiere/export/${format}`, {
+                //     method: 'POST',
+                //     body: JSON.stringify(this.filters)
+                // });
+                // const blob = await response.blob();
+                // // Download file...
+                
+                alert(`Export ${format.toUpperCase()} - da implementare`);
+            } catch (error) {
+                console.error('Errore export:', error);
+                alert('Errore durante l\'export');
+            }
+        },
+        
+        // Utility
+        getValidationPercentage() {
+            if (!this.stats.totali) return '0%';
+            const percentage = Math.round((this.stats.validati / this.stats.totali) * 100);
+            return `${percentage}%`;
+        },
+        
+        getWeatherIcon(condizione) {
+            const icons = {
+                'sereno': 'fas fa-sun',
+                'nuvoloso': 'fas fa-cloud',
+                'piovoso': 'fas fa-cloud-rain',
+                'nevoso': 'fas fa-snowflake',
+                'ventoso': 'fas fa-wind'
+            };
+            return icons[condizione] || 'fas fa-cloud';
+        },
+        
+        formatMeteo(condizione) {
+            const labels = {
+                'sereno': 'Sereno',
+                'nuvoloso': 'Nuvoloso',
+                'piovoso': 'Piovoso',
+                'nevoso': 'Nevoso',
+                'ventoso': 'Ventoso'
+            };
+            return labels[condizione] || condizione;
+        }
+    }
+}
+</script>
+
+<style>
+[x-cloak] { display: none !important; }
+
+.transition { 
+    transition: all 0.2s ease-in-out; 
+}
+
+/* Stili per progress bar */
+.progress-bar {
+    transition: width 0.3s ease-in-out;
+}
+</style>
+{% endblock %}

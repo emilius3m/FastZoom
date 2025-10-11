@@ -17,6 +17,11 @@ async def create_db_and_tables():
     Crea tabelle database e superuser iniziale
     SENZA dipendenza da fastapi-users
     """
+    # IMPORTANTE: Inizializza tutti i modelli PRIMA di creare le tabelle
+    from app.database.base import init_models
+    init_models()
+    logger.info("📦 Models initialized")
+    
     # Crea tutte le tabelle
     async with engine.begin() as conn:
         logger.info("🗄️  Creating database tables...")
