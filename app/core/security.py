@@ -300,10 +300,39 @@ async def get_current_user_sites_with_blacklist(
     db: AsyncSession = Depends(get_async_session)
 ) -> List[Dict[str, Any]]:
     """
-    Dependency: ottiene siti accessibili dal token nel cookie con controllo blacklist
+    Dependency: ottiene siti accessibili dal DATABASE in tempo reale
+    NON usa più il token JWT per evitare dati cached non sicuri
     """
+    # Verifica token e ottieni user_id
     token_payload = await get_current_user_token_with_blacklist(request, db)
-    return SecurityService.get_sites_from_token(token_payload)
+    user_id_str = token_payload.get("sub")
+    
+    try:
+        user_id = UUID(user_id_str)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="ID utente non valido nel token"
+        )
+    
+    # Interroga il database per ottenere i siti accessibili in tempo reale
+    site_service = SiteService(db)
+    user_sites = await site_service.get_user_sites_with_permissions(user_id)
+    
+    # Converti in formato dizionario per compatibilità
+    sites_data = []
+    for site_permission in user_sites:
+        sites_data.append({
+            "id": str(site_permission.site.id),
+            "name": site_permission.site.name,
+            "code": site_permission.site.code,
+            "location": site_permission.site.location,
+            "description": site_permission.site.description,
+            "permission_level": site_permission.permission_level.value,
+            "is_active": site_permission.is_active
+        })
+    
+    return sites_data
 
 async def current_active_user(
     user_id: UUID = Depends(get_current_user_id),

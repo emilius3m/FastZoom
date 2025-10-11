@@ -30,12 +30,14 @@ class OperatoreCantiereBase(BaseModel):
     """Schema base per operatore di cantiere"""
     nome: str = Field(..., min_length=2, max_length=100, description="Nome dell'operatore")
     cognome: str = Field(..., min_length=2, max_length=100, description="Cognome dell'operatore")
-    codice_fiscale: Optional[str] = Field(None, min_length=16, max_length=16, description="Codice fiscale (opzionale)")
+    codice_fiscale: Optional[str] = Field(None, description="Codice fiscale (opzionale)")
     qualifica: str = Field(..., min_length=3, max_length=150, description="Qualifica professionale")
+    ruolo: Optional[str] = Field(None, max_length=100, description="Ruolo nel cantiere")
     specializzazione: Optional[str] = Field(None, max_length=200, description="Specializzazione specifica")
     email: Optional[str] = Field(None, max_length=320, description="Email di contatto")
     telefono: Optional[str] = Field(None, max_length=20, description="Numero di telefono")
     abilitazioni: Optional[str] = Field(None, description="Abilitazioni e certificazioni")
+    note: Optional[str] = Field(None, description="Note aggiuntive")
     is_active: bool = Field(True, description="Operatore attivo")
 
     @validator('codice_fiscale')
@@ -57,12 +59,14 @@ class OperatoreCantiereUpdate(BaseModel):
     """Schema per aggiornamento operatore"""
     nome: Optional[str] = Field(None, min_length=2, max_length=100)
     cognome: Optional[str] = Field(None, min_length=2, max_length=100)
-    codice_fiscale: Optional[str] = Field(None, min_length=16, max_length=16)
+    codice_fiscale: Optional[str] = None
     qualifica: Optional[str] = Field(None, min_length=3, max_length=150)
+    ruolo: Optional[str] = Field(None, max_length=100)
     specializzazione: Optional[str] = Field(None, max_length=200)
     email: Optional[str] = Field(None, max_length=320)
     telefono: Optional[str] = Field(None, max_length=20)
     abilitazioni: Optional[str] = None
+    note: Optional[str] = None
     is_active: Optional[bool] = None
 
 
