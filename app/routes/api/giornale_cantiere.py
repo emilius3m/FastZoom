@@ -827,6 +827,12 @@ async def create_operatore(
         if 'is_active' not in operatore_data:
             operatore_data['is_active'] = True
         
+        # Convert empty strings to None for optional fields
+        optional_string_fields = ['codice_fiscale', 'ruolo', 'specializzazione', 'email', 'telefono', 'abilitazioni', 'note']
+        for field in optional_string_fields:
+            if field in operatore_data and operatore_data[field] == '':
+                operatore_data[field] = None
+        
         # Debug: Log the data that will be saved
         logger.info(f"Dati che verranno salvati: {operatore_data}")
         

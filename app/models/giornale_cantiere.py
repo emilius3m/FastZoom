@@ -78,7 +78,7 @@ class OperatoreCantiere(Base):
     note = Column(Text, nullable=True)
     
     # Stato e statistiche
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = Column('is_active', Boolean, default=True, nullable=False)
     ore_totali = Column(Integer, default=0, nullable=False)  # Ore totali lavorate
     
     # Timestamp automatici
