@@ -128,7 +128,10 @@ class GiornaleCantiere(Base):
     # ===== CONDIZIONI OPERATIVE =====
     condizioni_meteo = Column(String(20), nullable=False)  # Enum CondizioniMeteoEnum
     temperatura = Column(Integer, nullable=True)  # Gradi Celsius
+    temperatura_min = Column(Integer, nullable=True)  # Gradi Celsius minima
+    temperatura_max = Column(Integer, nullable=True)  # Gradi Celsius massima
     note_meteo = Column(Text, nullable=True)
+    compilatore = Column(String(200), nullable=True)  # Nome del compilatore del giornale
     
     # ===== DESCRIZIONE ATTIVITÀ =====
     descrizione_lavori = Column(Text, nullable=False)
@@ -164,6 +167,8 @@ class GiornaleCantiere(Base):
     contestazioni = Column(Text, nullable=True)
     sospensioni = Column(Text, nullable=True)  # Motivi di sospensione e ripresa
     incidenti = Column(Text, nullable=True)  # Eventuali incidenti o problemi
+    note_generali = Column(Text, nullable=True)  # Note generali sul giornale
+    problematiche = Column(Text, nullable=True)  # Problematiche riscontrate
     
     # ===== FORNITURE E MATERIALI =====
     forniture = Column(Text, nullable=True)  # Materiali consegnati in cantiere
@@ -245,6 +250,24 @@ class GiornaleCantiere(Base):
         if self.usm_elaborate:
             return [usm.strip() for usm in self.usm_elaborate.split(',') if usm.strip()]
         return []
+    
+    def set_us_list(self, us_list: List[str]) -> None:
+        """Imposta la lista delle US elaborate come stringa separata da virgole"""
+        self.us_elaborate = ', '.join(us_list) if us_list else None
+    
+    def set_usm_list(self, usm_list: List[str]) -> None:
+        """Imposta la lista delle USM elaborate come stringa separata da virgole"""
+        self.usm_elaborate = ', '.join(usm_list) if usm_list else None
+    
+    def get_apparecchiature_list(self) -> List[str]:
+        """Restituisce lista delle apparecchiature utilizzate come array"""
+        if self.attrezzatura_utilizzata:
+            return [app.strip() for app in self.attrezzatura_utilizzata.split(',') if app.strip()]
+        return []
+    
+    def set_apparecchiature_list(self, apparecchiature_list: List[str]) -> None:
+        """Imposta la lista delle apparecchiature utilizzate come stringa separata da virgole"""
+        self.attrezzatura_utilizzata = ', '.join(apparecchiature_list) if apparecchiature_list else None
 
 
 # ===== AGGIORNAMENTO DEL MODELLO ARCHAEOLOGICALSITE =====

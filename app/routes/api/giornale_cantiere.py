@@ -381,6 +381,309 @@ async def get_giornali_by_site(
             detail="Errore nel recupero dei giornali"
         )
 
+# Schema per creazione giornale
+class GiornaleCantiereCreate(BaseModel):
+    """Schema per creazione nuovo giornale"""
+    site_id: UUID
+    data: date
+    ora_inizio: Optional[time] = None
+    ora_fine: Optional[time] = None
+    responsabile_nome: str
+    compilatore: Optional[str] = None
+    condizioni_meteo: Optional[str] = None
+    temperatura_min: Optional[int] = None
+    temperatura_max: Optional[int] = None
+    descrizione_lavori: str
+    operatori_ids: Optional[List[UUID]] = []
+    us_elaborate_input: Optional[str] = None
+    note_generali: Optional[str] = None
+    problematiche: Optional[str] = None
+    apparecchiature_input: Optional[str] = None
+
+@router.post("/giornali", status_code=status.HTTP_201_CREATED)
+async def create_giornale(
+    giornale_data: GiornaleCantiereCreate,
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Crea un nuovo giornale di cantiere"""
+    try:
+        # Verifica accesso al sito
+        await get_site_with_verification(giornale_data.site_id, db, user_sites)
+        
+        # Crea nuovo giornale
+        db_giornale = GiornaleCantiere(
+            site_id=giornale_data.site_id,
+            data=giornale_data.data,
+            ora_inizio=giornale_data.ora_inizio,
+            ora_fine=giornale_data.ora_fine,
+            responsabile_nome=giornale_data.responsabile_nome,
+            compilatore=giornale_data.compilatore,
+            condizioni_meteo=giornale_data.condizioni_meteo,
+            temperatura=giornale_data.temperatura_max,  # Salviamo temperatura_max nel campo temperatura per compatibilità
+            temperatura_min=giornale_data.temperatura_min,
+            temperatura_max=giornale_data.temperatura_max,
+            descrizione_lavori=giornale_data.descrizione_lavori,
+            note_generali=giornale_data.note_generali,
+            problematiche=giornale_data.problematiche,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+            validato=False
+        )
+        
+        # Processa US elaborate
+        if giornale_data.us_elaborate_input:
+            us_list = [us.strip() for us in giornale_data.us_elaborate_input.split(",") if us.strip()]
+            db_giornale.set_us_list(us_list)
+        
+        # Processa apparecchiature
+        if giornale_data.apparecchiature_input:
+            apparecchiature_list = [app.strip() for app in giornale_data.apparecchiature_input.replace("\n", ",").split(",") if app.strip()]
+            db_giornale.set_apparecchiature_list(apparecchiature_list)
+        
+        db.add(db_giornale)
+        await db.flush()  # Ottieni l'ID senza commit finale
+        
+        # Associa operatori se specificati
+        if giornale_data.operatori_ids:
+            # Carica operatori
+            operatori_result = await db.execute(
+                select(OperatoreCantiere).where(OperatoreCantiere.id.in_(giornale_data.operatori_ids))
+            )
+            operatori = operatori_result.scalars().all()
+            
+            # Associa operatori al giornale
+            db_giornale.operatori = operatori
+        
+        await db.commit()
+        await db.refresh(db_giornale)
+        
+        logger.info(f"Giornale creato: {db_giornale.id} per sito {giornale_data.site_id} da user {current_user_id}")
+        
+        return {
+            "id": str(db_giornale.id),
+            "message": "Giornale creato con successo",
+            "site_id": str(db_giornale.site_id),
+            "data": db_giornale.data.isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore creazione giornale: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nella creazione del giornale: {str(e)}"
+        )
+
+@router.get("/giornali/{giornale_id}")
+async def get_giornale(
+    giornale_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Ottiene dettagli di un singolo giornale"""
+    try:
+        # Carica giornale con relazioni
+        result = await db.execute(
+            select(GiornaleCantiere)
+            .where(GiornaleCantiere.id == giornale_id)
+            .options(
+                selectinload(GiornaleCantiere.site),
+                selectinload(GiornaleCantiere.operatori)
+            )
+        )
+        giornale = result.scalar_one_or_none()
+        
+        if not giornale:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Giornale non trovato"
+            )
+        
+        # Verifica accesso al sito
+        await get_site_with_verification(giornale.site_id, db, user_sites)
+        
+        # Converti in dizionario per il frontend
+        giornale_dict = {
+            "id": str(giornale.id),
+            "site_id": str(giornale.site_id),
+            "data": giornale.data.isoformat() if giornale.data else None,
+            "ora_inizio": giornale.ora_inizio.strftime("%H:%M") if giornale.ora_inizio else None,
+            "ora_fine": giornale.ora_fine.strftime("%H:%M") if giornale.ora_fine else None,
+            "responsabile_scavo": giornale.responsabile_nome,
+            "compilatore": giornale.compilatore,
+            "condizioni_meteo": giornale.condizioni_meteo,
+            "temperatura_min": giornale.temperatura_min,
+            "temperatura_max": giornale.temperatura_max,
+            "descrizione_lavori": giornale.descrizione_lavori,
+            "us_elaborate": giornale.get_us_list(),
+            "apparecchiature_utilizzate": giornale.get_apparecchiature_list(),
+            "note_generali": giornale.note_generali,
+            "problematiche": giornale.problematiche,
+            "operatori_presenti": [
+                {"id": str(op.id), "nome": op.nome, "cognome": op.cognome, "ruolo": op.ruolo}
+                for op in giornale.operatori
+            ] if giornale.operatori else [],
+            "stato": "validato" if giornale.validato else "in_attesa",
+            "created_at": giornale.created_at.isoformat() if giornale.created_at else None,
+            "updated_at": giornale.updated_at.isoformat() if giornale.updated_at else None,
+            "version": giornale.version or 1
+        }
+        
+        return giornale_dict
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore recupero giornale {giornale_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel recupero del giornale"
+        )
+
+@router.put("/giornali/{giornale_id}")
+async def update_giornale(
+    giornale_id: UUID,
+    giornale_data: GiornaleCantiereCreate,
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Aggiorna un giornale esistente"""
+    try:
+        # Carica giornale esistente
+        result = await db.execute(
+            select(GiornaleCantiere).where(GiornaleCantiere.id == giornale_id)
+        )
+        db_giornale = result.scalar_one_or_none()
+        
+        if not db_giornale:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Giornale non trovato"
+            )
+        
+        # Verifica accesso al sito
+        await get_site_with_verification(db_giornale.site_id, db, user_sites)
+        
+        # Verifica che il giornale non sia già validato
+        if db_giornale.validato:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Impossibile modificare un giornale già validato"
+            )
+        
+        # Aggiorna campi
+        db_giornale.data = giornale_data.data
+        db_giornale.ora_inizio = giornale_data.ora_inizio
+        db_giornale.ora_fine = giornale_data.ora_fine
+        db_giornale.responsabile_nome = giornale_data.responsabile_nome
+        db_giornale.compilatore = giornale_data.compilatore
+        db_giornale.condizioni_meteo = giornale_data.condizioni_meteo
+        db_giornale.temperatura = giornale_data.temperatura_max  # Salviamo temperatura_max nel campo temperatura per compatibilità
+        db_giornale.temperatura_min = giornale_data.temperatura_min
+        db_giornale.temperatura_max = giornale_data.temperatura_max
+        db_giornale.descrizione_lavori = giornale_data.descrizione_lavori
+        db_giornale.note_generali = giornale_data.note_generali
+        db_giornale.problematiche = giornale_data.problematiche
+        db_giornale.updated_at = datetime.now()
+        db_giornale.version = (db_giornale.version or 1) + 1
+        
+        # Processa US elaborate
+        if giornale_data.us_elaborate_input:
+            us_list = [us.strip() for us in giornale_data.us_elaborate_input.split(",") if us.strip()]
+            db_giornale.set_us_list(us_list)
+        
+        # Processa apparecchiature
+        if giornale_data.apparecchiature_input:
+            apparecchiature_list = [app.strip() for app in giornale_data.apparecchiature_input.replace("\n", ",").split(",") if app.strip()]
+            db_giornale.set_apparecchiature_list(apparecchiature_list)
+        
+        # Aggiorna operatori se specificati
+        if giornale_data.operatori_ids:
+            # Carica operatori
+            operatori_result = await db.execute(
+                select(OperatoreCantiere).where(OperatoreCantiere.id.in_(giornale_data.operatori_ids))
+            )
+            operatori = operatori_result.scalars().all()
+            
+            # Associa operatori al giornale
+            db_giornale.operatori = operatori
+        
+        await db.commit()
+        
+        logger.info(f"Giornale {giornale_id} aggiornato da user {current_user_id}")
+        
+        return {
+            "id": str(db_giornale.id),
+            "message": "Giornale aggiornato con successo",
+            "site_id": str(db_giornale.site_id),
+            "data": db_giornale.data.isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore aggiornamento giornale {giornale_id}: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nell'aggiornamento del giornale: {str(e)}"
+        )
+
+@router.delete("/giornali/{giornale_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_giornale(
+    giornale_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Elimina un giornale di cantiere"""
+    try:
+        # Carica giornale esistente
+        result = await db.execute(
+            select(GiornaleCantiere).where(GiornaleCantiere.id == giornale_id)
+        )
+        db_giornale = result.scalar_one_or_none()
+        
+        if not db_giornale:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Giornale non trovato"
+            )
+        
+        # Verifica accesso al sito
+        await get_site_with_verification(db_giornale.site_id, db, user_sites)
+        
+        # Verifica che il giornale non sia già validato
+        if db_giornale.validato:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Impossibile eliminare un giornale già validato"
+            )
+        
+        # Elimina giornale
+        await db.delete(db_giornale)
+        await db.commit()
+        
+        logger.info(f"Giornale {giornale_id} eliminato da user {current_user_id}")
+        
+        return None
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore eliminazione giornale {giornale_id}: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nell'eliminazione del giornale: {str(e)}"
+        )
+
 @router.get("/operatori")
 async def get_operatori(
     skip: int = Query(0, ge=0),
