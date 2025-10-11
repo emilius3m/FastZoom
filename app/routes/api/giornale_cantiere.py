@@ -604,7 +604,7 @@ async def get_giornale(
 @router.put("/giornali/{giornale_id}")
 async def update_giornale(
     giornale_id: UUID,
-    giornale_data: GiornaleCantiereCreate,
+    giornale_data: GiornaleCantiereUpdate,
     db: AsyncSession = Depends(get_async_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
@@ -633,34 +633,48 @@ async def update_giornale(
                 detail="Impossibile modificare un giornale già validato"
             )
         
-        # Aggiorna campi
-        db_giornale.data = giornale_data.data
-        db_giornale.ora_inizio = giornale_data.ora_inizio
-        db_giornale.ora_fine = giornale_data.ora_fine
-        db_giornale.responsabile_nome = giornale_data.responsabile_nome
-        db_giornale.compilatore = giornale_data.compilatore
-        db_giornale.condizioni_meteo = giornale_data.condizioni_meteo
-        db_giornale.temperatura = giornale_data.temperatura_max  # Salviamo temperatura_max nel campo temperatura per compatibilità
-        db_giornale.temperatura_min = giornale_data.temperatura_min
-        db_giornale.temperatura_max = giornale_data.temperatura_max
-        db_giornale.descrizione_lavori = giornale_data.descrizione_lavori
-        db_giornale.note_generali = giornale_data.note_generali
-        db_giornale.problematiche = giornale_data.problematiche
-        # updated_at will be set automatically by onupdate
+        # Aggiorna solo i campi forniti
+        update_data = giornale_data.model_dump(exclude_unset=True)
+        
+        if update_data.get("data") is not None:
+            db_giornale.data = update_data["data"]
+        if update_data.get("ora_inizio") is not None:
+            db_giornale.ora_inizio = update_data["ora_inizio"]
+        if update_data.get("ora_fine") is not None:
+            db_giornale.ora_fine = update_data["ora_fine"]
+        if update_data.get("responsabile_nome") is not None:
+            db_giornale.responsabile_nome = update_data["responsabile_nome"]
+        if update_data.get("compilatore") is not None:
+            db_giornale.compilatore = update_data["compilatore"]
+        if update_data.get("condizioni_meteo") is not None:
+            db_giornale.condizioni_meteo = update_data["condizioni_meteo"]
+        if update_data.get("temperatura_max") is not None:
+            db_giornale.temperatura = update_data["temperatura_max"]  # Salviamo temperatura_max nel campo temperatura per compatibilità
+            db_giornale.temperatura_max = update_data["temperatura_max"]
+        if update_data.get("temperatura_min") is not None:
+            db_giornale.temperatura_min = update_data["temperatura_min"]
+        if update_data.get("descrizione_lavori") is not None:
+            db_giornale.descrizione_lavori = update_data["descrizione_lavori"]
+        if update_data.get("note_generali") is not None:
+            db_giornale.note_generali = update_data["note_generali"]
+        if update_data.get("problematiche") is not None:
+            db_giornale.problematiche = update_data["problematiche"]
+            
+        # Increment version
         db_giornale.version = (db_giornale.version or 1) + 1
         
         # Processa US elaborate
-        if giornale_data.us_elaborate_input:
-            us_list = [us.strip() for us in giornale_data.us_elaborate_input.split(",") if us.strip()]
+        if update_data.get("us_elaborate_input") is not None:
+            us_list = [us.strip() for us in update_data["us_elaborate_input"].split(",") if us.strip()]
             db_giornale.set_us_list(us_list)
         
         # Processa apparecchiature
-        if giornale_data.apparecchiature_input:
-            apparecchiature_list = [app.strip() for app in giornale_data.apparecchiature_input.replace("\n", ",").split(",") if app.strip()]
+        if update_data.get("apparecchiature_input") is not None:
+            apparecchiature_list = [app.strip() for app in update_data["apparecchiature_input"].replace("\n", ",").split(",") if app.strip()]
             db_giornale.set_apparecchiature_list(apparecchiature_list)
         
         # Aggiorna operatori se specificati
-        if giornale_data.operatori_ids:
+        if update_data.get("operatori_ids") is not None:
             # Prima elimina le associazioni esistenti
             delete_stmt = giornale_operatori_association.delete().where(
                 giornale_operatori_association.c.giornale_id == db_giornale.id
@@ -1277,4 +1291,11 @@ async def get_reference_data():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nel recupero dei dati di riferimento"
-        )
+        )        
+        return {
+            "condizioni_meteo": condizioni_meteo,
+            "ruoli_operatori": ruoli_operatori,
+            "specializzazioni": specializzazioni
+        }
+        
+
