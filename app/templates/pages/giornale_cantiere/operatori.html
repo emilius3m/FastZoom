@@ -6,7 +6,7 @@
 {% block title %}{{ title or "Operatori di Cantiere" }}{% endblock %}
 
 {% block content %}
-<div x-data="operatoriApp()" x-init="init()" class="container mx-auto px-4 py-6">
+<div x-data="operatoriApp()" x-init="init()" class="container mx-auto px-4 py-6 min-h-screen bg-gray-50 dark:bg-gray-900">
     
     <!-- Header con breadcrumb -->
     <div class="mb-6">
@@ -60,7 +60,7 @@
 
     <!-- Statistiche operatori -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-blue-500">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-600">Operatori Totali</p>
@@ -70,7 +70,7 @@
             </div>
         </div>
         
-        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-green-500">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-600">Attivi</p>
@@ -80,7 +80,7 @@
             </div>
         </div>
         
-        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-yellow-500">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-600">Specialisti</p>
@@ -90,7 +90,7 @@
             </div>
         </div>
         
-        <div class="bg-white p-4 rounded-lg shadow border-l-4 border-purple-500">
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-purple-500">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-600">Ore Totali</p>
@@ -102,7 +102,7 @@
     </div>
 
     <!-- Filtri avanzati -->
-    <div x-show="showFilters" x-cloak class="bg-white p-4 rounded-lg shadow mb-6">
+    <div x-show="showFilters" x-cloak class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Ricerca</label>
@@ -163,7 +163,7 @@
     <!-- Lista Operatori -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" x-show="!loading">
         <template x-for="operatore in operatoriList" :key="operatore.id">
-            <div class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow duration-200 border-l-4"
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow duration-200 border-l-4"
                  :class="getRoleBorderColor(operatore.ruolo)">
                 <div class="p-6">
                     <!-- Header operatore -->
@@ -172,9 +172,9 @@
                             <i :class="getRoleIcon(operatore.ruolo)" class="text-xl"></i>
                         </div>
                         <div class="flex-1">
-                            <h3 class="text-lg font-semibold text-gray-900" 
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white"
                                 x-text="`${operatore.nome} ${operatore.cognome}`"></h3>
-                            <p class="text-sm text-gray-600" x-text="formatRuolo(operatore.ruolo)"></p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400" x-text="formatRuolo(operatore.ruolo)"></p>
                         </div>
                         
                         <!-- Stato badge -->
@@ -185,7 +185,7 @@
                     </div>
                     
                     <!-- Informazioni base -->
-                    <div class="space-y-2 text-sm text-gray-600 mb-4">
+                    <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
                         <div x-show="operatore.codice_fiscale" class="flex items-center">
                             <i class="fas fa-id-card mr-2 text-gray-400"></i>
                             <span x-text="operatore.codice_fiscale"></span>
@@ -209,19 +209,19 @@
                     
                     <!-- Statistiche operatore -->
                     <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
-                        <div class="bg-gray-50 p-3 rounded text-center">
+                        <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded text-center">
                             <div class="text-gray-500">Ore Lavorate</div>
-                            <div class="font-semibold text-gray-900" x-text="operatore.ore_totali || 0"></div>
+                            <div class="font-semibold text-gray-900 dark:text-white" x-text="operatore.ore_totali || 0"></div>
                         </div>
-                        <div class="bg-gray-50 p-3 rounded text-center">
+                        <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded text-center">
                             <div class="text-gray-500">Giornali</div>
-                            <div class="font-semibold text-gray-900" x-text="operatore.giornali_count || 0"></div>
+                            <div class="font-semibold text-gray-900 dark:text-white" x-text="operatore.giornali_count || 0"></div>
                         </div>
                     </div>
                     
                     <!-- Qualifiche -->
                     <div x-show="operatore.qualifiche && operatore.qualifiche.length > 0" class="mb-4">
-                        <div class="text-sm text-gray-600 mb-2">Qualifiche:</div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">Qualifiche:</div>
                         <div class="flex flex-wrap gap-1">
                             <template x-for="qualifica in operatore.qualifiche.slice(0, 3)" :key="qualifica">
                                 <span class="inline-flex items-center px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded"
@@ -235,7 +235,7 @@
                     
                     <!-- Note -->
                     <div x-show="operatore.note" class="mb-4">
-                        <p class="text-sm text-gray-600" x-text="truncateText(operatore.note, 100)"></p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400" x-text="truncateText(operatore.note, 100)"></p>
                     </div>
                     
                     <!-- Azioni -->
@@ -255,10 +255,10 @@
 
         <!-- Messaggio vuoto -->
         <div x-show="operatoriList.length === 0 && !loading" 
-             class="col-span-full text-center py-12 bg-white rounded-lg shadow">
+             class="col-span-full text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
             <i class="fas fa-users text-6xl text-gray-300 mb-4"></i>
-            <h3 class="text-lg font-medium text-gray-900 mb-2">Nessun operatore trovato</h3>
-            <p class="text-gray-500 mb-4">Non ci sono operatori per i filtri selezionati.</p>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Nessun operatore trovato</h3>
+            <p class="text-gray-500 dark:text-gray-400 mb-4">Non ci sono operatori per i filtri selezionati.</p>
             <button @click="openCreateModal()" 
                     class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
                 <i class="fas fa-plus mr-2"></i>Aggiungi il primo operatore
@@ -269,7 +269,7 @@
     <!-- Loading spinner -->
     <div x-show="loading" class="text-center py-12">
         <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
-        <p class="text-gray-600">Caricamento operatori...</p>
+        <p class="text-gray-600 dark:text-gray-400">Caricamento operatori...</p>
     </div>
     
     <!-- Modal Creazione/Modifica Operatore -->
@@ -300,16 +300,16 @@
                  x-transition:leave="ease-in duration-200"
                  x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                  x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                 class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
                 
                 <form @submit.prevent="submitOperatore()">
-                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div class="flex items-start mb-4">
                             <div class="flex-1">
-                                <h3 class="text-lg leading-6 font-medium text-gray-900" x-text="modalMode === 'create' ? 'Nuovo Operatore' : 'Modifica Operatore'"></h3>
-                                <p class="mt-1 text-sm text-gray-500">Inserisci i dati dell'operatore di cantiere</p>
+                                <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" x-text="modalMode === 'create' ? 'Nuovo Operatore' : 'Modifica Operatore'"></h3>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Inserisci i dati dell'operatore di cantiere</p>
                             </div>
-                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-500">
+                            <button type="button" @click="closeModal()" class="text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400">
                                 <i class="fas fa-times text-xl"></i>
                             </button>
                         </div>
@@ -317,35 +317,35 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                             <!-- Nome -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Nome *</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nome *</label>
                                 <input type="text" x-model="formData.nome" required
                                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Cognome -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Cognome *</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cognome *</label>
                                 <input type="text" x-model="formData.cognome" required
                                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Codice Fiscale -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Codice Fiscale</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Codice Fiscale</label>
                                 <input type="text" x-model="formData.codice_fiscale" maxlength="16"
                                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Qualifica -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Qualifica *</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Qualifica *</label>
                                 <input type="text" x-model="formData.qualifica" required
                                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Ruolo -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Ruolo</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ruolo</label>
                                 <select x-model="formData.ruolo"
                                         class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <option value="">Seleziona ruolo</option>
@@ -359,7 +359,7 @@
                             
                             <!-- Specializzazione -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Specializzazione</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Specializzazione</label>
                                 <select x-model="formData.specializzazione"
                                         class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <option value="">Seleziona specializzazione</option>
@@ -375,14 +375,14 @@
                             
                             <!-- Email -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Email</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
                                 <input type="email" x-model="formData.email"
                                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Telefono -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Telefono</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Telefono</label>
                                 <input type="tel" x-model="formData.telefono"
                                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
@@ -391,13 +391,13 @@
                             <div class="md:col-span-2">
                                 <label class="flex items-center">
                                     <input type="checkbox" x-model="formData.is_active" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                                    <span class="ml-2 text-sm text-gray-700">Operatore attivo</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Operatore attivo</span>
                                 </label>
                             </div>
                             
                             <!-- Note -->
                             <div class="md:col-span-2">
-                                <label class="block text-sm font-medium text-gray-700">Note</label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Note</label>
                                 <textarea x-model="formData.note" rows="3"
                                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
                             </div>
@@ -409,14 +409,14 @@
                         </div>
                     </div>
                     
-                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                         <button type="submit" :disabled="saving"
                                 class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fas fa-spinner fa-spin mr-2" x-show="saving"></i>
                             <span x-text="saving ? 'Salvataggio...' : (modalMode === 'create' ? 'Crea Operatore' : 'Salva Modifiche')"></span>
                         </button>
                         <button type="button" @click="closeModal()" :disabled="saving"
-                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                             Annulla
                         </button>
                     </div>
@@ -721,8 +721,15 @@ function operatoriApp() {
 <style>
 [x-cloak] { display: none !important; }
 
-.transition { 
-    transition: all 0.2s ease-in-out; 
+.transition {
+    transition: all 0.2s ease-in-out;
 }
 </style>
+
+<script>
+// Theme management
+if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+}
+</script>
 {% endblock %}
