@@ -32,6 +32,7 @@ from app.models.sites import ArchaeologicalSite
 from app.models.user_sites import UserSitePermission
 from app.models.form_schemas import FormSchema
 from app.templates import templates
+from app.routes.api.dependencies import get_site_access
 
 # Import API sub-routers
 from app.routes.api.iccd_hierarchy import iccd_hierarchy_router
@@ -63,6 +64,5 @@ from app.routes.shared.router_utils import (
     get_current_user_with_context,
     create_user_context,
     handle_permission_denied,
-    handle_resource_not_found,
-    get_site_access
+    handle_resource_not_found
 )

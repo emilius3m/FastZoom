@@ -2343,6 +2343,22 @@ function photosManager() {
         editPhoto(photo) {
             console.log('editPhoto called with photo:', photo);
 
+            // Handle multi-edit button click which doesn't pass a photo
+            if (!photo) {
+                // Multi-edit mode triggered by the multi-edit button
+                if (this.selectedPhotos.length <= 1) {
+                    this.showAlertMessage('Seleziona almeno 2 foto per la modifica multipla');
+                    return;
+                }
+                // Find the first selected photo for form initialization
+                photo = this.photos.find(p => p && this.selectedPhotos.includes(p.id));
+                if (!photo) {
+                    console.error('No valid photo found among selected photos');
+                    this.showAlertMessage('Errore: nessuna foto valida selezionata');
+                    return;
+                }
+            }
+
             // Validate photo object
             if (!photo || !photo.id) {
                 console.error('Invalid photo object passed to editPhoto:', photo);
@@ -2354,6 +2370,8 @@ function photosManager() {
             if (this.selectedPhotos.length > 1) {
                 // Multi-edit mode: don't set selectedPhoto, use selectedPhotos array
                 this.selectedPhoto = null;
+                // Ensure we have the correct photo data for the form
+                photo = this.photos.find(p => p && p.id === photo.id) || photo;
             } else {
                 // Single photo edit mode
                 this.selectedPhoto = photo;
