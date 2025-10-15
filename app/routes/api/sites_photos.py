@@ -1095,7 +1095,7 @@ async def bulk_delete_photos(
         raise HTTPException(status_code=500, detail=f"Errore eliminazione in blocco: {str(e)}")
 
 
-@photos_router.post("/site/{site_id}/api/photos/bulk-update")
+@photos_router.post("/site/{site_id}/photos/bulk-update")
 async def bulk_update_photos(
         site_id: UUID,
         update_data: dict,
