@@ -1,0 +1,657 @@
+<!-- app/templates/pages/us/modal_us_create_edit.html -->
+<!-- Modal Creazione/Modifica Unità Stratigrafica (US) - Standard MiC 2021 -->
+
+<div x-show="showUSModal"
+     x-cloak
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
+     @click.self="closeUSModal()">
+
+    <div class="bg-white rounded-lg max-w-6xl w-full mx-4 my-8 max-h-95vh overflow-hidden shadow-2xl">
+
+        <!-- Header Modal -->
+        <div class="sticky top-0 bg-gradient-to-r from-orange-600 to-orange-500 text-white px-6 py-4 flex justify-between items-center z-10">
+            <div>
+                <h3 class="text-2xl font-bold" x-text="editingUS ? 'Modifica US ' + editingUS.us_code : 'Nuova Unità Stratigrafica (US)'"></h3>
+                <p class="text-orange-100 text-sm mt-1">Scheda standard MiC 2021</p>
+            </div>
+            <button @click="closeUSModal()" class="text-white hover:text-orange-200 transition">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+
+        <!-- Form Content -->
+        <div class="max-h-80vh overflow-y-auto">
+            <form @submit.prevent="saveUS()" class="p-6">
+
+                <!-- Alert Errori -->
+                <div x-show="usErrorMessage" class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 mr-3"></i>
+                        <p class="text-red-700 font-medium" x-text="usErrorMessage"></p>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 1: INTESTAZIONE E IDENTIFICAZIONE ========== -->
+                <div class="bg-orange-50 border-l-4 border-orange-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-orange-900 mb-4 flex items-center">
+                        <i class="fas fa-id-card mr-3"></i>
+                        Intestazione e Identificazione
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- US Code -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                Numero US <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.us_code"
+                                   required
+                                   pattern="^US\d{3,4}$"
+                                   placeholder="US001"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">Formato: US001, US002...</p>
+                        </div>
+
+                        <!-- Ente Responsabile -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ente Responsabile</label>
+                            <input type="text"
+                                   x-model="usFormData.ente_responsabile"
+                                   placeholder="Soprintendenza..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+
+                        <!-- Anno -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Anno</label>
+                            <input type="number"
+                                   x-model="usFormData.anno"
+                                   min="1900"
+                                   :max="new Date().getFullYear()"
+                                   placeholder="2025"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <!-- Ufficio MiC -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ufficio MiC Competente per Tutela</label>
+                            <input type="text"
+                                   x-model="usFormData.ufficio_mic"
+                                   placeholder="Ufficio competente..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+
+                        <!-- Identificativo Saggio -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Identificativo Saggio/Edificio/Struttura</label>
+                            <input type="text"
+                                   x-model="usFormData.identificativo_rif"
+                                   placeholder="Saggio A, Edificio 1..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 2: LOCALIZZAZIONE ========== -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-blue-900 mb-4 flex items-center">
+                        <i class="fas fa-map-marked-alt mr-3"></i>
+                        Localizzazione
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Località</label>
+                            <input type="text"
+                                   x-model="usFormData.localita"
+                                   placeholder="Località..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Area/Edificio/Struttura</label>
+                            <input type="text"
+                                   x-model="usFormData.area_struttura"
+                                   placeholder="Area A, Edificio B..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Saggio</label>
+                            <input type="text"
+                                   x-model="usFormData.saggio"
+                                   placeholder="Saggio 1..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ambiente/Unità Funzionale</label>
+                            <input type="text"
+                                   x-model="usFormData.ambiente_unita_funzione"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Posizione</label>
+                            <input type="text"
+                                   x-model="usFormData.posizione"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Settore/i</label>
+                            <input type="text"
+                                   x-model="usFormData.settori"
+                                   placeholder="A1, A2, B1..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Piante</label>
+                            <input type="text"
+                                   x-model="usFormData.piante"
+                                   placeholder="P1, P2..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Prospetti</label>
+                            <input type="text"
+                                   x-model="usFormData.prospetti"
+                                   placeholder="PR1, PR2..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Sezioni</label>
+                            <input type="text"
+                                   x-model="usFormData.sezioni"
+                                   placeholder="S1, S2..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 3: DEFINIZIONE E CARATTERIZZAZIONE ========== -->
+                <div class="bg-green-50 border-l-4 border-green-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-green-900 mb-4 flex items-center">
+                        <i class="fas fa-clipboard-list mr-3"></i>
+                        Definizione e Caratterizzazione
+                    </h4>
+
+                    <div class="space-y-4">
+                        <!-- Definizione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                Definizione
+                                <span class="text-gray-500 font-normal">(es: strato, interfaccia, riempimento...)</span>
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.definizione"
+                                   placeholder="Strato di terreno..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+
+                        <!-- Criteri Distinzione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Criteri di Distinzione</label>
+                            <textarea x-model="usFormData.criteri_distinzione"
+                                      rows="2"
+                                      placeholder="Criteri utilizzati per distinguere questa US..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"></textarea>
+                        </div>
+
+                        <!-- Modo Formazione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                Modo di Formazione
+                                <span class="text-gray-500 font-normal">(naturale, antropico...)</span>
+                            </label>
+                            <textarea x-model="usFormData.modo_formazione"
+                                      rows="2"
+                                      placeholder="Processo di formazione dell'US..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 4: COMPONENTI E PROPRIETÀ FISICHE ========== -->
+                <div class="bg-purple-50 border-l-4 border-purple-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-purple-900 mb-4 flex items-center">
+                        <i class="fas fa-microscope mr-3"></i>
+                        Componenti e Proprietà Fisiche
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <!-- Componenti Inorganici -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Componenti Inorganici</label>
+                            <textarea x-model="usFormData.componenti_inorganici"
+                                      rows="3"
+                                      placeholder="Sabbia, argilla, ciottoli..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                        </div>
+
+                        <!-- Componenti Organici -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Componenti Organici</label>
+                            <textarea x-model="usFormData.componenti_organici"
+                                      rows="3"
+                                      placeholder="Carbone, resti vegetali, ossei..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Consistenza -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Consistenza</label>
+                            <select x-model="usFormData.consistenza"
+                                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <option value="">Seleziona...</option>
+                                <option value="compatta">Compatta</option>
+                                <option value="media">Media</option>
+                                <option value="friabile">Friabile</option>
+                                <option value="molto_friabile">Molto friabile</option>
+                            </select>
+                        </div>
+
+                        <!-- Colore -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                Colore
+                                <span class="text-gray-500 font-normal text-xs">(Munsell o descrittivo)</span>
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.colore"
+                                   placeholder="10YR 5/3 o Marrone chiaro"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        </div>
+
+                        <!-- Misure -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                Misure
+                                <span class="text-gray-500 font-normal text-xs">(lungh./largh./spess.)</span>
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.misure"
+                                   placeholder="5x3x0.20 m"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+
+                    <!-- Stato Conservazione -->
+                    <div class="mt-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Stato di Conservazione</label>
+                        <textarea x-model="usFormData.stato_conservazione"
+                                  rows="2"
+                                  placeholder="Buono, mediocre, pessimo... descrizione..."
+                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 5: SEQUENZA FISICA (Matrix Harris) ========== -->
+                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-yellow-900 mb-4 flex items-center">
+                        <i class="fas fa-project-diagram mr-3"></i>
+                        Sequenza Fisica (Matrix Harris)
+                    </h4>
+
+                    <p class="text-sm text-gray-600 mb-4 italic">
+                        Inserisci i codici US separati da virgole per ogni relazione stratigrafica
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Uguale a -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-equals text-gray-500 mr-1"></i>
+                                Uguale a
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_uguale_a"
+                                   placeholder="US002, US003..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <!-- Si lega a -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-link text-gray-500 mr-1"></i>
+                                Si lega a
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_si_lega_a"
+                                   placeholder="US004, US005..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <!-- Gli si appoggia -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-arrow-down text-blue-500 mr-1"></i>
+                                Gli si appoggia
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_gli_si_appoggia"
+                                   placeholder="US006..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <!-- Si appoggia a -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-arrow-up text-green-500 mr-1"></i>
+                                Si appoggia a
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_si_appoggia_a"
+                                   placeholder="US007..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <!-- Coperto da -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-layer-group text-purple-500 mr-1"></i>
+                                Coperto da
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_coperto_da"
+                                   placeholder="US008..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <!-- Copre -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-layer-group text-orange-500 mr-1"></i>
+                                Copre
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_copre"
+                                   placeholder="US009..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <!-- Tagliato da -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-cut text-red-500 mr-1"></i>
+                                Tagliato da
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_tagliato_da"
+                                   placeholder="US010..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <!-- Taglia -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-cut text-red-700 mr-1"></i>
+                                Taglia
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_taglia"
+                                   placeholder="US011..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <!-- Riempito da -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-fill text-teal-500 mr-1"></i>
+                                Riempito da
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_riempito_da"
+                                   placeholder="US012..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <!-- Riempie -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-fill-drip text-teal-700 mr-1"></i>
+                                Riempie
+                            </label>
+                            <input type="text"
+                                   x-model="usFormData.seq_riempie"
+                                   placeholder="US013..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 6: DESCRIZIONE E INTERPRETAZIONE ========== -->
+                <div class="bg-indigo-50 border-l-4 border-indigo-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-indigo-900 mb-4 flex items-center">
+                        <i class="fas fa-pen mr-3"></i>
+                        Descrizione e Interpretazione
+                    </h4>
+
+                    <div class="space-y-4">
+                        <!-- Descrizione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Descrizione Dettagliata</label>
+                            <textarea x-model="usFormData.descrizione"
+                                      rows="4"
+                                      placeholder="Descrizione completa dell'unità stratigrafica..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+
+                        <!-- Osservazioni -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Osservazioni</label>
+                            <textarea x-model="usFormData.osservazioni"
+                                      rows="3"
+                                      placeholder="Osservazioni e note aggiuntive..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+
+                        <!-- Interpretazione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Interpretazione Archeologica</label>
+                            <textarea x-model="usFormData.interpretazione"
+                                      rows="4"
+                                      placeholder="Interpretazione funzionale e cronologica..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 7: DATAZIONE E REPERTI ========== -->
+                <div class="bg-pink-50 border-l-4 border-pink-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-pink-900 mb-4 flex items-center">
+                        <i class="fas fa-calendar-alt mr-3"></i>
+                        Datazione e Reperti
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <!-- Datazione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Datazione</label>
+                            <input type="text"
+                                   x-model="usFormData.datazione"
+                                   placeholder="I sec. a.C. - I sec. d.C."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
+                        </div>
+
+                        <!-- Periodo -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Periodo</label>
+                            <input type="text"
+                                   x-model="usFormData.periodo"
+                                   placeholder="Romano imperiale..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
+                        </div>
+
+                        <!-- Fase -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Fase</label>
+                            <input type="text"
+                                   x-model="usFormData.fase"
+                                   placeholder="Fase 2, III..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Elementi Datanti -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Elementi Datanti</label>
+                            <textarea x-model="usFormData.elementi_datanti"
+                                      rows="2"
+                                      placeholder="Monete, ceramica sigillata, materiali diagnostici..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"></textarea>
+                        </div>
+
+                        <!-- Dati Quantitativi Reperti -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Dati Quantitativi dei Reperti</label>
+                            <textarea x-model="usFormData.dati_quantitativi_reperti"
+                                      rows="2"
+                                      placeholder="Frr. ceramici: 150, ossa animali: 20..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 8: CAMPIONATURE ========== -->
+                <div class="bg-teal-50 border-l-4 border-teal-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-teal-900 mb-4 flex items-center">
+                        <i class="fas fa-vial mr-3"></i>
+                        Campionature
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Flottazione -->
+                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-teal-400 transition">
+                            <input type="checkbox"
+                                   x-model="usFormData.camp_flottazione"
+                                   class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500">
+                            <label class="ml-3 text-sm font-semibold text-gray-700 cursor-pointer">
+                                <i class="fas fa-water mr-2 text-teal-500"></i>
+                                Campionatura per Flottazione
+                            </label>
+                        </div>
+
+                        <!-- Setacciatura -->
+                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-teal-400 transition">
+                            <input type="checkbox"
+                                   x-model="usFormData.camp_setacciatura"
+                                   class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500">
+                            <label class="ml-3 text-sm font-semibold text-gray-700 cursor-pointer">
+                                <i class="fas fa-filter mr-2 text-teal-500"></i>
+                                Campionatura per Setacciatura
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 9: AFFIDABILITÀ E RESPONSABILITÀ ========== -->
+                <div class="bg-gray-100 border-l-4 border-gray-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-user-check mr-3"></i>
+                        Affidabilità e Responsabilità
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <!-- Affidabilità Stratigrafica -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Affidabilità Stratigrafica</label>
+                            <select x-model="usFormData.affidabilita_stratigrafica"
+                                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                                <option value="">Seleziona...</option>
+                                <option value="alta">Alta</option>
+                                <option value="media">Media</option>
+                                <option value="bassa">Bassa</option>
+                            </select>
+                        </div>
+
+                        <!-- Responsabile Scientifico -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Responsabile Scientifico Indagini</label>
+                            <input type="text"
+                                   x-model="usFormData.responsabile_scientifico"
+                                   placeholder="Nome cognome..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <!-- Data Rilevamento -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Data Rilevamento sul Campo</label>
+                            <input type="date"
+                                   x-model="usFormData.data_rilevamento"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+
+                        <!-- Responsabile Compilazione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Responsabile Compilazione sul Campo</label>
+                            <input type="text"
+                                   x-model="usFormData.responsabile_compilazione"
+                                   placeholder="Nome cognome..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Data Rielaborazione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Data Rielaborazione</label>
+                            <input type="date"
+                                   x-model="usFormData.data_rielaborazione"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+
+                        <!-- Responsabile Rielaborazione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Responsabile Rielaborazione</label>
+                            <input type="text"
+                                   x-model="usFormData.responsabile_rielaborazione"
+                                   placeholder="Nome cognome..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex justify-end space-x-4 pt-6 border-t-2 border-gray-200">
+                    <button type="button"
+                            @click="closeUSModal()"
+                            :disabled="usSaving"
+                            class="px-8 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-100 disabled:opacity-50 transition">
+                        <i class="fas fa-times mr-2"></i>
+                        Annulla
+                    </button>
+
+                    <button type="submit"
+                            :disabled="usSaving"
+                            class="px-8 py-3 bg-gradient-to-r from-orange-600 to-orange-500 text-white rounded-lg font-semibold hover:from-orange-700 hover:to-orange-600 disabled:opacity-50 transition shadow-lg">
+                        <i :class="usSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'" class="mr-2"></i>
+                        <span x-text="usSaving ? 'Salvataggio...' : (editingUS ? 'Salva Modifiche' : 'Crea US')"></span>
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+[x-cloak] { display: none !important; }
+.max-h-95vh { max-height: 95vh; }
+.max-h-80vh { max-height: 80vh; }
+</style>

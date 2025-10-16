@@ -1,0 +1,775 @@
+<!-- app/templates/pages/us/us_usm_alpine_script.html -->
+<script>
+function usUSMManagerApp() {
+    return {
+        // ===== STATE MANAGEMENT =====
+        currentSiteId: '{{ site.id if site else "" }}',
+
+        // US State
+        showUSModal: false,
+        editingUS: null,
+        usList: [],
+        usSaving: false,
+        usErrorMessage: '',
+
+        // USM State
+        showUSMModal: false,
+        editingUSM: null,
+        usmList: [],
+        usmSaving: false,
+        usmErrorMessage: '',
+
+        // Filters
+        filters: {
+            search: '',
+            dateFrom: '',
+            dateTo: '',
+            affidabilita: ''
+        },
+
+        // Pagination
+        pagination: {
+            currentPage: 1,
+            itemsPerPage: 20,
+            totalItems: 0
+        },
+
+        // ===== US FORM DATA =====
+        usFormData: {
+            site_id: '',
+            us_code: '',
+            ente_responsabile: '',
+            anno: null,
+            ufficio_mic: '',
+            identificativo_rif: '',
+            localita: '',
+            area_struttura: '',
+            saggio: '',
+            ambiente_unita_funzione: '',
+            posizione: '',
+            settori: '',
+            piante: '',
+            prospetti: '',
+            sezioni: '',
+            definizione: '',
+            criteri_distinzione: '',
+            modo_formazione: '',
+            componenti_inorganici: '',
+            componenti_organici: '',
+            consistenza: '',
+            colore: '',
+            misure: '',
+            stato_conservazione: '',
+            // Sequenza fisica
+            seq_uguale_a: '',
+            seq_si_lega_a: '',
+            seq_gli_si_appoggia: '',
+            seq_si_appoggia_a: '',
+            seq_coperto_da: '',
+            seq_copre: '',
+            seq_tagliato_da: '',
+            seq_taglia: '',
+            seq_riempito_da: '',
+            seq_riempie: '',
+            descrizione: '',
+            osservazioni: '',
+            interpretazione: '',
+            datazione: '',
+            periodo: '',
+            fase: '',
+            elementi_datanti: '',
+            dati_quantitativi_reperti: '',
+            // Campionature
+            camp_flottazione: false,
+            camp_setacciatura: false,
+            affidabilita_stratigrafica: '',
+            responsabile_scientifico: '',
+            data_rilevamento: '',
+            responsabile_compilazione: '',
+            data_rielaborazione: '',
+            responsabile_rielaborazione: ''
+        },
+
+        // ===== USM FORM DATA =====
+        usmFormData: {
+            site_id: '',
+            usm_code: '',
+            ente_responsabile: '',
+            anno: null,
+            ufficio_mic: '',
+            identificativo_rif: '',
+            localita: '',
+            area_struttura: '',
+            saggio: '',
+            ambiente_unita_funzione: '',
+            posizione: '',
+            settori: '',
+            piante: '',
+            prospetti: '',
+            sezioni: '',
+            misure: '',
+            superficie_analizzata: null,
+            definizione: '',
+            tecnica_costruttiva: '',
+            sezione_muraria_visibile: false,
+            sezione_muraria_tipo: '',
+            sezione_muraria_spessore: '',
+            funzione_statica: '',
+            modulo: '',
+            criteri_distinzione: '',
+            provenienza_materiali: '',
+            orientamento: '',
+            uso_primario: '',
+            riutilizzo: '',
+            stato_conservazione: '',
+            // Materiali Laterizi
+            lat_mattoni: false,
+            lat_tegole: false,
+            lat_embrici: false,
+            lat_altro: false,
+            lat_crudi: false,
+            lat_cotti: false,
+            lat_cotti_sole: false,
+            lat_semifusi: false,
+            // Elementi Litici
+            lit_tufo: false,
+            lit_calcare: false,
+            lit_arenaria: false,
+            lit_altro: false,
+            lit_sfaldati: false,
+            lit_spaccati: false,
+            lit_sbozzati: false,
+            lit_squadrati: false,
+            lit_spianati: false,
+            lit_bugnati: false,
+            materiali_altro: '',
+            // Legante
+            legante_tipo: '',
+            legante_consistenza: '',
+            legante_altro: '',
+            finiture_elementi_particolari: '',
+            // Sequenza fisica
+            seq_uguale_a: '',
+            seq_si_lega_a: '',
+            seq_gli_si_appoggia: '',
+            seq_si_appoggia_a: '',
+            seq_coperto_da: '',
+            seq_copre: '',
+            seq_tagliato_da: '',
+            seq_taglia: '',
+            seq_riempito_da: '',
+            seq_riempie: '',
+            descrizione: '',
+            osservazioni: '',
+            interpretazione: '',
+            datazione: '',
+            periodo: '',
+            fase: '',
+            elementi_datanti: '',
+            // Campionature
+            camp_elementi_litici: false,
+            camp_laterizi: false,
+            camp_malta: false,
+            affidabilita_stratigrafica: '',
+            responsabile_scientifico: '',
+            data_rilevamento: '',
+            responsabile_compilazione: '',
+            data_rielaborazione: '',
+            responsabile_rielaborazione: ''
+        },
+
+        // ===== INITIALIZATION =====
+        async init() {
+            console.log('US/USM Manager inizializzato per sito:', this.currentSiteId);
+            if (this.currentSiteId) {
+                await this.loadUSList();
+                await this.loadUSMList();
+            }
+        },
+
+        // ===== US CRUD OPERATIONS =====
+
+        async loadUSList() {
+            try {
+                const queryParams = new URLSearchParams({
+                    site_id: this.currentSiteId,
+                    skip: (this.pagination.currentPage - 1) * this.pagination.itemsPerPage,
+                    limit: this.pagination.itemsPerPage
+                });
+
+                if (this.filters.search) queryParams.append('search', this.filters.search);
+                if (this.filters.dateFrom) queryParams.append('da', this.filters.dateFrom);
+                if (this.filters.dateTo) queryParams.append('a', this.filters.dateTo);
+
+                const response = await fetch(`/api/us?${queryParams}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+
+                if (response.ok) {
+                    this.usList = await response.json();
+                    console.log('Lista US caricata:', this.usList.length, 'elementi');
+                } else {
+                    throw new Error('Errore caricamento US');
+                }
+            } catch (error) {
+                console.error('Errore caricamento US:', error);
+                this.showNotification('Errore nel caricamento delle US', 'error');
+            }
+        },
+
+        openUSModal(us = null) {
+            this.editingUS = us;
+            this.usErrorMessage = '';
+
+            if (us) {
+                // Modalità modifica - popola form
+                this.usFormData = {
+                    site_id: us.site_id,
+                    us_code: us.us_code,
+                    ente_responsabile: us.ente_responsabile || '',
+                    anno: us.anno,
+                    ufficio_mic: us.ufficio_mic || '',
+                    identificativo_rif: us.identificativo_rif || '',
+                    localita: us.localita || '',
+                    area_struttura: us.area_struttura || '',
+                    saggio: us.saggio || '',
+                    ambiente_unita_funzione: us.ambiente_unita_funzione || '',
+                    posizione: us.posizione || '',
+                    settori: us.settori || '',
+                    piante: us.piante || '',
+                    prospetti: us.prospetti || '',
+                    sezioni: us.sezioni || '',
+                    definizione: us.definizione || '',
+                    criteri_distinzione: us.criteri_distinzione || '',
+                    modo_formazione: us.modo_formazione || '',
+                    componenti_inorganici: us.componenti_inorganici || '',
+                    componenti_organici: us.componenti_organici || '',
+                    consistenza: us.consistenza || '',
+                    colore: us.colore || '',
+                    misure: us.misure || '',
+                    stato_conservazione: us.stato_conservazione || '',
+                    seq_uguale_a: this.sequenzaToString(us.sequenza_fisica?.uguale_a),
+                    seq_si_lega_a: this.sequenzaToString(us.sequenza_fisica?.si_lega_a),
+                    seq_gli_si_appoggia: this.sequenzaToString(us.sequenza_fisica?.gli_si_appoggia),
+                    seq_si_appoggia_a: this.sequenzaToString(us.sequenza_fisica?.si_appoggia_a),
+                    seq_coperto_da: this.sequenzaToString(us.sequenza_fisica?.coperto_da),
+                    seq_copre: this.sequenzaToString(us.sequenza_fisica?.copre),
+                    seq_tagliato_da: this.sequenzaToString(us.sequenza_fisica?.tagliato_da),
+                    seq_taglia: this.sequenzaToString(us.sequenza_fisica?.taglia),
+                    seq_riempito_da: this.sequenzaToString(us.sequenza_fisica?.riempito_da),
+                    seq_riempie: this.sequenzaToString(us.sequenza_fisica?.riempie),
+                    descrizione: us.descrizione || '',
+                    osservazioni: us.osservazioni || '',
+                    interpretazione: us.interpretazione || '',
+                    datazione: us.datazione || '',
+                    periodo: us.periodo || '',
+                    fase: us.fase || '',
+                    elementi_datanti: us.elementi_datanti || '',
+                    dati_quantitativi_reperti: us.dati_quantitativi_reperti || '',
+                    camp_flottazione: us.campionature?.flottazione || false,
+                    camp_setacciatura: us.campionature?.setacciatura || false,
+                    affidabilita_stratigrafica: us.affidabilita_stratigrafica || '',
+                    responsabile_scientifico: us.responsabile_scientifico || '',
+                    data_rilevamento: us.data_rilevamento || '',
+                    responsabile_compilazione: us.responsabile_compilazione || '',
+                    data_rielaborazione: us.data_rielaborazione || '',
+                    responsabile_rielaborazione: us.responsabile_rielaborazione || ''
+                };
+            } else {
+                // Modalità creazione - reset form
+                this.resetUSForm();
+                this.usFormData.site_id = this.currentSiteId;
+            }
+
+            this.showUSModal = true;
+        },
+
+        closeUSModal() {
+            this.showUSModal = false;
+            this.editingUS = null;
+            this.usErrorMessage = '';
+            this.resetUSForm();
+        },
+
+        async saveUS() {
+            this.usSaving = true;
+            this.usErrorMessage = '';
+
+            try {
+                // Prepara payload con sequenza fisica
+                const payload = {
+                    ...this.usFormData,
+                    sequenza_fisica: {
+                        uguale_a: this.stringToSequenza(this.usFormData.seq_uguale_a),
+                        si_lega_a: this.stringToSequenza(this.usFormData.seq_si_lega_a),
+                        gli_si_appoggia: this.stringToSequenza(this.usFormData.seq_gli_si_appoggia),
+                        si_appoggia_a: this.stringToSequenza(this.usFormData.seq_si_appoggia_a),
+                        coperto_da: this.stringToSequenza(this.usFormData.seq_coperto_da),
+                        copre: this.stringToSequenza(this.usFormData.seq_copre),
+                        tagliato_da: this.stringToSequenza(this.usFormData.seq_tagliato_da),
+                        taglia: this.stringToSequenza(this.usFormData.seq_taglia),
+                        riempito_da: this.stringToSequenza(this.usFormData.seq_riempito_da),
+                        riempie: this.stringToSequenza(this.usFormData.seq_riempie)
+                    },
+                    campionature: {
+                        flottazione: this.usFormData.camp_flottazione,
+                        setacciatura: this.usFormData.camp_setacciatura
+                    }
+                };
+
+                // Rimuovi campi sequenza temporanei
+                delete payload.seq_uguale_a;
+                delete payload.seq_si_lega_a;
+                delete payload.seq_gli_si_appoggia;
+                delete payload.seq_si_appoggia_a;
+                delete payload.seq_coperto_da;
+                delete payload.seq_copre;
+                delete payload.seq_tagliato_da;
+                delete payload.seq_taglia;
+                delete payload.seq_riempito_da;
+                delete payload.seq_riempie;
+                delete payload.camp_flottazione;
+                delete payload.camp_setacciatura;
+
+                const url = this.editingUS
+                    ? `/api/us/${this.editingUS.id}`
+                    : '/api/us';
+                const method = this.editingUS ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCSRFToken()
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const savedUS = await response.json();
+                    console.log('US salvata:', savedUS);
+
+                    this.showNotification(
+                        this.editingUS ? 'US aggiornata con successo' : 'US creata con successo',
+                        'success'
+                    );
+
+                    await this.loadUSList();
+                    this.closeUSModal();
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore nel salvataggio');
+                }
+            } catch (error) {
+                console.error('Errore salvataggio US:', error);
+                this.usErrorMessage = error.message || 'Errore nel salvataggio della US';
+            } finally {
+                this.usSaving = false;
+            }
+        },
+
+        async deleteUS(usId) {
+            if (!confirm('Sei sicuro di voler eliminare questa US? L\'operazione non può essere annullata.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/us/${usId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+
+                if (response.ok) {
+                    this.showNotification('US eliminata con successo', 'success');
+                    await this.loadUSList();
+                } else {
+                    throw new Error('Errore nell\'eliminazione');
+                }
+            } catch (error) {
+                console.error('Errore eliminazione US:', error);
+                this.showNotification('Errore nell\'eliminazione della US', 'error');
+            }
+        },
+
+        resetUSForm() {
+            this.usFormData = {
+                site_id: this.currentSiteId,
+                us_code: '',
+                ente_responsabile: '',
+                anno: null,
+                ufficio_mic: '',
+                identificativo_rif: '',
+                localita: '',
+                area_struttura: '',
+                saggio: '',
+                ambiente_unita_funzione: '',
+                posizione: '',
+                settori: '',
+                piante: '',
+                prospetti: '',
+                sezioni: '',
+                definizione: '',
+                criteri_distinzione: '',
+                modo_formazione: '',
+                componenti_inorganici: '',
+                componenti_organici: '',
+                consistenza: '',
+                colore: '',
+                misure: '',
+                stato_conservazione: '',
+                seq_uguale_a: '',
+                seq_si_lega_a: '',
+                seq_gli_si_appoggia: '',
+                seq_si_appoggia_a: '',
+                seq_coperto_da: '',
+                seq_copre: '',
+                seq_tagliato_da: '',
+                seq_taglia: '',
+                seq_riempito_da: '',
+                seq_riempie: '',
+                descrizione: '',
+                osservazioni: '',
+                interpretazione: '',
+                datazione: '',
+                periodo: '',
+                fase: '',
+                elementi_datanti: '',
+                dati_quantitativi_reperti: '',
+                camp_flottazione: false,
+                camp_setacciatura: false,
+                affidabilita_stratigrafica: '',
+                responsabile_scientifico: '',
+                data_rilevamento: '',
+                responsabile_compilazione: '',
+                data_rielaborazione: '',
+                responsabile_rielaborazione: ''
+            };
+        },
+
+        // ===== USM CRUD OPERATIONS =====
+
+        async loadUSMList() {
+            try {
+                const queryParams = new URLSearchParams({
+                    site_id: this.currentSiteId,
+                    skip: (this.pagination.currentPage - 1) * this.pagination.itemsPerPage,
+                    limit: this.pagination.itemsPerPage
+                });
+
+                if (this.filters.search) queryParams.append('search', this.filters.search);
+
+                const response = await fetch(`/api/usm?${queryParams}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+
+                if (response.ok) {
+                    this.usmList = await response.json();
+                    console.log('Lista USM caricata:', this.usmList.length, 'elementi');
+                } else {
+                    throw new Error('Errore caricamento USM');
+                }
+            } catch (error) {
+                console.error('Errore caricamento USM:', error);
+                this.showNotification('Errore nel caricamento delle USM', 'error');
+            }
+        },
+
+        openUSMModal(usm = null) {
+            this.editingUSM = usm;
+            this.usmErrorMessage = '';
+
+            if (usm) {
+                // Modalità modifica
+                this.usmFormData = {
+                    site_id: usm.site_id,
+                    usm_code: usm.usm_code,
+                    ente_responsabile: usm.ente_responsabile || '',
+                    anno: usm.anno,
+                    ufficio_mic: usm.ufficio_mic || '',
+                    identificativo_rif: usm.identificativo_rif || '',
+                    localita: usm.localita || '',
+                    area_struttura: usm.area_struttura || '',
+                    saggio: usm.saggio || '',
+                    ambiente_unita_funzione: usm.ambiente_unita_funzione || '',
+                    posizione: usm.posizione || '',
+                    settori: usm.settori || '',
+                    piante: usm.piante || '',
+                    prospetti: usm.prospetti || '',
+                    sezioni: usm.sezioni || '',
+                    misure: usm.misure || '',
+                    superficie_analizzata: usm.superficie_analizzata,
+                    definizione: usm.definizione || '',
+                    tecnica_costruttiva: usm.tecnica_costruttiva || '',
+                    sezione_muraria_visibile: usm.sezione_muraria_visibile || false,
+                    sezione_muraria_tipo: usm.sezione_muraria_tipo || '',
+                    sezione_muraria_spessore: usm.sezione_muraria_spessore || '',
+                    funzione_statica: usm.funzione_statica || '',
+                    modulo: usm.modulo || '',
+                    criteri_distinzione: usm.criteri_distinzione || '',
+                    provenienza_materiali: usm.provenienza_materiali || '',
+                    orientamento: usm.orientamento || '',
+                    uso_primario: usm.uso_primario || '',
+                    riutilizzo: usm.riutilizzo || '',
+                    stato_conservazione: usm.stato_conservazione || '',
+                    // Materiali laterizi
+                    lat_mattoni: usm.materiali_laterizi?.tipo?.includes('mattoni') || false,
+                    lat_tegole: usm.materiali_laterizi?.tipo?.includes('tegole') || false,
+                    lat_embrici: usm.materiali_laterizi?.tipo?.includes('embrici') || false,
+                    lat_altro: usm.materiali_laterizi?.tipo?.includes('altro') || false,
+                    lat_crudi: usm.materiali_laterizi?.consistenza?.includes('crudi') || false,
+                    lat_cotti: usm.materiali_laterizi?.consistenza?.includes('cotti') || false,
+                    lat_cotti_sole: usm.materiali_laterizi?.consistenza?.includes('cotti_sole') || false,
+                    lat_semifusi: usm.materiali_laterizi?.consistenza?.includes('semifusi') || false,
+                    // Elementi litici
+                    lit_tufo: usm.materiali_elementi_litici?.litotipi?.includes('tufo') || false,
+                    lit_calcare: usm.materiali_elementi_litici?.litotipi?.includes('calcare') || false,
+                    lit_arenaria: usm.materiali_elementi_litici?.litotipi?.includes('arenaria') || false,
+                    lit_altro: usm.materiali_elementi_litici?.litotipi?.includes('altro') || false,
+                    lit_sfaldati: usm.materiali_elementi_litici?.lavorazione?.includes('sfaldati') || false,
+                    lit_spaccati: usm.materiali_elementi_litici?.lavorazione?.includes('spaccati') || false,
+                    lit_sbozzati: usm.materiali_elementi_litici?.lavorazione?.includes('sbozzati') || false,
+                    lit_squadrati: usm.materiali_elementi_litici?.lavorazione?.includes('squadrati') || false,
+                    lit_spianati: usm.materiali_elementi_litici?.lavorazione?.includes('spianati') || false,
+                    lit_bugnati: usm.materiali_elementi_litici?.lavorazione?.includes('bugnati') || false,
+                    materiali_altro: usm.materiali_altro || '',
+                    legante_tipo: usm.legante?.tipo || '',
+                    legante_consistenza: usm.legante?.consistenza || '',
+                    legante_altro: usm.legante_altro || '',
+                    finiture_elementi_particolari: usm.finiture_elementi_particolari || '',
+                    seq_uguale_a: this.sequenzaToString(usm.sequenza_fisica?.uguale_a),
+                    seq_si_lega_a: this.sequenzaToString(usm.sequenza_fisica?.si_lega_a),
+                    seq_gli_si_appoggia: this.sequenzaToString(usm.sequenza_fisica?.gli_si_appoggia),
+                    seq_si_appoggia_a: this.sequenzaToString(usm.sequenza_fisica?.si_appoggia_a),
+                    seq_coperto_da: this.sequenzaToString(usm.sequenza_fisica?.coperto_da),
+                    seq_copre: this.sequenzaToString(usm.sequenza_fisica?.copre),
+                    seq_tagliato_da: this.sequenzaToString(usm.sequenza_fisica?.tagliato_da),
+                    seq_taglia: this.sequenzaToString(usm.sequenza_fisica?.taglia),
+                    seq_riempito_da: this.sequenzaToString(usm.sequenza_fisica?.riempito_da),
+                    seq_riempie: this.sequenzaToString(usm.sequenza_fisica?.riempie),
+                    descrizione: usm.descrizione || '',
+                    osservazioni: usm.osservazioni || '',
+                    interpretazione: usm.interpretazione || '',
+                    datazione: usm.datazione || '',
+                    periodo: usm.periodo || '',
+                    fase: usm.fase || '',
+                    elementi_datanti: usm.elementi_datanti || '',
+                    camp_elementi_litici: usm.campionature?.elementi_litici || false,
+                    camp_laterizi: usm.campionature?.laterizi || false,
+                    camp_malta: usm.campionature?.malta || false,
+                    affidabilita_stratigrafica: usm.affidabilita_stratigrafica || '',
+                    responsabile_scientifico: usm.responsabile_scientifico || '',
+                    data_rilevamento: usm.data_rilevamento || '',
+                    responsabile_compilazione: usm.responsabile_compilazione || '',
+                    data_rielaborazione: usm.data_rielaborazione || '',
+                    responsabile_rielaborazione: usm.responsabile_rielaborazione || ''
+                };
+            } else {
+                // Modalità creazione
+                this.resetUSMForm();
+                this.usmFormData.site_id = this.currentSiteId;
+            }
+
+            this.showUSMModal = true;
+        },
+
+        closeUSMModal() {
+            this.showUSMModal = false;
+            this.editingUSM = null;
+            this.usmErrorMessage = '';
+            this.resetUSMForm();
+        },
+
+        async saveUSM() {
+            this.usmSaving = true;
+            this.usmErrorMessage = '';
+
+            try {
+                // Prepara payload completo
+                const payload = {
+                    ...this.usmFormData,
+                    materiali_laterizi: {
+                        tipo: [
+                            this.usmFormData.lat_mattoni ? 'mattoni' : null,
+                            this.usmFormData.lat_tegole ? 'tegole' : null,
+                            this.usmFormData.lat_embrici ? 'embrici' : null,
+                            this.usmFormData.lat_altro ? 'altro' : null
+                        ].filter(Boolean),
+                        consistenza: [
+                            this.usmFormData.lat_crudi ? 'crudi' : null,
+                            this.usmFormData.lat_cotti ? 'cotti' : null,
+                            this.usmFormData.lat_cotti_sole ? 'cotti_sole' : null,
+                            this.usmFormData.lat_semifusi ? 'semifusi' : null
+                        ].filter(Boolean)
+                    },
+                    materiali_elementi_litici: {
+                        litotipi: [
+                            this.usmFormData.lit_tufo ? 'tufo' : null,
+                            this.usmFormData.lit_calcare ? 'calcare' : null,
+                            this.usmFormData.lit_arenaria ? 'arenaria' : null,
+                            this.usmFormData.lit_altro ? 'altro' : null
+                        ].filter(Boolean),
+                        lavorazione: [
+                            this.usmFormData.lit_sfaldati ? 'sfaldati' : null,
+                            this.usmFormData.lit_spaccati ? 'spaccati' : null,
+                            this.usmFormData.lit_sbozzati ? 'sbozzati' : null,
+                            this.usmFormData.lit_squadrati ? 'squadrati' : null,
+                            this.usmFormData.lit_spianati ? 'spianati' : null,
+                            this.usmFormData.lit_bugnati ? 'bugnati' : null
+                        ].filter(Boolean)
+                    },
+                    legante: {
+                        tipo: this.usmFormData.legante_tipo,
+                        consistenza: this.usmFormData.legante_consistenza
+                    },
+                    sequenza_fisica: {
+                        uguale_a: this.stringToSequenza(this.usmFormData.seq_uguale_a),
+                        si_lega_a: this.stringToSequenza(this.usmFormData.seq_si_lega_a),
+                        gli_si_appoggia: this.stringToSequenza(this.usmFormData.seq_gli_si_appoggia),
+                        si_appoggia_a: this.stringToSequenza(this.usmFormData.seq_si_appoggia_a),
+                        coperto_da: this.stringToSequenza(this.usmFormData.seq_coperto_da),
+                        copre: this.stringToSequenza(this.usmFormData.seq_copre),
+                        tagliato_da: this.stringToSequenza(this.usmFormData.seq_tagliato_da),
+                        taglia: this.stringToSequenza(this.usmFormData.seq_taglia),
+                        riempito_da: this.stringToSequenza(this.usmFormData.seq_riempito_da),
+                        riempie: this.stringToSequenza(this.usmFormData.seq_riempie)
+                    },
+                    campionature: {
+                        elementi_litici: this.usmFormData.camp_elementi_litici,
+                        laterizi: this.usmFormData.camp_laterizi,
+                        malta: this.usmFormData.camp_malta
+                    }
+                };
+
+                // Rimuovi campi temporanei
+                const tempFields = [
+                    'lat_mattoni', 'lat_tegole', 'lat_embrici', 'lat_altro',
+                    'lat_crudi', 'lat_cotti', 'lat_cotti_sole', 'lat_semifusi',
+                    'lit_tufo', 'lit_calcare', 'lit_arenaria', 'lit_altro',
+                    'lit_sfaldati', 'lit_spaccati', 'lit_sbozzati', 'lit_squadrati', 'lit_spianati', 'lit_bugnati',
+                    'legante_tipo', 'legante_consistenza',
+                    'seq_uguale_a', 'seq_si_lega_a', 'seq_gli_si_appoggia', 'seq_si_appoggia_a',
+                    'seq_coperto_da', 'seq_copre', 'seq_tagliato_da', 'seq_taglia',
+                    'seq_riempito_da', 'seq_riempie',
+                    'camp_elementi_litici', 'camp_laterizi', 'camp_malta'
+                ];
+
+                tempFields.forEach(field => delete payload[field]);
+
+                const url = this.editingUSM
+                    ? `/api/usm/${this.editingUSM.id}`
+                    : '/api/usm';
+                const method = this.editingUSM ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCSRFToken()
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const savedUSM = await response.json();
+                    console.log('USM salvata:', savedUSM);
+
+                    this.showNotification(
+                        this.editingUSM ? 'USM aggiornata con successo' : 'USM creata con successo',
+                        'success'
+                    );
+
+                    await this.loadUSMList();
+                    this.closeUSMModal();
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore nel salvataggio');
+                }
+            } catch (error) {
+                console.error('Errore salvataggio USM:', error);
+                this.usmErrorMessage = error.message || 'Errore nel salvataggio della USM';
+            } finally {
+                this.usmSaving = false;
+            }
+        },
+
+        async deleteUSM(usmId) {
+            if (!confirm('Sei sicuro di voler eliminare questa USM? L\'operazione non può essere annullata.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/usm/${usmId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+
+                if (response.ok) {
+                    this.showNotification('USM eliminata con successo', 'success');
+                    await this.loadUSMList();
+                } else {
+                    throw new Error('Errore nell\'eliminazione');
+                }
+            } catch (error) {
+                console.error('Errore eliminazione USM:', error);
+                this.showNotification('Errore nell\'eliminazione della USM', 'error');
+            }
+        },
+
+        resetUSMForm() {
+            Object.keys(this.usmFormData).forEach(key => {
+                if (typeof this.usmFormData[key] === 'boolean') {
+                    this.usmFormData[key] = false;
+                } else if (typeof this.usmFormData[key] === 'number') {
+                    this.usmFormData[key] = null;
+                } else {
+                    this.usmFormData[key] = '';
+                }
+            });
+            this.usmFormData.site_id = this.currentSiteId;
+        },
+
+        // ===== UTILITY FUNCTIONS =====
+
+        sequenzaToString(arr) {
+            return Array.isArray(arr) ? arr.join(', ') : '';
+        },
+
+        stringToSequenza(str) {
+            if (!str) return [];
+            return str.split(',').map(s => s.trim()).filter(Boolean);
+        },
+
+        getCSRFToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+        },
+
+        showNotification(message, type = 'info') {
+            // Implementa sistema notifiche (toast)
+            console.log(`[${type.toUpperCase()}] ${message}`);
+
+            // Esempio con alert temporaneo
+            if (type === 'error') {
+                alert('❌ ' + message);
+            } else if (type === 'success') {
+                alert('✅ ' + message);
+            }
+        },
+
+        formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('it-IT');
+        }
+    }
+}
+</script>

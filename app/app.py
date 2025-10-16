@@ -49,7 +49,8 @@ from app.routes.api.geographic_maps import geographic_maps_router
 from app.routes.api.notifications_ws import notifications_router
 
 from app.routes import photo_metadata
-
+from app.routes.api.us import us_router
+from app.routes.view.us import us_view_router
 
 
 
@@ -294,6 +295,13 @@ app.include_router(
     tags=["websocket-notifications"]
 )
 
+# 🏺 INCLUSIONE ROUTER US/USM - API per Unità Stratigrafiche
+app.include_router(
+    us_router,
+    tags=["us-usm-api"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+)
+
 # Router esistenti
 app.include_router(
     admin_router,
@@ -359,6 +367,13 @@ if ICCD_ROUTE_EXISTS:
         tags=["Pages", "ICCD Cataloging"],
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
+
+# 🏺 INCLUSIONE ROUTER US/USM VIEW - Visualizzazione pagina gestione US/USM
+app.include_router(
+    us_view_router,
+    tags=["Pages", "US/USM"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
 
 # Route principali
 @app.get("/")

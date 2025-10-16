@@ -1,0 +1,33 @@
+<!-- app/templates/pages/us/index.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div x-data="usUSMManagerApp()" x-init="init()">
+
+    <!-- Toolbar -->
+    <div class="mb-6 flex justify-between items-center">
+        <h1 class="text-3xl font-bold">Gestione US/USM</h1>
+        <div class="space-x-3">
+            <button @click="openUSModal()" class="btn btn-primary">
+                <i class="fas fa-plus mr-2"></i>
+                Nuova US
+            </button>
+            <button @click="openUSMModal()" class="btn btn-secondary">
+                <i class="fas fa-plus mr-2"></i>
+                Nuova USM
+            </button>
+        </div>
+    </div>
+
+    <!-- Liste US/USM con tab o cards -->
+    <!-- ... -->
+
+    <!-- Include modals -->
+    {% include "pages/us/modal_us_create_edit.html" %}
+    {% include "pages/us/modal_usm_create_edit.html" %}
+
+</div>
+
+<!-- Include script -->
+{% include "pages/us/us_usm_alpine_script.html" %}
+{% endblock %}

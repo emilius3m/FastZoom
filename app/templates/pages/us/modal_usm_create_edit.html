@@ -1,0 +1,870 @@
+<!-- app/templates/pages/us/modal_usm_create_edit.html -->
+<!-- Modal Creazione/Modifica Unità Stratigrafica Muraria (USM) - Standard MiC 2021 -->
+
+<div x-show="showUSMModal"
+     x-cloak
+     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
+     @click.self="closeUSMModal()">
+
+    <div class="bg-white rounded-lg max-w-6xl w-full mx-4 my-8 max-h-95vh overflow-hidden shadow-2xl">
+
+        <!-- Header Modal -->
+        <div class="sticky top-0 bg-gradient-to-r from-red-600 to-red-500 text-white px-6 py-4 flex justify-between items-center z-10">
+            <div>
+                <h3 class="text-2xl font-bold" x-text="editingUSM ? 'Modifica USM ' + editingUSM.usm_code : 'Nuova Unità Stratigrafica Muraria (USM)'"></h3>
+                <p class="text-red-100 text-sm mt-1">Scheda standard MiC 2021 - Strutture Murarie</p>
+            </div>
+            <button @click="closeUSMModal()" class="text-white hover:text-red-200 transition">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+
+        <!-- Form Content -->
+        <div class="max-h-80vh overflow-y-auto">
+            <form @submit.prevent="saveUSM()" class="p-6">
+
+                <!-- Alert Errori -->
+                <div x-show="usmErrorMessage" class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 mr-3"></i>
+                        <p class="text-red-700 font-medium" x-text="usmErrorMessage"></p>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 1: INTESTAZIONE E IDENTIFICAZIONE ========== -->
+                <div class="bg-red-50 border-l-4 border-red-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-red-900 mb-4 flex items-center">
+                        <i class="fas fa-id-card mr-3"></i>
+                        Intestazione e Identificazione
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- USM Code -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                Numero USM <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.usm_code"
+                                   required
+                                   pattern="^USM\d{3,4}$"
+                                   placeholder="USM001"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">Formato: USM001, USM002...</p>
+                        </div>
+
+                        <!-- Ente Responsabile -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ente Responsabile</label>
+                            <input type="text"
+                                   x-model="usmFormData.ente_responsabile"
+                                   placeholder="Soprintendenza..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+
+                        <!-- Anno -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Anno</label>
+                            <input type="number"
+                                   x-model="usmFormData.anno"
+                                   min="1900"
+                                   :max="new Date().getFullYear()"
+                                   placeholder="2025"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <!-- Ufficio MiC -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ufficio MiC Competente per Tutela</label>
+                            <input type="text"
+                                   x-model="usmFormData.ufficio_mic"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+
+                        <!-- Identificativo Edificio -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Identificativo Saggio/Edificio/Struttura</label>
+                            <input type="text"
+                                   x-model="usmFormData.identificativo_rif"
+                                   placeholder="Edificio A, Struttura 1..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 2: LOCALIZZAZIONE ========== -->
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-blue-900 mb-4 flex items-center">
+                        <i class="fas fa-map-marked-alt mr-3"></i>
+                        Localizzazione
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Località</label>
+                            <input type="text"
+                                   x-model="usmFormData.localita"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Area/Edificio/Struttura</label>
+                            <input type="text"
+                                   x-model="usmFormData.area_struttura"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Saggio</label>
+                            <input type="text"
+                                   x-model="usmFormData.saggio"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ambiente/Unità Funzionale</label>
+                            <input type="text"
+                                   x-model="usmFormData.ambiente_unita_funzione"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Posizione</label>
+                            <input type="text"
+                                   x-model="usmFormData.posizione"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Settore/i</label>
+                            <input type="text"
+                                   x-model="usmFormData.settori"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Piante</label>
+                            <input type="text"
+                                   x-model="usmFormData.piante"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Prospetti</label>
+                            <input type="text"
+                                   x-model="usmFormData.prospetti"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Sezioni</label>
+                            <input type="text"
+                                   x-model="usmFormData.sezioni"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 3: MISURE E DEFINIZIONE ========== -->
+                <div class="bg-green-50 border-l-4 border-green-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-green-900 mb-4 flex items-center">
+                        <i class="fas fa-ruler-combined mr-3"></i>
+                        Misure e Definizione
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Misure (lungh./larg./altezza)</label>
+                            <input type="text"
+                                   x-model="usmFormData.misure"
+                                   placeholder="5.2x0.6x2.8 m"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Superficie Analizzata (m²)</label>
+                            <input type="number"
+                                   x-model="usmFormData.superficie_analizzata"
+                                   step="0.01"
+                                   placeholder="12.5"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Definizione</label>
+                        <input type="text"
+                               x-model="usmFormData.definizione"
+                               placeholder="Muro, fondazione, pavimento..."
+                               class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 4: TECNICA COSTRUTTIVA E STRUTTURA ========== -->
+                <div class="bg-amber-50 border-l-4 border-amber-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-amber-900 mb-4 flex items-center">
+                        <i class="fas fa-building mr-3"></i>
+                        Tecnica Costruttiva e Struttura
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Tecnica Costruttiva</label>
+                            <input type="text"
+                                   x-model="usmFormData.tecnica_costruttiva"
+                                   placeholder="Paramento esterno/interno, opus..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <p class="text-xs text-gray-500 mt-1">Es: paramento esterno in opus quadratum</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Funzione Statica</label>
+                            <input type="text"
+                                   x-model="usmFormData.funzione_statica"
+                                   placeholder="Portante, non portante, contrafforte..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200">
+                            <input type="checkbox"
+                                   x-model="usmFormData.sezione_muraria_visibile"
+                                   class="w-5 h-5 text-amber-600 rounded focus:ring-amber-500">
+                            <label class="ml-3 text-sm font-semibold text-gray-700">
+                                Sezione Muraria Visibile
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo Sezione</label>
+                            <input type="text"
+                                   x-model="usmFormData.sezione_muraria_tipo"
+                                   placeholder="A sacco, piena..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Spessore</label>
+                            <input type="text"
+                                   x-model="usmFormData.sezione_muraria_spessore"
+                                   placeholder="60 cm"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Modulo</label>
+                            <input type="text"
+                                   x-model="usmFormData.modulo"
+                                   placeholder="Dimensioni modulo mattoni..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Orientamento</label>
+                            <input type="text"
+                                   x-model="usmFormData.orientamento"
+                                   placeholder="N-S, E-O..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Criteri di Distinzione</label>
+                        <textarea x-model="usmFormData.criteri_distinzione"
+                                  rows="2"
+                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 5: MATERIALI - LATERIZI ========== -->
+                <div class="bg-orange-50 border-l-4 border-orange-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-orange-900 mb-4 flex items-center">
+                        <i class="fas fa-cubes mr-3"></i>
+                        Materiali - Laterizi
+                    </h4>
+
+                    <div class="space-y-4">
+                        <!-- Tipo Laterizi -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">Tipo Laterizi</label>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lat_mattoni"
+                                           class="w-4 h-4 text-orange-600 rounded">
+                                    <span class="ml-2 text-sm">Mattoni</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lat_tegole"
+                                           class="w-4 h-4 text-orange-600 rounded">
+                                    <span class="ml-2 text-sm">Tegole</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lat_embrici"
+                                           class="w-4 h-4 text-orange-600 rounded">
+                                    <span class="ml-2 text-sm">Embrici</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lat_altro"
+                                           class="w-4 h-4 text-orange-600 rounded">
+                                    <span class="ml-2 text-sm">Altro</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Consistenza Laterizi -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">Consistenza Laterizi</label>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lat_crudi"
+                                           class="w-4 h-4 text-orange-600 rounded">
+                                    <span class="ml-2 text-sm">Crudi</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lat_cotti"
+                                           class="w-4 h-4 text-orange-600 rounded">
+                                    <span class="ml-2 text-sm">Cotti</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lat_cotti_sole"
+                                           class="w-4 h-4 text-orange-600 rounded">
+                                    <span class="ml-2 text-sm">Cotti al sole</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lat_semifusi"
+                                           class="w-4 h-4 text-orange-600 rounded">
+                                    <span class="ml-2 text-sm">Semifusi</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 6: MATERIALI - ELEMENTI LITICI ========== -->
+                <div class="bg-stone-50 border-l-4 border-stone-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-stone-900 mb-4 flex items-center">
+                        <i class="fas fa-mountain mr-3"></i>
+                        Materiali - Elementi Litici
+                    </h4>
+
+                    <div class="space-y-4">
+                        <!-- Tipo Elementi Litici -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">Litotipi</label>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_tufo"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Tufo</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_calcare"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Calcare</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_arenaria"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Arenaria</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_altro"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Altro</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Lavorazione Elementi Litici -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">Lavorazione</label>
+                            <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_sfaldati"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Sfaldati</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_spaccati"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Spaccati</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_sbozzati"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Sbozzati</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_squadrati"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Squadrati</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_spianati"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Spianati</span>
+                                </label>
+
+                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                    <input type="checkbox"
+                                           x-model="usmFormData.lit_bugnati"
+                                           class="w-4 h-4 text-stone-600 rounded">
+                                    <span class="ml-2 text-sm">Bugnati</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Materiali Altro -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Materiali - Altro</label>
+                            <textarea x-model="usmFormData.materiali_altro"
+                                      rows="2"
+                                      placeholder="Altri materiali non elencati..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-stone-500"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 7: LEGANTE E FINITURE ========== -->
+                <div class="bg-lime-50 border-l-4 border-lime-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-lime-900 mb-4 flex items-center">
+                        <i class="fas fa-mortar-pestle mr-3"></i>
+                        Legante e Finiture
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo Legante</label>
+                            <input type="text"
+                                   x-model="usmFormData.legante_tipo"
+                                   placeholder="Malta di calce, fango, terra..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Consistenza Legante</label>
+                            <input type="text"
+                                   x-model="usmFormData.legante_consistenza"
+                                   placeholder="Compatto, friabile..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Legante - Altro</label>
+                        <textarea x-model="usmFormData.legante_altro"
+                                  rows="2"
+                                  placeholder="Caratteristiche aggiuntive del legante..."
+                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Finiture dell'Opera Muraria / Elementi Particolari</label>
+                        <textarea x-model="usmFormData.finiture_elementi_particolari"
+                                  rows="3"
+                                  placeholder="Intonaco, decorazioni, iscrizioni, tracce di lavorazione..."
+                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500"></textarea>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 8: USO E CONSERVAZIONE ========== -->
+                <div class="bg-cyan-50 border-l-4 border-cyan-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-cyan-900 mb-4 flex items-center">
+                        <i class="fas fa-history mr-3"></i>
+                        Uso e Conservazione
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Uso Primario</label>
+                            <input type="text"
+                                   x-model="usmFormData.uso_primario"
+                                   placeholder="Funzione originaria..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Riutilizzo</label>
+                            <input type="text"
+                                   x-model="usmFormData.riutilizzo"
+                                   placeholder="Uso secondario, spoliazione..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Provenienza Materiali</label>
+                        <textarea x-model="usmFormData.provenienza_materiali"
+                                  rows="2"
+                                  placeholder="Cava, reimpiego da strutture precedenti..."
+                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Stato di Conservazione</label>
+                        <textarea x-model="usmFormData.stato_conservazione"
+                                  rows="3"
+                                  placeholder="Buono, discreto, degradato... descrizione danni..."
+                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 9: SEQUENZA FISICA (Matrix Harris) ========== -->
+                <!-- Stessa struttura della US, riutilizzo codice -->
+                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-yellow-900 mb-4 flex items-center">
+                        <i class="fas fa-project-diagram mr-3"></i>
+                        Sequenza Fisica (Matrix Harris)
+                    </h4>
+
+                    <p class="text-sm text-gray-600 mb-4 italic">
+                        Inserisci i codici USM/US separati da virgole per ogni relazione stratigrafica
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-equals text-gray-500 mr-1"></i>
+                                Uguale a
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_uguale_a"
+                                   placeholder="USM002, USM003..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-link text-gray-500 mr-1"></i>
+                                Si lega a
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_si_lega_a"
+                                   placeholder="USM004, USM005..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-arrow-down text-blue-500 mr-1"></i>
+                                Gli si appoggia
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_gli_si_appoggia"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-arrow-up text-green-500 mr-1"></i>
+                                Si appoggia a
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_si_appoggia_a"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-layer-group text-purple-500 mr-1"></i>
+                                Coperto da
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_coperto_da"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-layer-group text-orange-500 mr-1"></i>
+                                Copre
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_copre"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-cut text-red-500 mr-1"></i>
+                                Tagliato da
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_tagliato_da"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-cut text-red-700 mr-1"></i>
+                                Taglia
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_taglia"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-fill text-teal-500 mr-1"></i>
+                                Riempito da
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_riempito_da"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-fill-drip text-teal-700 mr-1"></i>
+                                Riempie
+                            </label>
+                            <input type="text"
+                                   x-model="usmFormData.seq_riempie"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 10: DESCRIZIONE E INTERPRETAZIONE ========== -->
+                <div class="bg-indigo-50 border-l-4 border-indigo-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-indigo-900 mb-4 flex items-center">
+                        <i class="fas fa-pen mr-3"></i>
+                        Descrizione e Interpretazione
+                    </h4>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Descrizione Dettagliata</label>
+                            <textarea x-model="usmFormData.descrizione"
+                                      rows="4"
+                                      placeholder="Descrizione completa della struttura muraria..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Osservazioni</label>
+                            <textarea x-model="usmFormData.osservazioni"
+                                      rows="3"
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Interpretazione Archeologica</label>
+                            <textarea x-model="usmFormData.interpretazione"
+                                      rows="4"
+                                      placeholder="Interpretazione funzionale e cronologica..."
+                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 11: DATAZIONE ========== -->
+                <div class="bg-pink-50 border-l-4 border-pink-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-pink-900 mb-4 flex items-center">
+                        <i class="fas fa-calendar-alt mr-3"></i>
+                        Datazione
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Datazione</label>
+                            <input type="text"
+                                   x-model="usmFormData.datazione"
+                                   placeholder="I sec. a.C. - I sec. d.C."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Periodo</label>
+                            <input type="text"
+                                   x-model="usmFormData.periodo"
+                                   placeholder="Romano, Medievale..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Fase</label>
+                            <input type="text"
+                                   x-model="usmFormData.fase"
+                                   placeholder="Fase 1, II..."
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Elementi Datanti</label>
+                        <textarea x-model="usmFormData.elementi_datanti"
+                                  rows="2"
+                                  placeholder="Bolli, iscrizioni, materiali diagnostici..."
+                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"></textarea>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 12: CAMPIONATURE ========== -->
+                <div class="bg-teal-50 border-l-4 border-teal-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-teal-900 mb-4 flex items-center">
+                        <i class="fas fa-vial mr-3"></i>
+                        Campionature
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-teal-400 transition">
+                            <input type="checkbox"
+                                   x-model="usmFormData.camp_elementi_litici"
+                                   class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500">
+                            <label class="ml-3 text-sm font-semibold text-gray-700">
+                                <i class="fas fa-mountain mr-2 text-teal-500"></i>
+                                Campionatura Elementi Litici
+                            </label>
+                        </div>
+
+                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-teal-400 transition">
+                            <input type="checkbox"
+                                   x-model="usmFormData.camp_laterizi"
+                                   class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500">
+                            <label class="ml-3 text-sm font-semibold text-gray-700">
+                                <i class="fas fa-cubes mr-2 text-teal-500"></i>
+                                Campionatura Laterizi
+                            </label>
+                        </div>
+
+                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-teal-400 transition">
+                            <input type="checkbox"
+                                   x-model="usmFormData.camp_malta"
+                                   class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500">
+                            <label class="ml-3 text-sm font-semibold text-gray-700">
+                                <i class="fas fa-mortar-pestle mr-2 text-teal-500"></i>
+                                Campionatura Malta
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 13: AFFIDABILITÀ E RESPONSABILITÀ ========== -->
+                <div class="bg-gray-100 border-l-4 border-gray-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-user-check mr-3"></i>
+                        Affidabilità e Responsabilità
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Affidabilità Stratigrafica</label>
+                            <select x-model="usmFormData.affidabilita_stratigrafica"
+                                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                                <option value="">Seleziona...</option>
+                                <option value="alta">Alta</option>
+                                <option value="media">Media</option>
+                                <option value="bassa">Bassa</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Responsabile Scientifico Indagini</label>
+                            <input type="text"
+                                   x-model="usmFormData.responsabile_scientifico"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Data Rilevamento sul Campo</label>
+                            <input type="date"
+                                   x-model="usmFormData.data_rilevamento"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Responsabile Compilazione sul Campo</label>
+                            <input type="text"
+                                   x-model="usmFormData.responsabile_compilazione"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Data Rielaborazione</label>
+                            <input type="date"
+                                   x-model="usmFormData.data_rielaborazione"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Responsabile Rielaborazione</label>
+                            <input type="text"
+                                   x-model="usmFormData.responsabile_rielaborazione"
+                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex justify-end space-x-4 pt-6 border-t-2 border-gray-200">
+                    <button type="button"
+                            @click="closeUSMModal()"
+                            :disabled="usmSaving"
+                            class="px-8 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-100 disabled:opacity-50 transition">
+                        <i class="fas fa-times mr-2"></i>
+                        Annulla
+                    </button>
+
+                    <button type="submit"
+                            :disabled="usmSaving"
+                            class="px-8 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-lg font-semibold hover:from-red-700 hover:to-red-600 disabled:opacity-50 transition shadow-lg">
+                        <i :class="usmSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'" class="mr-2"></i>
+                        <span x-text="usmSaving ? 'Salvataggio...' : (editingUSM ? 'Salva Modifiche' : 'Crea USM')"></span>
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+[x-cloak] { display: none !important; }
+.max-h-95vh { max-height: 95vh; }
+.max-h-80vh { max-height: 80vh; }
+</style>
