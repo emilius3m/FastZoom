@@ -84,22 +84,22 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <!-- Ufficio MiC -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ufficio MiC Competente per Tutela</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ufficio MiC Competente per Tutela</label>
                             <input type="text"
                                    x-model="usmFormData.ufficio_mic"
                                    x-bind:readonly="viewingUSM"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
                                    x-bind:class="viewingUSM ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Identificativo Edificio -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Identificativo Saggio/Edificio/Struttura</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Identificativo Saggio/Edificio/Struttura</label>
                             <input type="text"
                                    x-model="usmFormData.identificativo_rif"
                                    x-bind:readonly="viewingUSM"
                                    placeholder="Edificio A, Struttura 1..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
                                    x-bind:class="viewingUSM ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
@@ -226,73 +226,73 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Tecnica Costruttiva</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tecnica Costruttiva</label>
                             <input type="text"
                                    x-model="usmFormData.tecnica_costruttiva"
                                    placeholder="Paramento esterno/interno, opus..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                            <p class="text-xs text-gray-500 mt-1">Es: paramento esterno in opus quadratum</p>
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Es: paramento esterno in opus quadratum</p>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Funzione Statica</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Funzione Statica</label>
                             <input type="text"
                                    x-model="usmFormData.funzione_statica"
                                    placeholder="Portante, non portante, contrafforte..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200">
+                        <div class="flex items-center p-4 bg-white dark:bg-gray-700 rounded-lg border-2 border-gray-200 dark:border-gray-600">
                             <input type="checkbox"
                                    x-model="usmFormData.sezione_muraria_visibile"
                                    class="w-5 h-5 text-amber-600 rounded focus:ring-amber-500">
-                            <label class="ml-3 text-sm font-semibold text-gray-700">
+                            <label class="ml-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
                                 Sezione Muraria Visibile
                             </label>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo Sezione</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tipo Sezione</label>
                             <input type="text"
                                    x-model="usmFormData.sezione_muraria_tipo"
                                    placeholder="A sacco, piena..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Spessore</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Spessore</label>
                             <input type="text"
                                    x-model="usmFormData.sezione_muraria_spessore"
                                    placeholder="60 cm"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Modulo</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Modulo</label>
                             <input type="text"
                                    x-model="usmFormData.modulo"
                                    placeholder="Dimensioni modulo mattoni..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Orientamento</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Orientamento</label>
                             <input type="text"
                                    x-model="usmFormData.orientamento"
                                    placeholder="N-S, E-O..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500">
                         </div>
                     </div>
 
                     <div class="mt-4">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Criteri di Distinzione</label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Criteri di Distinzione</label>
                         <textarea x-model="usmFormData.criteri_distinzione"
                                   rows="2"
-                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+                                  class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
                     </div>
                 </div>
 
@@ -306,68 +306,68 @@
                     <div class="space-y-4">
                         <!-- Tipo Laterizi -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">Tipo Laterizi</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Tipo Laterizi</label>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-orange-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lat_mattoni"
                                            class="w-4 h-4 text-orange-600 rounded">
-                                    <span class="ml-2 text-sm">Mattoni</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Mattoni</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-orange-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lat_tegole"
                                            class="w-4 h-4 text-orange-600 rounded">
-                                    <span class="ml-2 text-sm">Tegole</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Tegole</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-orange-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lat_embrici"
                                            class="w-4 h-4 text-orange-600 rounded">
-                                    <span class="ml-2 text-sm">Embrici</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Embrici</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-orange-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lat_altro"
                                            class="w-4 h-4 text-orange-600 rounded">
-                                    <span class="ml-2 text-sm">Altro</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Altro</span>
                                 </label>
                             </div>
                         </div>
 
                         <!-- Consistenza Laterizi -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">Consistenza Laterizi</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Consistenza Laterizi</label>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-orange-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lat_crudi"
                                            class="w-4 h-4 text-orange-600 rounded">
-                                    <span class="ml-2 text-sm">Crudi</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Crudi</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-orange-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lat_cotti"
                                            class="w-4 h-4 text-orange-600 rounded">
-                                    <span class="ml-2 text-sm">Cotti</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Cotti</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-orange-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lat_cotti_sole"
                                            class="w-4 h-4 text-orange-600 rounded">
-                                    <span class="ml-2 text-sm">Cotti al sole</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Cotti al sole</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-orange-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-orange-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lat_semifusi"
                                            class="w-4 h-4 text-orange-600 rounded">
-                                    <span class="ml-2 text-sm">Semifusi</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Semifusi</span>
                                 </label>
                             </div>
                         </div>
@@ -384,93 +384,93 @@
                     <div class="space-y-4">
                         <!-- Tipo Elementi Litici -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">Litotipi</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Litotipi</label>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_tufo"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Tufo</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Tufo</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_calcare"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Calcare</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Calcare</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_arenaria"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Arenaria</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Arenaria</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_altro"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Altro</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Altro</span>
                                 </label>
                             </div>
                         </div>
 
                         <!-- Lavorazione Elementi Litici -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">Lavorazione</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Lavorazione</label>
                             <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_sfaldati"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Sfaldati</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Sfaldati</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_spaccati"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Spaccati</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Spaccati</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_sbozzati"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Sbozzati</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Sbozzati</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_squadrati"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Squadrati</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Squadrati</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_spianati"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Spianati</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Spianati</span>
                                 </label>
 
-                                <label class="flex items-center p-3 bg-white rounded border-2 hover:border-stone-400 cursor-pointer transition">
+                                <label class="flex items-center p-3 bg-white dark:bg-gray-700 rounded border-2 border-gray-200 dark:border-gray-600 hover:border-stone-400 cursor-pointer transition">
                                     <input type="checkbox"
                                            x-model="usmFormData.lit_bugnati"
                                            class="w-4 h-4 text-stone-600 rounded">
-                                    <span class="ml-2 text-sm">Bugnati</span>
+                                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Bugnati</span>
                                 </label>
                             </div>
                         </div>
 
                         <!-- Materiali Altro -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Materiali - Altro</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Materiali - Altro</label>
                             <textarea x-model="usmFormData.materiali_altro"
                                       rows="2"
                                       placeholder="Altri materiali non elencati..."
-                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-stone-500"></textarea>
+                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-stone-500"></textarea>
                         </div>
                     </div>
                 </div>
@@ -484,36 +484,36 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo Legante</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tipo Legante</label>
                             <input type="text"
                                    x-model="usmFormData.legante_tipo"
                                    placeholder="Malta di calce, fango, terra..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Consistenza Legante</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Consistenza Legante</label>
                             <input type="text"
                                    x-model="usmFormData.legante_consistenza"
                                    placeholder="Compatto, friabile..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500">
                         </div>
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Legante - Altro</label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Legante - Altro</label>
                         <textarea x-model="usmFormData.legante_altro"
                                   rows="2"
                                   placeholder="Caratteristiche aggiuntive del legante..."
-                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500"></textarea>
+                                  class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500"></textarea>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Finiture dell'Opera Muraria / Elementi Particolari</label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Finiture dell'Opera Muraria / Elementi Particolari</label>
                         <textarea x-model="usmFormData.finiture_elementi_particolari"
                                   rows="3"
                                   placeholder="Intonaco, decorazioni, iscrizioni, tracce di lavorazione..."
-                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500"></textarea>
+                                  class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-lime-500"></textarea>
                     </div>
                 </div>
 
@@ -526,36 +526,36 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Uso Primario</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Uso Primario</label>
                             <input type="text"
                                    x-model="usmFormData.uso_primario"
                                    placeholder="Funzione originaria..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Riutilizzo</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Riutilizzo</label>
                             <input type="text"
                                    x-model="usmFormData.riutilizzo"
                                    placeholder="Uso secondario, spoliazione..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500">
                         </div>
                     </div>
 
                     <div class="mb-4">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Provenienza Materiali</label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Provenienza Materiali</label>
                         <textarea x-model="usmFormData.provenienza_materiali"
                                   rows="2"
                                   placeholder="Cava, reimpiego da strutture precedenti..."
-                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+                                  class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Stato di Conservazione</label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Stato di Conservazione</label>
                         <textarea x-model="usmFormData.stato_conservazione"
                                   rows="3"
                                   placeholder="Buono, discreto, degradato... descrizione danni..."
-                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+                                  class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
                     </div>
                 </div>
 
@@ -573,105 +573,105 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-equals text-gray-500 mr-1"></i>
                                 Uguale a
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_uguale_a"
                                    placeholder="USM002, USM003..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-link text-gray-500 mr-1"></i>
                                 Si lega a
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_si_lega_a"
                                    placeholder="USM004, USM005..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-arrow-down text-blue-500 mr-1"></i>
                                 Gli si appoggia
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_gli_si_appoggia"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-arrow-up text-green-500 mr-1"></i>
                                 Si appoggia a
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_si_appoggia_a"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-layer-group text-purple-500 mr-1"></i>
                                 Coperto da
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_coperto_da"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-layer-group text-orange-500 mr-1"></i>
                                 Copre
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_copre"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-cut text-red-500 mr-1"></i>
                                 Tagliato da
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_tagliato_da"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-cut text-red-700 mr-1"></i>
                                 Taglia
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_taglia"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-fill text-teal-500 mr-1"></i>
                                 Riempito da
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_riempito_da"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 <i class="fas fa-fill-drip text-teal-700 mr-1"></i>
                                 Riempie
                             </label>
                             <input type="text"
                                    x-model="usmFormData.seq_riempie"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500">
                         </div>
                     </div>
                 </div>
@@ -685,26 +685,26 @@
 
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Descrizione Dettagliata</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Descrizione Dettagliata</label>
                             <textarea x-model="usmFormData.descrizione"
                                       rows="4"
                                       placeholder="Descrizione completa della struttura muraria..."
-                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Osservazioni</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Osservazioni</label>
                             <textarea x-model="usmFormData.osservazioni"
                                       rows="3"
-                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Interpretazione Archeologica</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Interpretazione Archeologica</label>
                             <textarea x-model="usmFormData.interpretazione"
                                       rows="4"
                                       placeholder="Interpretazione funzionale e cronologica..."
-                                      class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                         </div>
                     </div>
                 </div>
@@ -718,36 +718,36 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Datazione</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Datazione</label>
                             <input type="text"
                                    x-model="usmFormData.datazione"
                                    placeholder="I sec. a.C. - I sec. d.C."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Periodo</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Periodo</label>
                             <input type="text"
                                    x-model="usmFormData.periodo"
                                    placeholder="Romano, Medievale..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Fase</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Fase</label>
                             <input type="text"
                                    x-model="usmFormData.fase"
                                    placeholder="Fase 1, II..."
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500">
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Elementi Datanti</label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Elementi Datanti</label>
                         <textarea x-model="usmFormData.elementi_datanti"
                                   rows="2"
                                   placeholder="Bolli, iscrizioni, materiali diagnostici..."
-                                  class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"></textarea>
+                                  class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"></textarea>
                     </div>
                 </div>
 
@@ -759,31 +759,31 @@
                     </h4>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-teal-400 transition">
+                        <div class="flex items-center p-4 bg-white dark:bg-gray-700 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-teal-400 transition">
                             <input type="checkbox"
                                    x-model="usmFormData.camp_elementi_litici"
                                    class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500">
-                            <label class="ml-3 text-sm font-semibold text-gray-700">
+                            <label class="ml-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
                                 <i class="fas fa-mountain mr-2 text-teal-500"></i>
                                 Campionatura Elementi Litici
                             </label>
                         </div>
 
-                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-teal-400 transition">
+                        <div class="flex items-center p-4 bg-white dark:bg-gray-700 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-teal-400 transition">
                             <input type="checkbox"
                                    x-model="usmFormData.camp_laterizi"
                                    class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500">
-                            <label class="ml-3 text-sm font-semibold text-gray-700">
+                            <label class="ml-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
                                 <i class="fas fa-cubes mr-2 text-teal-500"></i>
                                 Campionatura Laterizi
                             </label>
                         </div>
 
-                        <div class="flex items-center p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-teal-400 transition">
+                        <div class="flex items-center p-4 bg-white dark:bg-gray-700 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-teal-400 transition">
                             <input type="checkbox"
                                    x-model="usmFormData.camp_malta"
                                    class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500">
-                            <label class="ml-3 text-sm font-semibold text-gray-700">
+                            <label class="ml-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
                                 <i class="fas fa-mortar-pestle mr-2 text-teal-500"></i>
                                 Campionatura Malta
                             </label>
@@ -800,9 +800,9 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Affidabilità Stratigrafica</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Affidabilità Stratigrafica</label>
                             <select x-model="usmFormData.affidabilita_stratigrafica"
-                                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                                    class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
                                 <option value="">Seleziona...</option>
                                 <option value="alta">Alta</option>
                                 <option value="media">Media</option>
@@ -811,42 +811,42 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Responsabile Scientifico Indagini</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Responsabile Scientifico Indagini</label>
                             <input type="text"
                                    x-model="usmFormData.responsabile_scientifico"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Data Rilevamento sul Campo</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Data Rilevamento sul Campo</label>
                             <input type="date"
                                    x-model="usmFormData.data_rilevamento"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Responsabile Compilazione sul Campo</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Responsabile Compilazione sul Campo</label>
                             <input type="text"
                                    x-model="usmFormData.responsabile_compilazione"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Data Rielaborazione</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Data Rielaborazione</label>
                             <input type="date"
                                    x-model="usmFormData.data_rielaborazione"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Responsabile Rielaborazione</label>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Responsabile Rielaborazione</label>
                             <input type="text"
                                    x-model="usmFormData.responsabile_rielaborazione"
-                                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500">
                         </div>
                     </div>
                 </div>
