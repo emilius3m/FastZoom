@@ -224,6 +224,10 @@ function usUSMManagerApp() {
         },
 
         async openUSModal(us = null, editMode = true) {
+            console.log('openUSModal called with:', us, editMode);
+            // Close USM modal if open
+            this.showUSMModal = false;
+            
             this.editingUS = us;
             this.viewingUS = !editMode;
             this.usErrorMessage = '';
@@ -545,6 +549,10 @@ function usUSMManagerApp() {
         },
 
         async openUSMModal(usm = null, editMode = true) {
+            console.log('openUSMModal called with:', usm, editMode);
+            // Close US modal if open
+            this.showUSModal = false;
+            
             this.editingUSM = usm;
             this.viewingUSM = !editMode;
             this.usmErrorMessage = '';

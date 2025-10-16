@@ -7,12 +7,12 @@
     <!-- Toolbar -->
     <div class="mb-6 flex justify-between items-center">
         <h1 class="text-3xl font-bold dark:text-white">Gestione US/USM</h1>
-        <div class="space-x-3">
-            <button @click="openUSModal()" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium flex items-center">
+        <div class="flex space-x-3">
+            <button @click="openUSModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-orange-700 font-medium inline-flex items-center">
                 <i class="fas fa-plus mr-2"></i>
                 Nuova US
             </button>
-            <button @click="openUSMModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center">
+            <button @click="openUSMModal()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium inline-flex items-center">
                 <i class="fas fa-plus mr-2"></i>
                 Nuova USM
             </button>
@@ -112,7 +112,7 @@
                                         <i class="fas fa-eye mr-1"></i>
                                         Visualizza
                                     </button>
-                                    <button @click="openUSModal(us, true)" class="px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 flex items-center" title="Modifica">
+                                    <button @click="openUSModal(us, true)" class="px-3 py-2 bg-red-600 text-white rounded hover:bg-orange-700 flex items-center" title="Modifica">
                                         <i class="fas fa-edit mr-1"></i>
                                         Modifica
                                     </button>
@@ -241,8 +241,9 @@
     </div>
 
     <!-- Include modals -->
-    {% include "pages/us/modal_us_create_edit.html" %}
     {% include "pages/us/modal_usm_create_edit.html" %}
+    {% include "pages/us/modal_us_create_edit.html" %}
+
 
 </div>
 

@@ -194,6 +194,9 @@ async def create_usm(
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     try:
+        # Get raw request body for debugging
+        body = await request.body()
+        logger.info(f"Raw request body: {body.decode('utf-8')}")
         logger.info(f"Creating USM with payload: {payload.model_dump()}")
         
         if not await verify_site_access(payload.site_id, user_sites):
@@ -268,9 +271,17 @@ async def create_usm(
         
     except ValidationError as e:
         logger.error(f"Validation error creating USM: {e}")
-        raise HTTPException(status_code=422, detail=f"Errore di validazione: {e}")
+        logger.error(f"Validation error details: {e.errors()}")
+        # Format validation errors in a more readable way
+        error_messages = []
+        for error in e.errors():
+            field = " -> ".join(str(loc) for loc in error['loc'])
+            msg = error['msg']
+            error_messages.append(f"Campo '{field}': {msg}")
+        raise HTTPException(status_code=422, detail=" | ".join(error_messages))
     except Exception as e:
         logger.error(f"Unexpected error creating USM: {e}")
+        logger.exception("Full traceback:")
         raise HTTPException(status_code=500, detail=f"Errore interno del server: {str(e)}")
 
 @us_router.get("/usm/{usm_id}", response_model=USMOut)
