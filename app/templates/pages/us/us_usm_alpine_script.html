@@ -4,6 +4,7 @@ function usUSMManagerApp() {
     return {
         // ===== STATE MANAGEMENT =====
         currentSiteId: '{{ site.id if site else "" }}',
+        activeTab: 'us',  // 'us' or 'usm'
 
         // US State
         showUSModal: false,
@@ -299,6 +300,9 @@ function usUSMManagerApp() {
             this.usErrorMessage = '';
 
             try {
+                // Debug log to check form data
+                console.log('Form data before save:', this.usFormData);
+                
                 // Prepara payload con sequenza fisica
                 const payload = {
                     ...this.usFormData,
@@ -319,6 +323,9 @@ function usUSMManagerApp() {
                         setacciatura: this.usFormData.camp_setacciatura
                     }
                 };
+                
+                // Debug log to check payload
+                console.log('Payload being sent:', payload);
 
                 // Rimuovi campi sequenza temporanei
                 delete payload.seq_uguale_a;
@@ -347,6 +354,9 @@ function usUSMManagerApp() {
                     },
                     body: JSON.stringify(payload)
                 });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
 
                 if (response.ok) {
                     const savedUS = await response.json();
@@ -361,7 +371,41 @@ function usUSMManagerApp() {
                     this.closeUSModal();
                 } else {
                     const error = await response.json();
-                    throw new Error(error.detail || 'Errore nel salvataggio');
+                    console.error('API Error:', error);
+                    let errorMessage = 'Errore nel salvataggio';
+                    
+                    if (error.detail) {
+                        if (typeof error.detail === 'string') {
+                            errorMessage = error.detail;
+                            
+                            // Highlight specific field if error mentions it
+                            if (errorMessage.includes("Campo '")) {
+                                const fieldNameMatch = errorMessage.match(/Campo '([^']+)'/);
+                                if (fieldNameMatch) {
+                                    const fieldName = fieldNameMatch[1];
+                                    // Try to find and highlight the field
+                                    setTimeout(() => {
+                                        const fieldElement = document.querySelector(`[x-model*="${fieldName}"]`);
+                                        if (fieldElement) {
+                                            fieldElement.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+                                            setTimeout(() => {
+                                                fieldElement.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+                                            }, 5000);
+                                        }
+                                    }, 100);
+                                }
+                            }
+                        } else if (Array.isArray(error.detail)) {
+                            // Handle validation errors array
+                            errorMessage = error.detail.map(err =>
+                                typeof err === 'object' ? err.msg || JSON.stringify(err) : err
+                            ).join(', ');
+                        } else if (typeof error.detail === 'object') {
+                            errorMessage = JSON.stringify(error.detail);
+                        }
+                    }
+                    
+                    throw new Error(errorMessage);
                 }
             } catch (error) {
                 console.error('Errore salvataggio US:', error);
@@ -592,6 +636,9 @@ function usUSMManagerApp() {
             this.usmErrorMessage = '';
 
             try {
+                // Debug log to check form data
+                console.log('USM Form data before save:', this.usmFormData);
+                
                 // Prepara payload completo
                 const payload = {
                     ...this.usmFormData,
@@ -647,6 +694,9 @@ function usUSMManagerApp() {
                         malta: this.usmFormData.camp_malta
                     }
                 };
+                
+                // Debug log to check payload
+                console.log('USM Payload being sent:', payload);
 
                 // Rimuovi campi temporanei
                 const tempFields = [
@@ -676,6 +726,9 @@ function usUSMManagerApp() {
                     },
                     body: JSON.stringify(payload)
                 });
+                
+                console.log('USM Response status:', response.status);
+                console.log('USM Response headers:', response.headers);
 
                 if (response.ok) {
                     const savedUSM = await response.json();
@@ -690,7 +743,41 @@ function usUSMManagerApp() {
                     this.closeUSMModal();
                 } else {
                     const error = await response.json();
-                    throw new Error(error.detail || 'Errore nel salvataggio');
+                    console.error('API Error:', error);
+                    let errorMessage = 'Errore nel salvataggio';
+                    
+                    if (error.detail) {
+                        if (typeof error.detail === 'string') {
+                            errorMessage = error.detail;
+                            
+                            // Highlight specific field if error mentions it
+                            if (errorMessage.includes("Campo '")) {
+                                const fieldNameMatch = errorMessage.match(/Campo '([^']+)'/);
+                                if (fieldNameMatch) {
+                                    const fieldName = fieldNameMatch[1];
+                                    // Try to find and highlight the field
+                                    setTimeout(() => {
+                                        const fieldElement = document.querySelector(`[x-model*="${fieldName}"]`);
+                                        if (fieldElement) {
+                                            fieldElement.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+                                            setTimeout(() => {
+                                                fieldElement.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+                                            }, 5000);
+                                        }
+                                    }, 100);
+                                }
+                            }
+                        } else if (Array.isArray(error.detail)) {
+                            // Handle validation errors array
+                            errorMessage = error.detail.map(err =>
+                                typeof err === 'object' ? err.msg || JSON.stringify(err) : err
+                            ).join(', ');
+                        } else if (typeof error.detail === 'object') {
+                            errorMessage = JSON.stringify(error.detail);
+                        }
+                    }
+                    
+                    throw new Error(errorMessage);
                 }
             } catch (error) {
                 console.error('Errore salvataggio USM:', error);
