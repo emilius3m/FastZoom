@@ -48,7 +48,7 @@ def init_models():
     
     # Import archeologia avanzata
     archeologia_module = importlib.import_module('app.models.archeologia_avanzata')
-    UnitaStratigrafica = archeologia_module.UnitaStratigrafica  # noqa: F401
+    UnitaStratigrafica = archeologia_module.UnitaStratigraficaCompleta  # noqa: F401
     SchedaTomba = archeologia_module.SchedaTomba  # noqa: F401
     InventarioReperto = archeologia_module.InventarioReperto  # noqa: F401
     MaterialeArcheologico = archeologia_module.MaterialeArcheologico  # noqa: F401

@@ -87,8 +87,8 @@ matrix_harris_relations = Table(
     'matrix_harris_relations',
     Base.metadata,
     Column('id', UUID(as_uuid=True), primary_key=True, default=uuid4),
-    Column('us_superiore_id', UUID(as_uuid=True), ForeignKey('unita_stratigrafiche.id', ondelete='CASCADE'), nullable=False),
-    Column('us_inferiore_id', UUID(as_uuid=True), ForeignKey('unita_stratigrafiche.id', ondelete='CASCADE'), nullable=False),
+    Column('us_superiore_id', UUID(as_uuid=True), ForeignKey('unita_stratigrafiche_complete.id', ondelete='CASCADE'), nullable=False),
+    Column('us_inferiore_id', UUID(as_uuid=True), ForeignKey('unita_stratigrafiche_complete.id', ondelete='CASCADE'), nullable=False),
     Column('tipo_relazione', String(50), nullable=False),  # "copre", "taglia", "riempie", etc.
     Column('created_at', DateTime(timezone=True), server_default=func.now())
 )
@@ -105,12 +105,12 @@ reperti_materiali_association = Table(
 
 
 # ===== MODELLO UNITÀ STRATIGRAFICHE COMPLETE =====
-class UnitaStratigrafica(Base):
+class UnitaStratigraficaCompleta(Base):
     """
     Modello per Unità Stratigrafiche complete con standard ICCD
     Include tutti i campi necessari per schede US definitive
     """
-    __tablename__ = "unita_stratigrafiche"
+    __tablename__ = "unita_stratigrafiche_complete"
     
     # Identificativi
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
@@ -177,11 +177,11 @@ class UnitaStratigrafica(Base):
     version = Column(Integer, default=1, nullable=False)
     
     # ===== RELAZIONI =====
-    site = relationship("ArchaeologicalSite", back_populates="unita_stratigrafiche")
+    site = relationship("ArchaeologicalSite", back_populates="unita_stratigrafiche_complete")
     
     # Relazioni stratigrafiche (Matrix Harris)
     us_superiori = relationship(
-        "UnitaStratigrafica",
+        "UnitaStratigraficaCompleta",
         secondary=matrix_harris_relations,
         primaryjoin=id==matrix_harris_relations.c.us_inferiore_id,
         secondaryjoin=id==matrix_harris_relations.c.us_superiore_id,
@@ -189,7 +189,7 @@ class UnitaStratigrafica(Base):
     )
     
     us_inferiori = relationship(
-        "UnitaStratigrafica",
+        "UnitaStratigraficaCompleta",
         secondary=matrix_harris_relations,
         primaryjoin=id==matrix_harris_relations.c.us_superiore_id,
         secondaryjoin=id==matrix_harris_relations.c.us_inferiore_id,
@@ -203,7 +203,7 @@ class UnitaStratigrafica(Base):
     campioni = relationship("CampioneScientifico", back_populates="unita_stratigrafica")
     
     def __repr__(self):
-        return f"<UnitaStratigrafica(numero='{self.numero_us}', tipo='{self.tipo_us}')>"
+        return f"<UnitaStratigraficaCompleta(numero='{self.numero_us}', tipo='{self.tipo_us}')>"
     
     @property
     def codice_completo(self) -> str:
@@ -223,8 +223,8 @@ class SchedaTomba(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
     numero_tomba = Column(String(20), nullable=False, index=True)  # es: "T001"
-    us_taglio_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche.id"), nullable=True)
-    us_riempimento_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche.id"), nullable=True)
+    us_taglio_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
+    us_riempimento_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
     
     # Tipologia sepoltura
     tipo_tomba = Column(String(30), nullable=False)  # Enum TipoTomba
@@ -299,8 +299,8 @@ class SchedaTomba(Base):
     
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="schede_tombe")
-    us_taglio = relationship("UnitaStratigrafica", foreign_keys=[us_taglio_id])
-    us_riempimento = relationship("UnitaStratigrafica", foreign_keys=[us_riempimento_id])
+    us_taglio = relationship("UnitaStratigraficaCompleta", foreign_keys=[us_taglio_id])
+    us_riempimento = relationship("UnitaStratigraficaCompleta", foreign_keys=[us_riempimento_id])
     
     # Corredo funerario
     reperti_corredo = relationship("InventarioReperto", back_populates="tomba")
@@ -327,7 +327,7 @@ class InventarioReperto(Base):
     numero_sacco = Column(String(20), nullable=True)  # es: "S001"
     
     # Provenienza
-    unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche.id"), nullable=True)
+    unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
     tomba_id = Column(UUID(as_uuid=True), ForeignKey("schede_tombe.id"), nullable=True)
     
     # Posizione nel deposito
@@ -397,7 +397,7 @@ class InventarioReperto(Base):
     
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="inventario_reperti")
-    unita_stratigrafica = relationship("UnitaStratigrafica", back_populates="reperti")
+    unita_stratigrafica = relationship("UnitaStratigraficaCompleta", back_populates="reperti")
     tomba = relationship("SchedaTomba", back_populates="reperti_corredo")
     
     # Materiali costituenti (many-to-many)
@@ -470,7 +470,7 @@ class CampioneScientifico(Base):
     tipo_campione = Column(String(30), nullable=False)  # Enum TipoCampione
     
     # Provenienza
-    unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche.id"), nullable=True)
+    unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
     tomba_id = Column(UUID(as_uuid=True), ForeignKey("schede_tombe.id"), nullable=True)
     
     # Prelievo
@@ -515,7 +515,7 @@ class CampioneScientifico(Base):
     
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="campioni_scientifici")
-    unita_stratigrafica = relationship("UnitaStratigrafica", back_populates="campioni")
+    unita_stratigrafica = relationship("UnitaStratigraficaCompleta", back_populates="campioni")
     tomba = relationship("SchedaTomba")
     
     def __repr__(self):

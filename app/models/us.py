@@ -7,10 +7,12 @@ from uuid import uuid4, UUID
 from sqlalchemy import (
     Column, String, Text, Enum, Date, DateTime, Boolean, ForeignKey, Numeric, Integer
 )
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
-Base = declarative_base()
+from sqlalchemy import JSON
+JSONType = JSON
+from sqlalchemy.orm import relationship
+from app.database.base import Base
 
 # Vocabolari controllati (estratti dalle schede)
 ConsistenzaEnum = Enum(
@@ -60,7 +62,7 @@ class UnitaStratigrafica(Base):
 
     # Sequenza fisica (relazioni Harris) come JSON list di codici US
     sequenza_fisica = Column(
-        JSONB,
+        JSONType,
         default=lambda: {
             "uguale_a": [],
             "si_lega_a": [],
@@ -90,7 +92,7 @@ class UnitaStratigrafica(Base):
     # Reperti e campionature
     dati_quantitativi_reperti = Column(Text)  # [US]
     campionature = Column(
-        JSONB, default=lambda: {"flottazione": False, "setacciatura": False}, nullable=False
+        JSONType, default=lambda: {"flottazione": False, "setacciatura": False}, nullable=False
     )  # [US]
 
     # Meta e responsabilità
@@ -104,7 +106,7 @@ class UnitaStratigrafica(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    site = relationship("ArchaeologicalSite", backref="unita_stratigrafiche")
+    site = relationship("ArchaeologicalSite", back_populates="unita_stratigrafiche")
 
 
 class UnitaStratigraficaMuraria(Base):
@@ -151,16 +153,16 @@ class UnitaStratigraficaMuraria(Base):
     stato_conservazione = Column(Text)            # [USM]
 
     # Materiali, lavorazioni, consistenze
-    materiali_laterizi = Column(JSONB, default=dict)  # {tipo:[...], consistenza:[...]} [USM]
-    materiali_elementi_litici = Column(JSONB, default=dict)  # {litotipi:[...], lavorazione:[...]} [USM]
+    materiali_laterizi = Column(JSONType, default=dict)  # {tipo:[...], consistenza:[...]} [USM]
+    materiali_elementi_litici = Column(JSONType, default=dict)  # {litotipi:[...], lavorazione:[...]} [USM]
     materiali_altro = Column(Text)                     # [USM]
-    legante = Column(JSONB, default=dict)              # {tipo, consistenza} [USM]
+    legante = Column(JSONType, default=dict)              # {tipo, consistenza} [USM]
     legante_altro = Column(Text)                       # [USM]
     finiture_elementi_particolari = Column(Text)       # [USM]
 
     # Sequenza fisica
     sequenza_fisica = Column(
-        JSONB,
+        JSONType,
         default=lambda: {
             "uguale_a": [],
             "si_lega_a": [],
@@ -187,7 +189,7 @@ class UnitaStratigraficaMuraria(Base):
     fase = Column(String(100))                   # [USM]
     elementi_datanti = Column(Text)              # [USM]
     campionature = Column(
-        JSONB, default=lambda: {
+        JSONType, default=lambda: {
             "elementi_litici": False, "laterizi": False, "malta": False
         }, nullable=False
     )  # [USM]
@@ -203,4 +205,4 @@ class UnitaStratigraficaMuraria(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    site = relationship("ArchaeologicalSite", backref="unita_stratigrafiche_murarie")
+    site = relationship("ArchaeologicalSite", back_populates="unita_stratigrafiche_murarie")

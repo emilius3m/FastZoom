@@ -61,6 +61,8 @@ class ArchaeologicalSite(Base):
 
     # ARCHEOLOGIA AVANZATA
     unita_stratigrafiche = relationship("UnitaStratigrafica", back_populates="site", cascade="all, delete-orphan")
+    unita_stratigrafiche_murarie = relationship("UnitaStratigraficaMuraria", back_populates="site", cascade="all, delete-orphan")
+    unita_stratigrafiche_complete = relationship("UnitaStratigraficaCompleta", back_populates="site", cascade="all, delete-orphan")
     schede_tombe = relationship("SchedaTomba", back_populates="site", cascade="all, delete-orphan")
     inventario_reperti = relationship("InventarioReperto", back_populates="site", cascade="all, delete-orphan")
     campioni_scientifici = relationship("CampioneScientifico", back_populates="site", cascade="all, delete-orphan")
