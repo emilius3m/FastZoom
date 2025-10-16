@@ -9,6 +9,7 @@ function usUSMManagerApp() {
         // US State
         showUSModal: false,
         editingUS: null,
+        viewingUS: false,  // true for view-only mode
         usList: [],
         usSaving: false,
         usErrorMessage: '',
@@ -16,6 +17,7 @@ function usUSMManagerApp() {
         // USM State
         showUSMModal: false,
         editingUSM: null,
+        viewingUSM: false,  // true for view-only mode
         usmList: [],
         usmSaving: false,
         usmErrorMessage: '',
@@ -221,64 +223,79 @@ function usUSMManagerApp() {
             }
         },
 
-        openUSModal(us = null) {
+        async openUSModal(us = null, editMode = true) {
             this.editingUS = us;
+            this.viewingUS = !editMode;
             this.usErrorMessage = '';
 
             if (us) {
-                // Modalità modifica - popola form
-                this.usFormData = {
-                    site_id: us.site_id,
-                    us_code: us.us_code,
-                    ente_responsabile: us.ente_responsabile || '',
-                    anno: us.anno,
-                    ufficio_mic: us.ufficio_mic || '',
-                    identificativo_rif: us.identificativo_rif || '',
-                    localita: us.localita || '',
-                    area_struttura: us.area_struttura || '',
-                    saggio: us.saggio || '',
-                    ambiente_unita_funzione: us.ambiente_unita_funzione || '',
-                    posizione: us.posizione || '',
-                    settori: us.settori || '',
-                    piante: us.piante || '',
-                    prospetti: us.prospetti || '',
-                    sezioni: us.sezioni || '',
-                    definizione: us.definizione || '',
-                    criteri_distinzione: us.criteri_distinzione || '',
-                    modo_formazione: us.modo_formazione || '',
-                    componenti_inorganici: us.componenti_inorganici || '',
-                    componenti_organici: us.componenti_organici || '',
-                    consistenza: us.consistenza || '',
-                    colore: us.colore || '',
-                    misure: us.misure || '',
-                    stato_conservazione: us.stato_conservazione || '',
-                    seq_uguale_a: this.sequenzaToString(us.sequenza_fisica?.uguale_a),
-                    seq_si_lega_a: this.sequenzaToString(us.sequenza_fisica?.si_lega_a),
-                    seq_gli_si_appoggia: this.sequenzaToString(us.sequenza_fisica?.gli_si_appoggia),
-                    seq_si_appoggia_a: this.sequenzaToString(us.sequenza_fisica?.si_appoggia_a),
-                    seq_coperto_da: this.sequenzaToString(us.sequenza_fisica?.coperto_da),
-                    seq_copre: this.sequenzaToString(us.sequenza_fisica?.copre),
-                    seq_tagliato_da: this.sequenzaToString(us.sequenza_fisica?.tagliato_da),
-                    seq_taglia: this.sequenzaToString(us.sequenza_fisica?.taglia),
-                    seq_riempito_da: this.sequenzaToString(us.sequenza_fisica?.riempito_da),
-                    seq_riempie: this.sequenzaToString(us.sequenza_fisica?.riempie),
-                    descrizione: us.descrizione || '',
-                    osservazioni: us.osservazioni || '',
-                    interpretazione: us.interpretazione || '',
-                    datazione: us.datazione || '',
-                    periodo: us.periodo || '',
-                    fase: us.fase || '',
-                    elementi_datanti: us.elementi_datanti || '',
-                    dati_quantitativi_reperti: us.dati_quantitativi_reperti || '',
-                    camp_flottazione: us.campionature?.flottazione || false,
-                    camp_setacciatura: us.campionature?.setacciatura || false,
-                    affidabilita_stratigrafica: us.affidabilita_stratigrafica || '',
-                    responsabile_scientifico: us.responsabile_scientifico || '',
-                    data_rilevamento: us.data_rilevamento || '',
-                    responsabile_compilazione: us.responsabile_compilazione || '',
-                    data_rielaborazione: us.data_rielaborazione || '',
-                    responsabile_rielaborazione: us.responsabile_rielaborazione || ''
-                };
+                try {
+                    // Fetch full US details
+                    const response = await fetch(`/api/us/${us.id}`);
+                    if (response.ok) {
+                        const usData = await response.json();
+                        
+                        // Modalità modifica - popola form
+                        this.usFormData = {
+                            site_id: usData.site_id,
+                            us_code: usData.us_code,
+                            ente_responsabile: usData.ente_responsabile || '',
+                            anno: usData.anno,
+                            ufficio_mic: usData.ufficio_mic || '',
+                            identificativo_rif: usData.identificativo_rif || '',
+                            localita: usData.localita || '',
+                            area_struttura: usData.area_struttura || '',
+                            saggio: usData.saggio || '',
+                            ambiente_unita_funzione: usData.ambiente_unita_funzione || '',
+                            posizione: usData.posizione || '',
+                            settori: usData.settori || '',
+                            piante: usData.piante || '',
+                            prospetti: usData.prospetti || '',
+                            sezioni: usData.sezioni || '',
+                            definizione: usData.definizione || '',
+                            criteri_distinzione: usData.criteri_distinzione || '',
+                            modo_formazione: usData.modo_formazione || '',
+                            componenti_inorganici: usData.componenti_inorganici || '',
+                            componenti_organici: usData.componenti_organici || '',
+                            consistenza: usData.consistenza || '',
+                            colore: usData.colore || '',
+                            misure: usData.misure || '',
+                            stato_conservazione: usData.stato_conservazione || '',
+                            seq_uguale_a: this.sequenzaToString(usData.sequenza_fisica?.uguale_a),
+                            seq_si_lega_a: this.sequenzaToString(usData.sequenza_fisica?.si_lega_a),
+                            seq_gli_si_appoggia: this.sequenzaToString(usData.sequenza_fisica?.gli_si_appoggia),
+                            seq_si_appoggia_a: this.sequenzaToString(usData.sequenza_fisica?.si_appoggia_a),
+                            seq_coperto_da: this.sequenzaToString(usData.sequenza_fisica?.coperto_da),
+                            seq_copre: this.sequenzaToString(usData.sequenza_fisica?.copre),
+                            seq_tagliato_da: this.sequenzaToString(usData.sequenza_fisica?.tagliato_da),
+                            seq_taglia: this.sequenzaToString(usData.sequenza_fisica?.taglia),
+                            seq_riempito_da: this.sequenzaToString(usData.sequenza_fisica?.riempito_da),
+                            seq_riempie: this.sequenzaToString(usData.sequenza_fisica?.riempie),
+                            descrizione: usData.descrizione || '',
+                            osservazioni: usData.osservazioni || '',
+                            interpretazione: usData.interpretazione || '',
+                            datazione: usData.datazione || '',
+                            periodo: usData.periodo || '',
+                            fase: usData.fase || '',
+                            elementi_datanti: usData.elementi_datanti || '',
+                            dati_quantitativi_reperti: usData.dati_quantitativi_reperti || '',
+                            camp_flottazione: usData.campionature?.flottazione || false,
+                            camp_setacciatura: usData.campionature?.setacciatura || false,
+                            affidabilita_stratigrafica: usData.affidabilita_stratigrafica || '',
+                            responsabile_scientifico: usData.responsabile_scientifico || '',
+                            data_rilevamento: usData.data_rilevamento || '',
+                            responsabile_compilazione: usData.responsabile_compilazione || '',
+                            data_rielaborazione: usData.data_rielaborazione || '',
+                            responsabile_rielaborazione: usData.responsabile_rielaborazione || ''
+                        };
+                    } else {
+                        throw new Error('Errore nel caricamento dei dati US');
+                    }
+                } catch (error) {
+                    console.error('Error fetching US data:', error);
+                    this.showNotification('Errore nel caricamento dei dati US', 'error');
+                    return;
+                }
             } else {
                 // Modalità creazione - reset form
                 this.resetUSForm();
@@ -291,6 +308,7 @@ function usUSMManagerApp() {
         closeUSModal() {
             this.showUSModal = false;
             this.editingUS = null;
+            this.viewingUS = false;
             this.usErrorMessage = '';
             this.resetUSForm();
         },
@@ -526,95 +544,110 @@ function usUSMManagerApp() {
             }
         },
 
-        openUSMModal(usm = null) {
+        async openUSMModal(usm = null, editMode = true) {
             this.editingUSM = usm;
+            this.viewingUSM = !editMode;
             this.usmErrorMessage = '';
 
             if (usm) {
-                // Modalità modifica
-                this.usmFormData = {
-                    site_id: usm.site_id,
-                    usm_code: usm.usm_code,
-                    ente_responsabile: usm.ente_responsabile || '',
-                    anno: usm.anno,
-                    ufficio_mic: usm.ufficio_mic || '',
-                    identificativo_rif: usm.identificativo_rif || '',
-                    localita: usm.localita || '',
-                    area_struttura: usm.area_struttura || '',
-                    saggio: usm.saggio || '',
-                    ambiente_unita_funzione: usm.ambiente_unita_funzione || '',
-                    posizione: usm.posizione || '',
-                    settori: usm.settori || '',
-                    piante: usm.piante || '',
-                    prospetti: usm.prospetti || '',
-                    sezioni: usm.sezioni || '',
-                    misure: usm.misure || '',
-                    superficie_analizzata: usm.superficie_analizzata,
-                    definizione: usm.definizione || '',
-                    tecnica_costruttiva: usm.tecnica_costruttiva || '',
-                    sezione_muraria_visibile: usm.sezione_muraria_visibile || false,
-                    sezione_muraria_tipo: usm.sezione_muraria_tipo || '',
-                    sezione_muraria_spessore: usm.sezione_muraria_spessore || '',
-                    funzione_statica: usm.funzione_statica || '',
-                    modulo: usm.modulo || '',
-                    criteri_distinzione: usm.criteri_distinzione || '',
-                    provenienza_materiali: usm.provenienza_materiali || '',
-                    orientamento: usm.orientamento || '',
-                    uso_primario: usm.uso_primario || '',
-                    riutilizzo: usm.riutilizzo || '',
-                    stato_conservazione: usm.stato_conservazione || '',
-                    // Materiali laterizi
-                    lat_mattoni: usm.materiali_laterizi?.tipo?.includes('mattoni') || false,
-                    lat_tegole: usm.materiali_laterizi?.tipo?.includes('tegole') || false,
-                    lat_embrici: usm.materiali_laterizi?.tipo?.includes('embrici') || false,
-                    lat_altro: usm.materiali_laterizi?.tipo?.includes('altro') || false,
-                    lat_crudi: usm.materiali_laterizi?.consistenza?.includes('crudi') || false,
-                    lat_cotti: usm.materiali_laterizi?.consistenza?.includes('cotti') || false,
-                    lat_cotti_sole: usm.materiali_laterizi?.consistenza?.includes('cotti_sole') || false,
-                    lat_semifusi: usm.materiali_laterizi?.consistenza?.includes('semifusi') || false,
-                    // Elementi litici
-                    lit_tufo: usm.materiali_elementi_litici?.litotipi?.includes('tufo') || false,
-                    lit_calcare: usm.materiali_elementi_litici?.litotipi?.includes('calcare') || false,
-                    lit_arenaria: usm.materiali_elementi_litici?.litotipi?.includes('arenaria') || false,
-                    lit_altro: usm.materiali_elementi_litici?.litotipi?.includes('altro') || false,
-                    lit_sfaldati: usm.materiali_elementi_litici?.lavorazione?.includes('sfaldati') || false,
-                    lit_spaccati: usm.materiali_elementi_litici?.lavorazione?.includes('spaccati') || false,
-                    lit_sbozzati: usm.materiali_elementi_litici?.lavorazione?.includes('sbozzati') || false,
-                    lit_squadrati: usm.materiali_elementi_litici?.lavorazione?.includes('squadrati') || false,
-                    lit_spianati: usm.materiali_elementi_litici?.lavorazione?.includes('spianati') || false,
-                    lit_bugnati: usm.materiali_elementi_litici?.lavorazione?.includes('bugnati') || false,
-                    materiali_altro: usm.materiali_altro || '',
-                    legante_tipo: usm.legante?.tipo || '',
-                    legante_consistenza: usm.legante?.consistenza || '',
-                    legante_altro: usm.legante_altro || '',
-                    finiture_elementi_particolari: usm.finiture_elementi_particolari || '',
-                    seq_uguale_a: this.sequenzaToString(usm.sequenza_fisica?.uguale_a),
-                    seq_si_lega_a: this.sequenzaToString(usm.sequenza_fisica?.si_lega_a),
-                    seq_gli_si_appoggia: this.sequenzaToString(usm.sequenza_fisica?.gli_si_appoggia),
-                    seq_si_appoggia_a: this.sequenzaToString(usm.sequenza_fisica?.si_appoggia_a),
-                    seq_coperto_da: this.sequenzaToString(usm.sequenza_fisica?.coperto_da),
-                    seq_copre: this.sequenzaToString(usm.sequenza_fisica?.copre),
-                    seq_tagliato_da: this.sequenzaToString(usm.sequenza_fisica?.tagliato_da),
-                    seq_taglia: this.sequenzaToString(usm.sequenza_fisica?.taglia),
-                    seq_riempito_da: this.sequenzaToString(usm.sequenza_fisica?.riempito_da),
-                    seq_riempie: this.sequenzaToString(usm.sequenza_fisica?.riempie),
-                    descrizione: usm.descrizione || '',
-                    osservazioni: usm.osservazioni || '',
-                    interpretazione: usm.interpretazione || '',
-                    datazione: usm.datazione || '',
-                    periodo: usm.periodo || '',
-                    fase: usm.fase || '',
-                    elementi_datanti: usm.elementi_datanti || '',
-                    camp_elementi_litici: usm.campionature?.elementi_litici || false,
-                    camp_laterizi: usm.campionature?.laterizi || false,
-                    camp_malta: usm.campionature?.malta || false,
-                    affidabilita_stratigrafica: usm.affidabilita_stratigrafica || '',
-                    responsabile_scientifico: usm.responsabile_scientifico || '',
-                    data_rilevamento: usm.data_rilevamento || '',
-                    responsabile_compilazione: usm.responsabile_compilazione || '',
-                    data_rielaborazione: usm.data_rielaborazione || '',
-                    responsabile_rielaborazione: usm.responsabile_rielaborazione || ''
-                };
+                try {
+                    // Fetch full USM details
+                    const response = await fetch(`/api/usm/${usm.id}`);
+                    if (response.ok) {
+                        const usmData = await response.json();
+                        
+                        // Modalità modifica
+                        this.usmFormData = {
+                            site_id: usmData.site_id,
+                            usm_code: usmData.usm_code,
+                            ente_responsabile: usmData.ente_responsabile || '',
+                            anno: usmData.anno,
+                            ufficio_mic: usmData.ufficio_mic || '',
+                            identificativo_rif: usmData.identificativo_rif || '',
+                            localita: usmData.localita || '',
+                            area_struttura: usmData.area_struttura || '',
+                            saggio: usmData.saggio || '',
+                            ambiente_unita_funzione: usmData.ambiente_unita_funzione || '',
+                            posizione: usmData.posizione || '',
+                            settori: usmData.settori || '',
+                            piante: usmData.piante || '',
+                            prospetti: usmData.prospetti || '',
+                            sezioni: usmData.sezioni || '',
+                            misure: usmData.misure || '',
+                            superficie_analizzata: usmData.superficie_analizzata,
+                            definizione: usmData.definizione || '',
+                            tecnica_costruttiva: usmData.tecnica_costruttiva || '',
+                            sezione_muraria_visibile: usmData.sezione_muraria_visibile || false,
+                            sezione_muraria_tipo: usmData.sezione_muraria_tipo || '',
+                            sezione_muraria_spessore: usmData.sezione_muraria_spessore || '',
+                            funzione_statica: usmData.funzione_statica || '',
+                            modulo: usmData.modulo || '',
+                            criteri_distinzione: usmData.criteri_distinzione || '',
+                            provenienza_materiali: usmData.provenienza_materiali || '',
+                            orientamento: usmData.orientamento || '',
+                            uso_primario: usmData.uso_primario || '',
+                            riutilizzo: usmData.riutilizzo || '',
+                            stato_conservazione: usmData.stato_conservazione || '',
+                            // Materiali laterizi
+                            lat_mattoni: usmData.materiali_laterizi?.tipo?.includes('mattoni') || false,
+                            lat_tegole: usmData.materiali_laterizi?.tipo?.includes('tegole') || false,
+                            lat_embrici: usmData.materiali_laterizi?.tipo?.includes('embrici') || false,
+                            lat_altro: usmData.materiali_laterizi?.tipo?.includes('altro') || false,
+                            lat_crudi: usmData.materiali_laterizi?.consistenza?.includes('crudi') || false,
+                            lat_cotti: usmData.materiali_laterizi?.consistenza?.includes('cotti') || false,
+                            lat_cotti_sole: usmData.materiali_laterizi?.consistenza?.includes('cotti_sole') || false,
+                            lat_semifusi: usmData.materiali_laterizi?.consistenza?.includes('semifusi') || false,
+                            // Elementi litici
+                            lit_tufo: usmData.materiali_elementi_litici?.litotipi?.includes('tufo') || false,
+                            lit_calcare: usmData.materiali_elementi_litici?.litotipi?.includes('calcare') || false,
+                            lit_arenaria: usmData.materiali_elementi_litici?.litotipi?.includes('arenaria') || false,
+                            lit_altro: usmData.materiali_elementi_litici?.litotipi?.includes('altro') || false,
+                            lit_sfaldati: usmData.materiali_elementi_litici?.lavorazione?.includes('sfaldati') || false,
+                            lit_spaccati: usmData.materiali_elementi_litici?.lavorazione?.includes('spaccati') || false,
+                            lit_sbozzati: usmData.materiali_elementi_litici?.lavorazione?.includes('sbozzati') || false,
+                            lit_squadrati: usmData.materiali_elementi_litici?.lavorazione?.includes('squadrati') || false,
+                            lit_spianati: usmData.materiali_elementi_litici?.lavorazione?.includes('spianati') || false,
+                            lit_bugnati: usmData.materiali_elementi_litici?.lavorazione?.includes('bugnati') || false,
+                            materiali_altro: usmData.materiali_altro || '',
+                            legante_tipo: usmData.legante?.tipo || '',
+                            legante_consistenza: usmData.legante?.consistenza || '',
+                            legante_altro: usmData.legante_altro || '',
+                            finiture_elementi_particolari: usmData.finiture_elementi_particolari || '',
+                            seq_uguale_a: this.sequenzaToString(usmData.sequenza_fisica?.uguale_a),
+                            seq_si_lega_a: this.sequenzaToString(usmData.sequenza_fisica?.si_lega_a),
+                            seq_gli_si_appoggia: this.sequenzaToString(usmData.sequenza_fisica?.gli_si_appoggia),
+                            seq_si_appoggia_a: this.sequenzaToString(usmData.sequenza_fisica?.si_appoggia_a),
+                            seq_coperto_da: this.sequenzaToString(usmData.sequenza_fisica?.coperto_da),
+                            seq_copre: this.sequenzaToString(usmData.sequenza_fisica?.copre),
+                            seq_tagliato_da: this.sequenzaToString(usmData.sequenza_fisica?.tagliato_da),
+                            seq_taglia: this.sequenzaToString(usmData.sequenza_fisica?.taglia),
+                            seq_riempito_da: this.sequenzaToString(usmData.sequenza_fisica?.riempito_da),
+                            seq_riempie: this.sequenzaToString(usmData.sequenza_fisica?.riempie),
+                            descrizione: usmData.descrizione || '',
+                            osservazioni: usmData.osservazioni || '',
+                            interpretazione: usmData.interpretazione || '',
+                            datazione: usmData.datazione || '',
+                            periodo: usmData.periodo || '',
+                            fase: usmData.fase || '',
+                            elementi_datanti: usmData.elementi_datanti || '',
+                            camp_elementi_litici: usmData.campionature?.elementi_litici || false,
+                            camp_laterizi: usmData.campionature?.laterizi || false,
+                            camp_malta: usmData.campionature?.malta || false,
+                            affidabilita_stratigrafica: usmData.affidabilita_stratigrafica || '',
+                            responsabile_scientifico: usmData.responsabile_scientifico || '',
+                            data_rilevamento: usmData.data_rilevamento || '',
+                            responsabile_compilazione: usmData.responsabile_compilazione || '',
+                            data_rielaborazione: usmData.data_rielaborazione || '',
+                            responsabile_rielaborazione: usmData.responsabile_rielaborazione || ''
+                        };
+                    } else {
+                        throw new Error('Errore nel caricamento dei dati USM');
+                    }
+                } catch (error) {
+                    console.error('Error fetching USM data:', error);
+                    this.showNotification('Errore nel caricamento dei dati USM', 'error');
+                    return;
+                }
             } else {
                 // Modalità creazione
                 this.resetUSMForm();
@@ -627,6 +660,7 @@ function usUSMManagerApp() {
         closeUSMModal() {
             this.showUSMModal = false;
             this.editingUSM = null;
+            this.viewingUSM = false;
             this.usmErrorMessage = '';
             this.resetUSMForm();
         },

@@ -11,7 +11,7 @@
         <!-- Header Modal -->
         <div class="sticky top-0 bg-gradient-to-r from-orange-600 to-orange-500 text-white px-6 py-4 flex justify-between items-center z-10">
             <div>
-                <h3 class="text-2xl font-bold" x-text="editingUS ? 'Modifica US ' + editingUS.us_code : 'Nuova Unità Stratigrafica (US)'"></h3>
+                <h3 class="text-2xl font-bold" x-text="viewingUS ? 'Visualizza US ' + editingUS.us_code : (editingUS ? 'Modifica US ' + editingUS.us_code : 'Nuova Unità Stratigrafica (US)')"></h3>
                 <p class="text-orange-100 text-sm mt-1">Scheda standard MiC 2021</p>
             </div>
             <button @click="closeUSModal()" class="text-white hover:text-orange-200 transition">
@@ -21,7 +21,8 @@
 
         <!-- Form Content -->
         <div class="max-h-80vh overflow-y-auto dark:bg-gray-800">
-            <form @submit.prevent="saveUS()" class="p-6 dark:bg-gray-800">
+            <form x-show="!viewingUS" @submit.prevent="saveUS()" class="p-6 dark:bg-gray-800">
+            <div x-show="viewingUS" class="p-6 dark:bg-gray-800">
 
                 <!-- Alert Errori -->
                 <div x-show="usErrorMessage" class="bg-red-50 dark:bg-red-900 dark:text-red-100 border-l-4 border-red-500 dark:border-red-600 p-4 mb-6 rounded">
@@ -46,10 +47,13 @@
                             </label>
                             <input type="text"
                                    x-model="usFormData.us_code"
+                                   x-bind:disabled="viewingUS"
+                                   x-bind:readonly="viewingUS"
                                    required
                                    pattern="^US\d{3,4}$"
                                    placeholder="US001"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Formato: US001, US002...</p>
                         </div>
 
@@ -58,8 +62,10 @@
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ente Responsabile</label>
                             <input type="text"
                                    x-model="usFormData.ente_responsabile"
+                                   x-bind:readonly="viewingUS"
                                    placeholder="Soprintendenza..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Anno -->
@@ -67,10 +73,12 @@
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Anno</label>
                             <input type="number"
                                    x-model="usFormData.anno"
+                                   x-bind:readonly="viewingUS"
                                    min="1900"
                                    :max="new Date().getFullYear()"
                                    placeholder="2025"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
 
@@ -80,8 +88,10 @@
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ufficio MiC Competente per Tutela</label>
                             <input type="text"
                                    x-model="usFormData.ufficio_mic"
+                                   x-bind:readonly="viewingUS"
                                    placeholder="Ufficio competente..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Identificativo Saggio -->
@@ -89,8 +99,10 @@
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Identificativo Saggio/Edificio/Struttura</label>
                             <input type="text"
                                    x-model="usFormData.identificativo_rif"
+                                   x-bind:readonly="viewingUS"
                                    placeholder="Saggio A, Edificio 1..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
                 </div>
@@ -629,7 +641,8 @@
 
                 <!-- Actions -->
                 <div class="flex justify-end space-x-4 pt-6 border-t-2 border-gray-200 dark:border-gray-600">
-                    <button type="button"
+                    <button x-show="!viewingUS"
+                            type="button"
                             @click="closeUSModal()"
                             :disabled="usSaving"
                             class="px-8 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition">
@@ -637,15 +650,25 @@
                         Annulla
                     </button>
 
-                    <button type="submit"
+                    <button x-show="!viewingUS"
+                            type="submit"
                             :disabled="usSaving"
                             class="px-8 py-3 bg-gradient-to-r from-orange-600 to-orange-500 text-white rounded-lg font-semibold hover:from-orange-700 hover:to-orange-600 disabled:opacity-50 transition shadow-lg">
                         <i :class="usSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'" class="mr-2"></i>
                         <span x-text="usSaving ? 'Salvataggio...' : (editingUS ? 'Salva Modifiche' : 'Crea US')"></span>
                     </button>
+
+                    <button x-show="viewingUS"
+                            type="button"
+                            @click="closeUSModal()"
+                            class="px-8 py-3 bg-gradient-to-r from-gray-600 to-gray-500 text-white rounded-lg font-semibold hover:from-gray-700 hover:to-gray-600 transition shadow-lg">
+                        <i class="fas fa-times mr-2"></i>
+                        Chiudi
+                    </button>
                 </div>
 
             </form>
+            </div>
         </div>
     </div>
 </div>
