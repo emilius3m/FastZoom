@@ -268,3 +268,5 @@ app/static/minio_server/*
 # Excluding DB files to be pushed
 *.db
 /alembic/versions/2025_09_21_1713_add_token_blacklist_table.py
+/.idea/copilot.data.migration.agent.xml
+/.idea/copilot.data.migration.ask.xml
