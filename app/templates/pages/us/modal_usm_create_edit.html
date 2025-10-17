@@ -9,13 +9,15 @@
      <div class="bg-white dark:bg-gray-800 absolute inset-0 flex flex-col overflow-hidden shadow-2xl border-4 border-purple-500">
 
         <!-- Header Modal -->
-        <div class="sticky top-0 bg-gradient-to-r from-red-600 to-red-500 text-white px-6 py-4 flex justify-between items-center z-10">
+        <div class="sticky top-0 bg-gradient-to-r from-red-600 to-red-500 px-6 py-4 flex justify-between items-center z-10">
             <div>
-                <h3 class="text-2xl font-bold" x-text="viewingUSM ? 'Visualizza USM ' + editingUSM.usm_code : (editingUSM ? 'Modifica USM ' + editingUSM.usm_code : 'Nuova Unità Stratigrafica Muraria (USM)')"></h3>
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white" x-text="viewingUSM ? 'Visualizza USM ' + editingUSM.usm_code : (editingUSM ? 'Modifica USM ' + editingUSM.usm_code : 'Nuova Unità Stratigrafica Muraria (USM)')"></h3>
                 <p class="text-red-100 text-sm mt-1">Scheda standard MiC 2021 - Strutture Murarie</p>
             </div>
-            <button @click="closeUSMModal()" class="text-white hover:text-red-200 transition">
-                <i class="fas fa-times text-2xl"></i>
+            <button @click="closeUSMModal()" class="text-gray-900 dark:text-white hover:text-red-800 dark:hover:text-red-200 transition p-2 rounded-full hover:bg-red-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
             </button>
         </div>
 
