@@ -5,7 +5,7 @@ from sqlalchemy import select, and_
 from fastapi import HTTPException, status
 
 from app.models import User
-from app.models.sites import ArchaeologicalSite
+from app.models.sites import ArchaeologicalSite, SiteStatusEnum
 from app.models import UserSitePermission, PermissionLevel
 from app.core.security import SecurityService
 from app.services.site_service import SiteService
@@ -84,7 +84,7 @@ class AuthService:
             ArchaeologicalSite.id,
             ArchaeologicalSite.name,
             ArchaeologicalSite.code,
-            ArchaeologicalSite.location,
+            ArchaeologicalSite.municipality,
             UserSitePermission.permission_level
         ).select_from(
             ArchaeologicalSite
@@ -95,7 +95,7 @@ class AuthService:
             and_(
                 UserSitePermission.user_id == user_id,
                 UserSitePermission.is_active == True,
-                ArchaeologicalSite.is_active == True
+                ArchaeologicalSite.status == SiteStatusEnum.ACTIVE
             )
         ).order_by(ArchaeologicalSite.name)
         
@@ -107,7 +107,7 @@ class AuthService:
                 "id": str(row.id),
                 "name": row.name,
                 "code": row.code,
-                "location": row.location or "",
+                "location": row.municipality or "",
                 "permission_level": row.permission_level.value
             })
         
@@ -130,9 +130,9 @@ class AuthService:
             ArchaeologicalSite.id,
             ArchaeologicalSite.name,
             ArchaeologicalSite.code,
-            ArchaeologicalSite.location,
+            ArchaeologicalSite.municipality,
         ).where(
-            ArchaeologicalSite.is_active == True
+            ArchaeologicalSite.status == SiteStatusEnum.ACTIVE
         ).order_by(ArchaeologicalSite.name)
         
         result = await db.execute(query)
@@ -143,7 +143,7 @@ class AuthService:
                 "id": str(row.id),
                 "name": row.name,
                 "code": row.code,
-                "location": row.location or "",
+                "location": row.municipality or "",
                 "permission_level": "regional_admin"  # Massimo livello per superadmin
             })
         

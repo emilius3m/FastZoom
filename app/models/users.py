@@ -147,10 +147,15 @@ class User(Base, SoftDeleteMixin):
                 return perm.permissions
         return []
 
-    def update_last_login(self):
+    async def update_last_login(self, db=None):
         """Aggiorna timestamp ultimo login"""
         self.last_login_at = datetime.utcnow()
         self.login_count += 1
+        
+        # If database session is provided, save changes
+        if db:
+            await db.commit()
+            await db.refresh(self)
 
     # ===== METODI PER PermissionLevel =====
 
