@@ -16,7 +16,7 @@ from app.core.security import (
     get_current_user_id_with_blacklist,
     get_current_user_sites_with_blacklist,
 )
-from app.models.us import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
 from app.schemas.us import (
     USCreate, USUpdate, USOut,
     USMCreate, USMUpdate, USMOut

@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional, List
 from datetime import date, datetime
 from loguru import logger
 
-from app.models.us_enhanced import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
 
 
 class USWordGenerator:

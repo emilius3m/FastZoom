@@ -16,7 +16,7 @@ import io
 from app.database.db import get_async_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.services.us_word_generator import USWordGenerator, USMWordGenerator
-from app.models.us_enhanced import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
 
 router = APIRouter(prefix="/api/us-export", tags=["us-export"])
 

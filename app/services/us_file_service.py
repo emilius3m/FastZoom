@@ -14,8 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from loguru import logger
 
-from app.models.us_enhanced import USFile, UnitaStratigrafica, UnitaStratigraficaMuraria
-from app.models.us_enhanced import us_files_association, usm_files_association
+from app.models.stratigraphy import USFile, UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.stratigraphy import us_files_association, usm_files_association
 from app.services.storageservice import storageservice
 from app.services.deepzoomminioservice import deepzoomminioservice
 
