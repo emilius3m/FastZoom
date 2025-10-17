@@ -41,10 +41,13 @@ async def create_db_and_tables():
             
             user = User(
                 email="superuser@admin.com",
+                username="superuser",  # Add required username field
                 hashed_password=hashed_password,
                 is_superuser=True,
                 is_active=True,
-                is_verified=True  # Aggiungi questo campo se presente nel modello
+                is_verified=True,  # Aggiungi questo campo se presente nel modello
+                first_name="Super",  # Add required first_name
+                last_name="User"     # Add required last_name
             )
             
             session.add(user)
@@ -95,10 +98,13 @@ async def create_archaeological_superadmin():
             
             admin_user = User(
                 email=admin_email,
+                username="admin",  # Add required username field
                 hashed_password=hashed_password,
                 is_superuser=True,
                 is_active=True,
-                is_verified=True
+                is_verified=True,
+                first_name="Admin",  # Add required first_name
+                last_name="User"     # Add required last_name
             )
             
             session.add(admin_user)

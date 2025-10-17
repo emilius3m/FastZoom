@@ -462,10 +462,13 @@ async def admin_users_create(
         user = User(
             id=uuid4(),
             email=email,
+            username=email.split("@")[0],  # Generate username from email
             hashed_password=hashed_password,
             is_active=is_active,
             is_superuser=is_superuser,
-            is_verified=True
+            is_verified=True,
+            first_name="User",  # Add required first_name
+            last_name="Account"  # Add required last_name
         )
         
         db.add(user)

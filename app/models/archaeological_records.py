@@ -232,6 +232,7 @@ class InventarioReperto(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     # ===== PROVENIENZA =====
     # Provenienza stratigrafica
     unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche.id"), nullable=True)
+    unita_stratigrafica_completa_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
     tomba_id = Column(UUID(as_uuid=True), ForeignKey("schede_tombe.id"), nullable=True)
     
     # Localizzazione
@@ -299,6 +300,7 @@ class InventarioReperto(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="inventario_reperti")
     unita_stratigrafica = relationship("UnitaStratigrafica", back_populates="reperti")
+    unita_stratigrafica_completa = relationship("UnitaStratigraficaCompleta", back_populates="reperti")
     tomba = relationship("SchedaTomba", back_populates="reperti_corredo", foreign_keys=[tomba_id])
     
     # Campioni associati
@@ -317,7 +319,7 @@ class InventarioReperto(Base, SiteMixin, UserMixin, SoftDeleteMixin):
         Index('idx_reperto_site_numero', 'site_id', 'numero_inventario'),
         Index('idx_reperto_categoria', 'categoria', 'materiale'),
         Index('idx_reperto_datazione', 'periodo', 'datazione'),
-        Index('idx_reperto_provenienza', 'unita_stratigrafica_id', 'tomba_id'),
+        Index('idx_reperto_provenienza', 'unita_stratigrafica_id', 'unita_stratigrafica_completa_id', 'tomba_id'),
     )
     
     def __repr__(self):
@@ -327,6 +329,8 @@ class InventarioReperto(Base, SiteMixin, UserMixin, SoftDeleteMixin):
         """Testo provenienza per display"""
         if self.tomba_id and self.tomba:
             return f"Tomba {self.tomba.numero_tomba}"
+        elif self.unita_stratigrafica_completa_id and self.unita_stratigrafica_completa:
+            return f"US {self.unita_stratigrafica_completa.numero_us}"
         elif self.unita_stratigrafica_id and self.unita_stratigrafica:
             return f"US {self.unita_stratigrafica.us_code}"
         elif self.settore:
@@ -353,6 +357,7 @@ class CampioneScientifico(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     
     # ===== PROVENIENZA =====
     unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche.id"), nullable=True)
+    unita_stratigrafica_completa_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
     unita_stratigrafica_muraria_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_murarie.id"), nullable=True)
     tomba_id = Column(UUID(as_uuid=True), ForeignKey("schede_tombe.id"), nullable=True)
     reperto_id = Column(UUID(as_uuid=True), ForeignKey("inventario_reperti.id"), nullable=True)
@@ -407,6 +412,7 @@ class CampioneScientifico(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="campioni_scientifici")
     unita_stratigrafica = relationship("UnitaStratigrafica", back_populates="campioni")
+    unita_stratigrafica_completa = relationship("UnitaStratigraficaCompleta", back_populates="campioni")
     unita_stratigrafica_muraria = relationship("UnitaStratigraficaMuraria", back_populates="campioni")
     tomba = relationship("SchedaTomba", back_populates="campioni")
     reperto = relationship("InventarioReperto", back_populates="campioni")
@@ -425,6 +431,8 @@ class CampioneScientifico(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     def get_provenienza_text(self) -> str:
         """Testo provenienza completo"""
         sources = []
+        if self.unita_stratigrafica_completa:
+            sources.append(f"US {self.unita_stratigrafica_completa.numero_us}")
         if self.unita_stratigrafica:
             sources.append(f"US {self.unita_stratigrafica.us_code}")
         if self.unita_stratigrafica_muraria:

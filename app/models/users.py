@@ -113,6 +113,7 @@ class User(Base, SoftDeleteMixin):
     created_forms = relationship("FormSchema", foreign_keys="FormSchema.created_by", back_populates="creator")
     giornali_cantiere = relationship("GiornaleCantiere", back_populates="responsabile")
     activities = relationship("UserActivity", back_populates="user", cascade="all, delete-orphan")
+    profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
     def __repr__(self):

@@ -135,6 +135,20 @@ from app.models.stratigraphy import (
     TecnicaCostruttiva
 )
 
+# ===== IMPORT ARCHEOLOGIA AVANZATA =====
+from app.models.archeologia_avanzata import (
+    UnitaStratigraficaCompleta,
+    MaterialeArcheologico,
+    matrix_harris_relations,
+    reperti_materiali_association,
+    TipoUS,
+    TipoTomba,
+    RitoSepolcrale,
+    TipoMateriale,
+    TipoCampione,
+    StatoConservazione
+)
+
 # ===== IMPORT RECORD ARCHEOLOGICI =====
 from app.models.archaeological_records import (
     SchedaTomba,
@@ -276,6 +290,18 @@ __all__ = [
     'ConsistenzaEnum',
     'AffidabilitaEnum',
     'TecnicaCostruttiva',
+    
+    # Archeologia Avanzata
+    'UnitaStratigraficaCompleta',
+    'MaterialeArcheologico',
+    'matrix_harris_relations',
+    'reperti_materiali_association',
+    'TipoUS',
+    'TipoTomba',
+    'RitoSepolcrale',
+    'TipoMateriale',
+    'TipoCampione',
+    'StatoConservazione',
     
     # Archaeological Records
     'SchedaTomba',
@@ -597,7 +623,7 @@ logger.info("🏛️ Enum archeologici completi per classificazione standard")
 
 # ===== COMPATIBILITY =====
 # Alias per compatibilità con codice esistente
-UnitaStratigraficaCompleta = UnitaStratigrafica  # Alias legacy
+# UnitàStratigraficaCompleta è ora un modello a sé stante, non un alias
 
 # Final validation on import
 try:

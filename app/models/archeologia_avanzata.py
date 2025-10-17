@@ -197,10 +197,14 @@ class UnitaStratigraficaCompleta(Base):
     )
     
     # Relazione con reperti trovati in questa US
-    reperti = relationship("InventarioReperto", back_populates="unita_stratigrafica")
+    reperti = relationship("InventarioReperto",
+                           foreign_keys="InventarioReperto.unita_stratigrafica_completa_id",
+                           back_populates="unita_stratigrafica_completa")
     
     # Relazione con campioni prelevati
-    campioni = relationship("CampioneScientifico", back_populates="unita_stratigrafica")
+    campioni = relationship("CampioneScientifico",
+                           foreign_keys="CampioneScientifico.unita_stratigrafica_completa_id",
+                           back_populates="unita_stratigrafica_completa")
     
     def __repr__(self):
         return f"<UnitaStratigraficaCompleta(numero='{self.numero_us}', tipo='{self.tipo_us}')>"

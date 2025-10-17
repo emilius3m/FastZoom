@@ -166,6 +166,7 @@ async def register(
         # Create new user
         user = User(
             email=email,
+            username=email.split("@")[0],  # Generate username from email
             hashed_password=hashed_password,
             first_name=first_name,
             last_name=last_name,
