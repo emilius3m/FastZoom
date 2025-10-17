@@ -9,7 +9,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from app.models import Photo
+from app.models import Photo, UserSitePermission
 from app.models import User, Role, UserActivity
 from app.models.user_profiles import UserProfile
 # Sicurezza multi-sito - DEPENDENCY CON BLACKLIST CHECK
