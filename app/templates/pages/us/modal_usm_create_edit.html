@@ -871,7 +871,7 @@
                     type="submit"
                     @click="!viewingUSM && saveUSM()"
                     :disabled="usmSaving"
-                    class="px-8 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-lg font-semibold hover:from-red-700 hover:to-red-600 disabled:opacity-50 transition shadow-lg">
+                    class="px-8 py-3 border-2 border-red-500 dark:border-red-600 rounded-lg text-red-700 dark:text-red-300 font-semibold hover:bg-red-50 dark:hover:bg-red-900 disabled:opacity-50 transition">
                 <i :class="usmSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'" class="mr-2"></i>
                 <span x-text="usmSaving ? 'Salvataggio...' : (editingUSM ? 'Salva Modifiche' : 'Crea USM')"></span>
             </button>
