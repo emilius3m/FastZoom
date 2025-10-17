@@ -124,15 +124,11 @@ class Document(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # ===== SOFT DELETE =====
-    is_deleted = Column(Boolean, default=False)
-    deleted_at = Column(DateTime, nullable=True)
-    deleted_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    # Note: is_deleted, deleted_at, and deleted_by are provided by SoftDeleteMixin
 
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="documents")
     uploader = relationship("User", foreign_keys=[uploaded_by])
-    deleter = relationship("User", foreign_keys=[deleted_by])
 
     def __repr__(self):
         return f"<Document(title={self.title}, category={self.category})>"

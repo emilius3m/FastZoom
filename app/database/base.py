@@ -7,7 +7,7 @@ import sqlalchemy
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import DateTime, Column
+from sqlalchemy import DateTime, Column, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.functions import func
@@ -73,7 +73,7 @@ class UserMixin:
 
 class SoftDeleteMixin:
     """Mixin per soft delete"""
-    is_deleted = Column('is_deleted', default=False, nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime, nullable=True)
     deleted_by = Column(UUID(as_uuid=True), nullable=True)
 

@@ -216,106 +216,8 @@ class UnitaStratigraficaCompleta(Base):
 from app.models.archaeological_records import SchedaTomba  # noqa: F401
 
 # ===== MODELLO INVENTARIO REPERTI =====
-class InventarioReperto(Base):
-    """
-    Modello per inventario completo dei reperti
-    Include numerazione, descrizione, stato, posizione
-    """
-    __tablename__ = "inventario_reperti"
-    
-    # Identificativi
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
-    
-    # Numerazione reperto
-    numero_inventario = Column(String(50), nullable=False, unique=True, index=True)  # es: "PMP-001-R001"
-    numero_cassa = Column(String(20), nullable=True, index=True)  # es: "C001"
-    numero_sacco = Column(String(20), nullable=True)  # es: "S001"
-    
-    # Provenienza
-    unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
-    tomba_id = Column(UUID(as_uuid=True), ForeignKey("schede_tombe.id"), nullable=True)
-    
-    # Posizione nel deposito
-    settore_deposito = Column(String(50), nullable=True)
-    scaffale = Column(String(20), nullable=True)
-    posizione = Column(String(50), nullable=True)
-    
-    # Classificazione
-    categoria_materiale = Column(String(30), nullable=False)  # Enum TipoMateriale
-    classe = Column(String(100), nullable=True)  # ceramica fine, grossolana, etc.
-    tipo = Column(String(100), nullable=True)  # coppa, anfora, etc.
-    forma = Column(String(100), nullable=True)
-    
-    # Descrizione
-    descrizione_breve = Column(String(500), nullable=False)
-    descrizione_dettagliata = Column(Text, nullable=True)
-    
-    # Caratteristiche fisiche
-    altezza = Column(Numeric(8, 2), nullable=True)  # in cm
-    larghezza = Column(Numeric(8, 2), nullable=True)
-    lunghezza = Column(Numeric(8, 2), nullable=True)
-    diametro = Column(Numeric(8, 2), nullable=True)
-    spessore = Column(Numeric(6, 2), nullable=True)
-    peso = Column(Numeric(8, 2), nullable=True)  # in grammi
-    
-    # Quantità
-    numero_frammenti = Column(Integer, default=1, nullable=False)
-    percentuale_conservato = Column(Integer, nullable=True)  # 0-100%
-    
-    # Stato conservazione
-    stato_conservazione = Column(String(20), nullable=False)  # Enum StatoConservazione
-    agenti_degrado = Column(Text, nullable=True)
-    interventi_restauro = Column(Text, nullable=True)
-    
-    # Cronologia
-    cronologia = Column(String(200), nullable=True)
-    periodo = Column(String(100), nullable=True)
-    datazione_proposta = Column(String(100), nullable=True)
-    
-    # Significatività
-    rilevanza_scientifica = Column(String(20), nullable=True)  # alta, media, bassa
-    note_interpretative = Column(Text, nullable=True)
-    
-    # Documentazione
-    foto_numeri = Column(Text, nullable=True)
-    disegni_numeri = Column(Text, nullable=True)
-    bibliografia = Column(Text, nullable=True)
-    
-    # Analisi
-    analisi_effettuate = Column(Text, nullable=True)
-    campionature = Column(Text, nullable=True)
-    
-    # Pubblicazione
-    pubblicato = Column(Boolean, default=False)
-    riferimenti_bibliografici = Column(Text, nullable=True)
-    
-    # Metadati
-    catalogatore = Column(String(200), nullable=True)
-    data_catalogazione = Column(Date, nullable=False, default=date.today)
-    revisore = Column(String(200), nullable=True)
-    data_revisione = Column(Date, nullable=True)
-    
-    # Sistema
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    version = Column(Integer, default=1, nullable=False)
-    
-    # ===== RELAZIONI =====
-    site = relationship("ArchaeologicalSite", back_populates="inventario_reperti")
-    unita_stratigrafica = relationship("UnitaStratigraficaCompleta", back_populates="reperti")
-    tomba = relationship("SchedaTomba", back_populates="reperti_corredo")
-    
-    # Materiali costituenti (many-to-many)
-    materiali = relationship(
-        "MaterialeArcheologico",
-        secondary=reperti_materiali_association,
-        back_populates="reperti"
-    )
-    
-    def __repr__(self):
-        return f"<InventarioReperto(numero='{self.numero_inventario}', categoria='{self.categoria_materiale}')>"
-
+# InventarioReperto è importato da archaeological_records per evitare duplicazione
+from app.models.archaeological_records import InventarioReperto  # noqa: F401
 
 # ===== MODELLO MATERIALI ARCHEOLOGICI =====
 class MaterialeArcheologico(Base):
@@ -359,73 +261,9 @@ class MaterialeArcheologico(Base):
     def __repr__(self):
         return f"<MaterialeArcheologico(nome='{self.nome_comune}', categoria='{self.categoria}')>"
 
-
 # ===== MODELLO CAMPIONI SCIENTIFICI =====
-class CampioneScientifico(Base):
-    """
-    Modello per campioni scientifici (C14, archeobotanici, etc.)
-    Include tracking delle analisi e risultati
-    """
-    __tablename__ = "campioni_scientifici"
-    
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
-    
-    # Identificativi
-    numero_campione = Column(String(50), nullable=False, unique=True, index=True)  # es: "PMP-001-C14-001"
-    tipo_campione = Column(String(30), nullable=False)  # Enum TipoCampione
-    
-    # Provenienza
-    unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
-    tomba_id = Column(UUID(as_uuid=True), ForeignKey("schede_tombe.id"), nullable=True)
-    
-    # Prelievo
-    data_prelievo = Column(Date, nullable=False)
-    responsabile_prelievo = Column(String(200), nullable=False)
-    metodo_prelievo = Column(String(200), nullable=True)
-    strumenti_utilizzati = Column(String(200), nullable=True)
-    
-    # Descrizione campione
-    descrizione = Column(Text, nullable=False)
-    peso_campione = Column(Numeric(8, 3), nullable=True)  # in grammi
-    volume_campione = Column(Numeric(8, 3), nullable=True)  # in ml
-    
-    # Conservazione
-    modalita_conservazione = Column(String(100), nullable=True)  # refrigerato, secco, etc.
-    contenitore = Column(String(100), nullable=True)
-    posizione_deposito = Column(String(100), nullable=True)
-    
-    # Analisi
-    laboratorio_analisi = Column(String(200), nullable=True)
-    data_invio = Column(Date, nullable=True)
-    data_risultati = Column(Date, nullable=True)
-    codice_laboratorio = Column(String(100), nullable=True)
-    
-    # Risultati
-    risultati_analisi = Column(JSON, nullable=True)  # JSON con risultati strutturati
-    interpretazione_risultati = Column(Text, nullable=True)
-    data_calibrata = Column(String(100), nullable=True)  # per C14
-    sigma = Column(String(50), nullable=True)  # per C14
-    
-    # Pubblicazione
-    pubblicato = Column(Boolean, default=False)
-    riferimenti_pubblicazione = Column(Text, nullable=True)
-    
-    # Note
-    note_prelievo = Column(Text, nullable=True)
-    note_analisi = Column(Text, nullable=True)
-    
-    # Sistema
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # ===== RELAZIONI =====
-    site = relationship("ArchaeologicalSite", back_populates="campioni_scientifici")
-    unita_stratigrafica = relationship("UnitaStratigraficaCompleta", back_populates="campioni")
-    tomba = relationship("SchedaTomba")
-    
-    def __repr__(self):
-        return f"<CampioneScientifico(numero='{self.numero_campione}', tipo='{self.tipo_campione}')>"
+# CampioneScientifico è importato da archaeological_records per evitare duplicazione
+from app.models.archaeological_records import CampioneScientifico  # noqa: F401
 
 
 # ===== AGGIORNAMENTI PER ARCHAEOLOGICALSITE =====

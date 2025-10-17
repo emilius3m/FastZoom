@@ -293,7 +293,7 @@ TEMPLATE_ELENCHI = {
         'descrizione': 'Elenco completo delle tavole grafiche prodotte'
     },
     'foto': {
-        'nome': 'Elenco Fotografico', 
+        'nome': 'Elenco Fotografico',
         'campi': ['numero_foto', 'descrizione', 'soggetto', 'data_scatto', 'fotografo', 'formato'],
         'descrizione': 'Catalogo fotografico completo'
     },
@@ -318,6 +318,78 @@ TEMPLATE_ELENCHI = {
         'descrizione': 'Registro dei campioni per analisi scientifiche'
     }
 }
+
+
+# ===== MODELLO TEMPLATE RELAZIONE =====
+
+class TemplateRelazione(Base, SiteMixin, UserMixin):
+    """
+    Template per relazioni finali di scavo
+    Configurazioni riutilizzabili per diversi progetti
+    """
+    __tablename__ = "template_relazioni"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
+    
+    # ===== IDENTIFICAZIONE =====
+    nome_template = Column(String(200), nullable=False)
+    descrizione = Column(Text, nullable=True)
+    categoria = Column(String(100), nullable=True)                # Standard, Personalizzato, etc.
+    
+    # ===== STRUTTURA TEMPLATE =====
+    # Sezioni principali della relazione
+    sezioni_obbligatorie = Column(JSON, default=list)             # Lista sezioni obbligatorie
+    sezioni_opzionali = Column(JSON, default=list)               # Lista sezioni opzionali
+    
+    # Template specifici per ogni sezione
+    template_premessa = Column(Text, nullable=True)
+    template_inquadramento = Column(Text, nullable=True)
+    template_metodologia = Column(Text, nullable=True)
+    template_risultati = Column(Text, nullable=True)
+    template_conclusioni = Column(Text, nullable=True)
+    
+    # ===== CONFIGURAZIONI VISUALI =====
+    stile_testo = Column(JSON, default=dict)                     # Font, dimensioni, colori
+    stile_titoli = Column(JSON, default=dict)                    # Stile per i titoli
+    formato_pagina = Column(String(20), default='A4')
+    margini = Column(JSON, default=dict)                         # Configurazione margini
+    
+    # ===== INTESTAZIONE E PIE DI PAGINA =====
+    intestazione_template = Column(Text, nullable=True)          # Header template
+    piedi_pagina_template = Column(Text, nullable=True)          # Footer template
+    include_numero_pagina = Column(Boolean, default=True)
+    
+    # ===== FIRME =====
+    firme_template = Column(JSON, default=dict)                  # Mappa ruoli -> posizioni
+    
+    # ===== STATUS =====
+    attivo = Column(Boolean, default=True)
+    predefinito = Column(Boolean, default=False)                 # Template di default
+    
+    # ===== SISTEMA =====
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # ===== RELAZIONI =====
+    site = relationship("ArchaeologicalSite", back_populates="template_relazioni")
+    
+    def __repr__(self):
+        return f"<TemplateRelazione(nome={self.nome_template}, categoria={self.categoria})>"
+    
+    def get_sezioni_template(self) -> Dict[str, Any]:
+        """Restituisce struttura completa sezioni"""
+        return {
+            'obbligatorie': self.sezioni_obbligatorie or [],
+            'opzionali': self.sezioni_opzionali or [],
+            'template': {
+                'premessa': self.template_premessa,
+                'inquadramento': self.template_inquadramento,
+                'metodologia': self.template_metodologia,
+                'risultati': self.template_risultati,
+                'conclusioni': self.template_conclusioni
+            }
+        }
 
 
 # ===== HELPER FUNCTIONS =====

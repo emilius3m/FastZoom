@@ -100,8 +100,10 @@ class User(Base, SoftDeleteMixin):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relazioni
-    roles = relationship("Role", secondary=user_roles_association, back_populates="users")
-    site_permissions = relationship("UserSitePermission", back_populates="user", cascade="all, delete-orphan")
+    roles = relationship("Role", secondary=user_roles_association,
+                        foreign_keys=[user_roles_association.c.user_id, user_roles_association.c.role_id],
+                        back_populates="users")
+    site_permissions = relationship("UserSitePermission", foreign_keys="UserSitePermission.user_id", back_populates="user", cascade="all, delete-orphan")
 
     # Relazioni con contenuti creati
     created_sites = relationship("ArchaeologicalSite", foreign_keys="ArchaeologicalSite.created_by",
@@ -214,7 +216,9 @@ class Role(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relazioni
-    users = relationship("User", secondary=user_roles_association, back_populates="roles")
+    users = relationship("User", secondary=user_roles_association,
+                        foreign_keys=[user_roles_association.c.role_id, user_roles_association.c.user_id],
+                        back_populates="roles")
 
     def __repr__(self):
         return f"<Role(name={self.name})>"
