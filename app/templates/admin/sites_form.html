@@ -189,7 +189,6 @@
                             <select id="region"
                                     name="region"
                                     x-model="formData.region"
-                                    @change="updateProvinces"
                                     class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                     required>
                                 <option value="">Seleziona regione...</option>
@@ -203,16 +202,12 @@
                             <label for="province" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Provincia
                             </label>
-                            <select id="province"
-                                    name="province"
-                                    x-model="formData.province"
-                                    :disabled="!formData.region"
-                                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 dark:disabled:bg-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                                <option value="">Seleziona provincia...</option>
-                                <template x-for="province in availableProvinces" :key="province">
-                                    <option :value="province" x-text="province"></option>
-                                </template>
-                            </select>
+                            <input type="text"
+                                   id="province"
+                                   name="province"
+                                   x-model="formData.province"
+                                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                   placeholder="Nome della provincia">
                         </div>
                         
                         <div>
@@ -517,10 +512,10 @@ document.addEventListener('alpine:init', () => {
             region: '{{ site.region if site else "" }}',
             province: '{{ site.province if site else "" }}',
             municipality: '{{ site.municipality if site else "" }}',
-            location: '{{ site.location if site else "" }}',
+            location: '{{ site.locality if site else "" }}',
             coordinates_lat: {{ site.coordinates_lat if site and site.coordinates_lat else 'null' }},
             coordinates_lng: {{ site.coordinates_lng if site and site.coordinates_lng else 'null' }},
-            is_active: {{ 'true' if not site or site.is_active else 'false' }},
+            is_active: {{ 'true' if not site or site.status == 'active' else 'false' }},
             is_public: {{ 'true' if site and site.is_public else 'false' }},
             research_status: '{{ site.research_status if site else "" }}'
         },
@@ -532,20 +527,7 @@ document.addEventListener('alpine:init', () => {
             'Molise', 'Piemonte', 'Puglia', 'Sardegna', 'Sicilia',
             'Toscana', 'Trentino-Alto Adige', 'Umbria', "Valle d'Aosta", 'Veneto'
         ],
-        
-        // Provinces by Region (simplified)
-        regionProvinces: {
-            'Lazio': ['Roma', 'Frosinone', 'Latina', 'Rieti', 'Viterbo'],
-            'Lombardia': ['Milano', 'Bergamo', 'Brescia', 'Como', 'Cremona', 'Mantova', 'Pavia', 'Sondrio', 'Varese'],
-            'Campania': ['Napoli', 'Avellino', 'Benevento', 'Caserta', 'Salerno'],
-            'Sicilia': ['Palermo', 'Catania', 'Messina', 'Siracusa', 'Trapani', 'Agrigento', 'Caltanissetta', 'Enna', 'Ragusa'],
-            'Veneto': ['Venezia', 'Verona', 'Vicenza', 'Treviso', 'Padova', 'Rovigo', 'Belluno'],
-            'Toscana': ['Firenze', 'Arezzo', 'Grosseto', 'Livorno', 'Lucca', 'Massa-Carrara', 'Pisa', 'Pistoia', 'Prato', 'Siena'],
-            'Piemonte': ['Torino', 'Alessandria', 'Asti', 'Biella', 'Cuneo', 'Novara', 'Verbano-Cusio-Ossola', 'Vercelli'],
-            'Puglia': ['Bari', 'Barletta-Andria-Trani', 'Brindisi', 'Foggia', 'Lecce', 'Taranto'],
-            'Emilia-Romagna': ['Bologna', 'Ferrara', 'Forlì-Cesena', 'Modena', 'Parma', 'Piacenza', 'Ravenna', 'Reggio Emilia', 'Rimini'],
-            // Add more as needed
-        },
+
         
         // Validation
         errors: {},
@@ -557,10 +539,6 @@ document.addEventListener('alpine:init', () => {
         alertType: 'success',
         alertMessage: '',
         
-        // Computed
-        get availableProvinces() {
-            return this.regionProvinces[this.formData.region] || [];
-        },
         
         init() {
             // Check for URL parameters
@@ -570,10 +548,6 @@ document.addEventListener('alpine:init', () => {
             }
         },
         
-        updateProvinces() {
-            // Reset province when region changes
-            this.formData.province = '';
-        },
         
         validateField(field) {
             this.touched[field] = true;
@@ -700,10 +674,10 @@ document.addEventListener('alpine:init', () => {
                 region: '{{ site.region if site else "" }}',
                 province: '{{ site.province if site else "" }}',
                 municipality: '{{ site.municipality if site else "" }}',
-                location: '{{ site.location if site else "" }}',
+                location: '{{ site.locality if site else "" }}',
                 coordinates_lat: {{ site.coordinates_lat if site and site.coordinates_lat else 'null' }},
                 coordinates_lng: {{ site.coordinates_lng if site and site.coordinates_lng else 'null' }},
-                is_active: {{ 'true' if not site or site.is_active else 'false' }},
+                is_active: {{ 'true' if not site or site.status == 'active' else 'false' }},  
                 is_public: {{ 'true' if site and site.is_public else 'false' }},
                 research_status: '{{ site.research_status if site else "" }}'
             };

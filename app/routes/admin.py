@@ -13,7 +13,7 @@ from app.models import User
 from app.models.user_profiles import UserProfile
 from app.models.sites import ArchaeologicalSite
 from app.models import UserSitePermission, PermissionLevel
-# from app.models.photos import Photo
+from app.models import Photo
 from app.services.auth_service import AuthService
 from app.templates import templates
 
@@ -107,14 +107,14 @@ async def admin_sites_list(
             "id": str(site.id),
             "name": site.name,
             "code": site.code,
-            "location": site.location,
+            "location": site.locality,  # Changed from site.location to site.locality
             "region": site.region,
             "province": site.province,
             "description": site.description,
             "historical_period": site.historical_period,
             "coordinates_lat": site.coordinates_lat,
             "coordinates_lng": site.coordinates_lng,
-            "is_active": site.is_active,
+            "is_active": site.status == "active",  # Changed from site.is_active to site.status check
             "is_public": site.is_public,
             "created_at": site.created_at.isoformat() if site.created_at else None,
             "updated_at": site.updated_at.isoformat() if site.updated_at else None,
@@ -186,7 +186,7 @@ async def admin_sites_create(
             id=uuid4(),
             name=name,
             code=code,
-            location=location,
+            locality=location,  # Changed from location to locality to match the model
             region=region,
             province=province,
             municipality=municipality,
@@ -196,8 +196,9 @@ async def admin_sites_create(
             coordinates_lat=coordinates_lat,
             coordinates_lng=coordinates_lng,
             research_status=research_status,
-            is_active=is_active,
-            is_public=is_public
+            status="active" if is_active else "planned",  # Changed from is_active to status
+            is_public=is_public,
+            created_by=superuser.id  # Add the required created_by field
         )
         
         db.add(site)
@@ -291,7 +292,7 @@ async def admin_sites_update(
         # Aggiorna campi
         site.name = name
         site.code = code
-        site.location = location
+        site.locality = location  # Changed from location to locality to match the model
         site.region = region
         site.province = province
         site.municipality = municipality
@@ -301,7 +302,7 @@ async def admin_sites_update(
         site.coordinates_lat = coordinates_lat
         site.coordinates_lng = coordinates_lng
         site.research_status = research_status
-        site.is_active = is_active
+        site.status = "active" if is_active else "planned"  # Changed from is_active to status
         site.is_public = is_public
         
         await db.commit()
@@ -402,7 +403,7 @@ async def admin_users_list(
             "sites_count": sites_count,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "updated_at": user.updated_at.isoformat() if user.updated_at else None,
-            "last_login": user.last_login.isoformat() if user.last_login else None
+            "last_login": user.last_login_at.isoformat() if user.last_login_at else None
         }
         users_list.append(user_dict)
     
