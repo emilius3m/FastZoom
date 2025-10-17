@@ -26,12 +26,11 @@ def init_models():
     # Import esistenti
 
 
-    from ..models.users import Role, User, UserActivity  # noqa: F401
+    from ..models import Role, User, UserActivity, UserSitePermission # noqa: F401
 
     # 🆕 NUOVI: Modelli archeologici
     from ..models.sites import ArchaeologicalSite # noqa: F401
-    from ..models.user_sites import UserSitePermission # noqa: F401
-    from ..models.photos import Photo # noqa: F401
+    from ..models import Photo # noqa: F401
     from ..models.iccd_records import ICCDRecord, ICCDSchemaTemplate # noqa: F401
     # Import giornale di cantiere (nota: file con trattini richiede importlib)
     import importlib
