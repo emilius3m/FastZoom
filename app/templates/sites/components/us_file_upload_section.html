@@ -1,0 +1,370 @@
+<!-- app/templates/components/us_file_upload_section.html -->
+<!-- Componente per upload/gestione file nelle schede US/USM -->
+<!-- Da integrare nei modal esistenti -->
+
+<!-- ========== SEZIONE DOCUMENTAZIONE E FILE ========== -->
+<div class="bg-emerald-50 border-l-4 border-emerald-500 p-6 mb-6 rounded-lg">
+    <h4 class="text-xl font-bold text-emerald-900 mb-4 flex items-center">
+        <i class="fas fa-folder-open mr-3"></i>
+        Documentazione e File
+    </h4>
+    
+    <!-- Riferimenti Testuali (come nella scheda originale) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                Piante - Riferimenti
+                <span class="text-gray-500 text-xs">(es: TAV. 8)</span>
+            </label>
+            <input type="text" 
+                   x-model="formData.piante_riferimenti"
+                   placeholder="TAV. 8, TAV. 12..."
+                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                Sezioni - Riferimenti
+                <span class="text-gray-500 text-xs">(es: TAV. 38-39)</span>
+            </label>
+            <input type="text" 
+                   x-model="formData.sezioni_riferimenti"
+                   placeholder="TAV. 38-39, TAV. 40..."
+                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                Prospetti - Riferimenti
+                <span class="text-gray-500 text-xs">(es: TAV. 15-16)</span>
+            </label>
+            <input type="text" 
+                   x-model="formData.prospetti_riferimenti"
+                   placeholder="TAV. 15-16..."
+                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+    </div>
+    
+    <!-- File Upload Sections -->
+    <div class="space-y-6">
+        
+        <!-- ===== PIANTE ===== -->
+        <div class="bg-white p-4 rounded-lg border border-emerald-200">
+            <div class="flex justify-between items-center mb-3">
+                <h5 class="font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-map mr-2 text-emerald-600"></i>
+                    File Piante
+                    <span x-text="filesData.piante.length > 0 ? '(' + filesData.piante.length + ')' : ''" 
+                          class="ml-2 text-sm text-gray-500"></span>
+                </h5>
+                
+                <button type="button" 
+                        @click="showUploadModal('pianta')"
+                        class="text-sm bg-emerald-600 text-white px-3 py-1 rounded hover:bg-emerald-700 transition">
+                    <i class="fas fa-plus mr-1"></i>
+                    Carica Pianta
+                </button>
+            </div>
+            
+            <!-- Lista file piante -->
+            <div x-show="filesData.piante.length > 0" class="space-y-2">
+                <template x-for="file in filesData.piante" :key="file.id">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                        <div class="flex items-center">
+                            <i class="fas fa-file-image mr-3 text-emerald-600"></i>
+                            <div>
+                                <p class="text-sm font-medium" x-text="file.title || file.original_filename"></p>
+                                <p class="text-xs text-gray-500">
+                                    <span x-text="file.tavola_number || 'Nessun numero tavola'"></span>
+                                    <span x-show="file.scale_ratio" x-text="' - Scala: ' + file.scale_ratio"></span>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <!-- Anteprima -->
+                            <button type="button" 
+                                    @click="previewFile(file)"
+                                    class="text-blue-600 hover:text-blue-800" 
+                                    title="Anteprima">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            
+                            <!-- Modifica metadati -->
+                            <button type="button" 
+                                    @click="editFileMetadata(file)"
+                                    class="text-orange-600 hover:text-orange-800" 
+                                    title="Modifica">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            
+                            <!-- Download -->
+                            <button type="button" 
+                                    @click="downloadFile(file)"
+                                    class="text-green-600 hover:text-green-800" 
+                                    title="Download">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            
+                            <!-- Elimina -->
+                            <button type="button" 
+                                    @click="deleteFile(file, 'pianta')"
+                                    class="text-red-600 hover:text-red-800" 
+                                    title="Elimina">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            
+            <div x-show="filesData.piante.length === 0" class="text-center py-4 text-gray-500">
+                <i class="fas fa-map text-3xl mb-2"></i>
+                <p class="text-sm">Nessuna pianta caricata</p>
+            </div>
+        </div>
+        
+        <!-- ===== SEZIONI ===== -->
+        <div class="bg-white p-4 rounded-lg border border-emerald-200">
+            <div class="flex justify-between items-center mb-3">
+                <h5 class="font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-cut mr-2 text-emerald-600"></i>
+                    File Sezioni
+                    <span x-text="filesData.sezioni.length > 0 ? '(' + filesData.sezioni.length + ')' : ''" 
+                          class="ml-2 text-sm text-gray-500"></span>
+                </h5>
+                
+                <button type="button" 
+                        @click="showUploadModal('sezione')"
+                        class="text-sm bg-emerald-600 text-white px-3 py-1 rounded hover:bg-emerald-700 transition">
+                    <i class="fas fa-plus mr-1"></i>
+                    Carica Sezione
+                </button>
+            </div>
+            
+            <!-- Lista file sezioni -->
+            <div x-show="filesData.sezioni.length > 0" class="space-y-2">
+                <template x-for="file in filesData.sezioni" :key="file.id">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                        <div class="flex items-center">
+                            <i class="fas fa-file-image mr-3 text-emerald-600"></i>
+                            <div>
+                                <p class="text-sm font-medium" x-text="file.title || file.original_filename"></p>
+                                <p class="text-xs text-gray-500">
+                                    <span x-text="file.tavola_number || 'Nessun numero tavola'"></span>
+                                    <span x-show="file.scale_ratio" x-text="' - Scala: ' + file.scale_ratio"></span>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <button type="button" @click="previewFile(file)" class="text-blue-600 hover:text-blue-800" title="Anteprima">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button type="button" @click="editFileMetadata(file)" class="text-orange-600 hover:text-orange-800" title="Modifica">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" @click="downloadFile(file)" class="text-green-600 hover:text-green-800" title="Download">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button type="button" @click="deleteFile(file, 'sezione')" class="text-red-600 hover:text-red-800" title="Elimina">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            
+            <div x-show="filesData.sezioni.length === 0" class="text-center py-4 text-gray-500">
+                <i class="fas fa-cut text-3xl mb-2"></i>
+                <p class="text-sm">Nessuna sezione caricata</p>
+            </div>
+        </div>
+        
+        <!-- ===== PROSPETTI ===== -->
+        <div class="bg-white p-4 rounded-lg border border-emerald-200">
+            <div class="flex justify-between items-center mb-3">
+                <h5 class="font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-building mr-2 text-emerald-600"></i>
+                    File Prospetti
+                    <span x-text="filesData.prospetti.length > 0 ? '(' + filesData.prospetti.length + ')' : ''" 
+                          class="ml-2 text-sm text-gray-500"></span>
+                </h5>
+                
+                <button type="button" 
+                        @click="showUploadModal('prospetto')"
+                        class="text-sm bg-emerald-600 text-white px-3 py-1 rounded hover:bg-emerald-700 transition">
+                    <i class="fas fa-plus mr-1"></i>
+                    Carica Prospetto
+                </button>
+            </div>
+            
+            <!-- Lista file prospetti -->
+            <div x-show="filesData.prospetti.length > 0" class="space-y-2">
+                <template x-for="file in filesData.prospetti" :key="file.id">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                        <div class="flex items-center">
+                            <i class="fas fa-file-image mr-3 text-emerald-600"></i>
+                            <div>
+                                <p class="text-sm font-medium" x-text="file.title || file.original_filename"></p>
+                                <p class="text-xs text-gray-500">
+                                    <span x-text="file.tavola_number || 'Nessun numero tavola'"></span>
+                                    <span x-show="file.scale_ratio" x-text="' - Scala: ' + file.scale_ratio"></span>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <button type="button" @click="previewFile(file)" class="text-blue-600 hover:text-blue-800" title="Anteprima">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button type="button" @click="editFileMetadata(file)" class="text-orange-600 hover:text-orange-800" title="Modifica">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" @click="downloadFile(file)" class="text-green-600 hover:text-green-800" title="Download">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button type="button" @click="deleteFile(file, 'prospetto')" class="text-red-600 hover:text-red-800" title="Elimina">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            
+            <div x-show="filesData.prospetti.length === 0" class="text-center py-4 text-gray-500">
+                <i class="fas fa-building text-3xl mb-2"></i>
+                <p class="text-sm">Nessun prospetto caricato</p>
+            </div>
+        </div>
+        
+        <!-- ===== FOTOGRAFIE ===== -->
+        <div class="bg-white p-4 rounded-lg border border-emerald-200">
+            <div class="flex justify-between items-center mb-3">
+                <h5 class="font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-camera mr-2 text-emerald-600"></i>
+                    Fotografie Documentarie
+                    <span x-text="filesData.fotografie.length > 0 ? '(' + filesData.fotografie.length + ')' : ''" 
+                          class="ml-2 text-sm text-gray-500"></span>
+                </h5>
+                
+                <button type="button" 
+                        @click="showUploadModal('fotografia')"
+                        class="text-sm bg-emerald-600 text-white px-3 py-1 rounded hover:bg-emerald-700 transition">
+                    <i class="fas fa-plus mr-1"></i>
+                    Carica Foto
+                </button>
+            </div>
+            
+            <!-- Lista fotografie -->
+            <div x-show="filesData.fotografie.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <template x-for="file in filesData.fotografie" :key="file.id">
+                    <div class="relative bg-gray-50 rounded border overflow-hidden">
+                        <!-- Thumbnail -->
+                        <div class="aspect-video bg-gray-200 flex items-center justify-center">
+                            <img x-show="file.thumbnail_url" 
+                                 :src="file.thumbnail_url" 
+                                 :alt="file.title || file.original_filename"
+                                 class="w-full h-full object-cover cursor-pointer"
+                                 @click="previewFile(file)">
+                            <i x-show="!file.thumbnail_url" class="fas fa-image text-4xl text-gray-400"></i>
+                        </div>
+                        
+                        <!-- Info -->
+                        <div class="p-3">
+                            <p class="text-sm font-medium truncate" x-text="file.title || file.original_filename"></p>
+                            <p class="text-xs text-gray-500">
+                                <span x-show="file.photographer" x-text="'Foto: ' + file.photographer"></span>
+                                <span x-show="file.photo_date" x-text="' - ' + new Date(file.photo_date).toLocaleDateString()"></span>
+                            </p>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="absolute top-2 right-2 flex space-x-1">
+                            <button type="button" 
+                                    @click="previewFile(file)"
+                                    class="bg-white bg-opacity-80 hover:bg-opacity-100 p-1 rounded text-blue-600" 
+                                    title="Anteprima">
+                                <i class="fas fa-eye text-xs"></i>
+                            </button>
+                            
+                            <button type="button" 
+                                    @click="deleteFile(file, 'fotografia')"
+                                    class="bg-white bg-opacity-80 hover:bg-opacity-100 p-1 rounded text-red-600" 
+                                    title="Elimina">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            
+            <div x-show="filesData.fotografie.length === 0" class="text-center py-8 text-gray-500">
+                <i class="fas fa-camera text-4xl mb-3"></i>
+                <p class="text-sm">Nessuna fotografia caricata</p>
+            </div>
+        </div>
+        
+        <!-- ===== DOCUMENTI ===== -->
+        <div class="bg-white p-4 rounded-lg border border-emerald-200">
+            <div class="flex justify-between items-center mb-3">
+                <h5 class="font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-file-pdf mr-2 text-emerald-600"></i>
+                    Documenti Allegati
+                    <span x-text="filesData.documenti.length > 0 ? '(' + filesData.documenti.length + ')' : ''" 
+                          class="ml-2 text-sm text-gray-500"></span>
+                </h5>
+                
+                <button type="button" 
+                        @click="showUploadModal('documento')"
+                        class="text-sm bg-emerald-600 text-white px-3 py-1 rounded hover:bg-emerald-700 transition">
+                    <i class="fas fa-plus mr-1"></i>
+                    Carica Documento
+                </button>
+            </div>
+            
+            <!-- Lista documenti -->
+            <div x-show="filesData.documenti.length > 0" class="space-y-2">
+                <template x-for="file in filesData.documenti" :key="file.id">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                        <div class="flex items-center">
+                            <i :class="getDocumentIcon(file.mimetype)" class="mr-3 text-emerald-600"></i>
+                            <div>
+                                <p class="text-sm font-medium" x-text="file.title || file.original_filename"></p>
+                                <p class="text-xs text-gray-500" x-text="formatFileSize(file.filesize) + ' - ' + file.mimetype"></p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <button type="button" @click="downloadFile(file)" class="text-green-600 hover:text-green-800" title="Download">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button type="button" @click="editFileMetadata(file)" class="text-orange-600 hover:text-orange-800" title="Modifica">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" @click="deleteFile(file, 'documento')" class="text-red-600 hover:text-red-800" title="Elimina">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            
+            <div x-show="filesData.documenti.length === 0" class="text-center py-4 text-gray-500">
+                <i class="fas fa-file-pdf text-3xl mb-2"></i>
+                <p class="text-sm">Nessun documento caricato</p>
+            </div>
+        </div>
+        
+    </div>
+    
+    <!-- File Summary -->
+    <div x-show="getTotalFilesCount() > 0" class="mt-6 p-4 bg-emerald-100 rounded-lg">
+        <p class="text-sm text-emerald-800">
+            <i class="fas fa-info-circle mr-2"></i>
+            <strong x-text="getTotalFilesCount()"></strong> file totali caricati:
+            <span x-text="getFilesSummaryText()"></span>
+        </p>
+    </div>
+    
+</div>
