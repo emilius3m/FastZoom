@@ -217,7 +217,7 @@ class Photo(Base, SiteMixin, UserMixin):
 
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="photos")
-    uploader = relationship("User")
+    uploader = relationship("User", foreign_keys=[uploaded_by])
 
     # ===== INDICI =====
     __table_args__ = (
@@ -317,7 +317,7 @@ class FormSchema(Base, SiteMixin, UserMixin):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     site = relationship("ArchaeologicalSite", back_populates="form_schemas")
-    creator = relationship("User", back_populates="created_forms")
+    creator = relationship("User", foreign_keys=[created_by], back_populates="created_forms")
 
     def __repr__(self):
         return f"<FormSchema({self.name})>"

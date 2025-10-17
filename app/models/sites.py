@@ -143,6 +143,7 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
     unita_stratigrafiche = relationship("UnitaStratigrafica", back_populates="site", cascade="all, delete-orphan")
     unita_stratigrafiche_murarie = relationship("UnitaStratigraficaMuraria", back_populates="site",
                                                 cascade="all, delete-orphan")
+    unita_stratigrafiche_complete = relationship("UnitaStratigraficaCompleta", back_populates="site", cascade="all, delete-orphan")
 
     # Tombe e sepolture
     schede_tombe = relationship("SchedaTomba", back_populates="site", cascade="all, delete-orphan")
@@ -161,13 +162,13 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
 
     # Documentazione grafica
     tavole_grafiche = relationship("TavolaGrafica", back_populates="site", cascade="all, delete-orphan")
+    fotografie_archeologiche = relationship("FotografiaArcheologica", back_populates="site", cascade="all, delete-orphan")
     matrix_harris = relationship("MatrixHarris", back_populates="site", cascade="all, delete-orphan")
     elenchi_consegna = relationship("ElencoConsegna", back_populates="site", cascade="all, delete-orphan")
 
     # === GESTIONE CANTIERE ===
-    # Giornali di cantiere e operatori
+    # Giornali di cantiere (operatori sono accessibili tramite giornali_cantiere)
     giornali_cantiere = relationship("GiornaleCantiere", back_populates="site", cascade="all, delete-orphan")
-    operatori_cantiere = relationship("OperatoreCantiere", back_populates="site", cascade="all, delete-orphan")
 
     # === CONFIGURAZIONI E STANDARD ===
     # Form personalizzati e ICCD
@@ -177,9 +178,11 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
     # Configurazioni export e report
     configurazioni_export = relationship("ConfigurazioneExport", back_populates="site", cascade="all, delete-orphan")
     relazioni_finali = relationship("RelazioneFinaleScavo", back_populates="site", cascade="all, delete-orphan")
+    template_relazioni = relationship("TemplateRelazione", back_populates="site", cascade="all, delete-orphan")
 
     # === MAPPE E GIS ===
     geographic_maps = relationship("GeographicMap", back_populates="site", cascade="all, delete-orphan")
+    plans = relationship("ArchaeologicalPlan", back_populates="site", cascade="all, delete-orphan")
 
     # Indici per performance
     __table_args__ = (

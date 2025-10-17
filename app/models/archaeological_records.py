@@ -304,6 +304,13 @@ class InventarioReperto(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     # Campioni associati
     campioni = relationship("CampioneScientifico", back_populates="reperto")
     
+    # Materiali (many-to-many con MaterialeArcheologico)
+    materiali = relationship(
+        "MaterialeArcheologico",
+        secondary="reperti_materiali",
+        back_populates="reperti"
+    )
+    
     # Indici
     __table_args__ = (
         UniqueConstraint('site_id', 'numero_inventario', name='uq_site_inventario'),

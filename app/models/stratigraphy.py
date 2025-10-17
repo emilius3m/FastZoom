@@ -264,10 +264,10 @@ class UnitaStratigrafica(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     
     # Relazioni file
     files = relationship(
-        "USFile", 
+        "USFile",
         secondary=us_files_association,
         backref="unita_stratigrafiche",
-        order_by="us_files_association.c.ordine"
+        order_by=us_files_association.c.ordine
     )
     
     # Campioni e reperti associati
@@ -464,10 +464,10 @@ class UnitaStratigraficaMuraria(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     
     # Relazioni file
     files = relationship(
-        "USFile", 
+        "USFile",
         secondary=usm_files_association,
         backref="unita_stratigrafiche_murarie",
-        order_by="usm_files_association.c.ordine"
+        order_by=usm_files_association.c.ordine
     )
     
     # Campioni associati
