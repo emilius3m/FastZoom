@@ -155,17 +155,59 @@ async def update_us(
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    result = await db.execute(select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id))
-    us = result.scalar_one_or_none()
-    if not us:
-        raise HTTPException(status_code=404, detail="US non trovata")
-    if not await verify_site_access(us.site_id, user_sites):
-        raise HTTPException(status_code=403, detail="Accesso negato al sito")
-    for k, v in payload.model_dump(exclude_unset=True).items():
-        setattr(us, k, v)
-    await db.commit()
-    await db.refresh(us)
-    return us
+    try:
+        logger.info(f"Updating US {us_id} with payload: {payload.model_dump()}")
+        
+        result = await db.execute(select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id))
+        us = result.scalar_one_or_none()
+        if not us:
+            raise HTTPException(status_code=404, detail="US non trovata")
+        if not await verify_site_access(us.site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Accesso negato al sito")
+        
+        # Process payload to ensure proper data types
+        payload_dict = payload.model_dump(exclude_unset=True)
+        
+        # Handle date fields
+        date_fields = ['data_rilevamento', 'data_rielaborazione']
+        for field in date_fields:
+            if field in payload_dict and payload_dict[field] is not None:
+                if isinstance(payload_dict[field], str):
+                    if not payload_dict[field].strip():
+                        payload_dict[field] = None
+                    else:
+                        try:
+                            from datetime import datetime
+                            payload_dict[field] = datetime.strptime(payload_dict[field], '%Y-%m-%d').date()
+                        except ValueError:
+                            raise HTTPException(
+                                status_code=422,
+                                detail=f"Campo '{field}': '{payload_dict[field]}' non è una data valida. Usare formato YYYY-MM-DD (es: 2025-01-15)"
+                            )
+        
+        # Handle numeric fields
+        if 'anno' in payload_dict and payload_dict['anno'] is not None:
+            try:
+                payload_dict['anno'] = int(payload_dict['anno'])
+            except (ValueError, TypeError):
+                pass
+        
+        # Update all fields
+        for k, v in payload_dict.items():
+            setattr(us, k, v)
+        
+        await db.commit()
+        await db.refresh(us)
+        logger.info(f"US {us_id} updated successfully")
+        return us
+        
+    except ValidationError as e:
+        logger.error(f"Validation error updating US: {e}")
+        raise HTTPException(status_code=422, detail=f"Errore di validazione: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error updating US: {e}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=f"Errore interno del server: {str(e)}")
 
 @us_router.delete("/us/{us_id}", status_code=204)
 async def delete_us(
@@ -326,19 +368,84 @@ async def update_usm(
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    result = await db.execute(
-        select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == usm_id)
-    )
-    usm = result.scalar_one_or_none()
-    if not usm:
-        raise HTTPException(status_code=404, detail="USM non trovata")
-    if not await verify_site_access(usm.site_id, user_sites):
-        raise HTTPException(status_code=403, detail="Accesso negato al sito")
-    for k, v in payload.model_dump(exclude_unset=True).items():
-        setattr(usm, k, v)
-    await db.commit()
-    await db.refresh(usm)
-    return usm
+    try:
+        print(f"\n{'='*80}")
+        print(f"[UPDATE USM] Updating USM {usm_id}")
+        print(f"[UPDATE USM] Payload received: {payload.model_dump()}")
+        print(f"{'='*80}\n")
+        
+        result = await db.execute(
+            select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == usm_id)
+        )
+        usm = result.scalar_one_or_none()
+        if not usm:
+            raise HTTPException(status_code=404, detail="USM non trovata")
+        if not await verify_site_access(usm.site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Accesso negato al sito")
+        
+        # Process payload to ensure proper data types
+        payload_dict = payload.model_dump(exclude_unset=True)
+        
+        # Handle date fields
+        date_fields = ['data_rilevamento', 'data_rielaborazione']
+        for field in date_fields:
+            if field in payload_dict and payload_dict[field] is not None:
+                if isinstance(payload_dict[field], str):
+                    if not payload_dict[field].strip():
+                        payload_dict[field] = None
+                    else:
+                        try:
+                            from datetime import datetime
+                            payload_dict[field] = datetime.strptime(payload_dict[field], '%Y-%m-%d').date()
+                        except ValueError:
+                            raise HTTPException(
+                                status_code=422,
+                                detail=f"Campo '{field}': '{payload_dict[field]}' non è una data valida. Usare formato YYYY-MM-DD (es: 2025-01-15)"
+                            )
+        
+        # Handle numeric fields
+        if 'anno' in payload_dict and payload_dict['anno'] is not None:
+            try:
+                payload_dict['anno'] = int(payload_dict['anno'])
+            except (ValueError, TypeError):
+                pass
+        
+        if 'superficie_analizzata' in payload_dict and payload_dict['superficie_analizzata'] is not None:
+            try:
+                payload_dict['superficie_analizzata'] = float(payload_dict['superficie_analizzata'])
+            except (ValueError, TypeError):
+                pass
+        
+        # Update all fields
+        print(f"\n[UPDATE USM] Updating fields:")
+        for k, v in payload_dict.items():
+            setattr(usm, k, v)
+            print(f"  - {k} = {v}")
+        
+        # Force flush to ensure changes are written
+        await db.flush()
+        await db.commit()
+        await db.refresh(usm)
+        
+        print(f"\n[UPDATE USM] USM {usm_id} updated successfully")
+        print(f"[UPDATE USM] data_rilevamento after save: {usm.data_rilevamento}")
+        print(f"[UPDATE USM] data_rielaborazione after save: {usm.data_rielaborazione}")
+        print(f"{'='*80}\n")
+        return usm
+        
+    except ValidationError as e:
+        logger.error(f"Validation error updating USM: {e}")
+        logger.error(f"Validation error details: {e.errors()}")
+        error_messages = []
+        for error in e.errors():
+            field = " -> ".join(str(loc) for loc in error['loc'])
+            msg = error['msg']
+            error_messages.append(f"Campo '{field}': {msg}")
+        raise HTTPException(status_code=422, detail=" | ".join(error_messages))
+    except Exception as e:
+        logger.error(f"Unexpected error updating USM: {e}")
+        logger.exception("Full traceback:")
+        raise HTTPException(status_code=500, detail=f"Errore interno del server: {str(e)}")
 
 @us_router.delete("/usm/{usm_id}", status_code=204)
 async def delete_usm(

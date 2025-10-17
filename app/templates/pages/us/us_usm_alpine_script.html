@@ -325,9 +325,25 @@ function usUSMManagerApp() {
                 // Debug log to check form data
                 console.log('Form data before save:', this.usFormData);
                 
+                // Clean up form data - convert empty strings to null for optional fields
+                const cleanFormData = { ...this.usFormData };
+                
+                // Convert empty strings to null for numeric fields
+                if (cleanFormData.anno === '' || cleanFormData.anno === null) {
+                    cleanFormData.anno = null;
+                }
+                
+                // Convert empty strings to null for date fields
+                if (!cleanFormData.data_rilevamento || cleanFormData.data_rilevamento === '') {
+                    cleanFormData.data_rilevamento = null;
+                }
+                if (!cleanFormData.data_rielaborazione || cleanFormData.data_rielaborazione === '') {
+                    cleanFormData.data_rielaborazione = null;
+                }
+                
                 // Prepara payload con sequenza fisica
                 const payload = {
-                    ...this.usFormData,
+                    ...cleanFormData,
                     sequenza_fisica: {
                         uguale_a: this.stringToSequenza(this.usFormData.seq_uguale_a),
                         si_lega_a: this.stringToSequenza(this.usFormData.seq_si_lega_a),
@@ -563,6 +579,9 @@ function usUSMManagerApp() {
                     const response = await fetch(`/api/usm/${usm.id}`);
                     if (response.ok) {
                         const usmData = await response.json();
+                        console.log('USM data loaded from backend:', usmData);
+                        console.log('data_rilevamento from backend:', usmData.data_rilevamento);
+                        console.log('data_rielaborazione from backend:', usmData.data_rielaborazione);
                         
                         // Modalità modifica
                         this.usmFormData = {
@@ -681,9 +700,28 @@ function usUSMManagerApp() {
                 // Debug log to check form data
                 console.log('USM Form data before save:', this.usmFormData);
                 
+                // Clean up form data - convert empty strings to null for optional fields
+                const cleanFormData = { ...this.usmFormData };
+                
+                // Convert empty strings to null for numeric fields
+                if (cleanFormData.anno === '' || cleanFormData.anno === null) {
+                    cleanFormData.anno = null;
+                }
+                if (cleanFormData.superficie_analizzata === '' || cleanFormData.superficie_analizzata === null) {
+                    cleanFormData.superficie_analizzata = null;
+                }
+                
+                // Convert empty strings to null for date fields
+                if (!cleanFormData.data_rilevamento || cleanFormData.data_rilevamento === '') {
+                    cleanFormData.data_rilevamento = null;
+                }
+                if (!cleanFormData.data_rielaborazione || cleanFormData.data_rielaborazione === '') {
+                    cleanFormData.data_rielaborazione = null;
+                }
+                
                 // Prepara payload completo
                 const payload = {
-                    ...this.usmFormData,
+                    ...cleanFormData,
                     materiali_laterizi: {
                         tipo: [
                             this.usmFormData.lat_mattoni ? 'mattoni' : null,
@@ -737,8 +775,10 @@ function usUSMManagerApp() {
                     }
                 };
                 
-                // Debug log to check payload
-                console.log('USM Payload being sent:', payload);
+                // Debug log to check payload BEFORE cleanup
+                console.log('USM Payload BEFORE cleanup:', JSON.parse(JSON.stringify(payload)));
+                console.log('data_rilevamento in payload BEFORE cleanup:', payload.data_rilevamento);
+                console.log('data_rielaborazione in payload BEFORE cleanup:', payload.data_rielaborazione);
 
                 // Rimuovi campi temporanei
                 const tempFields = [
@@ -754,6 +794,11 @@ function usUSMManagerApp() {
                 ];
 
                 tempFields.forEach(field => delete payload[field]);
+                
+                // Debug log to check payload AFTER cleanup
+                console.log('USM Payload AFTER cleanup:', JSON.parse(JSON.stringify(payload)));
+                console.log('data_rilevamento in payload AFTER cleanup:', payload.data_rilevamento);
+                console.log('data_rielaborazione in payload AFTER cleanup:', payload.data_rielaborazione);
 
                 const url = this.editingUSM
                     ? `/api/usm/${this.editingUSM.id}`
@@ -774,7 +819,9 @@ function usUSMManagerApp() {
 
                 if (response.ok) {
                     const savedUSM = await response.json();
-                    console.log('USM salvata:', savedUSM);
+                    console.log('USM salvata con successo:', savedUSM);
+                    console.log('data_rilevamento salvata:', savedUSM.data_rilevamento);
+                    console.log('data_rielaborazione salvata:', savedUSM.data_rielaborazione);
 
                     this.showNotification(
                         this.editingUSM ? 'USM aggiornata con successo' : 'USM creata con successo',
@@ -782,6 +829,7 @@ function usUSMManagerApp() {
                     );
 
                     await this.loadUSMList();
+                    console.log('Lista USM ricaricata dopo salvataggio');
                     this.closeUSMModal();
                 } else {
                     const error = await response.json();
