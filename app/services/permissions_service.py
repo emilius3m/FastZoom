@@ -47,7 +47,7 @@ class PermissionsService:
         user_id: UUID,
         site_id: UUID,
         permission_level: PermissionLevel,
-        assigned_by: UUID,
+        granted_by: UUID,
         expires_at: Optional[datetime] = None,
         notes: Optional[str] = None,
         replace_existing: bool = True
@@ -69,7 +69,7 @@ class PermissionsService:
             if replace_existing:
                 # Aggiorna il permesso esistente
                 existing_permission.permission_level = permission_level
-                existing_permission.assigned_by = assigned_by
+                existing_permission.granted_by = granted_by
                 existing_permission.expires_at = expires_at
                 existing_permission.notes = notes
                 existing_permission.is_active = True
@@ -85,7 +85,7 @@ class PermissionsService:
             user_id=user_id,
             site_id=site_id,
             permission_level=permission_level,
-            assigned_by=assigned_by,
+            granted_by=granted_by,
             expires_at=expires_at,
             notes=notes,
             is_active=True

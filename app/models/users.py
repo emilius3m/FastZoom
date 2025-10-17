@@ -262,6 +262,7 @@ class UserSitePermission(Base):
     granted_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     granted_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=True)  # Permessi temporanei
+    notes = Column(Text, nullable=True)  # Note sul permesso
 
     is_active = Column(Boolean, default=True)
 

@@ -789,7 +789,7 @@ async def admin_user_add_permission(
             site_id=site_id,
             permission_level=PermissionLevel(permission_level),
             expires_at=expires_datetime,
-            assigned_by=superuser.id,
+            granted_by=superuser.id,
             notes=notes,
             is_active=True
         )
@@ -933,14 +933,14 @@ async def admin_permissions_create(
                 detail="Permesso già esistente per questo utente e sito"
             )
 
-        # Crea permesso - CORRETTO con assigned_by
+        # Crea permesso - CORRETTO con granted_by
         permission = UserSitePermission(
             id=uuid4(),
             user_id=user_id,
             site_id=site_id,
             permission_level=PermissionLevel(permission_level),
             is_active=True,
-            assigned_by=superuser.id,  # CORRETTO: usa assigned_by
+            granted_by=superuser.id,  # CORRETTO: usa granted_by
             notes=notes
         )
 
