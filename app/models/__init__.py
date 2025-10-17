@@ -167,6 +167,12 @@ from app.models.documentation_and_field import (
     get_photos_by_types
 )
 
+# ===== IMPORT DOCUMENTAZIONE GRAFICA =====
+from app.models.documentazione_grafica import (
+    FotografiaArcheologica,
+    ElencoConsegna
+)
+
 # ===== IMPORT ICCD RECORDS =====
 from app.models.iccd_records import (
     ICCDBaseRecord,
@@ -179,7 +185,6 @@ from app.models.iccd_records import (
 from app.models.configurations import (
     ConfigurazioneExport,
     RelazioneFinaleScavo,
-    ElencoConsegna,
     FormatoExportEnum,
     TipoDestinatarioEnum,
     StatoRelazioneEnum,

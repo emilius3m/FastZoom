@@ -280,72 +280,8 @@ class RelazioneFinaleScavo(Base, SiteMixin, UserMixin, SoftDeleteMixin):
 
 
 # ===== ELENCHI CONSEGNA =====
-
-class ElencoConsegna(Base, SiteMixin, UserMixin):
-    """
-    Elenchi di consegna per documentazione
-    Include tutti gli elenchi richiesti dalle Soprintendenze
-    """
-    __tablename__ = "elenchi_consegna"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id', ondelete='CASCADE'), nullable=False)
-
-    # ===== TIPO ELENCO =====
-    tipo_elenco = Column(String(50), nullable=False)               # Enum tipi elenco
-    titolo = Column(String(200), nullable=False)
-    
-    # ===== CONTENUTO ELENCO =====
-    # JSON strutturato con tutti gli elementi
-    contenuto = Column(JSON, nullable=False)                       # Lista elementi strutturati
-    
-    # ===== GENERAZIONE AUTOMATICA =====
-    generato_automaticamente = Column(Boolean, default=True)
-    data_generazione = Column(DateTime, nullable=False, default=datetime.now)
-    
-    # ===== EXPORT =====
-    formato_export = Column(String(20), nullable=True)             # pdf, excel, csv
-    filepath = Column(String(500), nullable=True)
-    
-    # ===== METADATI =====
-    compilatore = Column(String(200), nullable=False)
-    note = Column(Text, nullable=True)
-    
-    # ===== SISTEMA =====
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # ===== RELAZIONI =====
-    site = relationship("ArchaeologicalSite", back_populates="elenchi_consegna")
-
-    def __repr__(self):
-        return f"<ElencoConsegna(tipo={self.tipo_elenco}, sito={self.site.name if self.site else 'N/A'})>"
-    
-    def get_elementi_count(self) -> int:
-        """Conta elementi nell'elenco"""
-        if isinstance(self.contenuto, list):
-            return len(self.contenuto)
-        elif isinstance(self.contenuto, dict) and 'items' in self.contenuto:
-            return len(self.contenuto['items'])
-        return 0
-    
-    def add_elemento(self, elemento: Dict[str, Any]):
-        """Aggiunge elemento all'elenco"""
-        if not isinstance(self.contenuto, list):
-            self.contenuto = []
-        
-        contenuto_list = list(self.contenuto)
-        contenuto_list.append(elemento)
-        self.contenuto = contenuto_list
-    
-    def remove_elemento(self, index: int) -> bool:
-        """Rimuove elemento per indice"""
-        if isinstance(self.contenuto, list) and 0 <= index < len(self.contenuto):
-            contenuto_list = list(self.contenuto)
-            contenuto_list.pop(index)
-            self.contenuto = contenuto_list
-            return True
-        return False
+# ElencoConsegna è importato da documentazione_grafica per evitare duplicazione
+from app.models.documentazione_grafica import ElencoConsegna  # noqa: F401
 
 
 # ===== TEMPLATE ELENCHI =====
