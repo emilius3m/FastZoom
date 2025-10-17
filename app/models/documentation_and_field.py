@@ -521,59 +521,7 @@ class FormSchema(Base, SiteMixin, UserMixin):
         return f"<FormSchema({self.name})>"
 
 
-class ICCDBaseRecord(Base, SiteMixin, UserMixin):
-    """Modello base per schede ICCD con supporto gerarchico"""
-    __tablename__ = "iccd_base_records"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
-
-    nct_region = Column(String(2), nullable=False)
-    nct_number = Column(String(10), nullable=False)
-    nct_suffix = Column(String(5), nullable=True)
-    
-    schema_type = Column(String(5), nullable=False)
-    schema_version = Column(String(10), default="3.00")
-    level = Column(String(1), nullable=False, default='C')
-    
-    parent_id = Column(UUID(as_uuid=True), ForeignKey('iccd_base_records.id'), nullable=True)
-    
-    iccd_data = Column(JSON, nullable=False)
-    
-    created_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    status = Column(String(20), default='draft')
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    parent = relationship("ICCDBaseRecord", remote_side=[id])
-    children = relationship("ICCDBaseRecord", back_populates="parent")
-    site = relationship("ArchaeologicalSite", back_populates="iccd_records")
-    creator = relationship("User")
-
-    __table_args__ = (
-        Index('idx_nct_complete', 'nct_region', 'nct_number', 'nct_suffix'),
-        Index('idx_schema_site', 'schema_type', 'site_id'),
-        Index('idx_hierarchy', 'parent_id', 'schema_type'),
-        UniqueConstraint('nct_region', 'nct_number', 'nct_suffix', name='uq_nct_complete'),
-    )
-
-    def get_nct(self) -> str:
-        """Restituisce il codice NCT completo"""
-        suffix = self.nct_suffix or ""
-        return f"{self.nct_region}{self.nct_number}{suffix}"
-    
-    def get_object_name(self) -> str:
-        """Estrae il nome dell'oggetto dai dati ICCD"""
-        try:
-            return self.iccd_data.get('OG', {}).get('OGT', {}).get('OGTD', 'Oggetto sconosciuto')
-        except (AttributeError, KeyError):
-            return "Oggetto sconosciuto"
-
-    def __repr__(self):
-        return f"<ICCDRecord(nct={self.get_nct()}, type={self.schema_type})>"
+# ICCDBaseRecord è importata da app.models.iccd_records per evitare duplicazione
 
 
 # ===== HELPER FUNCTIONS PER ENUM USAGE =====

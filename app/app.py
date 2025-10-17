@@ -13,7 +13,7 @@ from sqlalchemy import select, func
 # from app.models.users import User, Role, UserActivity
 # from app.models.user_profiles import UserProfile
 # Sicurezza multi-sito - DEPENDENCY CON BLACKLIST CHECK
-from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
+#from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
 from app.core.config import get_settings
 
 # Route imports

@@ -110,10 +110,17 @@ from app.models.token_blacklist import (
 # ===== IMPORT SITI ARCHEOLOGICI =====
 from app.models.sites import (
     ArchaeologicalSite,
-    GeographicMap,
     SiteStatusEnum,
     SiteTypeEnum,
     ResearchStatusEnum
+)
+
+# ===== IMPORT MAPPE GEOGRAFICHE =====
+from app.models.geographic_maps import (
+    GeographicMap,
+    GeographicMapLayer,
+    GeographicMapMarker,
+    GeographicMapMarkerPhoto
 )
 
 # ===== IMPORT STRATIGRAFIA =====
@@ -149,7 +156,6 @@ from app.models.documentation_and_field import (
     OperatoreCantiere,
     GiornaleCantiere,
     FormSchema,
-    ICCDBaseRecord,
     giornale_operatori_association,
     DocumentCategoryEnum,
     PhotoStatusEnum,
@@ -159,6 +165,14 @@ from app.models.documentation_and_field import (
     create_photo_with_type,
     filter_photos_by_type,
     get_photos_by_types
+)
+
+# ===== IMPORT ICCD RECORDS =====
+from app.models.iccd_records import (
+    ICCDBaseRecord,
+    ICCDRecord,
+    ICCDAuthorityFile,
+    ICCDSchemaTemplate
 )
 
 # ===== IMPORT CONFIGURAZIONI =====
@@ -238,10 +252,15 @@ __all__ = [
     
     # Sites
     'ArchaeologicalSite',
-    'GeographicMap',
     'SiteStatusEnum',
     'SiteTypeEnum',
     'ResearchStatusEnum',
+    
+    # Geographic Maps
+    'GeographicMap',
+    'GeographicMapLayer',
+    'GeographicMapMarker',
+    'GeographicMapMarkerPhoto',
     
     # Stratigraphy
     'UnitaStratigrafica',
@@ -269,9 +288,8 @@ __all__ = [
     'TavolaGrafica',
     'MatrixHarris',
     'OperatoreCantiere',
-    'GiornaleCantiere', 
+    'GiornaleCantiere',
     'FormSchema',
-    'ICCDBaseRecord',
     'giornale_operatori_association',
     'DocumentCategoryEnum',
     'PhotoStatusEnum',
@@ -280,6 +298,12 @@ __all__ = [
     'create_photo_with_type',
     'filter_photos_by_type',
     'get_photos_by_types',
+    
+    # ICCD Records
+    'ICCDBaseRecord',
+    'ICCDRecord',
+    'ICCDAuthorityFile',
+    'ICCDSchemaTemplate',
     
     # Configurations
     'ConfigurazioneExport',
