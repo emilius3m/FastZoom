@@ -140,8 +140,8 @@ async def get_team_members(db: AsyncSession, site_id: UUID, limit: int = 10) -> 
             "user_id": str(user.id),
             "email": user.email,
             "full_name": user.full_name,
-            "permission_level": permission.permission_level.value,
-            "permission_display": permission.permission_level.value.replace('_', ' ').title(),
+            "permission_level": permission.permission_level,
+            "permission_display": permission.permission_level.replace('_', ' ').title(),
             "granted_at": permission.created_at.isoformat()
         }
         for user, permission in team

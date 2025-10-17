@@ -177,7 +177,7 @@ class PermissionsService:
         
         stats = {level.value: 0 for level in PermissionLevel}
         for row in result:
-            stats[row.permission_level.value] = row.count
+            stats[row.permission_level] = row.count
         
         return {
             'total_users': sum(stats.values()),

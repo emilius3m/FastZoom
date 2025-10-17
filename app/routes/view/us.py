@@ -79,7 +79,7 @@ async def us_usm_view(
         "current_site_name": site.name if site else None,
         "user_email": current_user.email if current_user else None,
         "user_type": "superuser" if current_user and current_user.is_superuser else "user",
-        "user_role": permission.permission_level.value if permission else "none",
+        "user_role": permission.permission_level if permission else "none",
         "current_page": "us"
     }
 

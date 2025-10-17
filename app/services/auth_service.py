@@ -108,7 +108,7 @@ class AuthService:
                 "name": row.name,
                 "code": row.code,
                 "location": row.municipality or "",
-                "permission_level": row.permission_level.value
+                "permission_level": row.permission_level
             })
         
         return sites_data

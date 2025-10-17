@@ -59,7 +59,7 @@ async def get_team_members(
         member_data = {
             "user_id": str(permission_obj.user_id),
             "email": email,
-            "permission_level": permission_obj.permission_level.value,
+            "permission_level": permission_obj.permission_level,
             "is_active": permission_obj.is_active,
             "is_pending": False,
             "created_at": permission_obj.created_at.isoformat(),
@@ -107,7 +107,7 @@ async def update_team_member_permissions(
         raise HTTPException(status_code=404, detail="Membro del team non trovato")
 
     # Update permissions
-    member.permission_level = PermissionLevel(permission_data.get('permission_level', member.permission_level.value))
+    member.permission_level = PermissionLevel(permission_data.get('permission_level', member.permission_level))
     member.is_active = permission_data.get('is_active', member.is_active)
 
     # Update additional fields
@@ -147,8 +147,8 @@ async def get_site_team(db: AsyncSession, site_id: UUID) -> List[Dict]:
             "user_id": str(user.id),
             "email": user.email,
             "full_name": user.full_name,
-            "permission_level": permission.permission_level.value,
-            "permission_display": permission.permission_level.value.replace('_', ' ').title(),
+            "permission_level": permission.permission_level,
+            "permission_display": permission.permission_level.replace('_', ' ').title(),
             "granted_at": permission.created_at.isoformat()
         }
         for user, permission in team

@@ -247,7 +247,7 @@ async def get_current_user_sites(
             "name": site.name,
             "code": site.code,
             "region": site.region,
-            "permission_level": perm.permission_level.value,
+            "permission_level": perm.permission_level,
             "is_superuser_access": False
         }
         for perm, site in permissions
