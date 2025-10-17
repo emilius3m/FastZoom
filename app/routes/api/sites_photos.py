@@ -14,8 +14,8 @@ import asyncio
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id
-from app.models.photos import Photo, PhotoType, MaterialType, ConservationStatus
-from app.models.users import UserActivity
+from app.models import Photo, PhotoType, MaterialType, ConservationStatus
+from app.models import UserActivity
 from app.routes.api.dependencies import get_site_access
 from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service

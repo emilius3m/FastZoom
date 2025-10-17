@@ -9,11 +9,11 @@ from loguru import logger
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id, get_current_user_sites
-from app.models.users import User
+from app.models import User
 from app.models.user_profiles import UserProfile
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission, PermissionLevel
-from app.models.photos import Photo
+from app.models import UserSitePermission, PermissionLevel
+# from app.models.photos import Photo
 from app.services.auth_service import AuthService
 from app.templates import templates
 

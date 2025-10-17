@@ -12,7 +12,7 @@ from app.database.session import get_async_session
 from app.services.auth_service import AuthService
 from app.core.security import get_current_user_id, get_current_user_sites, SecurityService, current_active_user
 from app.core.config import get_settings
-from app.models.users import User
+from app.models import User
 from app.models.user_profiles import UserProfile as UserProfileModelDB
 from app.routes.view.view_crud import SQLAlchemyCRUD
 

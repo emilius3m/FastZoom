@@ -10,8 +10,8 @@ from typing import List, Dict, Any
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id, get_current_user_sites_with_blacklist
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission
-from app.models.users import User
+from app.models import UserSitePermission
+from app.models import User
 from app.templates import templates
 
 iccd_router = APIRouter(prefix="/view", tags=["iccd"])

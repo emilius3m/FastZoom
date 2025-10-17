@@ -5,9 +5,7 @@ from uuid import UUID
 from datetime import datetime
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission
-from app.models.users import User
+from app.models import ArchaeologicalSite, UserSitePermission, User
 from app.repositories.iccd_records import ICCDRecordRepository
 from app.exceptions import BusinessLogicError
 
@@ -23,7 +21,7 @@ class ICCDRecordService:
         """Check if user has access to the site for ICCD operations."""
         from sqlalchemy import select, and_, or_, func
         from app.models.sites import ArchaeologicalSite
-        from app.models.user_sites import UserSitePermission
+        from app.models import UserSitePermission
         
         # Check site existence
         site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
@@ -418,7 +416,7 @@ class ICCDRecordService:
         """Get available ICCD schemas templates from Python code."""
         # Verify user exists
         from sqlalchemy import select
-        from app.models.users import User
+        from app.models import User
         user_query = select(User).where(User.id == current_user_id)
         user_result = await self.db_session.execute(user_query)
         user = user_result.scalar_one_or_none()
@@ -460,7 +458,7 @@ class ICCDRecordService:
         """Get a specific ICCD schemas template by type from Python code."""
         # Verify user exists
         from sqlalchemy import select
-        from app.models.users import User
+        from app.models import User
         user_query = select(User).where(User.id == current_user_id)
         user_result = await self.db_session.execute(user_query)
         user = user_result.scalar_one_or_none()

@@ -4,9 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from fastapi import HTTPException, status
 
-from app.models.users import User
+from app.models import User
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission, PermissionLevel
+from app.models import UserSitePermission, PermissionLevel
 from app.core.security import SecurityService
 from app.services.site_service import SiteService
 from app.core.config import get_settings

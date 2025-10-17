@@ -12,8 +12,8 @@ from typing import Dict, List
 import json
 
 from app.database.session import get_async_session
-from app.models.user_sites import UserSitePermission, PermissionLevel
-from app.models.users import User
+from app.models import UserSitePermission, PermissionLevel
+from app.models import User
 from app.routes.api.dependencies import get_site_access
 
 team_router = APIRouter()

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, desc
 
 from app.services.archaeological_minio_service import archaeological_minio_service
-from app.models.photos import Photo
+from app.models import Photo
 from minio.error import S3Error
 
 

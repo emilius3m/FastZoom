@@ -5,8 +5,8 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
-from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission, PermissionLevel
+from app.models import ArchaeologicalSite
+from app.models import UserSitePermission, PermissionLevel
 from app.core.config import get_settings
 
 settings = get_settings()

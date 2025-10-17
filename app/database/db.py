@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import bcrypt
 
 from app.database.base import async_session_maker, Base, engine
-from app.models.users import User
+from app.models import User
 
 def get_password_hash(password: str) -> str:
     """Hash password con bcrypt (senza dipendenza da fastapi-users)"""
@@ -193,7 +193,7 @@ async def get_database_stats() -> dict:
                 
             # Conta permessi se esistono
             try:
-                from app.models.user_sites import UserSitePermission
+                from app.models import UserSitePermission
                 permissions_result = await session.execute(select(UserSitePermission))
                 permissions_count = len(permissions_result.scalars().all())
             except:

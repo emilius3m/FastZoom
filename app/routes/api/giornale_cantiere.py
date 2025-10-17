@@ -23,7 +23,7 @@ from app.core.security import (
     get_current_user_sites_with_blacklist,
 )
 from app.models.sites import ArchaeologicalSite
-from app.models.users import User
+from app.models import User
 
 # Import modelli giornale cantiere
 from app.models.giornale_cantiere import (

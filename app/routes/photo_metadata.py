@@ -13,8 +13,8 @@ from datetime import datetime
 
 # Import dalla tua architettura
 from app.database.db import get_async_session
-from app.models.photos import Photo
-from app.models.users import User
+from app.models import Photo
+from app.models import User
 from app.core.security import get_current_user_id_with_blacklist
 
 # Schemas Pydantic (da creare separatamente)

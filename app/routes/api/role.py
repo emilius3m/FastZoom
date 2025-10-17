@@ -6,8 +6,8 @@ from fastapi.routing import APIRouter
 
 from app.database.db import CurrentAsyncSession
 from app.database.security import current_active_user
-from app.models.users import Role as RoleModelDB
-from app.models.users import User as UserModelDB
+from app.models import Role as RoleModelDB
+from app.models import User as UserModelDB
 from app.routes.api.crud import BaseCRUD
 from app.schemas.users import RoleBase, RoleCreate, RoleRead, RoleUpdate
 

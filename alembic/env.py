@@ -32,9 +32,7 @@ except ImportError as e:
     from app.database.base import Base
     # Import esplicito dei modelli
     try:
-        import app.models.users  # noqa: F401
-        import app.models.sites  # noqa: F401
-        import app.models.user_sites  # noqa: F401
+        import app.models  # noqa: F401
         print("Models imported explicitly")
     except ImportError:
         print("Warning: Could not import some models")

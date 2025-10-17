@@ -15,7 +15,7 @@ from uuid import UUID
 from typing import Optional, Tuple
 
 from app.database.session import get_async_session
-from app.models.photos import Photo
+from app.models import Photo
 from app.services.archaeological_minio_service import archaeological_minio_service
 
 

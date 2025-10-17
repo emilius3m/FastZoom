@@ -1067,7 +1067,7 @@ class DeepZoomMinIOService:
         try:
             # Avoid circular import
             from app.database.session import get_async_session
-            from app.models.photos import Photo
+            from app.models import Photo
             from sqlalchemy import select
             from datetime import datetime
             import uuid

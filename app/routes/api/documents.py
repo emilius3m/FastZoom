@@ -19,8 +19,8 @@ from app.database.db import get_async_session
 from app.core.security import get_current_user_id_with_blacklist
 from app.models.documents import Document
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission
-from app.models.users import UserActivity
+from app.models import UserSitePermission
+from app.models import UserActivity
 from app.routes.sites_router import get_site_access
 from app.services.archaeological_minio_service import archaeological_minio_service
 

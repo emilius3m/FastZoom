@@ -6,8 +6,8 @@ from datetime import datetime
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission
-from app.models.users import User
+from app.models import UserSitePermission
+from app.models import User
 from app.models.geographic_maps import GeographicMapMarker
 from app.repositories.geographic_maps import GeographicMapRepository
 from app.exceptions import BusinessLogicError
@@ -25,7 +25,7 @@ class GeographicMapService:
         """Check if user has access to the site for geographic map operations."""
         from sqlalchemy import select, and_, or_, func
         from app.models.sites import ArchaeologicalSite
-        from app.models.user_sites import UserSitePermission
+        from app.models import UserSitePermission
         
         # Check site existence
         site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
@@ -612,7 +612,7 @@ class GeographicMapService:
             
             # Verify that the photos exist and belong to the site
             from sqlalchemy import select, and_
-            from app.models.photos import Photo
+            from app.models import Photo
             photos_query = select(Photo).where(
                 and_(
                     Photo.id.in_(photo_ids),

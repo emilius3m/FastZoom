@@ -13,9 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
 from app.database.db import get_async_session
-from app.models.users import User
+from app.models import User
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission, PermissionLevel
+from app.models import UserSitePermission, PermissionLevel
 from app.core.config import get_settings
 
 # ===== CONFIGURAZIONE SICUREZZA =====

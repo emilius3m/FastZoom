@@ -15,7 +15,7 @@ from loguru import logger
 
 # Import per audit
 from app.database.session import get_async_session
-from app.models.users import UserActivity
+from app.models import UserActivity
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 

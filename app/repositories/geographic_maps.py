@@ -11,9 +11,9 @@ from app.models.geographic_maps import (
     GeographicMapMarker, 
     GeographicMapMarkerPhoto
 )
-from app.models.photos import Photo
-from app.repositories.base import BaseRepository
 
+from app.repositories.base import BaseRepository
+from app.models.documentation_and_field import Photo
 
 class GeographicMapRepository:
     """Repository for geographic map operations."""
@@ -47,7 +47,7 @@ class GeographicMapRepository:
 
     async def get_map_with_layers_and_markers(self, map_id: UUID, site_id: UUID) -> Optional[GeographicMap]:
         """Get a map with its layers and markers loaded."""
-        from app.models.photos import Photo
+        from app.models.documentation_and_field import Photo
         
         query = select(GeographicMap).options(
             selectinload(GeographicMap.geojson_layers),

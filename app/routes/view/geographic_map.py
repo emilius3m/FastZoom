@@ -8,7 +8,7 @@ from uuid import UUID
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission
+from app.models import UserSitePermission
 from app.templates import templates
 
 geographic_map_router = APIRouter(prefix="/view", tags=["geographic-map"])

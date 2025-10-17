@@ -7,8 +7,8 @@ from uuid import UUID
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id
-from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission
+from app.models import ArchaeologicalSite
+from app.models import UserSitePermission
 
 
 async def get_site_access(

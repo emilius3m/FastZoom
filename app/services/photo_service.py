@@ -24,7 +24,7 @@ except ImportError:
     ORIENTATION = 274
 
 # 🔧 CORREZIONE: Import del modello Photo corretto
-from app.models.photos import Photo, PhotoType, MaterialType, ConservationStatus
+from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 
 # 🔧 CORREZIONE: Import condizionale di storage_service (se esiste)
 try:

@@ -21,7 +21,7 @@ from loguru import logger
 from app.database.db import get_async_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.models.sites import ArchaeologicalSite
-from app.models.users import User
+from app.models import User
 
 # Import modelli archeologia avanzata
 from app.models.archeologia_avanzata import (

@@ -8,9 +8,9 @@ from typing import Dict, Any, List
 from datetime import datetime, timedelta
 
 from app.database.session import get_async_session
-from app.models.photos import Photo
-from app.models.user_sites import UserSitePermission
-from app.models.users import UserActivity, User
+from app.models import Photo
+from app.models import UserSitePermission
+from app.models import UserActivity, User
 from app.routes.api.dependencies import get_site_access
 from sqlalchemy import select, func, and_
 

@@ -27,9 +27,9 @@ from loguru import logger
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id, get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
-from app.models.users import User
+from app.models import User
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission
+from app.models import UserSitePermission
 from app.models.form_schemas import FormSchema
 from app.templates import templates
 from app.routes.api.dependencies import get_site_access

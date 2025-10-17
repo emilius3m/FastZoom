@@ -298,7 +298,7 @@ async def initialize_iccd_for_site(
     try:
         # Check site access
         from app.models.sites import ArchaeologicalSite
-        from app.models.user_sites import UserSitePermission
+        from app.models import UserSitePermission
         from sqlalchemy import select, and_, or_, func
         
         site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
@@ -361,7 +361,7 @@ async def get_iccd_integration_status(
     try:
         # Check site access
         from app.models.sites import ArchaeologicalSite
-        from app.models.user_sites import UserSitePermission
+        from app.models import UserSitePermission
         from sqlalchemy import select, and_, or_, func
         
         site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)

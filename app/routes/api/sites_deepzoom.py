@@ -9,7 +9,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 
 from app.database.session import get_async_session
-from app.models.photos import Photo
+from app.models import Photo
 from app.routes.api.dependencies import get_site_access
 from app.services.archaeological_minio_service import archaeological_minio_service
 from app.services.deep_zoom_minio_service import deep_zoom_minio_service

@@ -16,8 +16,8 @@ from app.database.session import get_async_session
 from app.core.security import get_current_user_id
 from app.models.form_schemas import FormSchema
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission
-from app.models.users import UserActivity
+from app.models import UserSitePermission
+from app.models import UserActivity
 
 # Importa la funzione di verifica accesso dal sites_router
 from app.routes.sites_router import get_site_access

@@ -10,8 +10,8 @@ from uuid import UUID
 from app.core.config import get_settings
 from app.database.db import get_async_session
 from app.services.site_service import SiteService
-from app.models.user_sites import PermissionLevel
-from app.models.users import User
+from app.models import PermissionLevel
+from app.models import User
 
 settings = get_settings()
 
@@ -105,7 +105,7 @@ class SecurityService:
 
             # Controlla se il token è nella blacklist (se DB disponibile)
             if db and token_jti:
-                from app.models.users import TokenBlacklist
+                from app.models import TokenBlacklist
                 if await TokenBlacklist.is_token_blacklisted(db, token_jti):
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,

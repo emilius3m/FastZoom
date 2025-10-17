@@ -13,7 +13,7 @@ from fastapi import HTTPException, status, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.models.photos import Photo
+from app.models import Photo
 from app.services.photo_service import photo_metadata_service
 from app.services.storage_service import storage_service
 from app.services.photo_serving_service import photo_serving_service
@@ -321,7 +321,7 @@ class PhotoUploadService:
     ):
         """Log attività upload"""
         try:
-            from app.models.users import UserActivity
+            from app.models import UserActivity
 
             activity = UserActivity(
                 user_id=user_id,

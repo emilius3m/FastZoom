@@ -9,12 +9,9 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-# Sistema archeologico multi-sito
-from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission
-from app.models.photos import Photo
-from app.models.users import User, Role, UserActivity
-from app.models.user_profiles import UserProfile
+# from app.models.photos import Photo
+# from app.models.users import User, Role, UserActivity
+# from app.models.user_profiles import UserProfile
 # Sicurezza multi-sito - DEPENDENCY CON BLACKLIST CHECK
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
 from app.core.config import get_settings

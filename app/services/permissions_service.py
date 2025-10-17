@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from datetime import datetime, timezone
 
-from app.models.users import User
+from app.models import User
 from app.models.sites import ArchaeologicalSite
-from app.models.user_sites import UserSitePermission, PermissionLevel
+from app.models import UserSitePermission, PermissionLevel
 
 class PermissionsService:
     """Servizio per la gestione dei permessi utenti multi-sito"""

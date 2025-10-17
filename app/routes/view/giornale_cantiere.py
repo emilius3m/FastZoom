@@ -19,7 +19,7 @@ from loguru import logger
 from app.database.db import get_async_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.models.sites import ArchaeologicalSite
-from app.models.users import User
+from app.models import User
 from app.models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere, CondizioniMeteoEnum
 from app.templates import templates
 from app.core.csrf_settings import _csrf_tokens_optional

@@ -13,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from app.database.session import get_async_session
 from app.models.iccd_records import ICCDRecord
 from app.models.sites import ArchaeologicalSite
-from app.models.users import User
+from app.models import User
 from sqlalchemy import select, func
 from uuid import uuid4
 
