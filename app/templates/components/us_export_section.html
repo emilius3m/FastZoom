@@ -1,0 +1,429 @@
+<!-- app/templates/components/us_export_section.html -->
+<!-- Componente per export Word nelle schede US/USM -->
+<!-- Da integrare nei modal e liste esistenti -->
+
+<!-- ========== SEZIONE EXPORT WORD ========== -->
+<div class="bg-blue-50 border-l-4 border-blue-500 p-6 mb-6 rounded-lg">
+    <h4 class="text-xl font-bold text-blue-900 mb-4 flex items-center">
+        <i class="fas fa-file-word mr-3"></i>
+        Esportazione Scheda Ufficiale
+    </h4>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- Export Singolo -->
+        <div class="bg-white p-4 rounded-lg border border-blue-200">
+            <h5 class="font-semibold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-download mr-2 text-blue-600"></i>
+                Scarica Scheda Word
+            </h5>
+            
+            <p class="text-sm text-gray-600 mb-4">
+                Genera documento Word identico al modello MiC 2021 con tutti i dati compilati
+            </p>
+            
+            <!-- Pulsanti Export -->
+            <div class="space-y-2">
+                <!-- Export US -->
+                <button x-show="formType === 'us'" 
+                        @click="exportUSWord()"
+                        :disabled="exportingWord"
+                        class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition flex items-center justify-center">
+                    <i :class="exportingWord ? 'fas fa-spinner fa-spin' : 'fas fa-file-word'" class="mr-2"></i>
+                    <span x-text="exportingWord ? 'Generando...' : 'Scarica US Word'"></span>
+                </button>
+                
+                <!-- Export USM -->
+                <button x-show="formType === 'usm'" 
+                        @click="exportUSMWord()"
+                        :disabled="exportingWord"
+                        class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition flex items-center justify-center">
+                    <i :class="exportingWord ? 'fas fa-spinner fa-spin' : 'fas fa-file-word'" class="mr-2"></i>
+                    <span x-text="exportingWord ? 'Generando...' : 'Scarica USM Word'"></span>
+                </button>
+            </div>
+            
+            <!-- Info Template -->
+            <div class="mt-3 p-3 bg-blue-100 rounded text-sm">
+                <div class="flex items-start">
+                    <i class="fas fa-info-circle text-blue-600 mr-2 mt-0.5"></i>
+                    <div>
+                        <p class="font-medium text-blue-800">Template MiC 2021</p>
+                        <p class="text-blue-700">Struttura tabellare a 3 colonne, identica alle schede cartacee ufficiali</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Anteprima Struttura -->
+        <div class="bg-white p-4 rounded-lg border border-blue-200">
+            <h5 class="font-semibold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-eye mr-2 text-blue-600"></i>
+                Anteprima Contenuto
+            </h5>
+            
+            <div class="text-sm space-y-2">
+                <!-- Informazioni chiave che saranno nel documento -->
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Codice:</span>
+                    <span class="font-medium" x-text="formData.us_code || formData.usm_code || '-'"></span>
+                </div>
+                
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Località:</span>
+                    <span class="font-medium" x-text="formData.localita || '-'"></span>
+                </div>
+                
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Ente:</span>
+                    <span class="font-medium" x-text="formData.ente_responsabile || '-'"></span>
+                </div>
+                
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Anno:</span>
+                    <span class="font-medium" x-text="formData.anno || '-'"></span>
+                </div>
+                
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Piante:</span>
+                    <span class="font-medium" x-text="formData.piante_riferimenti || '-'"></span>
+                </div>
+                
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Sezioni:</span>
+                    <span class="font-medium" x-text="formData.sezioni_riferimenti || '-'"></span>
+                </div>
+            </div>
+            
+            <!-- Bottone Preview Completa -->
+            <button @click="previewWordStructure()"
+                    class="w-full mt-4 border-2 border-blue-600 text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition flex items-center justify-center">
+                <i class="fas fa-search mr-2"></i>
+                Anteprima Completa
+            </button>
+        </div>
+        
+    </div>
+    
+    <!-- Export Multiplo (se siamo in lista) -->
+    <div x-show="showBulkExport" class="mt-6 p-4 bg-white rounded-lg border border-blue-200">
+        <h5 class="font-semibold text-gray-800 mb-3 flex items-center">
+            <i class="fas fa-archive mr-2 text-blue-600"></i>
+            Export Multiplo
+        </h5>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button @click="exportSelectedUSWord()"
+                    :disabled="selectedUS.length === 0 || exportingBulk"
+                    class="bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700 disabled:opacity-50 transition flex items-center justify-center">
+                <i :class="exportingBulk ? 'fas fa-spinner fa-spin' : 'fas fa-file-archive'" class="mr-2"></i>
+                <span x-text="exportingBulk ? 'Generando ZIP...' : `Selezionate (${selectedUS.length})`"></span>
+            </button>
+            
+            <button @click="exportAllSiteUSWord(false)"
+                    :disabled="exportingBulk"
+                    class="bg-orange-600 text-white px-4 py-2 rounded font-semibold hover:bg-orange-700 disabled:opacity-50 transition flex items-center justify-center">
+                <i :class="exportingBulk ? 'fas fa-spinner fa-spin' : 'fas fa-globe'" class="mr-2"></i>
+                Tutte US Sito
+            </button>
+            
+            <button @click="exportAllSiteUSWord(true)"
+                    :disabled="exportingBulk"
+                    class="bg-purple-600 text-white px-4 py-2 rounded font-semibold hover:bg-purple-700 disabled:opacity-50 transition flex items-center justify-center">
+                <i :class="exportingBulk ? 'fas fa-spinner fa-spin' : 'fas fa-certificate'" class="mr-2"></i>
+                Solo Validate
+            </button>
+        </div>
+        
+        <p class="text-xs text-gray-500 mt-2 italic">
+            <i class="fas fa-info-circle mr-1"></i>
+            Export multiplo genera un file ZIP con documenti Word separati
+        </p>
+    </div>
+    
+    <!-- Status Export -->
+    <div x-show="exportStatus" class="mt-4 p-3 rounded-lg" 
+         :class="exportStatus.type === 'success' ? 'bg-green-100 text-green-800' : 
+                 exportStatus.type === 'error' ? 'bg-red-100 text-red-800' : 
+                 'bg-yellow-100 text-yellow-800'">
+        <div class="flex items-center">
+            <i :class="exportStatus.type === 'success' ? 'fas fa-check-circle' : 
+                       exportStatus.type === 'error' ? 'fas fa-exclamation-triangle' : 
+                       'fas fa-info-circle'" 
+               class="mr-2"></i>
+            <span x-text="exportStatus.message"></span>
+        </div>
+    </div>
+    
+</div>
+
+<!-- ========== SCRIPT ALPINE.JS PER EXPORT ========== -->
+<script>
+// Estendi il componente US/USM esistente con metodi export
+function extendUSManagerWithExport() {
+    return {
+        // Export state
+        exportingWord: false,
+        exportingBulk: false,
+        exportStatus: null,
+        showBulkExport: false,
+        selectedUS: [],
+        
+        // ===== EXPORT SINGOLO US =====
+        async exportUSWord() {
+            if (!this.editingUS && !this.formData.us_code) {
+                this.showExportStatus('error', 'Devi prima salvare la US per esportarla');
+                return;
+            }
+            
+            this.exportingWord = true;
+            this.exportStatus = null;
+            
+            try {
+                const usId = this.editingUS?.id || 'current';
+                const response = await fetch(`/api/us-export/us/${usId}/word`, {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+                
+                if (response.ok) {
+                    // Download file
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    
+                    // Nome file dal header o default
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'SchediaUS.docx';
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+)/);
+                        if (match) filename = match[1].replace(/"/g, '');
+                    }
+                    
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    this.showExportStatus('success', 'Documento Word generato e scaricato');
+                    
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore export');
+                }
+                
+            } catch (error) {
+                console.error('Errore export US Word:', error);
+                this.showExportStatus('error', `Errore: ${error.message}`);
+            } finally {
+                this.exportingWord = false;
+            }
+        },
+        
+        // ===== EXPORT SINGOLO USM =====
+        async exportUSMWord() {
+            if (!this.editingUSM && !this.formData.usm_code) {
+                this.showExportStatus('error', 'Devi prima salvare la USM per esportarla');
+                return;
+            }
+            
+            this.exportingWord = true;
+            this.exportStatus = null;
+            
+            try {
+                const usmId = this.editingUSM?.id || 'current';
+                const response = await fetch(`/api/us-export/usm/${usmId}/word`, {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    this.downloadBlob(blob, response.headers.get('Content-Disposition'));
+                    this.showExportStatus('success', 'Documento USM Word scaricato');
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore export USM');
+                }
+                
+            } catch (error) {
+                console.error('Errore export USM:', error);
+                this.showExportStatus('error', `Errore: ${error.message}`);
+            } finally {
+                this.exportingWord = false;
+            }
+        },
+        
+        // ===== EXPORT MULTIPLO =====
+        async exportSelectedUSWord() {
+            if (this.selectedUS.length === 0) {
+                this.showExportStatus('error', 'Seleziona almeno una US da esportare');
+                return;
+            }
+            
+            this.exportingBulk = true;
+            this.exportStatus = null;
+            
+            try {
+                const response = await fetch('/api/us-export/us/bulk-word', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCSRFToken()
+                    },
+                    body: JSON.stringify(this.selectedUS)
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    this.downloadBlob(blob, response.headers.get('Content-Disposition'));
+                    this.showExportStatus('success', `${this.selectedUS.length} schede US esportate in ZIP`);
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore export multiplo');
+                }
+                
+            } catch (error) {
+                console.error('Errore export bulk:', error);
+                this.showExportStatus('error', `Errore: ${error.message}`);
+            } finally {
+                this.exportingBulk = false;
+            }
+        },
+        
+        // ===== EXPORT TUTTO SITO =====
+        async exportAllSiteUSWord(validatedOnly = false) {
+            this.exportingBulk = true;
+            this.exportStatus = null;
+            
+            try {
+                const url = `/api/us-export/site/${this.currentSiteId}/us/word-zip${validatedOnly ? '?validated_only=true' : ''}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    this.downloadBlob(blob, response.headers.get('Content-Disposition'));
+                    
+                    const typeText = validatedOnly ? 'validate' : 'del sito';
+                    this.showExportStatus('success', `Tutte le US ${typeText} esportate`);
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore export sito');
+                }
+                
+            } catch (error) {
+                console.error('Errore export sito:', error);
+                this.showExportStatus('error', `Errore: ${error.message}`);
+            } finally {
+                this.exportingBulk = false;
+            }
+        },
+        
+        // ===== ANTEPRIMA STRUTTURA =====
+        async previewWordStructure() {
+            const entityId = this.editingUS?.id || this.editingUSM?.id;
+            if (!entityId) {
+                this.showExportStatus('info', 'Salva prima la scheda per vedere l\'anteprima');
+                return;
+            }
+            
+            try {
+                const endpoint = this.editingUS ? 'us' : 'usm';
+                const response = await fetch(`/api/us-export/${endpoint}/${entityId}/preview`, {
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+                
+                if (response.ok) {
+                    const preview = await response.json();
+                    
+                    // Mostra modal anteprima
+                    this.showPreviewModal(preview);
+                    
+                } else {
+                    throw new Error('Errore caricamento anteprima');
+                }
+                
+            } catch (error) {
+                console.error('Errore preview:', error);
+                this.showExportStatus('error', 'Errore caricamento anteprima');
+            }
+        },
+        
+        // ===== UTILITY FUNCTIONS =====
+        downloadBlob(blob, contentDispositionHeader) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            let filename = 'SchediArcheologiche.docx';
+            if (contentDispositionHeader) {
+                const match = contentDispositionHeader.match(/filename=(.+)/);
+                if (match) filename = match[1].replace(/"/g, '');
+            }
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        },
+        
+        showExportStatus(type, message) {
+            this.exportStatus = { type, message };
+            
+            // Auto-hide dopo 5 secondi
+            setTimeout(() => {
+                if (this.exportStatus && this.exportStatus.message === message) {
+                    this.exportStatus = null;
+                }
+            }, 5000);
+        },
+        
+        showPreviewModal(preview) {
+            // Implementa modal per anteprima dati Word
+            const previewModal = `
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-90vh overflow-y-auto p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold">Anteprima Documento Word</h3>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div class="bg-blue-50 p-4 rounded">
+                                <h4 class="font-semibold mb-2">File generato:</h4>
+                                <p class="text-sm text-gray-700">${preview.estimated_filename}</p>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                ${Object.entries(preview.word_data).map(([key, value]) => 
+                                    `<div class="flex justify-between border-b pb-1">
+                                        <span class="text-gray-600">${key.replace('_', ' ').toUpperCase()}:</span>
+                                        <span class="font-medium">${value || '-'}</span>
+                                    </div>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', previewModal);
+        }
+    }
+}
+</script>

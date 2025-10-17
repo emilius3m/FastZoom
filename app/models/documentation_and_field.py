@@ -282,91 +282,12 @@ class Photo(Base, SiteMixin, UserMixin):
 # ===== RESTO DEL FILE INVARIATO =====
 # (Mantengo tutto il resto uguale per brevità...)
 
-class TavolaGrafica(Base, SiteMixin, UserMixin):
-    """Gestione tavole grafiche e disegni archeologici"""
-    __tablename__ = "tavole_grafiche"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id', ondelete='CASCADE'), nullable=False)
-
-    # Numero e classificazione
-    numero_tavola = Column(String(20), nullable=False, index=True)
-    numero_progressivo = Column(Integer, nullable=False)
-    tipo_tavola = Column(String(30), nullable=False)
-    titolo = Column(String(200), nullable=False)
-    descrizione = Column(Text, nullable=True)
-    
-    # Metadati tecnici
-    scala = Column(String(20), nullable=True)
-    formato = Column(String(10), nullable=True)
-    software_utilizzato = Column(String(100), nullable=True)
-    
-    # File
-    filepath = Column(String(500), nullable=True)
-    formato_file = Column(String(10), nullable=True)
-    filesize = Column(BigInteger, nullable=True)
-    
-    # Versioning
-    versione = Column(String(10), default="1.0")
-    note_versione = Column(Text, nullable=True)
-    data_ultima_modifica = Column(DateTime, default=datetime.utcnow)
-    
-    # Responsabilità
-    autore = Column(String(200), nullable=True)
-    revisore = Column(String(200), nullable=True)
-    approvato_da = Column(String(200), nullable=True)
-    data_approvazione = Column(DateTime, nullable=True)
-    
-    # Status
-    stato = Column(String(20), default='bozza')
-    pubblicato = Column(Boolean, default=False)
-    
-    # Sistema
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # Relazioni
-    site = relationship("ArchaeologicalSite", back_populates="tavole_grafiche")
-
-    def __repr__(self):
-        return f"<TavolaGrafica(numero={self.numero_tavola}, tipo={self.tipo_tavola})>"
+# TavolaGrafica è importata da app.models.documentazione_grafica per evitare duplicazione
+from app.models.documentazione_grafica import TavolaGrafica  # noqa: F401
 
 
-class MatrixHarris(Base, SiteMixin, UserMixin):
-    """Matrix Harris digitale per sequenze stratigrafiche"""
-    __tablename__ = "matrix_harris"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id', ondelete='CASCADE'), nullable=False)
-
-    nome_matrix = Column(String(200), nullable=False)
-    descrizione = Column(Text, nullable=True)
-    area_riferimento = Column(String(100), nullable=True)
-    
-    us_incluse = Column(JSON, default=list)
-    usm_incluse = Column(JSON, default=list)
-    relazioni = Column(JSON, default=dict)
-    
-    layout_dati = Column(JSON, default=dict)
-    configurazione_display = Column(JSON, default=dict)
-    
-    versione = Column(String(10), default="1.0")
-    note_versione = Column(Text, nullable=True)
-    
-    validata = Column(Boolean, default=False)
-    validata_da = Column(String(200), nullable=True)
-    data_validazione = Column(DateTime, nullable=True)
-    
-    ultimo_export = Column(DateTime, nullable=True)
-    formati_export = Column(JSON, default=list)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    site = relationship("ArchaeologicalSite", back_populates="matrix_harris")
-
-    def __repr__(self):
-        return f"<MatrixHarris(nome={self.nome_matrix}, versione={self.versione})>"
+# MatrixHarris è importata da app.models.documentazione_grafica per evitare duplicazione
+from app.models.documentazione_grafica import MatrixHarris  # noqa: F401
 
 
 # ===== OPERATORI E GIORNALI CANTIERE (invariati) =====
