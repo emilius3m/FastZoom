@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum as PyEnum
 from typing import List, Optional
 
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Table, Index
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Table, Index, Integer
 from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
