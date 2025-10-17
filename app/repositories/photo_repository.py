@@ -13,7 +13,8 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.base import BaseRepository
-from app.models.photos import Photo, PhotoType, MaterialType, ConservationStatus
+from app.models.documentation_and_field import Photo
+from app.models.archaeological_enums import PhotoType, MaterialType, ConservationStatus
 
 
 class PhotoRepository(BaseRepository[Photo]):
@@ -141,8 +142,8 @@ class PhotoRepository(BaseRepository[Photo]):
 
         # Ordinamento
         order_mappings = {
-            "created_desc": Photo.created.desc(),
-            "created_asc": Photo.created.asc(),
+            "created_desc": Photo.created_at.desc(),
+            "created_asc": Photo.created_at.asc(),
             "filename_asc": Photo.filename.asc(),
             "filename_desc": Photo.filename.desc(),
             "size_desc": Photo.file_size.desc(),
@@ -157,7 +158,7 @@ class PhotoRepository(BaseRepository[Photo]):
         if order_by and order_by in order_mappings:
             query = query.order_by(order_mappings[order_by])
         else:
-            query = query.order_by(Photo.created.desc())
+            query = query.order_by(Photo.created_at.desc())
 
         # Paginazione
         query = query.offset(skip).limit(limit)
@@ -421,7 +422,7 @@ class PhotoRepository(BaseRepository[Photo]):
         if conditions:
             query = query.where(and_(*conditions))
 
-        query = query.order_by(Photo.created.desc()).limit(limit)
+        query = query.order_by(Photo.created_at.desc()).limit(limit)
 
         result = await self.db_session.execute(query)
         return result.scalars().all()

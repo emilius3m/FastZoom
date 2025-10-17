@@ -181,27 +181,27 @@
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Piante</label>
                             <input type="text"
-                                   x-model="usFormData.piante"
+                                   x-model="usFormData.piante_riferimenti"
                                    x-bind:readonly="viewingUS"
                                    placeholder="P1, P2..."
                                    class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                                    x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
-
+    
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Prospetti</label>
                             <input type="text"
-                                   x-model="usFormData.prospetti"
+                                   x-model="usFormData.prospetti_riferimenti"
                                    x-bind:readonly="viewingUS"
                                    placeholder="PR1, PR2..."
                                    class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                                    x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
-
+    
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Sezioni</label>
                             <input type="text"
-                                   x-model="usFormData.sezioni"
+                                   x-model="usFormData.sezioni_riferimenti"
                                    x-bind:readonly="viewingUS"
                                    placeholder="S1, S2..."
                                    class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -727,6 +727,14 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- ========== SEZIONE 10: DOCUMENTAZIONE E FILE ========== -->
+                <!-- TODO: Implementare gestione file US con Alpine.js -->
+                <!-- {% include "components/us_file_upload_section.html" %} -->
+
+                <!-- ========== SEZIONE 11: EXPORT WORD ========== -->
+                <!-- TODO: Implementare export Word con Alpine.js -->
+                <!-- {% include "components/us_export_section.html" %} -->
 
             </form>
         </div>

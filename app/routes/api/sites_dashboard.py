@@ -55,7 +55,7 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
         select(func.count(Photo.id)).where(
             and_(
                 Photo.site_id == site_id,
-                Photo.created >= last_month
+                Photo.created_at >= last_month
             )
         )
     )
@@ -106,7 +106,7 @@ async def get_recent_photos(db: AsyncSession, site_id: UUID, limit: int = 6) -> 
     """Recupera foto recenti del sito"""
     photos_query = select(Photo).where(
         Photo.site_id == site_id
-    ).order_by(Photo.created.desc()).limit(limit)
+    ).order_by(Photo.created_at.desc()).limit(limit)
 
     photos = await db.execute(photos_query)
     photos = photos.scalars().all()
@@ -118,7 +118,7 @@ async def get_recent_photos(db: AsyncSession, site_id: UUID, limit: int = 6) -> 
             "thumbnail_url": f"/photos/{photo.id}/thumbnail",
             "full_url": f"/photos/{photo.id}/full",
             "photo_type": photo.photo_type.value if photo.photo_type else None,
-            "created_at": photo.created.isoformat()
+            "created_at": photo.created_at.isoformat()
         }
         for photo in photos
     ]

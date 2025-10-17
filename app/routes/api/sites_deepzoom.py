@@ -238,7 +238,7 @@ async def get_processing_queue_status(
             Photo.site_id == site_id,
             Photo.deep_zoom_status.in_(['scheduled', 'processing'])
         )
-    ).order_by(Photo.created.desc())
+    ).order_by(Photo.created_at.desc())
     
     processing_photos = await db.execute(processing_query)
     processing_photos = processing_photos.scalars().all()
@@ -262,7 +262,7 @@ async def get_processing_queue_status(
                 "photo_id": str(photo.id),
                 "filename": photo.filename,
                 "status": photo.deep_zoom_status,
-                "created_at": photo.created.isoformat(),
+                "created_at": photo.created_at.isoformat(),
                 "width": photo.width,
                 "height": photo.height
             }

@@ -98,6 +98,10 @@ async def create_us(
                                 detail=f"Campo '{field}': '{payload_dict[field]}' non è una data valida. Usare formato YYYY-MM-DD (es: 2025-01-15)"
                             )
         
+        # Add user_id for created_by field
+        payload_dict['created_by'] = user_id
+        payload_dict['updated_by'] = user_id
+        
         us = UnitaStratigrafica(**payload_dict)
         db.add(us)
         await db.commit()
@@ -304,6 +308,10 @@ async def create_usm(
                                 status_code=422,
                                 detail=f"Campo '{field}': '{payload_dict[field]}' non è una data valida. Usare formato YYYY-MM-DD (es: 2025-01-15)"
                             )
+        
+        # Add user_id for created_by field
+        payload_dict['created_by'] = user_id
+        payload_dict['updated_by'] = user_id
         
         usm = UnitaStratigraficaMuraria(**payload_dict)
         db.add(usm)

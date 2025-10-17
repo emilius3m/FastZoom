@@ -150,14 +150,14 @@ async def get_site_photos_api(
     if upload_date_from:
         try:
             date_from = datetime.fromisoformat(upload_date_from)
-            photos_query = photos_query.where(Photo.created >= date_from)
+            photos_query = photos_query.where(Photo.created_at >= date_from)
         except ValueError:
             pass
 
     if upload_date_to:
         try:
             date_to = datetime.fromisoformat(upload_date_to)
-            photos_query = photos_query.where(Photo.created <= date_to)
+            photos_query = photos_query.where(Photo.created_at <= date_to)
         except ValueError:
             pass
 
@@ -229,8 +229,8 @@ async def get_site_photos_api(
 
     # Sorting
     sort_mapping = {
-        "created_desc": Photo.created.desc(),
-        "created_asc": Photo.created.asc(),
+        "created_desc": Photo.created_at.desc(),
+        "created_asc": Photo.created_at.asc(),
         "filename_asc": Photo.filename.asc(),
         "filename_desc": Photo.filename.desc(),
         "size_desc": Photo.file_size.desc(),
@@ -246,7 +246,7 @@ async def get_site_photos_api(
     if sort_by in sort_mapping:
         photos_query = photos_query.order_by(sort_mapping[sort_by])
     else:
-        photos_query = photos_query.order_by(Photo.created.desc())
+        photos_query = photos_query.order_by(Photo.created_at.desc())
 
     # Execute query
     photos = await db.execute(photos_query)

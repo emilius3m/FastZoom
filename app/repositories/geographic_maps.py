@@ -159,7 +159,7 @@ class GeographicMapRepository:
         total = total_result.scalar() or 0
         
         # Apply pagination
-        query = query.order_by(Photo.created.desc())
+        query = query.order_by(Photo.created_at.desc())
         query = query.offset(skip).limit(limit)
         
         result = await self.db_session.execute(query)
