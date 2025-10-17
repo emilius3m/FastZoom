@@ -106,7 +106,8 @@ class User(Base, SoftDeleteMixin):
     site_permissions = relationship("UserSitePermission", foreign_keys="UserSitePermission.user_id", back_populates="user", cascade="all, delete-orphan")
 
     # Relazioni con contenuti creati
-    created_sites = relationship("ArchaeologicalSite", foreign_keys="ArchaeologicalSite.created_by",
+    created_sites = relationship("ArchaeologicalSite",
+                                 primaryjoin="User.id == ArchaeologicalSite.created_by",
                                  back_populates="creator")
     uploaded_documents = relationship("Document", foreign_keys="Document.uploaded_by", back_populates="uploader")
     created_forms = relationship("FormSchema", foreign_keys="FormSchema.created_by", back_populates="creator")
@@ -263,7 +264,7 @@ class UserSitePermission(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relazioni
-    user = relationship("User", back_populates="site_permissions")
+    user = relationship("User", foreign_keys=[user_id], back_populates="site_permissions")
     site = relationship("ArchaeologicalSite", back_populates="user_permissions")
     granter = relationship("User", foreign_keys=[granted_by])
 

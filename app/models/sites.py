@@ -133,7 +133,9 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
 
     # === RELAZIONI ===
     # Utenti e permessi
-    creator = relationship("User", foreign_keys=[UserMixin.created_by], back_populates="created_sites")
+    creator = relationship("User",
+                         primaryjoin="ArchaeologicalSite.created_by == User.id",
+                         back_populates="created_sites")
     user_permissions = relationship("UserSitePermission", back_populates="site", cascade="all, delete-orphan")
 
     # === CONTENUTI ARCHEOLOGICI ===

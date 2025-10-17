@@ -198,7 +198,7 @@ class GiornaleCantiere(Base):
     site = relationship("ArchaeologicalSite", back_populates="giornali_cantiere")
     
     # Relazione con l'utente responsabile
-    responsabile = relationship("User", foreign_keys=[responsabile_id])
+    responsabile = relationship("User", foreign_keys=[responsabile_id], back_populates="giornali_cantiere")
     
     # Relazione many-to-many con operatori
     operatori = relationship(

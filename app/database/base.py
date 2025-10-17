@@ -7,7 +7,7 @@ import sqlalchemy
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import DateTime, Column, Boolean
+from sqlalchemy import DateTime, Column, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.functions import func
@@ -67,8 +67,8 @@ class SiteMixin:
 
 class UserMixin:
     """Mixin per modelli che richiedono tracciamento utente"""
-    created_by = Column(UUID(as_uuid=True), nullable=False)
-    updated_by = Column(UUID(as_uuid=True), nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    updated_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
 
 
 class SoftDeleteMixin:
