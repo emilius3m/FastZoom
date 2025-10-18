@@ -16,8 +16,8 @@
                 Piante - Riferimenti
                 <span class="text-gray-500 text-xs">(es: TAV. 8)</span>
             </label>
-            <input type="text" 
-                   x-model="formData.piante_riferimenti"
+            <input type="text"
+                   x-model="formType === 'us' ? usFormData.piante_riferimenti : usmFormData.piante_riferimenti"
                    placeholder="TAV. 8, TAV. 12..."
                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
         </div>
@@ -27,8 +27,8 @@
                 Sezioni - Riferimenti
                 <span class="text-gray-500 text-xs">(es: TAV. 38-39)</span>
             </label>
-            <input type="text" 
-                   x-model="formData.sezioni_riferimenti"
+            <input type="text"
+                   x-model="formType === 'us' ? usFormData.sezioni_riferimenti : usmFormData.sezioni_riferimenti"
                    placeholder="TAV. 38-39, TAV. 40..."
                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
         </div>
@@ -38,8 +38,8 @@
                 Prospetti - Riferimenti
                 <span class="text-gray-500 text-xs">(es: TAV. 15-16)</span>
             </label>
-            <input type="text" 
-                   x-model="formData.prospetti_riferimenti"
+            <input type="text"
+                   x-model="formType === 'us' ? usFormData.prospetti_riferimenti : usmFormData.prospetti_riferimenti"
                    placeholder="TAV. 15-16..."
                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
         </div>

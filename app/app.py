@@ -48,6 +48,8 @@ from app.routes.api.notifications_ws import notifications_router
 from app.routes import photo_metadata
 from app.routes.api.us import us_router
 from app.routes.view.us import us_view_router
+from app.routes.api.us_word_export_api import router as us_word_export_router
+from app.routes.api.us_files import router as us_files_router
 
 
 
@@ -296,6 +298,20 @@ app.include_router(
 app.include_router(
     us_router,
     tags=["us-usm-api"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+)
+
+# 📄 INCLUSIONE ROUTER US/USM WORD EXPORT - Export Word per US/USM
+app.include_router(
+    us_word_export_router,
+    tags=["us-word-export"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+)
+
+# 📎 INCLUSIONE ROUTER US/USM FILES - Gestione file US/USM
+app.include_router(
+    us_files_router,
+    tags=["us-files"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 

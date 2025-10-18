@@ -66,32 +66,32 @@
                 <!-- Informazioni chiave che saranno nel documento -->
                 <div class="flex justify-between">
                     <span class="text-gray-600">Codice:</span>
-                    <span class="font-medium" x-text="formData.us_code || formData.usm_code || '-'"></span>
+                    <span class="font-medium" x-text="formType === 'us' ? usFormData.us_code : usmFormData.usm_code || '-'"></span>
                 </div>
                 
                 <div class="flex justify-between">
                     <span class="text-gray-600">Località:</span>
-                    <span class="font-medium" x-text="formData.localita || '-'"></span>
+                    <span class="font-medium" x-text="formType === 'us' ? usFormData.localita : usmFormData.localita || '-'"></span>
                 </div>
                 
                 <div class="flex justify-between">
                     <span class="text-gray-600">Ente:</span>
-                    <span class="font-medium" x-text="formData.ente_responsabile || '-'"></span>
+                    <span class="font-medium" x-text="formType === 'us' ? usFormData.ente_responsabile : usmFormData.ente_responsabile || '-'"></span>
                 </div>
                 
                 <div class="flex justify-between">
                     <span class="text-gray-600">Anno:</span>
-                    <span class="font-medium" x-text="formData.anno || '-'"></span>
+                    <span class="font-medium" x-text="formType === 'us' ? usFormData.anno : usmFormData.anno || '-'"></span>
                 </div>
                 
                 <div class="flex justify-between">
                     <span class="text-gray-600">Piante:</span>
-                    <span class="font-medium" x-text="formData.piante_riferimenti || '-'"></span>
+                    <span class="font-medium" x-text="formType === 'us' ? usFormData.piante_riferimenti : usmFormData.piante_riferimenti || '-'"></span>
                 </div>
                 
                 <div class="flex justify-between">
                     <span class="text-gray-600">Sezioni:</span>
-                    <span class="font-medium" x-text="formData.sezioni_riferimenti || '-'"></span>
+                    <span class="font-medium" x-text="formType === 'us' ? usFormData.sezioni_riferimenti : usmFormData.sezioni_riferimenti || '-'"></span>
                 </div>
             </div>
             

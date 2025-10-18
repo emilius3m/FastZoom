@@ -16,8 +16,8 @@ from loguru import logger
 
 from app.models.stratigraphy import USFile, UnitaStratigrafica, UnitaStratigraficaMuraria
 from app.models.stratigraphy import us_files_association, usm_files_association
-from app.services.storageservice import storageservice
-from app.services.deepzoomminioservice import deepzoomminioservice
+from app.services.storage_service import storage_service
+from app.services.deep_zoom_minio_service import deep_zoom_minio_service
 
 
 class USFileService:
@@ -55,7 +55,7 @@ class USFileService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.storage = storageservice
+        self.storage = storage_service
     
     async def upload_us_file(
         self,
@@ -178,7 +178,7 @@ class USFileService:
                 
                 # Avvia processing deep zoom in background
                 asyncio.create_task(
-                    deepzoomminioservice.process_single_image(
+                    deep_zoom_minio_service.process_single_image(
                         str(us_file.id), filepath, str(us.site_id)
                     )
                 )
@@ -409,6 +409,7 @@ class USFileService:
             if field in metadata:
                 setattr(us_file, field, metadata[field])
         
+        from datetime import datetime
         us_file.updated_at = datetime.utcnow()
         await self.db.commit()
         

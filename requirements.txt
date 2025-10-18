@@ -56,3 +56,4 @@ pillow
 python-multipart
 piexif
 jsonschema
+python-docx

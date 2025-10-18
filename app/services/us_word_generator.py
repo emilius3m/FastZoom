@@ -10,7 +10,6 @@ from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.oxml.shared import OxmlElement, qn
-from docx.oxml.ns import nsdecls, parse_xml
 from typing import Dict, Any, Optional, List
 from datetime import date, datetime
 from loguru import logger
@@ -350,11 +349,13 @@ class USWordGenerator:
     
     def _set_cell_text_bold(self, cell, text: str, centered: bool = False, borders: bool = False, font_size: int = 9):
         """Imposta testo cella in grassetto"""
-        cell.text = text
-        cell.paragraphs[0].runs[0].font.bold = True
-        cell.paragraphs[0].runs[0].font.size = Pt(font_size)
+        paragraph = cell.paragraphs[0]
+        paragraph.clear()
+        run = paragraph.add_run(text)
+        run.font.bold = True
+        run.font.size = Pt(font_size)
         if centered:
-            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
         if borders:
             self._set_cell_borders(cell)

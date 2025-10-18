@@ -181,6 +181,36 @@ function usUSMManagerApp() {
             responsabile_rielaborazione: ''
         },
 
+        // ===== FILE MANAGEMENT DATA =====
+        filesData: {
+            piante: [],
+            sezioni: [],
+            prospetti: [],
+            fotografie: [],
+            documenti: []
+        },
+        
+        // File upload state
+        uploadingFile: false,
+        showFileUploadModal: false,
+        currentFileType: '',
+        fileUploadMetadata: {
+            title: '',
+            description: '',
+            tavola_number: '',
+            scale_ratio: '',
+            photographer: '',
+            photo_date: ''
+        },
+
+        // Export state (for export component)
+        exportingWord: false,
+        exportingBulk: false,
+        exportStatus: null,
+        showBulkExport: false,
+        selectedUS: [],
+        formType: 'us',  // 'us' or 'usm'
+
         // ===== INITIALIZATION =====
         async init() {
             console.log('US/USM Manager inizializzato per sito:', this.currentSiteId);
@@ -231,6 +261,7 @@ function usUSMManagerApp() {
             this.editingUS = us;
             this.viewingUS = !editMode;
             this.usErrorMessage = '';
+            this.formType = 'us';  // Set form type for components
 
             if (us) {
                 try {
@@ -304,6 +335,20 @@ function usUSMManagerApp() {
                 // Modalità creazione - reset form
                 this.resetUSForm();
                 this.usFormData.site_id = this.currentSiteId;
+            }
+
+            // Load files if editing existing US
+            if (us) {
+                await this.loadUSFiles(us.id);
+            } else {
+                // Reset files for new US
+                this.filesData = {
+                    piante: [],
+                    sezioni: [],
+                    prospetti: [],
+                    fotografie: [],
+                    documenti: []
+                };
             }
 
             this.showUSModal = true;
@@ -572,6 +617,7 @@ function usUSMManagerApp() {
             this.editingUSM = usm;
             this.viewingUSM = !editMode;
             this.usmErrorMessage = '';
+            this.formType = 'usm';  // Set form type for components
 
             if (usm) {
                 try {
@@ -679,6 +725,20 @@ function usUSMManagerApp() {
                 // Modalità creazione
                 this.resetUSMForm();
                 this.usmFormData.site_id = this.currentSiteId;
+            }
+
+            // Load files if editing existing USM
+            if (usm) {
+                await this.loadUSMFiles(usm.id);
+            } else {
+                // Reset files for new USM
+                this.filesData = {
+                    piante: [],
+                    sezioni: [],
+                    prospetti: [],
+                    fotografie: [],
+                    documenti: []
+                };
             }
 
             this.showUSMModal = true;
@@ -946,6 +1006,317 @@ function usUSMManagerApp() {
             if (!dateString) return '-';
             const date = new Date(dateString);
             return date.toLocaleDateString('it-IT');
+        },
+
+        // ===== FILE MANAGEMENT METHODS =====
+
+        async loadUSFiles(usId) {
+            try {
+                const response = await fetch(`/api/us/${usId}/files`);
+                if (response.ok) {
+                    const filesSummary = await response.json();
+                    this.filesData = {
+                        piante: filesSummary.piante || [],
+                        sezioni: filesSummary.sezioni || [],
+                        prospetti: filesSummary.prospetti || [],
+                        fotografie: filesSummary.fotografie || [],
+                        documenti: filesSummary.documenti || []
+                    };
+                }
+            } catch (error) {
+                console.error('Errore caricamento file US:', error);
+            }
+        },
+
+        async loadUSMFiles(usmId) {
+            try {
+                const response = await fetch(`/api/usm/${usmId}/files`);
+                if (response.ok) {
+                    const filesSummary = await response.json();
+                    this.filesData = {
+                        piante: filesSummary.piante || [],
+                        sezioni: filesSummary.sezioni || [],
+                        prospetti: filesSummary.prospetti || [],
+                        fotografie: filesSummary.fotografie || [],
+                        documenti: filesSummary.documenti || []
+                    };
+                }
+            } catch (error) {
+                console.error('Errore caricamento file USM:', error);
+            }
+        },
+
+        showUploadModal(fileType) {
+            this.currentFileType = fileType;
+            this.showFileUploadModal = true;
+            this.fileUploadMetadata = {
+                title: '',
+                description: '',
+                tavola_number: '',
+                scale_ratio: '',
+                photographer: '',
+                photo_date: ''
+            };
+        },
+
+        async uploadFile(fileInput) {
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Seleziona un file');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('file_type', this.currentFileType);
+            
+            // Aggiungi metadati
+            Object.keys(this.fileUploadMetadata).forEach(key => {
+                if (this.fileUploadMetadata[key]) {
+                    formData.append(key, this.fileUploadMetadata[key]);
+                }
+            });
+
+            this.uploadingFile = true;
+
+            try {
+                const entityId = this.editingUS?.id || this.editingUSM?.id;
+                const endpoint = this.editingUS ? 'us' : 'usm';
+                
+                const response = await fetch(`/api/${endpoint}/${entityId}/files`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const uploadedFile = await response.json();
+                    
+                    // Aggiungi file alla lista corretta
+                    if (!this.filesData[this.currentFileType + 's']) {
+                        this.filesData[this.currentFileType + 's'] = [];
+                    }
+                    this.filesData[this.currentFileType + 's'].push(uploadedFile);
+                    
+                    this.showNotification('File caricato con successo', 'success');
+                    this.showFileUploadModal = false;
+                    
+                    // Ricarica file
+                    if (this.editingUS) {
+                        await this.loadUSFiles(entityId);
+                    } else {
+                        await this.loadUSMFiles(entityId);
+                    }
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore upload');
+                }
+            } catch (error) {
+                console.error('Errore upload file:', error);
+                this.showNotification('Errore caricamento file: ' + error.message, 'error');
+            } finally {
+                this.uploadingFile = false;
+            }
+        },
+
+        async deleteFile(file, fileType) {
+            if (!confirm('Eliminare questo file?')) {
+                return;
+            }
+
+            try {
+                const entityId = this.editingUS?.id || this.editingUSM?.id;
+                const endpoint = this.editingUS ? 'us' : 'usm';
+                
+                const response = await fetch(`/api/${endpoint}/${entityId}/files/${file.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+
+                if (response.ok) {
+                    // Rimuovi dalla lista
+                    const listKey = fileType + 's';
+                    this.filesData[listKey] = this.filesData[listKey].filter(f => f.id !== file.id);
+                    this.showNotification('File eliminato', 'success');
+                } else {
+                    throw new Error('Errore eliminazione');
+                }
+            } catch (error) {
+                console.error('Errore eliminazione file:', error);
+                this.showNotification('Errore eliminazione file', 'error');
+            }
+        },
+
+        previewFile(file) {
+            // Apri anteprima in modal o nuova tab
+            if (file.thumbnail_url) {
+                window.open(file.thumbnail_url, '_blank');
+            } else {
+                alert('Anteprima non disponibile');
+            }
+        },
+
+        async downloadFile(file) {
+            window.location.href = `/api/files/${file.id}/download`;
+        },
+
+        async editFileMetadata(file) {
+            // Implementa modal per editing metadati
+            const newTitle = prompt('Titolo:', file.title || '');
+            if (newTitle !== null) {
+                try {
+                    const response = await fetch(`/api/files/${file.id}/metadata`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
+                        },
+                        body: JSON.stringify({ title: newTitle })
+                    });
+
+                    if (response.ok) {
+                        file.title = newTitle;
+                        this.showNotification('Metadati aggiornati', 'success');
+                    }
+                } catch (error) {
+                    console.error('Errore aggiornamento metadati:', error);
+                }
+            }
+        },
+
+        getTotalFilesCount() {
+            return Object.values(this.filesData).reduce((sum, arr) => sum + arr.length, 0);
+        },
+
+        getFilesSummaryText() {
+            const counts = [];
+            if (this.filesData.piante.length > 0) counts.push(`${this.filesData.piante.length} piante`);
+            if (this.filesData.sezioni.length > 0) counts.push(`${this.filesData.sezioni.length} sezioni`);
+            if (this.filesData.prospetti.length > 0) counts.push(`${this.filesData.prospetti.length} prospetti`);
+            if (this.filesData.fotografie.length > 0) counts.push(`${this.filesData.fotografie.length} foto`);
+            if (this.filesData.documenti.length > 0) counts.push(`${this.filesData.documenti.length} doc`);
+            return counts.join(', ');
+        },
+
+        getDocumentIcon(mimetype) {
+            if (!mimetype) return 'fas fa-file';
+            if (mimetype.includes('pdf')) return 'fas fa-file-pdf';
+            if (mimetype.includes('word')) return 'fas fa-file-word';
+            return 'fas fa-file';
+        },
+
+        formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        },
+
+        // ===== EXPORT WORD METHODS =====
+
+        async exportUSWord() {
+            if (!this.editingUS && !this.usFormData.us_code) {
+                this.showExportStatus('error', 'Salva prima la US per esportarla');
+                return;
+            }
+
+            this.exportingWord = true;
+            this.exportStatus = null;
+
+            try {
+                const usId = this.editingUS?.id;
+                const response = await fetch(`/api/us-export/us/${usId}/word`, {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    this.downloadBlob(blob, response.headers.get('Content-Disposition'));
+                    this.showExportStatus('success', 'Documento Word generato');
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore export');
+                }
+            } catch (error) {
+                console.error('Errore export US Word:', error);
+                this.showExportStatus('error', 'Errore: ' + error.message);
+            } finally {
+                this.exportingWord = false;
+            }
+        },
+
+        async exportUSMWord() {
+            if (!this.editingUSM && !this.usmFormData.usm_code) {
+                this.showExportStatus('error', 'Salva prima la USM per esportarla');
+                return;
+            }
+
+            this.exportingWord = true;
+            this.exportStatus = null;
+
+            try {
+                const usmId = this.editingUSM?.id;
+                const response = await fetch(`/api/us-export/usm/${usmId}/word`, {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    this.downloadBlob(blob, response.headers.get('Content-Disposition'));
+                    this.showExportStatus('success', 'Documento USM Word scaricato');
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Errore export USM');
+                }
+            } catch (error) {
+                console.error('Errore export USM:', error);
+                this.showExportStatus('error', 'Errore: ' + error.message);
+            } finally {
+                this.exportingWord = false;
+            }
+        },
+
+        downloadBlob(blob, contentDispositionHeader) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            let filename = 'SchediArcheologiche.docx';
+            if (contentDispositionHeader) {
+                const match = contentDispositionHeader.match(/filename=(.+)/);
+                if (match) filename = match[1].replace(/"/g, '');
+            }
+
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        },
+
+        showExportStatus(type, message) {
+            this.exportStatus = { type, message };
+
+            setTimeout(() => {
+                if (this.exportStatus && this.exportStatus.message === message) {
+                    this.exportStatus = null;
+                }
+            }, 5000);
+        },
+
+        previewWordStructure() {
+            alert('Funzione anteprima in sviluppo');
         }
     }
 }
