@@ -14,8 +14,8 @@ from loguru import logger
 from app.database.db import get_async_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.services.us_file_service import USFileService
-from app.services.photoservingservice import photoservingservice
-from app.models.us_enhanced import USFile
+from app.services.photo_serving_service import photo_serving_service
+from app.models.stratigraphy import USFile
 
 router = APIRouter(prefix="/api/us-files", tags=["us-files"])
 
@@ -244,7 +244,7 @@ async def view_us_file(
     
     try:
         # Riutilizza il sistema di serving consolidato di FastZoom
-        return await photoservingservice.serve_photo_full(file_id, db)
+        return await photo_serving_service.serve_photo_full(file_id, db)
         
     except HTTPException:
         raise
@@ -261,7 +261,7 @@ async def get_us_file_thumbnail(
     """Ottieni thumbnail file US/USM"""
     
     try:
-        return await photoservingservice.serve_photo_thumbnail(file_id, db)
+        return await photo_serving_service.serve_photo_thumbnail(file_id, db)
         
     except HTTPException:
         raise
@@ -278,7 +278,7 @@ async def download_us_file(
     """Download file US/USM"""
     
     try:
-        return await photoservingservice.serve_photo_download(file_id, db)
+        return await photo_serving_service.serve_photo_download(file_id, db)
         
     except HTTPException:
         raise
@@ -378,8 +378,8 @@ async def get_next_file_order(
         max_order = 0
         if files:
             # Query per ottenere ordini dalla tabella associativa
-            from sqlalchemy import select, func
-            from app.models.us_enhanced import us_files_association
+            from sqlalchemy import select, func, and_
+            from app.models.stratigraphy import us_files_association
             
             max_query = select(func.max(us_files_association.c.ordine)).where(
                 and_(

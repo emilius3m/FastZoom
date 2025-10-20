@@ -45,20 +45,28 @@ class USWordGenerator:
         Genera documento Word per US replicando ESATTAMENTE la struttura US-3.doc
         """
         
-        # Tabella principale 3 colonne - STRUTTURA IDENTICA
-        table = self.doc.add_table(rows=25, cols=3)  # Righe sufficienti per tutti i campi
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        table.allow_autofit = False
-        
-        # Larghezza colonne (replica proporzioni originali)
-        table.columns[0].width = Inches(2.5)  # Colonna etichette
-        table.columns[1].width = Inches(2.5)  # Colonna centrale
-        table.columns[2].width = Inches(2.0)  # Colonna destra
-        
-        row_idx = 0
-        
-        # ===== RIGA 1: INTESTAZIONE PRINCIPALE =====
-        cells = table.rows[row_idx].cells
+        try:
+            logger.debug(f"→ generate_us_word START - US {us.id} - code: {us.us_code}")
+            
+            # Tabella principale 3 colonne - STRUTTURA IDENTICA
+            table = self.doc.add_table(rows=25, cols=3)  # Righe sufficienti per tutti i campi
+            table.alignment = WD_TABLE_ALIGNMENT.CENTER
+            table.allow_autofit = False
+            
+            logger.debug(f"Tabella creata: 25 righe x 3 colonne")
+            
+            # Larghezza colonne (replica proporzioni originali)
+            table.columns[0].width = Inches(2.5)  # Colonna etichette
+            table.columns[1].width = Inches(2.5)  # Colonna centrale
+            table.columns[2].width = Inches(2.0)  # Colonna destra
+            
+            logger.debug(f"Larghezza colonne impostata")
+            
+            row_idx = 0
+            
+            # ===== RIGA 1: INTESTAZIONE PRINCIPALE =====
+            logger.debug(f"Processando riga {row_idx}: INTESTAZIONE")
+            cells = table.rows[row_idx].cells
         cells[0].merge(cells[0])  # US
         cells[1].merge(cells[1])  # ENTE RESPONSABILE 
         cells[2].merge(cells[2])  # ANNO
@@ -78,44 +86,50 @@ class USWordGenerator:
         row_idx += 1
         
         # ===== RIGA 2: NUMERO US =====
+        logger.debug(f"Processando riga {row_idx}: NUMERO US")
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[2])  # Merge tutte e 3 per numero US centrato
+        logger.debug(f"Merging celle 0, 1, 2 per numero US")
+        # Merge celle 0, 1, 2 per numero US centrato
+        merged_cell = cells[0].merge(cells[1]).merge(cells[2])
+        logger.debug(f"Merge completato")
         
         # Estrai solo numero da US code (US003 -> 3)
-        us_number = us.us_code.replace('US', '').replace('us', '').lstrip('0') if us.us_code else ''
-        self._set_cell_text_bold(cells[0], us_number, centered=True, font_size=14)
-        self._set_cell_borders(cells[0])
+        us_number_str = us.us_code.replace('US', '').replace('us', '').lstrip('0') if us.us_code else ''
+        # Se vuoto dopo strip, usa '0'
+        us_number_str = us_number_str if us_number_str else '0'
+        self._set_cell_text_bold(merged_cell, us_number_str, centered=True, font_size=14)
+        self._set_cell_borders(merged_cell)
         
         row_idx += 1
         
         # ===== RIGA 3: UFFICIO MiC / IDENTIFICATIVO =====
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[0])
-        cells[1].merge(cells[2])
+        # cells[0] resta singola
+        merged_cell_right = cells[1].merge(cells[2])
         
         self._set_cell_text(cells[0], "", borders=True)
         id_text = f"UFFICIO MiC COMPETENTE PER TUTELA"
         if us.identificativo_rif:
             id_text += f" IDENTIFICATIVO DEL SAGGIO STRATIGRAFICO/DELL'EDIFICIO/DELLA STRUTTURA/DELLA DEPOSIZIONE FUNERARIA DI RIFERIMENTO {us.identificativo_rif}"
-        self._set_cell_text(cells[1], id_text, borders=True)
+        self._set_cell_text(merged_cell_right, id_text, borders=True)
         
         row_idx += 1
         
         # ===== RIGA 4: LOCALITÀ =====
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[2])
+        merged_cell = cells[0].merge(cells[1]).merge(cells[2])
         
         localita_text = f"LOCALITÀ {us.localita or ''}"
-        self._set_cell_text_bold(cells[0], localita_text, borders=True)
+        self._set_cell_text_bold(merged_cell, localita_text, borders=True)
         
         row_idx += 1
         
         # ===== RIGA 5: AREA/EDIFICIO/STRUTTURA | SAGGIO =====
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[1])
+        merged_cell_left = cells[0].merge(cells[1])
         
         area_text = f"AREA/EDIFICIO/STRUTTURA{us.area_struttura or ''}"
-        self._set_cell_text(cells[0], area_text, borders=True)
+        self._set_cell_text(merged_cell_left, area_text, borders=True)
         self._set_cell_text(cells[2], f"SAGGIO {us.saggio or ''}", borders=True)
         
         row_idx += 1
@@ -151,37 +165,36 @@ class USWordGenerator:
         row_idx += 1
         
         # ===== RIGA 9: DEFINIZIONE =====
+        logger.debug(f"Processando riga {row_idx}: DEFINIZIONE")
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[2])
+        merged_cell = cells[0].merge(cells[1]).merge(cells[2])
         
         def_text = f"DEFINIZIONE{us.definizione or ''}"
-        self._set_cell_text(cells[0], def_text, borders=True)
+        self._set_cell_text(merged_cell, def_text, borders=True)
         
         row_idx += 1
         
         # ===== RIGA 10: CRITERI DISTINZIONE =====
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[2])
+        merged_cell = cells[0].merge(cells[1]).merge(cells[2])
         
         criteri_text = f"CRITERI DI DISTINZIONE{us.criteri_distinzione or ''}"
-        self._set_cell_text(cells[0], criteri_text, borders=True)
+        self._set_cell_text(merged_cell, criteri_text, borders=True)
         
         row_idx += 1
         
         # ===== RIGA 11: MODO FORMAZIONE =====
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[2])
+        merged_cell = cells[0].merge(cells[1]).merge(cells[2])
         
         modo_text = f"MODO DI FORMAZIONE{us.modo_formazione or ''}"
-        self._set_cell_text(cells[0], modo_text, borders=True)
+        self._set_cell_text(merged_cell, modo_text, borders=True)
         
         row_idx += 1
         
         # ===== RIGA 12: COMPONENTI (HEADER) =====
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[0])
-        cells[1].merge(cells[1])
-        cells[2].merge(cells[2])
+        # Celle singole, non serve merge
         
         self._set_cell_text_bold(cells[0], "COMPONENTI", borders=True)
         self._set_cell_text_bold(cells[1], "INORGANICI", borders=True)
@@ -213,21 +226,20 @@ class USWordGenerator:
         
         # ===== RIGA 15: STATO CONSERVAZIONE =====
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[2])
+        merged_cell = cells[0].merge(cells[1]).merge(cells[2])
         
         stato_text = f"STATO DI CONSERVAZIONE {us.stato_conservazione or ''}"
-        self._set_cell_text_bold_selective(cells[0], stato_text, 
+        self._set_cell_text_bold_selective(merged_cell, stato_text,
                                           bold_parts=[us.stato_conservazione] if us.stato_conservazione else [],
                                           borders=True)
         
         row_idx += 1
         
         # ===== SEZIONE SEQUENZA FISICA (Matrix Harris) =====
+        logger.debug(f"Processando riga {row_idx}: SEQUENZA FISICA")
         # Riga header sequenza
         cells = table.rows[row_idx].cells
-        cells[0].merge(cells[0])
-        cells[1].merge(cells[1]) 
-        cells[2].merge(cells[2])
+        # Celle singole, non serve merge
         
         self._set_cell_text_bold(cells[0], "SEQUENZA FISICA", borders=True)
         self._set_cell_text_bold(cells[1], "UGUALE A", borders=True)
@@ -336,13 +348,21 @@ class USWordGenerator:
         # Se necessario aggiungi altre righe per completare tutti i campi...
         # [Il codice continua per tutti gli altri campi seguendo lo stesso pattern]
         
-        return self.doc
+            logger.debug(f"✓ generate_us_word completato - ritorno documento")
+            return self.doc
+            
+        except Exception as e:
+            logger.error(f"✗ ERRORE in generate_us_word riga {row_idx}: {str(e)}", exc_info=True)
+            raise
     
     def _set_cell_text(self, cell, text: str, centered: bool = False, borders: bool = False):
         """Imposta testo cella con formattazione base"""
-        cell.text = text
+        paragraph = cell.paragraphs[0]
+        paragraph.clear()
+        run = paragraph.add_run(text)
+        run.font.size = Pt(9)
         if centered:
-            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
         if borders:
             self._set_cell_borders(cell)
@@ -362,16 +382,14 @@ class USWordGenerator:
     
     def _set_cell_text_bold_selective(self, cell, text: str, bold_parts: List[str], borders: bool = False):
         """Imposta testo con parti specifiche in grassetto (es: TAV. 8 in grassetto)"""
-        cell.text = text
+        paragraph = cell.paragraphs[0]
+        paragraph.clear()
         
         # Se ci sono parti da rendere in grassetto
-        if bold_parts:
-            paragraph = cell.paragraphs[0]
-            paragraph.clear()
-            
+        if bold_parts and text:
             current_text = text
             for bold_part in bold_parts:
-                if bold_part in current_text:
+                if bold_part and bold_part in current_text:
                     before, after = current_text.split(bold_part, 1)
                     
                     # Testo normale prima
@@ -389,6 +407,11 @@ class USWordGenerator:
             # Testo rimanente
             if current_text:
                 run = paragraph.add_run(current_text)
+                run.font.size = Pt(9)
+        else:
+            # Nessuna parte in grassetto, aggiungi solo il testo
+            if text:
+                run = paragraph.add_run(text)
                 run.font.size = Pt(9)
         
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
@@ -428,11 +451,20 @@ class USWordGenerator:
         """Genera documento US come bytes per download"""
         from io import BytesIO
         
-        doc = self.generate_us_word(us)
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        return buffer.getvalue()
+        try:
+            logger.debug(f"→ generate_us_bytes START per US {us.id}")
+            doc = self.generate_us_word(us)
+            logger.debug(f"Documento generato, creazione buffer")
+            buffer = BytesIO()
+            doc.save(buffer)
+            logger.debug(f"Documento salvato in buffer")
+            buffer.seek(0)
+            result = buffer.getvalue()
+            logger.debug(f"✓ generate_us_bytes completato - {len(result)} bytes")
+            return result
+        except Exception as e:
+            logger.error(f"✗ ERRORE in generate_us_bytes per US {us.id}: {str(e)}", exc_info=True)
+            raise
 
 
 class USMWordGenerator(USWordGenerator):

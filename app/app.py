@@ -305,7 +305,7 @@ app.include_router(
 app.include_router(
     us_word_export_router,
     tags=["us-word-export"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
 
 # 📎 INCLUSIONE ROUTER US/USM FILES - Gestione file US/USM

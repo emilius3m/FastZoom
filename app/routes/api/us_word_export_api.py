@@ -39,28 +39,43 @@ async def export_us_word(
     """
     
     try:
+        logger.info(f"→ Inizio export Word US {us_id}")
+        
         # Carica US con relazioni
         us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id)
         us_result = await db.execute(us_query)
         us = us_result.scalar_one_or_none()
         
+        logger.debug(f"US caricata: {us is not None}")
+        
         if not us:
             raise HTTPException(status_code=404, detail="US non trovata")
+        
+        logger.debug(f"US trovata - code: {us.us_code}, site_id: {us.site_id}")
         
         # Verifica accesso sito
         if not await verify_site_access(us.site_id, user_sites):
             raise HTTPException(status_code=403, detail="Accesso negato al sito")
         
+        logger.debug(f"Accesso verificato, inizio generazione documento")
+        
         # Genera documento Word
         generator = USWordGenerator()
+        logger.debug(f"Generator creato, chiamata generate_us_bytes")
         doc_bytes = generator.generate_us_bytes(us)
         
+        logger.debug(f"Bytes generati: {len(doc_bytes)} bytes")
+        logger.info(f"filename Word US ")
         # Nome file: US003_Sepino_2023.docx
-        us_number = us.us_code.replace('US', '').replace('us', '').lstrip('0') if us.us_code else 'X'
+        logger.debug(f"Preparazione filename - us_code: {us.us_code}")
+        us_number_str = us.us_code.replace('US', '').replace('us', '').lstrip('0') if us.us_code else '0'
+        logger.debug(f"us_number_str dopo processing: '{us_number_str}'")
+        us_number_int = int(us_number_str) if us_number_str else 0
         localita_clean = (us.localita or '').replace(' ', '_').replace(',', '') or 'Sito'
         anno = us.anno or 2025
-        filename = f"US{us_number:03d}_{localita_clean}_{anno}.docx"
-        
+        filename = f"US{us_number_int:03d}_{localita_clean}_{anno}.docx"
+        logger.info(f"✓ Export completato: {filename}")
+        logger.info(f"filename Word US {filename}")
         # Response streaming
         return StreamingResponse(
             io.BytesIO(doc_bytes),
@@ -165,9 +180,10 @@ async def export_multiple_us_word(
                     doc_bytes = generator.generate_us_bytes(us)
                     
                     # Nome file univoco
-                    us_number = us.us_code.replace('US', '').lstrip('0') if us.us_code else 'X'
+                    us_number_str = us.us_code.replace('US', '').replace('us', '').lstrip('0') if us.us_code else '0'
+                    us_number_int = int(us_number_str) if us_number_str else 0
                     localita_clean = (us.localita or '').replace(' ', '_')[:10] or 'Sito'
-                    filename = f"US{us_number:03d}_{localita_clean}.docx"
+                    filename = f"US{us_number_int:03d}_{localita_clean}.docx"
                     
                     # Aggiungi a ZIP
                     zip_file.writestr(filename, doc_bytes)
@@ -246,8 +262,9 @@ async def export_site_us_word(
                 try:
                     doc_bytes = generator.generate_us_bytes(us)
                     
-                    us_number = us.us_code.replace('US', '').lstrip('0') if us.us_code else 'X'
-                    filename = f"US{us_number:03d}_{us.us_code}.docx"
+                    us_number_str = us.us_code.replace('US', '').replace('us', '').lstrip('0') if us.us_code else '0'
+                    us_number_int = int(us_number_str) if us_number_str else 0
+                    filename = f"US{us_number_int:03d}_{us.us_code}.docx"
                     
                     zip_file.writestr(filename, doc_bytes)
                     success_count += 1
@@ -303,9 +320,10 @@ async def preview_us_word_structure(
             raise HTTPException(status_code=403, detail="Accesso negato")
         
         # Struttura dati per Word
+        us_number_str = us.us_code.replace('US', '').replace('us', '').lstrip('0') if us.us_code else '0'
         word_data = {
             'us_code': us.us_code,
-            'us_number': us.us_code.replace('US', '').lstrip('0') if us.us_code else '',
+            'us_number': us_number_str,
             'ente_responsabile': us.ente_responsabile or '',
             'anno': us.anno or '',
             'identificativo_rif': us.identificativo_rif or '',
@@ -354,7 +372,7 @@ async def preview_us_word_structure(
             'word_data': word_data,
             'files_summary': files_summary,
             'export_ready': True,
-            'estimated_filename': f"US{word_data['us_number']:03d}_{word_data['localita'].replace(' ', '_')}_{word_data['anno']}.docx"
+            'estimated_filename': f"US{int(word_data['us_number']) if word_data['us_number'] else 0:03d}_{word_data['localita'].replace(' ', '_')}_{word_data['anno']}.docx"
         }
         
     except HTTPException:
