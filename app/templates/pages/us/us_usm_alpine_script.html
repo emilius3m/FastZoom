@@ -51,9 +51,9 @@ function usUSMManagerApp() {
             ambiente_unita_funzione: '',
             posizione: '',
             settori: '',
-            piante: '',
-            prospetti: '',
-            sezioni: '',
+            piante_riferimenti: '',
+            prospetti_riferimenti: '',
+            sezioni_riferimenti: '',
             definizione: '',
             criteri_distinzione: '',
             modo_formazione: '',
@@ -284,9 +284,9 @@ function usUSMManagerApp() {
                             ambiente_unita_funzione: usData.ambiente_unita_funzione || '',
                             posizione: usData.posizione || '',
                             settori: usData.settori || '',
-                            piante: usData.piante || '',
-                            prospetti: usData.prospetti || '',
-                            sezioni: usData.sezioni || '',
+                            piante_riferimenti: usData.piante_riferimenti || '',
+                            prospetti_riferimenti: usData.prospetti_riferimenti || '',
+                            sezioni_riferimenti: usData.sezioni_riferimenti || '',
                             definizione: usData.definizione || '',
                             criteri_distinzione: usData.criteri_distinzione || '',
                             modo_formazione: usData.modo_formazione || '',
@@ -537,9 +537,9 @@ function usUSMManagerApp() {
                 ambiente_unita_funzione: '',
                 posizione: '',
                 settori: '',
-                piante: '',
-                prospetti: '',
-                sezioni: '',
+                piante_riferimenti: '',
+                prospetti_riferimenti: '',
+                sezioni_riferimenti: '',
                 definizione: '',
                 criteri_distinzione: '',
                 modo_formazione: '',
@@ -1012,15 +1012,15 @@ function usUSMManagerApp() {
 
         async loadUSFiles(usId) {
             try {
-                const response = await fetch(`/api/us/${usId}/files`);
+                const response = await fetch(`/api/us-files/us/${usId}/files`);
                 if (response.ok) {
                     const filesSummary = await response.json();
                     this.filesData = {
-                        piante: filesSummary.piante || [],
-                        sezioni: filesSummary.sezioni || [],
-                        prospetti: filesSummary.prospetti || [],
-                        fotografie: filesSummary.fotografie || [],
-                        documenti: filesSummary.documenti || []
+                        piante: filesSummary.files.filter(f => f.file_type === 'pianta') || [],
+                        sezioni: filesSummary.files.filter(f => f.file_type === 'sezione') || [],
+                        prospetti: filesSummary.files.filter(f => f.file_type === 'prospetto') || [],
+                        fotografie: filesSummary.files.filter(f => f.file_type === 'fotografia') || [],
+                        documenti: filesSummary.files.filter(f => f.file_type === 'documento') || []
                     };
                 }
             } catch (error) {
@@ -1030,15 +1030,15 @@ function usUSMManagerApp() {
 
         async loadUSMFiles(usmId) {
             try {
-                const response = await fetch(`/api/usm/${usmId}/files`);
+                const response = await fetch(`/api/us-files/usm/${usmId}/files`);
                 if (response.ok) {
                     const filesSummary = await response.json();
                     this.filesData = {
-                        piante: filesSummary.piante || [],
-                        sezioni: filesSummary.sezioni || [],
-                        prospetti: filesSummary.prospetti || [],
-                        fotografie: filesSummary.fotografie || [],
-                        documenti: filesSummary.documenti || []
+                        piante: filesSummary.files.filter(f => f.file_type === 'pianta') || [],
+                        sezioni: filesSummary.files.filter(f => f.file_type === 'sezione') || [],
+                        prospetti: filesSummary.files.filter(f => f.file_type === 'prospetto') || [],
+                        fotografie: filesSummary.files.filter(f => f.file_type === 'fotografia') || [],
+                        documenti: filesSummary.files.filter(f => f.file_type === 'documento') || []
                     };
                 }
             } catch (error) {
@@ -1083,7 +1083,7 @@ function usUSMManagerApp() {
                 const entityId = this.editingUS?.id || this.editingUSM?.id;
                 const endpoint = this.editingUS ? 'us' : 'usm';
                 
-                const response = await fetch(`/api/${endpoint}/${entityId}/files`, {
+                const response = await fetch(`/api/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': this.getCSRFToken()
@@ -1130,7 +1130,7 @@ function usUSMManagerApp() {
                 const entityId = this.editingUS?.id || this.editingUSM?.id;
                 const endpoint = this.editingUS ? 'us' : 'usm';
                 
-                const response = await fetch(`/api/${endpoint}/${entityId}/files/${file.id}`, {
+                const response = await fetch(`/api/us-files/${endpoint}/${entityId}/files/${file.id}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': this.getCSRFToken()

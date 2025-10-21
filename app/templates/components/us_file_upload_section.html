@@ -354,8 +354,134 @@
                 <i class="fas fa-file-pdf text-3xl mb-2"></i>
                 <p class="text-sm">Nessun documento caricato</p>
             </div>
+            
         </div>
         
+        <!-- ========== MODAL UPLOAD FILE ========== -->
+        <div x-show="showFileUploadModal"
+             x-cloak
+             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+             @click.self="showFileUploadModal = false">
+            
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-90vh overflow-y-auto">
+                
+                <!-- Header -->
+                <div class="sticky top-0 bg-gradient-to-r from-emerald-600 to-emerald-500 px-6 py-4 flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-white">
+                        Carica <span x-text="currentFileType"></span>
+                    </h3>
+                    <button @click="showFileUploadModal = false" class="text-white hover:text-gray-200 transition">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Body -->
+                <div class="p-6">
+                    <form @submit.prevent="uploadFile($refs.fileInput)" class="space-y-4">
+                        
+                        <!-- File Input -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                Seleziona File <span class="text-red-500">*</span>
+                            </label>
+                            <input type="file"
+                                   x-ref="fileInput"
+                                   required
+                                   accept="image/*,.pdf,.doc,.docx"
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Formati supportati: immagini, PDF, DOC, DOCX</p>
+                        </div>
+                        
+                        <!-- Titolo -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Titolo</label>
+                            <input type="text"
+                                   x-model="fileUploadMetadata.title"
+                                   placeholder="Titolo del file..."
+                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        </div>
+                        
+                        <!-- Descrizione -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Descrizione</label>
+                            <textarea x-model="fileUploadMetadata.description"
+                                      rows="2"
+                                      placeholder="Descrizione del file..."
+                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+                        </div>
+                        
+                        <!-- Metadati specifici per tipo -->
+                        <div x-show="currentFileType === 'pianta' || currentFileType === 'sezione' || currentFileType === 'prospetto'">
+                            <div class="grid grid-cols-2 gap-4">
+                                <!-- Numero Tavola -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Numero Tavola</label>
+                                    <input type="text"
+                                           x-model="fileUploadMetadata.tavola_number"
+                                           placeholder="TAV. 8"
+                                           class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                </div>
+                                
+                                <!-- Scala -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Scala</label>
+                                    <input type="text"
+                                           x-model="fileUploadMetadata.scale_ratio"
+                                           placeholder="1:50"
+                                           class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Metadati fotografia -->
+                        <div x-show="currentFileType === 'fotografia'">
+                            <div class="grid grid-cols-2 gap-4">
+                                <!-- Fotografo -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Fotografo</label>
+                                    <input type="text"
+                                           x-model="fileUploadMetadata.photographer"
+                                           placeholder="Nome fotografo..."
+                                           class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                </div>
+                                
+                                <!-- Data Foto -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Data Foto</label>
+                                    <input type="date"
+                                           x-model="fileUploadMetadata.photo_date"
+                                           class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="flex justify-end space-x-3 pt-4 border-t dark:border-gray-600">
+                            <button type="button"
+                                    @click="showFileUploadModal = false"
+                                    :disabled="uploadingFile"
+                                    class="px-6 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition">
+                                Annulla
+                            </button>
+                            
+                            <button type="submit"
+                                    :disabled="uploadingFile"
+                                    class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-50 transition">
+                                <i :class="uploadingFile ? 'fas fa-spinner fa-spin' : 'fas fa-upload'" class="mr-2"></i>
+                                <span x-text="uploadingFile ? 'Caricamento...' : 'Carica File'"></span>
+                            </button>
+                        </div>
+                        
+                    </form>
+                </div>
+                
+            </div>
+        </div>
+        
+        <style>
+        [x-cloak] { display: none !important; }
+        .max-h-90vh { max-height: 90vh; }
+        </style>
     </div>
     
     <!-- File Summary -->
