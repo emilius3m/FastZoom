@@ -1060,30 +1060,46 @@ function usUSMManagerApp() {
         },
 
         async uploadFile(fileInput) {
+            console.log('uploadFile called with:', fileInput);
+            console.log('currentFileType:', this.currentFileType);
+            console.log('editingUS:', this.editingUS);
+            console.log('editingUSM:', this.editingUSM);
+            
+            // Check if US/USM is saved first
+            const entityId = this.editingUS?.id || this.editingUSM?.id;
+            if (!entityId) {
+                alert('Devi prima salvare la US/USM prima di poter caricare file');
+                this.showFileUploadModal = false;
+                return;
+            }
+            
             if (!fileInput.files || fileInput.files.length === 0) {
                 alert('Seleziona un file');
                 return;
             }
 
             const file = fileInput.files[0];
+            console.log('File selezionato:', file.name, file.size);
+            
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('file_type', this.currentFileType);
             
             // Aggiungi metadati
             Object.keys(this.fileUploadMetadata).forEach(key => {
                 if (this.fileUploadMetadata[key]) {
                     formData.append(key, this.fileUploadMetadata[key]);
+                    console.log(`Metadata ${key}:`, this.fileUploadMetadata[key]);
                 }
             });
 
             this.uploadingFile = true;
 
             try {
-                const entityId = this.editingUS?.id || this.editingUSM?.id;
                 const endpoint = this.editingUS ? 'us' : 'usm';
+                const uploadUrl = `/api/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`;
+                console.log('Upload URL:', uploadUrl);
                 
-                const response = await fetch(`/api/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`, {
+                const response = await fetch(uploadUrl, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': this.getCSRFToken()
@@ -1091,14 +1107,24 @@ function usUSMManagerApp() {
                     body: formData
                 });
 
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+
                 if (response.ok) {
                     const uploadedFile = await response.json();
+                    console.log('File caricato con successo:', uploadedFile);
                     
                     // Aggiungi file alla lista corretta
-                    if (!this.filesData[this.currentFileType + 's']) {
-                        this.filesData[this.currentFileType + 's'] = [];
+                    const fileListKey = this.currentFileType === 'pianta' ? 'piante' :
+                                       this.currentFileType === 'sezione' ? 'sezioni' :
+                                       this.currentFileType === 'prospetto' ? 'prospetti' :
+                                       this.currentFileType === 'fotografia' ? 'fotografie' :
+                                       'documenti';
+                    
+                    if (!this.filesData[fileListKey]) {
+                        this.filesData[fileListKey] = [];
                     }
-                    this.filesData[this.currentFileType + 's'].push(uploadedFile);
+                    this.filesData[fileListKey].push(uploadedFile.file || uploadedFile);
                     
                     this.showNotification('File caricato con successo', 'success');
                     this.showFileUploadModal = false;
@@ -1110,8 +1136,16 @@ function usUSMManagerApp() {
                         await this.loadUSMFiles(entityId);
                     }
                 } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Errore upload');
+                    const errorText = await response.text();
+                    console.error('Upload error response:', errorText);
+                    let errorDetail = 'Errore upload';
+                    try {
+                        const error = JSON.parse(errorText);
+                        errorDetail = error.detail || errorDetail;
+                    } catch (e) {
+                        errorDetail = errorText;
+                    }
+                    throw new Error(errorDetail);
                 }
             } catch (error) {
                 console.error('Errore upload file:', error);

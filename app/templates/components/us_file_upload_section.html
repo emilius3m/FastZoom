@@ -377,7 +377,7 @@
                 
                 <!-- Body -->
                 <div class="p-6">
-                    <form @submit.prevent="uploadFile($refs.fileInput)" class="space-y-4">
+                    <div class="space-y-4">
                         
                         <!-- File Input -->
                         <div>
@@ -464,7 +464,8 @@
                                 Annulla
                             </button>
                             
-                            <button type="submit"
+                            <button type="button"
+                                    @click="uploadFile($refs.fileInput)"
                                     :disabled="uploadingFile"
                                     class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-50 transition">
                                 <i :class="uploadingFile ? 'fas fa-spinner fa-spin' : 'fas fa-upload'" class="mr-2"></i>
@@ -472,7 +473,7 @@
                             </button>
                         </div>
                         
-                    </form>
+                    </div>
                 </div>
                 
             </div>
