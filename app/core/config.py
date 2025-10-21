@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     # Storage Fotografico
     max_photo_size_mb: int = 100
-    supported_formats: str = "jpg,jpeg,png,tiff,raw,dng"
+    supported_formats: str = "jpg,jpeg,png,tiff,raw,dng,pdf,doc,docx"
     thumbnail_sizes: str = "200,800"
     auto_metadata_extraction: bool = True
     photos_per_page: int = 24
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     @field_validator("supported_formats")
     @classmethod
     def validate_formats(cls, v: str) -> str:
-        allowed = {"jpg", "jpeg", "png", "tiff", "raw", "dng", "cr2", "nef"}
+        allowed = {"jpg", "jpeg", "png", "tiff", "raw", "dng", "cr2", "nef", "pdf", "doc", "docx"}
         formats = set(v.lower().split(","))
         if not formats.issubset(allowed):
             raise ValueError(f"Formati non supportati: {formats - allowed}")

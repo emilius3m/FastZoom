@@ -199,8 +199,8 @@ class StorageService:
             logger.warning("Empty file")
             return False
 
-        # Estensioni permesse
-        allowed_extensions = {f'.{fmt}' for fmt in settings.supported_formats_list}
+        # Estensioni permesse - Hardcodate temporaneamente per bypassare il cache
+        allowed_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.raw', '.dng', '.pdf', '.doc', '.docx'}
         file_extension = Path(file.filename).suffix.lower()
 
         if file_extension not in allowed_extensions:
@@ -220,13 +220,21 @@ class StorageService:
             '.cr2': 'image/x-canon-cr2',
             '.nef': 'image/x-nikon-nef',
             '.arw': 'image/x-sony-arw',
-            '.dng': 'image/x-adobe-dng'
+            '.dng': 'image/x-adobe-dng',
+            '.pdf': 'application/pdf',
+            '.doc': 'application/msword',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         }
 
         expected_mime = mime_mapping.get(file_extension)
         if expected_mime and hasattr(file, 'content_type') and file.content_type and file.content_type != expected_mime:
-            logger.warning(f"MIME type mismatch: expected {expected_mime}, got {file.content_type}")
-            return False
+            # Per i documenti, permetti una maggiore flessibilità nei MIME type
+            if file_extension in ['.doc', '.docx', '.pdf']:
+                logger.info(f"Document MIME type: {file.content_type} (expected: {expected_mime})")
+                # Accetta comunque i documenti anche se il MIME type non corrisponde esattamente
+            else:
+                logger.warning(f"MIME type mismatch: expected {expected_mime}, got {file.content_type}")
+                return False
 
         return True
 
