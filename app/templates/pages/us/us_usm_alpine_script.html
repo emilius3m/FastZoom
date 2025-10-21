@@ -1215,6 +1215,8 @@ function usUSMManagerApp() {
                 const entityId = this.editingUS?.id || this.editingUSM?.id;
                 const endpoint = this.editingUS ? 'us' : 'usm';
                 
+                console.log('🗑️ Tentativo eliminazione file:', file.id, 'tipo:', fileType, 'entity:', entityId);
+                
                 const response = await fetch(`/api/us-files/${endpoint}/${entityId}/files/${file.id}`, {
                     method: 'DELETE',
                     headers: {
@@ -1223,15 +1225,21 @@ function usUSMManagerApp() {
                 });
 
                 if (response.ok) {
-                    // Rimuovi dalla lista
-                    const listKey = fileType + 's';
-                    this.filesData[listKey] = this.filesData[listKey].filter(f => f.id !== file.id);
+                    console.log('✅ File eliminato con successo dal server');
+                    
+                    // Ricarica tutti i file dal server per assicurare coerenza
+                    if (this.editingUS) {
+                        await this.loadUSFiles(entityId);
+                    } else {
+                        await this.loadUSMFiles(entityId);
+                    }
+                    
                     this.showNotification('File eliminato', 'success');
                 } else {
                     throw new Error('Errore eliminazione');
                 }
             } catch (error) {
-                console.error('Errore eliminazione file:', error);
+                console.error('❌ Errore eliminazione file:', error);
                 this.showNotification('Errore eliminazione file', 'error');
             }
         },
