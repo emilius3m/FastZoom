@@ -107,7 +107,7 @@ class USFileService:
         try:
             # Upload file su MinIO (riutilizza sistema esistente)
             filename, filepath, actual_filesize = await self.storage.save_upload_file(
-                file, str(us.site_id), str(user_id), subfolder="us_files"
+                file, str(us.site_id), str(user_id)
             )
             
             # Prepara metadati file
@@ -150,6 +150,8 @@ class USFileService:
                 width=file_metadata.get('width'),
                 height=file_metadata.get('height'),
                 uploaded_by=user_id,
+                created_by=user_id,
+                updated_by=user_id,
                 is_published=file_metadata.get('is_published', False)
             )
             
@@ -177,12 +179,19 @@ class USFileService:
                 await self.db.commit()
                 
                 # Avvia processing deep zoom in background
-                asyncio.create_task(
-                    deep_zoom_minio_service.process_single_image(
-                        str(us_file.id), filepath, str(us.site_id)
+                try:
+                    # Carica il contenuto del file per il deep zoom
+                    from app.services.archaeological_minio_service import archaeological_minio_service
+                    file_content = await archaeological_minio_service.get_file(f"minio://{archaeological_minio_service.buckets['photos']}/{filepath}")
+                    
+                    # Schedula generazione tiles in background
+                    await deep_zoom_minio_service.schedule_tiles_generation_async(
+                        str(us_file.id), file_content, str(us.site_id)
                     )
-                )
-                logger.info(f"Deep zoom schedulato per US file {us_file.id}")
+                    logger.info(f"Deep zoom schedulato per US file {us_file.id}")
+                except Exception as e:
+                    logger.warning(f"Impossibile schedulare deep zoom per US file {us_file.id}: {e}")
+                    # Non bloccare l'upload se il deep zoom fallisce
             
             logger.info(f"File {file_type} caricato per US {us.us_code}: {filename}")
             return us_file
@@ -220,7 +229,7 @@ class USFileService:
         # Processo upload identico, ma con associazione USM
         try:
             filename, filepath, actual_filesize = await self.storage.save_upload_file(
-                file, str(usm.site_id), str(user_id), subfolder="us_files"
+                file, str(usm.site_id), str(user_id)
             )
             
             file_metadata = metadata or {}
@@ -259,7 +268,9 @@ class USFileService:
                 photographer=file_metadata.get('photographer', ''),
                 width=file_metadata.get('width'),
                 height=file_metadata.get('height'),
-                uploaded_by=user_id
+                uploaded_by=user_id,
+                created_by=user_id,
+                updated_by=user_id
             )
             
             self.db.add(us_file)

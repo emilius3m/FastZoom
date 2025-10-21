@@ -1012,19 +1012,82 @@ function usUSMManagerApp() {
 
         async loadUSFiles(usId) {
             try {
+                console.log('🔄 Caricamento file US:', usId);
                 const response = await fetch(`/api/us-files/us/${usId}/files`);
+                console.log('📡 Response status:', response.status);
+                
                 if (response.ok) {
                     const filesSummary = await response.json();
+                    console.log('📄 Files Summary ricevuto:', filesSummary);
+                    console.log('📊 Totale files trovati:', filesSummary.files?.length || 0);
+                    
+                    // 🔥 DEBUG: Mostra struttura di ogni file
+                    if (filesSummary.files && filesSummary.files.length > 0) {
+                        console.log('🔍 Struttura file:');
+                        filesSummary.files.forEach((file, index) => {
+                            console.log(`  File ${index}:`, {
+                                id: file.id,
+                                filename: file.filename,
+                                original_filename: file.original_filename,
+                                file_category: file.file_category,
+                                drawing_type: file.drawing_type,
+                                // Cerca tutti i campi che potrebbero contenere il tipo
+                                file_type: file.file_type,
+                                type: file.type,
+                                category: file.category,
+                                association_type: file.association_type
+                            });
+                        });
+                    }
+                    
+                    // Filtra per tipo con debug - prova diversi campi
+                    const piante = filesSummary.files.filter(f =>
+                        f.file_type === 'pianta' ||
+                        f.drawing_type === 'pianta' ||
+                        f.file_category === 'pianta'
+                    ) || [];
+                    const sezioni = filesSummary.files.filter(f =>
+                        f.file_type === 'sezione' ||
+                        f.drawing_type === 'sezione' ||
+                        f.file_category === 'sezione'
+                    ) || [];
+                    const prospetti = filesSummary.files.filter(f =>
+                        f.file_type === 'prospetto' ||
+                        f.drawing_type === 'prospetto' ||
+                        f.file_category === 'prospetto'
+                    ) || [];
+                    const fotografie = filesSummary.files.filter(f =>
+                        f.file_type === 'fotografia' ||
+                        f.drawing_type === 'fotografia' ||
+                        f.file_category === 'fotografia'
+                    ) || [];
+                    const documenti = filesSummary.files.filter(f =>
+                        f.file_type === 'documento' ||
+                        f.drawing_type === 'documento' ||
+                        f.file_category === 'documento'
+                    ) || [];
+                    
+                    console.log('🔍 File per tipo:');
+                    console.log('  - Piante:', piante.length, piante);
+                    console.log('  - Sezioni:', sezioni.length, sezioni);
+                    console.log('  - Prospetti:', prospetti.length, prospetti);
+                    console.log('  - Fotografie:', fotografie.length, fotografie);
+                    console.log('  - Documenti:', documenti.length, documenti);
+                    
                     this.filesData = {
-                        piante: filesSummary.files.filter(f => f.file_type === 'pianta') || [],
-                        sezioni: filesSummary.files.filter(f => f.file_type === 'sezione') || [],
-                        prospetti: filesSummary.files.filter(f => f.file_type === 'prospetto') || [],
-                        fotografie: filesSummary.files.filter(f => f.file_type === 'fotografia') || [],
-                        documenti: filesSummary.files.filter(f => f.file_type === 'documento') || []
+                        piante: piante,
+                        sezioni: sezioni,
+                        prospetti: prospetti,
+                        fotografie: fotografie,
+                        documenti: documenti
                     };
+                    
+                    console.log('💾 filesData aggiornato:', this.filesData);
+                } else {
+                    console.error('❌ Response non OK:', response.status, response.statusText);
                 }
             } catch (error) {
-                console.error('Errore caricamento file US:', error);
+                console.error('❌ Errore caricamento file US:', error);
             }
         },
 
@@ -1113,18 +1176,6 @@ function usUSMManagerApp() {
                 if (response.ok) {
                     const uploadedFile = await response.json();
                     console.log('File caricato con successo:', uploadedFile);
-                    
-                    // Aggiungi file alla lista corretta
-                    const fileListKey = this.currentFileType === 'pianta' ? 'piante' :
-                                       this.currentFileType === 'sezione' ? 'sezioni' :
-                                       this.currentFileType === 'prospetto' ? 'prospetti' :
-                                       this.currentFileType === 'fotografia' ? 'fotografie' :
-                                       'documenti';
-                    
-                    if (!this.filesData[fileListKey]) {
-                        this.filesData[fileListKey] = [];
-                    }
-                    this.filesData[fileListKey].push(uploadedFile.file || uploadedFile);
                     
                     this.showNotification('File caricato con successo', 'success');
                     this.showFileUploadModal = false;
