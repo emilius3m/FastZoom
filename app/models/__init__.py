@@ -90,6 +90,11 @@ from app.models.users import (
     PERMISSION_LEVEL_CHOICES  # RIPRISTINATO!
 )
 
+# ===== IMPORT USER PROFILES =====
+from app.models.user_profiles import (
+    UserProfile
+)
+
 # ===== IMPORT ACTIVITY TRACKING =====
 from app.models.user_activity import (
     UserActivity,  # RIPRISTINATO!
@@ -113,6 +118,11 @@ from app.models.sites import (
     SiteStatusEnum,
     SiteTypeEnum,
     ResearchStatusEnum
+)
+
+# ===== IMPORT PIANTE ARCHEOLOGICHE =====
+from app.models.archaeological_plans import (
+    ArchaeologicalPlan
 )
 
 # ===== IMPORT MAPPE GEOGRAFICHE =====
@@ -256,6 +266,9 @@ __all__ = [
     'SYSTEM_ROLES',
     'PERMISSION_LEVEL_CHOICES',  # RIPRISTINATO!
     
+    # User Profiles
+    'UserProfile',
+    
     # Activity Tracking
     'UserActivity',  # RIPRISTINATO!
     'ACTIVITY_TYPES',
@@ -274,6 +287,9 @@ __all__ = [
     'SiteStatusEnum',
     'SiteTypeEnum',
     'ResearchStatusEnum',
+    
+    # Archaeological Plans
+    'ArchaeologicalPlan',
     
     # Geographic Maps
     'GeographicMap',
