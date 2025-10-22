@@ -566,12 +566,12 @@ async def upload_photo(
                     photo_record = result.scalar_one_or_none()
                     
                     if photo_record:
-                        photo_record.deep_zoom_status = 'scheduled'
+                        photo_record.deepzoom_status = 'scheduled'
                         await db.commit()
                         
                         photos_needing_tiles.append({
                             'photo_id': photo_id,
-                            'file_path': photo_record.file_path,
+                            'file_path': photo_record.filepath,
                             'width': width,
                             'height': height,
                             'archaeological_metadata': {
