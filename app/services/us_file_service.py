@@ -395,6 +395,76 @@ class USFileService:
             logger.error(f"Errore eliminazione file US: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
     
+    async def delete_usm_file(self, usm_id: UUID, file_id: UUID, user_id: UUID) -> bool:
+        """Elimina file USM con cleanup storage"""
+        
+        try:
+            # Trova file
+            file_query = select(USFile).where(USFile.id == file_id)
+            file_result = await self.db.execute(file_query)
+            us_file = file_result.scalar_one_or_none()
+            
+            if not us_file:
+                raise HTTPException(status_code=404, detail="File non trovato")
+            
+            # Verifica associazione USM
+            assoc_query = select(usm_files_association).where(
+                and_(
+                    usm_files_association.c.usm_id == usm_id,
+                    usm_files_association.c.file_id == file_id
+                )
+            )
+            assoc_result = await self.db.execute(assoc_query)
+            if not assoc_result.first():
+                raise HTTPException(status_code=404, detail="Associazione file-USM non trovata")
+            
+            # Elimina file da storage
+            if us_file.filepath:
+                try:
+                    await self.storage.delete_file(us_file.filepath)
+                    logger.info(f"File eliminato da storage: {us_file.filepath}")
+                except Exception as e:
+                    logger.warning(f"Errore eliminazione storage: {e}")
+            
+            # Elimina thumbnail se esiste
+            if us_file.thumbnail_path:
+                try:
+                    await self.storage.delete_file(us_file.thumbnail_path)
+                except Exception as e:
+                    logger.warning(f"Errore eliminazione thumbnail: {e}")
+            
+            # Elimina associazione
+            delete_assoc = usm_files_association.delete().where(
+                and_(
+                    usm_files_association.c.usm_id == usm_id,
+                    usm_files_association.c.file_id == file_id
+                )
+            )
+            await self.db.execute(delete_assoc)
+            
+            # Elimina record file se non ha altre associazioni
+            us_assoc_query = select(us_files_association).where(
+                us_files_association.c.file_id == file_id
+            )
+            us_assoc = await self.db.execute(us_assoc_query)
+            
+            usm_assoc_query = select(usm_files_association).where(
+                usm_files_association.c.file_id == file_id
+            )
+            usm_assoc = await self.db.execute(usm_assoc_query)
+            
+            if not us_assoc.first() and not usm_assoc.first():
+                await self.db.delete(us_file)
+            
+            await self.db.commit()
+            logger.info(f"File USM {file_id} eliminato da USM {usm_id}")
+            return True
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Errore eliminazione file USM: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
+    
     async def update_file_metadata(
         self, 
         file_id: UUID, 
@@ -440,6 +510,44 @@ class USFileService:
                 and_(
                     us_files_association.c.us_id == us_id,
                     us_files_association.c.file_id == file_obj.id
+                )
+            )
+            type_result = await self.db.execute(file_type_query)
+            file_type = type_result.scalar_one_or_none()
+            
+            if file_type not in files_by_type:
+                files_by_type[file_type] = []
+            files_by_type[file_type].append(file_obj.to_dict())
+        
+        return {
+            'piante': files_by_type.get('pianta', []),
+            'sezioni': files_by_type.get('sezione', []),
+            'prospetti': files_by_type.get('prospetto', []),
+            'fotografie': files_by_type.get('fotografia', []),
+            'documenti': files_by_type.get('documento', []),
+            'counts': {
+                'piante': len(files_by_type.get('pianta', [])),
+                'sezioni': len(files_by_type.get('sezione', [])),
+                'prospetti': len(files_by_type.get('prospetto', [])),
+                'fotografie': len(files_by_type.get('fotografia', [])),
+                'documenti': len(files_by_type.get('documento', [])),
+                'total': len(files)
+            }
+        }
+    
+    async def get_files_summary_for_usm(self, usm_id: UUID) -> Dict[str, Any]:
+        """Riassunto file per USM con conteggi per tipo"""
+        
+        files = await self.get_usm_files(usm_id)
+        
+        # Raggruppa per tipo
+        files_by_type = {}
+        for file_obj in files:
+            # Trova tipo dal join association
+            file_type_query = select(usm_files_association.c.file_type).where(
+                and_(
+                    usm_files_association.c.usm_id == usm_id,
+                    usm_files_association.c.file_id == file_obj.id
                 )
             )
             type_result = await self.db.execute(file_type_query)

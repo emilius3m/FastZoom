@@ -232,6 +232,27 @@ async def get_us_files_summary(
         logger.error(f"Errore summary file US {us_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Errore summary: {str(e)}")
 
+@router.get("/usm/{usm_id}/files/summary")
+async def get_usm_files_summary(
+    usm_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Riassunto file USM raggruppati per tipo"""
+    
+    try:
+        us_file_service = USFileService(db)
+        summary = await us_file_service.get_files_summary_for_usm(usm_id)
+        
+        return {
+            'usm_id': str(usm_id),
+            'summary': summary
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore summary file USM {usm_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore summary: {str(e)}")
+
 # ===== SERVE FILE CONTENT =====
 
 @router.get("/{file_id}/view")
@@ -346,6 +367,35 @@ async def delete_us_file(
         raise
     except Exception as e:
         logger.error(f"Errore eliminazione file {file_id} da US {us_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
+
+@router.delete("/usm/{usm_id}/files/{file_id}")
+async def delete_usm_file(
+    usm_id: UUID,
+    file_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Elimina file da USM"""
+    
+    try:
+        us_file_service = USFileService(db)
+        success = await us_file_service.delete_usm_file(
+            usm_id=usm_id,
+            file_id=file_id,
+            user_id=current_user_id
+        )
+        
+        if success:
+            return {'message': 'File eliminato con successo'}
+        else:
+            raise HTTPException(status_code=500, detail="Eliminazione fallita")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore eliminazione file {file_id} da USM {usm_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
 
 # ===== UTILITY ENDPOINTS =====
