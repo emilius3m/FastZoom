@@ -159,6 +159,7 @@ class Photo(Base, SiteMixin, UserMixin):
     filename = Column(String(255), nullable=False, index=True)
     original_filename = Column(String(255), nullable=False)
     filepath = Column(String(500), nullable=False)
+    thumbnail_path = Column(String(500), nullable=True)  # Path to thumbnail in MinIO
     file_size = Column(BigInteger, nullable=True)      # bytes
     mime_type = Column(String(100), nullable=True)     # MIME type for compatibility
     
