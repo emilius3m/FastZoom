@@ -549,16 +549,16 @@ class PhotoMetadataService:
         photo_data = {
             "filename": filename,
             "original_filename": original_filename,
-            "file_path": file_path,
+            "filepath": file_path,  # Fixed: use 'filepath' instead of 'file_path'
             "file_size": file_size,
             "mime_type": self._guess_mime_type(filename),
             "site_id": site_id,
             "uploaded_by": uploaded_by,
+            "created_by": uploaded_by,
 
             # Metadati tecnici
             "width": metadata.get('width'),
             "height": metadata.get('height'),
-            "dpi": metadata.get('dpi'),
             "color_profile": metadata.get('color_profile'),
 
             # Metadati EXIF
@@ -580,13 +580,21 @@ class PhotoMetadataService:
             "description": archaeological_metadata.get('description'),
             "keywords": archaeological_metadata.get('keywords'),
 
-            # EXIF completo
-            "exif_data": json.dumps(metadata.get('exif_data', {})) if metadata.get('exif_data') else None,
+            # 🔧 FIX: Exif completo removed - exif_data field doesn't exist in Photo model
+            # The exif_data is stored internally but not passed to the Photo model
 
             # Stato iniziale
             "is_published": False,
             "is_validated": False
         }
+
+        # 🔧 FIX: Remove problematic fields that don't exist in Photo model
+        # This prevents "invalid keyword argument" errors
+        problematic_fields = ['dpi', 'exif_data']  # Fields that might be in metadata but not in Photo model
+        for field in problematic_fields:
+            if field in metadata:
+                logger.debug(f"Excluding '{field}' field from Photo model (not supported)")
+                # Field is already excluded since we don't add it to photo_data
 
         # Rimuovi campi None per evitare errori
         photo_data = {k: v for k, v in photo_data.items() if v is not None}
@@ -603,6 +611,28 @@ class PhotoMetadataService:
         try:
             return enum_class(value)
         except ValueError:
+            # Special handling for Italian values
+            if enum_class.__name__ == 'ConservationStatus' and isinstance(value, str):
+                italian_to_english = {
+                    'buono': 'good',
+                    'eccellente': 'excellent',
+                    'discreto': 'fair',
+                    'cattivo': 'poor',
+                    'pessimo': 'very_poor',
+                    'frammentario': 'fragmentary',
+                    'restaurato': 'restored',
+                    'ricostruito': 'reconstructed',
+                    'perduto': 'lost',
+                    'mancante': 'missing',
+                    'danneggiato': 'damaged',
+                    'incompleto': 'incomplete'
+                }
+                if value.lower() in italian_to_english:
+                    try:
+                        return enum_class(italian_to_english[value.lower()])
+                    except ValueError:
+                        pass
+            
             logger.warning(f"Invalid value for {enum_class.__name__}: {value}")
             return None
 

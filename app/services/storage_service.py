@@ -17,9 +17,22 @@ class StorageService:
     """Servizio per gestione storage MinIO"""
 
     def __init__(self):
-        self.bucket_name = settings.minio_bucket
-        self.base_url = f"{settings.minio_url}/{self.bucket_name}"
-        logger.info(f"MinIO Storage service initialized: {self.base_url}")
+        # Don't store settings as instance variables to ensure dynamic profile changes
+        logger.info("MinIO Storage service initialized (profile-based)")
+    
+    @property
+    def bucket_name(self) -> str:
+        """Get the current bucket name based on active profile"""
+        from app.core.config import get_settings
+        config_settings = get_settings()
+        return config_settings.active_minio_bucket
+    
+    @property
+    def base_url(self) -> str:
+        """Get the current base URL based on active profile"""
+        from app.core.config import get_settings
+        config_settings = get_settings()
+        return f"{config_settings.active_minio_url}/{self.bucket_name}"
 
     async def ensure_bucket_exists(self):
         """Assicura che il bucket esista"""

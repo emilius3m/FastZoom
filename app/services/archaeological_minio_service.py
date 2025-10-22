@@ -23,15 +23,26 @@ class ArchaeologicalMinIOService:
     """Servizio MinIO ottimizzato per dati archeologici con supporto avanzato"""
 
     def _create_minio_client(self) -> Minio:
-        """Crea e configura il client MinIO con supporto fallback"""
-        # Supporto sia settings che environment variables per flessibilità
-        minio_url = settings.minio_url.replace("http://", "").replace("https://", "")
-        access_key = settings.minio_access_key
-        secret_key = settings.minio_secret_key
-        secure = settings.minio_secure
+        """Crea e configura il client MinIO con supporto profile-based configuration"""
+        from app.core.config import get_settings
+        
+        # Get settings with profile support
+        config_settings = get_settings()
+        
+        # Use profile-based configuration
+        minio_url = config_settings.active_minio_url.replace("http://", "").replace("https://", "")
+        access_key = config_settings.active_minio_access_key
+        secret_key = config_settings.active_minio_secret_key
+        secure = config_settings.active_minio_secure
+        
+        logger.info(f"Creating MinIO client with profile '{config_settings.minio_config_profile}'")
+        logger.info(f"MinIO endpoint: {minio_url}")
+        logger.info(f"MinIO bucket: {config_settings.active_minio_bucket}")
+        logger.info(f"MinIO secure: {secure}")
 
         # Fallback a environment variables se settings non disponibili
         if not all([minio_url, access_key, secret_key]):
+            logger.warning("Profile-based configuration incomplete, falling back to environment variables")
             minio_url = os.getenv("MINIO_ENDPOINT", "localhost:9000")
             access_key = os.getenv("MINIO_ACCESS_KEY", "")
             secret_key = os.getenv("MINIO_SECRET_KEY", "")

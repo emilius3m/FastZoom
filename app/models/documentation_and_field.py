@@ -160,12 +160,14 @@ class Photo(Base, SiteMixin, UserMixin):
     original_filename = Column(String(255), nullable=False)
     filepath = Column(String(500), nullable=False)
     file_size = Column(BigInteger, nullable=True)      # bytes
+    mime_type = Column(String(100), nullable=True)     # MIME type for compatibility
     
     # ===== METADATI IMMAGINE =====
     width = Column(Integer, nullable=True)             # pixel
     height = Column(Integer, nullable=True)            # pixel
     format = Column(String(10), nullable=True)         # JPEG, PNG, TIFF
     color_space = Column(String(20), nullable=True)    # RGB, CMYK
+    color_profile = Column(String(50), nullable=True)  # Color profile information
     
     # ===== METADATI FOTOGRAFICI CON ENUM RIPRISTINATO =====
     title = Column(String(200), nullable=True)
@@ -337,6 +339,139 @@ class Photo(Base, SiteMixin, UserMixin):
     def is_type(self, photo_type: PhotoType) -> bool:
         """Controlla se è di un tipo specifico"""
         return self.photo_type == photo_type.value
+    
+    def get_keywords_list(self) -> List[str]:
+        """
+        Convert keywords field to a list of strings.
+        Handles both comma-separated strings and JSON arrays.
+        """
+        if not self.keywords:
+            return []
+        
+        # Try to parse as JSON first (for backward compatibility)
+        try:
+            import json
+            parsed = json.loads(self.keywords)
+            if isinstance(parsed, list):
+                return [str(item) for item in parsed if item]
+        except (json.JSONDecodeError, TypeError):
+            pass
+        
+        # Fall back to comma-separated string
+        if isinstance(self.keywords, str):
+            return [kw.strip() for kw in self.keywords.split(',') if kw.strip()]
+        
+        return []
+    
+    def to_dict(self) -> dict:
+        """Conversione a dizionario per API e template rendering"""
+        return {
+            # ID e relazioni
+            "id": str(self.id),
+            "site_id": str(self.site_id),
+            "uploaded_by": str(self.uploaded_by),
+            
+            # Info file
+            "filename": self.filename,
+            "original_filename": self.original_filename,
+            "filepath": self.filepath,
+            "file_size": self.file_size,
+            "mime_type": self.mime_type,
+            
+            # Metadati immagine
+            "width": self.width,
+            "height": self.height,
+            "format": self.format,
+            "color_space": self.color_space,
+            "color_profile": self.color_profile,
+            
+            # Metadati fotografici
+            "title": self.title,
+            "description": self.description,
+            "keywords": self.keywords,
+            "photo_type": self.photo_type,
+            "photo_type_display": self.photo_type_display,
+            
+            # Dati EXIF
+            "camera_make": self.camera_make,
+            "camera_model": self.camera_model,
+            "lens_info": self.lens_info,
+            "iso": self.iso,
+            "aperture": self.aperture,
+            "shutter_speed": self.shutter_speed,
+            "focal_length": self.focal_length,
+            
+            # Localizzazione foto
+            "us_reference": self.us_reference,
+            "usm_reference": self.usm_reference,
+            "tomba_reference": self.tomba_reference,
+            "reperto_reference": self.reperto_reference,
+            "gps_lat": self.gps_lat,
+            "gps_lng": self.gps_lng,
+            "gps_altitude": self.gps_altitude,
+            "has_coordinates": self.has_coordinates,
+            
+            # Metadati archeologici
+            "inventory_number": self.inventory_number,
+            "catalog_number": self.catalog_number,
+            "excavation_area": self.excavation_area,
+            "stratigraphic_unit": self.stratigraphic_unit,
+            "grid_square": self.grid_square,
+            "depth_level": self.depth_level,
+            "find_date": self.find_date.isoformat() if self.find_date else None,
+            "finder": self.finder,
+            "excavation_campaign": self.excavation_campaign,
+            "material": self.material,
+            "material_details": self.material_details,
+            "object_type": self.object_type,
+            "object_function": self.object_function,
+            "length_cm": self.length_cm,
+            "width_cm": self.width_cm,
+            "height_cm": self.height_cm,
+            "diameter_cm": self.diameter_cm,
+            "weight_grams": self.weight_grams,
+            "chronology_period": self.chronology_period,
+            "chronology_culture": self.chronology_culture,
+            "dating_from": self.dating_from,
+            "dating_to": self.dating_to,
+            "dating_notes": self.dating_notes,
+            "conservation_status": self.conservation_status,
+            "conservation_notes": self.conservation_notes,
+            "restoration_history": self.restoration_history,
+            "bibliography": self.bibliography,
+            "comparative_references": self.comparative_references,
+            "external_links": self.external_links,
+            "copyright_holder": self.copyright_holder,
+            "license_type": self.license_type,
+            "usage_rights": self.usage_rights,
+            "is_published": self.is_published,
+            "is_validated": self.is_validated,
+            "validation_notes": self.validation_notes,
+            
+            # Deep zoom
+            "has_deep_zoom": self.has_deep_zoom,
+            "deepzoom_status": self.deepzoom_status,
+            "deepzoom_processed_at": self.deepzoom_processed_at.isoformat() if self.deepzoom_processed_at else None,
+            "tile_count": self.tile_count,
+            "max_zoom_level": self.max_zoom_level,
+            "is_deepzoom_ready": self.is_deepzoom_ready,
+            
+            # Gestione
+            "photographer": self.photographer,
+            "photo_date": self.photo_date.isoformat() if self.photo_date else None,
+            "is_featured": self.is_featured,
+            "is_public": self.is_public,
+            "sort_order": self.sort_order,
+            
+            # Timestamp
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            
+            # URL properties (computed)
+            "thumbnail_url": f"/photos/{self.id}/thumbnail",
+            "full_url": f"/photos/{self.id}/full",
+            "download_url": f"/photos/{self.id}/download"
+        }
 
 
 # ===== RESTO DEL FILE INVARIATO =====
