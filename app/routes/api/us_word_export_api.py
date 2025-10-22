@@ -53,12 +53,52 @@ async def compile_us_template(us: UnitaStratigrafica, template_path: Path, db: A
     us_file_service = USFileService(db)
     files_summary = await us_file_service.get_files_summary_for_us(us.id)
     
-    # Crea elenco fotografie per placeholder
+    # Crea elenchi file per placeholder
+    piante_list = []
+    for file in files_summary['piante']:
+        file_name = file.get('title') or file.get('original_filename') or ''
+        if file_name:
+            piante_list.append(file_name)
+    
+    sezioni_list = []
+    for file in files_summary['sezioni']:
+        file_name = file.get('title') or file.get('original_filename') or ''
+        if file_name:
+            sezioni_list.append(file_name)
+    
+    prospetti_list = []
+    for file in files_summary['prospetti']:
+        file_name = file.get('title') or file.get('original_filename') or ''
+        if file_name:
+            prospetti_list.append(file_name)
+    
     fotografie_list = []
     for foto in files_summary['fotografie']:
         foto_name = foto.get('title') or foto.get('original_filename') or ''
         if foto_name:
             fotografie_list.append(foto_name)
+    
+    # Combina riferimenti testuali con nomi file
+    piante_text = us.piante_riferimenti or ''
+    if piante_list:
+        if piante_text:
+            piante_text += f" ({', '.join(piante_list)})"
+        else:
+            piante_text = ', '.join(piante_list)
+    
+    sezioni_text = us.sezioni_riferimenti or ''
+    if sezioni_list:
+        if sezioni_text:
+            sezioni_text += f" ({', '.join(sezioni_list)})"
+        else:
+            sezioni_text = ', '.join(sezioni_list)
+    
+    prospetti_text = us.prospetti_riferimenti or ''
+    if prospetti_list:
+        if prospetti_text:
+            prospetti_text += f" ({', '.join(prospetti_list)})"
+        else:
+            prospetti_text = ', '.join(prospetti_list)
     
     fotografie_text = ', '.join(fotografie_list) if fotografie_list else ''
 
@@ -710,5 +750,4 @@ async def get_supported_export_formats():
             'placeholders_count': 48
         }
     }
-
 
