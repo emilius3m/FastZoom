@@ -16,6 +16,7 @@ from app.database.session import get_async_session
 from app.core.security import get_current_user_id
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 from app.models import UserActivity
+from app.models import USFile
 from app.routes.api.dependencies import get_site_access
 from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service
@@ -90,10 +91,10 @@ async def get_site_photos_api(
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi insufficienti")
 
-    # Base query
+    # === Query 1: General photos from Photo table ===
     photos_query = select(Photo).where(Photo.site_id == site_id)
 
-    # Apply filters
+    # Apply filters to Photo query
     if search:
         search_term = f"%{search}%"
         photos_query = photos_query.where(
@@ -248,21 +249,164 @@ async def get_site_photos_api(
     else:
         photos_query = photos_query.order_by(Photo.created_at.desc())
 
-    # Execute query
+    # Execute Photo query
     photos = await db.execute(photos_query)
     photos = photos.scalars().all()
 
-    # Convert to dictionary format with proper URLs
+    # === Query 2: US photos from USFile table ===
+    us_files_query = select(USFile).where(
+        and_(
+            USFile.site_id == site_id,
+            USFile.file_category == 'fotografia'
+        )
+    )
+
+    # Apply search filter to USFile query
+    if search:
+        search_term = f"%{search}%"
+        us_files_query = us_files_query.where(
+            or_(
+                USFile.filename.ilike(search_term),
+                USFile.title.ilike(search_term),
+                USFile.description.ilike(search_term),
+                USFile.original_filename.ilike(search_term)
+            )
+        )
+
+    # Execute USFile query
+    us_files = await db.execute(us_files_query)
+    us_files = us_files.scalars().all()
+
+    # === Convert to unified dictionary format ===
     photos_data = []
+    
+    # Add general photos
     for photo in photos:
         photo_dict = photo.to_dict()
         photo_dict['file_url'] = f"/photos/{photo.id}/full"
         photo_dict['thumbnail_url'] = f"/photos/{photo.id}/thumbnail"
-        # Add tags property for compatibility
         photo_dict['tags'] = photo.get_keywords_list()
+        photo_dict['source_type'] = 'photo'  # Mark as general photo
         photos_data.append(photo_dict)
 
-    logger.info(f"Photos API: Returned {len(photos_data)} photos with filters: "
+    # Add US photos with unified format
+    for us_file in us_files:
+        us_photo_dict = {
+            # ID and relations
+            "id": str(us_file.id),
+            "site_id": str(us_file.site_id),
+            "uploaded_by": str(us_file.uploaded_by),
+            
+            # File info
+            "filename": us_file.filename,
+            "original_filename": us_file.original_filename,
+            "filepath": us_file.filepath,
+            "file_size": us_file.filesize,
+            "mime_type": us_file.mimetype,
+            
+            # Image metadata
+            "width": us_file.width,
+            "height": us_file.height,
+            "format": None,  # Not stored in USFile
+            "color_space": None,
+            "color_profile": None,
+            
+            # Photo metadata
+            "title": us_file.title,
+            "description": us_file.description,
+            "keywords": None,
+            "photo_type": "us_fotografia",  # Special type for US photos
+            "photo_type_display": "US Fotografia",
+            
+            # Camera/EXIF data
+            "camera_make": None,
+            "camera_model": us_file.camera_info,
+            "lens_info": None,
+            "iso": None,
+            "aperture": None,
+            "shutter_speed": None,
+            "focal_length": None,
+            
+            # Localization
+            "us_reference": None,
+            "usm_reference": None,
+            "tomba_reference": None,
+            "reperto_reference": None,
+            "gps_lat": None,
+            "gps_lng": None,
+            "gps_altitude": None,
+            "has_coordinates": False,
+            
+            # Archaeological metadata (limited for US files)
+            "inventory_number": None,
+            "catalog_number": None,
+            "excavation_area": None,
+            "stratigraphic_unit": None,
+            "grid_square": None,
+            "depth_level": None,
+            "find_date": us_file.photo_date.isoformat() if us_file.photo_date else None,
+            "finder": None,
+            "excavation_campaign": None,
+            "material": None,
+            "material_details": None,
+            "object_type": None,
+            "object_function": None,
+            "length_cm": None,
+            "width_cm": None,
+            "height_cm": None,
+            "diameter_cm": None,
+            "weight_grams": None,
+            "chronology_period": None,
+            "chronology_culture": None,
+            "dating_from": None,
+            "dating_to": None,
+            "dating_notes": None,
+            "conservation_status": None,
+            "conservation_notes": None,
+            "restoration_history": None,
+            "bibliography": None,
+            "comparative_references": None,
+            "external_links": None,
+            "copyright_holder": None,
+            "license_type": None,
+            "usage_rights": None,
+            "is_published": us_file.is_published,
+            "is_validated": us_file.is_validated,
+            "validation_notes": None,
+            
+            # Deep zoom
+            "has_deep_zoom": us_file.is_deepzoom_enabled,
+            "deepzoom_status": us_file.deepzoom_status,
+            "deepzoom_processed_at": None,
+            "tile_count": 0,
+            "max_zoom_level": 0,
+            "is_deepzoom_ready": us_file.deepzoom_status == 'completed',
+            
+            # Management
+            "photographer": us_file.photographer,
+            "photo_date": us_file.photo_date.isoformat() if us_file.photo_date else None,
+            "is_featured": False,
+            "is_public": True,
+            "sort_order": 0,
+            
+            # Timestamps
+            "created_at": us_file.created_at.isoformat() if us_file.created_at else None,
+            "updated_at": us_file.updated_at.isoformat() if us_file.updated_at else None,
+            
+            # URLs (using USFile serving endpoints)
+            "thumbnail_url": f"/api/us-files/{us_file.id}/thumbnail",
+            "full_url": f"/api/us-files/{us_file.id}/view",
+            "file_url": f"/api/us-files/{us_file.id}/view",
+            "download_url": f"/api/us-files/{us_file.id}/download",
+            
+            # Source marker
+            "source_type": "us_file",  # Mark as US photo
+            "upload_date": us_file.created_at.isoformat() if us_file.created_at else None,
+            "tags": []  # US files don't have tags
+        }
+        photos_data.append(us_photo_dict)
+
+    logger.info(f"Photos API: Returned {len(photos)} general photos + {len(us_files)} US photos = {len(photos_data)} total with filters: "
                 f"search={search}, photo_type={photo_type}, material={material}, "
                 f"conservation_status={conservation_status}, sort_by={sort_by}")
 
@@ -906,7 +1050,7 @@ async def delete_photo(
 
     try:
         photo_filename = photo.filename
-        photo_path = photo.file_path
+        photo_path = photo.filepath
         thumbnail_path = photo.thumbnail_path
 
         await db.delete(photo)
@@ -1030,7 +1174,7 @@ async def bulk_delete_photos(
         for photo in photos:
             try:
                 photo_filename = photo.filename
-                photo_path = photo.file_path
+                photo_path = photo.filepath
                 thumbnail_path = photo.thumbnail_path
 
                 if photo_path and '/' in photo_path:

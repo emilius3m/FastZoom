@@ -264,8 +264,48 @@ async def view_us_file(
     """Visualizza file US/USM (stream per immagini)"""
     
     try:
-        # Riutilizza il sistema di serving consolidato di FastZoom
-        return await photo_serving_service.serve_photo_full(file_id, db)
+        # Get USFile record from database
+        from sqlalchemy import select
+        from app.models.stratigraphy import USFile
+        
+        us_file_query = select(USFile).where(USFile.id == file_id)
+        us_file = await db.execute(us_file_query)
+        us_file = us_file.scalar_one_or_none()
+        
+        if not us_file:
+            raise HTTPException(status_code=404, detail="File US non trovato")
+        
+        # Verify user has access to the site
+        if not verify_site_access(us_file.site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Accesso negato al sito")
+        
+        # Serve the file using the appropriate method based on filepath
+        if us_file.filepath:
+            # Use the archaeological_minio_service directly for US files
+            from app.services.archaeological_minio_service import archaeological_minio_service
+            import io
+            
+            try:
+                # Get file data from MinIO
+                file_data = await archaeological_minio_service.get_file(us_file.filepath)
+                
+                if file_data and isinstance(file_data, bytes):
+                    return StreamingResponse(
+                        io.BytesIO(file_data),
+                        media_type=us_file.mimetype or "image/jpeg",
+                        headers={"Cache-Control": "public, max-age=3600"}
+                    )
+                else:
+                    raise HTTPException(status_code=404, detail="File data non valido")
+                    
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error serving US file from MinIO: {e}")
+                raise HTTPException(status_code=500, detail=f"Errore nel servire file: {str(e)}")
+        
+        # If no filepath, return 404
+        raise HTTPException(status_code=404, detail="File non disponibile")
         
     except HTTPException:
         raise
@@ -282,7 +322,72 @@ async def get_us_file_thumbnail(
     """Ottieni thumbnail file US/USM"""
     
     try:
-        return await photo_serving_service.serve_photo_thumbnail(file_id, db)
+        # Get USFile record from database
+        from sqlalchemy import select
+        from app.models.stratigraphy import USFile
+        
+        us_file_query = select(USFile).where(USFile.id == file_id)
+        us_file = await db.execute(us_file_query)
+        us_file = us_file.scalar_one_or_none()
+        
+        if not us_file:
+            raise HTTPException(status_code=404, detail="File US non trovato")
+        
+        # Verify user has access to the site
+        if not verify_site_access(us_file.site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Accesso negato al sito")
+        
+        # Check if thumbnail exists
+        if us_file.thumbnail_path:
+            # Use the archaeological_minio_service directly for US file thumbnails
+            from app.services.archaeological_minio_service import archaeological_minio_service
+            import io
+            
+            try:
+                # Get thumbnail data from MinIO
+                thumbnail_data = await archaeological_minio_service.get_file(us_file.thumbnail_path)
+                
+                if thumbnail_data and isinstance(thumbnail_data, bytes):
+                    return StreamingResponse(
+                        io.BytesIO(thumbnail_data),
+                        media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=3600"}
+                    )
+                else:
+                    raise HTTPException(status_code=404, detail="Thumbnail data non valido")
+                    
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error serving US file thumbnail from MinIO: {e}")
+                raise HTTPException(status_code=500, detail=f"Errore nel servire thumbnail: {str(e)}")
+        
+        # If no thumbnail, try to serve the original file (smaller)
+        if us_file.filepath:
+            from app.services.archaeological_minio_service import archaeological_minio_service
+            import io
+            
+            try:
+                # Get file data from MinIO
+                file_data = await archaeological_minio_service.get_file(us_file.filepath)
+                
+                if file_data and isinstance(file_data, bytes):
+                    return StreamingResponse(
+                        io.BytesIO(file_data),
+                        media_type=us_file.mimetype or "image/jpeg",
+                        headers={"Cache-Control": "public, max-age=3600"}
+                    )
+                else:
+                    raise HTTPException(status_code=404, detail="File data non valido")
+                    
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error serving US file from MinIO: {e}")
+                raise HTTPException(status_code=500, detail=f"Errore nel servire file: {str(e)}")
+        
+        # If no filepath, return 404
+        raise HTTPException(status_code=404, detail="File non disponibile")
         
     except HTTPException:
         raise
@@ -299,7 +404,53 @@ async def download_us_file(
     """Download file US/USM"""
     
     try:
-        return await photo_serving_service.serve_photo_download(file_id, db)
+        # Get USFile record from database
+        from sqlalchemy import select
+        from app.models.stratigraphy import USFile
+        
+        us_file_query = select(USFile).where(USFile.id == file_id)
+        us_file = await db.execute(us_file_query)
+        us_file = us_file.scalar_one_or_none()
+        
+        if not us_file:
+            raise HTTPException(status_code=404, detail="File US non trovato")
+        
+        # Verify user has access to the site
+        if not verify_site_access(us_file.site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Accesso negato al sito")
+        
+        # Serve the file for download using the archaeological_minio_service
+        if us_file.filepath:
+            from app.services.archaeological_minio_service import archaeological_minio_service
+            import io
+            
+            try:
+                # Get file data from MinIO
+                file_data = await archaeological_minio_service.get_file(us_file.filepath)
+                
+                if file_data and isinstance(file_data, bytes):
+                    # Determine filename for download
+                    filename = us_file.original_filename or us_file.filename or f"us_file_{file_id}"
+                    
+                    return StreamingResponse(
+                        io.BytesIO(file_data),
+                        media_type=us_file.mimetype or "application/octet-stream",
+                        headers={
+                            "Content-Disposition": f"attachment; filename=\"{filename}\"",
+                            "Cache-Control": "private, max-age=0"
+                        }
+                    )
+                else:
+                    raise HTTPException(status_code=404, detail="File data non valido")
+                    
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error downloading US file from MinIO: {e}")
+                raise HTTPException(status_code=500, detail=f"Errore nel download: {str(e)}")
+        
+        # If no filepath, return 404
+        raise HTTPException(status_code=404, detail="File non disponibile per il download")
         
     except HTTPException:
         raise
