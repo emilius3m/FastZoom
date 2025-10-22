@@ -251,7 +251,6 @@ class ArchaeologicalMinIOService:
             'find_date': 'x-amz-meta-find-date',
             'conservation_status': 'x-amz-meta-conservation-status',
             'catalog_number': 'x-amz-meta-catalog-number',
-            'old_inventory_number': 'x-amz-meta-old-inventory-number',
             'grid_square': 'x-amz-meta-grid-square',
             'depth_level': 'x-amz-meta-depth-level',
             'finder': 'x-amz-meta-finder',

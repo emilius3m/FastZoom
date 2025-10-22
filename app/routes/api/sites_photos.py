@@ -282,7 +282,6 @@ async def upload_photo(
         
         # Archaeological metadata
         inventory_number: Optional[str] = Form(None),
-        old_inventory_number: Optional[str] = Form(None),
         catalog_number: Optional[str] = Form(None),
         excavation_area: Optional[str] = Form(None),
         stratigraphic_unit: Optional[str] = Form(None),
@@ -382,8 +381,6 @@ async def upload_photo(
                 # Archaeological context
                 if inventory_number:
                     archaeological_metadata_from_form['inventory_number'] = inventory_number
-                if old_inventory_number:
-                    archaeological_metadata_from_form['old_inventory_number'] = old_inventory_number
                 if catalog_number:
                     archaeological_metadata_from_form['catalog_number'] = catalog_number
                 if excavation_area:
@@ -747,7 +744,7 @@ async def update_photo(
     # Campi aggiornabili
     updatable_fields = {
         'title', 'description', 'keywords', 'photo_type', 'photographer',
-        'inventory_number', 'old_inventory_number', 'catalog_number',
+        'inventory_number', 'catalog_number',
         'excavation_area', 'stratigraphic_unit', 'grid_square', 'depth_level',
         'find_date', 'finder', 'excavation_campaign',
         'material', 'material_details', 'object_type', 'object_function',
@@ -1151,7 +1148,7 @@ async def bulk_update_photos(
 
         updatable_fields = {
             'title', 'description', 'keywords', 'photo_type', 'photographer',
-            'inventory_number', 'old_inventory_number', 'catalog_number',
+            'inventory_number', 'catalog_number',
             'excavation_area', 'stratigraphic_unit', 'grid_square', 'depth_level',
             'find_date', 'finder', 'excavation_campaign',
             'material', 'material_details', 'object_type', 'object_function',

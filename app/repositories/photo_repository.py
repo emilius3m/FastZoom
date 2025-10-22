@@ -227,7 +227,7 @@ class PhotoRepository(BaseRepository[Photo]):
         # Campi aggiornabili
         updatable_fields = {
             'title', 'description', 'keywords', 'photo_type', 'photographer',
-            'inventory_number', 'old_inventory_number', 'catalog_number',
+            'inventory_number', 'catalog_number',
             'excavation_area', 'stratigraphic_unit', 'grid_square', 'depth_level',
             'find_date', 'finder', 'excavation_campaign',
             'material', 'material_details', 'object_type', 'object_function',

@@ -200,7 +200,6 @@ class Photo(Base, SiteMixin, UserMixin):
     
     # Identification fields
     inventory_number = Column(String(100), nullable=True, index=True)
-    old_inventory_number = Column(String(100), nullable=True)
     catalog_number = Column(String(100), nullable=True)
     
     # Excavation context fields
