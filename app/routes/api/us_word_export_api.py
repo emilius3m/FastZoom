@@ -17,10 +17,13 @@ import io
 import zipfile
 from datetime import datetime
 from docx import Document
+from docx.shared import Inches, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from app.database.db import get_async_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
-from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria, USFile
+from app.services.us_file_service import USFileService
 
 router = APIRouter(prefix="/api/us-export", tags=["us-export"])
 
@@ -37,13 +40,27 @@ async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) ->
     return any(s["id"] == str(site_id) for s in user_sites)
 
 
-def compile_us_template(us: UnitaStratigrafica, template_path: Path) -> bytes:
+async def compile_us_template(us: UnitaStratigrafica, template_path: Path, db: AsyncSession) -> bytes:
     """
     Compila template Word con dati US
     Sostituisce placeholder {{...}} con dati database
+    Include sezione con file allegati
     """
     # Carica template
     doc = Document(template_path)
+
+    # Carica file associati alla US per popolare placeholder fotografie
+    us_file_service = USFileService(db)
+    files_summary = await us_file_service.get_files_summary_for_us(us.id)
+    
+    # Crea elenco fotografie per placeholder
+    fotografie_list = []
+    for foto in files_summary['fotografie']:
+        foto_name = foto.get('title') or foto.get('original_filename') or ''
+        if foto_name:
+            fotografie_list.append(foto_name)
+    
+    fotografie_text = ', '.join(fotografie_list) if fotografie_list else ''
 
     # Prepara dati per sostituzione
     replacements = {
@@ -61,7 +78,7 @@ def compile_us_template(us: UnitaStratigrafica, template_path: Path) -> bytes:
         '{{piante}}': us.piante_riferimenti or '',
         '{{prospetti}}': us.prospetti_riferimenti or '',
         '{{sezioni}}': us.sezioni_riferimenti or '',
-        '{{fotografie}}': '',  # Non esiste nel modello
+        '{{fotografie}}': fotografie_text,
         '{{rif_tabelle}}': '',  # Non esiste nel modello
         '{{definizione}}': us.definizione or '',
         '{{criteri_distinzione}}': us.criteri_distinzione or '',
@@ -114,6 +131,9 @@ def compile_us_template(us: UnitaStratigrafica, template_path: Path) -> bytes:
 
     # Sostituisci in tutto il documento
     _replace_placeholders_in_doc(doc, replacements)
+
+    # Aggiungi sezione file allegati
+    await _add_files_section(doc, us, db)
 
     # Salva in BytesIO
     buffer = io.BytesIO()
@@ -332,7 +352,7 @@ async def export_us_word(
             raise HTTPException(status_code=403, detail="Accesso negato al sito")
 
         # Compila template
-        doc_bytes = compile_us_template(us, US_TEMPLATE_PATH)
+        doc_bytes = await compile_us_template(us, US_TEMPLATE_PATH, db)
         filename = generate_us_filename(us)
 
         logger.info(f"✓ Export completato: {filename} ({len(doc_bytes)} bytes)")
@@ -390,7 +410,7 @@ async def export_multiple_us_word(
             for us in us_list:
                 try:
                     # Compila template
-                    doc_bytes = compile_us_template(us, US_TEMPLATE_PATH)
+                    doc_bytes = await compile_us_template(us, US_TEMPLATE_PATH, db)
                     filename = generate_us_filename(us)
 
                     # Aggiungi a ZIP
@@ -543,6 +563,125 @@ async def export_usm_word(
         raise HTTPException(status_code=500, detail=f"Errore generazione USM: {str(e)}")
 
 
+# ===== FUNZIONE PER AGGIUNGERE SEZIONE FILE =====
+
+async def _add_files_section(doc: Document, us: UnitaStratigrafica, db: AsyncSession):
+    """
+    Aggiunge sezione con elenco file allegati al documento Word
+    """
+    try:
+        # Carica file associati alla US
+        us_file_service = USFileService(db)
+        files_summary = await us_file_service.get_files_summary_for_us(us.id)
+        
+        # Verifica se ci sono file
+        total_files = files_summary['counts']['total']
+        if total_files == 0:
+            return  # Nessun file da aggiungere
+        
+        # Aggiungi paragrafo di separazione
+        doc.add_paragraph().add_run().add_break()
+        
+        # Titolo sezione
+        title_para = doc.add_paragraph()
+        title_run = title_para.add_run("DOCUMENTAZIONE E FILE ALLEGATI")
+        title_run.bold = True
+        title_run.font.size = Pt(12)
+        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Riepilogo file
+        summary_para = doc.add_paragraph()
+        summary_run = summary_para.add_run(f"Totale documenti allegati: {total_files}")
+        summary_run.bold = True
+        summary_run.font.size = Pt(10)
+        
+        # Tabella file per tipo
+        file_types = [
+            ('piante', 'Piante', files_summary['piante']),
+            ('sezioni', 'Sezioni', files_summary['sezioni']),
+            ('prospetti', 'Prospetti', files_summary['prospetti']),
+            ('fotografie', 'Fotografie', files_summary['fotografie']),
+            ('documenti', 'Documenti', files_summary['documenti'])
+        ]
+        
+        for file_type_key, file_type_label, files in file_types:
+            if len(files) == 0:
+                continue  # Salta tipi senza file
+            
+            # Titolo tipo file
+            type_para = doc.add_paragraph()
+            type_run = type_para.add_run(f"{file_type_label} ({len(files)} file):")
+            type_run.bold = True
+            type_run.font.size = Pt(10)
+            
+            # Tabella elenco file
+            table = doc.add_table(rows=len(files) + 1, cols=4)
+            table.style = 'Table Grid'
+            
+            # Header
+            header_cells = table.rows[0].cells
+            header_cells[0].text = "Nome File"
+            header_cells[1].text = "Descrizione"
+            header_cells[2].text = "Data"
+            header_cells[3].text = "Dimensione"
+            
+            # Rendi header grassetto
+            for cell in header_cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.bold = True
+            
+            # Dati file
+            for i, file in enumerate(files):
+                row_cells = table.rows[i + 1].cells
+                
+                # Nome file
+                file_name = file.get('title') or file.get('original_filename') or 'N/D'
+                row_cells[0].text = file_name
+                
+                # Descrizione
+                description = file.get('description') or '-'
+                row_cells[1].text = description
+                
+                # Data
+                created_at = file.get('created_at')
+                if created_at:
+                    # Formatta data
+                    if isinstance(created_at, str):
+                        try:
+                            from datetime import datetime
+                            created_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                            date_str = created_date.strftime('%d/%m/%Y')
+                        except:
+                            date_str = created_at[:10]  # Formato ISO YYYY-MM-DD
+                    else:
+                        date_str = created_at.strftime('%d/%m/%Y')
+                else:
+                    date_str = '-'
+                row_cells[2].text = date_str
+                
+                # Dimensione
+                filesize = file.get('filesize')
+                if filesize:
+                    # Formatta dimensione in KB/MB
+                    if filesize < 1024:
+                        size_str = f"{filesize} B"
+                    elif filesize < 1024 * 1024:
+                        size_str = f"{filesize / 1024:.1f} KB"
+                    else:
+                        size_str = f"{filesize / (1024 * 1024):.1f} MB"
+                else:
+                    size_str = '-'
+                row_cells[3].text = size_str
+            
+            # Spazio dopo ogni tipo
+            doc.add_paragraph()
+            
+    except Exception as e:
+        logger.error(f"Errore nell'aggiungere sezione file: {str(e)}")
+        # Non bloccare la generazione del documento se c'è un errore nei file
+
+
 # ===== UTILITY ENDPOINTS =====
 
 @router.get("/supported-formats")
@@ -571,3 +710,5 @@ async def get_supported_export_formats():
             'placeholders_count': 48
         }
     }
+
+
