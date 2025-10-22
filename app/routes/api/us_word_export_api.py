@@ -115,9 +115,9 @@ async def compile_us_template(us: UnitaStratigrafica, template_path: Path, db: A
         '{{saggio}}': us.saggio or '',
         '{{posizione}}': us.posizione or '',
         '{{settori}}': us.settori or '',
-        '{{piante}}': us.piante_riferimenti or '',
-        '{{prospetti}}': us.prospetti_riferimenti or '',
-        '{{sezioni}}': us.sezioni_riferimenti or '',
+        '{{piante}}': piante_text,
+        '{{prospetti}}': prospetti_text,
+        '{{sezioni}}': sezioni_text,
         '{{fotografie}}': fotografie_text,
         '{{rif_tabelle}}': '',  # Non esiste nel modello
         '{{definizione}}': us.definizione or '',
