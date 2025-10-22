@@ -196,7 +196,66 @@ class Photo(Base, SiteMixin, UserMixin):
     gps_lng = Column(String(50), nullable=True)
     gps_altitude = Column(String(50), nullable=True)
     
+    # ===== METADATI ARCHEOLOGICI COMPLETI =====
+    
+    # Identification fields
+    inventory_number = Column(String(100), nullable=True, index=True)
+    old_inventory_number = Column(String(100), nullable=True)
+    catalog_number = Column(String(100), nullable=True)
+    
+    # Excavation context fields
+    excavation_area = Column(String(100), nullable=True)
+    stratigraphic_unit = Column(String(100), nullable=True)
+    grid_square = Column(String(50), nullable=True)
+    depth_level = Column(Float, nullable=True)
+    
+    # Find information fields
+    find_date = Column(DateTime, nullable=True)
+    finder = Column(String(200), nullable=True)
+    excavation_campaign = Column(String(100), nullable=True)
+    
+    # Object characteristics fields
+    material = Column(String(50), nullable=True)  # This should use the MaterialType enum
+    material_details = Column(String(255), nullable=True)
+    object_type = Column(String(100), nullable=True)
+    object_function = Column(String(200), nullable=True)
+    
+    # Dimension fields
+    length_cm = Column(Float, nullable=True)
+    width_cm = Column(Float, nullable=True)
+    height_cm = Column(Float, nullable=True)
+    diameter_cm = Column(Float, nullable=True)
+    weight_grams = Column(Float, nullable=True)
+    
+    # Chronology fields
+    chronology_period = Column(String(100), nullable=True)
+    chronology_culture = Column(String(100), nullable=True)
+    dating_from = Column(String(50), nullable=True)
+    dating_to = Column(String(50), nullable=True)
+    dating_notes = Column(Text, nullable=True)
+    
+    # Conservation fields
+    conservation_status = Column(String(50), nullable=True)  # This should use the ConservationStatus enum
+    conservation_notes = Column(Text, nullable=True)
+    restoration_history = Column(Text, nullable=True)
+    
+    # Reference fields
+    bibliography = Column(Text, nullable=True)
+    comparative_references = Column(Text, nullable=True)
+    external_links = Column(Text, nullable=True)
+    
+    # Rights fields
+    copyright_holder = Column(String(255), nullable=True)
+    license_type = Column(String(100), nullable=True)
+    usage_rights = Column(Text, nullable=True)
+    
+    # Validation fields
+    is_published = Column(Boolean, default=False)
+    is_validated = Column(Boolean, default=False)
+    validation_notes = Column(Text, nullable=True)
+    
     # ===== DEEP ZOOM INTEGRATION =====
+    has_deep_zoom = Column(Boolean, default=False)
     deepzoom_status = Column(String(20), default='none')  # none, scheduled, processing, completed, error
     deepzoom_processed_at = Column(DateTime, nullable=True)
     tile_count = Column(Integer, default=0)
@@ -225,6 +284,12 @@ class Photo(Base, SiteMixin, UserMixin):
         Index('idx_photo_deepzoom', 'deepzoom_status'),
         Index('idx_photo_references', 'us_reference', 'usm_reference', 'tomba_reference'),
         Index('idx_photo_type', 'photo_type'),  # Nuovo indice per PhotoType
+        # New indexes for archaeological metadata
+        Index('idx_photo_inventory', 'inventory_number'),
+        Index('idx_photo_material', 'material'),
+        Index('idx_photo_area', 'excavation_area'),
+        Index('idx_photo_unit', 'stratigraphic_unit'),
+        Index('idx_photo_period', 'chronology_period'),
     )
 
     def __repr__(self):
