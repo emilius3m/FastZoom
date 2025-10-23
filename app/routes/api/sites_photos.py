@@ -254,6 +254,8 @@ async def get_site_photos_api(
     photos = photos.scalars().all()
 
     # === Query 2: US photos from USFile table ===
+    from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria, us_files_association, usm_files_association
+    
     us_files_query = select(USFile).where(
         and_(
             USFile.site_id == site_id,
@@ -276,6 +278,61 @@ async def get_site_photos_api(
     # Execute USFile query
     us_files = await db.execute(us_files_query)
     us_files = us_files.scalars().all()
+    
+    # Build a map of file_id -> US/USM codes for efficient lookup
+    us_file_ids = [uf.id for uf in us_files]
+    us_associations_map = {}  # {file_id: [list of US codes]}
+    
+    if us_file_ids:
+        # Query US associations
+        us_assoc_query = select(us_files_association.c.file_id, us_files_association.c.us_id).where(
+            us_files_association.c.file_id.in_(us_file_ids)
+        )
+        us_assoc_results = await db.execute(us_assoc_query)
+        us_assoc_list = us_assoc_results.fetchall()
+        
+        # Get US codes for these associations
+        if us_assoc_list:
+            us_ids = [row.us_id for row in us_assoc_list]
+            us_query = select(UnitaStratigrafica.id, UnitaStratigrafica.us_code).where(
+                UnitaStratigrafica.id.in_(us_ids)
+            )
+            us_results = await db.execute(us_query)
+            us_codes_map = {row.id: row.us_code for row in us_results.fetchall()}
+            
+            # Build associations map
+            for assoc in us_assoc_list:
+                file_id = assoc.file_id
+                us_code = us_codes_map.get(assoc.us_id)
+                if us_code:
+                    if file_id not in us_associations_map:
+                        us_associations_map[file_id] = []
+                    us_associations_map[file_id].append(f"US {us_code}")
+        
+        # Query USM associations
+        usm_assoc_query = select(usm_files_association.c.file_id, usm_files_association.c.usm_id).where(
+            usm_files_association.c.file_id.in_(us_file_ids)
+        )
+        usm_assoc_results = await db.execute(usm_assoc_query)
+        usm_assoc_list = usm_assoc_results.fetchall()
+        
+        # Get USM codes for these associations
+        if usm_assoc_list:
+            usm_ids = [row.usm_id for row in usm_assoc_list]
+            usm_query = select(UnitaStratigraficaMuraria.id, UnitaStratigraficaMuraria.usm_code).where(
+                UnitaStratigraficaMuraria.id.in_(usm_ids)
+            )
+            usm_results = await db.execute(usm_query)
+            usm_codes_map = {row.id: row.usm_code for row in usm_results.fetchall()}
+            
+            # Build associations map
+            for assoc in usm_assoc_list:
+                file_id = assoc.file_id
+                usm_code = usm_codes_map.get(assoc.usm_id)
+                if usm_code:
+                    if file_id not in us_associations_map:
+                        us_associations_map[file_id] = []
+                    us_associations_map[file_id].append(f"USM {usm_code}")
 
     # === Convert to unified dictionary format ===
     photos_data = []
