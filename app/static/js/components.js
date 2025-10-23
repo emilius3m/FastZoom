@@ -241,34 +241,66 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebarToggle = document.querySelector('[data-drawer-toggle="logo-sidebar"]');
     const sidebar = document.getElementById('logo-sidebar');
     
-    if (sidebarToggle && sidebar) {
-        console.log('Sidebar elements found, adding manual toggle');
-        
-        sidebarToggle.addEventListener('click', function() {
-            console.log('Sidebar toggle clicked');
-            sidebar.classList.toggle('-translate-x-full');
-        });
-        
-        // Close sidebar when clicking outside (on mobile)
-        document.addEventListener('click', function(event) {
-            const isClickInsideSidebar = sidebar.contains(event.target);
-            const isToggleButton = sidebarToggle.contains(event.target);
+    // Check if sidebar exists before trying to manipulate it
+    if (sidebar) {
+        if (sidebarToggle) {
+            console.log('Sidebar elements found, adding manual toggle');
             
-            if (!isClickInsideSidebar && !isToggleButton && !sidebar.classList.contains('-translate-x-full')) {
-                sidebar.classList.add('-translate-x-full');
+            sidebarToggle.addEventListener('click', function() {
+                console.log('Sidebar toggle clicked');
+                sidebar.classList.toggle('-translate-x-full');
+            });
+            
+            // Close sidebar when clicking outside (on mobile)
+            document.addEventListener('click', function(event) {
+                const isClickInsideSidebar = sidebar.contains(event.target);
+                const isToggleButton = sidebarToggle.contains(event.target);
+                
+                if (!isClickInsideSidebar && !isToggleButton && !sidebar.classList.contains('-translate-x-full')) {
+                    sidebar.classList.add('-translate-x-full');
+                }
+            });
+            
+            // Handle ESC key to close sidebar
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && !sidebar.classList.contains('-translate-x-full')) {
+                    sidebar.classList.add('-translate-x-full');
+                }
+            });
+        } else {
+            console.log('Sidebar exists but toggle button not found - sidebar may be hidden when no site is selected');
+        }
+    } else {
+        console.log('Sidebar element not found - this is expected when no site is selected');
+    }
+});
+
+// Enhanced dropdown indicators for sidebar menu
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle dropdown toggle rotation
+    const dropdownToggles = document.querySelectorAll('[data-collapse-toggle]');
+    
+    dropdownToggles.forEach(toggle => {
+        // Add click event listener to rotate chevron
+        toggle.addEventListener('click', function() {
+            const chevron = this.querySelector('svg');
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            
+            // Toggle rotation
+            if (chevron) {
+                if (isExpanded) {
+                    chevron.style.transform = 'rotate(0deg)';
+                } else {
+                    chevron.style.transform = 'rotate(90deg)';
+                }
             }
         });
         
-        // Handle ESC key to close sidebar
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape' && !sidebar.classList.contains('-translate-x-full')) {
-                sidebar.classList.add('-translate-x-full');
-            }
-        });
-    } else {
-        console.error('Sidebar toggle elements not found:', {
-            sidebarToggle: !!sidebarToggle,
-            sidebar: !!sidebar
-        });
-    }
+        // Set initial state based on current aria-expanded attribute
+        const chevron = toggle.querySelector('svg');
+        const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+        if (chevron && isExpanded) {
+            chevron.style.transform = 'rotate(90deg)';
+        }
+    });
 });

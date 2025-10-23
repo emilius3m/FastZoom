@@ -58,7 +58,7 @@
     {% endif %}
 
     <!-- Main content area with responsive layout support -->
-    <main class="pt-20 {% if layout_type == 'sidebar' %}flex-1 p-4 pt-20 sm:ml-64{% else %}min-h-screen{% endif %}">
+    <main class="pt-20 {% if layout_type == 'sidebar' %}flex-1 p-4 pt-20{% if site and site.id %} sm:ml-64{% endif %}{% else %}min-h-screen{% endif %}">
       {% block content %}{% endblock %}
     </main>
 

@@ -342,3 +342,25 @@
 .dark #theme-toggle-dark-icon {
   display: block;
 }
+/* Enhanced dropdown indicators for sidebar menu */
+[data-collapse-toggle] svg {
+    transition: transform 0.2s ease-in-out;
+}
+
+[data-collapse-toggle][aria-expanded="true"] svg {
+    transform: rotate(90deg);
+}
+
+/* Additional styling for menu item badges */
+.sidebar-menu-badge {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
