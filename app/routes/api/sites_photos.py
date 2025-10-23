@@ -348,6 +348,10 @@ async def get_site_photos_api(
 
     # Add US photos with unified format
     for us_file in us_files:
+        # Get US/USM codes this file belongs to
+        us_codes = us_associations_map.get(us_file.id, [])
+        us_codes_string = ", ".join(us_codes) if us_codes else None
+        
         us_photo_dict = {
             # ID and relations
             "id": str(us_file.id),
@@ -398,7 +402,7 @@ async def get_site_photos_api(
             "inventory_number": None,
             "catalog_number": None,
             "excavation_area": None,
-            "stratigraphic_unit": None,
+            "stratigraphic_unit": us_codes_string,  # Include US/USM codes here
             "grid_square": None,
             "depth_level": None,
             "find_date": us_file.photo_date.isoformat() if us_file.photo_date else None,
