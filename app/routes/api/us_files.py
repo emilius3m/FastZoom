@@ -286,8 +286,12 @@ async def view_us_file(
             import io
             
             try:
+                # Construct proper MinIO path with bucket prefix
+                # The filepath in DB is stored as "site_id/filename", we need to prefix with bucket
+                minio_path = f"minio://{archaeological_minio_service.buckets['photos']}/{us_file.filepath}"
+                
                 # Get file data from MinIO
-                file_data = await archaeological_minio_service.get_file(us_file.filepath)
+                file_data = await archaeological_minio_service.get_file(minio_path)
                 
                 if file_data and isinstance(file_data, bytes):
                     return StreamingResponse(
@@ -296,7 +300,11 @@ async def view_us_file(
                         headers={"Cache-Control": "public, max-age=3600"}
                     )
                 else:
-                    raise HTTPException(status_code=404, detail="File data non valido")
+                    logger.error(f"File found in DB but missing in MinIO: {us_file.filepath}")
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"File exists in database but is missing from storage. File may have been deleted or upload may have failed. Path: {us_file.filepath}"
+                    )
                     
             except HTTPException:
                 raise
@@ -344,8 +352,11 @@ async def get_us_file_thumbnail(
             import io
             
             try:
+                # Construct proper MinIO path with bucket prefix for thumbnail
+                minio_thumbnail_path = f"minio://{archaeological_minio_service.buckets['thumbnails']}/{us_file.thumbnail_path}"
+                
                 # Get thumbnail data from MinIO
-                thumbnail_data = await archaeological_minio_service.get_file(us_file.thumbnail_path)
+                thumbnail_data = await archaeological_minio_service.get_file(minio_thumbnail_path)
                 
                 if thumbnail_data and isinstance(thumbnail_data, bytes):
                     return StreamingResponse(
@@ -368,8 +379,11 @@ async def get_us_file_thumbnail(
             import io
             
             try:
+                # Construct proper MinIO path with bucket prefix (fallback to original if no thumbnail)
+                minio_path = f"minio://{archaeological_minio_service.buckets['photos']}/{us_file.filepath}"
+                
                 # Get file data from MinIO
-                file_data = await archaeological_minio_service.get_file(us_file.filepath)
+                file_data = await archaeological_minio_service.get_file(minio_path)
                 
                 if file_data and isinstance(file_data, bytes):
                     return StreamingResponse(
@@ -425,8 +439,11 @@ async def download_us_file(
             import io
             
             try:
+                # Construct proper MinIO path with bucket prefix for download
+                minio_path = f"minio://{archaeological_minio_service.buckets['photos']}/{us_file.filepath}"
+                
                 # Get file data from MinIO
-                file_data = await archaeological_minio_service.get_file(us_file.filepath)
+                file_data = await archaeological_minio_service.get_file(minio_path)
                 
                 if file_data and isinstance(file_data, bytes):
                     # Determine filename for download

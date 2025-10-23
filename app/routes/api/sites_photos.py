@@ -1033,11 +1033,24 @@ async def delete_photo(
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Elimina foto dal sito archeologico"""
+    """Elimina foto dal sito archeologico - PROTETTO contro eliminazione foto US"""
     site, permission = site_access
 
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+
+    # Check if this is a US photo (which should not be deleted from here)
+    us_file_query = select(USFile).where(
+        and_(USFile.id == photo_id, USFile.site_id == site_id)
+    )
+    us_file = await db.execute(us_file_query)
+    us_file = us_file.scalar_one_or_none()
+    
+    if us_file:
+        raise HTTPException(
+            status_code=403,
+            detail="Questa foto appartiene a una US/USM e può essere eliminata solo dalla pagina US"
+        )
 
     photo_query = select(Photo).where(
         and_(Photo.id == photo_id, Photo.site_id == site_id)
@@ -1131,7 +1144,7 @@ async def bulk_delete_photos(
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Elimina più foto in blocco"""
+    """Elimina più foto in blocco - PROTETTO contro eliminazione foto US"""
     site, permission = site_access
 
     if not permission.can_write():
@@ -1157,6 +1170,20 @@ async def bulk_delete_photos(
 
         if not photo_ids:
             raise HTTPException(status_code=400, detail="Nessun ID foto valido")
+
+        # Check for US photos in the selection
+        us_files_query = select(USFile).where(
+            and_(USFile.site_id == site_id, USFile.id.in_(photo_ids))
+        )
+        us_files = await db.execute(us_files_query)
+        us_files_list = us_files.scalars().all()
+        
+        if us_files_list:
+            us_count = len(us_files_list)
+            raise HTTPException(
+                status_code=403,
+                detail=f"{us_count} foto appartengono a US/USM e non possono essere eliminate da qui"
+            )
 
         logger.info(f"Bulk delete: processing {len(photo_ids)} photos for site {site_id}")
 
