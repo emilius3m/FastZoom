@@ -1,0 +1,130 @@
+<!-- Unified Activity Feed Component -->
+<div x-data="activityFeed()" class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+            <i class="fas fa-stream mr-2 text-blue-600"></i>
+            Attività Recenti
+        </h2>
+        
+        <div class="flex items-center space-x-2">
+            <!-- Filter Dropdown -->
+            <div class="relative" x-data="{ open: false }">
+                <button @click="open = !open" 
+                        class="flex items-center px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <i class="fas fa-filter mr-2 text-gray-500"></i>
+                    <span x-text="activityFilter === 'all' ? 'Tutto' : activityFilter"></span>
+                    <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
+                </button>
+                
+                <div x-show="open" 
+                     @click.away="open = false"
+                     x-transition:enter="transition ease-out duration-100"
+                     x-transition:enter-start="transform opacity-0 scale-95"
+                     x-transition:enter-end="transform opacity-100 scale-100"
+                     x-transition:leave="transition ease-in duration-75"
+                     x-transition:leave-start="transform opacity-100 scale-100"
+                     x-transition:leave-end="transform opacity-0 scale-95"
+                     class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 z-10">
+                    
+                    <template x-for="filter in activityFilters" :key="filter.value">
+                        <button @click="setActivityFilter(filter.value); open = false"
+                                class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between"
+                                :class="activityFilter === filter.value ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300'">
+                            <span x-text="filter.label"></span>
+                            <i x-show="activityFilter === filter.value" class="fas fa-check text-blue-600"></i>
+                        </button>
+                    </template>
+                </div>
+            </div>
+            
+            <!-- Refresh Button -->
+            <button @click="refreshActivities()" 
+                    class="p-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                    :disabled="loading.activities">
+                <i class="fas fa-sync-alt" :class="loading.activities ? 'animate-spin' : ''"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div x-show="loading.activities" class="flex justify-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+
+    <!-- Activity List -->
+    <div x-show="!loading.activities" class="space-y-3">
+        <template x-for="activity in filteredActivities" :key="activity.id">
+            <div class="activity-item bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                <div class="flex items-start space-x-3">
+                    <!-- Activity Icon -->
+                    <div class="flex-shrink-0 mt-1">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                             :class="getActivityIconClass(activity.type)">
+                            <i class="fas" :class="getActivityIcon(activity.type)"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Activity Content -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm font-medium text-gray-900 dark:text-white" x-text="activity.title"></p>
+                            <span class="text-xs text-gray-500 dark:text-gray-400" x-text="formatTime(activity.timestamp)"></span>
+                        </div>
+                        
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1" x-text="activity.description"></p>
+                        
+                        <!-- Activity Metadata -->
+                        <div class="flex items-center space-x-4 mt-2">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                  :class="getActivityTypeClass(activity.type)"
+                                  x-text="getActivityTypeLabel(activity.type)"></span>
+                            
+                            <span x-show="activity.site" class="text-xs text-gray-500 dark:text-gray-400">
+                                <i class="fas fa-map-marker-alt mr-1"></i>
+                                <span x-text="activity.site"></span>
+                            </span>
+                            
+                            <span x-show="activity.user" class="text-xs text-gray-500 dark:text-gray-400">
+                                <i class="fas fa-user mr-1"></i>
+                                <span x-text="activity.user"></span>
+                            </span>
+                        </div>
+                        
+                        <!-- Action Buttons (if applicable) -->
+                        <div x-show="activity.actions && activity.actions.length > 0" class="flex space-x-2 mt-3">
+                            <template x-for="action in activity.actions" :key="action.label">
+                                <button @click="executeActivityAction(action, activity)"
+                                        class="text-xs px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition">
+                                    <i class="fas mr-1" :class="action.icon"></i>
+                                    <span x-text="action.label"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="!loading.activities && filteredActivities.length === 0" class="text-center py-12">
+        <i class="fas fa-stream text-4xl text-gray-300 mb-4"></i>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Nessuna attività recente</h3>
+        <p class="text-gray-500 dark:text-gray-400">
+            <span x-show="activityFilter === 'all'">Non ci sono attività recenti da mostrare.</span>
+            <span x-show="activityFilter !== 'all'">Non ci sono attività di tipo "<span x-text="activityFilter"></span>" da mostrare.</span>
+        </p>
+    </div>
+
+    <!-- Load More Button -->
+    <div x-show="!loading.activities && activities.length > 0 && hasMoreActivities" class="text-center mt-4">
+        <button @click="loadMoreActivities()" 
+                :disabled="loading.moreActivities"
+                class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50">
+            <span x-show="!loading.moreActivities">Carica altre attività</span>
+            <span x-show="loading.moreActivities">
+                <i class="fas fa-spinner fa-spin mr-2"></i>Caricamento...
+            </span>
+        </button>
+    </div>
+</div>

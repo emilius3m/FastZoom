@@ -44,6 +44,8 @@ from app.routes.api.iccd_records import iccd_router
 from app.routes.api.geographic_maps import geographic_maps_router
 # 📡 NUOVO IMPORT - Router WebSocket Notifications
 from app.routes.api.notifications_ws import notifications_router
+# 🆕 NUOVO IMPORT - Router Unified Dashboard API
+from app.routes.api.unified_dashboard import router as unified_dashboard_router
 
 from app.routes import photo_metadata
 from app.routes.api.us import us_router
@@ -294,6 +296,14 @@ app.include_router(
     tags=["websocket-notifications"]
 )
 
+# 🆕 INCLUSIONE ROUTER UNIFIED DASHBOARD API - API per dashboard unificata
+app.include_router(
+    unified_dashboard_router,
+    tags=["unified-dashboard"],
+    prefix="/api/unified",
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
+
 # 🏺 INCLUSIONE ROUTER US/USM - API per Unità Stratigrafiche
 app.include_router(
     us_router,
@@ -450,19 +460,23 @@ async def logout_endpoint(request: Request, response: Response, db: AsyncSession
             detail="Logout failed"
         )
 
-# DASHBOARD CORRETTO CON TEMPLATE CONTEXT COMPLETO
+# DASHBOARD UNIFICATO - Supporto per vecchia e nuova interfaccia
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_view(
     request: Request,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_session),
+    view: str = None  # Parameter to switch between 'unified' and 'classic' view
 ):
     """
-    Dashboard principale con template HTML completo
+    Dashboard unificata con supporto per template classico e nuovo
     Include tutte le variabili necessarie per auth_navigation.html
     """
     try:
+        # Determine which template to use
+        use_unified = view == 'unified' or view is None  # Default to unified
+        
         # Ottieni informazioni utente dal database
         user = await db.execute(select(User).where(User.id == current_user_id))
         user = user.scalar_one_or_none()
@@ -476,6 +490,7 @@ async def dashboard_view(
         # Calcola conteggio foto reali per tutti i siti accessibili
         photos_count = 0
         users_count = 0
+        documents_count = 0
         if user_sites:
             site_ids = [UUID(site['id']) for site in user_sites]
             
@@ -498,11 +513,11 @@ async def dashboard_view(
         # CSRF opzionale
         csrf_token, signed_token, csrf_instance = _csrf_tokens_optional()
 
-        # Context completo per il template
-        context = {
+        # Prepare base context
+        base_context = {
             "request": request,
-            "title": "Dashboard | Sistema Archeologico",
-            "message": "Benvenuto nel Sistema Archeologico",
+            "title": "Dashboard Unificata | Sistema Archeologico" if use_unified else "Dashboard | Sistema Archeologico",
+            "message": "Benvenuto nel Sistema Archeologico Unificato" if use_unified else "Benvenuto nel Sistema Archeologico",
             
             # VARIABILI RICHIESTE DA auth_navigation.html
             "sites": user_sites,
@@ -515,11 +530,32 @@ async def dashboard_view(
             "current_page": "dashboard",
             "current_user": user,
             "user_profile": user_profile,
-            "csrf_token": csrf_token
+            "csrf_token": csrf_token,
+            "use_unified": use_unified
         }
 
-        logger.info(f"Dashboard rendered: user_id={current_user_id}, sites={len(user_sites)}")
-        response = templates.TemplateResponse("pages/dashboard.html", context)
+        # Add unified-specific context
+        if use_unified:
+            unified_context = {
+                **base_context,
+                # Additional data for unified dashboard
+                "unified_stats": {
+                    "sites_count": len(user_sites),
+                    "photos_count": photos_count,
+                    "documents_count": documents_count,
+                    "users_count": users_count
+                }
+            }
+            
+            template_name = "pages/unified/dashboard.html"
+            context = unified_context
+        else:
+            # Classic dashboard context
+            template_name = "pages/dashboard.html"
+            context = base_context
+
+        logger.info(f"Dashboard rendered: user_id={current_user_id}, sites={len(user_sites)}, unified={use_unified}")
+        response = templates.TemplateResponse(template_name, context)
         
         # Se CSRF disponibile, imposta cookie firmato
         if csrf_instance and signed_token:
@@ -533,6 +569,32 @@ async def dashboard_view(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore interno dashboard"
         )
+
+# DASHBOARD CLASSICA (per retrocompatibilità)
+@app.get("/dashboard/classic", response_class=HTMLResponse)
+async def dashboard_classic_view(
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Dashboard classica per retrocompatibilità
+    """
+    return await dashboard_view(request, current_user_id, user_sites, db, view='classic')
+
+# DASHBOARD UNIFICATA (esplicita)
+@app.get("/dashboard/unified", response_class=HTMLResponse)
+async def dashboard_unified_view(
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Dashboard unificata esplicita
+    """
+    return await dashboard_view(request, current_user_id, user_sites, db, view='unified')
 
 
 # Test cookie e autenticazione

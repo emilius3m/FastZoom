@@ -1,0 +1,435 @@
+{% extends "base/site_base.html" %}
+
+{% block title %}Dashboard Unificato | Sistema Archeologico{% endblock %}
+
+{% block additional_head %}
+<style>
+/* Unified Dashboard Styles */
+.unified-tab-content {
+    display: none;
+}
+
+.unified-tab-content.active {
+    display: block;
+}
+
+.tab-button {
+    position: relative;
+    overflow: hidden;
+}
+
+.tab-button::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+    transition: width 0.3s ease;
+}
+
+.tab-button.active::after {
+    width: 100%;
+}
+
+.stat-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+.stat-card.overview {
+    border-left-color: #3b82f6;
+}
+
+.stat-card.giornale {
+    border-left-color: #f97316;
+}
+
+.stat-card.analytics {
+    border-left-color: #10b981;
+}
+
+.activity-item {
+    transition: all 0.2s ease;
+}
+
+.activity-item:hover {
+    background-color: rgba(59, 130, 246, 0.05);
+    border-left: 3px solid #3b82f6;
+    padding-left: 12px;
+}
+
+.context-action-btn {
+    transition: all 0.2s ease;
+}
+
+.context-action-btn:hover {
+    transform: scale(1.05);
+}
+
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .tab-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .stat-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="unifiedDashboard()" x-init="init()" class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    
+    <!-- Header Section -->
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6 mb-6 shadow-lg">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div class="flex items-center mb-4 md:mb-0">
+                <i class="fas fa-layer-group text-3xl mr-4"></i>
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold">Dashboard Unificato</h1>
+                    <p class="text-blue-100 mt-1">Gestione completa siti e giornale di cantiere</p>
+                </div>
+            </div>
+            
+            <!-- Context Actions -->
+            <div class="flex flex-wrap gap-2">
+                <template x-if="activeTab === 'overview'">
+                    <div class="flex gap-2">
+                        <button @click="refreshOverviewData()" 
+                                class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
+                            <i class="fas fa-sync-alt mr-2"></i>Aggiorna
+                        </button>
+                    </div>
+                </template>
+                
+                <template x-if="activeTab === 'giornale'">
+                    <div class="flex gap-2">
+                        <a href="/giornale-cantiere/operatori" 
+                           class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
+                            <i class="fas fa-users mr-2"></i>Operatori
+                        </a>
+                        <a href="/giornale-cantiere/reports"
+                           class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
+                            <i class="fas fa-chart-bar mr-2"></i>Report
+                        </a>
+                    </div>
+                </template>
+                
+                <template x-if="activeTab === 'analytics'">
+                    <div class="flex gap-2">
+                        <button @click="exportAnalytics()" 
+                                class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
+                            <i class="fas fa-download mr-2"></i>Esporta
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    {% include "pages/unified/partials/tab_navigation.html" %}
+
+    <!-- Tab Content Container -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+        
+        <!-- Overview Tab Content -->
+        <div id="overview-content" class="unified-tab-content active p-6">
+            <div class="space-y-6">
+                <!-- Statistics Cards -->
+                {% include "pages/unified/components/statistics_cards.html" %}
+                
+                <!-- Sites Overview -->
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                        <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>
+                        I Tuoi Siti Archeologici
+                    </h2>
+                    
+                    <div x-show="loading.sites" class="space-y-4">
+                        <div class="loading-skeleton h-20 rounded-lg"></div>
+                        <div class="loading-skeleton h-20 rounded-lg"></div>
+                    </div>
+                    
+                    <div x-show="!loading.sites" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <template x-for="site in sitesData" :key="site.id">
+                            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600 hover:shadow-md transition-all cursor-pointer"
+                                 @click="navigateToSite(site.id)">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex-1">
+                                        <h3 class="font-semibold text-gray-900 dark:text-white" x-text="site.name"></h3>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1" x-text="site.location"></p>
+                                        <span class="inline-block px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded-full dark:bg-blue-900 dark:text-blue-300 mt-2"
+                                              x-text="site.permission_level"></span>
+                                    </div>
+                                    <i class="fas fa-map-marker-alt text-gray-400"></i>
+                                </div>
+                                <div class="flex items-center text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                                    <i class="fas fa-external-link-alt mr-1"></i>
+                                    <span>Accedi al sito</span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <div x-show="!loading.sites && sitesData.length === 0" class="text-center py-12">
+                        <i class="fas fa-map-marker-alt text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-500 dark:text-gray-400">Nessun sito archeologico disponibile</p>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                {% include "pages/unified/components/activity_feed.html" %}
+            </div>
+        </div>
+
+        <!-- Giornale Tab Content -->
+        <div id="giornale-content" class="unified-tab-content p-6">
+            <div class="space-y-6">
+                <!-- Giornale Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="stat-card giornale bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Siti Attivi</p>
+                                <p class="text-3xl font-bold text-orange-600" x-text="giornaleStats.siti_totali || 0"></p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Con giornali</p>
+                            </div>
+                            <div class="p-3 bg-orange-100 rounded-full">
+                                <i class="fas fa-map-marked-alt text-orange-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card giornale bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Giornali Totali</p>
+                                <p class="text-3xl font-bold text-green-600" x-text="giornaleStats.giornali_totali || 0"></p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Inseriti</p>
+                            </div>
+                            <div class="p-3 bg-green-100 rounded-full">
+                                <i class="fas fa-book text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card giornale bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Validati</p>
+                                <p class="text-3xl font-bold text-blue-600" x-text="giornaleStats.giornali_validati || 0"></p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Approvati</p>
+                            </div>
+                            <div class="p-3 bg-blue-100 rounded-full">
+                                <i class="fas fa-check-circle text-blue-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card giornale bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">In Attesa</p>
+                                <p class="text-3xl font-bold text-yellow-600" x-text="giornaleStats.giornali_pendenti || 0"></p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Da validare</p>
+                            </div>
+                            <div class="p-3 bg-yellow-100 rounded-full">
+                                <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Site Selection for Giornale -->
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                        <i class="fas fa-map-marked-alt mr-2 text-orange-600"></i>
+                        Seleziona Sito per Giornale di Cantiere
+                    </h2>
+                    
+                    <div x-show="loading.giornaleSites" class="space-y-4">
+                        <div class="loading-skeleton h-32 rounded-lg"></div>
+                    </div>
+                    
+                    <div x-show="!loading.giornaleSites" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <template x-for="site in giornaleSites" :key="site.id">
+                            <div class="group relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-lg transition-all duration-200 cursor-pointer"
+                                 @click="navigateToGiornaleSite(site.id)">
+                                
+                                <div class="flex items-start justify-between mb-4">
+                                    <div class="flex-1">
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 transition" x-text="site.name"></h3>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1" x-text="site.code"></p>
+                                    </div>
+                                    <div class="p-2 bg-white dark:bg-gray-700 rounded-full shadow-sm">
+                                        <i class="fas fa-excavator text-orange-500"></i>
+                                    </div>
+                                </div>
+                                
+                                <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                    <div x-show="site.location" class="flex items-center">
+                                        <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
+                                        <span x-text="site.location"></span>
+                                    </div>
+                                    
+                                    <div x-show="site.description" class="flex items-start">
+                                        <i class="fas fa-info-circle mr-2 mt-0.5 text-gray-400"></i>
+                                        <span class="line-clamp-2" x-text="site.description ? (site.description.length > 100 ? site.description.substring(0, 100) + '...' : site.description) : ''"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                                    <div class="bg-white dark:bg-gray-700 p-3 rounded border">
+                                        <div class="text-gray-500">Giornali</div>
+                                        <div class="font-semibold text-gray-900 dark:text-white" x-text="giornaleSiteStats[site.id]?.total || 0"></div>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-700 p-3 rounded border">
+                                        <div class="text-gray-500">Validati</div>
+                                        <div class="font-semibold text-green-600" x-text="giornaleSiteStats[site.id]?.validated || 0"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">Click per aprire</span>
+                                    <div class="flex items-center text-orange-600 opacity-0 group-hover:opacity-100 transition">
+                                        <span class="text-sm font-medium mr-1">Apri Giornale</span>
+                                        <i class="fas fa-arrow-right"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <div x-show="!loading.giornaleSites && giornaleSites.length === 0" class="text-center py-12">
+                        <i class="fas fa-map-marked-alt text-6xl text-gray-300 mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Nessun sito disponibile</h3>
+                        <p class="text-gray-500 dark:text-gray-400 mb-4">Non hai accesso a nessun sito archeologico o non ci sono siti configurati.</p>
+                        <a href="/sites" class="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition">
+                            <i class="fas fa-plus mr-2"></i>Gestisci Siti
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab Content -->
+        <div id="analytics-content" class="unified-tab-content p-6">
+            <div class="space-y-6">
+                <!-- Analytics Overview -->
+                <div class="bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-lg p-6">
+                    <h2 class="text-2xl font-bold mb-2">
+                        <i class="fas fa-chart-line mr-2"></i>
+                        Analisi e Report
+                    </h2>
+                    <p class="text-green-100">Visualizzazione completa dei dati e statistiche del sistema</p>
+                </div>
+
+                <!-- Analytics Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="stat-card analytics bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Produttività</p>
+                                <p class="text-3xl font-bold text-green-600">+24%</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">vs mese scorso</p>
+                            </div>
+                            <div class="p-3 bg-green-100 rounded-full">
+                                <i class="fas fa-trending-up text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card analytics bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Documenti</p>
+                                <p class="text-3xl font-bold text-teal-600">1,847</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Totali</p>
+                            </div>
+                            <div class="p-3 bg-teal-100 rounded-full">
+                                <i class="fas fa-file-alt text-teal-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card analytics bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Attività</p>
+                                <p class="text-3xl font-bold text-blue-600">342</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Questa settimana</p>
+                            </div>
+                            <div class="p-3 bg-blue-100 rounded-full">
+                                <i class="fas fa-users text-blue-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics Content Placeholders -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-chart-bar mr-2 text-green-600"></i>
+                            Statistiche Siti
+                        </h3>
+                        <div class="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                            <div class="text-center">
+                                <i class="fas fa-chart-bar text-4xl mb-2"></i>
+                                <p>Grafici statistici in sviluppo</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-calendar-alt mr-2 text-blue-600"></i>
+                            Attività Recenti
+                        </h3>
+                        <div class="h-64 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                            <div class="text-center">
+                                <i class="fas fa-calendar-alt text-4xl mb-2"></i>
+                                <p>Timeline attività in sviluppo</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div x-show="loading.global" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p class="mt-4 text-gray-700 dark:text-gray-300">Caricamento dati...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Include Unified Dashboard JavaScript -->
+<script type="text/javascript" src="/static/js/unified_dashboard.js"></script>
+
+{% endblock %}

@@ -1,0 +1,54 @@
+<!-- Tab Navigation -->
+<div class="tab-container border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg">
+    <nav class="flex space-x-0" aria-label="Tabs">
+        <button @click="switchTab('overview')" 
+                :class="activeTab === 'overview' ? 'border-blue-500 text-blue-600 dark:text-blue-400 active' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
+                class="tab-button flex items-center px-6 py-3 border-b-2 font-medium text-sm transition-colors duration-200">
+            <i class="fas fa-th-large mr-2"></i>
+            Panoramica
+            <span x-show="activeTab === 'overview'" class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                Attiva
+            </span>
+        </button>
+        
+        <button @click="switchTab('giornale')" 
+                :class="activeTab === 'giornale' ? 'border-orange-500 text-orange-600 dark:text-orange-400 active' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
+                class="tab-button flex items-center px-6 py-3 border-b-2 font-medium text-sm transition-colors duration-200">
+            <i class="fas fa-hard-hat mr-2"></i>
+            Giornale di Cantiere
+            <span x-show="giornaleStats.giornali_pendenti > 0" class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                <span x-text="giornaleStats.giornali_pendenti"></span> in attesa
+            </span>
+        </button>
+        
+        <button @click="switchTab('analytics')" 
+                :class="activeTab === 'analytics' ? 'border-green-500 text-green-600 dark:text-green-400 active' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
+                class="tab-button flex items-center px-6 py-3 border-b-2 font-medium text-sm transition-colors duration-200">
+            <i class="fas fa-chart-line mr-2"></i>
+            Analisi
+            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                Nuovo
+            </span>
+        </button>
+    </nav>
+</div>
+
+<!-- Tab Indicators (Mobile) -->
+<div class="lg:hidden bg-gray-50 dark:bg-gray-700 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+    <div class="flex items-center justify-between">
+        <span class="text-sm text-gray-600 dark:text-gray-400">
+            Vista corrente: 
+            <span class="font-medium" x-text="getTabLabel(activeTab)"></span>
+        </span>
+        <div class="flex space-x-2">
+            <button @click="switchTab(getPreviousTab())" 
+                    class="p-1 rounded text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button @click="switchTab(getNextTab())" 
+                    class="p-1 rounded text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
