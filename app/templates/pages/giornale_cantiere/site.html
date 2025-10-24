@@ -47,7 +47,7 @@
                         class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition">
                     <i class="fas fa-filter mr-2"></i>Filtri
                 </button>
-                <button @click="exportGiornali()"
+                <button @click="exportGiornali($event)"
                         class="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-4 py-2 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-800/40 transition">
                     <i class="fas fa-download mr-2"></i>Export
                 </button>
@@ -246,10 +246,15 @@
                         
                         <!-- Azioni -->
                         <div class="flex flex-col gap-2 ml-4">
-                            <a :href="`/giornale-cantiere/site/{{ site.id if site else 'unknown' }}/entry/${giornale.id}`" 
+                            <a :href="`/giornale-cantiere/site/{{ site.id if site else 'unknown' }}/entry/${giornale.id}`"
                                class="inline-flex items-center px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition">
                                 <i class="fas fa-eye mr-1"></i>Visualizza
                             </a>
+                            
+                            <button @click="exportSingleGiornale(giornale, $event)"
+                                    class="inline-flex items-center px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition">
+                                <i class="fas fa-file-word mr-1"></i>Export
+                            </button>
                             
                             <button @click="editGiornale(giornale)"
                                     x-show="giornale.stato !== 'validato'"
@@ -649,8 +654,180 @@ function giornaleSitoAppCompleto() {
             alert(`Duplicazione giornale del ${this.formatDate(giornale.data)} - da implementare`);
         },
         
-        async exportGiornali() {
-            alert('Export giornali - da implementare');
+        async exportSingleGiornale(giornale, event) {
+            console.log('DEBUG: exportSingleGiornale called with giornale:', giornale, 'event:', event);
+            
+            // Declare exportButton and originalText outside try block to fix scoping issue
+            let exportButton;
+            let originalText;
+            
+            try {
+                // Mostra loading
+                if (event && event.target) {
+                    exportButton = event.target.closest('button') || event.target;
+                } else {
+                    // Fallback: find the export button by its content and giornale ID
+                    const buttons = document.querySelectorAll('button');
+                    exportButton = Array.from(buttons).find(btn =>
+                        btn.textContent.includes('Export') &&
+                        btn.closest('[x-show*="giornaleList"]') &&
+                        btn.closest('[x-for*="giornale"]')
+                    );
+                }
+                
+                console.log('DEBUG: exportSingleGiornale exportButton found:', exportButton);
+                
+                if (!exportButton) {
+                    console.error('DEBUG: Could not find single export button for giornale:', giornale.id);
+                    alert('Errore: impossibile trovare il pulsante di export singolo');
+                    return;
+                }
+                
+                originalText = exportButton.innerHTML;
+                exportButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Export...';
+                exportButton.disabled = true;
+
+                const url = `/api/giornale-cantiere/giornali/${giornale.id}/word-export`;
+                
+                // Esegui richiesta
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (response.ok) {
+                    // Ottieni filename dall'header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `giornale_${giornale.id}.docx`;
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                        if (filenameMatch) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+                    
+                    // Crea blob e download
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(downloadUrl);
+                    document.body.removeChild(a);
+                    
+                    // Mostra successo
+                    alert('Export singolo giornale completato con successo!');
+                } else {
+                    const error = await response.json();
+                    alert('Errore nell\'export: ' + (error.detail || 'Errore sconosciuto'));
+                }
+                
+            } catch (error) {
+                console.error('Errore export singolo giornale:', error);
+                alert('Errore di rete durante l\'export');
+            } finally {
+                // Ripristina pulsante - check if exportButton exists before using it
+                if (exportButton) {
+                    exportButton.innerHTML = originalText;
+                    exportButton.disabled = false;
+                }
+            }
+        },
+        
+        async exportGiornali(event) {
+            console.log('DEBUG: exportGiornali called with event:', event);
+            
+            // Declare exportButton and originalText outside try block to fix scoping issue
+            let exportButton;
+            let originalText;
+            
+            try {
+                // Mostra loading
+                if (event && event.target) {
+                    exportButton = event.target.closest('button') || event.target;
+                } else {
+                    // Fallback: find the export button by its content
+                    const buttons = document.querySelectorAll('button');
+                    exportButton = Array.from(buttons).find(btn =>
+                        btn.textContent.includes('Export') && !btn.textContent.includes('Export singolo')
+                    );
+                }
+                
+                console.log('DEBUG: exportButton found:', exportButton);
+                
+                if (!exportButton) {
+                    console.error('DEBUG: Could not find export button');
+                    alert('Errore: impossibile trovare il pulsante di export');
+                    return;
+                }
+                
+                originalText = exportButton.innerHTML;
+                exportButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Export in corso...';
+                exportButton.disabled = true;
+
+                // Costruisci URL con filtri correnti
+                const siteId = '{{ site.id if site else "unknown" }}';
+                const params = new URLSearchParams();
+                
+                // Aggiungi filtri applicati
+                if (this.filters.data_da) params.append('data_da', this.filters.data_da);
+                if (this.filters.data_a) params.append('data_a', this.filters.data_a);
+                if (this.filters.responsabile) params.append('responsabile', this.filters.responsabile);
+                if (this.filters.stato) params.append('stato', this.filters.stato);
+                
+                const url = `/api/giornale-cantiere/site/${siteId}/word-export?${params.toString()}`;
+                
+                // Esegui richiesta
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (response.ok) {
+                    // Ottieni filename dall'header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'giornali_export.docx';
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                        if (filenameMatch) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+                    
+                    // Crea blob e download
+                    const blob = await response.blob();
+                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(downloadUrl);
+                    document.body.removeChild(a);
+                    
+                    // Mostra successo
+                    alert('Export completato con successo!');
+                } else {
+                    const error = await response.json();
+                    alert('Errore nell\'export: ' + (error.detail || 'Errore sconosciuto'));
+                }
+                
+            } catch (error) {
+                console.error('Errore export giornali:', error);
+                alert('Errore di rete durante l\'export');
+            } finally {
+                // Ripristina pulsante - check if exportButton exists before using it
+                if (exportButton) {
+                    exportButton.innerHTML = originalText;
+                    exportButton.disabled = false;
+                }
+            }
         },
         
         // Filtri

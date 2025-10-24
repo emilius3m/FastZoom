@@ -7,9 +7,13 @@ Statistiche, CRUD Giornali, CRUD Operatori, Report, Validazione
 from datetime import date, datetime, time
 from typing import List, Dict, Any, Optional
 from uuid import UUID
+from pathlib import Path
+import io
+import tempfile
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, desc, distinct
 from sqlalchemy.orm import selectinload
@@ -39,6 +43,9 @@ from app.schemas.giornale_cantiere import (
     OperatoreCantiereOut,
     OperatoreCantiereUpdate,
 )
+
+# Import export service
+from app.services.giornale_word_export import GiornaleWordExporter, create_giornale_word_from_template
 
 
 # ===== Pydantic Schemas =====
@@ -1052,7 +1059,7 @@ async def get_reports_data(
             select(
                 ArchaeologicalSite.id,
                 ArchaeologicalSite.name,
-                ArchaeologicalSite.location,
+                ArchaeologicalSite.display_location.label("location"),
                 func.count(GiornaleCantiere.id).label("giornali_count"),
             )
             .join(GiornaleCantiere, ArchaeologicalSite.id == GiornaleCantiere.site_id)
@@ -1060,7 +1067,7 @@ async def get_reports_data(
             .group_by(
                 ArchaeologicalSite.id,
                 ArchaeologicalSite.name,
-                ArchaeologicalSite.location,
+                ArchaeologicalSite.display_location.label("location"),
             )
             .order_by(desc("giornali_count"))
         )
@@ -1223,3 +1230,296 @@ async def get_reference_data():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nel recupero dei dati di riferimento",
         )
+
+
+# ===== WORD EXPORT ENDPOINTS =====
+
+# Path ai template .docx con placeholder
+TEMPLATES_DIR = Path("app/templates/word")
+GIORNALE_TEMPLATE_PATH = TEMPLATES_DIR / "Giornale_Template_con_Placeholder.code.docx"
+
+
+@router.get("/site/{site_id}/word-export")
+async def export_giornali_word(
+    site_id: UUID,
+    data_da: Optional[date] = Query(None),
+    data_a: Optional[date] = Query(None),
+    responsabile: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+):
+    """
+    Esporta giornali di cantiere in formato Word
+    Rispetta i filtri applicati (data, responsabile, stato)
+    """
+    try:
+        logger.info(f"→ Export Word giornali sito {site_id}")
+
+        # Verifica accesso al sito
+        site = await get_site_with_verification(site_id, db, user_sites)
+
+        # Costruisci query con filtri
+        query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == site_id)
+
+        if data_da:
+            query = query.where(GiornaleCantiere.data >= data_da)
+        if data_a:
+            query = query.where(GiornaleCantiere.data <= data_a)
+        if responsabile:
+            query = query.where(
+                GiornaleCantiere.responsabile_nome.ilike(f"%{responsabile}%")
+            )
+        if stato:
+            if stato == "validato":
+                query = query.where(GiornaleCantiere.validato.is_(True))
+            elif stato == "in_attesa":
+                query = query.where(GiornaleCantiere.validato.is_(False))
+
+        query = query.options(
+            selectinload(GiornaleCantiere.site),
+            selectinload(GiornaleCantiere.responsabile),
+            selectinload(GiornaleCantiere.operatori),
+        )
+        query = query.order_by(desc(GiornaleCantiere.data), desc(GiornaleCantiere.created_at))
+
+        result = await db.execute(query)
+        giornali = result.scalars().all()
+
+        if not giornali:
+            raise HTTPException(
+                status_code=404,
+                detail="Nessun giornale trovato per i filtri specificati"
+            )
+
+        # Prepara dati per export
+        export_data = prepare_export_data(site, giornali, {
+            'data_da': data_da.isoformat() if data_da else None,
+            'data_a': data_a.isoformat() if data_a else None,
+            'responsabile': responsabile,
+            'stato': stato
+        }, current_user_id)
+
+        # Crea documento Word
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, f"giornali_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx")
+            
+            exporter = GiornaleWordExporter(str(GIORNALE_TEMPLATE_PATH))
+            exporter.export_giornali_list(export_data, output_path)
+
+            # Leggi il file generato
+            with open(output_path, 'rb') as f:
+                doc_bytes = f.read()
+
+        # Genera nome file
+        site_name_clean = site.name.replace(' ', '_').replace(',', '')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"Giornali_{site_name_clean}_{timestamp}.docx"
+
+        logger.info(f"✓ Export Word completato: {filename} ({len(doc_bytes)} bytes)")
+
+        return StreamingResponse(
+            io.BytesIO(doc_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore export Word giornali sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore generazione documento Word: {str(e)}"
+        )
+
+
+@router.get("/giornali/{giornale_id}/word-export")
+async def export_single_giornale_word(
+    giornale_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+):
+    """
+    Esporta singolo giornale di cantiere in formato Word
+    """
+    try:
+        logger.info(f"→ Export Word singolo giornale {giornale_id}")
+
+        # Carica giornale con relazioni
+        result = await db.execute(
+            select(GiornaleCantiere)
+            .where(GiornaleCantiere.id == giornale_id)
+            .options(
+                selectinload(GiornaleCantiere.site),
+                selectinload(GiornaleCantiere.responsabile),
+                selectinload(GiornaleCantiere.operatori),
+            )
+        )
+        giornale = result.scalar_one_or_none()
+
+        if not giornale:
+            raise HTTPException(status_code=404, detail="Giornale non trovato")
+
+        # Verifica accesso al sito
+        await get_site_with_verification(giornale.site_id, db, user_sites)
+
+        # Prepara dati per export
+        giornale_data = prepare_single_giornale_data(giornale)
+
+        # Crea documento Word
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, f"giornale_{giornale_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx")
+            
+            exporter = GiornaleWordExporter(str(GIORNALE_TEMPLATE_PATH))
+            exporter.export_single_giornale(giornale_data, output_path)
+
+            # Leggi il file generato
+            with open(output_path, 'rb') as f:
+                doc_bytes = f.read()
+
+        # Genera nome file
+        site_name_clean = giornale.site.name.replace(' ', '_').replace(',', '')
+        data_giornale = giornale.data.strftime('%d_%m_%Y') if giornale.data else 'data'
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"Giornale_{site_name_clean}_{data_giornale}_{timestamp}.docx"
+
+        logger.info(f"✓ Export Word singolo giornale completato: {filename} ({len(doc_bytes)} bytes)")
+
+        return StreamingResponse(
+            io.BytesIO(doc_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore export Word giornale {giornale_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore generazione documento Word: {str(e)}"
+        )
+
+
+# ===== HELPER FUNCTIONS FOR EXPORT =====
+
+def prepare_export_data(site, giornali, filters, user_id) -> Dict[str, Any]:
+    """
+    Prepara dati per export multi-giornali
+    """
+    # Statistiche
+    total_giornali = len(giornali)
+    validated_giornali = sum(1 for g in giornali if g.validato)
+    pending_giornali = total_giornali - validated_giornali
+    
+    # Operatori unici
+    operatori_unici = set()
+    for g in giornali:
+        for op in g.operatori or []:
+            operatori_unici.add(op.id)
+    
+    # Prepara filtri applicati
+    filtri_testo = []
+    if filters.get('data_da'):
+        filtri_testo.append(f"Dal {filters['data_da']}")
+    if filters.get('data_a'):
+        filtri_testo.append(f"Al {filters['data_a']}")
+    if filters.get('responsabile'):
+        filtri_testo.append(f"Responsabile: {filters['responsabile']}")
+    if filters.get('stato'):
+        filtri_testo.append(f"Stato: {filters['stato']}")
+    
+    # Prepara dati giornali per tabella
+    giornali_data = []
+    for g in giornali:
+        giornale_dict = {
+            'data': g.data.isoformat() if g.data else None,
+            'ora_inizio': g.ora_inizio.strftime('%H:%M') if g.ora_inizio else None,
+            'ora_fine': g.ora_fine.strftime('%H:%M') if g.ora_fine else None,
+            'responsabile_scavo': g.responsabile_nome or (g.responsabile.email if g.responsabile else None),
+            'condizioni_meteo': g.condizioni_meteo,
+            'validato': g.validato,
+            'note_generali': g.note_generali,
+        }
+        giornali_data.append(giornale_dict)
+    
+    return {
+        'site_info': {
+            'name': site.name,
+            'code': site.code,
+            'location': site.display_location,
+        },
+        'export_metadata': {
+            'export_date': datetime.now(),
+            'user': str(user_id),
+            'filters': '; '.join(filtri_testo) if filtri_testo else 'Nessun filtro',
+        },
+        'stats': {
+            'total_giornali': total_giornali,
+            'validated_giornali': validated_giornali,
+            'pending_giornali': pending_giornali,
+            'operatori_attivi': len(operatori_unici),
+            'validation_percentage': round((validated_giornali / total_giornali) * 100) if total_giornali > 0 else 0,
+        },
+        'giornali': giornali_data,
+    }
+
+
+def prepare_single_giornale_data(giornale) -> Dict[str, Any]:
+    """
+    Prepara dati per export singolo giornale
+    """
+    # Informazioni sito
+    site_info = {
+        'name': giornale.site.name if giornale.site else '',
+        'code': giornale.site.code if giornale.site else '',
+        'location': giornale.site.display_location if giornale.site else '',
+    }
+    
+    # Dati giornale
+    giornale_data = {
+        'site_info': site_info,
+        'data': giornale.data.isoformat() if giornale.data else None,
+        'ora_inizio': giornale.ora_inizio.strftime('%H:%M') if giornale.ora_inizio else None,
+        'ora_fine': giornale.ora_fine.strftime('%H:%M') if giornale.ora_fine else None,
+        'compilatore': giornale.compilatore,
+        'responsabile_scavo': giornale.responsabile_nome or (giornale.responsabile.email if giornale.responsabile else None),
+        'condizioni_meteo': giornale.condizioni_meteo,
+        'temperatura_min': giornale.temperatura_min,
+        'temperatura_max': giornale.temperatura_max,
+        'note_meteo': giornale.note_meteo,
+        'descrizione_lavori': giornale.descrizione_lavori,
+        'modalita_lavorazioni': giornale.modalita_lavorazioni,
+        'attrezzatura_utilizzata': giornale.attrezzatura_utilizzata,
+        'mezzi_utilizzati': giornale.mezzi_utilizzati,
+        'us_elaborate': giornale.get_us_list() if hasattr(giornale, 'get_us_list') else [],
+        'usm_elaborate': giornale.get_usm_list() if hasattr(giornale, 'get_usm_list') else [],
+        'usr_elaborate': [],  # Non implementato nel modello
+        'materiali_rinvenuti': giornale.materiali_rinvenuti,
+        'documentazione_prodotta': giornale.documentazione_prodotta,
+        'operatori_presenti': [
+            {
+                'nome': op.nome,
+                'cognome': op.cognome,
+                'qualifica': op.qualifica,
+                'ruolo': op.ruolo,
+            }
+            for op in (giornale.operatori or [])
+        ],
+        'sopralluoghi': giornale.sopralluoghi,
+        'disposizioni_rup': giornale.disposizioni_rup,
+        'disposizioni_direttore': giornale.disposizioni_direttore,
+        'contestazioni': giornale.contestazioni,
+        'sospensioni': giornale.sospensioni,
+        'incidenti': giornale.incidenti,
+        'forniture': giornale.forniture,
+        'note_generali': giornale.note_generali,
+        'problematiche': giornale.problematiche,
+        'validato': giornale.validato,
+        'data_validazione': giornale.data_validazione,
+    }
+    
+    return giornale_data
