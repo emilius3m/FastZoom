@@ -585,7 +585,7 @@
             <template x-for="photo in paginatedPhotos" :key="photo.id">
                 <div class="flex flex-col h-full bg-white rounded-lg shadow overflow-hidden group hover:shadow-lg transition-shadow duration-200">
                     <!-- Photo Thumbnail -->
-                    <div class="aspect-square bg-gray-200 relative overflow-hidden">
+                    <div class="w-full h-48 bg-gray-200 relative overflow-hidden">
                         <img :src="photo.thumbnail_url || photo.file_url"
                               :alt="photo.filename"
                               class="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-200"
