@@ -3059,7 +3059,7 @@ function photosManager() {
             );
             
             if (processingPhotos.length === 0) {
-                this.stopStatusPolling();
+                console.log('✅ No photos currently processing');
                 return;
             }
             
@@ -3142,14 +3142,14 @@ function photosManager() {
                     await this.updatePhotoDeepZoomStatus(photo);
                 }
                 
-                // Se ci sono ancora foto in elaborazione, avvia il polling
+                // Status updates now handled by WebSocket notifications
                 const stillProcessing = this.photos.some(photo =>
                     photo.deep_zoom_status === 'processing' ||
                     photo.deep_zoom_status === 'scheduled'
                 );
                 
                 if (stillProcessing) {
-                    this.startStatusPolling();
+                    console.log(`📡 ${this.photos.filter(p => p.deep_zoom_status === 'processing' || p.deep_zoom_status === 'scheduled').length} photos still processing - WebSocket will notify on completion`);
                 }
                 
                 // Aggiorna la vista
@@ -3178,10 +3178,9 @@ function photosManager() {
                 console.log(`📋 ${photosScheduled} foto schedulate per Deep Zoom processing`);
             }
             
-            // Avvia polling se non già attivo
-            if (!this.statusPollingInterval) {
-                this.startStatusPolling();
-            }
+            // Status updates now handled automatically via WebSocket notifications
+            // No need for polling - WebSocket will notify when processing completes
+            console.log(`📡 WebSocket will notify when Deep Zoom processing completes`);
             
             // Aggiorna vista
             this.applyFilters();
