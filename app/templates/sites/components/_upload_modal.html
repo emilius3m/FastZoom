@@ -419,11 +419,45 @@ document.addEventListener('alpine:init', () => {
         },
         
         async processFiles(files) {
+            const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+            const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/tiff'];
+            
             for (const file of files) {
-                if (file.type.startsWith('image/')) {
-                    const processedFile = await this.processFile(file);
-                    this.selectedFiles.push(processedFile);
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    this.showError(`Il file "${file.name}" non è un'immagine valida.`);
+                    continue;
                 }
+                
+                // Validate specific image types
+                if (!ALLOWED_TYPES.includes(file.type.toLowerCase())) {
+                    this.showError(`Il file "${file.name}" ha un formato non supportato. Formati accettati: JPEG, PNG, GIF, WebP, TIFF.`);
+                    continue;
+                }
+                
+                // Validate file size
+                if (file.size > MAX_FILE_SIZE) {
+                    this.showError(`Il file "${file.name}" supera la dimensione massima di 50MB (dimensione: ${(file.size / 1024 / 1024).toFixed(2)}MB).`);
+                    continue;
+                }
+                
+                const processedFile = await this.processFile(file);
+                this.selectedFiles.push(processedFile);
+            }
+        },
+        
+        showError(message) {
+            // Try to find parent component's showNotification method
+            const parent = this.getParentComponent();
+            if (parent && parent.showNotification && typeof parent.showNotification === 'function') {
+                parent.showNotification(message, 'error');
+            } else {
+                // Fallback: dispatch event for notification system
+                this.$dispatch('show-notification', { message: message, type: 'error' });
+                // Also console log for debugging
+                console.error('❌ Validation Error:', message);
+                // Show browser alert as last resort
+                alert(message);
             }
         },
         
@@ -490,6 +524,18 @@ document.addEventListener('alpine:init', () => {
                 
             } catch (error) {
                 console.error(`❌ Batch upload failed:`, error);
+                
+                // Show user-friendly error notification
+                const errorMessage = error.message.includes('401') || error.message.includes('Unauthorized')
+                    ? 'Sessione scaduta. Per favore effettua nuovamente il login.'
+                    : error.message.includes('413') || error.message.includes('too large')
+                    ? 'I file sono troppo grandi. Prova a caricare meno foto o file più piccoli.'
+                    : error.message.includes('Network')
+                    ? 'Errore di connessione. Verifica la tua connessione internet e riprova.'
+                    : `Errore durante il caricamento: ${error.message}`;
+                
+                this.showError(errorMessage);
+                
                 // Mark all as failed if batch fails
                 this.selectedFiles.forEach(fileData => {
                     this.uploadResults.push({
@@ -539,6 +585,9 @@ document.addEventListener('alpine:init', () => {
             // Single API call with all files
             const response = await fetch(`/api/site/{{ site.id }}/photos/upload`, {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
                 body: formData
             });
             

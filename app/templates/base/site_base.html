@@ -24,7 +24,7 @@
     <script>
       // Expose server-side variables to JavaScript before any initialization
       window.currentUser = {% if current_user %}{
-        id: {{ current_user.id }},
+        id: "{{ current_user.id }}",
         email: "{{ current_user.email }}",
         isAuthenticated: true
       }{% else %}{ isAuthenticated: false }{% endif %};
