@@ -657,7 +657,7 @@
 
                         <!-- Selection Checkbox (disabled for US photos) -->
                         {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
-                        <div class="absolute bottom-2 left-2">
+                        <div class="absolute top-2 left-2">
                             <input type="checkbox"
                                    :value="photo.id"
                                    x-model="selectedPhotos"
