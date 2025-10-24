@@ -89,7 +89,7 @@ async def get_site_photos_v1(
             "filename": photo.filename,
             "title": photo.title,
             "description": photo.description,
-            "photo_type": photo.photo_type.value if photo.photo_type else None,
+            "photo_type": photo.photo_type if photo.photo_type else None,
             "file_size": photo.file_size,
             "width": photo.width,
             "height": photo.height,

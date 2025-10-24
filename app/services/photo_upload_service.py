@@ -264,9 +264,9 @@ class PhotoUploadService:
                             'archaeological_metadata': {
                                 'inventory_number': photo_record.inventory_number,
                                 'excavation_area': photo_record.excavation_area,
-                                'material': photo_record.material.value if photo_record.material else None,
+                                'material': photo_record.material if photo_record.material else None,
                                 'chronology_period': photo_record.chronology_period,
-                                'photo_type': photo_record.photo_type.value if photo_record.photo_type else None,
+                                'photo_type': photo_record.photo_type if photo_record.photo_type else None,
                                 'photographer': photo_record.photographer,
                                 'description': photo_record.description,
                                 'keywords': photo_record.keywords
