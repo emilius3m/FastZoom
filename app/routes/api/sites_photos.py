@@ -782,9 +782,9 @@ async def upload_photo(
                             'archaeological_metadata': {
                                 'inventory_number': photo_record.inventory_number,
                                 'excavation_area': photo_record.excavation_area,
-                                'material': photo_record.material.value if photo_record.material else None,
+                                'material': photo_record.material,
                                 'chronology_period': photo_record.chronology_period,
-                                'photo_type': photo_record.photo_type.value if photo_record.photo_type else None,
+                                'photo_type': photo_record.photo_type,
                                 'photographer': photo_record.photographer,
                                 'description': photo_record.description,
                                 'keywords': photo_record.keywords

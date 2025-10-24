@@ -1513,10 +1513,20 @@ function photosManager() {
                 await this.loadPhotos();
                 this.updateStatistics();
                 this.extractAvailableTags();
-                this.applyFilters();
+                
+                // Don't call applyFilters here since loadPhotos already sets the photos
+                // and we want to show all photos initially
+                this.filteredPhotos = this.photos;
+                this.updatePagination();
 
                 // Initialize deep zoom status checking
                 await this.initializeDeepZoomStatus();
+
+                // FIXED: Clean up any stuck processing photos
+                this.cleanupStuckProcessingPhotos();
+
+                // FIXED: Start cleanup timer to periodically check for stuck processing photos
+                this.startCleanupTimer();
 
                 // Ensure grid view is displayed by default
                 this.ensureGridView();
@@ -1541,7 +1551,9 @@ function photosManager() {
                 try {
                     this.updateStatistics();
                     this.extractAvailableTags();
-                    this.applyFilters();
+                    // Don't call applyFilters here either on error
+                    this.filteredPhotos = this.photos || [];
+                    this.updatePagination();
                 } catch (updateError) {
                     console.error('Error updating photo data after init failure:', updateError);
                 }
@@ -1572,8 +1584,8 @@ function photosManager() {
 
                 // Handle specific authentication errors
                 if (response.status === 401) {
-                    console.error('Authentication error (401): Token expired or invalid');
-                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    console.error('Authentication error - please login again');
+                    this.showAlertMessage('Errore di autenticazione. Effettua nuovamente il login.');
                     // Optionally redirect to login page
                     setTimeout(() => {
                         window.location.href = '/login';
@@ -1622,6 +1634,10 @@ function photosManager() {
                 // Set empty array as fallback
                 this.photos = [];
                 throw error;
+            } finally {
+                // FIXED: Set isLoading to false here since loadPhotos is called directly from init()
+                // and also from applyFilters() which manages its own loading state
+                this.isLoading = false;
             }
         },
 
@@ -2454,7 +2470,11 @@ function photosManager() {
                 await this.loadPhotos();
                 this.updateStatistics();
                 this.extractAvailableTags();
-                this.applyFilters();
+                
+                // Don't call applyFilters here since loadPhotos already sets the photos
+                // and we want to show all photos after upload
+                this.filteredPhotos = this.photos;
+                this.updatePagination();
                 
                 // Start monitoring new photos for deep zoom processing
                 if (newPhotoIds && newPhotoIds.length > 0) {
@@ -2486,7 +2506,9 @@ function photosManager() {
                 try {
                     this.updateStatistics();
                     this.extractAvailableTags();
-                    this.applyFilters();
+                    // Don't call applyFilters here either on error
+                    this.filteredPhotos = this.photos || [];
+                    this.updatePagination();
                 } catch (updateError) {
                     console.error('Error updating photo data after refresh failure:', updateError);
                 }
@@ -2815,7 +2837,11 @@ function photosManager() {
                 await this.loadPhotos();
                 this.updateStatistics();
                 this.extractAvailableTags();
-                this.applyFilters();
+                
+                // Don't call applyFilters here since loadPhotos already sets the photos
+                // and we want to show all photos after bulk edit
+                this.filteredPhotos = this.photos;
+                this.updatePagination();
 
                 this.showAlertMessage(`${this.selectedPhotos.length} foto aggiornate con successo!`);
                 this.selectedPhotos = []; // Clear selection
@@ -2973,7 +2999,11 @@ function photosManager() {
                 await this.loadPhotos();
                 this.updateStatistics();
                 this.extractAvailableTags();
-                this.applyFilters();
+                
+                // Don't call applyFilters here since loadPhotos already sets the photos
+                // and we want to show all photos after bulk delete
+                this.filteredPhotos = this.photos;
+                this.updatePagination();
 
                 this.showAlertMessage(`${this.selectedPhotos.length} foto eliminate con successo!`);
                 this.selectedPhotos = []; // Clear selection
@@ -3019,6 +3049,9 @@ function photosManager() {
         wsReconnectTimer: null,
         wsAuthFailed: false,
         photosBeingProcessed: new Set(),
+        
+        // FIXED: Add cleanup timer reference
+        cleanupTimer: null,
         
         connectWebSocket() {
             const siteId = this.getCurrentSiteId();
@@ -3169,6 +3202,7 @@ function photosManager() {
                         photo.tile_count = notification.tile_count;
                         photo.max_zoom_level = notification.levels;
                     }
+                    // FIXED: Ensure photo is removed from processing set
                     this.photosBeingProcessed.delete(notification.photo_id);
 
                     // Show success notification
@@ -3185,6 +3219,7 @@ function photosManager() {
                         photo.deepzoom_status = 'failed';
                         photo.has_deep_zoom = false;
                     }
+                    // FIXED: Ensure photo is removed from processing set
                     this.photosBeingProcessed.delete(notification.photo_id);
 
                     // Show error notification
@@ -3195,8 +3230,8 @@ function photosManager() {
                     console.log(`❌ [${notification.current_photo}/${notification.total_photos}] Failed: ${notification.photo_filename}`);
                 }
 
-                // Update UI
-                this.applyFilters();
+                // Don't call applyFilters here - just update pagination
+                this.updatePagination();
 
             } else if (notification.type === 'photo_updated') {
                 console.log('📝 Photo updated notification:', notification);
@@ -3243,6 +3278,13 @@ function photosManager() {
             if (this.wsReconnectTimer) {
                 clearTimeout(this.wsReconnectTimer);
                 this.wsReconnectTimer = null;
+            }
+
+            // FIXED: Clear cleanup timer
+            if (this.cleanupTimer) {
+                clearInterval(this.cleanupTimer);
+                this.cleanupTimer = null;
+                console.log('🧹 Cleanup timer cleared');
             }
 
             if (this.ws) {
@@ -3382,8 +3424,8 @@ function photosManager() {
                     console.log(`📡 ${this.photos.filter(p => p.deepzoom_status === 'processing' || p.deepzoom_status === 'scheduled').length} photos still processing - WebSocket will notify on completion`);
                 }
                 
-                // Aggiorna la vista
-                this.applyFilters();
+                // Don't call applyFilters here - just update pagination
+                this.updatePagination();
             }
         },
         
@@ -3412,13 +3454,54 @@ function photosManager() {
             // No need for polling - WebSocket will notify when processing completes
             console.log(`📡 WebSocket will notify when Deep Zoom processing completes`);
             
-            // Aggiorna vista
-            this.applyFilters();
+            // Don't call applyFilters here - just update pagination
+            this.updatePagination();
         },
 
         // Deep zoom status checking (versione legacy per compatibilità)
         async checkDeepZoomStatus(photo) {
             return await this.updatePhotoDeepZoomStatus(photo);
+        },
+        
+        // FIXED: Method to clean up stuck processing photos
+        cleanupStuckProcessingPhotos() {
+            if (this.photosBeingProcessed.size === 0) return;
+            
+            console.log(`🧹 Cleaning up stuck processing photos. Current: ${this.photosBeingProcessed.size}`);
+            
+            // Check each photo in processing set
+            for (const photoId of this.photosBeingProcessed) {
+                const photo = this.photos.find(p => p && p.id === photoId);
+                
+                // If photo doesn't exist or has completed/failed status, remove from processing set
+                if (!photo ||
+                    photo.deepzoom_status === 'completed' ||
+                    photo.deepzoom_status === 'failed' ||
+                    photo.deepzoom_status === null) {
+                    this.photosBeingProcessed.delete(photoId);
+                    console.log(`🧹 Removed stuck photo ${photoId} from processing set`);
+                }
+            }
+            
+            // Update UI if processing set changed
+            if (this.photosBeingProcessed.size === 0) {
+                console.log('✅ All photos processing completed, indicator should be hidden');
+            }
+        },
+        
+        // FIXED: Method to start periodic cleanup timer
+        startCleanupTimer() {
+            // Clear any existing timer
+            if (this.cleanupTimer) {
+                clearInterval(this.cleanupTimer);
+            }
+            
+            // Start new timer to check every 30 seconds
+            this.cleanupTimer = setInterval(() => {
+                this.cleanupStuckProcessingPhotos();
+            }, 30000);
+            
+            console.log('🧹 Cleanup timer started (30s interval)');
         }
     };
 }
