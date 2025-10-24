@@ -607,7 +607,7 @@
                         <!-- Deep Zoom Status Indicators -->
                         <div class="absolute top-2 right-2 flex space-x-1">
                             <!-- Tiles Available Indicator -->
-                            <div x-show="photo.has_deep_zoom && photo.deep_zoom_status === 'completed'"
+                            <div x-show="photo.has_deep_zoom && photo.deepzoom_status === 'completed'"
                                  class="bg-green-500 rounded-full p-1.5 shadow-lg"
                                  title="Deep zoom tiles disponibili">
                                 <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -616,7 +616,7 @@
                             </div>
                             
                             <!-- Processing Indicator -->
-                            <div x-show="photo.deep_zoom_status === 'processing' || photo.deep_zoom_status === 'scheduled'"
+                            <div x-show="photo.deepzoom_status === 'processing' || photo.deepzoom_status === 'scheduled'"
                                  class="bg-blue-500 rounded-full p-1.5 shadow-lg animate-pulse"
                                  title="Elaborazione tiles in corso">
                                 <svg class="w-3 h-3 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,7 +625,7 @@
                             </div>
                             
                             <!-- Failed Indicator -->
-                            <div x-show="photo.deep_zoom_status === 'failed'"
+                            <div x-show="photo.deepzoom_status === 'failed'"
                                  class="bg-red-500 rounded-full p-1.5 shadow-lg"
                                  title="Elaborazione tiles fallita">
                                 <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -743,7 +743,7 @@
                                 <!-- Deep Zoom Status Indicators (List View) -->
                                 <div class="absolute -top-1 -right-1 flex space-x-1">
                                     <!-- Tiles Available Indicator -->
-                                    <div x-show="photo.has_deep_zoom && photo.deep_zoom_status === 'completed'"
+                                    <div x-show="photo.has_deep_zoom && photo.deepzoom_status === 'completed'"
                                          class="bg-green-500 rounded-full p-1 shadow-lg"
                                          title="Deep zoom tiles disponibili">
                                         <svg class="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -752,7 +752,7 @@
                                     </div>
                                     
                                     <!-- Processing Indicator -->
-                                    <div x-show="photo.deep_zoom_status === 'processing' || photo.deep_zoom_status === 'scheduled'"
+                                    <div x-show="photo.deepzoom_status === 'processing' || photo.deepzoom_status === 'scheduled'"
                                          class="bg-blue-500 rounded-full p-1 shadow-lg animate-pulse"
                                          title="Elaborazione tiles in corso">
                                         <svg class="w-2 h-2 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -761,7 +761,7 @@
                                     </div>
                                     
                                     <!-- Failed Indicator -->
-                                    <div x-show="photo.deep_zoom_status === 'failed'"
+                                    <div x-show="photo.deepzoom_status === 'failed'"
                                          class="bg-red-500 rounded-full p-1 shadow-lg"
                                          title="Elaborazione tiles fallita">
                                         <svg class="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -1535,7 +1535,16 @@ function photosManager() {
                 }
             } catch (error) {
                 console.error('Errore durante inizializzazione:', error);
-                this.showAlertMessage('Errore durante il caricamento delle foto');
+                this.showAlertMessage(`Errore durante il caricamento delle foto: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
+                
+                // Ensure data consistency even on error
+                try {
+                    this.updateStatistics();
+                    this.extractAvailableTags();
+                    this.applyFilters();
+                } catch (updateError) {
+                    console.error('Error updating photo data after init failure:', updateError);
+                }
             } finally {
                 this.isLoading = false;
             }
@@ -1543,17 +1552,45 @@ function photosManager() {
 
         // Data Loading
         async loadPhotos() {
+            // Create a timeout controller to prevent hanging requests
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
             try {
+                console.log('Loading photos from API...');
+                
                 const response = await fetch(`/api/site/{{ site.id }}/photos`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    signal: controller.signal
                 });
+
+                // Clear the timeout since the request completed
+                clearTimeout(timeoutId);
+
+                // Handle specific authentication errors
+                if (response.status === 401) {
+                    console.error('Authentication error (401): Token expired or invalid');
+                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    // Optionally redirect to login page
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Errore di autenticazione: sessione scaduta');
+                }
+                
+                if (response.status === 403) {
+                    console.error('Authorization error (403): Insufficient permissions');
+                    this.showAlertMessage('Non hai i permessi per visualizzare queste foto.');
+                    throw new Error('Errore di autorizzazione: permessi insufficienti');
+                }
 
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error('API Error:', response.status, errorText);
+                    this.showAlertMessage(`Errore nel caricamento foto: ${response.status} ${response.statusText}`);
                     throw new Error(`Errore API ${response.status}: ${response.statusText}`);
                 }
 
@@ -1561,14 +1598,27 @@ function photosManager() {
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
                     console.error('Invalid response type:', contentType);
+                    this.showAlertMessage('Il server ha restituito una risposta non valida.');
                     throw new Error('La risposta del server non è in formato JSON');
                 }
 
                 const data = await response.json();
                 this.photos = Array.isArray(data) ? data.filter(photo => photo && photo.id) : [];
+                console.log(`Successfully loaded ${this.photos.length} photos`);
 
             } catch (error) {
-                console.error('Errore nel caricamento foto:', error);
+                // Clear the timeout if there's an error
+                clearTimeout(timeoutId);
+                
+                // Handle timeout specifically
+                if (error.name === 'AbortError') {
+                    console.error('Request timeout: The server took too long to respond');
+                    this.showAlertMessage('Timeout del server. Riprova più tardi.');
+                } else {
+                    console.error('Errore nel caricamento foto:', error);
+                    this.showAlertMessage('Impossibile caricare le foto. Riprova più tardi.');
+                }
+                
                 // Set empty array as fallback
                 this.photos = [];
                 throw error;
@@ -1598,7 +1648,13 @@ function photosManager() {
         async applyFilters() {
             this.isLoading = true;
             
+            // Create a timeout controller to prevent hanging requests
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
             try {
+                console.log('Applying filters and fetching photos...');
+                
                 // Build query parameters from active filters
                 const params = new URLSearchParams();
                 
@@ -1649,11 +1705,35 @@ function photosManager() {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    signal: controller.signal
                 });
                 
+                // Clear the timeout since the request completed
+                clearTimeout(timeoutId);
+                
+                // Handle specific authentication errors
+                if (response.status === 401) {
+                    console.error('Authentication error (401): Token expired or invalid');
+                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    // Optionally redirect to login page
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Errore di autenticazione: sessione scaduta');
+                }
+                
+                if (response.status === 403) {
+                    console.error('Authorization error (403): Insufficient permissions');
+                    this.showAlertMessage('Non hai i permessi per visualizzare queste foto.');
+                    throw new Error('Errore di autorizzazione: permessi insufficienti');
+                }
+                
                 if (!response.ok) {
-                    throw new Error(`Errore API ${response.status}`);
+                    const errorText = await response.text();
+                    console.error('API Error:', response.status, errorText);
+                    this.showAlertMessage(`Errore nell'applicazione dei filtri: ${response.status} ${response.statusText}`);
+                    throw new Error(`Errore API ${response.status}: ${response.statusText}`);
                 }
                 
                 const data = await response.json();
@@ -1666,9 +1746,27 @@ function photosManager() {
                 console.log(`Filters applied: ${this.filteredPhotos.length} photos found`);
                 
             } catch (error) {
-                console.error('Error applying filters:', error);
-                this.showAlertMessage('Errore nell\'applicazione dei filtri');
+                // Clear the timeout if there's an error
+                clearTimeout(timeoutId);
+                
+                // Handle timeout specifically
+                if (error.name === 'AbortError') {
+                    console.error('Request timeout: The server took too long to respond');
+                    this.showAlertMessage('Timeout del server. Riprova più tardi.');
+                } else {
+                    console.error('Error applying filters:', error);
+                    this.showAlertMessage('Errore nell\'applicazione dei filtri. Riprova più tardi.');
+                }
+                
+                // Ensure we have valid arrays even on error
+                if (!Array.isArray(this.photos)) {
+                    this.photos = [];
+                }
+                if (!Array.isArray(this.filteredPhotos)) {
+                    this.filteredPhotos = [];
+                }
             } finally {
+                // Always reset isLoading state, even if an error occurred
                 this.isLoading = false;
             }
         },
@@ -2139,6 +2237,23 @@ function photosManager() {
                     }
                 });
 
+                // Handle specific authentication errors
+                if (response.status === 401) {
+                    console.error('Authentication error (401): Token expired or invalid');
+                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    // Optionally redirect to login page
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Errore di autenticazione: sessione scaduta');
+                }
+                
+                if (response.status === 403) {
+                    console.error('Authorization error (403): Insufficient permissions');
+                    this.showAlertMessage('Non hai i permessi per visualizzare le informazioni Deep Zoom di questa foto.');
+                    throw new Error('Errore di autorizzazione: permessi insufficienti');
+                }
+
                 if (response.ok) {
                     const data = await response.json();
                     console.log('Deep zoom response:', data);
@@ -2154,11 +2269,14 @@ function photosManager() {
                     console.log('Deep zoom info not found for this photo');
                     return null;
                 } else {
-                    console.warn('Failed to get deep zoom info:', response.status, response.statusText);
+                    const errorText = await response.text();
+                    console.warn('Failed to get deep zoom info:', response.status, response.statusText, errorText);
+                    this.showAlertMessage(`Errore nel recupero delle informazioni Deep Zoom: ${response.status} ${response.statusText}`);
                     return null;
                 }
             } catch (error) {
                 console.warn('Failed to get deep zoom info:', error);
+                this.showAlertMessage(`Errore nel recupero delle informazioni Deep Zoom: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
                 return null;
             }
         },
@@ -2332,6 +2450,7 @@ function photosManager() {
         // Method called by upload modal after successful upload
         async refreshPhotos(newPhotoIds = []) {
             try {
+                console.log('Refreshing photos after upload...');
                 await this.loadPhotos();
                 this.updateStatistics();
                 this.extractAvailableTags();
@@ -2361,7 +2480,16 @@ function photosManager() {
                 }
             } catch (error) {
                 console.error('Error refreshing photos:', error);
-                this.showAlertMessage('❌ Errore nel refresh delle foto');
+                this.showAlertMessage('❌ Errore nel refresh delle foto. Riprova più tardi.');
+                
+                // Ensure data consistency even on error
+                try {
+                    this.updateStatistics();
+                    this.extractAvailableTags();
+                    this.applyFilters();
+                } catch (updateError) {
+                    console.error('Error updating photo data after refresh failure:', updateError);
+                }
             }
         },
 
@@ -2566,9 +2694,28 @@ function photosManager() {
                     body: JSON.stringify(metadata)
                 });
 
+                // Handle specific authentication errors
+                if (response.status === 401) {
+                    console.error('Authentication error (401): Token expired or invalid');
+                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    // Optionally redirect to login page
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Errore di autenticazione: sessione scaduta');
+                }
+                
+                if (response.status === 403) {
+                    console.error('Authorization error (403): Insufficient permissions');
+                    this.showAlertMessage('Non hai i permessi per modificare questa foto.');
+                    throw new Error('Errore di autorizzazione: permessi insufficienti');
+                }
+
                 if (!response.ok) {
                     const errorText = await response.text();
-                    throw new Error(`Errore durante il salvataggio: ${response.status} ${errorText}`);
+                    console.error('API Error:', response.status, errorText);
+                    this.showAlertMessage(`Errore durante il salvataggio: ${response.status} ${response.statusText}`);
+                    throw new Error(`Errore durante il salvataggio: ${response.status} ${response.statusText}`);
                 }
 
                 const updatedPhoto = await response.json();
@@ -2591,7 +2738,7 @@ function photosManager() {
 
             } catch (error) {
                 console.error('Errore durante il salvataggio:', error);
-                this.showAlertMessage(`Errore durante il salvataggio: ${error.message}`);
+                this.showAlertMessage(`Errore durante il salvataggio: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
             } finally {
                 this.isSaving = false;
             }
@@ -2601,6 +2748,7 @@ function photosManager() {
         async saveBulkEdit(metadata) {
             if (!this.selectedPhotos.length || !metadata) {
                 console.error('No photos selected or metadata provided for bulk edit');
+                this.showAlertMessage('Errore: nessuna foto selezionata o metadati forniti');
                 return;
             }
 
@@ -2637,9 +2785,28 @@ function photosManager() {
                     })
                 });
 
+                // Handle specific authentication errors
+                if (response.status === 401) {
+                    console.error('Authentication error (401): Token expired or invalid');
+                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    // Optionally redirect to login page
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Errore di autenticazione: sessione scaduta');
+                }
+                
+                if (response.status === 403) {
+                    console.error('Authorization error (403): Insufficient permissions');
+                    this.showAlertMessage('Non hai i permessi per modificare queste foto.');
+                    throw new Error('Errore di autorizzazione: permessi insufficienti');
+                }
+
                 if (!response.ok) {
                     const errorText = await response.text();
-                    throw new Error(`Errore durante l'aggiornamento di massa: ${response.status} ${errorText}`);
+                    console.error('API Error:', response.status, errorText);
+                    this.showAlertMessage(`Errore durante l'aggiornamento di massa: ${response.status} ${response.statusText}`);
+                    throw new Error(`Errore durante l'aggiornamento di massa: ${response.status} ${response.statusText}`);
                 }
 
                 const result = await response.json();
@@ -2649,14 +2816,14 @@ function photosManager() {
                 this.updateStatistics();
                 this.extractAvailableTags();
                 this.applyFilters();
-                
+
                 this.showAlertMessage(`${this.selectedPhotos.length} foto aggiornate con successo!`);
                 this.selectedPhotos = []; // Clear selection
                 this.closeEditModal();
 
             } catch (error) {
                 console.error('Errore durante l\'aggiornamento di massa:', error);
-                this.showAlertMessage(`Errore durante l'aggiornamento: ${error.message}`);
+                this.showAlertMessage(`Errore durante l'aggiornamento: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
             } finally {
                 this.isSaving = false;
             }
@@ -2703,8 +2870,28 @@ function photosManager() {
                     }
                 });
 
+                // Handle specific authentication errors
+                if (response.status === 401) {
+                    console.error('Authentication error (401): Token expired or invalid');
+                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    // Optionally redirect to login page
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Errore di autenticazione: sessione scaduta');
+                }
+                
+                if (response.status === 403) {
+                    console.error('Authorization error (403): Insufficient permissions');
+                    this.showAlertMessage('Non hai i permessi per eliminare questa foto.');
+                    throw new Error('Errore di autorizzazione: permessi insufficienti');
+                }
+
                 if (!response.ok) {
-                    throw new Error('Errore durante l\'eliminazione');
+                    const errorText = await response.text();
+                    console.error('API Error:', response.status, errorText);
+                    this.showAlertMessage(`Errore durante l'eliminazione: ${response.status} ${response.statusText}`);
+                    throw new Error(`Errore durante l'eliminazione: ${response.status} ${response.statusText}`);
                 }
 
                 // Remove from local data
@@ -2722,7 +2909,7 @@ function photosManager() {
 
             } catch (error) {
                 console.error('Errore durante l\'eliminazione:', error);
-                this.showAlertMessage('Errore durante l\'eliminazione della foto');
+                this.showAlertMessage(`Errore durante l'eliminazione: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
             } finally {
                 this.isDeleting = false;
                 this.showDeleteModal = false;
@@ -2758,8 +2945,28 @@ function photosManager() {
                     })
                 });
 
+                // Handle specific authentication errors
+                if (response.status === 401) {
+                    console.error('Authentication error (401): Token expired or invalid');
+                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    // Optionally redirect to login page
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Errore di autenticazione: sessione scaduta');
+                }
+                
+                if (response.status === 403) {
+                    console.error('Authorization error (403): Insufficient permissions');
+                    this.showAlertMessage('Non hai i permessi per eliminare queste foto.');
+                    throw new Error('Errore di autorizzazione: permessi insufficienti');
+                }
+
                 if (!response.ok) {
-                    throw new Error('Errore durante l\'eliminazione di massa');
+                    const errorText = await response.text();
+                    console.error('API Error:', response.status, errorText);
+                    this.showAlertMessage(`Errore durante l'eliminazione di massa: ${response.status} ${response.statusText}`);
+                    throw new Error(`Errore durante l'eliminazione di massa: ${response.status} ${response.statusText}`);
                 }
 
                 // Refresh data
@@ -2773,7 +2980,7 @@ function photosManager() {
 
             } catch (error) {
                 console.error('Errore durante l\'eliminazione di massa:', error);
-                this.showAlertMessage('Errore durante l\'eliminazione delle foto');
+                this.showAlertMessage(`Errore durante l'eliminazione: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
             } finally {
                 this.isBulkDeleting = false;
             }
@@ -2948,7 +3155,7 @@ function photosManager() {
                 if (notification.status === 'processing') {
                     // Update photo status
                     if (photo) {
-                        photo.deep_zoom_status = 'processing';
+                        photo.deepzoom_status = 'processing';
                     }
                     this.photosBeingProcessed.add(notification.photo_id);
 
@@ -2957,10 +3164,10 @@ function photosManager() {
                 } else if (notification.status === 'completed') {
                     // Update photo with completion data
                     if (photo) {
-                        photo.deep_zoom_status = 'completed';
+                        photo.deepzoom_status = 'completed';
                         photo.has_deep_zoom = true;
-                        photo.deep_zoom_tile_count = notification.tile_count;
-                        photo.deep_zoom_levels = notification.levels;
+                        photo.tile_count = notification.tile_count;
+                        photo.max_zoom_level = notification.levels;
                     }
                     this.photosBeingProcessed.delete(notification.photo_id);
 
@@ -2975,7 +3182,7 @@ function photosManager() {
                 } else if (notification.status === 'failed') {
                     // Update photo with error status
                     if (photo) {
-                        photo.deep_zoom_status = 'failed';
+                        photo.deepzoom_status = 'failed';
                         photo.has_deep_zoom = false;
                     }
                     this.photosBeingProcessed.delete(notification.photo_id);
@@ -3053,8 +3260,8 @@ function photosManager() {
         async checkAllProcessingPhotos() {
             const processingPhotos = this.photos.filter(photo =>
                 photo && (
-                    photo.deep_zoom_status === 'processing' ||
-                    photo.deep_zoom_status === 'scheduled'
+                    photo.deepzoom_status === 'processing' ||
+                    photo.deepzoom_status === 'scheduled'
                 )
             );
             
@@ -3086,40 +3293,63 @@ function photosManager() {
                     }
                 });
                 
-                if (response.ok) {
-                    const statusData = await response.json();
-                    
-                    // Aggiorna lo stato della foto
-                    const wasProcessing = photo.deep_zoom_status === 'processing' || photo.deep_zoom_status === 'scheduled';
-                    
-                    photo.has_deep_zoom = statusData.has_deep_zoom || false;
-                    photo.deep_zoom_status = statusData.deep_zoom_status || null;
-                    photo.deep_zoom_levels = statusData.deep_zoom_levels || null;
-                    photo.deep_zoom_tile_count = statusData.deep_zoom_tile_count || null;
-                    photo.deep_zoom_processed_at = statusData.deep_zoom_processed_at || null;
-                    
-                    // Se il processing è completato, mostra notifica dettagliata
-                    if (wasProcessing && statusData.deep_zoom_status === 'completed') {
-                        console.log(`✅ Deep zoom processing completed for: ${photo.filename}`);
-                        const tileCount = statusData.deep_zoom_tile_count || 0;
-                        const levels = statusData.deep_zoom_levels || 0;
-                        this.showAlertMessage(
-                            `🎉 Deep Zoom completato per: ${photo.original_filename || photo.filename} ` +
-                            `(${tileCount} tiles, ${levels} livelli). La foto ora supporta lo zoom avanzato!`
-                        );
-                    } else if (wasProcessing && statusData.deep_zoom_status === 'failed') {
-                        console.log(`❌ Deep zoom processing failed for: ${photo.filename}`);
-                        this.showAlertMessage(
-                            `⚠️ Errore elaborazione Deep Zoom per: ${photo.original_filename || photo.filename}. ` +
-                            `La foto è comunque disponibile in modalità standard.`
-                        );
-                    }
-                    
-                    return statusData.deep_zoom_status;
+                // Handle specific authentication errors
+                if (response.status === 401) {
+                    console.error('Authentication error (401): Token expired or invalid');
+                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    // Optionally redirect to login page
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Errore di autenticazione: sessione scaduta');
                 }
+                
+                if (response.status === 403) {
+                    console.error('Authorization error (403): Insufficient permissions');
+                    this.showAlertMessage('Non hai i permessi per visualizzare lo stato Deep Zoom di questa foto.');
+                    throw new Error('Errore di autorizzazione: permessi insufficienti');
+                }
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error:', response.status, errorText);
+                    this.showAlertMessage(`Errore nel recupero dello stato Deep Zoom: ${response.status} ${response.statusText}`);
+                    throw new Error(`Errore API ${response.status}: ${response.statusText}`);
+                }
+                
+                const statusData = await response.json();
+                
+                // Aggiorna lo stato della foto
+                const wasProcessing = photo.deepzoom_status === 'processing' || photo.deepzoom_status === 'scheduled';
+                
+                photo.has_deep_zoom = statusData.has_deep_zoom || false;
+                photo.deepzoom_status = statusData.deepzoom_status || null;
+                photo.max_zoom_level = statusData.max_zoom_level || null;
+                photo.tile_count = statusData.tile_count || null;
+                photo.deepzoom_processed_at = statusData.deepzoom_processed_at || null;
+                
+                // Se il processing è completato, mostra notifica dettagliata
+                if (wasProcessing && statusData.deepzoom_status === 'completed') {
+                    console.log(`✅ Deep zoom processing completed for: ${photo.filename}`);
+                    const tileCount = statusData.tile_count || 0;
+                    const levels = statusData.max_zoom_level || 0;
+                    this.showAlertMessage(
+                        `🎉 Deep Zoom completato per: ${photo.original_filename || photo.filename} ` +
+                        `(${tileCount} tiles, ${levels} livelli). La foto ora supporta lo zoom avanzato!`
+                    );
+                } else if (wasProcessing && statusData.deepzoom_status === 'failed') {
+                    console.log(`❌ Deep zoom processing failed for: ${photo.filename}`);
+                    this.showAlertMessage(
+                        `⚠️ Errore elaborazione Deep Zoom per: ${photo.original_filename || photo.filename}. ` +
+                        `La foto è comunque disponibile in modalità standard.`
+                    );
+                }
+                
+                return statusData.deepzoom_status;
                 
             } catch (error) {
                 console.warn(`Error updating deep zoom status for photo ${photo.id}:`, error);
+                this.showAlertMessage(`Errore nel recupero dello stato Deep Zoom: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
             }
             
             return null;
@@ -3129,9 +3359,9 @@ function photosManager() {
         async initializeDeepZoomStatus() {
             const photosNeedingStatusCheck = this.photos.filter(photo =>
                 photo && (
-                    photo.deep_zoom_status === 'processing' ||
-                    photo.deep_zoom_status === 'scheduled' ||
-                    (!photo.deep_zoom_status && photo.width > 2000) // Foto grandi che potrebbero aver bisogno di tiles
+                    photo.deepzoom_status === 'processing' ||
+                    photo.deepzoom_status === 'scheduled' ||
+                    (!photo.deepzoom_status && photo.width > 2000) // Foto grandi che potrebbero aver bisogno di tiles
                 )
             );
             
@@ -3144,12 +3374,12 @@ function photosManager() {
                 
                 // Status updates now handled by WebSocket notifications
                 const stillProcessing = this.photos.some(photo =>
-                    photo.deep_zoom_status === 'processing' ||
-                    photo.deep_zoom_status === 'scheduled'
+                    photo.deepzoom_status === 'processing' ||
+                    photo.deepzoom_status === 'scheduled'
                 );
                 
                 if (stillProcessing) {
-                    console.log(`📡 ${this.photos.filter(p => p.deep_zoom_status === 'processing' || p.deep_zoom_status === 'scheduled').length} photos still processing - WebSocket will notify on completion`);
+                    console.log(`📡 ${this.photos.filter(p => p.deepzoom_status === 'processing' || p.deepzoom_status === 'scheduled').length} photos still processing - WebSocket will notify on completion`);
                 }
                 
                 // Aggiorna la vista
@@ -3167,8 +3397,8 @@ function photosManager() {
             let photosScheduled = 0;
             photoIds.forEach(photoId => {
                 const photo = this.photos.find(p => p && p.id === photoId);
-                if (photo && photo.width > 2000 && !photo.deep_zoom_status) {
-                    photo.deep_zoom_status = 'scheduled';
+                if (photo && photo.width > 2000 && !photo.deepzoom_status) {
+                    photo.deepzoom_status = 'scheduled';
                     this.photosBeingProcessed.add(photoId);
                     photosScheduled++;
                 }

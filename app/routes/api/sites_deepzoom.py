@@ -136,7 +136,7 @@ async def process_deep_zoom(
 
     # Scarica foto da MinIO per processamento
     try:
-        photo_data = await archaeological_minio_service.get_file(photo.file_path)
+        photo_data = await archaeological_minio_service.get_file(photo.filepath)
 
         # Processa con deep zoom
         from fastapi import UploadFile
@@ -161,8 +161,8 @@ async def process_deep_zoom(
 
         # Aggiorna database con info deep zoom
         photo.has_deep_zoom = True
-        photo.deep_zoom_levels = result['levels']
-        photo.deep_zoom_tile_count = result['total_tiles']
+        photo.max_zoom_level = result['levels']
+        photo.tile_count = result['total_tiles']
         await db.commit()
 
         return JSONResponse({
@@ -208,11 +208,11 @@ async def get_deep_zoom_processing_status(
     return JSONResponse({
         "photo_id": str(photo_id),
         "site_id": str(site_id),
-        "status": photo.deep_zoom_status,
+        "status": photo.deepzoom_status,
         "has_deep_zoom": photo.has_deep_zoom,
-        "levels": photo.deep_zoom_levels,
-        "tile_count": photo.deep_zoom_tile_count,
-        "processed_at": photo.deep_zoom_processed_at.isoformat() if photo.deep_zoom_processed_at else None,
+        "levels": photo.max_zoom_level,
+        "tile_count": photo.tile_count,
+        "processed_at": photo.deepzoom_processed_at.isoformat() if photo.deepzoom_processed_at else None,
         "minio_status": minio_status
     })
 
@@ -236,7 +236,7 @@ async def get_processing_queue_status(
     processing_query = select(Photo).where(
         and_(
             Photo.site_id == site_id,
-            Photo.deep_zoom_status.in_(['scheduled', 'processing'])
+            Photo.deepzoom_status.in_(['scheduled', 'processing'])
         )
     ).order_by(Photo.created_at.desc())
     
@@ -247,7 +247,7 @@ async def get_processing_queue_status(
     recent_completed_query = select(Photo).where(
         and_(
             Photo.site_id == site_id,
-            Photo.deep_zoom_status == 'completed',
+            Photo.deepzoom_status == 'completed',
             Photo.deep_zoom_processed_at >= datetime.now() - timedelta(hours=24)
         )
     ).order_by(Photo.deep_zoom_processed_at.desc()).limit(10)
@@ -261,7 +261,7 @@ async def get_processing_queue_status(
             {
                 "photo_id": str(photo.id),
                 "filename": photo.filename,
-                "status": photo.deep_zoom_status,
+                "status": photo.deepzoom_status,
                 "created_at": photo.created_at.isoformat(),
                 "width": photo.width,
                 "height": photo.height
@@ -272,10 +272,10 @@ async def get_processing_queue_status(
             {
                 "photo_id": str(photo.id),
                 "filename": photo.filename,
-                "status": photo.deep_zoom_status,
-                "completed_at": photo.deep_zoom_processed_at.isoformat() if photo.deep_zoom_processed_at else None,
-                "tile_count": photo.deep_zoom_tile_count,
-                "levels": photo.deep_zoom_levels
+                "status": photo.deepzoom_status,
+                "completed_at": photo.deepzoom_processed_at.isoformat() if photo.deepzoom_processed_at else None,
+                "tile_count": photo.tile_count,
+                "levels": photo.max_zoom_level
             }
             for photo in completed_photos
         ],

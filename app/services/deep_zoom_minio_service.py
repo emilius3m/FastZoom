@@ -1094,21 +1094,21 @@ class DeepZoomMinIOService:
                     
                     if photo:
                         # Update status
-                        photo.deep_zoom_status = status
+                        photo.deepzoom_status = status
                         
                         if status == "completed":
                             photo.has_deep_zoom = True
                             photo.deep_zoom_processed_at = datetime.now()
                             if tile_count is not None:
-                                photo.deep_zoom_tile_count = tile_count
+                                photo.tile_count = tile_count
                             if levels is not None:
-                                photo.deep_zoom_levels = levels
+                                photo.max_zoom_level = levels
                         elif status == "failed":
                             photo.has_deep_zoom = False
                             photo.deep_zoom_processed_at = datetime.now()
                         elif status == "processing":
                             # Set processing status
-                            photo.deep_zoom_status = "processing"
+                            photo.deepzoom_status = "processing"
                         
                         await db.commit()
                         logger.info(f"Updated photo {photo_id} deep zoom status to: {status}")

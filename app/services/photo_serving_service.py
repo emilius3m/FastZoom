@@ -176,20 +176,20 @@ class PhotoServingService:
                 raise HTTPException(status_code=404, detail="Foto non trovata")
 
             # Determina path file
-            if photo.file_path:
-                logger.info(f"Photo {photo_id} has file_path: {photo.file_path}")
+            if photo.filepath:
+                logger.info(f"Photo {photo_id} has filepath: {photo.filepath}")
 
                 # Se file è su MinIO
-                if photo.file_path.startswith("sites/") or not photo.file_path.startswith("storage/"):
+                if photo.filepath.startswith("sites/") or not photo.filepath.startswith("storage/"):
                     return await PhotoServingService.serve_file_from_minio(
-                        photo.file_path,
+                        photo.filepath,
                         photo.mime_type or "image/jpeg"
                     )
 
                 # Se file è su filesystem locale
-                elif photo.file_path.startswith("storage/") or photo.file_path.startswith("app/static/"):
+                elif photo.filepath.startswith("storage/") or photo.filepath.startswith("app/static/"):
                     return PhotoServingService.serve_file_from_local(
-                        photo.file_path,
+                        photo.filepath,
                         photo.mime_type or "image/jpeg"
                     )
 
@@ -213,16 +213,16 @@ class PhotoServingService:
                 raise HTTPException(status_code=404, detail="Foto non trovata")
 
             # Determina path file
-            if photo.file_path:
-                logger.info(f"Photo {photo_id} download request for file_path: {photo.file_path}")
+            if photo.filepath:
+                logger.info(f"Photo {photo_id} download request for filepath: {photo.filepath}")
 
                 # Determina filename per il download
                 filename = photo.original_filename or photo.filename or f"photo_{photo_id}.jpg"
 
                 # Se file è su MinIO
-                if photo.file_path.startswith("sites/") or not photo.file_path.startswith("storage/"):
+                if photo.filepath.startswith("sites/") or not photo.filepath.startswith("storage/"):
                     try:
-                        clean_path = PhotoServingService.clean_minio_path(photo.file_path)
+                        clean_path = PhotoServingService.clean_minio_path(photo.filepath)
                         logger.info(f"Attempting to download from Archaeological MinIO: {clean_path}")
 
                         file_data = await archaeological_minio_service.get_file(clean_path)
@@ -248,8 +248,8 @@ class PhotoServingService:
                         raise HTTPException(status_code=500, detail=f"Errore nel download: {str(e)}")
 
                 # Se file è su filesystem locale
-                elif photo.file_path.startswith("storage/") or photo.file_path.startswith("app/static/uploads/"):
-                    file_path = Path(photo.file_path)
+                elif photo.filepath.startswith("storage/") or photo.filepath.startswith("app/static/uploads/"):
+                    file_path = Path(photo.filepath)
                     logger.info(f"Checking local file path for download: {file_path}")
 
                     if file_path.exists():

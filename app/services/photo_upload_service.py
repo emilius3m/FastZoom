@@ -258,7 +258,7 @@ class PhotoUploadService:
                     if photo_record:
                         photos_needing_tiles.append({
                             'photo_id': str(result.photo_id),
-                            'file_path': photo_record.file_path,
+                            'file_path': photo_record.filepath,
                             'width': width,
                             'height': height,
                             'archaeological_metadata': {
@@ -274,7 +274,7 @@ class PhotoUploadService:
                         })
 
                         # Aggiorna status deep zoom
-                        photo_record.deep_zoom_status = 'scheduled'
+                        photo_record.deepzoom_status = 'scheduled'
                         await self.db.commit()
 
             except Exception as e:

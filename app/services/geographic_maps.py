@@ -312,7 +312,7 @@ class GeographicMapService:
                                     "width": photo.width,
                                     "height": photo.height,
                                     "has_deep_zoom": photo.has_deep_zoom,
-                                    "deep_zoom_status": photo.deep_zoom_status,
+                                    "deep_zoom_status": photo.deepzoom_status,
                                     "display_order": assoc.display_order,
                                     "is_primary": assoc.is_primary
                                 })
@@ -666,7 +666,7 @@ class GeographicMapService:
                 "description": photo.description,
                 "filename": photo.filename,
                 "original_filename": photo.original_filename,
-                "file_path": photo.file_path,
+                "file_path": photo.filepath,
                 "file_size": photo.file_size,
                 "mime_type": photo.mime_type,
                 "keywords": photo.keywords,
