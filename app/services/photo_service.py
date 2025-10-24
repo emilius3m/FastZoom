@@ -603,37 +603,45 @@ class PhotoMetadataService:
         return photo
 
     def _convert_to_enum(self, enum_class, value):
-        """Converte stringa in enum se possibile"""
+        """
+        Converte stringa in enum se possibile usando il sistema di conversione centralizzato
+        
+        Args:
+            enum_class: La classe enum a cui convertire
+            value: Il valore da convertire (italiano o inglese)
+            
+        Returns:
+            Istanza dell'enum o None se la conversione fallisce
+        """
         if value is None:
             return None
+            
         if isinstance(value, enum_class):
             return value
-        try:
-            return enum_class(value)
-        except ValueError:
-            # Special handling for Italian values
-            if enum_class.__name__ == 'ConservationStatus' and isinstance(value, str):
-                italian_to_english = {
-                    'buono': 'good',
-                    'eccellente': 'excellent',
-                    'discreto': 'fair',
-                    'cattivo': 'poor',
-                    'pessimo': 'very_poor',
-                    'frammentario': 'fragmentary',
-                    'restaurato': 'restored',
-                    'ricostruito': 'reconstructed',
-                    'perduto': 'lost',
-                    'mancante': 'missing',
-                    'danneggiato': 'damaged',
-                    'incompleto': 'incomplete'
-                }
-                if value.lower() in italian_to_english:
-                    try:
-                        return enum_class(italian_to_english[value.lower()])
-                    except ValueError:
-                        pass
             
-            logger.warning(f"Invalid value for {enum_class.__name__}: {value}")
+        # Import the centralized enum converter
+        try:
+            from app.utils.enum_mappings import enum_converter, log_conversion_attempt
+            
+            # Use the centralized converter
+            converted_value = enum_converter.convert_to_enum(enum_class, value)
+            
+            # Log the conversion attempt
+            success = converted_value is not None
+            log_conversion_attempt(enum_class, str(value), converted_value, success)
+            
+            return converted_value
+            
+        except ImportError:
+            # Fallback to basic conversion if enum_mappings is not available
+            logger.warning("enum_mappings not available, using basic conversion")
+            try:
+                return enum_class(value)
+            except ValueError:
+                logger.warning(f"Invalid value for {enum_class.__name__}: {value}")
+                return None
+        except Exception as e:
+            logger.error(f"Error converting value '{value}' to {enum_class.__name__}: {e}")
             return None
 
     def _guess_mime_type(self, filename: str) -> str:

@@ -978,24 +978,55 @@ async def update_photo(
             else:
                 filtered_data[field] = value
 
-    # Gestione campi enum
-    if 'photo_type' in filtered_data and filtered_data['photo_type']:
-        try:
-            filtered_data['photo_type'] = PhotoType(filtered_data['photo_type'])
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Tipo foto non valido: {filtered_data['photo_type']}")
+    # Gestione campi enum con sistema di conversione centralizzato
+    try:
+        from app.utils.enum_mappings import enum_converter, log_conversion_attempt
+        
+        # Convert photo_type
+        if 'photo_type' in filtered_data and filtered_data['photo_type']:
+            converted_photo_type = enum_converter.convert_to_enum(PhotoType, filtered_data['photo_type'])
+            if converted_photo_type is None:
+                raise HTTPException(status_code=400, detail=f"Tipo foto non valido: {filtered_data['photo_type']}")
+            filtered_data['photo_type'] = converted_photo_type
+            log_conversion_attempt(PhotoType, str(filtered_data['photo_type']), converted_photo_type, True)
 
-    if 'material' in filtered_data and filtered_data['material']:
-        try:
-            filtered_data['material'] = MaterialType(filtered_data['material'])
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Materiale non valido: {filtered_data['material']}")
+        # Convert material
+        if 'material' in filtered_data and filtered_data['material']:
+            converted_material = enum_converter.convert_to_enum(MaterialType, filtered_data['material'])
+            if converted_material is None:
+                raise HTTPException(status_code=400, detail=f"Materiale non valido: {filtered_data['material']}")
+            filtered_data['material'] = converted_material
+            log_conversion_attempt(MaterialType, str(filtered_data['material']), converted_material, True)
 
-    if 'conservation_status' in filtered_data and filtered_data['conservation_status']:
-        try:
-            filtered_data['conservation_status'] = ConservationStatus(filtered_data['conservation_status'])
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Stato di conservazione non valido: {filtered_data['conservation_status']}")
+        # Convert conservation_status
+        if 'conservation_status' in filtered_data and filtered_data['conservation_status']:
+            converted_conservation = enum_converter.convert_to_enum(ConservationStatus, filtered_data['conservation_status'])
+            if converted_conservation is None:
+                raise HTTPException(status_code=400, detail=f"Stato di conservazione non valido: {filtered_data['conservation_status']}")
+            filtered_data['conservation_status'] = converted_conservation
+            log_conversion_attempt(ConservationStatus, str(filtered_data['conservation_status']), converted_conservation, True)
+            
+    except ImportError:
+        # Fallback to basic conversion if enum_mappings is not available
+        logger.warning("enum_mappings not available, using basic enum conversion")
+        
+        if 'photo_type' in filtered_data and filtered_data['photo_type']:
+            try:
+                filtered_data['photo_type'] = PhotoType(filtered_data['photo_type'])
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Tipo foto non valido: {filtered_data['photo_type']}")
+
+        if 'material' in filtered_data and filtered_data['material']:
+            try:
+                filtered_data['material'] = MaterialType(filtered_data['material'])
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Materiale non valido: {filtered_data['material']}")
+
+        if 'conservation_status' in filtered_data and filtered_data['conservation_status']:
+            try:
+                filtered_data['conservation_status'] = ConservationStatus(filtered_data['conservation_status'])
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Stato di conservazione non valido: {filtered_data['conservation_status']}")
 
     # Gestione date
     if 'find_date' in filtered_data and filtered_data['find_date']:
@@ -1406,24 +1437,55 @@ async def bulk_update_photos(
                 else:
                     filtered_metadata[field] = value
 
-        # Gestione campi enum
-        if 'photo_type' in filtered_metadata and filtered_metadata['photo_type']:
-            try:
-                filtered_metadata['photo_type'] = PhotoType(filtered_metadata['photo_type'])
-            except ValueError:
-                raise HTTPException(status_code=400, detail=f"Tipo foto non valido: {filtered_metadata['photo_type']}")
+        # Gestione campi enum con sistema di conversione centralizzato
+        try:
+            from app.utils.enum_mappings import enum_converter, log_conversion_attempt
+            
+            # Convert photo_type
+            if 'photo_type' in filtered_metadata and filtered_metadata['photo_type']:
+                converted_photo_type = enum_converter.convert_to_enum(PhotoType, filtered_metadata['photo_type'])
+                if converted_photo_type is None:
+                    raise HTTPException(status_code=400, detail=f"Tipo foto non valido: {filtered_metadata['photo_type']}")
+                filtered_metadata['photo_type'] = converted_photo_type
+                log_conversion_attempt(PhotoType, str(filtered_metadata['photo_type']), converted_photo_type, True)
 
-        if 'material' in filtered_metadata and filtered_metadata['material']:
-            try:
-                filtered_metadata['material'] = MaterialType(filtered_metadata['material'])
-            except ValueError:
-                raise HTTPException(status_code=400, detail=f"Materiale non valido: {filtered_metadata['material']}")
+            # Convert material
+            if 'material' in filtered_metadata and filtered_metadata['material']:
+                converted_material = enum_converter.convert_to_enum(MaterialType, filtered_metadata['material'])
+                if converted_material is None:
+                    raise HTTPException(status_code=400, detail=f"Materiale non valido: {filtered_metadata['material']}")
+                filtered_metadata['material'] = converted_material
+                log_conversion_attempt(MaterialType, str(filtered_metadata['material']), converted_material, True)
 
-        if 'conservation_status' in filtered_metadata and filtered_metadata['conservation_status']:
-            try:
-                filtered_metadata['conservation_status'] = ConservationStatus(filtered_metadata['conservation_status'])
-            except ValueError:
-                raise HTTPException(status_code=400, detail=f"Stato di conservazione non valido: {filtered_metadata['conservation_status']}")
+            # Convert conservation_status
+            if 'conservation_status' in filtered_metadata and filtered_metadata['conservation_status']:
+                converted_conservation = enum_converter.convert_to_enum(ConservationStatus, filtered_metadata['conservation_status'])
+                if converted_conservation is None:
+                    raise HTTPException(status_code=400, detail=f"Stato di conservazione non valido: {filtered_metadata['conservation_status']}")
+                filtered_metadata['conservation_status'] = converted_conservation
+                log_conversion_attempt(ConservationStatus, str(filtered_metadata['conservation_status']), converted_conservation, True)
+                
+        except ImportError:
+            # Fallback to basic conversion if enum_mappings is not available
+            logger.warning("enum_mappings not available, using basic enum conversion")
+            
+            if 'photo_type' in filtered_metadata and filtered_metadata['photo_type']:
+                try:
+                    filtered_metadata['photo_type'] = PhotoType(filtered_metadata['photo_type'])
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Tipo foto non valido: {filtered_metadata['photo_type']}")
+
+            if 'material' in filtered_metadata and filtered_metadata['material']:
+                try:
+                    filtered_metadata['material'] = MaterialType(filtered_metadata['material'])
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Materiale non valido: {filtered_metadata['material']}")
+
+            if 'conservation_status' in filtered_metadata and filtered_metadata['conservation_status']:
+                try:
+                    filtered_metadata['conservation_status'] = ConservationStatus(filtered_metadata['conservation_status'])
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Stato di conservazione non valido: {filtered_metadata['conservation_status']}")
 
         # Gestione date
         if 'find_date' in filtered_metadata and filtered_metadata['find_date']:

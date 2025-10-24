@@ -154,12 +154,12 @@
                 <select x-model="filters.stato_conservazione" 
                         class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <option value="">Tutti</option>
-                    <option value="ottimo">Ottimo</option>
-                    <option value="buono">Buono</option>
-                    <option value="discreto">Discreto</option>
-                    <option value="cattivo">Cattivo</option>
-                    <option value="pessimo">Pessimo</option>
-                    <option value="frammentario">Frammentario</option>
+                    <option value="excellent">Ottimo</option>
+                    <option value="good">Buono</option>
+                    <option value="fair">Discreto</option>
+                    <option value="poor">Cattivo</option>
+                    <option value="very_poor">Pessimo</option>
+                    <option value="fragmentary">Frammentario</option>
                 </select>
             </div>
             <div>
@@ -692,24 +692,24 @@ function repertiApp() {
         
         getConservationColor(stato) {
             const colors = {
-                'ottimo': 'text-green-600',
-                'buono': 'text-green-500',
-                'discreto': 'text-yellow-600',
-                'cattivo': 'text-orange-600',
-                'pessimo': 'text-red-600',
-                'frammentario': 'text-gray-600'
+                'excellent': 'text-green-600',
+                'good': 'text-green-500',
+                'fair': 'text-yellow-600',
+                'poor': 'text-orange-600',
+                'very_poor': 'text-red-600',
+                'fragmentary': 'text-gray-600'
             };
             return colors[stato] || 'text-gray-600';
         },
         
         getConservationBadge(stato) {
             const badges = {
-                'ottimo': 'bg-green-100 text-green-800',
-                'buono': 'bg-green-100 text-green-700',
-                'discreto': 'bg-yellow-100 text-yellow-800',
-                'cattivo': 'bg-orange-100 text-orange-800',
-                'pessimo': 'bg-red-100 text-red-800',
-                'frammentario': 'bg-gray-100 text-gray-800'
+                'excellent': 'bg-green-100 text-green-800',
+                'good': 'bg-green-100 text-green-700',
+                'fair': 'bg-yellow-100 text-yellow-800',
+                'poor': 'bg-orange-100 text-orange-800',
+                'very_poor': 'bg-red-100 text-red-800',
+                'fragmentary': 'bg-gray-100 text-gray-800'
             };
             return badges[stato] || 'bg-gray-100 text-gray-800';
         },
