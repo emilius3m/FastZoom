@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastZoom Performance Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        .metric-card {
+            @apply bg-white rounded-lg shadow-md p-6 border border-gray-200;
+        }
+        .health-excellent { @apply bg-green-100 text-green-800; }
+        .health-good { @apply bg-blue-100 text-blue-800; }
+        .health-fair { @apply bg-yellow-100 text-yellow-800; }
+        .health-poor { @apply bg-orange-100 text-orange-800; }
+        .health-critical { @apply bg-red-100 text-red-800; }
+        .alert-warning { @apply bg-yellow-50 border-yellow-200 text-yellow-800; }
+        .alert-critical { @apply bg-red-50 border-red-200 text-red-800; }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900">FastZoom Performance Dashboard</h1>
+                    <span id="last-update" class="ml-4 text-sm text-gray-500"></span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="refresh-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                        🔄 Refresh
+                    </button>
+                    <button id="auto-refresh-toggle" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors">
+                        ⏱️ Auto Refresh: ON
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Health Score Section -->
+        <section class="mb-8">
+            <div class="metric-card">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900 mb-2">System Health Score</h2>
+                        <div class="flex items-center">
+                            <div id="health-score" class="text-4xl font-bold mr-4">--</div>
+                            <div id="health-status" class="px-3 py-1 rounded-full text-sm font-medium">
+                                Loading...
+                            </div>
+                        </div>
+                        <div id="health-factors" class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <!-- Health factors will be populated here -->
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-gray-500">Active Alerts</div>
+                        <div id="active-alerts-count" class="text-2xl font-bold text-red-600">0</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Key Metrics Grid -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Key Performance Metrics</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Response Time -->
+                <div class="metric-card">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600">Response Time</h3>
+                        <span class="text-xs text-gray-500">Target: <2s</span>
+                    </div>
+                    <div id="response-time-value" class="text-2xl font-bold text-gray-900">--</div>
+                    <div id="response-time-trend" class="text-sm mt-1">--</div>
+                </div>
+
+                <!-- Error Rate -->
+                <div class="metric-card">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600">Error Rate</h3>
+                        <span class="text-xs text-gray-500">Target: <5%</span>
+                    </div>
+                    <div id="error-rate-value" class="text-2xl font-bold text-gray-900">--</div>
+                    <div id="error-rate-trend" class="text-sm mt-1">--</div>
+                </div>
+
+                <!-- Throughput -->
+                <div class="metric-card">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600">Throughput</h3>
+                        <span class="text-xs text-gray-500">Target: >100 req/s</span>
+                    </div>
+                    <div id="throughput-value" class="text-2xl font-bold text-gray-900">--</div>
+                    <div id="throughput-trend" class="text-sm mt-1">--</div>
+                </div>
+
+                <!-- Concurrent Requests -->
+                <div class="metric-card">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-medium text-gray-600">Concurrent Requests</h3>
+                        <span class="text-xs text-gray-500">Target: >50</span>
+                    </div>
+                    <div id="concurrent-requests-value" class="text-2xl font-bold text-gray-900">--</div>
+                    <div id="concurrent-requests-trend" class="text-sm mt-1">--</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Performance Trends</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Response Time Chart -->
+                <div class="metric-card">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Response Time (Last Hour)</h3>
+                    <div class="chart-container">
+                        <canvas id="response-time-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- System Resources Chart -->
+                <div class="metric-card">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">System Resources</h3>
+                    <div class="chart-container">
+                        <canvas id="system-resources-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Throughput Chart -->
+                <div class="metric-card">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Throughput (Last Hour)</h3>
+                    <div class="chart-container">
+                        <canvas id="throughput-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Database Pool Chart -->
+                <div class="metric-card">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Database Pool Utilization</h3>
+                    <div class="chart-container">
+                        <canvas id="database-pool-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Performance Comparison Section -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Performance Improvements</h2>
+            <div class="metric-card">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Metric</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Baseline</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Improvement</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target Met</th>
+                            </tr>
+                        </thead>
+                        <tbody id="performance-comparison-tbody" class="bg-white divide-y divide-gray-200">
+                            <!-- Performance comparison data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Active Alerts Section -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Active Alerts</h2>
+            <div id="alerts-container" class="space-y-4">
+                <!-- Alerts will be populated here -->
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Global variables
+        let autoRefresh = true;
+        let refreshInterval;
+        let charts = {};
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            loadDashboardData();
+            startAutoRefresh();
+            
+            // Event listeners
+            document.getElementById('refresh-btn').addEventListener('click', function() {
+                loadDashboardData();
+            });
+            
+            document.getElementById('auto-refresh-toggle').addEventListener('click', function() {
+                toggleAutoRefresh();
+            });
+        });
+
+        // Initialize charts
+        function initializeCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            displayFormats: {
+                                minute: 'HH:mm'
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                }
+            };
+
+            // Response Time Chart
+            const responseTimeCtx = document.getElementById('response-time-chart').getContext('2d');
+            charts.responseTime = new Chart(responseTimeCtx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Response Time (s)',
+                        data: [],
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Seconds'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // System Resources Chart
+            const systemResourcesCtx = document.getElementById('system-resources-chart').getContext('2d');
+            charts.systemResources = new Chart(systemResourcesCtx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'CPU %',
+                            data: [],
+                            borderColor: 'rgb(239, 68, 68)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Memory %',
+                            data: [],
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Percentage'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Throughput Chart
+            const throughputCtx = document.getElementById('throughput-chart').getContext('2d');
+            charts.throughput = new Chart(throughputCtx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Throughput (req/s)',
+                        data: [],
+                        borderColor: 'rgb(168, 85, 247)',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Requests per Second'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Database Pool Chart
+            const databasePoolCtx = document.getElementById('database-pool-chart').getContext('2d');
+            charts.databasePool = new Chart(databasePoolCtx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Pool Utilization %',
+                        data: [],
+                        borderColor: 'rgb(251, 146, 60)',
+                        backgroundColor: 'rgba(251, 146, 60, 0.1)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Utilization %'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                showLoading(true);
+                
+                // Load all data in parallel
+                const [dashboardData, metricsHistory, alerts, comparison] = await Promise.all([
+                    fetch('/api/performance-monitoring/dashboard').then(r => r.json()),
+                    loadMetricsHistory(),
+                    fetch('/api/performance-monitoring/alerts').then(r => r.json()),
+                    fetch('/api/performance-monitoring/comparison').then(r => r.json())
+                ]);
+
+                // Update dashboard components
+                updateHealthScore(dashboardData.health_score);
+                updateKeyMetrics(dashboardData.recent_metrics);
+                updatePerformanceComparison(comparison);
+                updateAlerts(alerts.alerts);
+                updateCharts(metricsHistory);
+                updateLastUpdate();
+
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                showError('Failed to load dashboard data');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Load metrics history for charts
+        async function loadMetricsHistory() {
+            const metricTypes = ['response_time', 'system_resources', 'throughput', 'database_pool'];
+            const history = {};
+
+            for (const metricType of metricTypes) {
+                try {
+                    const response = await fetch(`/api/performance-monitoring/metrics/history?metric_type=${metricType}&time_range=1h`);
+                    const data = await response.json();
+                    history[metricType] = data.data || [];
+                } catch (error) {
+                    console.error(`Error loading ${metricType} history:`, error);
+                    history[metricType] = [];
+                }
+            }
+
+            return history;
+        }
+
+        // Update health score
+        function updateHealthScore(healthScore) {
+            const scoreElement = document.getElementById('health-score');
+            const statusElement = document.getElementById('health-status');
+            const factorsElement = document.getElementById('health-factors');
+
+            scoreElement.textContent = healthScore.score;
+            
+            // Update status
+            statusElement.textContent = healthScore.status.toUpperCase();
+            statusElement.className = `px-3 py-1 rounded-full text-sm font-medium health-${healthScore.status}`;
+
+            // Update factors
+            factorsElement.innerHTML = '';
+            for (const [factor, score] of Object.entries(healthScore.factors)) {
+                const factorDiv = document.createElement('div');
+                factorDiv.className = 'text-center';
+                factorDiv.innerHTML = `
+                    <div class="text-sm text-gray-600">${factor.replace('_', ' ').toUpperCase()}</div>
+                    <div class="text-lg font-semibold">${score}</div>
+                `;
+                factorsElement.appendChild(factorDiv);
+            }
+        }
+
+        // Update key metrics
+        function updateKeyMetrics(metrics) {
+            // Update response time
+            const responseTimeMetric = findMetric(metrics, 'response_time');
+            if (responseTimeMetric) {
+                document.getElementById('response-time-value').textContent = 
+                    `${responseTimeMetric.avg?.toFixed(2) || '--'}s`;
+                updateTrend('response-time-trend', responseTimeMetric.avg, 2.0, 'lower');
+            }
+
+            // Update error rate
+            const errorRateMetric = findMetric(metrics, 'error_rate');
+            if (errorRateMetric) {
+                document.getElementById('error-rate-value').textContent = 
+                    `${errorRateMetric.avg?.toFixed(1) || '--'}%`;
+                updateTrend('error-rate-trend', errorRateMetric.avg, 5.0, 'lower');
+            }
+
+            // Update throughput
+            const throughputMetric = findMetric(metrics, 'throughput');
+            if (throughputMetric) {
+                document.getElementById('throughput-value').textContent = 
+                    `${throughputMetric.avg?.toFixed(1) || '--'} req/s`;
+                updateTrend('throughput-trend', throughputMetric.avg, 100.0, 'higher');
+            }
+
+            // Update concurrent requests
+            const concurrentMetric = findMetric(metrics, 'concurrent_requests');
+            if (concurrentMetric) {
+                document.getElementById('concurrent-requests-value').textContent = 
+                    `${concurrentMetric.avg?.toFixed(0) || '--'}`;
+                updateTrend('concurrent-requests-trend', concurrentMetric.avg, 50.0, 'higher');
+            }
+        }
+
+        // Find metric in summary data
+        function findMetric(metrics, metricType) {
+            for (const key in metrics) {
+                if (key.startsWith(metricType)) {
+                    return metrics[key];
+                }
+            }
+            return null;
+        }
+
+        // Update trend indicator
+        function updateTrend(elementId, currentValue, targetValue, direction) {
+            const element = document.getElementById(elementId);
+            if (currentValue === undefined || currentValue === null) {
+                element.textContent = '--';
+                return;
+            }
+
+            const isGood = direction === 'lower' ? currentValue <= targetValue : currentValue >= targetValue;
+            const trend = isGood ? '✅ Good' : '⚠️ Above Target';
+            const color = isGood ? 'text-green-600' : 'text-yellow-600';
+            
+            element.innerHTML = `<span class="${color}">${trend}</span>`;
+        }
+
+        // Update performance comparison
+        function updatePerformanceComparison(comparison) {
+            const tbody = document.getElementById('performance-comparison-tbody');
+            tbody.innerHTML = '';
+
+            for (const [metric, data] of Object.entries(comparison.metrics)) {
+                const row = document.createElement('tr');
+                const improvementClass = data.improvement_percent >= 0 ? 'text-green-600' : 'text-red-600';
+                const targetMetIcon = data.target_met ? '✅' : '❌';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        ${metric.replace('_', ' ').toUpperCase()}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${data.baseline_value} ${data.unit}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${data.current_value.toFixed(2)} ${data.unit}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${improvementClass}">
+                        ${data.improvement_percent > 0 ? '+' : ''}${data.improvement_percent}%
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        ${targetMetIcon}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            }
+        }
+
+        // Update alerts
+        function updateAlerts(alerts) {
+            const container = document.getElementById('alerts-container');
+            const countElement = document.getElementById('active-alerts-count');
+            
+            countElement.textContent = alerts.length;
+            
+            if (alerts.length === 0) {
+                container.innerHTML = '<div class="metric-card text-center text-gray-500">No active alerts</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            alerts.forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `metric-card border-l-4 alert-${alert.level}`;
+                alertDiv.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="font-medium">${alert.message}</div>
+                            <div class="text-sm text-gray-600 mt-1">
+                                Level: ${alert.level.toUpperCase()} | 
+                                Threshold: ${alert.threshold} | 
+                                Count: ${alert.count}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-500">Created</div>
+                            <div class="text-sm">${new Date(alert.created_at).toLocaleString()}</div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(alertDiv);
+            });
+        }
+
+        // Update charts
+        function updateCharts(history) {
+            // Update Response Time Chart
+            if (history.response_time) {
+                charts.responseTime.data.datasets[0].data = history.response_time.map(m => ({
+                    x: m.timestamp,
+                    y: m.value
+                }));
+                charts.responseTime.update();
+            }
+
+            // Update System Resources Chart
+            if (history.system_resources) {
+                const cpuData = history.system_resources
+                    .filter(m => m.tags.resource === 'cpu')
+                    .map(m => ({ x: m.timestamp, y: m.value }));
+                
+                const memoryData = history.system_resources
+                    .filter(m => m.tags.resource === 'memory')
+                    .map(m => ({ x: m.timestamp, y: m.value }));
+
+                charts.systemResources.data.datasets[0].data = cpuData;
+                charts.systemResources.data.datasets[1].data = memoryData;
+                charts.systemResources.update();
+            }
+
+            // Update Throughput Chart
+            if (history.throughput) {
+                charts.throughput.data.datasets[0].data = history.throughput.map(m => ({
+                    x: m.timestamp,
+                    y: m.value
+                }));
+                charts.throughput.update();
+            }
+
+            // Update Database Pool Chart
+            if (history.database_pool) {
+                const poolData = history.database_pool
+                    .filter(m => m.tags.metric === 'utilization')
+                    .map(m => ({ x: m.timestamp, y: m.value }));
+
+                charts.databasePool.data.datasets[0].data = poolData;
+                charts.databasePool.update();
+            }
+        }
+
+        // Update last update time
+        function updateLastUpdate() {
+            const element = document.getElementById('last-update');
+            element.textContent = `Last updated: ${new Date().toLocaleString()}`;
+        }
+
+        // Toggle auto refresh
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            const button = document.getElementById('auto-refresh-toggle');
+            
+            if (autoRefresh) {
+                button.textContent = '⏱️ Auto Refresh: ON';
+                button.className = 'bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors';
+                startAutoRefresh();
+            } else {
+                button.textContent = '⏱️ Auto Refresh: OFF';
+                button.className = 'bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors';
+                stopAutoRefresh();
+            }
+        }
+
+        // Start auto refresh
+        function startAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+            
+            refreshInterval = setInterval(() => {
+                if (autoRefresh) {
+                    loadDashboardData();
+                }
+            }, 30000); // Refresh every 30 seconds
+        }
+
+        // Stop auto refresh
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+        }
+
+        // Show/hide loading indicator
+        function showLoading(show) {
+            const button = document.getElementById('refresh-btn');
+            if (show) {
+                button.innerHTML = '<div class="loading-spinner inline-block w-4 h-4 mr-2"></div>Loading...';
+                button.disabled = true;
+            } else {
+                button.innerHTML = '🔄 Refresh';
+                button.disabled = false;
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+            errorDiv.innerHTML = `
+                <strong>Error:</strong> ${message}
+                <button onclick="this.parentElement.remove()" class="ml-4 text-red-500 hover:text-red-700">×</button>
+            `;
+            document.body.appendChild(errorDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (errorDiv.parentElement) {
+                    errorDiv.remove();
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
