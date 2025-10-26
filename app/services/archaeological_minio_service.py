@@ -4,6 +4,8 @@ import io
 import asyncio
 import json
 import os
+import random
+import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 from uuid import UUID
@@ -17,6 +19,108 @@ from minio.error import S3Error
 from app.core.minio_settings import settings
 # Import locale per evitare circular import
 # from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+
+
+class RetryWithJitter:
+    """Retry pattern con backoff esponenziale e jitter per operazioni MinIO"""
+    
+    def __init__(self, max_retries: int = 5, base_delay: float = 1.0, max_delay: float = 60.0, jitter_factor: float = 0.1):
+        self.max_retries = max_retries
+        self.base_delay = base_delay
+        self.max_delay = max_delay
+        self.jitter_factor = jitter_factor
+    
+    async def execute_with_retry(self, operation_func, operation_name: str, *args, **kwargs):
+        """Esegue operazione con retry e jitter"""
+        
+        last_exception = None
+        
+        for attempt in range(self.max_retries + 1):
+            try:
+                if attempt > 0:
+                    # Calcola delay con backoff esponenziale e jitter
+                    delay = min(self.base_delay * (2 ** attempt), self.max_delay)
+                    jitter = random.uniform(-self.jitter_factor * delay, self.jitter_factor * delay)
+                    final_delay = max(0, delay + jitter)
+                    
+                    logger.warning(f"Retry {attempt}/{self.max_retries} for {operation_name} after {final_delay:.2f}s delay")
+                    await asyncio.sleep(final_delay)
+                
+                # Esegui operazione
+                if asyncio.iscoroutinefunction(operation_func):
+                    return await operation_func(*args, **kwargs)
+                else:
+                    # Esegui operazione sincrona in thread pool
+                    return await asyncio.to_thread(operation_func, *args, **kwargs)
+                
+            except S3Error as e:
+                last_exception = e
+                error_code = getattr(e, 'code', 'Unknown')
+                error_message = str(e)
+                
+                # Classifica errori per retry strategy
+                if self._should_retry_error(error_code, error_message):
+                    if attempt < self.max_retries:
+                        logger.warning(f"MinIO {operation_name} failed (attempt {attempt + 1}): {error_code} - {error_message}")
+                        continue
+                    else:
+                        logger.error(f"MinIO {operation_name} failed after {self.max_retries} retries: {error_code} - {error_message}")
+                        raise HTTPException(status_code=503, detail=f"MinIO operation failed after retries: {error_message}")
+                else:
+                    # Errori non retryable
+                    logger.error(f"MinIO {operation_name} failed with non-retryable error: {error_code} - {error_message}")
+                    raise HTTPException(status_code=400, detail=f"MinIO operation failed: {error_message}")
+            
+            except Exception as e:
+                last_exception = e
+                error_message = str(e)
+                
+                if attempt < self.max_retries:
+                    logger.warning(f"MinIO {operation_name} failed with unexpected error (attempt {attempt + 1}): {error_message}")
+                    continue
+                else:
+                    logger.error(f"MinIO {operation_name} failed after {self.max_retries} retries: {error_message}")
+                    raise HTTPException(status_code=500, detail=f"MinIO operation failed after retries: {error_message}")
+        
+        # Questo punto non dovrebbe essere raggiunto
+        raise HTTPException(status_code=500, detail=f"MinIO operation failed: {str(last_exception)}")
+    
+    def _should_retry_error(self, error_code: str, error_message: str) -> bool:
+        """Determina se l'errore è retryable"""
+        
+        # Errori retryable comuni
+        retryable_errors = {
+            'InternalError', 'ServiceUnavailable', 'SlowDown', 'RequestTimeout',
+            'RequestTimeoutException', 'ServiceUnavailable', 'InternalError',
+            'NetworkError', 'ConnectionError', 'Timeout', 'ReadTimeout'
+        }
+        
+        # Errori non retryable
+        non_retryable_errors = {
+            'InvalidAccessKeyId', 'SignatureDoesNotMatch', 'AccessDenied',
+            'NoSuchBucket', 'NoSuchKey', 'InvalidBucketName', 'MalformedXML'
+        }
+        
+        # Controlla errori specifici
+        if error_code in non_retryable_errors:
+            return False
+        
+        if error_code in retryable_errors:
+            return True
+        
+        # Controlla messaggi di errore per casi speciali
+        error_lower = error_message.lower()
+        
+        # Storage full - retryable con cleanup
+        if 'storage full' in error_lower or 'minimum free drive' in error_lower:
+            return True
+        
+        # Network errors - retryable
+        if any(keyword in error_lower for keyword in ['connection', 'timeout', 'network', 'dns']):
+            return True
+        
+        # Default: retry per errori sconosciuti
+        return True
 
 
 class ArchaeologicalMinIOService:
@@ -106,10 +210,10 @@ class ArchaeologicalMinIOService:
         operation_name: str = "upload",
         target_freed_mb: int = 100
     ) -> str:
-        """Metodo base per upload con gestione errori unificata"""
-        async def upload_operation():
-            result = await asyncio.to_thread(
-                self.client.put_object,
+        """Metodo base per upload con retry pattern migliorato e jitter"""
+        
+        def upload_operation():
+            result = self.client.put_object(
                 bucket_name=bucket_name,
                 object_name=object_name,
                 data=io.BytesIO(data),
@@ -119,11 +223,21 @@ class ArchaeologicalMinIOService:
             )
             return f"minio://{bucket_name}/{object_name}"
 
-        return await self._handle_storage_full_error(
-            upload_operation,
-            operation_name,
-            target_freed_mb
-        )
+        try:
+            # Usa retry pattern con jitter
+            return await self.retry_handler.execute_with_retry(
+                upload_operation,
+                f"{operation_name} to {bucket_name}/{object_name}"
+            )
+        except HTTPException as e:
+            # Gestione speciale per storage full
+            if "storage full" in str(e.detail).lower():
+                return await self._handle_storage_full_error(
+                    upload_operation,
+                    operation_name,
+                    target_freed_mb
+                )
+            raise
 
     async def _generate_presigned_url(
         self,
@@ -132,18 +246,22 @@ class ArchaeologicalMinIOService:
         expires_hours: int = 24,
         operation_name: str = "URL generation"
     ) -> Optional[str]:
-        """Metodo base per generazione URL presigned"""
-        try:
-            url = await asyncio.to_thread(
-                self.client.presigned_get_object,
+        """Metodo base per generazione URL presigned con retry"""
+        
+        def url_operation():
+            return self.client.presigned_get_object(
                 bucket_name=bucket_name,
                 object_name=object_name,
                 expires=timedelta(hours=expires_hours)
             )
-            return url
 
-        except S3Error as e:
-            logger.error(f"MinIO {operation_name} error: {e}")
+        try:
+            return await self.retry_handler.execute_with_retry(
+                url_operation,
+                f"{operation_name} for {bucket_name}/{object_name}"
+            )
+        except HTTPException:
+            # Per URL presigned, ritorna None invece di sollevare eccezione
             return None
 
     def _create_base_metadata(self, site_id: str, content_type: str = None) -> Dict[str, str]:
@@ -174,6 +292,14 @@ class ArchaeologicalMinIOService:
 
     def __init__(self):
         self.client = self._create_minio_client()
+        
+        # Inizializza retry pattern con jitter
+        self.retry_handler = RetryWithJitter(
+            max_retries=5,
+            base_delay=1.0,
+            max_delay=60.0,
+            jitter_factor=0.1
+        )
 
         # Bucket specializzati per archeologia
         self.buckets = {
@@ -536,48 +662,52 @@ class ArchaeologicalMinIOService:
     async def get_storage_stats(self, site_id: str) -> Dict[str, Any]:
         """Ottieni statistiche storage per sito"""
 
-        try:
-            total_size = 0
-            photo_count = 0
-            document_count = 0
+        def _calculate_stats():
+            try:
+                total_size = 0
+                photo_count = 0
+                document_count = 0
 
-            # Statistiche foto
-            photo_objects = self.client.list_objects(
-                self.buckets['photos'],
-                prefix=f"{site_id}/",
-                recursive=True
-            )
-            for obj in photo_objects:
-                photo_count += 1
-                total_size += obj.size
+                # Statistiche foto
+                photo_objects = self.client.list_objects(
+                    self.buckets['photos'],
+                    prefix=f"{site_id}/",
+                    recursive=True
+                )
+                for obj in photo_objects:
+                    photo_count += 1
+                    total_size += obj.size
 
-            # Statistiche documenti
-            doc_objects = self.client.list_objects(
-                self.buckets['documents'],
-                prefix=f"{site_id}/",
-                recursive=True
-            )
-            for obj in doc_objects:
-                document_count += 1
-                total_size += obj.size
+                # Statistiche documenti
+                doc_objects = self.client.list_objects(
+                    self.buckets['documents'],
+                    prefix=f"{site_id}/",
+                    recursive=True
+                )
+                for obj in doc_objects:
+                    document_count += 1
+                    total_size += obj.size
 
-            return {
-                'site_id': site_id,
-                'total_size_mb': round(total_size / (1024 * 1024), 2),
-                'photo_count': photo_count,
-                'document_count': document_count,
-                'total_files': photo_count + document_count
-            }
+                return {
+                    'site_id': site_id,
+                    'total_size_mb': round(total_size / (1024 * 1024), 2),
+                    'photo_count': photo_count,
+                    'document_count': document_count,
+                    'total_files': photo_count + document_count
+                }
 
-        except Exception as e:
-            logger.error(f"Error getting storage stats: {e}")
-            return {
-                'site_id': site_id,
-                'total_size_mb': 0,
-                'photo_count': 0,
-                'document_count': 0,
-                'total_files': 0
-            }
+            except Exception as e:
+                logger.error(f"Error getting storage stats: {e}")
+                return {
+                    'site_id': site_id,
+                    'total_size_mb': 0,
+                    'photo_count': 0,
+                    'document_count': 0,
+                    'total_files': 0
+                }
+
+        # Esegui il calcolo delle statistiche in un thread separato
+        return await asyncio.to_thread(_calculate_stats)
 
     async def upload_tiles(self, site_id: str, photo_id: str, tiles_data: bytes) -> str:
         """Upload tiles per deep zoom viewing"""
@@ -609,21 +739,23 @@ class ArchaeologicalMinIOService:
         try:
             bucket, obj_name = self._parse_minio_path(object_name)
 
-            if range_header:
-                # Parse range per streaming parziale
-                response = await asyncio.to_thread(
-                    self.client.get_object,
-                    bucket_name=bucket,
-                    object_name=obj_name,
-                    request_headers={"Range": range_header}
-                )
-            else:
-                response = await asyncio.to_thread(
-                    self.client.get_object,
-                    bucket_name=bucket,
-                    object_name=obj_name
-                )
+            def _get_stream():
+                if range_header:
+                    # Parse range per streaming parziale
+                    response = self.client.get_object(
+                        bucket_name=bucket,
+                        object_name=obj_name,
+                        request_headers={"Range": range_header}
+                    )
+                else:
+                    response = self.client.get_object(
+                        bucket_name=bucket,
+                        object_name=obj_name
+                    )
+                return response
 
+            # Esegui l'operazione di get_object in un thread separato
+            response = await asyncio.to_thread(_get_stream)
             return response
 
         except S3Error as e:
@@ -781,17 +913,21 @@ class ArchaeologicalMinIOService:
         try:
             bucket, object_name = self._parse_minio_path(object_path)
 
-            # get_object returns HTTPResponse object, need to read content
-            response = await asyncio.to_thread(
-                self.client.get_object,
-                bucket_name=bucket,
-                object_name=object_name
-            )
+            def _download_file():
+                # get_object returns HTTPResponse object, need to read content
+                response = self.client.get_object(
+                    bucket_name=bucket,
+                    object_name=object_name
+                )
+                try:
+                    # Read content from HTTPResponse object
+                    content = response.read()
+                    return content
+                finally:
+                    response.close()
 
-            # Read content from HTTPResponse object
-            content = response.read()
-            response.close()
-
+            # Esegui l'intera operazione di download in un thread separato
+            content = await asyncio.to_thread(_download_file)
             return content
 
         except Exception as e:
@@ -803,11 +939,13 @@ class ArchaeologicalMinIOService:
         try:
             bucket, object_name = self._parse_minio_path(object_path)
 
-            await asyncio.to_thread(
-                self.client.remove_object,
-                bucket_name=bucket,
-                object_name=object_name
-            )
+            def _remove_object():
+                self.client.remove_object(
+                    bucket_name=bucket,
+                    object_name=object_name
+                )
+
+            await asyncio.to_thread(_remove_object)
 
             logger.info(f"File removed from MinIO: {object_path}")
             return True
@@ -819,11 +957,13 @@ class ArchaeologicalMinIOService:
     async def remove_object_from_bucket(self, bucket_name: str, object_name: str) -> bool:
         """Rimuovi oggetto da bucket specifico"""
         try:
-            await asyncio.to_thread(
-                self.client.remove_object,
-                bucket_name=bucket_name,
-                object_name=object_name
-            )
+            def _remove_object():
+                self.client.remove_object(
+                    bucket_name=bucket_name,
+                    object_name=object_name
+                )
+
+            await asyncio.to_thread(_remove_object)
 
             logger.info(f"Object removed from bucket {bucket_name}: {object_name}")
             return True

@@ -57,14 +57,22 @@ class QueueMiddleware(BaseHTTPMiddleware):
         self.user_requests: Dict[str, Dict[str, Any]] = {}
         self._user_requests_lock = asyncio.Lock()
         
+        # CRITICO: Distributed rate limiting con Redis fallback
+        self._distributed_rate_limiting = True
+        self._redis_available = False
+        self._redis_client = None
+        
         # Bypass paths (not queued)
         self.bypass_paths = {
             '/health', '/login', '/logout', '/auth-test',
             '/static/', '/docs', '/openapi.json', '/favicon.ico'
         }
         
-        # Initialize queue service
-        asyncio.create_task(self._initialize_queue_service())
+        # Initialize queue service (moved to app.py startup)
+        # asyncio.create_task(self._initialize_queue_service())
+        
+        # Initialize distributed rate limiting
+        asyncio.create_task(self._initialize_distributed_rate_limiting())
     
     async def _initialize_queue_service(self):
         """Initialize the queue service"""
@@ -73,6 +81,97 @@ class QueueMiddleware(BaseHTTPMiddleware):
             logger.info("Queue service initialized by middleware")
         except Exception as e:
             logger.error(f"Failed to initialize queue service: {e}")
+    
+    async def _initialize_distributed_rate_limiting(self):
+        """Initialize distributed rate limiting with Redis fallback"""
+        
+        try:
+            # Try to import Redis
+            import redis
+            from app.core.config import get_settings
+            
+            settings = get_settings()
+            
+            # Try to connect to Redis
+            try:
+                self._redis_client = redis.Redis(
+                    host=settings.redis_host,
+                    port=settings.redis_port,
+                    db=settings.redis_db,
+                    password=settings.redis_password,
+                    decode_responses=True,
+                    socket_connect_timeout=5,
+                    socket_timeout=5,
+                    retry_on_timeout=True
+                )
+                
+                # Test connection
+                self._redis_client.ping()
+                self._redis_available = True
+                self._distributed_rate_limiting = True
+                
+                logger.info("Distributed rate limiting initialized with Redis")
+                
+            except Exception as e:
+                logger.warning(f"Redis not available for distributed rate limiting: {e}")
+                self._redis_available = False
+                self._distributed_rate_limiting = False
+                
+        except ImportError:
+            logger.warning("Redis not installed, falling back to local rate limiting")
+            self._redis_available = False
+            self._distributed_rate_limiting = False
+    
+    async def _check_distributed_rate_limit(self, request: Request):
+        """Check distributed rate limiting with Redis fallback"""
+        
+        if not self._distributed_rate_limiting or not self._redis_available:
+            # Fallback to local rate limiting
+            return await self._check_rate_limit(request)
+        
+        # Get user identifier
+        user_id = await self._get_user_id(request)
+        if not user_id:
+            return  # No rate limiting for unauthenticated requests
+        
+        # Get rate limit for this request type
+        request_type = self._get_request_type(request)
+        rate_limit = self.rate_limits.get(request_type, self.rate_limits['default'])
+        
+        # Redis key for this user and request type
+        redis_key = f"rate_limit:{user_id}:{request_type}"
+        
+        try:
+            # Use Redis pipeline for atomic operations
+            pipe = self._redis_client.pipeline()
+            
+            # Get current count and window start
+            current_time = time.time()
+            window_start = current_time - rate_limit['window']
+            
+            pipe.zremrangebyscore(redis_key, 0, window_start)
+            pipe.zcard(redis_key)
+            pipe.expire(redis_key, rate_limit['window'] + 60)  # Add extra time for safety
+            
+            results = pipe.execute()
+            current_count = results[1] if len(results) > 1 else 0
+            
+            # Check if under limit
+            if current_count < rate_limit['requests']:
+                # Add current request
+                self._redis_client.zadd(redis_key, {str(current_time): str(current_time)})
+                self._redis_client.expire(redis_key, rate_limit['window'] + 60)
+            else:
+                logger.warning(f"Distributed rate limit exceeded for user {user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Distributed rate limit exceeded. Maximum {rate_limit['requests']} requests per {rate_limit['window']} seconds."
+                )
+                
+        except Exception as e:
+            logger.error(f"Distributed rate limiting error: {e}")
+            # Fallback to local rate limiting on error
+            return await self._check_rate_limit(request)
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request through queue if needed"""
@@ -89,32 +188,28 @@ class QueueMiddleware(BaseHTTPMiddleware):
             await self._check_rate_limit(request)
             return await call_next(request)
         
-        # Check if system is overloaded (but be more permissive for testing)
-        system_overloaded = request_queue_service.system_monitor.is_system_overloaded()
-        if system_overloaded:
-            # Check if this is a stress test request (more permissive)
-            user_agent = request.headers.get('user-agent', '').lower()
-            is_stress_test = 'photo_stress_test' in user_agent or 'python-requests' in user_agent
-            
-            if is_stress_test:
-                logger.info(f"System overloaded but allowing stress test request to {request.url.path}")
-                # Allow stress test requests even when overloaded
-            else:
-                logger.warning(f"System overloaded, rejecting request to {request.url.path}")
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="System temporarily overloaded. Please try again later."
-                )
-        
-        # Apply rate limiting
-        await self._check_rate_limit(request)
+        # Apply rate limiting (distributed or local)
+        if self._distributed_rate_limiting and self._redis_available:
+            await self._check_distributed_rate_limit(request)
+        else:
+            await self._check_rate_limit(request)
         
         # Check if we should queue this request
         if await self._should_queue_request(request):
             return await self._handle_queued_request(request, queue_setting)
-        else:
-            # Process immediately
-            return await call_next(request)
+        
+        # Check if system is overloaded ONLY for immediate processing
+        # (not for queued requests which are designed to handle overload)
+        system_overloaded = request_queue_service.system_monitor.is_system_overloaded()
+        if system_overloaded:
+            logger.warning(f"System overloaded, rejecting request to {request.url.path}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="System temporarily overloaded. Please try again later."
+            )
+        
+        # Process immediately
+        return await call_next(request)
     
     def _should_bypass_queue(self, request: Request) -> bool:
         """Check if request should bypass queue"""
@@ -291,21 +386,20 @@ class QueueMiddleware(BaseHTTPMiddleware):
         # Check system load
         load_factor = request_queue_service.system_monitor.get_load_factor()
         
-        # Queue if system is under moderate load
-        if load_factor > 0.3:
+        # Queue if system is under moderate load (lowered threshold for better responsiveness)
+        if load_factor > 0.2:
+            return True
+        
+        # Check if system is overloaded - always queue in this case
+        if request_queue_service.system_monitor.is_system_overloaded():
+            logger.info(f"System overloaded, queueing request to {request.url.path}")
             return True
         
         # Check queue sizes
         queue_status = await request_queue_service.get_queue_status()
         
-        # Queue if there are already many requests (higher threshold for stress test)
-        queue_threshold = 5
-        user_agent = request.headers.get('user-agent', '').lower()
-        is_stress_test = 'photo_stress_test' in user_agent or 'python-requests' in user_agent
-        
-        # Be more permissive for stress tests
-        if is_stress_test:
-            queue_threshold = 20  # Allow more concurrent requests for stress test
+        # Queue if there are already many requests (production threshold)
+        queue_threshold = 3  # Lowered threshold for better load management
         
         if queue_status['active_requests'] > queue_threshold:
             return True
@@ -314,10 +408,11 @@ class QueueMiddleware(BaseHTTPMiddleware):
         if 'bulk' in request.url.path:
             return True
         
-        # Also allow stress test uploads
-        user_agent = request.headers.get('user-agent', '').lower()
-        if 'photo_stress_test' in user_agent or 'python-requests' in user_agent:
+        # Always queue upload requests during high load periods
+        if 'upload' in request.url.path and load_factor > 0.1:
             return True
+        
+        # Production behavior - no special handling for stress tests
         
         return False
     
@@ -460,28 +555,35 @@ class QueueStatusMiddleware(BaseHTTPMiddleware):
 
 # Request handlers for queued requests
 async def upload_request_handler(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Handler for queued upload requests"""
-    
+    """Handler for queued upload requests - CALLS REAL UPLOAD LOGIC"""
+
     logger.info(f"Processing queued upload request: {payload.get('path')}")
-    
-    # This would need to be implemented to actually process the upload
-    # For now, return a mock response
-    return {
-        'status': 'completed',
-        'message': 'Upload processed successfully',
-        'processed_at': time.time()
-    }
+
+    try:
+        # Import the real upload handler from sites_photos
+        from app.routes.api.sites_photos import process_queued_upload
+
+        # Call the real upload processing logic
+        result = await process_queued_upload(payload)
+
+        logger.info(f"Queued upload completed successfully: {result.get('message', 'No message')}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in queued upload handler: {e}")
+        raise Exception(f"Upload processing failed: {str(e)}")
 
 
 async def bulk_upload_request_handler(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Handler for queued bulk upload requests"""
-    
+
     logger.info(f"Processing queued bulk upload request: {payload.get('path')}")
-    
-    # This would need to be implemented to actually process the bulk upload
+
+    # For now, this is still a mock - bulk upload would need separate implementation
+    # TODO: Implement real bulk upload processing
     return {
         'status': 'completed',
-        'message': 'Bulk upload processed successfully',
+        'message': 'Bulk upload processed successfully (mock)',
         'processed_at': time.time()
     }
 
@@ -489,8 +591,14 @@ async def bulk_upload_request_handler(payload: Dict[str, Any]) -> Dict[str, Any]
 # Register handlers
 def register_queue_handlers():
     """Register request handlers with queue service"""
-    
+
     request_queue_service.register_handler('POST_/api/site/{site_id}/photos/upload', upload_request_handler)
     request_queue_service.register_handler('POST_/api/site/{site_id}/photos/bulk-upload', bulk_upload_request_handler)
-    
+
+    # Register deep zoom processing handler
+    from app.services.deep_zoom_background_service import deep_zoom_background_service
+    if hasattr(deep_zoom_background_service, 'process_queued_deep_zoom'):
+        request_queue_service.register_handler('POST_/api/site/{site_id}/photos/deep-zoom/start-background', deep_zoom_background_service.process_queued_deep_zoom)
+
     logger.info("Queue request handlers registered")
+    

@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +22,7 @@ from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service
 from app.services.archaeological_minio_service import archaeological_minio_service
 from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+from app.services.deep_zoom_background_service import deep_zoom_background_service
 from app.services.storage_management_service import storage_management_service
 from app.services.photo_serving_service import photo_serving_service
 
@@ -484,6 +485,9 @@ async def upload_photo(
         photo_type: Optional[str] = Form(None),
         photographer: Optional[str] = Form(None),
         keywords: Optional[str] = Form(None),
+        # Queue control
+        use_queue: Optional[bool] = Form(False),
+        priority: Optional[str] = Form("normal"),
         
         # Archaeological metadata
         inventory_number: Optional[str] = Form(None),
@@ -535,175 +539,299 @@ async def upload_photo(
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Upload foto al sito archeologico - FIXED: Background processing non bloccante"""
+    """Upload foto al sito archeologico - ASYNC PARALLEL PROCESSING con Request Queueing"""
     site, permission = site_access
 
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
 
+    # Check if we should use queue based on system load or explicit request
+    from app.services.request_queue_service import request_queue_service, RequestPriority
+    from app.core.config import get_settings
+    settings = get_settings()
+    
+    should_queue = use_queue or (
+        settings.queue_enabled and
+        (request_queue_service.system_monitor.is_system_overloaded() or
+         request_queue_service.system_monitor.get_load_factor() > 0.6)
+    )
+    
+    if should_queue:
+        return await _handle_queued_upload(
+            site_id, photos, title, description, photo_type, photographer, keywords,
+            inventory_number, catalog_number, excavation_area, stratigraphic_unit,
+            grid_square, depth_level, find_date, finder, excavation_campaign,
+            material, material_details, object_type, object_function,
+            length_cm, width_cm, height_cm, diameter_cm, weight_grams,
+            chronology_period, chronology_culture, dating_from, dating_to, dating_notes,
+            conservation_status, conservation_notes, restoration_history,
+            bibliography, comparative_references, external_links,
+            copyright_holder, license_type, usage_rights,
+            site_access, current_user_id, db, priority
+        )
+
     try:
-        uploaded_photos = []
+        # Ensure MinIO buckets exist before uploading
+        try:
+            await storage_management_service.ensure_buckets_exist()
+        except Exception as storage_error:
+            logger.error(f"Storage service initialization failed: {storage_error}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage service is currently unavailable. Please try again later."
+            )
+        
+        # Check storage health before uploading
+        try:
+            storage_usage = await storage_management_service.get_storage_usage()
+            if storage_usage.get('total_size_gb', 0) > 8:  # >80% of 10GB
+                logger.warning(f"Storage usage critical ({storage_usage.get('total_size_gb', 0)}GB), triggering cleanup")
+                cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=1000)
+                logger.info(f"Pre-upload cleanup: {cleanup_result}")
+        except Exception as storage_health_error:
+            logger.error(f"Storage health check failed: {storage_health_error}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage health check failed. Please try again later."
+            )
 
-        # Process each photo - Upload first, schedule background processing after
-        for file in photos:
+        # Prepara TUTTI i metadati archeologici da form utente (una sola volta)
+        archaeological_metadata_from_form = {}
+        
+        # Basic metadata
+        if title:
+            archaeological_metadata_from_form['title'] = title
+        if description:
+            archaeological_metadata_from_form['description'] = description
+        if photographer:
+            archaeological_metadata_from_form['photographer'] = photographer
+        if keywords:
+            archaeological_metadata_from_form['keywords'] = keywords
+        if photo_type:
+            archaeological_metadata_from_form['photo_type'] = photo_type
+        
+        # Archaeological context
+        if inventory_number:
+            archaeological_metadata_from_form['inventory_number'] = inventory_number
+        if catalog_number:
+            archaeological_metadata_from_form['catalog_number'] = catalog_number
+        if excavation_area:
+            archaeological_metadata_from_form['excavation_area'] = excavation_area
+        if stratigraphic_unit:
+            archaeological_metadata_from_form['stratigraphic_unit'] = stratigraphic_unit
+        if grid_square:
+            archaeological_metadata_from_form['grid_square'] = grid_square
+        if depth_level is not None:
+            archaeological_metadata_from_form['depth_level'] = depth_level
+        if find_date:
             try:
-                # Ensure MinIO buckets exist before uploading
-                await storage_management_service.ensure_buckets_exist()
-                
-                # 1. Check storage health before uploading
-                storage_usage = await storage_management_service.get_storage_usage()
-                if storage_usage.get('total_size_gb', 0) > 8:  # >80% of 10GB
-                    logger.warning(f"Storage usage critical ({storage_usage.get('total_size_gb', 0)}GB), triggering cleanup")
-                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=1000)
-                    logger.info(f"Pre-upload cleanup: {cleanup_result}")
+                archaeological_metadata_from_form['find_date'] = datetime.fromisoformat(find_date.replace('Z', '+00:00'))
+            except ValueError:
+                try:
+                    archaeological_metadata_from_form['find_date'] = datetime.strptime(find_date, '%Y-%m-%d')
+                except ValueError:
+                    logger.warning(f"Invalid find_date format: {find_date}")
+        if finder:
+            archaeological_metadata_from_form['finder'] = finder
+        if excavation_campaign:
+            archaeological_metadata_from_form['excavation_campaign'] = excavation_campaign
+        
+        # Material and object
+        if material:
+            archaeological_metadata_from_form['material'] = material
+        if material_details:
+            archaeological_metadata_from_form['material_details'] = material_details
+        if object_type:
+            archaeological_metadata_from_form['object_type'] = object_type
+        if object_function:
+            archaeological_metadata_from_form['object_function'] = object_function
+        
+        # Dimensions
+        if length_cm is not None:
+            archaeological_metadata_from_form['length_cm'] = length_cm
+        if width_cm is not None:
+            archaeological_metadata_from_form['width_cm'] = width_cm
+        if height_cm is not None:
+            archaeological_metadata_from_form['height_cm'] = height_cm
+        if diameter_cm is not None:
+            archaeological_metadata_from_form['diameter_cm'] = diameter_cm
+        if weight_grams is not None:
+            archaeological_metadata_from_form['weight_grams'] = weight_grams
+        
+        # Chronology
+        if chronology_period:
+            archaeological_metadata_from_form['chronology_period'] = chronology_period
+        if chronology_culture:
+            archaeological_metadata_from_form['chronology_culture'] = chronology_culture
+        if dating_from:
+            archaeological_metadata_from_form['dating_from'] = dating_from
+        if dating_to:
+            archaeological_metadata_from_form['dating_to'] = dating_to
+        if dating_notes:
+            archaeological_metadata_from_form['dating_notes'] = dating_notes
+        
+        # Conservation
+        if conservation_status:
+            archaeological_metadata_from_form['conservation_status'] = conservation_status
+        if conservation_notes:
+            archaeological_metadata_from_form['conservation_notes'] = conservation_notes
+        if restoration_history:
+            archaeological_metadata_from_form['restoration_history'] = restoration_history
+        
+        # References
+        if bibliography:
+            archaeological_metadata_from_form['bibliography'] = bibliography
+        if comparative_references:
+            archaeological_metadata_from_form['comparative_references'] = comparative_references
+        if external_links:
+            archaeological_metadata_from_form['external_links'] = external_links
+        
+        # Rights
+        if copyright_holder:
+            archaeological_metadata_from_form['copyright_holder'] = copyright_holder
+        if license_type:
+            archaeological_metadata_from_form['license_type'] = license_type
+        if usage_rights:
+            archaeological_metadata_from_form['usage_rights'] = usage_rights
+        
+        logger.info(f"📋 Processing {len(photos)} photos in parallel with metadata: {list(archaeological_metadata_from_form.keys())}")
+        
+        # NUOVO: Processa tutte le foto in parallelo con asyncio.gather()
+        async def process_single_photo(file: UploadFile) -> Optional[dict]:
+            """Processa una singola foto in modo asincrono con error handling completo"""
+            try:
+                # 1. Salva file su MinIO con error handling
+                try:
+                    filename, file_path, file_size = await storage_service.save_upload_file(
+                        file, str(site_id), str(current_user_id)
+                    )
+                except Exception as storage_error:
+                    logger.error(f"Failed to save file {file.filename} to storage: {storage_error}")
+                    raise HTTPException(
+                        status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+                        detail=f"Storage service error: Unable to save file {file.filename}"
+                    )
 
-                # 2. Salva file su MinIO
-                filename, file_path, file_size = await storage_service.save_upload_file(
-                    file, str(site_id), str(current_user_id)
-                )
+                # 2. Estrai metadati dal file caricato con error handling
+                try:
+                    await file.seek(0)  # Reset file pointer
+                    exif_data, metadata = await photo_metadata_service.extract_metadata_from_file(
+                        file, filename
+                    )
+                except Exception as metadata_error:
+                    logger.error(f"Failed to extract metadata from {file.filename}: {metadata_error}")
+                    # Continue with empty metadata if extraction fails
+                    exif_data, metadata = {}, {}
 
-                # 3. Estrai metadati dal file caricato
-                await file.seek(0)  # Reset file pointer
-                exif_data, metadata = await photo_metadata_service.extract_metadata_from_file(
-                    file, filename
-                )
-
-                # 4. Prepara TUTTI i metadati archeologici da form utente
-                archaeological_metadata_from_form = {}
-                
-                # Basic metadata
-                if title:
-                    archaeological_metadata_from_form['title'] = title
-                if description:
-                    archaeological_metadata_from_form['description'] = description
-                if photographer:
-                    archaeological_metadata_from_form['photographer'] = photographer
-                if keywords:
-                    archaeological_metadata_from_form['keywords'] = keywords
-                if photo_type:
-                    archaeological_metadata_from_form['photo_type'] = photo_type
-                
-                # Archaeological context
-                if inventory_number:
-                    archaeological_metadata_from_form['inventory_number'] = inventory_number
-                if catalog_number:
-                    archaeological_metadata_from_form['catalog_number'] = catalog_number
-                if excavation_area:
-                    archaeological_metadata_from_form['excavation_area'] = excavation_area
-                if stratigraphic_unit:
-                    archaeological_metadata_from_form['stratigraphic_unit'] = stratigraphic_unit
-                if grid_square:
-                    archaeological_metadata_from_form['grid_square'] = grid_square
-                if depth_level is not None:
-                    archaeological_metadata_from_form['depth_level'] = depth_level
-                if find_date:
+                # 3. Crea record nel database CON metadati archeologici con error handling
+                try:
+                    photo_record = await photo_metadata_service.create_photo_record(
+                        filename=filename,
+                        original_filename=file.filename,
+                        file_path=file_path,
+                        file_size=file_size,
+                        site_id=str(site_id),
+                        uploaded_by=str(current_user_id),
+                        metadata=metadata,
+                        archaeological_metadata=archaeological_metadata_from_form
+                    )
+                except Exception as record_creation_error:
+                    logger.error(f"Failed to create photo record for {file.filename}: {record_creation_error}")
+                    # Clean up the uploaded file if record creation fails
                     try:
-                        archaeological_metadata_from_form['find_date'] = datetime.fromisoformat(find_date.replace('Z', '+00:00'))
-                    except ValueError:
-                        try:
-                            archaeological_metadata_from_form['find_date'] = datetime.strptime(find_date, '%Y-%m-%d')
-                        except ValueError:
-                            logger.warning(f"Invalid find_date format: {find_date}")
-                if finder:
-                    archaeological_metadata_from_form['finder'] = finder
-                if excavation_campaign:
-                    archaeological_metadata_from_form['excavation_campaign'] = excavation_campaign
-                
-                # Material and object
-                if material:
-                    archaeological_metadata_from_form['material'] = material
-                if material_details:
-                    archaeological_metadata_from_form['material_details'] = material_details
-                if object_type:
-                    archaeological_metadata_from_form['object_type'] = object_type
-                if object_function:
-                    archaeological_metadata_from_form['object_function'] = object_function
-                
-                # Dimensions
-                if length_cm is not None:
-                    archaeological_metadata_from_form['length_cm'] = length_cm
-                if width_cm is not None:
-                    archaeological_metadata_from_form['width_cm'] = width_cm
-                if height_cm is not None:
-                    archaeological_metadata_from_form['height_cm'] = height_cm
-                if diameter_cm is not None:
-                    archaeological_metadata_from_form['diameter_cm'] = diameter_cm
-                if weight_grams is not None:
-                    archaeological_metadata_from_form['weight_grams'] = weight_grams
-                
-                # Chronology
-                if chronology_period:
-                    archaeological_metadata_from_form['chronology_period'] = chronology_period
-                if chronology_culture:
-                    archaeological_metadata_from_form['chronology_culture'] = chronology_culture
-                if dating_from:
-                    archaeological_metadata_from_form['dating_from'] = dating_from
-                if dating_to:
-                    archaeological_metadata_from_form['dating_to'] = dating_to
-                if dating_notes:
-                    archaeological_metadata_from_form['dating_notes'] = dating_notes
-                
-                # Conservation
-                if conservation_status:
-                    archaeological_metadata_from_form['conservation_status'] = conservation_status
-                if conservation_notes:
-                    archaeological_metadata_from_form['conservation_notes'] = conservation_notes
-                if restoration_history:
-                    archaeological_metadata_from_form['restoration_history'] = restoration_history
-                
-                # References
-                if bibliography:
-                    archaeological_metadata_from_form['bibliography'] = bibliography
-                if comparative_references:
-                    archaeological_metadata_from_form['comparative_references'] = comparative_references
-                if external_links:
-                    archaeological_metadata_from_form['external_links'] = external_links
-                
-                # Rights
-                if copyright_holder:
-                    archaeological_metadata_from_form['copyright_holder'] = copyright_holder
-                if license_type:
-                    archaeological_metadata_from_form['license_type'] = license_type
-                if usage_rights:
-                    archaeological_metadata_from_form['usage_rights'] = usage_rights
-                
-                logger.info(f"📋 Complete metadata for {file.filename}: {list(archaeological_metadata_from_form.keys())}")
-                
-                # 5. Crea record nel database CON metadati archeologici
-                photo_record = await photo_metadata_service.create_photo_record(
-                    filename=filename,
-                    original_filename=file.filename,
-                    file_path=file_path,
-                    file_size=file_size,
-                    site_id=str(site_id),
-                    uploaded_by=str(current_user_id),
-                    metadata=metadata,
-                    archaeological_metadata=archaeological_metadata_from_form
-                )
+                        await storage_service.delete_file(file_path)
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to cleanup file after record creation failure: {cleanup_error}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Database error: Unable to create photo record for {file.filename}"
+                    )
 
-                # 6. Salva nel database PRIMA di generare il thumbnail
-                db.add(photo_record)
-                await db.commit()
-                await db.refresh(photo_record)
-
-                logger.info(f"Photo record saved with ID: {photo_record.id}")
-
-                # 7. Genera thumbnail DOPO che il record è stato salvato
-                await file.seek(0)  # Reset file pointer per thumbnail
-                thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
-                    file, str(photo_record.id)
-                )
-
-                if thumbnail_path:
-                    photo_record.thumbnail_path = thumbnail_path
+                # 4. Salva nel database PRIMA di generare il thumbnail con error handling
+                try:
+                    db.add(photo_record)
                     await db.commit()
-                    logger.info(f"Thumbnail generated and saved: {thumbnail_path}")
-                else:
-                    logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+                    await db.refresh(photo_record)
+                    logger.info(f"Photo record saved with ID: {photo_record.id}")
+                except Exception as db_commit_error:
+                    logger.error(f"Database commit failed for photo {file.filename}: {db_commit_error}")
+                    # Clean up the uploaded file if database commit fails
+                    try:
+                        await storage_service.delete_file(file_path)
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to cleanup file after DB commit failure: {cleanup_error}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Database error: Unable to save photo record"
+                    )
+
+                # 5. Genera thumbnail DOPO che il record è stato salvato con error handling
+                try:
+                    await file.seek(0)  # Reset file pointer per thumbnail
+                    thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
+                        file, str(photo_record.id)
+                    )
+
+                    if thumbnail_path:
+                        photo_record.thumbnail_path = thumbnail_path
+                        await db.commit()
+                        logger.info(f"Thumbnail generated and saved: {thumbnail_path}")
+                    else:
+                        logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+                except Exception as thumbnail_error:
+                    logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
+                    # Don't fail the entire upload if thumbnail generation fails
+                    # Just log the error and continue
 
                 logger.info(f"Photo {photo_record.id} saved with thumbnail_path: {photo_record.thumbnail_path}")
                 
+                # 6. Log attività con error handling
+                try:
+                    activity = UserActivity(
+                        user_id=current_user_id,
+                        site_id=site_id,
+                        activity_type="UPLOAD",
+                        activity_desc=f"Caricata foto: {file.filename}",
+                        extra_data=json.dumps({
+                            "photo_id": str(photo_record.id),
+                            "filename": filename,
+                            "file_size": file_size
+                        })
+                    )
+
+                    db.add(activity)
+                    await db.commit()
+                except Exception as activity_error:
+                    logger.error(f"Failed to log activity for photo {photo_record.id}: {activity_error}")
+                    # Don't fail the upload if activity logging fails
+
+                logger.info(f"Photo uploaded successfully: {photo_record.id} by user {current_user_id}")
+
+                return {
+                    "photo_id": str(photo_record.id),
+                    "filename": filename,
+                    "file_size": file_size,
+                    "file_path": file_path,
+                    "metadata": {
+                        "width": photo_record.width,
+                        "height": photo_record.height,
+                        "photo_date": photo_record.photo_date.isoformat() if photo_record.photo_date else None,
+                        "camera_model": photo_record.camera_model
+                    },
+                    "archaeological_metadata": {
+                        'inventory_number': photo_record.inventory_number,
+                        'excavation_area': photo_record.excavation_area,
+                        'material': photo_record.material,
+                        'chronology_period': photo_record.chronology_period,
+                        'photo_type': photo_record.photo_type,
+                        'photographer': photo_record.photographer,
+                        'description': photo_record.description,
+                        'keywords': photo_record.keywords
+                    }
+                }
+                
             except HTTPException as he:
+                # Re-raise HTTP exceptions as-is
                 if he.status_code == 507:  # Storage full
                     logger.error(f"Storage full during upload of {file.filename}")
                     try:
@@ -717,41 +845,53 @@ async def upload_photo(
                 raise he
                 
             except Exception as photo_error:
-                logger.error(f"Error processing photo {file.filename}: {photo_error}")
-                continue
+                logger.error(f"Unexpected error processing photo {file.filename}: {photo_error}")
+                # Return None for this photo but don't fail the entire batch
+                return None
 
-            # 7. Log attività
-            activity = UserActivity(
-                user_id=current_user_id,
-                site_id=site_id,
-                activity_type="UPLOAD",
-                activity_desc=f"Caricata foto: {file.filename}",
-                extra_data=json.dumps({
-                    "photo_id": str(photo_record.id),
-                    "filename": filename,
-                    "file_size": file_size
-                })
+        # Processa tutte le foto in parallelo con error handling
+        try:
+            logger.info(f"🚀 Starting parallel processing of {len(photos)} photos")
+            upload_tasks = [process_single_photo(file) for file in photos]
+            upload_results = await asyncio.gather(*upload_tasks, return_exceptions=True)
+            
+            # Filtra risultati validi
+            uploaded_photos = []
+            failed_photos = []
+            
+            for i, result in enumerate(upload_results):
+                if isinstance(result, Exception):
+                    logger.error(f"Upload task failed for photo {photos[i].filename}: {result}")
+                    failed_photos.append({
+                        "filename": photos[i].filename,
+                        "error": str(result)
+                    })
+                elif result is not None:
+                    uploaded_photos.append(result)
+                else:
+                    # None result indicates a failed upload that was handled gracefully
+                    failed_photos.append({
+                        "filename": photos[i].filename,
+                        "error": "Processing failed but was handled gracefully"
+                    })
+            
+            logger.info(f"✅ Parallel processing completed: {len(uploaded_photos)} photos uploaded successfully, {len(failed_photos)} failed")
+            
+            # If no photos were uploaded successfully, raise an error
+            if not uploaded_photos and failed_photos:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"All photo uploads failed. First error: {failed_photos[0]['error']}"
+                )
+                
+        except Exception as parallel_error:
+            logger.error(f"Parallel processing error: {parallel_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error during parallel processing: {str(parallel_error)}"
             )
 
-            db.add(activity)
-            await db.commit()
-
-            logger.info(f"Photo uploaded successfully: {photo_record.id} by user {current_user_id}")
-
-            uploaded_photos.append({
-                "photo_id": str(photo_record.id),
-                "filename": filename,
-                "file_size": file_size,
-                "metadata": {
-                    "width": photo_record.width,
-                    "height": photo_record.height,
-                    "photo_date": photo_record.photo_date.isoformat() if photo_record.photo_date else None,
-                    "camera_model": photo_record.camera_model
-                }
-            })
-
-        # 8. COMPLETAMENTE RIVISTO: Prepara lista foto per tiles MA NON inizia processing
-        # Il processing inizierà DOPO che tutte le foto sono state caricate
+        # Prepara lista foto per tiles MA NON inizia processing
         photos_needing_tiles = []
         
         for photo_data in uploaded_photos:
@@ -776,19 +916,10 @@ async def upload_photo(
                         
                         photos_needing_tiles.append({
                             'photo_id': photo_id,
-                            'file_path': photo_record.filepath,
+                            'file_path': photo_data['file_path'],
                             'width': width,
                             'height': height,
-                            'archaeological_metadata': {
-                                'inventory_number': photo_record.inventory_number,
-                                'excavation_area': photo_record.excavation_area,
-                                'material': photo_record.material,
-                                'chronology_period': photo_record.chronology_period,
-                                'photo_type': photo_record.photo_type,
-                                'photographer': photo_record.photographer,
-                                'description': photo_record.description,
-                                'keywords': photo_record.keywords
-                            }
+                            'archaeological_metadata': photo_data.get('archaeological_metadata', {})
                         })
                 else:
                     logger.info(f"Skipping tiles for small image {photo_id}: {width}x{height}")
@@ -796,41 +927,86 @@ async def upload_photo(
             except Exception as e:
                 logger.error(f"❌ Error checking tile requirements for photo {photo_id}: {e}")
         
-        # 9. DOPO tutti gli upload: avvia UNICO task background per processare TUTTE le foto sequenzialmente
+        # DOPO tutti gli upload: avvia batch processing con il nuovo servizio background con error handling
         if photos_needing_tiles:
-            logger.info(f"🎯 {len(photos_needing_tiles)} foto richiedono tiles - avvio batch processing in background")
-            
-            # Avvia UN SOLO task che processerà tutte le foto una alla volta
-            asyncio.create_task(
-                deep_zoom_minio_service.process_tiles_batch_sequential(
+            try:
+                logger.info(f"🎯 {len(photos_needing_tiles)} foto richiedono tiles - avvio batch processing con background service")
+                
+                # Avvia il batch processing con il nuovo servizio background
+                batch_result = await deep_zoom_background_service.schedule_batch_processing(
                     photos_list=photos_needing_tiles,
                     site_id=str(site_id)
                 )
-            )
-            
-            logger.info(f"✅ Batch tiles processing schedulato per {len(photos_needing_tiles)} foto")
+                
+                logger.info(f"✅ Batch tiles processing schedulato: {batch_result}")
+            except Exception as batch_error:
+                logger.error(f"Failed to schedule batch processing for tiles: {batch_error}")
+                # Don't fail the upload if batch processing fails, just log the error
+                # The tiles can be processed later manually
 
-        # Ritorna risposta con info foto E ID per batch processing
-        response_data = {
+        # Validate uploaded_photos before returning
+        if not isinstance(uploaded_photos, list):
+            logger.error(f"Invalid uploaded_photos type: {type(uploaded_photos)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid response format: uploaded_photos must be a list"
+            )
+
+        # Validate each photo entry has required fields
+        for i, photo in enumerate(uploaded_photos):
+            if not isinstance(photo, dict):
+                logger.error(f"Invalid photo entry at index {i}: {type(photo)}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Invalid photo entry at index {i}: must be a dictionary"
+                )
+            required_fields = ['photo_id', 'filename', 'file_size']
+            for field in required_fields:
+                if field not in photo:
+                    logger.error(f"Missing required field '{field}' in photo entry at index {i}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Invalid photo entry at index {i}: missing required field '{field}'"
+                    )
+
+        # Prepare response metadata
+        response_metadata = {
             "message": f"{len(uploaded_photos)} foto caricate con successo",
-            "uploaded_photos": uploaded_photos,
             "total_uploaded": len(uploaded_photos),
-            "photos_needing_tiles": len(photos_needing_tiles)
+            "photos_needing_tiles": len(photos_needing_tiles),
+            "upload_timestamp": datetime.now(timezone.utc).isoformat()
         }
-        
+
+        # Include failed photos information if any
+        if 'failed_photos' in locals() and failed_photos:
+            response_metadata["failed_photos"] = failed_photos
+            response_metadata["total_failed"] = len(failed_photos)
+
+        # Return uploaded_photos as direct field with metadata
+        response_data = {
+            "uploaded_photos": uploaded_photos,
+            **response_metadata
+        }
+
         logger.info(f"✅ Upload API response: {len(uploaded_photos)} foto caricate, {len(photos_needing_tiles)} necessitano tiles")
-        
+
         return JSONResponse(response_data)
 
-    except HTTPException:
-        raise
+    except HTTPException as he:
+        # Re-raise HTTP exceptions with proper status codes
+        raise he
     except Exception as e:
-        logger.error(f"Upload error: {str(e)}")
-        if 'filename' in locals():
-            await storage_service.delete_file(file_path)
+        logger.error(f"Unexpected upload error: {str(e)}")
+        # Clean up any temporary files if they exist
+        try:
+            if 'file_path' in locals():
+                await storage_service.delete_file(file_path)
+        except Exception as cleanup_error:
+            logger.error(f"Failed to cleanup during error handling: {cleanup_error}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Errore durante upload: {str(e)}"
+            detail=f"Unexpected error during upload: {str(e)}"
         )
 
 
@@ -1611,3 +1787,410 @@ async def log_user_activity(
     except Exception as e:
         logger.error(f"Error logging activity: {e}")
         await db.rollback()
+
+
+@photos_router.post("/site/{site_id}/photos/deep-zoom/start-background")
+async def start_deep_zoom_background_processor(
+        site_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id)
+):
+    """Avvia il processore background per deep zoom tiles"""
+    site, permission = site_access
+
+    if not permission.can_write():
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+
+    try:
+        await deep_zoom_background_service.start_background_processor()
+        
+        logger.info(f"Deep zoom background processor started by user {current_user_id} for site {site_id}")
+        
+        return {
+            "message": "Deep zoom background processor started successfully",
+            "site_id": str(site_id),
+            "started_by": str(current_user_id),
+            "started_at": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to start deep zoom background processor: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start background processor: {str(e)}"
+        )
+
+
+@photos_router.post("/site/{site_id}/photos/deep-zoom/stop-background")
+async def stop_deep_zoom_background_processor(
+        site_id: UUID,
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id)
+):
+    """Ferma il processore background per deep zoom tiles"""
+    site, permission = site_access
+
+    if not permission.can_write():
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+
+    try:
+        await deep_zoom_background_service.stop_background_processor()
+        
+        logger.info(f"Deep zoom background processor stopped by user {current_user_id} for site {site_id}")
+        
+        return {
+            "message": "Deep zoom background processor stopped successfully",
+            "site_id": str(site_id),
+            "stopped_by": str(current_user_id),
+            "stopped_at": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to stop deep zoom background processor: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to stop background processor: {str(e)}"
+        )
+
+
+@photos_router.get("/site/{site_id}/photos/deep-zoom/background-status")
+async def get_deep_zoom_background_status(
+        site_id: UUID,
+        site_access: tuple = Depends(get_site_access)
+):
+    """Ottieni lo stato del processore background per deep zoom tiles"""
+    site, permission = site_access
+
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
+
+    try:
+        queue_status = await deep_zoom_background_service.get_queue_status()
+        
+        return {
+            "site_id": str(site_id),
+            "background_status": queue_status,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get deep zoom background status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get background status: {str(e)}"
+        )
+
+
+@photos_router.get("/site/{site_id}/photos/{photo_id}/deep-zoom/task-status")
+async def get_photo_deep_zoom_task_status(
+        site_id: UUID,
+        photo_id: UUID,
+        site_access: tuple = Depends(get_site_access)
+):
+    """Ottieni lo stato del task di processing per una foto specifica"""
+    site, permission = site_access
+
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
+
+    try:
+        task_status = await deep_zoom_background_service.get_task_status(str(photo_id))
+        
+        if not task_status:
+            # Fallback to processing status from MinIO
+            processing_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo_id))
+            
+            return {
+                "site_id": str(site_id),
+                "photo_id": str(photo_id),
+                "task_status": None,
+                "processing_status": processing_status,
+                "message": "Task not found in background service, checking MinIO status"
+            }
+        
+        return {
+            "site_id": str(site_id),
+            "photo_id": str(photo_id),
+            "task_status": task_status,
+            "message": "Task status from background service"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get photo deep zoom task status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get task status: {str(e)}"
+        )
+
+
+async def _handle_queued_upload(
+        site_id: UUID,
+        photos: List[UploadFile],
+        title: Optional[str],
+        description: Optional[str],
+        photo_type: Optional[str],
+        photographer: Optional[str],
+        keywords: Optional[str],
+        inventory_number: Optional[str],
+        catalog_number: Optional[str],
+        excavation_area: Optional[str],
+        stratigraphic_unit: Optional[str],
+        grid_square: Optional[str],
+        depth_level: Optional[float],
+        find_date: Optional[str],
+        finder: Optional[str],
+        excavation_campaign: Optional[str],
+        material: Optional[str],
+        material_details: Optional[str],
+        object_type: Optional[str],
+        object_function: Optional[str],
+        length_cm: Optional[float],
+        width_cm: Optional[float],
+        height_cm: Optional[float],
+        diameter_cm: Optional[float],
+        weight_grams: Optional[float],
+        chronology_period: Optional[str],
+        chronology_culture: Optional[str],
+        dating_from: Optional[str],
+        dating_to: Optional[str],
+        dating_notes: Optional[str],
+        conservation_status: Optional[str],
+        conservation_notes: Optional[str],
+        restoration_history: Optional[str],
+        bibliography: Optional[str],
+        comparative_references: Optional[str],
+        external_links: Optional[str],
+        copyright_holder: Optional[str],
+        license_type: Optional[str],
+        usage_rights: Optional[str],
+        site_access: tuple,
+        current_user_id: UUID,
+        db: AsyncSession,
+        priority: str = "normal"
+):
+    """Handle upload through queue system"""
+    
+    from app.services.request_queue_service import request_queue_service, RequestPriority
+    
+    # Map priority string to enum
+    priority_map = {
+        "critical": RequestPriority.CRITICAL,
+        "high": RequestPriority.HIGH,
+        "normal": RequestPriority.NORMAL,
+        "low": RequestPriority.LOW,
+        "bulk": RequestPriority.BULK
+    }
+    
+    request_priority = priority_map.get(priority.lower(), RequestPriority.NORMAL)
+    
+    # Prepare upload data for queue
+    upload_data = {
+        'site_id': str(site_id),
+        'user_id': str(current_user_id),
+        'photos_count': len(photos),
+        'metadata': {
+            'title': title,
+            'description': description,
+            'photo_type': photo_type,
+            'photographer': photographer,
+            'keywords': keywords,
+            'inventory_number': inventory_number,
+            'catalog_number': catalog_number,
+            'excavation_area': excavation_area,
+            'stratigraphic_unit': stratigraphic_unit,
+            'grid_square': grid_square,
+            'depth_level': depth_level,
+            'find_date': find_date,
+            'finder': finder,
+            'excavation_campaign': excavation_campaign,
+            'material': material,
+            'material_details': material_details,
+            'object_type': object_type,
+            'object_function': object_function,
+            'length_cm': length_cm,
+            'width_cm': width_cm,
+            'height_cm': height_cm,
+            'diameter_cm': diameter_cm,
+            'weight_grams': weight_grams,
+            'chronology_period': chronology_period,
+            'chronology_culture': chronology_culture,
+            'dating_from': dating_from,
+            'dating_to': dating_to,
+            'dating_notes': dating_notes,
+            'conservation_status': conservation_status,
+            'conservation_notes': conservation_notes,
+            'restoration_history': restoration_history,
+            'bibliography': bibliography,
+            'comparative_references': comparative_references,
+            'external_links': external_links,
+            'copyright_holder': copyright_holder,
+            'license_type': license_type,
+            'usage_rights': usage_rights
+        }
+    }
+    
+    # Estimate processing time based on file count
+    estimated_duration = len(photos) * 30  # 30 seconds per photo estimate
+    
+    try:
+        # Enqueue upload request
+        request_id = await request_queue_service.enqueue_request(
+            request_type="POST_/api/site/{site_id}/photos/upload",
+            payload=upload_data,
+            priority=request_priority,
+            user_id=str(current_user_id),
+            site_id=str(site_id),
+            timeout_seconds=600 + (len(photos) * 60),  # Base 10min + 1min per photo
+            max_retries=3,
+            estimated_duration=estimated_duration
+        )
+        
+        # Store files temporarily for queue processing
+        temp_files = []
+        upload_paths = []
+        
+        try:
+            from app.services.storage_service import storage_service
+            
+            for photo in photos:
+                # Save to temporary location
+                filename, file_path, file_size = await storage_service.save_upload_file(
+                    photo, str(site_id), str(current_user_id), temp=True
+                )
+                temp_files.append({
+                    'filename': filename,
+                    'file_path': file_path,
+                    'file_size': file_size,
+                    'original_filename': photo.filename
+                })
+                upload_paths.append(file_path)
+            
+            # Update request payload with file info
+            upload_data['temp_files'] = temp_files
+            
+            logger.info(f"Queued upload request {request_id} for {len(photos)} photos with priority {request_priority.name}")
+            
+            return JSONResponse({
+                'message': f'Upload queued for processing',
+                'request_id': request_id,
+                'status': 'queued',
+                'priority': request_priority.name,
+                'photos_count': len(photos),
+                'estimated_wait': await request_queue_service._estimate_wait_time(request_priority),
+                'queue_status_url': f'/api/queue/request/{request_id}'
+            }, status_code=status.HTTP_202_ACCEPTED)
+            
+        except Exception as e:
+            # Clean up temp files if queueing fails
+            logger.error(f"Failed to prepare temp files for queue: {e}")
+            try:
+                from app.services.storage_service import storage_service
+                for file_path in upload_paths:
+                    await storage_service.delete_file(file_path)
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup temp files: {cleanup_error}")
+            raise
+            
+    except Exception as e:
+        logger.error(f"Failed to queue upload request: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue upload: {str(e)}"
+        )
+
+
+async def process_queued_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Process queued upload request"""
+    
+    from app.services.storage_service import storage_service
+    from app.services.photo_metadata_service import photo_metadata_service
+    from app.services.deep_zoom_background_service import deep_zoom_background_service
+    from app.models import Photo
+    from sqlalchemy import select
+    import uuid
+    
+    logger.info(f"Processing queued upload for site {payload['site_id']}")
+    
+    try:
+        site_id = uuid.UUID(payload['site_id'])
+        user_id = uuid.UUID(payload['user_id'])
+        metadata = payload['metadata']
+        temp_files = payload.get('temp_files', [])
+        
+        # Process each photo
+        uploaded_photos = []
+        photos_needing_tiles = []
+        
+        for temp_file in temp_files:
+            try:
+                # Check if temp file exists before moving
+                from app.services.storage_service import storage_service
+                temp_file_exists = await storage_service.file_exists(temp_file['file_path'])
+                if not temp_file_exists:
+                    logger.error(f"Temp file not found: {temp_file['file_path']}")
+                    continue
+                
+                # Move temp file to permanent location
+                permanent_path = await storage_service.move_temp_file(
+                    temp_file['file_path'],
+                    str(site_id),
+                    str(user_id)
+                )
+                
+                # Create photo record
+                photo_record = await photo_metadata_service.create_photo_record(
+                    filename=temp_file['filename'],
+                    original_filename=temp_file['original_filename'],
+                    file_path=permanent_path,
+                    file_size=temp_file['file_size'],
+                    site_id=str(site_id),
+                    uploaded_by=str(user_id),
+                    metadata={},
+                    archaeological_metadata=metadata
+                )
+                
+                # Save to database
+                from app.database.base import async_session_maker
+                async with async_session_maker() as db:
+                    db.add(photo_record)
+                    await db.commit()
+                    await db.refresh(photo_record)
+                
+                uploaded_photos.append({
+                    'photo_id': str(photo_record.id),
+                    'filename': temp_file['filename'],
+                    'file_size': temp_file['file_size']
+                })
+                
+                # Check if tiles are needed
+                if temp_file['file_size'] > 5 * 1024 * 1024:  # > 5MB
+                    photos_needing_tiles.append({
+                        'photo_id': str(photo_record.id),
+                        'file_path': permanent_path,
+                        'archaeological_metadata': metadata
+                    })
+                
+            except Exception as e:
+                logger.error(f"Error processing queued photo {temp_file.get('filename')}: {e}")
+                continue
+        
+        # Schedule tile processing if needed
+        if photos_needing_tiles:
+            await deep_zoom_background_service.schedule_batch_processing(
+                photos_list=photos_needing_tiles,
+                site_id=str(site_id)
+            )
+        
+        return {
+            'status': 'completed',
+            'message': f'Processed {len(uploaded_photos)} photos successfully',
+            'uploaded_photos': uploaded_photos,
+            'photos_needing_tiles': len(photos_needing_tiles),
+            'processed_at': datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing queued upload: {e}")
+        raise Exception(f"Upload processing failed: {str(e)}")
+        
+

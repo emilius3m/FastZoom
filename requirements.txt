@@ -57,3 +57,4 @@ python-multipart
 piexif
 jsonschema
 python-docx
+psutil

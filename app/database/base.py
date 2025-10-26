@@ -81,7 +81,17 @@ class SoftDeleteMixin:
 DATABASE_URL = os.environ["DATABASE_URL"]
 
 
-engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    future=True,
+    # Connection Pool Configuration - Ottimizzato per 15-20 richieste concorrenti
+    pool_size=20,           # 20 connessioni permanenti
+    max_overflow=30,        # 30 connessioni aggiuntive sotto carico
+    pool_timeout=30,        # 30 secondi timeout
+    pool_recycle=3600,      # 1 ora riciclo connessioni
+    pool_pre_ping=True,     # Verifica connessioni prima dell'uso
+)
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
 

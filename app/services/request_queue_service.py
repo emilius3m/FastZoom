@@ -86,10 +86,10 @@ class SystemLoadMonitor:
     """Monitor system load for dynamic rate limiting"""
     
     def __init__(self):
-        # More lenient thresholds for stress testing
-        self.cpu_threshold = 85.0  # Increased from 75.0
-        self.memory_threshold = 90.0  # Increased from 80.0
-        self.disk_threshold = 90.0   # Increased from 85.0
+        # Production-appropriate thresholds for normal operation
+        self.cpu_threshold = 75.0  # Standard production threshold
+        self.memory_threshold = 80.0  # Standard production threshold
+        self.disk_threshold = 85.0   # Standard production threshold
         self.load_history = []
         self.max_history = 60  # Keep 60 samples
         
@@ -139,16 +139,14 @@ class SystemLoadMonitor:
     def is_system_overloaded(self) -> bool:
         """Check if system is overloaded"""
         load = self.get_current_load()
-        
-        # Be more permissive for stress testing
+
+        # Production-appropriate overload detection
         cpu_overloaded = load['cpu_percent'] > self.cpu_threshold
         memory_overloaded = load['memory_percent'] > self.memory_threshold
         disk_overloaded = load['disk_percent'] > self.disk_threshold
-        
-        # Only consider system overloaded if at least 2 metrics are exceeded
-        overload_count = sum([cpu_overloaded, memory_overloaded, disk_overloaded])
-        
-        return overload_count >= 2  # Require at least 2 metrics to be overloaded
+
+        # Consider system overloaded if any critical metric is exceeded
+        return cpu_overloaded or memory_overloaded or disk_overloaded
     
     def get_load_factor(self) -> float:
         """Get load factor (0.0 to 1.0) for dynamic rate limiting"""
@@ -413,7 +411,7 @@ class RequestQueueService:
                         self._process_request_with_semaphore(request)
                     )
                 else:
-                    # No requests, brief sleep
+                    # No requests, brief sleep but continue loop
                     await asyncio.sleep(0.1)
                     
             except asyncio.CancelledError:
@@ -598,17 +596,29 @@ class RequestQueueService:
         except Exception as e:
             logger.error(f"Failed to send callback for request {request.request_id}: {e}")
     
+    
     async def get_queue_status(self) -> Dict[str, Any]:
         """Get overall queue status"""
-        
+
         # Update queue sizes
         for priority in RequestPriority:
-            self.metrics['queue_sizes'][priority] = self.queues[priority].qsize()
-        
+            self.metrics['queue_sizes'][priority.name] = self.queues[priority].qsize()
+
         # Get system load
         system_load = self.system_monitor.get_current_load()
-        
-        return {
+
+        # Ensure all values are JSON serializable
+        def make_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(item) for item in obj]
+            elif isinstance(obj, (int, float, str, bool, type(None))):
+                return obj
+            else:
+                return str(obj)  # Convert non-serializable objects to strings
+
+        return make_serializable({
             'is_running': self.running,
             'metrics': self.metrics.copy(),
             'system_load': system_load,
@@ -616,12 +626,12 @@ class RequestQueueService:
             'completed_requests': len(self.completed_requests),
             'failed_requests': len(self.failed_requests),
             'queue_sizes': {
-                priority.name: queue.qsize() 
+                priority.name: queue.qsize()
                 for priority, queue in self.queues.items()
             },
             'concurrent_limit': self.current_concurrent_limit,
             'registered_handlers': list(self.request_handlers.keys())
-        }
+        })
     
     async def cleanup_old_requests(self, days: int = 7):
         """Clean up old completed and failed requests"""

@@ -52,7 +52,17 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         except Exception as e:
             process_time = time.time() - start_time
-            logger.error(f"❌ Request failed: {request.method} {request.url.path} - {process_time:.3f}s - Error: {str(e)}")
+            
+            # Safe error logging with null checking and fallback
+            error_msg = "Unknown error"
+            if e is not None:
+                try:
+                    error_msg = str(e)
+                except Exception:
+                    # If string conversion fails, use exception type
+                    error_msg = f"{type(e).__name__} (string conversion failed)"
+            
+            logger.error(f"❌ Request failed: {request.method} {request.url.path} - {process_time:.3f}s - Error: {error_msg}")
             raise
 
 

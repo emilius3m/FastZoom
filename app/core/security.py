@@ -15,8 +15,13 @@ from app.models import User
 
 settings = get_settings()
 
-# Configurazione sicurezza
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Configurazione sicurezza - usa bcrypt con handling per compatibilità
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12,
+    bcrypt__ident="2b"  # Usa identificatore standard per compatibilità
+)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # Costanti JWT
@@ -30,6 +35,9 @@ class SecurityService:
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """Verifica password con hash bcrypt"""
+        # Tronca la password a 72 byte come richiesto da bcrypt
+        if len(plain_password.encode('utf-8')) > 72:
+            plain_password = plain_password[:72]
         return pwd_context.verify(plain_password, hashed_password)
     
     @staticmethod

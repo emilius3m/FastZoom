@@ -49,3 +49,25 @@ async def get_site_access(
         )
 
     return site, permission
+
+
+async def get_photo_site_access(
+        photo_id: UUID,
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+) -> tuple[ArchaeologicalSite, UserSitePermission]:
+    """Verifica accesso utente al sito della foto e restituisce sito e permessi"""
+    
+    # Import Photo model here to avoid circular imports
+    from app.models.documentation_and_field import Photo
+    
+    # Verifica esistenza foto
+    photo_query = select(Photo).where(Photo.id == photo_id)
+    photo = await db.execute(photo_query)
+    photo = photo.scalar_one_or_none()
+    
+    if not photo:
+        raise HTTPException(status_code=404, detail="Foto non trovata")
+    
+    # Usa la funzione esistente per verificare l'accesso al sito della foto
+    return await get_site_access(photo.site_id, current_user_id, db)

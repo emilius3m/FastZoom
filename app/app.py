@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse ,Response
@@ -46,6 +47,12 @@ from app.routes.api.geographic_maps import geographic_maps_router
 from app.routes.api.notifications_ws import notifications_router
 # 🆕 NUOVO IMPORT - Router Unified Dashboard API
 from app.routes.api.unified_dashboard import router as unified_dashboard_router
+# 🗄️ NUOVO IMPORT - Router Database Monitoring API
+from app.routes.api.database_monitoring import router as database_monitoring_router
+# 📋 NUOVO IMPORT - Router Queue Monitoring API
+from app.routes.api.queue_monitoring import queue_monitoring_router
+# 📊 NUOVO IMPORT - Router Performance Monitoring API
+from app.routes.api.performance_monitoring import router as performance_monitoring_router
 
 from app.routes import photo_metadata
 from app.routes.api.us import us_router
@@ -146,12 +153,57 @@ from app.core.middleware import (
     PerformanceMonitoringMiddleware,
     SecurityHeadersMiddleware
 )
+# 📊 NUOVO IMPORT - Performance Tracking Middleware
+from app.middleware.performance_tracking_middleware import (
+    PerformanceTrackingMiddleware,
+    RequestCountMiddleware
+)
+
+# Queue middleware
+from app.middleware.queue_middleware import QueueMiddleware, QueueStatusMiddleware, register_queue_handlers
 
 # Aggiungi middleware all'app
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(AuditMiddleware)
 app.add_middleware(PerformanceMonitoringMiddleware)
+# 📊 NUOVO: Aggiungi Performance Tracking Middleware
+app.add_middleware(RequestCountMiddleware)
+app.add_middleware(PerformanceTrackingMiddleware)
 #app.add_middleware(SecurityHeadersMiddleware)
+
+# Add queue middleware (order matters - queue middleware should be before status middleware)
+from app.core.config import get_settings
+settings = get_settings()
+
+if settings.queue_enabled:
+    # Import RequestPriority enum for queue configuration
+    from app.services.request_queue_service import RequestPriority
+    
+    queue_config = {
+        'rate_limits': {
+            'upload': {
+                'requests': settings.rate_limit_upload_requests,
+                'window': settings.rate_limit_upload_window
+            },
+            'default': {
+                'requests': settings.rate_limit_default_requests,
+                'window': settings.rate_limit_default_window
+            }
+        },
+        'queue_settings': {
+            '/api/site/{site_id}/photos/upload': {
+                'enable_queue': True,
+                'priority': RequestPriority.NORMAL,
+                'timeout': settings.queue_timeout_seconds,
+                'max_retries': settings.queue_max_retries
+            }
+        }
+    }
+    
+    app.add_middleware(QueueMiddleware, queue_config=queue_config)
+    app.add_middleware(QueueStatusMiddleware)
+    
+    logger.info("Queue middleware enabled")
 
 
 
@@ -301,6 +353,29 @@ app.include_router(
     unified_dashboard_router,
     tags=["unified-dashboard"],
     prefix="/api/unified",
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
+
+# 🗄️ INCLUSIONE ROUTER DATABASE MONITORING - API per monitoring connection pool
+app.include_router(
+    database_monitoring_router,
+    tags=["database-monitoring"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
+
+# 📋 INCLUSIONE ROUTER QUEUE MONITORING - API per monitoring request queue
+app.include_router(
+    queue_monitoring_router,
+    tags=["queue-monitoring"],
+    prefix="/api/queue",
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
+
+# 📊 INCLUSIONE ROUTER PERFORMANCE MONITORING - API per monitoring performance
+app.include_router(
+    performance_monitoring_router,
+    tags=["performance-monitoring"],
+    prefix="/api/performance-monitoring",
     dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
 
@@ -596,6 +671,62 @@ async def dashboard_unified_view(
     """
     return await dashboard_view(request, current_user_id, user_sites, db, view='unified')
 
+# 📊 PERFORMANCE DASHBOARD - Dashboard per monitoring performance
+@app.get("/performance-dashboard", response_class=HTMLResponse)
+async def performance_dashboard_view(
+    request: Request,
+    current_user_id: str = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Dashboard per monitoring delle performance del sistema"""
+    try:
+        # Ottieni informazioni utente dal database
+        user = await db.execute(select(User).where(User.id == current_user_id))
+        user = user.scalar_one_or_none()
+
+        # Ottieni profilo utente
+        user_profile_result = await db.execute(
+            select(UserProfile).where(UserProfile.user_id == current_user_id)
+        )
+        user_profile = user_profile_result.scalar_one_or_none()
+
+        # CSRF opzionale
+        csrf_token, signed_token, csrf_instance = _csrf_tokens_optional()
+
+        # Prepare context
+        context = {
+            "request": request,
+            "title": "Performance Dashboard | FastZoom",
+            "message": "Sistema di Monitoring Performance",
+            
+            # VARIABILI RICHIESTE DA auth_navigation.html
+            "sites": user_sites,
+            "sites_count": len(user_sites),
+            "user_email": user.email if user else None,
+            "user_type": "superuser" if user and user.is_superuser else "user",
+            "current_page": "performance_dashboard",
+            "current_user": user,
+            "user_profile": user_profile,
+            "csrf_token": csrf_token,
+        }
+
+        logger.info(f"Performance dashboard rendered: user_id={current_user_id}")
+        response = templates.TemplateResponse("pages/performance_dashboard.html", context)
+        
+        # Se CSRF disponibile, imposta cookie firmato
+        if csrf_instance and signed_token:
+            csrf_instance.set_csrf_cookie(signed_token, response)
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Performance dashboard error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore interno dashboard performance"
+        )
+
 
 # Test cookie e autenticazione
 @app.get("/auth-test")
@@ -706,18 +837,76 @@ async def health_check():
 @app.on_event("shutdown")
 async def on_shutdown():
     """Chiusura sistema"""
-    museum_name = getattr(settings, 'museum_name', 'Museo Archeologico')
-    logger.info(f"🏺 {museum_name} - Sistema arrestato")
+    try:
+        # Ferma il servizio di background processing per deep zoom tiles
+        from app.services.deep_zoom_background_service import deep_zoom_background_service
+        await deep_zoom_background_service.stop_background_processor()
+        
+        # Ferma il servizio di monitoring delle performance
+        from app.services.performance_monitoring_service import performance_monitoring_service
+        await performance_monitoring_service.stop_monitoring()
+        
+        # Stop queue service
+        if settings.queue_enabled:
+            from app.services.request_queue_service import request_queue_service
+            await request_queue_service.stop()
+            logger.info(f"🛑 Request queue service stopped")
+        
+        museum_name = getattr(settings, 'museum_name', 'Museo Archeologico')
+        logger.info(f"🏺 {museum_name} - Sistema arrestato")
+        logger.info(f"🛑 Deep zoom background processor stopped")
+    except Exception as e:
+        logger.error(f"❌ Errore durante shutdown: {e}")
 
 @app.on_event("startup")
 async def on_startup():
     """Inizializzazione sistema archeologico"""
     try:
         await create_db_and_tables()
+        
+        # Avvia il servizio di background processing per deep zoom tiles
+        from app.services.deep_zoom_background_service import deep_zoom_background_service
+        await deep_zoom_background_service.start_background_processor()
+        
+        # Avvia il servizio di monitoring delle performance
+        from app.services.performance_monitoring_service import performance_monitoring_service
+        await performance_monitoring_service.start_monitoring()
+        
+        # Initialize queue service and register handlers
+        if settings.queue_enabled:
+            from app.services.request_queue_service import request_queue_service
+            logger.info("Starting queue service...")
+            await request_queue_service.start()
+
+            # CRITICAL: Wait a moment for service to fully start
+            await asyncio.sleep(0.1)
+
+            # Register queue handlers AFTER service is started
+            from app.middleware.queue_middleware import register_queue_handlers
+            register_queue_handlers()
+
+            # Register photo upload handler
+            from app.routes.api.sites_photos import process_queued_upload
+            request_queue_service.register_handler('POST_/api/site/{site_id}/photos/upload', process_queued_upload)
+
+            # Register bulk upload handler
+            from app.middleware.queue_middleware import bulk_upload_request_handler
+            request_queue_service.register_handler('POST_/api/site/{site_id}/photos/bulk-upload', bulk_upload_request_handler)
+
+            # Register deep zoom processing handler
+            from app.services.deep_zoom_background_service import deep_zoom_background_service
+            if hasattr(deep_zoom_background_service, 'process_queued_deep_zoom'):
+                request_queue_service.register_handler('POST_/api/site/{site_id}/photos/deep-zoom/start-background', deep_zoom_background_service.process_queued_deep_zoom)
+
+            logger.info(f"📋 Request queue service started with {len(request_queue_service.request_handlers)} handlers")
+        
         museum_name = getattr(settings, 'museum_name', 'Museo Archeologico')
         logger.info(f"🏺 {museum_name} - Sistema Archeologico avviato")
         logger.info(f"🔐 Cookie-based authentication enabled")
         logger.info(f"📊 Admin routes enabled")
+        logger.info(f"🚀 Deep zoom background processor started")
+        if settings.queue_enabled:
+            logger.info(f"📋 Request queue system enabled")
     except Exception as e:
         logger.error(f"❌ Errore avvio: {e}")
         raise

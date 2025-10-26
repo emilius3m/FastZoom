@@ -159,19 +159,80 @@ class StorageService:
             clean_object_name = object_name
             if object_name.startswith("sites/"):
                 clean_object_name = object_name[6:]  # Rimuove "sites/"
-
+            
             # Verifica esistenza
             exists = await self.file_exists(object_name)
-
+            
             return {
                 "object_name": clean_object_name,
                 "url": f"{self.base_url}/{clean_object_name}",
                 "exists": exists
             }
-
+            
         except Exception as e:
             logger.error(f"Error getting file info {object_name}: {e}")
             return None
+    
+    async def move_file(self, source_path: str, destination_name: str) -> str:
+        """Move file from source to destination"""
+        try:
+            # Check if source file exists
+            source_exists = await self.file_exists(source_path)
+            if not source_exists:
+                logger.error(f"Source file not found: {source_path}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Source file not found: {source_path}"
+                )
+            
+            # Move file using archaeological service
+            success = await archaeological_minio_service.move_file(source_path, destination_name)
+            
+            if success:
+                logger.info(f"File moved from {source_path} to {destination_name}")
+                return destination_name
+            else:
+                logger.error(f"Failed to move file from {source_path} to {destination_name}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to move file: {source_path} to {destination_name}"
+                )
+            
+        except Exception as e:
+            logger.error(f"Error moving file: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error moving file: {str(e)}"
+            )
+    
+    async def move_temp_file(self, temp_file_path: str, site_id: str, user_id: str) -> str:
+        """Move temporary file to permanent location"""
+        try:
+            # Check if temp file exists before moving
+            temp_file_exists = await self.file_exists(temp_file_path)
+            if not temp_file_exists:
+                logger.error(f"Temp file not found: {temp_file_path}")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Temporary file not found: {temp_file_path}"
+                )
+            
+            # Generate permanent filename
+            file_extension = Path(temp_file_path).suffix
+            unique_filename = f"{site_id}_{user_id}_{uuid4().hex[:8]}{file_extension}"
+            
+            # Move file to permanent location
+            permanent_path = await self.move_file(temp_file_path, unique_filename)
+            
+            logger.info(f"Moved temp file from {temp_file_path} to {permanent_path}")
+            return permanent_path
+            
+        except Exception as e:
+            logger.error(f"Error moving temp file: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error moving temporary file: {str(e)}"
+            )
 
     async def get_presigned_url(self, object_name: str, expiry_seconds: int = 3600) -> Optional[str]:
         """Ottiene URL pre-firmato per accesso diretto"""

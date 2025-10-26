@@ -11,6 +11,35 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./archaeological_catalog.db"
     secret_key: str = "archaeological-site-secret-key-2025"
     algorithm: str = "HS256"
+    
+    # Database Connection Pool Configuration
+    # CRITICO: Ottimizzato per supportare 50+ richieste concorrenti (stress test)
+    db_pool_size: int = 30           # Aumentato a 30 connessioni permanenti nel pool
+    db_max_overflow: int = 70        # Aumentato a 70 connessioni aggiuntive (totale: 100)
+    db_pool_timeout: int = 60        # Aumentato a 60 secondi timeout per operazioni lunghe
+    db_pool_recycle: int = 1800     # Ridotto a 30 minuti per evitare stale connections
+    db_pool_pre_ping: bool = True    # Mantenuto: Verifica salute connessioni prima dell'uso
+    db_pool_reset_on_return: str = "commit"  # Resetta stato connessione al ritorno
+
+    # Request Queue Configuration
+    queue_enabled: bool = True
+    queue_base_concurrent_limit: int = 10
+    queue_max_concurrent_limit: int = 50
+    queue_cpu_threshold: float = 75.0
+    queue_memory_threshold: float = 80.0
+    queue_disk_threshold: float = 85.0
+    queue_adjustment_interval: int = 30
+    queue_max_retries: int = 3
+    queue_timeout_seconds: int = 300
+    queue_cleanup_days: int = 7
+
+    # Rate Limiting Configuration
+    rate_limit_enabled: bool = True
+    rate_limit_upload_requests: int = 30
+    rate_limit_upload_window: int = 60
+    rate_limit_upload_burst: int = 50
+    rate_limit_default_requests: int = 100
+    rate_limit_default_window: int = 60
 
     # MinIO Storage - Profile-based Configuration
     minio_config_profile: str = "local"
