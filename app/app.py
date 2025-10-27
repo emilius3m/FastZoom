@@ -53,6 +53,8 @@ from app.routes.api.database_monitoring import router as database_monitoring_rou
 from app.routes.api.queue_monitoring import queue_monitoring_router
 # 📊 NUOVO IMPORT - Router Performance Monitoring API
 from app.routes.api.performance_monitoring import router as performance_monitoring_router
+# 🔧 NUOVO IMPORT - Router DeepZoom Tiles Management
+from app.routes.api.deepzoom_tiles import deepzoom_router
 
 from app.routes import photo_metadata
 from app.routes.api.us import us_router
@@ -377,6 +379,13 @@ app.include_router(
     tags=["performance-monitoring"],
     prefix="/api/performance-monitoring",
     dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
+
+# 🔧 INCLUSIONE ROUTER DEEPZOOM TILES - API per gestione tiles deep zoom
+app.include_router(
+    deepzoom_router,
+    tags=["deepzoom-tiles"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 
 # 🏺 INCLUSIONE ROUTER US/USM - API per Unità Stratigrafiche
@@ -842,6 +851,10 @@ async def on_shutdown():
         from app.services.deep_zoom_background_service import deep_zoom_background_service
         await deep_zoom_background_service.stop_background_processor()
         
+        # Ferma il servizio di verifica periodica tiles
+        from app.services.tiles_verification_service import tiles_verification_service
+        await tiles_verification_service.stop_periodic_verification()
+        
         # Ferma il servizio di monitoring delle performance
         from app.services.performance_monitoring_service import performance_monitoring_service
         await performance_monitoring_service.stop_monitoring()
@@ -855,6 +868,7 @@ async def on_shutdown():
         museum_name = getattr(settings, 'museum_name', 'Museo Archeologico')
         logger.info(f"🏺 {museum_name} - Sistema arrestato")
         logger.info(f"🛑 Deep zoom background processor stopped")
+        logger.info(f"🛑 Tiles verification service stopped")
     except Exception as e:
         logger.error(f"❌ Errore durante shutdown: {e}")
 
@@ -867,6 +881,10 @@ async def on_startup():
         # Avvia il servizio di background processing per deep zoom tiles
         from app.services.deep_zoom_background_service import deep_zoom_background_service
         await deep_zoom_background_service.start_background_processor()
+        
+        # Avvia il servizio di verifica periodica tiles
+        from app.services.tiles_verification_service import tiles_verification_service
+        await tiles_verification_service.start_periodic_verification()
         
         # Avvia il servizio di monitoring delle performance
         from app.services.performance_monitoring_service import performance_monitoring_service
@@ -905,6 +923,7 @@ async def on_startup():
         logger.info(f"🔐 Cookie-based authentication enabled")
         logger.info(f"📊 Admin routes enabled")
         logger.info(f"🚀 Deep zoom background processor started")
+        logger.info(f"🔍 Tiles verification service started")
         if settings.queue_enabled:
             logger.info(f"📋 Request queue system enabled")
     except Exception as e:
