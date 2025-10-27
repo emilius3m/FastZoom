@@ -575,17 +575,23 @@ async def upload_request_handler(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 async def bulk_upload_request_handler(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Handler for queued bulk upload requests"""
+    """Handler for queued bulk upload requests - CALLS REAL BULK UPLOAD LOGIC"""
 
     logger.info(f"Processing queued bulk upload request: {payload.get('path')}")
 
-    # For now, this is still a mock - bulk upload would need separate implementation
-    # TODO: Implement real bulk upload processing
-    return {
-        'status': 'completed',
-        'message': 'Bulk upload processed successfully (mock)',
-        'processed_at': time.time()
-    }
+    try:
+        # Import the real bulk upload handler from bulk_upload_handler module
+        from app.routes.api.bulk_upload_handler import process_queued_bulk_upload
+
+        # Call the real bulk upload processing logic
+        result = await process_queued_bulk_upload(payload)
+
+        logger.info(f"Queued bulk upload completed successfully: {result.get('message', 'No message')}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in queued bulk upload handler: {e}")
+        raise Exception(f"Bulk upload processing failed: {str(e)}")
 
 
 # Register handlers

@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     db_pool_reset_on_return: str = "commit"  # Resetta stato connessione al ritorno
 
     # Request Queue Configuration
-    queue_enabled: bool = True
+    queue_enabled: bool = False
     queue_base_concurrent_limit: int = 10
     queue_max_concurrent_limit: int = 50
     queue_cpu_threshold: float = 75.0

@@ -2101,26 +2101,28 @@ async def _handle_queued_upload(
 
 async def process_queued_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Process queued upload request"""
-    
+
     from app.services.storage_service import storage_service
     from app.services.photo_metadata_service import photo_metadata_service
     from app.services.deep_zoom_background_service import deep_zoom_background_service
     from app.models import Photo
     from sqlalchemy import select
     import uuid
-    
+    import aiofiles
+    from io import BytesIO
+
     logger.info(f"Processing queued upload for site {payload['site_id']}")
-    
+
     try:
         site_id = uuid.UUID(payload['site_id'])
         user_id = uuid.UUID(payload['user_id'])
         metadata = payload['metadata']
         temp_files = payload.get('temp_files', [])
-        
+
         # Process each photo
         uploaded_photos = []
         photos_needing_tiles = []
-        
+
         for temp_file in temp_files:
             try:
                 # Check if temp file exists before moving
@@ -2129,14 +2131,32 @@ async def process_queued_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
                 if not temp_file_exists:
                     logger.error(f"Temp file not found: {temp_file['file_path']}")
                     continue
-                
+
                 # Move temp file to permanent location
                 permanent_path = await storage_service.move_temp_file(
                     temp_file['file_path'],
                     str(site_id),
                     str(user_id)
                 )
-                
+
+                # Extract metadata from the actual file
+                file_metadata = {}
+                try:
+                    # Create a file-like object from the permanent path for metadata extraction
+                    async with aiofiles.open(permanent_path, 'rb') as f:
+                        # Create a simple file-like object for metadata extraction
+                        content = await f.read()
+                        file_like = BytesIO(content)
+                        file_like.filename = temp_file['original_filename']
+
+                        exif_data, extracted_metadata = await photo_metadata_service.extract_metadata_from_file(
+                            file_like, temp_file['filename']
+                        )
+                        file_metadata = extracted_metadata
+                except Exception as metadata_error:
+                    logger.warning(f"Failed to extract metadata for {temp_file.get('filename')}: {metadata_error}")
+                    # Continue with empty metadata if extraction fails
+
                 # Create photo record
                 photo_record = await photo_metadata_service.create_photo_record(
                     filename=temp_file['filename'],
@@ -2145,42 +2165,95 @@ async def process_queued_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
                     file_size=temp_file['file_size'],
                     site_id=str(site_id),
                     uploaded_by=str(user_id),
-                    metadata={},
+                    metadata=file_metadata,
                     archaeological_metadata=metadata
                 )
-                
+
                 # Save to database
                 from app.database.base import async_session_maker
                 async with async_session_maker() as db:
                     db.add(photo_record)
                     await db.commit()
                     await db.refresh(photo_record)
-                
+
+                    # Generate thumbnail after database save
+                    try:
+                        async with aiofiles.open(permanent_path, 'rb') as f:
+                            content = await f.read()
+                            file_like = BytesIO(content)
+                            file_like.filename = temp_file['original_filename']
+
+                            thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
+                                file_like, str(photo_record.id)
+                            )
+
+                            if thumbnail_path:
+                                photo_record.thumbnail_path = thumbnail_path
+                                await db.commit()
+                                logger.info(f"Thumbnail generated and saved: {thumbnail_path}")
+                            else:
+                                logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+                    except Exception as thumbnail_error:
+                        logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
+                        # Don't fail the upload if thumbnail generation fails
+
                 uploaded_photos.append({
                     'photo_id': str(photo_record.id),
                     'filename': temp_file['filename'],
-                    'file_size': temp_file['file_size']
+                    'original_filename': temp_file['original_filename'],
+                    'file_size': temp_file['file_size'],
+                    'file_path': permanent_path,
+                    'metadata': {
+                        'width': photo_record.width,
+                        'height': photo_record.height,
+                        'photo_date': photo_record.photo_date.isoformat() if photo_record.photo_date else None,
+                        'camera_model': photo_record.camera_model
+                    },
+                    'archaeological_metadata': {
+                        'inventory_number': photo_record.inventory_number,
+                        'excavation_area': photo_record.excavation_area,
+                        'material': photo_record.material,
+                        'chronology_period': photo_record.chronology_period,
+                        'photo_type': photo_record.photo_type,
+                        'photographer': photo_record.photographer,
+                        'description': photo_record.description,
+                        'keywords': photo_record.keywords
+                    }
                 })
-                
-                # Check if tiles are needed
-                if temp_file['file_size'] > 5 * 1024 * 1024:  # > 5MB
+
+                # Check if tiles are needed (larger files or high resolution)
+                width = photo_record.width or 0
+                height = photo_record.height or 0
+                max_dimension = max(width, height)
+                file_size_mb = temp_file['file_size'] / (1024 * 1024)
+
+                if max_dimension > 2000 or file_size_mb > 5:  # Large images need tiles
                     photos_needing_tiles.append({
                         'photo_id': str(photo_record.id),
                         'file_path': permanent_path,
+                        'width': width,
+                        'height': height,
                         'archaeological_metadata': metadata
                     })
-                
+
+                logger.info(f"Queued upload: Successfully processed photo {photo_record.id} ({temp_file['original_filename']})")
+
             except Exception as e:
                 logger.error(f"Error processing queued photo {temp_file.get('filename')}: {e}")
                 continue
-        
+
         # Schedule tile processing if needed
         if photos_needing_tiles:
-            await deep_zoom_background_service.schedule_batch_processing(
-                photos_list=photos_needing_tiles,
-                site_id=str(site_id)
-            )
-        
+            try:
+                await deep_zoom_background_service.schedule_batch_processing(
+                    photos_list=photos_needing_tiles,
+                    site_id=str(site_id)
+                )
+                logger.info(f"Scheduled deep zoom processing for {len(photos_needing_tiles)} photos")
+            except Exception as tile_error:
+                logger.error(f"Failed to schedule tile processing: {tile_error}")
+                # Don't fail entire upload if tile scheduling fails
+
         return {
             'status': 'completed',
             'message': f'Processed {len(uploaded_photos)} photos successfully',
@@ -2188,7 +2261,7 @@ async def process_queued_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
             'photos_needing_tiles': len(photos_needing_tiles),
             'processed_at': datetime.now().isoformat()
         }
-        
+
     except Exception as e:
         logger.error(f"Error processing queued upload: {e}")
         raise Exception(f"Upload processing failed: {str(e)}")
