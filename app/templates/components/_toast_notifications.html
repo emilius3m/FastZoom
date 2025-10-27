@@ -1,0 +1,375 @@
+<!-- templates/components/_toast_notifications.html - SISTEMA DI NOTIFICHE TOAST RIUTILIZZABILE -->
+<div x-data="toastNotificationSystem()" 
+     x-init="initToastSystem()"
+     class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none"
+     style="max-width: 400px;">
+    
+    <!-- Toast Container -->
+    <template x-for="toast in toasts" :key="toast.id">
+        <div x-show="toast.visible"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform translate-x-full"
+             x-transition:enter-end="opacity-100 transform translate-x-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform translate-x-0"
+             x-transition:leave-end="opacity-0 transform translate-x-full"
+             class="pointer-events-auto relative rounded-lg shadow-lg border p-4 mb-2"
+             :class="getToastClasses(toast.type)">
+            
+            <!-- Icona e contenuto -->
+            <div class="flex items-start">
+                <!-- Icona -->
+                <div class="flex-shrink-0 mr-3">
+                    <div class="w-6 h-6 rounded-full flex items-center justify-center"
+                         :class="getIconClasses(toast.type)">
+                        <svg x-show="toast.type === 'success'" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 0116 0zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 0l-2 2a1 1 0 001.414 1.414l2.293-2.293a1 1 0 001.414-1.414z" clip-rule="evenodd"></path>
+                        </svg>
+                        <svg x-show="toast.type === 'error'" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 0116 0zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                        </svg>
+                        <svg x-show="toast.type === 'warning'" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        <svg x-show="toast.type === 'info'" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                        </svg>
+                        <svg x-show="toast.type === 'loading'" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                </div>
+                
+                <!-- Contenuto testuale -->
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium" x-text="toast.title"></p>
+                    <p x-show="toast.message" class="text-sm mt-1 opacity-90" x-text="toast.message"></p>
+                    
+                    <!-- Dettagli aggiuntivi per errori -->
+                    <div x-show="toast.type === 'error' && toast.details" class="mt-2 text-xs opacity-80">
+                        <details class="cursor-pointer">
+                            <summary class="font-medium">Dettagli errore</summary>
+                            <pre class="mt-1 p-2 bg-black bg-opacity-10 rounded text-xs overflow-auto max-h-32" x-text="toast.details"></pre>
+                        </details>
+                    </div>
+                    
+                    <!-- Azioni disponibili -->
+                    <div x-show="toast.actions && toast.actions.length > 0" class="mt-3 flex space-x-2">
+                        <template x-for="action in toast.actions" :key="action.id">
+                            <button @click="executeAction(action, toast)"
+                                    :class="action.classes || 'text-xs font-medium underline hover:no-underline'"
+                                    x-text="action.label">
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pulsante chiusura -->
+            <button @click="dismissToast(toast.id)"
+                    class="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                </svg>
+            </button>
+            
+            <!-- Progress bar per toast persistenti -->
+            <div x-show="toast.persistent && toast.progress !== undefined"
+                 class="absolute bottom-0 left-0 h-1 bg-gray-200 rounded-b-lg">
+                <div class="h-full bg-blue-500 rounded-b-lg transition-all duration-300"
+                     :style="`width: ${toast.progress || 0}%`"></div>
+            </div>
+        </div>
+    </template>
+</div>
+
+<script>
+function toastNotificationSystem() {
+    return {
+        toasts: [],
+        toastIdCounter: 0,
+        
+        // Inizializzazione del sistema
+        initToastSystem() {
+            // Rendi disponibile globalmente per altri componenti
+            window.toastSystem = this;
+            
+            // Ascolta eventi custom per notifiche
+            document.addEventListener('show-toast', (event) => {
+                this.showToast(event.detail.message, event.detail.type, event.detail.options);
+            });
+            
+            document.addEventListener('dismiss-toast', (event) => {
+                this.dismissToast(event.detail.toastId);
+            });
+            
+            document.addEventListener('clear-all-toasts', () => {
+                this.clearAllToasts();
+            });
+            
+            console.log('🔔 Toast notification system initialized');
+        },
+        
+        // Metodo principale per mostrare toast
+        showToast(message, type = 'info', options = {}) {
+            const toastId = this.toastIdCounter++;
+            
+            const toast = {
+                id: toastId,
+                message: message,
+                type: type, // success, error, warning, info, loading
+                title: options.title || this.getDefaultTitle(type),
+                persistent: options.persistent || false,
+                timeout: options.timeout || this.getDefaultTimeout(type),
+                actions: options.actions || [],
+                details: options.details || null,
+                progress: options.progress || null,
+                visible: true,
+                createdAt: Date.now()
+            };
+            
+            this.toasts.unshift(toast);
+            
+            // Auto-dismiss per toast non persistenti
+            if (!toast.persistent && toast.timeout > 0) {
+                setTimeout(() => {
+                    this.dismissToast(toastId);
+                }, toast.timeout);
+            }
+            
+            // Log per debugging
+            this.logToast(toast);
+            
+            return toastId;
+        },
+        
+        // Metodi specifici per tipo
+        showSuccess(message, options = {}) {
+            return this.showToast(message, 'success', options);
+        },
+        
+        showError(message, options = {}) {
+            return this.showToast(message, 'error', {
+                title: 'Errore',
+                timeout: 0, // Gli errori non scompaiono automaticamente
+                persistent: true,
+                ...options
+            });
+        },
+        
+        showWarning(message, options = {}) {
+            return this.showToast(message, 'warning', options);
+        },
+        
+        showInfo(message, options = {}) {
+            return this.showToast(message, 'info', options);
+        },
+        
+        showLoading(message, options = {}) {
+            return this.showToast(message, 'loading', {
+                title: 'Caricamento...',
+                persistent: true,
+                timeout: 0,
+                ...options
+            });
+        },
+        
+        // Metodi per scenari specifici
+        showNetworkError(error, options = {}) {
+            const message = this.getNetworkErrorMessage(error);
+            return this.showError(message, {
+                title: 'Errore di Rete',
+                details: {
+                    error: error.message,
+                    status: error.status,
+                    url: error.url,
+                    timestamp: new Date().toISOString()
+                },
+                actions: [
+                    {
+                        id: 'retry',
+                        label: 'Riprova',
+                        classes: 'text-blue-600 hover:text-blue-800 font-medium',
+                        handler: options.retryHandler
+                    }
+                ],
+                ...options
+            });
+        },
+        
+        showAuthError(message, options = {}) {
+            return this.showError(message, {
+                title: 'Errore di Autenticazione',
+                actions: [
+                    {
+                        id: 'login',
+                        label: 'Accedi',
+                        classes: 'text-blue-600 hover:text-blue-800 font-medium',
+                        handler: () => {
+                            window.location.href = '/login';
+                        }
+                    }
+                ],
+                ...options
+            });
+        },
+        
+        showValidationError(errors, options = {}) {
+            const message = Array.isArray(errors) ? errors.join(', ') : errors;
+            return this.showError(message, {
+                title: 'Errore di Validazione',
+                details: Array.isArray(errors) ? { validation_errors: errors } : null,
+                ...options
+            });
+        },
+        
+        // Gestione toast
+        dismissToast(toastId) {
+            const toastIndex = this.toasts.findIndex(t => t.id === toastId);
+            if (toastIndex !== -1) {
+                const toast = this.toasts[toastIndex];
+                toast.visible = false;
+                
+                // Rimuovi dopo l'animazione
+                setTimeout(() => {
+                    this.toasts = this.toasts.filter(t => t.id !== toastId);
+                }, 200);
+            }
+        },
+        
+        clearAllToasts() {
+            this.toasts.forEach(toast => {
+                toast.visible = false;
+            });
+            
+            setTimeout(() => {
+                this.toasts = [];
+            }, 200);
+        },
+        
+        updateToastProgress(toastId, progress) {
+            const toast = this.toasts.find(t => t.id === toastId);
+            if (toast) {
+                toast.progress = Math.max(0, Math.min(100, progress));
+            }
+        },
+        
+        // Esecuzione azioni
+        executeAction(action, toast) {
+            if (action.handler && typeof action.handler === 'function') {
+                action.handler(toast);
+            }
+            
+            // Chiudi il toast dopo l'azione
+            if (action.dismissOnClick !== false) {
+                this.dismissToast(toast.id);
+            }
+        },
+        
+        // Utilità
+        getDefaultTitle(type) {
+            const titles = {
+                success: 'Successo',
+                error: 'Errore',
+                warning: 'Attenzione',
+                info: 'Informazione',
+                loading: 'Caricamento'
+            };
+            return titles[type] || 'Notifica';
+        },
+        
+        getDefaultTimeout(type) {
+            const timeouts = {
+                success: 4000,
+                error: 0, // Non auto-dismiss
+                warning: 6000,
+                info: 3000,
+                loading: 0 // Non auto-dismiss
+            };
+            return timeouts[type] || 4000;
+        },
+        
+        getToastClasses(type) {
+            const baseClasses = 'backdrop-blur-sm';
+            
+            const typeClasses = {
+                success: 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-200',
+                error: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900 dark:border-red-700 dark:text-red-200',
+                warning: 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-200',
+                info: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-200',
+                loading: 'bg-gray-50 border-gray-200 text-gray-800 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-200'
+            };
+            
+            return `${baseClasses} ${typeClasses[type] || typeClasses.info}`;
+        },
+        
+        getIconClasses(type) {
+            const baseClasses = 'text-white';
+            
+            const typeClasses = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500',
+                loading: 'bg-gray-500'
+            };
+            
+            return `${baseClasses} ${typeClasses[type] || typeClasses.info}`;
+        },
+        
+        getNetworkErrorMessage(error) {
+            if (!error) return 'Errore di rete sconosciuto';
+            
+            if (error.name === 'AbortError') {
+                return 'Timeout della richiesta. Il server ha impiegato troppo tempo a rispondere.';
+            }
+            
+            if (error.status === 0) {
+                return 'Impossibile connettersi al server. Verifica la tua connessione internet.';
+            }
+            
+            if (error.status === 401) {
+                return 'Sessione scaduta. Effettua nuovamente il login.';
+            }
+            
+            if (error.status === 403) {
+                return 'Non hai i permessi per eseguire questa operazione.';
+            }
+            
+            if (error.status === 404) {
+                return 'Risorsa non trovata.';
+            }
+            
+            if (error.status === 429) {
+                return 'Troppe richieste. Riprova tra qualche istante.';
+            }
+            
+            if (error.status >= 500) {
+                return 'Errore del server. Riprova più tardi.';
+            }
+            
+            return error.message || 'Errore di rete generico';
+        },
+        
+        // Logging per debugging
+        logToast(toast) {
+            const logLevel = toast.type === 'error' ? 'error' : 
+                           toast.type === 'warning' ? 'warn' : 'info';
+            
+            console[logLevel]('🔔 Toast:', {
+                id: toast.id,
+                type: toast.type,
+                title: toast.title,
+                message: toast.message,
+                timestamp: new Date().toISOString()
+            });
+        }
+    };
+}
+
+// Inizializza quando Alpine è pronto
+document.addEventListener('alpine:init', () => {
+    Alpine.data('toastNotificationSystem', toastNotificationSystem);
+});
+</script>
