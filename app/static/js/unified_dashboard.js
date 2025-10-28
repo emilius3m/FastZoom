@@ -488,11 +488,25 @@ document.addEventListener("alpine:init", () => {
         
         // Navigation methods
         navigateToSite(siteId) {
-            window.location.href = `/view/${siteId}/dashboard/`;
+            console.log('Navigating to site:', siteId);
+            // Ensure we have a valid site ID
+            if (!siteId) {
+                console.error('No site ID provided for navigation');
+                return;
+            }
+            // Force navigation with full page reload
+            window.location.assign(`/view/${siteId}/dashboard/`);
         },
         
         navigateToGiornaleSite(siteId) {
-            window.location.href = `/giornale-cantiere/site/${siteId}`;
+            console.log('Navigating to giornale site:', siteId);
+            // Ensure we have a valid site ID
+            if (!siteId) {
+                console.error('No site ID provided for giornale navigation');
+                return;
+            }
+            // Force navigation with full page reload
+            window.location.assign(`/giornale-cantiere/site/${siteId}`);
         },
         
         navigateToNewSite() {
@@ -843,15 +857,26 @@ document.addEventListener("alpine:init", () => {
         },
         
         selectSite(site) {
+            console.log('Selecting site:', site, 'with context:', this.context);
+            
+            // Ensure we have a valid site object and ID
+            if (!site || !site.id) {
+                console.error('Invalid site object provided to selectSite');
+                return;
+            }
+            
             switch(this.context) {
                 case 'overview':
-                    window.location.href = `/view/${site.id}/dashboard/`;
+                    console.log('Navigating to site dashboard:', site.id);
+                    window.location.assign(`/view/${site.id}/dashboard/`);
                     break;
                 case 'giornale':
-                    window.location.href = `/giornale-cantiere/site/${site.id}`;
+                    console.log('Navigating to giornale site:', site.id);
+                    window.location.assign(`/giornale-cantiere/site/${site.id}`);
                     break;
                 default:
-                    window.location.href = `/view/${site.id}/dashboard/`;
+                    console.log('Default navigation to site dashboard:', site.id);
+                    window.location.assign(`/view/${site.id}/dashboard/`);
             }
         },
         

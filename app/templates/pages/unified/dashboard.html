@@ -175,7 +175,7 @@
                     <div x-show="!loading.sites" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <template x-for="site in sitesData" :key="site.id">
                             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600 hover:shadow-md transition-all cursor-pointer"
-                                 @click="navigateToSite(site.id)">
+                                 @click.stop="navigateToSite(site.id)">
                                 <div class="flex items-start justify-between mb-3">
                                     <div class="flex-1">
                                         <h3 class="font-semibold text-gray-900 dark:text-white" x-text="site.name"></h3>
@@ -276,7 +276,7 @@
                     <div x-show="!loading.giornaleSites" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <template x-for="site in giornaleSites" :key="site.id">
                             <div class="group relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-lg transition-all duration-200 cursor-pointer"
-                                 @click="navigateToGiornaleSite(site.id)">
+                                 @click.stop="navigateToGiornaleSite(site.id)">
                                 
                                 <div class="flex items-start justify-between mb-4">
                                     <div class="flex-1">
