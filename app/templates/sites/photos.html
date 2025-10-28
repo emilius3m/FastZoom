@@ -1005,9 +1005,97 @@
                 <!-- Photo Display Area -->
                 <div class="flex-1 flex items-center justify-center relative">
 
-                    <!-- OpenSeadragon Viewer Component -->
-                    <div class="w-full h-full relative">
-                        {% include 'sites/components/_openseadragon_viewer.html' %}
+                    <!-- OpenSeadragon Viewer Container -->
+                    <div id="openseadragon-container" class="w-full h-full bg-gray-900 relative">
+                        <!-- Modern FAB Controls Container -->
+                        <div id="osd-fab-container" class="osd-fab-container" style="display: none;" data-initialized="false">
+                            <!-- Zoom In Button -->
+                            <button id="osd-zoom-in" class="osd-fab osd-fab-primary"
+                                    aria-label="Zoom in"
+                                    tabindex="0">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                </svg>
+                                <span class="osd-fab-tooltip">Zoom In (+)</span>
+                            </button>
+                            
+                            <!-- Zoom Out Button -->
+                            <button id="osd-zoom-out" class="osd-fab osd-fab-primary"
+                                    aria-label="Zoom out"
+                                    tabindex="0">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M19 13H5v-2h14v2z"/>
+                                </svg>
+                                <span class="osd-fab-tooltip">Zoom Out (-)</span>
+                            </button>
+                            
+                            <!-- Reset View Button -->
+                            <button id="osd-reset-view" class="osd-fab osd-fab-secondary"
+                                    aria-label="Reset view"
+                                    tabindex="0">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h2c0 2.21 1.79 4 4 4s4-1.79 4-4-1.79-4-4-4z"/>
+                                </svg>
+                                <span class="osd-fab-tooltip">Reset View (0)</span>
+                            </button>
+                            
+                            <!-- Rotate Left Button -->
+                            <button id="osd-rotate-left" class="osd-fab osd-fab-secondary"
+                                    aria-label="Rotate left"
+                                    tabindex="0">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M7.11 8.53L5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/>
+                                </svg>
+                                <span class="osd-fab-tooltip">Rotate Left (Q)</span>
+                            </button>
+                            
+                            <!-- Rotate Right Button -->
+                            <button id="osd-rotate-right" class="osd-fab osd-fab-secondary"
+                                    aria-label="Rotate right"
+                                    tabindex="0">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.05 7.44 7 7.93v-2.02c-2.84-.48-5-2.94-5-5.91s2.16-5.43 5-5.91V10l4.55-4.45zM19.93 11c-.17-1.39-.72-2.73-1.62-3.89l-1.42 1.42c.54.75.88 1.6 1.02 2.47h2.02zM13 17.9v2.02c1.39-.17 2.74-.71 3.9-1.61l-1.44-1.44c-.75.54-1.59.89-2.46 1.03zm3.89-2.42l1.42 1.41c.9-1.16 1.45-2.5 1.62-3.89h-2.02c-.14.87-.48 1.72-1.02 2.48z"/>
+                                </svg>
+                                <span class="osd-fab-tooltip">Rotate Right (E)</span>
+                            </button>
+                            
+                            <!-- Fullscreen Button -->
+                            <button id="osd-fullscreen" class="osd-fab osd-fab-accent"
+                                    aria-label="Toggle fullscreen"
+                                    tabindex="0">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                                </svg>
+                                <span class="osd-fab-tooltip">Fullscreen (F)</span>
+                            </button>
+                        </div>
+                        <!-- Loading State -->
+                        <div x-show="osdLoading"
+                             class="absolute inset-0 flex items-center justify-center bg-gray-900 text-white z-30">
+                            <div class="text-center">
+                                <svg class="animate-spin h-8 w-8 text-white mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <p class="text-sm">Inizializzazione visualizzatore Deep Zoom...</p>
+                            </div>
+                        </div>
+
+                        <!-- Error State -->
+                        <div x-show="osdError && !osdLoading"
+                             class="absolute inset-0 flex items-center justify-center bg-gray-900 text-white z-30">
+                            <div class="text-center max-w-md mx-auto px-4">
+                                <svg class="h-12 w-12 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <h3 class="text-lg font-medium mb-2">Errore Visualizzatore</h3>
+                                <p class="text-sm text-gray-300 mb-4" x-text="osdErrorMessage"></p>
+                                <button @click="switchToOpenSeadragon()"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                                    Riprova
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Hover Zone for Sidebar (Desktop only) -->
@@ -2095,10 +2183,11 @@ function photosManager() {
         },
 
         async switchToOpenSeadragon() {
-            console.log('switchToOpenSeadragon: Starting OpenSeadragon view switch');
+            console.log('switchToOpenSeadragon: Starting OpenSeadragon initialization');
             this.photoViewMode = 'openseadragon';
             this.osdLoading = true;
             this.osdError = false;
+            this.osdErrorMessage = '';
 
             try {
                 console.log('switchToOpenSeadragon: About to call initOpenSeadragon');
@@ -2108,6 +2197,10 @@ function photosManager() {
                 console.error('switchToOpenSeadragon: Failed to initialize OpenSeadragon:', error);
                 this.osdError = true;
                 this.osdErrorMessage = error.message || 'Errore nell\'inizializzazione del visualizzatore';
+                
+                // Non usiamo fallback - tutte le immagini devono funzionare con OpenSeadragon
+                // Se fallisce, mostriamo l'errore ma manteniamo il tentativo
+                console.warn('OpenSeadragon initialization failed but no fallback will be used');
             } finally {
                 this.osdLoading = false;
                 console.log('switchToOpenSeadragon: Finished (loading set to false)');
@@ -2122,8 +2215,6 @@ function photosManager() {
                 console.log('Loading OpenSeadragon script...');
                 await this.loadOpenSeadragonScript();
             }
-
-            // Using OpenSeadragon's built-in TileSource format - no custom class needed
 
             // Check if photo has deep zoom support
             console.log('Getting deep zoom info...');
@@ -2160,7 +2251,8 @@ function photosManager() {
                     }
                 };
             } else {
-                console.log('Using simple image fallback - deep zoom not available or no levels');
+                console.log('Using simple image with OpenSeadragon (no tiles available)');
+                // SEMPRE usiamo OpenSeadragon, anche senza tiles
                 tileSource = {
                     type: 'image',
                     url: this.currentPhoto.file_url,
@@ -2172,13 +2264,28 @@ function photosManager() {
             console.log('Final tile source:', tileSource);
 
             // Create OpenSeadragon viewer
-            const container = document.getElementById('openseadragon-viewer');
+            const container = document.getElementById('openseadragon-container');
             if (!container) {
                 throw new Error('Container OpenSeadragon non trovato');
             }
 
-            // Clear container
+            // Store FAB container before clearing
+            const fabContainer = document.getElementById('osd-fab-container');
+            let fabHTML = '';
+            if (fabContainer) {
+                fabHTML = fabContainer.outerHTML;
+                console.log('Preserved FAB container HTML:', fabHTML.substring(0, 100) + '...');
+            }
+
+            // Clear container but preserve FAB container
             container.innerHTML = '';
+            
+            // Restore FAB container if it was preserved
+            if (fabHTML) {
+                container.innerHTML = fabHTML;
+                console.log('Restored FAB container to container');
+            }
+            
             console.log('Container cleared, creating OpenSeadragon viewer...');
 
             // Detect if image might have transparency (PNG format)
@@ -2189,7 +2296,7 @@ function photosManager() {
                 this.osdViewer = OpenSeadragon({
                     element: container,
                     tileSources: [tileSource],
-                    prefixUrl: '/static/img/openseadragon/',
+                    prefixUrl: 'https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/images/',
                     animationTime: 0.5,
                     blendTime: 0.1,
                     constrainDuringPan: true,
@@ -2198,11 +2305,11 @@ function photosManager() {
                     maxZoomLevel: 10,
                     zoomPerClick: 2.0,
                     zoomPerScroll: 1.2,
-                    showNavigationControl: true,
-                    showZoomControl: true,
-                    showHomeControl: true,
+                    showNavigationControl: false,
+                    showZoomControl: false,
+                    showHomeControl: false,
                     showFullPageControl: false,
-                    showRotationControl: true,
+                    showRotationControl: false,
                     debugMode: false,
                     // Set background color based on image type
                     backgroundColor: backgroundColor,
@@ -2227,11 +2334,31 @@ function photosManager() {
                 // Wait for viewer to be ready
                 return new Promise((resolve, reject) => {
                     let resolved = false;
+                    const timeoutId = setTimeout(() => {
+                        if (!resolved) {
+                            console.error('OpenSeadragon initialization timeout after 15 seconds');
+                            resolved = true;
+                            reject(new Error('Timeout nell\'apertura dell\'immagine'));
+                        }
+                    }, 15000);
 
                     this.osdViewer.addHandler('open', () => {
                         console.log('OpenSeadragon viewer opened successfully');
                         if (!resolved) {
                             resolved = true;
+                            clearTimeout(timeoutId);
+                            
+                            // Initialize FAB controls after OpenSeadragon is ready
+                            // Use a longer delay to ensure DOM is fully updated
+                            setTimeout(() => {
+                                const managerInstance = window.photosManagerInstance;
+                                if (managerInstance && managerInstance.initializeFABControls) {
+                                    managerInstance.initializeFABControls();
+                                } else {
+                                    console.warn('photosManagerInstance not available for FAB initialization');
+                                }
+                            }, 200); // Increased delay to 200ms
+                            
                             resolve();
                         }
                     });
@@ -2240,37 +2367,28 @@ function photosManager() {
                         console.error('OpenSeadragon failed to open:', event);
                         if (!resolved) {
                             resolved = true;
+                            clearTimeout(timeoutId);
                             reject(new Error('Impossibile aprire l\'immagine: ' + (event.message || 'errore sconosciuto')));
                         }
                     });
 
                     this.osdViewer.addHandler('tile-load-failed', (event) => {
                         console.warn('Tile load failed:', event);
-                        // If too many tiles fail, switch to standard view
+                        // Non facciamo fallback - registriamo solo l'errore
                         if (!this.osdTileFailureCount) this.osdTileFailureCount = 0;
                         this.osdTileFailureCount++;
                         
-                        if (this.osdTileFailureCount > 5) {
-                            console.error('Too many tile failures, switching to standard view');
-                            this.osdError = true;
-                            this.osdErrorMessage = 'Errore nel caricamento dei tiles. Usa la vista standard.';
-                            this.switchToStandard();
+                        if (this.osdTileFailureCount > 10) {
+                            console.warn('Many tile failures, but continuing with OpenSeadragon');
                         }
                     });
 
                     this.osdViewer.addHandler('tile-loaded', (event) => {
                         // Reset failure counter on successful tile load
-                        this.osdTileFailureCount = 0;
-                    });
-
-                    // Timeout fallback più lungo per debug
-                    setTimeout(() => {
-                        if (!resolved) {
-                            console.error('OpenSeadragon initialization timeout');
-                            resolved = true;
-                            reject(new Error('Timeout nell\'apertura dell\'immagine'));
+                        if (this.osdTileFailureCount > 0) {
+                            this.osdTileFailureCount = Math.max(0, this.osdTileFailureCount - 1);
                         }
-                    }, 15000);
+                    });
                 });
 
             } catch (error) {
@@ -2279,20 +2397,415 @@ function photosManager() {
             }
         },
 
-        async loadOpenSeadragonScript() {
-            return new Promise((resolve, reject) => {
-                if (window.OpenSeadragon) {
-                    resolve();
+        // Initialize FAB Controls
+        initializeFABControls() {
+            console.log('Initializing FAB controls...');
+            
+            // Wait for DOM to be ready with retry mechanism
+            this.initializeFABControlsWithRetry(0);
+        },
+        
+        // Initialize FAB Controls with retry mechanism
+        initializeFABControlsWithRetry(attempt) {
+            const maxRetries = 10;
+            const retryDelay = 100;
+            
+            // Try multiple selector strategies to find the FAB container
+            let fabContainer = document.getElementById('osd-fab-container');
+            
+            // If not found by ID, try by class name
+            if (!fabContainer) {
+                fabContainer = document.querySelector('.osd-fab-container');
+            }
+            
+            // If still not found, try within the OpenSeadragon container
+            if (!fabContainer) {
+                const osdContainer = document.getElementById('openseadragon-container');
+                if (osdContainer) {
+                    fabContainer = osdContainer.querySelector('#osd-fab-container') ||
+                                   osdContainer.querySelector('.osd-fab-container');
+                }
+            }
+            
+            // If still not found, create the FAB container dynamically
+            if (!fabContainer) {
+                const osdContainer = document.getElementById('openseadragon-container');
+                if (osdContainer) {
+                    console.log('Creating FAB container dynamically...');
+                    fabContainer = this.createFABContainer(osdContainer);
+                }
+            }
+            
+            if (!fabContainer) {
+                if (attempt < maxRetries) {
+                    console.log(`FAB container not found, retrying (${attempt + 1}/${maxRetries})...`);
+                    setTimeout(() => {
+                        this.initializeFABControlsWithRetry(attempt + 1);
+                    }, retryDelay);
+                    return;
+                } else {
+                    console.error('FAB container not found after', maxRetries, 'attempts');
+                    console.log('Debug: Available containers:', {
+                        osdContainer: !!document.getElementById('openseadragon-container'),
+                        fabContainer: !!document.getElementById('osd-fab-container'),
+                        fabContainerByClass: !!document.querySelector('.osd-fab-container')
+                    });
                     return;
                 }
-
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js';
-                script.onload = () => resolve();
-                script.onerror = () => reject(new Error('Impossibile caricare OpenSeadragon'));
-                document.head.appendChild(script);
-            });
+            }
+            
+            console.log('FAB container found, proceeding with initialization...');
+            console.log('FAB container element:', fabContainer);
+            console.log('FAB container parent:', fabContainer.parentElement);
+            console.log('FAB container display style:', window.getComputedStyle(fabContainer).display);
+            
+            // Check if already initialized
+            if (fabContainer.dataset.initialized === 'true') {
+                console.log('FAB controls already initialized, skipping...');
+                return;
+            }
+            
+            // Show FAB container with animation
+            console.log('Setting FAB container display to flex');
+            fabContainer.style.display = 'flex';
+            fabContainer.style.visibility = 'visible';
+            fabContainer.dataset.initialized = 'true';
+            
+            // Force a reflow to ensure the container is visible
+            fabContainer.offsetHeight;
+            console.log('FAB container is now visible:', fabContainer.style.display);
+            
+            // Get buttons
+            const zoomInBtn = document.getElementById('osd-zoom-in');
+            const zoomOutBtn = document.getElementById('osd-zoom-out');
+            const resetBtn = document.getElementById('osd-reset-view');
+            const rotateLeftBtn = document.getElementById('osd-rotate-left');
+            const rotateRightBtn = document.getElementById('osd-rotate-right');
+            const fullscreenBtn = document.getElementById('osd-fullscreen');
+            
+            // Store reference for cleanup
+            this.fabControls = {
+                container: fabContainer,
+                buttons: [zoomInBtn, zoomOutBtn, resetBtn, rotateLeftBtn, rotateRightBtn, fullscreenBtn]
+            };
+            
+            // Add event listeners
+            if (zoomInBtn) {
+                zoomInBtn.addEventListener('click', () => this.zoomIn());
+                zoomInBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.zoomIn();
+                    }
+                });
+            }
+            
+            if (zoomOutBtn) {
+                zoomOutBtn.addEventListener('click', () => this.zoomOut());
+                zoomOutBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.zoomOut();
+                    }
+                });
+            }
+            
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => this.resetView());
+                resetBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.resetView();
+                    }
+                });
+            }
+            
+            if (rotateLeftBtn) {
+                rotateLeftBtn.addEventListener('click', () => this.rotateLeft());
+                rotateLeftBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.rotateLeft();
+                    }
+                });
+            }
+            
+            if (rotateRightBtn) {
+                rotateRightBtn.addEventListener('click', () => this.rotateRight());
+                rotateRightBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.rotateRight();
+                    }
+                });
+            }
+            
+            if (fullscreenBtn) {
+                fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+                fullscreenBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.toggleFullscreen();
+                    }
+                });
+            }
+            
+            // Add keyboard shortcuts
+            this.addKeyboardShortcuts();
+            
+            console.log('FAB controls initialized successfully');
         },
+        
+        // Create FAB Container dynamically if missing
+        createFABContainer(osdContainer) {
+            console.log('Creating FAB container dynamically...');
+            
+            if (!osdContainer) {
+                console.error('Cannot create FAB container: OpenSeadragon container not found');
+                return null;
+            }
+            
+            // Create the FAB container div
+            const fabContainer = document.createElement('div');
+            fabContainer.id = 'osd-fab-container';
+            fabContainer.className = 'osd-fab-container';
+            fabContainer.style.display = 'flex';
+            fabContainer.style.visibility = 'visible';
+            fabContainer.dataset.initialized = 'false';
+            
+            // Create all FAB buttons
+            const buttonsHTML = `
+                <!-- Zoom In Button -->
+                <button id="osd-zoom-in" class="osd-fab osd-fab-primary"
+                        aria-label="Zoom in"
+                        tabindex="0">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                    </svg>
+                    <span class="osd-fab-tooltip">Zoom In (+)</span>
+                </button>
+                
+                <!-- Zoom Out Button -->
+                <button id="osd-zoom-out" class="osd-fab osd-fab-primary"
+                        aria-label="Zoom out"
+                        tabindex="0">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 13H5v-2h14v2z"/>
+                    </svg>
+                    <span class="osd-fab-tooltip">Zoom Out (-)</span>
+                </button>
+                
+                <!-- Reset View Button -->
+                <button id="osd-reset-view" class="osd-fab osd-fab-secondary"
+                        aria-label="Reset view"
+                        tabindex="0">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h2c0 2.21 1.79 4 4 4s4-1.79 4-4-1.79-4-4-4z"/>
+                    </svg>
+                    <span class="osd-fab-tooltip">Reset View (0)</span>
+                </button>
+                
+                <!-- Rotate Left Button -->
+                <button id="osd-rotate-left" class="osd-fab osd-fab-secondary"
+                        aria-label="Rotate left"
+                        tabindex="0">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M7.11 8.53L5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/>
+                    </svg>
+                    <span class="osd-fab-tooltip">Rotate Left (Q)</span>
+                </button>
+                
+                <!-- Rotate Right Button -->
+                <button id="osd-rotate-right" class="osd-fab osd-fab-secondary"
+                        aria-label="Rotate right"
+                        tabindex="0">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.05 7.44 7 7.93v-2.02c-2.84-.48-5-2.94-5-5.91s2.16-5.43 5-5.91V10l4.55-4.45zM19.93 11c-.17-1.39-.72-2.73-1.62-3.89l-1.42 1.42c.54.75.88 1.6 1.02 2.47h2.02zM13 17.9v2.02c1.39-.17 2.74-.71 3.9-1.61l-1.44-1.44c-.75.54-1.59.89-2.46 1.03zm3.89-2.42l1.42 1.41c.9-1.16 1.45-2.5 1.62-3.89h-2.02c-.14.87-.48 1.72-1.02 2.48z"/>
+                    </svg>
+                    <span class="osd-fab-tooltip">Rotate Right (E)</span>
+                </button>
+                
+                <!-- Fullscreen Button -->
+                <button id="osd-fullscreen" class="osd-fab osd-fab-accent"
+                        aria-label="Toggle fullscreen"
+                        tabindex="0">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                    </svg>
+                    <span class="osd-fab-tooltip">Fullscreen (F)</span>
+                </button>
+            `;
+            
+            fabContainer.innerHTML = buttonsHTML;
+            
+            // Append to OpenSeadragon container
+            osdContainer.appendChild(fabContainer);
+            
+            console.log('FAB container created and appended successfully');
+            return fabContainer;
+        },
+        
+        // FAB Control Functions
+        zoomIn() {
+            if (this.osdViewer) {
+                this.osdViewer.viewport.zoomBy(1.5);
+                this.addRippleEffect('osd-zoom-in');
+            }
+        },
+        
+        zoomOut() {
+            if (this.osdViewer) {
+                this.osdViewer.viewport.zoomBy(0.67);
+                this.addRippleEffect('osd-zoom-out');
+            }
+        },
+        
+        resetView() {
+            if (this.osdViewer) {
+                this.osdViewer.viewport.goHome();
+                this.addRippleEffect('osd-reset-view');
+            }
+        },
+        
+        rotateLeft() {
+            if (this.osdViewer) {
+                const currentRotation = this.osdViewer.viewport.getRotation();
+                this.osdViewer.viewport.setRotation(currentRotation - 90);
+                this.addRippleEffect('osd-rotate-left');
+            }
+        },
+        
+        rotateRight() {
+            if (this.osdViewer) {
+                const currentRotation = this.osdViewer.viewport.getRotation();
+                this.osdViewer.viewport.setRotation(currentRotation + 90);
+                this.addRippleEffect('osd-rotate-right');
+            }
+        },
+        
+        toggleFullscreen() {
+            const container = document.getElementById('openseadragon-container');
+            if (!document.fullscreenElement) {
+                container.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+            this.addRippleEffect('osd-fullscreen');
+        },
+        
+        // Add ripple effect to buttons
+        addRippleEffect(buttonId) {
+            const button = document.getElementById(buttonId);
+            if (!button) return;
+            
+            // Create ripple element
+            const ripple = document.createElement('span');
+            ripple.style.position = 'absolute';
+            ripple.style.borderRadius = '50%';
+            ripple.style.background = 'rgba(255, 255, 255, 0.5)';
+            ripple.style.width = '20px';
+            ripple.style.height = '20px';
+            ripple.style.top = '50%';
+            ripple.style.left = '50%';
+            ripple.style.transform = 'translate(-50%, -50%) scale(0)';
+            ripple.style.animation = 'ripple 0.6s ease-out';
+            ripple.style.pointerEvents = 'none';
+            
+            // Add ripple animation
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes ripple {
+                    to {
+                        transform: translate(-50%, -50%) scale(4);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            button.appendChild(ripple);
+            
+            // Remove ripple after animation
+            setTimeout(() => {
+                if (ripple.parentNode) {
+                    ripple.parentNode.removeChild(ripple);
+                }
+            }, 600);
+        },
+        
+        // Keyboard shortcuts
+        addKeyboardShortcuts() {
+            this.keyboardHandler = (e) => {
+                // Only handle shortcuts when photo modal is open and not typing in input fields
+                if (!this.showPhotoModal || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return;
+                }
+                
+                switch(e.key.toLowerCase()) {
+                    case '+':
+                    case '=':
+                        e.preventDefault();
+                        this.zoomIn();
+                        break;
+                    case '-':
+                    case '_':
+                        e.preventDefault();
+                        this.zoomOut();
+                        break;
+                    case '0':
+                        e.preventDefault();
+                        this.resetView();
+                        break;
+                    case 'r':
+                        e.preventDefault();
+                        this.rotateRight();
+                        break;
+                    case 'q':
+                        e.preventDefault();
+                        this.rotateLeft();
+                        break;
+                    case 'f':
+                        e.preventDefault();
+                        this.toggleFullscreen();
+                        break;
+                }
+            };
+            
+            document.addEventListener('keydown', this.keyboardHandler);
+        },
+        
+        // Cleanup FAB controls
+        cleanupFABControls() {
+            console.log('Cleaning up FAB controls...');
+            
+            // Hide container and reset initialization flag
+            if (this.fabControls && this.fabControls.container) {
+                this.fabControls.container.style.display = 'none';
+                this.fabControls.container.dataset.initialized = 'false';
+            }
+            
+            // Also try to reset the main container
+            const fabContainer = document.getElementById('osd-fab-container');
+            if (fabContainer) {
+                fabContainer.style.display = 'none';
+                fabContainer.dataset.initialized = 'false';
+            }
+            
+            // Remove keyboard shortcuts
+            if (this.keyboardHandler) {
+                document.removeEventListener('keydown', this.keyboardHandler);
+                this.keyboardHandler = null;
+            }
+            
+            // Clear references
+            this.fabControls = null;
+            
+            console.log('FAB controls cleaned up');
+        },
+
+        // loadOpenSeadragonScript removed - now handled by the OpenSeadragon component
 
         async getDeepZoomInfo() {
             if (!this.currentPhoto) return null;
@@ -2371,16 +2884,7 @@ function photosManager() {
             return null;
         },
 
-        destroyOpenSeadragon() {
-            if (this.osdViewer) {
-                try {
-                    this.osdViewer.destroy();
-                } catch (error) {
-                    console.warn('Error destroying OpenSeadragon viewer:', error);
-                }
-                this.osdViewer = null;
-            }
-        },
+        // destroyOpenSeadragon removed - now handled by the OpenSeadragon component
 
         downloadPhoto() {
             console.log('downloadPhoto called');
@@ -2499,6 +3003,9 @@ function photosManager() {
             // Don't reset image state - let OpenSeadragon handle cleanup
             this.showMobileInfo = false;
             this.showSidebar = false; // Hide sidebar when closing modal
+            
+            // Cleanup FAB controls
+            this.cleanupFABControls();
 
             // Clear URL params
             const url = new URL(window.location);
@@ -3774,4 +4281,207 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('photosManager', photosManager);
 });
 </script>
+
+<style>
+/* Modern FAB Controls for OpenSeadragon - Archaeological Theme */
+.osd-fab-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.osd-fab {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    position: relative;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Archaeological color scheme */
+.osd-fab-primary {
+    background: linear-gradient(135deg, #8B7355 0%, #6B5637 100%);
+    color: #ffffff;
+}
+
+.osd-fab-secondary {
+    background: linear-gradient(135deg, #A0826D 0%, #8B7355 100%);
+    color: #ffffff;
+}
+
+.osd-fab-accent {
+    background: linear-gradient(135deg, #CD853F 0%, #B87333 100%);
+    color: #ffffff;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .osd-fab-primary {
+        background: linear-gradient(135deg, #A0826D 0%, #8B7355 100%);
+    }
+    
+    .osd-fab-secondary {
+        background: linear-gradient(135deg, #8B7355 0%, #6B5637 100%);
+    }
+    
+    .osd-fab-accent {
+        background: linear-gradient(135deg, #DEB887 0%, #CD853F 100%);
+    }
+}
+
+/* Hover animations */
+.osd-fab:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.osd-fab:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Ripple effect */
+.osd-fab::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.osd-fab:active::before {
+    width: 100px;
+    height: 100px;
+}
+
+/* SVG Icons */
+.osd-fab svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+    transition: transform 0.2s ease;
+}
+
+.osd-fab:hover svg {
+    transform: scale(1.1);
+}
+
+/* Tooltip */
+.osd-fab-tooltip {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-right: 12px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 1001;
+}
+
+.osd-fab-tooltip::after {
+    content: '';
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-left-color: rgba(0, 0, 0, 0.9);
+}
+
+.osd-fab:hover .osd-fab-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Focus states for accessibility */
+.osd-fab:focus-visible {
+    outline: 3px solid #CD853F;
+    outline-offset: 2px;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .osd-fab-container {
+        bottom: 16px;
+        right: 16px;
+        gap: 8px;
+    }
+    
+    .osd-fab {
+        width: 48px;
+        height: 48px;
+    }
+    
+    .osd-fab svg {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .osd-fab-tooltip {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+}
+
+/* Animation for entrance */
+@keyframes fabEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.osd-fab {
+    animation: fabEntrance 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.osd-fab:nth-child(2) { animation-delay: 0.1s; }
+.osd-fab:nth-child(3) { animation-delay: 0.2s; }
+.osd-fab:nth-child(4) { animation-delay: 0.3s; }
+.osd-fab:nth-child(5) { animation-delay: 0.4s; }
+.osd-fab:nth-child(6) { animation-delay: 0.5s; }
+.osd-fab:nth-child(7) { animation-delay: 0.6s; }
+
+/* Hide default OpenSeadragon controls */
+.osd-container .navigator,
+.osd-container .zoom-in,
+.osd-container .zoom-out,
+.osd-container .home,
+.osd-container .full-page,
+.osd-container .rotate-left,
+.osd-container .rotate-right {
+    display: none !important;
+}
+</style>
 {% endblock %}
