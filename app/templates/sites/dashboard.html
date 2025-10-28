@@ -110,26 +110,28 @@
             </div>
         </div>
 
-        <!-- Recent Activity -->
+        <!-- Documents Count -->
         <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
             <div class="p-5">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
                         <svg class="h-6 w-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                     </div>
                     <div class="ml-5 w-0 flex-1">
                         <dl>
-                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Foto Recenti</dt>
-                            <dd class="text-lg font-medium text-gray-900 dark:text-white" x-text="stats.recent_photos">{{ stats.recent_photos }}</dd>
+                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">documenti</dt>
+                            <dd class="text-lg font-medium text-gray-900 dark:text-white" x-text="stats.documents_count">{{ stats.documents_count }}</dd>
                         </dl>
                     </div>
                 </div>
             </div>
             <div class="bg-gray-50 dark:bg-gray-700 px-5 py-3">
                 <div class="text-sm">
-                    <span class="text-gray-500 dark:text-gray-400">Ultimo mese</span>
+                    <a href="/view/{{ site.id }}/documentation" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300">
+                        Visualizza documenti
+                    </a>
                 </div>
             </div>
         </div>
@@ -169,8 +171,8 @@
             <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
                 <div class="px-4 py-5 sm:p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">Foto Recenti</h3>
-                        <a href="/view/{{ site.id }}/photos" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">documenti</h3>
+                        <a href="/view/{{ site.id }}/documentation" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300">
                             Visualizza tutte
                         </a>
                     </div>

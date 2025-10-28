@@ -105,14 +105,15 @@ async def upload_document(
             category=category,
             doc_type=doc_type or content_type,
             filename=file.filename,
-            file_path=minio_path,  # Salva path MinIO
-            file_size=len(content),
-            mime_type=content_type,
+            filepath=minio_path,  # Salva path MinIO (correct field name)
+            filesize=len(content),
+            mimetype=content_type,
             tags=tags,
             doc_date=datetime.fromisoformat(doc_date) if doc_date else None,
             author=author,
             is_public=is_public,
-            uploaded_by=current_user_id
+            uploaded_by=current_user_id,
+            created_by=current_user_id  # Add required created_by field
         )
 
         db.add(new_document)
@@ -197,8 +198,8 @@ async def get_documents(
                 "category": doc.category,
                 "doc_type": doc.doc_type,
                 "filename": doc.filename,
-                "file_size": doc.file_size,
-                "mime_type": doc.mime_type,
+                "file_size": doc.filesize,
+                "mime_type": doc.mimetype,
                 "tags": doc.tags,
                 "doc_date": doc.doc_date.isoformat() if doc.doc_date else None,
                 "author": doc.author,
@@ -253,8 +254,8 @@ async def get_document(
             "category": doc.category,
             "doc_type": doc.doc_type,
             "filename": doc.filename,
-            "file_size": doc.file_size,
-            "mime_type": doc.mime_type,
+            "file_size": doc.filesize,
+            "mime_type": doc.mimetype,
             "tags": doc.tags,
             "doc_date": doc.doc_date.isoformat() if doc.doc_date else None,
             "author": doc.author,
@@ -325,8 +326,8 @@ async def update_document(
         # Se c'è un nuovo file, sostituisci
         if file:
             # Elimina vecchio file da MinIO
-            if doc.file_path:
-                await archaeological_minio_service.remove_file(doc.file_path)
+            if doc.filepath:
+                await archaeological_minio_service.remove_file(doc.filepath)
 
             # Leggi nuovo file
             content = await file.read()
@@ -360,9 +361,9 @@ async def update_document(
             )
 
             doc.filename = file.filename
-            doc.file_path = minio_path
-            doc.file_size = len(content)
-            doc.mime_type = content_type
+            doc.filepath = minio_path
+            doc.filesize = len(content)
+            doc.mimetype = content_type
             doc.version += 1
             doc.version_notes = version_notes
 
@@ -484,11 +485,11 @@ async def download_document(
 
         # Scarica file da MinIO
         try:
-            file_data = await archaeological_minio_service.get_file(doc.file_path)
+            file_data = await archaeological_minio_service.get_file(doc.filepath)
             
             return StreamingResponse(
                 iter([file_data]),
-                media_type=doc.mime_type or "application/octet-stream",
+                media_type=doc.mimetype or "application/octet-stream",
                 headers={
                     "Content-Disposition": f"attachment; filename={doc.filename}"
                 }
