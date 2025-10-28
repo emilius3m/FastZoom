@@ -3037,13 +3037,45 @@ function photosManager() {
             }
         },
 
-        openEditModal() {
+        async openEditModal() {
             console.log('openEditModal called');
             if (!this.currentPhoto || !this.currentPhoto.id) {
                 console.error('No valid current photo for edit modal');
                 this.showAlertMessage('Errore: nessuna foto valida selezionata');
                 return;
             }
+
+            // Fetch fresh data from server for photo modal edit button
+            try {
+                console.log('Fetching fresh data for photo modal edit:', this.currentPhoto.id);
+                const response = await fetch(`/api/site/{{ site.id }}/photos`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const freshPhotos = await response.json();
+                    const freshPhoto = freshPhotos.find(p => p.id === this.currentPhoto.id);
+                    if (freshPhoto) {
+                        console.log('Fresh data received for modal edit:', freshPhoto);
+                        // Update currentPhoto with fresh data
+                        this.currentPhoto = freshPhoto;
+                        // Also update the photo in the main photos array
+                        const photoIndex = this.photos.findIndex(p => p && p.id === this.currentPhoto.id);
+                        if (photoIndex !== -1) {
+                            this.photos[photoIndex] = freshPhoto;
+                        }
+                    }
+                } else {
+                    console.warn('Failed to fetch fresh photo data for modal edit, using existing data');
+                }
+            } catch (error) {
+                console.error('Error fetching fresh photo data for modal edit:', error);
+                this.showAlertMessage('Impossibile caricare dati aggiornati. Verranno usati i dati locali.');
+            }
+
             this.editPhoto(this.currentPhoto);
         },
 
@@ -3139,7 +3171,7 @@ function photosManager() {
         },
 
         // Edit Methods
-        editPhoto(photo) {
+        async editPhoto(photo) {
             console.log('editPhoto called with photo:', photo);
 
             // Handle multi-edit button click which doesn't pass a photo
@@ -3172,11 +3204,42 @@ function photosManager() {
                 // Ensure we have the correct photo data for the form
                 photo = this.photos.find(p => p && p.id === photo.id) || photo;
             } else {
-                // Single photo edit mode
+                // Single photo edit mode - fetch fresh data from server
                 this.selectedPhoto = photo;
                 // If the photo isn't already selected, select it
                 if (!this.selectedPhotos.includes(photo.id)) {
                     this.selectedPhotos = [photo.id];
+                }
+
+                // Fetch fresh data from server for single photo edit
+                try {
+                    console.log('Fetching fresh data for photo:', photo.id);
+                    const response = await fetch(`/api/site/{{ site.id }}/photos`, {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const freshPhotos = await response.json();
+                        const freshPhoto = freshPhotos.find(p => p.id === photo.id);
+                        if (freshPhoto) {
+                            console.log('Fresh data received:', freshPhoto);
+                            // Update local photo data with fresh data
+                            const photoIndex = this.photos.findIndex(p => p && p.id === photo.id);
+                            if (photoIndex !== -1) {
+                                this.photos[photoIndex] = freshPhoto;
+                                photo = freshPhoto; // Use fresh photo for form initialization
+                                this.selectedPhoto = freshPhoto; // Update selectedPhoto reference
+                            }
+                        }
+                    } else {
+                        console.warn('Failed to fetch fresh photo data, using existing data');
+                    }
+                } catch (error) {
+                    console.error('Error fetching fresh photo data:', error);
+                    this.showAlertMessage('Impossibile caricare dati aggiornati. Verranno usati i dati locali.');
                 }
             }
 
