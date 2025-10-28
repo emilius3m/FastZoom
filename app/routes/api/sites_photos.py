@@ -751,68 +751,70 @@ async def upload_photo(
                         detail=f"Database error: Unable to create photo record for {file.filename}"
                     )
 
-                # 4. Use a transaction for all database operations
-                try:
-                    # Start transaction
-                    async with db.begin():
-                        # Add photo record to transaction
-                        db.add(photo_record)
-                        
-                        # Flush to get the ID without committing
-                        await db.flush()
-                        await db.refresh(photo_record)
-                        logger.info(f"Photo record flushed with ID: {photo_record.id}")
-                        
-                        # 5. Genera thumbnail DOPO che il record è stato salvato con error handling
-                        try:
-                            await file.seek(0)  # Reset file pointer per thumbnail
-                            thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
-                                file, str(photo_record.id)
-                            )
-
-                            if thumbnail_path:
-                                photo_record.thumbnail_path = thumbnail_path
-                                logger.info(f"Thumbnail generated: {thumbnail_path}")
-                            else:
-                                logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
-                        except Exception as thumbnail_error:
-                            logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
-                            # Don't fail the entire upload if thumbnail generation fails
-                            # Just log the error and continue
-                        
-                        # 6. Log attività con error handling
-                        try:
-                            activity = UserActivity(
-                                user_id=current_user_id,
-                                site_id=site_id,
-                                activity_type="UPLOAD",
-                                activity_desc=f"Caricata foto: {file.filename}",
-                                extra_data=json.dumps({
-                                    "photo_id": str(photo_record.id),
-                                    "filename": filename,
-                                    "file_size": file_size
-                                })
-                            )
-                            db.add(activity)
-                            logger.info(f"Activity log added for photo {photo_record.id}")
-                        except Exception as activity_error:
-                            logger.error(f"Failed to log activity for photo {photo_record.id}: {activity_error}")
-                            # Don't fail the upload if activity logging fails
-                    
-                    # Transaction commits automatically here
-                    logger.info(f"Transaction committed successfully for photo {photo_record.id}")
-                    
-                except Exception as db_error:
-                    logger.error(f"Database transaction failed for photo {file.filename}: {db_error}")
-                    # Clean up the uploaded file if database transaction fails
+                # 4. Create a NEW database session for this parallel task to avoid transaction conflicts
+                from app.database.base import async_session_maker
+                async with async_session_maker() as task_db:
                     try:
-                        await storage_service.delete_file(file_path)
-                    except Exception as cleanup_error:
-                        logger.error(f"Failed to cleanup file after DB transaction failure: {cleanup_error}")
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Database error: Unable to save photo record"
-                    )
+                        # Start transaction in the new session
+                        async with task_db.begin():
+                            # Add photo record to transaction
+                            task_db.add(photo_record)
+                            
+                            # Flush to get the ID without committing
+                            await task_db.flush()
+                            await task_db.refresh(photo_record)
+                            logger.info(f"Photo record flushed with ID: {photo_record.id}")
+                            
+                            # 5. Genera thumbnail DOPO che il record è stato salvato con error handling
+                            try:
+                                await file.seek(0)  # Reset file pointer per thumbnail
+                                thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
+                                    file, str(photo_record.id)
+                                )
+
+                                if thumbnail_path:
+                                    photo_record.thumbnail_path = thumbnail_path
+                                    logger.info(f"Thumbnail generated: {thumbnail_path}")
+                                else:
+                                    logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+                            except Exception as thumbnail_error:
+                                logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
+                                # Don't fail the entire upload if thumbnail generation fails
+                                # Just log the error and continue
+                            
+                            # 6. Log attività con error handling
+                            try:
+                                activity = UserActivity(
+                                    user_id=current_user_id,
+                                    site_id=site_id,
+                                    activity_type="UPLOAD",
+                                    activity_desc=f"Caricata foto: {file.filename}",
+                                    extra_data=json.dumps({
+                                        "photo_id": str(photo_record.id),
+                                        "filename": filename,
+                                        "file_size": file_size
+                                    })
+                                )
+                                task_db.add(activity)
+                                logger.info(f"Activity log added for photo {photo_record.id}")
+                            except Exception as activity_error:
+                                logger.error(f"Failed to log activity for photo {photo_record.id}: {activity_error}")
+                                # Don't fail the upload if activity logging fails
+                        
+                        # Transaction commits automatically here
+                        logger.info(f"Transaction committed successfully for photo {photo_record.id}")
+                        
+                    except Exception as db_error:
+                        logger.error(f"Database transaction failed for photo {file.filename}: {db_error}")
+                        # Clean up the uploaded file if database transaction fails
+                        try:
+                            await storage_service.delete_file(file_path)
+                        except Exception as cleanup_error:
+                            logger.error(f"Failed to cleanup file after DB transaction failure: {cleanup_error}")
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Database error: Unable to save photo record"
+                        )
 
                 logger.info(f"Photo {photo_record.id} saved with thumbnail_path: {photo_record.thumbnail_path}")
                 logger.info(f"Photo uploaded successfully: {photo_record.id} by user {current_user_id}")
