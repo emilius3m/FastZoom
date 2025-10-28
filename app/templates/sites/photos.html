@@ -52,8 +52,35 @@
                         Carica Foto
                     </button>
 
+                    <!-- Select All Button (always visible) -->
+                    <button @click="selectAllPhotos()"
+                            class="inline-flex items-center px-4 py-2 bg-indigo-600 dark:bg-indigo-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-indigo-700 dark:hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                        Seleziona Tutte (<span x-text="filteredPhotos.filter(p => p && p.source_type !== 'us_file').length"></span>)
+                    </button>
+
                     <!-- Bulk Actions -->
                     <div x-show="selectedPhotos.length > 0" class="flex space-x-2">
+                        <!-- Select All Button -->
+                        <button @click="selectAllPhotos()"
+                                class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                            </svg>
+                            Seleziona Tutte
+                        </button>
+                        
+                        <!-- Deselect All Button -->
+                        <button @click="deselectAllPhotos()"
+                                class="inline-flex items-center px-4 py-2 bg-gray-600 dark:bg-gray-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-gray-700 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            Deseleziona Tutte
+                        </button>
+                        
                         <!-- Multi-Edit Button -->
                         <button @click="editPhoto(null)"
                                 class="inline-flex items-center px-4 py-2 bg-green-600 dark:bg-green-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
@@ -1952,6 +1979,22 @@ function photosManager() {
             if (this.currentPage < this.totalPages) {
                 this.goToPage(this.currentPage + 1);
             }
+        },
+
+        // Selection Methods
+        selectAllPhotos() {
+            // Get all photo IDs from filtered photos, excluding US photos which can't be selected
+            const selectablePhotoIds = this.filteredPhotos
+                .filter(photo => photo && photo.id && photo.source_type !== 'us_file')
+                .map(photo => photo.id);
+            
+            this.selectedPhotos = selectablePhotoIds;
+            console.log(`Selected ${this.selectedPhotos.length} photos`);
+        },
+
+        deselectAllPhotos() {
+            this.selectedPhotos = [];
+            console.log('Deselected all photos');
         },
 
         // Photo Modal Methods
