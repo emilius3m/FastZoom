@@ -1007,12 +1007,13 @@
 
                     <!-- OpenSeadragon Viewer Container -->
                     <div id="openseadragon-container" class="w-full h-full bg-gray-900 relative">
-                        <!-- Modern FAB Controls Container -->
+                        <!-- Flowbite-style Controls Container -->
                         <div id="osd-fab-container" class="osd-fab-container" style="display: none;" data-initialized="false">
                             <!-- Zoom In Button -->
                             <button id="osd-zoom-in" class="osd-fab osd-fab-primary"
                                     aria-label="Zoom in"
-                                    tabindex="0">
+                                    tabindex="0"
+                                    type="button">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                                 </svg>
@@ -1022,7 +1023,8 @@
                             <!-- Zoom Out Button -->
                             <button id="osd-zoom-out" class="osd-fab osd-fab-primary"
                                     aria-label="Zoom out"
-                                    tabindex="0">
+                                    tabindex="0"
+                                    type="button">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M19 13H5v-2h14v2z"/>
                                 </svg>
@@ -1032,7 +1034,8 @@
                             <!-- Reset View Button -->
                             <button id="osd-reset-view" class="osd-fab osd-fab-secondary"
                                     aria-label="Reset view"
-                                    tabindex="0">
+                                    tabindex="0"
+                                    type="button">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h2c0 2.21 1.79 4 4 4s4-1.79 4-4-1.79-4-4-4z"/>
                                 </svg>
@@ -1042,7 +1045,8 @@
                             <!-- Rotate Left Button -->
                             <button id="osd-rotate-left" class="osd-fab osd-fab-secondary"
                                     aria-label="Rotate left"
-                                    tabindex="0">
+                                    tabindex="0"
+                                    type="button">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M7.11 8.53L5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/>
                                 </svg>
@@ -1052,7 +1056,8 @@
                             <!-- Rotate Right Button -->
                             <button id="osd-rotate-right" class="osd-fab osd-fab-secondary"
                                     aria-label="Rotate right"
-                                    tabindex="0">
+                                    tabindex="0"
+                                    type="button">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.05 7.44 7 7.93v-2.02c-2.84-.48-5-2.94-5-5.91s2.16-5.43 5-5.91V10l4.55-4.45zM19.93 11c-.17-1.39-.72-2.73-1.62-3.89l-1.42 1.42c.54.75.88 1.6 1.02 2.47h2.02zM13 17.9v2.02c1.39-.17 2.74-.71 3.9-1.61l-1.44-1.44c-.75.54-1.59.89-2.46 1.03zm3.89-2.42l1.42 1.41c.9-1.16 1.45-2.5 1.62-3.89h-2.02c-.14.87-.48 1.72-1.02 2.48z"/>
                                 </svg>
@@ -1062,7 +1067,8 @@
                             <!-- Fullscreen Button -->
                             <button id="osd-fullscreen" class="osd-fab osd-fab-accent"
                                     aria-label="Toggle fullscreen"
-                                    tabindex="0">
+                                    tabindex="0"
+                                    type="button">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
                                 </svg>
@@ -2483,6 +2489,16 @@ function photosManager() {
             const rotateRightBtn = document.getElementById('osd-rotate-right');
             const fullscreenBtn = document.getElementById('osd-fullscreen');
             
+            // Debug: Log which buttons were found
+            console.log('FAB Buttons found:', {
+                zoomInBtn: !!zoomInBtn,
+                zoomOutBtn: !!zoomOutBtn,
+                resetBtn: !!resetBtn,
+                rotateLeftBtn: !!rotateLeftBtn,
+                rotateRightBtn: !!rotateRightBtn,
+                fullscreenBtn: !!fullscreenBtn
+            });
+            
             // Store reference for cleanup
             this.fabControls = {
                 container: fabContainer,
@@ -2491,17 +2507,29 @@ function photosManager() {
             
             // Add event listeners
             if (zoomInBtn) {
-                zoomInBtn.addEventListener('click', () => this.zoomIn());
+                console.log('Adding zoomIn event listener');
+                zoomInBtn.addEventListener('click', (e) => {
+                    console.log('Zoom in button clicked');
+                    e.preventDefault();
+                    this.zoomIn();
+                });
                 zoomInBtn.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         this.zoomIn();
                     }
                 });
+            } else {
+                console.error('Zoom in button not found!');
             }
             
             if (zoomOutBtn) {
-                zoomOutBtn.addEventListener('click', () => this.zoomOut());
+                console.log('Adding zoomOut event listener');
+                zoomOutBtn.addEventListener('click', (e) => {
+                    console.log('Zoom out button clicked');
+                    e.preventDefault();
+                    this.zoomOut();
+                });
                 zoomOutBtn.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -2511,7 +2539,11 @@ function photosManager() {
             }
             
             if (resetBtn) {
-                resetBtn.addEventListener('click', () => this.resetView());
+                resetBtn.addEventListener('click', (e) => {
+                    console.log('Reset view button clicked');
+                    e.preventDefault();
+                    this.resetView();
+                });
                 resetBtn.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -2521,7 +2553,11 @@ function photosManager() {
             }
             
             if (rotateLeftBtn) {
-                rotateLeftBtn.addEventListener('click', () => this.rotateLeft());
+                rotateLeftBtn.addEventListener('click', (e) => {
+                    console.log('Rotate left button clicked');
+                    e.preventDefault();
+                    this.rotateLeft();
+                });
                 rotateLeftBtn.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -2531,7 +2567,11 @@ function photosManager() {
             }
             
             if (rotateRightBtn) {
-                rotateRightBtn.addEventListener('click', () => this.rotateRight());
+                rotateRightBtn.addEventListener('click', (e) => {
+                    console.log('Rotate right button clicked');
+                    e.preventDefault();
+                    this.rotateRight();
+                });
                 rotateRightBtn.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -2541,7 +2581,11 @@ function photosManager() {
             }
             
             if (fullscreenBtn) {
-                fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+                fullscreenBtn.addEventListener('click', (e) => {
+                    console.log('Fullscreen button clicked');
+                    e.preventDefault();
+                    this.toggleFullscreen();
+                });
                 fullscreenBtn.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -2578,7 +2622,8 @@ function photosManager() {
                 <!-- Zoom In Button -->
                 <button id="osd-zoom-in" class="osd-fab osd-fab-primary"
                         aria-label="Zoom in"
-                        tabindex="0">
+                        tabindex="0"
+                        type="button">
                     <svg viewBox="0 0 24 24">
                         <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                     </svg>
@@ -2588,7 +2633,8 @@ function photosManager() {
                 <!-- Zoom Out Button -->
                 <button id="osd-zoom-out" class="osd-fab osd-fab-primary"
                         aria-label="Zoom out"
-                        tabindex="0">
+                        tabindex="0"
+                        type="button">
                     <svg viewBox="0 0 24 24">
                         <path d="M19 13H5v-2h14v2z"/>
                     </svg>
@@ -2598,7 +2644,8 @@ function photosManager() {
                 <!-- Reset View Button -->
                 <button id="osd-reset-view" class="osd-fab osd-fab-secondary"
                         aria-label="Reset view"
-                        tabindex="0">
+                        tabindex="0"
+                        type="button">
                     <svg viewBox="0 0 24 24">
                         <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h2c0 2.21 1.79 4 4 4s4-1.79 4-4-1.79-4-4-4z"/>
                     </svg>
@@ -2608,7 +2655,8 @@ function photosManager() {
                 <!-- Rotate Left Button -->
                 <button id="osd-rotate-left" class="osd-fab osd-fab-secondary"
                         aria-label="Rotate left"
-                        tabindex="0">
+                        tabindex="0"
+                        type="button">
                     <svg viewBox="0 0 24 24">
                         <path d="M7.11 8.53L5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/>
                     </svg>
@@ -2618,7 +2666,8 @@ function photosManager() {
                 <!-- Rotate Right Button -->
                 <button id="osd-rotate-right" class="osd-fab osd-fab-secondary"
                         aria-label="Rotate right"
-                        tabindex="0">
+                        tabindex="0"
+                        type="button">
                     <svg viewBox="0 0 24 24">
                         <path d="M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.05 7.44 7 7.93v-2.02c-2.84-.48-5-2.94-5-5.91s2.16-5.43 5-5.91V10l4.55-4.45zM19.93 11c-.17-1.39-.72-2.73-1.62-3.89l-1.42 1.42c.54.75.88 1.6 1.02 2.47h2.02zM13 17.9v2.02c1.39-.17 2.74-.71 3.9-1.61l-1.44-1.44c-.75.54-1.59.89-2.46 1.03zm3.89-2.42l1.42 1.41c.9-1.16 1.45-2.5 1.62-3.89h-2.02c-.14.87-.48 1.72-1.02 2.48z"/>
                     </svg>
@@ -2628,7 +2677,8 @@ function photosManager() {
                 <!-- Fullscreen Button -->
                 <button id="osd-fullscreen" class="osd-fab osd-fab-accent"
                         aria-label="Toggle fullscreen"
-                        tabindex="0">
+                        tabindex="0"
+                        type="button">
                     <svg viewBox="0 0 24 24">
                         <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
                     </svg>
@@ -2947,6 +2997,9 @@ function photosManager() {
                     console.error('Invalid photo at index:', index, photo);
                     return;
                 }
+
+                // Clean up previous FAB controls before switching
+                this.cleanupFABControls();
 
                 this.currentPhotoIndex = index;
                 this.currentPhoto = photo;
@@ -4283,7 +4336,7 @@ document.addEventListener('alpine:init', () => {
 </script>
 
 <style>
-/* Modern FAB Controls for OpenSeadragon - Archaeological Theme */
+/* Flowbite-style Controls for OpenSeadragon */
 .osd-fab-container {
     position: fixed;
     bottom: 24px;
@@ -4291,98 +4344,98 @@ document.addEventListener('alpine:init', () => {
     z-index: 1000;
     display: flex;
     flex-direction: column-reverse;
-    gap: 12px;
+    gap: 8px;
     align-items: flex-end;
 }
 
 .osd-fab {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    padding: 10px;
+    width: 44px;
+    height: 44px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    border: 1px solid;
+    border-radius: 0.5rem;
     cursor: pointer;
-    border: none;
-    outline: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.15s ease-in-out;
     position: relative;
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    white-space: nowrap;
 }
 
-/* Archaeological color scheme */
+/* Flowbite button variants */
 .osd-fab-primary {
-    background: linear-gradient(135deg, #8B7355 0%, #6B5637 100%);
+    background-color: #3b82f6;
+    border-color: #3b82f6;
     color: #ffffff;
+}
+
+.osd-fab-primary:hover {
+    background-color: #2563eb;
+    border-color: #2563eb;
 }
 
 .osd-fab-secondary {
-    background: linear-gradient(135deg, #A0826D 0%, #8B7355 100%);
+    background-color: #6b7280;
+    border-color: #6b7280;
     color: #ffffff;
 }
 
+.osd-fab-secondary:hover {
+    background-color: #4b5563;
+    border-color: #4b5563;
+}
+
 .osd-fab-accent {
-    background: linear-gradient(135deg, #CD853F 0%, #B87333 100%);
+    background-color: #8b5cf6;
+    border-color: #8b5cf6;
     color: #ffffff;
+}
+
+.osd-fab-accent:hover {
+    background-color: #7c3aed;
+    border-color: #7c3aed;
 }
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
     .osd-fab-primary {
-        background: linear-gradient(135deg, #A0826D 0%, #8B7355 100%);
+        background-color: #60a5fa;
+        border-color: #60a5fa;
+    }
+    
+    .osd-fab-primary:hover {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
     }
     
     .osd-fab-secondary {
-        background: linear-gradient(135deg, #8B7355 0%, #6B5637 100%);
+        background-color: #9ca3af;
+        border-color: #9ca3af;
     }
     
-    .osd-fab-accent {
-        background: linear-gradient(135deg, #DEB887 0%, #CD853F 100%);
+    .osd-fab-secondary:hover {
+        background-color: #6b7280;
+        border-color: #6b7280;
     }
 }
 
-/* Hover animations */
-.osd-fab:hover {
-    transform: translateY(-2px) scale(1.05);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-}
-
+/* Active state */
 .osd-fab:active {
-    transform: translateY(0) scale(0.98);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-/* Ripple effect */
-.osd-fab::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
-}
-
-.osd-fab:active::before {
-    width: 100px;
-    height: 100px;
+    transform: scale(0.98);
 }
 
 /* SVG Icons */
 .osd-fab svg {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     fill: currentColor;
-    transition: transform 0.2s ease;
-}
-
-.osd-fab:hover svg {
-    transform: scale(1.1);
+    flex-shrink: 0;
 }
 
 /* Tooltip */
@@ -4392,17 +4445,19 @@ document.addEventListener('alpine:init', () => {
     top: 50%;
     transform: translateY(-50%);
     margin-right: 12px;
-    background: rgba(0, 0, 0, 0.9);
+    background: rgba(17, 24, 39, 0.9);
     color: white;
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 0.375rem;
+    font-size: 12px;
+    font-weight: 500;
     white-space: nowrap;
     opacity: 0;
     visibility: hidden;
-    transition: all 0.3s ease;
+    transition: all 0.15s ease-in-out;
     pointer-events: none;
     z-index: 1001;
+    border: 1px solid rgba(75, 85, 99, 0.3);
 }
 
 .osd-fab-tooltip::after {
@@ -4411,8 +4466,8 @@ document.addEventListener('alpine:init', () => {
     left: 100%;
     top: 50%;
     transform: translateY(-50%);
-    border: 6px solid transparent;
-    border-left-color: rgba(0, 0, 0, 0.9);
+    border: 4px solid transparent;
+    border-left-color: rgba(17, 24, 39, 0.9);
 }
 
 .osd-fab:hover .osd-fab-tooltip {
@@ -4422,7 +4477,7 @@ document.addEventListener('alpine:init', () => {
 
 /* Focus states for accessibility */
 .osd-fab:focus-visible {
-    outline: 3px solid #CD853F;
+    outline: 2px solid #3b82f6;
     outline-offset: 2px;
 }
 
@@ -4431,22 +4486,33 @@ document.addEventListener('alpine:init', () => {
     .osd-fab-container {
         bottom: 16px;
         right: 16px;
-        gap: 8px;
+        gap: 6px;
     }
     
     .osd-fab {
-        width: 48px;
-        height: 48px;
+        padding: 8px 12px;
+        font-size: 13px;
+        min-height: 40px;
     }
     
     .osd-fab svg {
-        width: 20px;
-        height: 20px;
+        width: 18px;
+        height: 18px;
     }
     
     .osd-fab-tooltip {
-        font-size: 12px;
-        padding: 6px 10px;
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+    
+    /* Hide text on mobile, show only icons */
+    .osd-fab:not(:only-child) {
+        padding: 8px;
+        width: 40px;
+    }
+    
+    .osd-fab:not(:only-child) .osd-fab-tooltip {
+        display: block;
     }
 }
 
@@ -4454,24 +4520,23 @@ document.addEventListener('alpine:init', () => {
 @keyframes fabEntrance {
     from {
         opacity: 0;
-        transform: translateY(20px) scale(0.8);
+        transform: translateY(20px);
     }
     to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: translateY(0);
     }
 }
 
 .osd-fab {
-    animation: fabEntrance 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: fabEntrance 0.3s ease-out;
 }
 
-.osd-fab:nth-child(2) { animation-delay: 0.1s; }
-.osd-fab:nth-child(3) { animation-delay: 0.2s; }
-.osd-fab:nth-child(4) { animation-delay: 0.3s; }
-.osd-fab:nth-child(5) { animation-delay: 0.4s; }
-.osd-fab:nth-child(6) { animation-delay: 0.5s; }
-.osd-fab:nth-child(7) { animation-delay: 0.6s; }
+.osd-fab:nth-child(2) { animation-delay: 0.05s; }
+.osd-fab:nth-child(3) { animation-delay: 0.1s; }
+.osd-fab:nth-child(4) { animation-delay: 0.15s; }
+.osd-fab:nth-child(5) { animation-delay: 0.2s; }
+.osd-fab:nth-child(6) { animation-delay: 0.25s; }
 
 /* Hide default OpenSeadragon controls */
 .osd-container .navigator,
