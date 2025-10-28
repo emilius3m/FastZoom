@@ -436,10 +436,11 @@ document.addEventListener('alpine:init', () => {
                 }
                 
                 // Validate file size
-                if (file.size > MAX_FILE_SIZE) {
-                    this.showError(`Il file "${file.name}" supera la dimensione massima di 50MB (dimensione: ${(file.size / 1024 / 1024).toFixed(2)}MB).`);
-                    continue;
-                }
+
+                //if (file.size > MAX_FILE_SIZE) {
+                //    this.showError(`Il file "${file.name}" supera la dimensione massima di 50MB (dimensione: ${(file.size / 1024 / 1024).toFixed(2)}MB).`);
+                //    continue;
+                //}
                 
                 const processedFile = await this.processFile(file);
                 this.selectedFiles.push(processedFile);
