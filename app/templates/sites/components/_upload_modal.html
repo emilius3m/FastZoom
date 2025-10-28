@@ -55,7 +55,7 @@
          <!-- Header -->
          <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
              <div>
-                 <h3 class="text-xl font-semibold text-gray-600 dark:text-white">Carica Fotografie Archeologiche</h3>
+                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Carica Fotografie Archeologiche</h3>
                  <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">Carica e cataloga le foto con metadati archeologici completi</p>
              </div>
              <button @click="closeUploadModal"
@@ -182,17 +182,17 @@
                      </div>
 
                      <div>
-                         <h3 x-show="!isUploading && !uploadComplete" class="text-lg font-medium text-gray-900">
+                         <h3 x-show="!isUploading && !uploadComplete" class="text-lg font-medium text-gray-900 dark:text-white">
                              Pronto per il caricamento
                          </h3>
-                         <h3 x-show="isUploading" class="text-lg font-medium text-gray-900">
+                         <h3 x-show="isUploading" class="text-lg font-medium text-gray-900 dark:text-white">
                              Caricamento in corso...
                          </h3>
-                         <h3 x-show="uploadComplete" class="text-lg font-medium text-green-900">
+                         <h3 x-show="uploadComplete" class="text-lg font-medium text-green-900 dark:text-green-300">
                              Caricamento completato!
                          </h3>
                          
-                         <p class="mt-2 text-sm text-gray-600">
+                         <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
                              <span x-show="!isUploading && !uploadComplete">
                                  <span x-text="selectedFiles.length"></span> foto verranno caricate con i metadati inseriti
                              </span>
@@ -207,7 +207,7 @@
 
                      <!-- Enhanced Progress Bar -->
                      <div x-show="isUploading" class="w-full">
-                         <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
+                         <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-2">
                              <div class="bg-blue-600 h-3 rounded-full transition-all duration-300"
                                   :style="`width: ${uploadProgress}%`"></div>
                          </div>
@@ -219,7 +219,7 @@
 
                      <!-- Upload Results -->
                      <div x-show="uploadResults.length > 0" class="mt-6 text-left">
-                         <h4 class="text-sm font-medium text-gray-900 mb-3">Risultati Caricamento</h4>
+                         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Risultati Caricamento</h4>
                          <div class="space-y-2 max-h-96 overflow-y-auto">
                              <template x-for="result in uploadResults" :key="result.filename">
                                  <div class="flex items-center justify-between p-2 rounded"
@@ -238,7 +238,7 @@
          </div>
 
          <!-- Fixed Footer for Actions -->
-         <div class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600 p-4 flex justify-between items-center">
+         <div class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center">
              <!-- Step 1 Actions -->
              <template x-if="step === 1">
                  <div class="w-full flex justify-between items-center">
@@ -393,6 +393,11 @@ document.addEventListener('alpine:init', () => {
             const metadataFormComponent = this.$refs.metadataForm?.querySelector('[x-data]')?._x_dataStack?.[0];
             if (metadataFormComponent && metadataFormComponent.resetForm) {
                 metadataFormComponent.resetForm();
+            }
+            
+            // Initialize form component if it exists but hasn't been initialized
+            if (metadataFormComponent && metadataFormComponent.initializeForm) {
+                metadataFormComponent.initializeForm();
             }
         },
         
