@@ -699,6 +699,10 @@ async def upload_photo(
         # NUOVO: Processa tutte le foto in parallelo con asyncio.gather()
         async def process_single_photo(file: UploadFile) -> Optional[dict]:
             """Processa una singola foto in modo asincrono con error handling completo"""
+            photo_record = None
+            filename = None
+            file_path = None
+            
             try:
                 # 1. Salva file su MinIO con error handling
                 try:
@@ -747,64 +751,70 @@ async def upload_photo(
                         detail=f"Database error: Unable to create photo record for {file.filename}"
                     )
 
-                # 4. Salva nel database PRIMA di generare il thumbnail con error handling
+                # 4. Use a transaction for all database operations
                 try:
-                    db.add(photo_record)
-                    await db.commit()
-                    await db.refresh(photo_record)
-                    logger.info(f"Photo record saved with ID: {photo_record.id}")
-                except Exception as db_commit_error:
-                    logger.error(f"Database commit failed for photo {file.filename}: {db_commit_error}")
-                    # Clean up the uploaded file if database commit fails
+                    # Start transaction
+                    async with db.begin():
+                        # Add photo record to transaction
+                        db.add(photo_record)
+                        
+                        # Flush to get the ID without committing
+                        await db.flush()
+                        await db.refresh(photo_record)
+                        logger.info(f"Photo record flushed with ID: {photo_record.id}")
+                        
+                        # 5. Genera thumbnail DOPO che il record è stato salvato con error handling
+                        try:
+                            await file.seek(0)  # Reset file pointer per thumbnail
+                            thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
+                                file, str(photo_record.id)
+                            )
+
+                            if thumbnail_path:
+                                photo_record.thumbnail_path = thumbnail_path
+                                logger.info(f"Thumbnail generated: {thumbnail_path}")
+                            else:
+                                logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+                        except Exception as thumbnail_error:
+                            logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
+                            # Don't fail the entire upload if thumbnail generation fails
+                            # Just log the error and continue
+                        
+                        # 6. Log attività con error handling
+                        try:
+                            activity = UserActivity(
+                                user_id=current_user_id,
+                                site_id=site_id,
+                                activity_type="UPLOAD",
+                                activity_desc=f"Caricata foto: {file.filename}",
+                                extra_data=json.dumps({
+                                    "photo_id": str(photo_record.id),
+                                    "filename": filename,
+                                    "file_size": file_size
+                                })
+                            )
+                            db.add(activity)
+                            logger.info(f"Activity log added for photo {photo_record.id}")
+                        except Exception as activity_error:
+                            logger.error(f"Failed to log activity for photo {photo_record.id}: {activity_error}")
+                            # Don't fail the upload if activity logging fails
+                    
+                    # Transaction commits automatically here
+                    logger.info(f"Transaction committed successfully for photo {photo_record.id}")
+                    
+                except Exception as db_error:
+                    logger.error(f"Database transaction failed for photo {file.filename}: {db_error}")
+                    # Clean up the uploaded file if database transaction fails
                     try:
                         await storage_service.delete_file(file_path)
                     except Exception as cleanup_error:
-                        logger.error(f"Failed to cleanup file after DB commit failure: {cleanup_error}")
+                        logger.error(f"Failed to cleanup file after DB transaction failure: {cleanup_error}")
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail="Database error: Unable to save photo record"
                     )
 
-                # 5. Genera thumbnail DOPO che il record è stato salvato con error handling
-                try:
-                    await file.seek(0)  # Reset file pointer per thumbnail
-                    thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
-                        file, str(photo_record.id)
-                    )
-
-                    if thumbnail_path:
-                        photo_record.thumbnail_path = thumbnail_path
-                        await db.commit()
-                        logger.info(f"Thumbnail generated and saved: {thumbnail_path}")
-                    else:
-                        logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
-                except Exception as thumbnail_error:
-                    logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
-                    # Don't fail the entire upload if thumbnail generation fails
-                    # Just log the error and continue
-
                 logger.info(f"Photo {photo_record.id} saved with thumbnail_path: {photo_record.thumbnail_path}")
-                
-                # 6. Log attività con error handling
-                try:
-                    activity = UserActivity(
-                        user_id=current_user_id,
-                        site_id=site_id,
-                        activity_type="UPLOAD",
-                        activity_desc=f"Caricata foto: {file.filename}",
-                        extra_data=json.dumps({
-                            "photo_id": str(photo_record.id),
-                            "filename": filename,
-                            "file_size": file_size
-                        })
-                    )
-
-                    db.add(activity)
-                    await db.commit()
-                except Exception as activity_error:
-                    logger.error(f"Failed to log activity for photo {photo_record.id}: {activity_error}")
-                    # Don't fail the upload if activity logging fails
-
                 logger.info(f"Photo uploaded successfully: {photo_record.id} by user {current_user_id}")
 
                 return {
@@ -846,6 +856,12 @@ async def upload_photo(
                 
             except Exception as photo_error:
                 logger.error(f"Unexpected error processing photo {file.filename}: {photo_error}")
+                # Clean up file if it exists
+                if file_path:
+                    try:
+                        await storage_service.delete_file(file_path)
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to cleanup file after error: {cleanup_error}")
                 # Return None for this photo but don't fail the entire batch
                 return None
 
@@ -1516,7 +1532,65 @@ async def bulk_delete_photos(
                 logger.warning(f"Error deleting photo {photo.id}: {e}")
                 continue
 
-        await db.commit()
+        # Delete all photos first without nested transaction
+        for photo in photos:
+            try:
+                photo_filename = photo.filename
+                photo_path = photo.filepath
+                thumbnail_path = photo.thumbnail_path
+
+                if photo_path and '/' in photo_path:
+                    try:
+                        success = await archaeological_minio_service.remove_file(photo_path)
+                        if success:
+                            logger.info(f"File deleted from MinIO: {photo_path}")
+                        else:
+                            logger.warning(f"Could not delete file: {photo_path}")
+                    except Exception as e:
+                        logger.warning(f"Error deleting file {photo_path}: {e}")
+
+                if thumbnail_path and thumbnail_path.startswith("thumbnails/"):
+                    try:
+                        success = await archaeological_minio_service.remove_object_from_bucket(
+                            archaeological_minio_service.buckets["thumbnails"],
+                            thumbnail_path
+                        )
+                        if success:
+                            logger.info(f"Thumbnail deleted from MinIO: {thumbnail_path}")
+                        else:
+                            logger.warning(f"Could not delete thumbnail: {thumbnail_path}")
+                    except Exception as e:
+                        logger.warning(f"Error deleting thumbnail {thumbnail_path}: {e}")
+
+                await db.delete(photo)
+                deleted_count += 1
+
+                activity = UserActivity(
+                    user_id=current_user_id,
+                    site_id=site_id,
+                    activity_type="DELETE",
+                    activity_desc=f"Eliminazione massiva foto {photo_filename}",
+                    extra_data=json.dumps({
+                        "photo_id": str(photo.id),
+                        "bulk_operation": True,
+                        "filename": photo_filename
+                    })
+                )
+
+                db.add(activity)
+
+            except Exception as e:
+                logger.warning(f"Error deleting photo {photo.id}: {e}")
+                continue
+
+        # Commit all changes at once
+        try:
+            await db.commit()
+            logger.info(f"Bulk delete transaction committed successfully for {deleted_count} photos")
+        except Exception as e:
+            logger.error(f"Bulk delete transaction error: {e}")
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=f"Errore eliminazione in blocco: {str(e)}")
 
         return JSONResponse({
             "message": f"{deleted_count} foto eliminate con successo",
@@ -1730,23 +1804,71 @@ async def bulk_update_photos(
                 logger.warning(f"Error updating photo {photo.id}: {e}")
                 continue
 
-        await log_user_activity(
-            db=db,
-            user_id=current_user_id,
-            site_id=site_id,
-            activity_type="BULK_UPDATE",
-            activity_desc=f"Aggiornamento massivo di {updated_count} foto",
-            extra_data=json.dumps({
-                "photo_count": updated_count,
-                "photo_ids": [str(pid) for pid in photo_ids],
-                "updated_fields": updated_fields,
-                "metadata_fields": list(filtered_metadata.keys()),
-                "add_tags": add_tags,
-                "remove_tags": remove_tags
-            })
-        )
+        # Use a transaction for all database operations
+        try:
+            async with db.begin():
+                # Update all photos first
+                for photo in photos:
+                    try:
+                        for field, value in filtered_metadata.items():
+                            old_value = getattr(photo, field, None)
+                            setattr(photo, field, value)
+                            if field not in updated_fields:
+                                updated_fields.append(field)
+                            logger.info(f"Bulk update - Photo {photo.id} - Field '{field}': '{old_value}' -> '{value}'")
 
-        await db.commit()
+                        if add_tags or remove_tags:
+                            current_tags = getattr(photo, 'tags', None) or []
+                            if isinstance(current_tags, str):
+                                try:
+                                    current_tags = json.loads(current_tags)
+                                except:
+                                    current_tags = []
+
+                            for tag in add_tags:
+                                if tag not in current_tags:
+                                    current_tags.append(tag)
+
+                            for tag in remove_tags:
+                                if tag in current_tags:
+                                    current_tags.remove(tag)
+
+                            if hasattr(photo, 'tags'):
+                                photo.tags = current_tags
+                                if 'tags' not in updated_fields:
+                                    updated_fields.append('tags')
+
+                        photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
+                        updated_count += 1
+
+                    except Exception as e:
+                        logger.warning(f"Error updating photo {photo.id}: {e}")
+                        continue
+
+                # Log activity after all updates
+                await log_user_activity(
+                    db=db,
+                    user_id=current_user_id,
+                    site_id=site_id,
+                    activity_type="BULK_UPDATE",
+                    activity_desc=f"Aggiornamento massivo di {updated_count} foto",
+                    extra_data=json.dumps({
+                        "photo_count": updated_count,
+                        "photo_ids": [str(pid) for pid in photo_ids],
+                        "updated_fields": updated_fields,
+                        "metadata_fields": list(filtered_metadata.keys()),
+                        "add_tags": add_tags,
+                        "remove_tags": remove_tags
+                    })
+                )
+            
+            # Transaction commits automatically here
+            logger.info(f"Bulk update transaction committed successfully for {updated_count} photos")
+            
+        except Exception as e:
+            logger.error(f"Bulk update transaction error: {e}")
+            await db.rollback()
+            raise HTTPException(status_code=500, detail=f"Errore aggiornamento in blocco: {str(e)}")
 
         return JSONResponse({
             "message": f"{updated_count} foto aggiornate con successo",
@@ -2172,9 +2294,15 @@ async def process_queued_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
                 # Save to database
                 from app.database.base import async_session_maker
                 async with async_session_maker() as db:
-                    db.add(photo_record)
-                    await db.commit()
-                    await db.refresh(photo_record)
+                    try:
+                        db.add(photo_record)
+                        await db.commit()
+                        await db.refresh(photo_record)
+                        logger.info(f"Photo record saved with ID: {photo_record.id}")
+                    except Exception as db_commit_error:
+                        logger.error(f"Database commit failed for queued photo {temp_file.get('filename')}: {db_commit_error}")
+                        # Don't try to rollback here - let the session handle it naturally
+                        raise Exception(f"Database error: Unable to save photo record: {db_commit_error}")
 
                     # Generate thumbnail after database save
                     try:
@@ -2189,8 +2317,12 @@ async def process_queued_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
                             if thumbnail_path:
                                 photo_record.thumbnail_path = thumbnail_path
-                                await db.commit()
-                                logger.info(f"Thumbnail generated and saved: {thumbnail_path}")
+                                try:
+                                    await db.commit()
+                                    logger.info(f"Thumbnail generated and saved: {thumbnail_path}")
+                                except Exception as thumbnail_commit_error:
+                                    logger.error(f"Failed to commit thumbnail update: {thumbnail_commit_error}")
+                                    # Don't try to rollback here - let the session handle it naturally
                             else:
                                 logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
                     except Exception as thumbnail_error:

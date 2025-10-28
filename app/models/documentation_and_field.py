@@ -152,7 +152,7 @@ class Photo(Base, SiteMixin, UserMixin):
     """
     __tablename__ = "photos"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=lambda: uuid.uuid4())
     site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
 
     # ===== INFO FILE =====

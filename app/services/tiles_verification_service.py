@@ -377,9 +377,9 @@ class TilesVerificationService:
             archaeological_metadata = {
                 'inventory_number': photo.inventory_number,
                 'excavation_area': photo.excavation_area,
-                'material': photo.material.value if photo.material else None,
+                'material': photo.material,  # Already stored as string value
                 'chronology_period': photo.chronology_period,
-                'photo_type': photo.photo_type.value if photo.photo_type else None,
+                'photo_type': photo.photo_type,  # Already stored as string value
                 'photographer': photo.photographer,
                 'description': photo.description,
                 'keywords': photo.keywords
