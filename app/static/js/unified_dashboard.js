@@ -25,6 +25,26 @@ document.addEventListener("alpine:init", () => {
             giornali_validati: 0,
             giornali_pendenti: 0
         },
+        systemStatus: {
+            database: {
+                status: 'online',
+                text: 'Online',
+                class: 'text-green-600 dark:text-green-400',
+                icon: 'fa-check-circle'
+            },
+            storage: {
+                status: 'operational',
+                text: 'Operativo',
+                class: 'text-green-600 dark:text-green-400',
+                icon: 'fa-check-circle'
+            },
+            backup: {
+                status: 'recent',
+                text: 'Recente',
+                class: 'text-green-600 dark:text-green-400',
+                icon: 'fa-check-circle'
+            }
+        },
         error: null,
         
         // Store methods
@@ -75,6 +95,26 @@ document.addEventListener("alpine:init", () => {
         recentActivities: [],
         activityFilter: 'all',
         hasMoreActivities: false,
+        systemStatus: {
+            database: {
+                status: 'online',
+                text: 'Online',
+                class: 'text-green-600 dark:text-green-400',
+                icon: 'fa-check-circle'
+            },
+            storage: {
+                status: 'operational',
+                text: 'Operativo',
+                class: 'text-green-600 dark:text-green-400',
+                icon: 'fa-check-circle'
+            },
+            backup: {
+                status: 'recent',
+                text: 'Recente',
+                class: 'text-green-600 dark:text-green-400',
+                icon: 'fa-check-circle'
+            }
+        },
         
         // Error handling
         error: null,
@@ -82,7 +122,8 @@ document.addEventListener("alpine:init", () => {
             sites: 0,
             activities: 0,
             documents: 0,
-            giornale: 0
+            giornale: 0,
+            system: 0
         },
         maxRetries: 3,
         
@@ -120,7 +161,8 @@ document.addEventListener("alpine:init", () => {
                 await Promise.all([
                     this.loadOverviewData(),
                     this.loadGiornaleData(),
-                    this.loadActivities()
+                    this.loadActivities(),
+                    this.loadSystemStatus()
                 ]);
             } catch (error) {
                 this.handleError(error, 'initial_data_load');
@@ -355,6 +397,56 @@ document.addEventListener("alpine:init", () => {
             } finally {
                 this.loading.activities = false;
             }
+        },
+
+        // System status loading
+        async loadSystemStatus() {
+            try {
+                const response = await this.apiCallWithRetry(
+                    '/api/unified/system/status',
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
+                    },
+                    'system'
+                );
+                
+                if (response) {
+                    const statusData = await response.json();
+                    this.systemStatus = statusData;
+                    // Update store data
+                    Alpine.store('unifiedDashboard').updateData('systemStatus', this.systemStatus);
+                }
+            } catch (error) {
+                console.warn('Failed to load system status:', error);
+                // Use default values if API fails
+                this.systemStatus = {
+                    database: {
+                        status: 'unknown',
+                        text: 'Sconosciuto',
+                        class: 'text-gray-600 dark:text-gray-400',
+                        icon: 'fa-question-circle'
+                    },
+                    storage: {
+                        status: 'unknown',
+                        text: 'Sconosciuto',
+                        class: 'text-gray-600 dark:text-gray-400',
+                        icon: 'fa-question-circle'
+                    },
+                    backup: {
+                        status: 'unknown',
+                        text: 'Sconosciuto',
+                        class: 'text-gray-600 dark:text-gray-400',
+                        icon: 'fa-question-circle'
+                    }
+                };
+            }
+        },
+
+        async refreshSystemStatus() {
+            await this.loadSystemStatus();
         },
         
         async refreshActivities() {
@@ -661,7 +753,7 @@ document.addEventListener("alpine:init", () => {
                     id: 1,
                     type: 'sites',
                     title: 'Nuovo sito aggiunto',
-                    description: 'Sito "Foro Romano" è stato aggiunto al sistema',
+                    description: 'Nuovo sito archeologico aggiunto al sistema',
                     timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
                     user: 'Mario Rossi',
                     site: 'Foro Romano'
@@ -670,7 +762,7 @@ document.addEventListener("alpine:init", () => {
                     id: 2,
                     type: 'giornale',
                     title: 'Giornale creato',
-                    description: 'Nuovo giornale di cantiere per il giorno 2023-10-23',
+                    description: 'Nuovo giornale di cantiere creato',
                     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
                     user: 'Giulia Bianchi',
                     site: 'Scavo A'
@@ -679,7 +771,7 @@ document.addEventListener("alpine:init", () => {
                     id: 3,
                     type: 'photos',
                     title: 'Fotografie caricate',
-                    description: '15 nuove fotografie sono state caricate',
+                    description: 'Nuove fotografie caricate nel sistema',
                     timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
                     user: 'Paolo Verdi',
                     site: 'Area B'

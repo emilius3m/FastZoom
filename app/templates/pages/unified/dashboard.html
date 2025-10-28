@@ -116,8 +116,8 @@
             <div class="flex flex-wrap gap-2">
                 <template x-if="activeTab === 'overview'">
                     <div class="flex gap-2">
-                        <button @click="refreshOverviewData()" 
-                                class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
+                        <button @click="refreshOverviewData()"
+                                class=" bg-opacity-20 hover:bg-opacity-30 text-gray-900 dark:text-white px-4 py-2 rounded-lg transition flex items-center">
                             <i class="fas fa-sync-alt mr-2"></i>Aggiorna
                         </button>
                     </div>
@@ -126,11 +126,11 @@
                 <template x-if="activeTab === 'giornale'">
                     <div class="flex gap-2">
                         <a href="/giornale-cantiere/operatori" 
-                           class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
+                           class=" bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
                             <i class="fas fa-users mr-2"></i>Operatori
                         </a>
                         <a href="/giornale-cantiere/reports"
-                           class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
+                           class=" bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
                             <i class="fas fa-chart-bar mr-2"></i>Report
                         </a>
                     </div>
