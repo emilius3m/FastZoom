@@ -81,7 +81,7 @@
     <ul class="py-2 text-sm text-gray-700 dark:text-gray-200 max-h-64 overflow-y-auto">
       {% for site in sites %}
       <li>
-        <a href="/site/{{ site.id }}/dashboard/" class="flex items-center px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-b border-gray-100 dark:border-gray-600 last:border-b-0">
+        <a href="/view/{{ site.id }}/dashboard/" class="flex items-center px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-b border-gray-100 dark:border-gray-600 last:border-b-0">
           <i class="fas fa-map-marker-alt me-3 text-blue-600 flex-shrink-0"></i>
           <div class="flex-1 min-w-0">
             <div class="font-medium text-gray-900 dark:text-white truncate">{{ site.name }}</div>
