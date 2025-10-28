@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse, StreamingResponse
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from typing import Optional
 from uuid import UUID
 import uuid
@@ -25,6 +25,45 @@ from app.routes.sites_router import get_site_access
 from app.services.archaeological_minio_service import archaeological_minio_service
 
 documents_router = APIRouter(prefix="/api", tags=["documents"])
+
+
+@documents_router.get("/unified/documents/count")
+async def get_documents_count(
+        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Get total documents count for the current user across all accessible sites"""
+    try:
+        # Get all sites the user has access to
+        accessible_sites_query = select(UserSitePermission.site_id).where(
+            and_(
+                UserSitePermission.user_id == current_user_id,
+                UserSitePermission.is_active == True
+            )
+        )
+        
+        accessible_sites_result = await db.execute(accessible_sites_query)
+        accessible_site_ids = [row[0] for row in accessible_sites_result.fetchall()]
+        
+        if not accessible_site_ids:
+            return JSONResponse({"count": 0})
+        
+        # Count documents across all accessible sites
+        documents_count = await db.execute(
+            select(func.count(Document.id)).where(
+                and_(
+                    Document.site_id.in_(accessible_site_ids),
+                    Document.is_deleted == False
+                )
+            )
+        )
+        documents_count = documents_count.scalar() or 0
+        
+        return JSONResponse({"count": documents_count})
+        
+    except Exception as e:
+        logger.error(f"Error getting documents count: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel recupero conteggio documenti: {str(e)}")
 
 
 @documents_router.post("/site/{site_id}/documents")

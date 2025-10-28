@@ -43,12 +43,12 @@
         <div class="border-b border-gray-200 dark:border-gray-700">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                 <button @click="activeTab = 'documents'"
-                        :class="activeTab === 'documents' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
+                        :class="(activeTab || 'documents') === 'documents' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
                         class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
                     📄 Documenti
                 </button>
                 <button @click="activeTab = 'formBuilder'"
-                        :class="activeTab === 'formBuilder' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
+                        :class="(activeTab || 'documents') === 'formBuilder' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
                         class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
                     🛠️ Form Builder
                 </button>
@@ -57,7 +57,13 @@
     </div>
 
     <!-- Documents Tab Content -->
-    <div x-show="activeTab === 'documents'">
+    <div x-show="(activeTab || 'documents') === 'documents'">
+        <!-- Add a safety check for activeTab -->
+        <template x-if="!activeTab">
+            <div class="p-4 text-center text-gray-500">
+                Caricamento...
+            </div>
+        </template>
         <!-- Document Categories Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -93,7 +99,7 @@
                 </div>
             </div>
             <div class="mt-4">
-                <button @click="filterByCategory('publication')"
+                <button @click="filterByCategory('pubblicazioni')"
                         class="text-sm text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300">
                     Visualizza tutti →
                 </button>
@@ -113,7 +119,7 @@
                 </div>
             </div>
             <div class="mt-4">
-                <button @click="filterByCategory('lab_analysis')"
+                <button @click="filterByCategory('documentazione')"
                         class="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300">
                     Visualizza tutti →
                 </button>
@@ -133,7 +139,7 @@
                 </div>
             </div>
             <div class="mt-4">
-                <button @click="filterByCategory('other')"
+                <button @click="filterByCategory('altro')"
                         class="text-sm text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300">
                     Visualizza tutti →
                 </button>
@@ -162,13 +168,12 @@
                             @change="filterDocuments"
                             class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                         <option value="">Tutte le categorie</option>
-                        <option value="excavation_report">Rapporti di Scavo</option>
-                        <option value="publication">Pubblicazioni</option>
-                        <option value="lab_analysis">Analisi di Laboratorio</option>
-                        <option value="conservation">Conservazione</option>
-                        <option value="drawing">Disegni</option>
-                        <option value="map">Cartografia</option>
-                        <option value="other">Altri</option>
+                        <option value="relazioni">Rapporti di Scavo</option>
+                        <option value="pubblicazioni">Pubblicazioni</option>
+                        <option value="documentazione">Analisi di Laboratorio</option>
+                        <option value="planimetrie">Planimetrie e Rilievi</option>
+                        <option value="amministrativi">Documenti Amministrativi</option>
+                        <option value="altro">Altri</option>
                     </select>
                 </div>
 
@@ -204,7 +209,7 @@
                             <!-- Document Icon -->
                             <div class="flex-shrink-0">
                                 <div class="w-10 h-10 rounded-lg flex items-center justify-center"
-                                     :class="getDocumentIconClass(document.category)">
+                                     :class="getDocumentIconClass(document ? document.category : '')">
                                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
                                     </svg>
@@ -214,27 +219,27 @@
                             <!-- Document Info -->
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center space-x-2 mb-1">
-                                    <h3 class="text-sm font-medium text-gray-900 dark:text-white" x-text="document.title"></h3>
+                                    <h3 class="text-sm font-medium text-gray-900 dark:text-white" x-text="document ? document.title : ''"></h3>
                                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                                           :class="getCategoryBadgeClass(document.category)"
-                                           x-text="getCategoryDisplayName(document.category)">
+                                           :class="getCategoryBadgeClass(document ? document.category : '')"
+                                           x-text="getCategoryDisplayName(document ? document.category : '')">
                                     </span>
                                 </div>
 
                                 <div class="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                    <span x-show="document.author" x-text="'Autore: ' + document.author"></span>
-                                    <span x-show="document.year" x-text="'Anno: ' + document.year"></span>
-                                    <span x-text="'Aggiunto: ' + formatDate(document.created_at)"></span>
+                                    <span x-show="document && document.author" x-text="'Autore: ' + (document.author || '')"></span>
+                                    <span x-show="document && document.year" x-text="'Anno: ' + (document.year || '')"></span>
+                                    <span x-text="'Aggiunto: ' + formatDate(document ? document.created_at : null)"></span>
                                 </div>
 
-                                <p x-show="document.description"
+                                <p x-show="document && document.description"
                                    class="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-2"
                                    x-text="document.description"></p>
 
                                 <!-- Document Tags -->
-                                <div x-show="document.tags && document.tags.length > 0"
+                                <div x-show="document && document.tags && document.tags.length > 0"
                                      class="flex flex-wrap gap-1 mt-2">
-                                    <template x-for="tag in document.tags" :key="tag">
+                                    <template x-for="tag in (document.tags || [])" :key="tag">
                                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
                                               x-text="tag"></span>
                                     </template>
@@ -244,7 +249,7 @@
 
                         <!-- Document Actions -->
                         <div class="flex items-center space-x-2">
-                            <button @click="previewDocument(document)"
+                            <button @click="document && previewDocument(document)"
                                     class="p-2 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
                                     title="Anteprima">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,7 +258,7 @@
                                 </svg>
                             </button>
 
-                            <a :href="'/api/site/{{ site.id }}/documents/' + document.id + '/download'"
+                            <a :href="document ? '/api/site/{{ site.id }}/documents/' + document.id + '/download' : '#'"
                                class="p-2 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400"
                                title="Scarica">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,7 +267,7 @@
                             </a>
 
                             {% if can_write %}
-                            <button @click="openEditDocumentModal(document)"
+                            <button @click="document && openEditDocumentModal(document)"
                                     class="p-2 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
                                     title="Modifica">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -270,7 +275,7 @@
                                 </svg>
                             </button>
 
-                            <button @click="deleteDocument(document)"
+                            <button @click="document && deleteDocument(document.id)"
                                     class="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400"
                                     title="Elimina">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -346,7 +351,7 @@
     </div>
 
     <!-- Form Builder Tab Content -->
-    <div x-show="activeTab === 'formBuilder'" x-data="formBuilder()">
+    <div x-show="(activeTab || 'documents') === 'formBuilder'" x-data="formBuilder()">
         <!-- Existing Forms Section -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
             <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -1092,7 +1097,7 @@ document.addEventListener('alpine:init', () => {
         showEditModal: false,
         showPreviewModal: false,
         selectedDocument: null,
-        editDocument: null,
+        editDocument: null, // Will be initialized when edit modal is opened
         
         // File handling
         uploadFile: null,
@@ -1117,31 +1122,36 @@ document.addEventListener('alpine:init', () => {
         
         // Computed
         get paginatedDocuments() {
+            if (!this.filteredDocuments || !Array.isArray(this.filteredDocuments)) return [];
             const start = (this.currentPage - 1) * this.pageSize;
             const end = start + this.pageSize;
             return this.filteredDocuments.slice(start, end);
         },
         
         get totalPages() {
+            if (!this.filteredDocuments || !Array.isArray(this.filteredDocuments)) return 0;
             return Math.ceil(this.filteredDocuments.length / this.pageSize);
         },
         
         init() {
-            this.filteredDocuments = [...this.documents];
+            // Initialize with defensive checks
+            this.filteredDocuments = (this.documents && Array.isArray(this.documents)) ? [...this.documents] : [];
             this.calculateStats();
         },
         
         calculateStats() {
+            // Defensive calculation with null checks
+            const docs = (this.documents && Array.isArray(this.documents)) ? this.documents : [];
             this.stats = {
-                excavation_reports: this.documents.filter(d => d.category === 'excavation_report').length,
-                publications: this.documents.filter(d => d.category === 'publication').length,
-                lab_analyses: this.documents.filter(d => d.category === 'lab_analysis').length,
-                other_documents: this.documents.filter(d => !['excavation_report', 'publication', 'lab_analysis'].includes(d.category)).length
+                excavation_reports: docs.filter(d => d && (d.category === 'excavation_report' || d.category === 'relazioni')).length,
+                publications: docs.filter(d => d && (d.category === 'publication' || d.category === 'pubblicazioni')).length,
+                lab_analyses: docs.filter(d => d && (d.category === 'lab_analysis' || d.category === 'documentazione')).length,
+                other_documents: docs.filter(d => d && !['excavation_report', 'publication', 'lab_analysis', 'relazioni', 'pubblicazioni', 'documentazione'].includes(d.category)).length
             };
         },
         
         filterDocuments() {
-            let filtered = [...this.documents];
+            let filtered = (this.documents && Array.isArray(this.documents)) ? [...this.documents] : [];
             
             // Text search
             if (this.searchTerm) {
@@ -1178,16 +1188,25 @@ document.addEventListener('alpine:init', () => {
         
         // Document actions
         previewDocument(document) {
+            if (!document) return;
             this.selectedDocument = document;
             this.showPreviewModal = true;
         },
         
         openEditDocumentModal(document) {
-            this.editDocument = { ...document };
+            if (!document) return;
+            
+            // Ensure editDocument is properly initialized
+            this.editDocument = {
+                ...document,
+                is_public: document.is_public !== undefined ? document.is_public : true,
+                version_notes: document.version_notes || ''
+            };
             this.showEditModal = true;
         },
         
         async deleteDocument(document) {
+            if (!document || !document.title) return;
             if (!confirm(`Vuoi eliminare il documento "${document.title}"?`)) return;
             
             try {
@@ -1258,6 +1277,14 @@ document.addEventListener('alpine:init', () => {
         
         getCategoryBadgeClass(category) {
             const classes = {
+                // Italian categories
+                'relazioni': 'bg-blue-100 text-blue-800',
+                'pubblicazioni': 'bg-green-100 text-green-800',
+                'documentazione': 'bg-purple-100 text-purple-800',
+                'planimetrie': 'bg-pink-100 text-pink-800',
+                'amministrativi': 'bg-yellow-100 text-yellow-800',
+                'altro': 'bg-gray-100 text-gray-800',
+                // English categories (fallback)
                 'excavation_report': 'bg-blue-100 text-blue-800',
                 'publication': 'bg-green-100 text-green-800',
                 'lab_analysis': 'bg-purple-100 text-purple-800',
@@ -1271,14 +1298,29 @@ document.addEventListener('alpine:init', () => {
         
         getCategoryDisplayName(category) {
             const names = {
+                // Italian categories (primary)
+                'relazioni': 'Relazioni di scavo',
+                'documentazione': 'Documentazione fotografica',
+                'planimetrie': 'Planimetrie e rilievi',
+                'pubblicazioni': 'Pubblicazioni',
+                'amministrativi': 'Documenti amministrativi',
+                'altro': 'Altro',
+                // English categories (fallback)
                 'excavation_report': 'Rapporto Scavo',
                 'publication': 'Pubblicazione',
                 'lab_analysis': 'Analisi Lab',
                 'conservation': 'Conservazione',
                 'drawing': 'Disegno',
                 'map': 'Cartografia',
-                'other': 'Altro'
+                'other': 'Altro',
+                // Additional categories
+                'excavation_reports': 'Rapporti di Scavo',
+                'documents': 'Documenti',
+                'photos': 'Fotografie',
+                'users': 'Utenti',
+                'sites': 'Siti'
             };
+            
             return names[category] || 'Sconosciuto';
         },
         
@@ -1364,6 +1406,20 @@ document.addEventListener('alpine:init', () => {
                 this.showNotification('Inserisci un titolo valido', 'warning');
                 return;
             }
+            
+            // Ensure all required fields are properly initialized
+            this.editDocument = {
+                ...this.editDocument,
+                title: this.editDocument.title || '',
+                description: this.editDocument.description || '',
+                category: this.editDocument.category || '',
+                doc_type: this.editDocument.doc_type || '',
+                tags: this.editDocument.tags || '',
+                doc_date: this.editDocument.doc_date || '',
+                author: this.editDocument.author || '',
+                is_public: this.editDocument.is_public !== undefined ? this.editDocument.is_public : true,
+                version_notes: this.editDocument.version_notes || ''
+            };
 
             try {
                 const formData = new FormData();
@@ -1393,7 +1449,16 @@ document.addEventListener('alpine:init', () => {
                 if (!response.ok) throw new Error('Errore nell\'aggiornamento');
 
                 this.showNotification('Documento aggiornato con successo', 'success');
-                await this.loadDocuments();
+                // Update the document in the local array
+                if (this.editDocument && this.editDocument.id) {
+                    const index = this.documents.findIndex(d => d.id === this.editDocument.id);
+                    if (index !== -1) {
+                        // Update the document in the local array
+                        this.documents[index] = { ...this.documents[index], ...this.editDocument };
+                        this.filterDocuments();
+                        this.calculateStats();
+                    }
+                }
                 this.closeEditModal();
 
             } catch (error) {
@@ -1417,7 +1482,12 @@ document.addEventListener('alpine:init', () => {
                 if (!response.ok) throw new Error('Errore nell\'eliminazione');
 
                 this.showNotification('Documento eliminato con successo', 'success');
-                await this.loadDocuments();
+                // Update the local documents array
+                if (documentId) {
+                    this.documents = this.documents.filter(d => d.id !== documentId);
+                    this.filterDocuments();
+                    this.calculateStats();
+                }
                 this.closeEditModal();
 
             } catch (error) {
@@ -1504,7 +1574,12 @@ document.addEventListener('alpine:init', () => {
         },
 
         openEditModal(doc) {
-            this.editDocument = { ...doc };
+            // Ensure editDocument is properly initialized with all required fields
+            this.editDocument = {
+                ...doc,
+                is_public: doc.is_public !== undefined ? doc.is_public : true,
+                version_notes: doc.version_notes || ''
+            };
             this.replaceFile = null;
             this.showEditModal = true;
         },
@@ -1549,6 +1624,56 @@ document.addEventListener('alpine:init', () => {
             const sizes = ['Bytes', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        },
+        
+        // Notification system
+        showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
+            
+            // Set color based on type
+            const colors = {
+                success: 'bg-green-500 text-white',
+                error: 'bg-red-500 text-white',
+                warning: 'bg-yellow-500 text-white',
+                info: 'bg-blue-500 text-white'
+            };
+            
+            notification.className += ' ' + (colors[type] || colors.info);
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <span class="mr-2">${this.getNotificationIcon(type)}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            // Add to document
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+                notification.classList.add('translate-x-0');
+            }, 100);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        },
+        
+        getNotificationIcon(type) {
+            const icons = {
+                success: '✓',
+                error: '✗',
+                warning: '⚠',
+                info: 'ℹ'
+            };
+            return icons[type] || icons.info;
         }
     }));
 });

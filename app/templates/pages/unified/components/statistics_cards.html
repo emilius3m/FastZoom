@@ -24,6 +24,30 @@
         </div>
     </div>
 
+    <!-- Documents Card -->
+    <div class="stat-card overview bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="flex items-center">
+            <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900">
+                <i class="fas fa-file-alt text-yellow-600 dark:text-yellow-300"></i>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Documenti</p>
+                <p class="text-2xl font-semibold text-gray-900 dark:text-white" x-text="overviewStats.documents_count || 0"></p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <template x-if="overviewStats.documents_count > 1">
+                        <span x-text="overviewStats.documents_count + ' documenti totali'"></span>
+                    </template>
+                    <template x-if="overviewStats.documents_count === 1">
+                        <span>1 documento</span>
+                    </template>
+                    <template x-if="overviewStats.documents_count === 0">
+                        <span>Nessun documento</span>
+                    </template>
+                </p>
+            </div>
+        </div>
+    </div>
+
     <!-- System Status Card -->
     <div class="stat-card overview bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div class="flex items-center">
@@ -46,28 +70,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Documents Card -->
-    <div class="stat-card overview bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div class="flex items-center">
-            <div class="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900">
-                <i class="fas fa-file-alt text-yellow-600 dark:text-yellow-300"></i>
-            </div>
-            <div class="ml-4">
-                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Backup</p>
-
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-
-
-                    <span class="flex items-center">
-                        <i :class="['fas', systemStatus.backup.icon, 'mr-1', 'text-sm', systemStatus.backup.class]"></i>
-                        <span :class="systemStatus.backup.class" x-text="systemStatus.backup.text"></span>
-                    </span>
-                </p>
-            </div>
-        </div>
-    </div>
-
 
 </div>
 

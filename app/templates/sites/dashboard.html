@@ -422,6 +422,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('siteDashboard', () => ({
         stats: {
             photos_count: {{ stats.photos_count }},
+            documents_count: {{ stats.documents_count }},
             users_count: {{ stats.users_count }},
             recent_photos: {{ stats.recent_photos }},
             storage_mb: {{ stats.storage_mb }}

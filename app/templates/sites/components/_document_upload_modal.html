@@ -9,16 +9,16 @@
      class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50"
      @click.self="showUploadModal = false">
 
-    <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
         <!-- Header -->
-        <div class="flex items-center justify-between mb-4 pb-3 border-b">
-            <h3 class="text-lg font-semibold text-gray-900">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
                 <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                 </svg>
                 Carica nuovo documento
             </h3>
-            <button @click="showUploadModal = false" class="text-gray-400 hover:text-gray-600">
+            <button @click="showUploadModal = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -32,34 +32,34 @@
                 <div @drop.prevent="handleFileDrop($event)"
                      @dragover.prevent="dragOver = true"
                      @dragleave.prevent="dragOver = false"
-                     :class="{'border-blue-500 bg-blue-50': dragOver}"
-                     class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center transition-all">
+                     :class="{'border-blue-500 bg-blue-50 dark:bg-blue-900/20': dragOver}"
+                     class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center transition-all">
                     <input type="file"
                            id="document-file"
                            @change="handleFileSelect($event)"
                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.tif,.tiff,.zip"
                            class="hidden">
                     <label for="document-file" class="cursor-pointer">
-                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
-                        <p class="text-lg text-gray-700 mb-1">Trascina qui il file oppure clicca per selezionarlo</p>
-                        <p class="text-sm text-gray-500">PDF, DOC, XLS, immagini, ZIP - Max 50MB</p>
+                        <p class="text-lg text-gray-700 dark:text-gray-300 mb-1">Trascina qui il file oppure clicca per selezionarlo</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">PDF, DOC, XLS, immagini, ZIP - Max 50MB</p>
                     </label>
                 </div>
 
                 <!-- Selected File Info -->
-                <div x-show="uploadFile" class="mt-3 p-3 bg-gray-50 rounded flex items-center justify-between">
+                <div x-show="uploadFile" class="mt-3 p-3 bg-gray-50 dark:bg-gray-700 rounded flex items-center justify-between">
                     <div class="flex items-center">
-                        <svg class="w-8 h-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-8 h-8 text-blue-600 dark:text-blue-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         <div>
-                            <p class="font-medium text-gray-900" x-text="uploadFile ? uploadFile.name : ''"></p>
-                            <p class="text-sm text-gray-500" x-text="uploadFile ? formatFileSize(uploadFile.size) : ''"></p>
+                            <p class="font-medium text-gray-900 dark:text-white" x-text="uploadFile ? uploadFile.name : ''"></p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400" x-text="uploadFile ? formatFileSize(uploadFile.size) : ''"></p>
                         </div>
                     </div>
-                    <button type="button" @click="uploadFile = null" class="text-red-600 hover:text-red-800">
+                    <button type="button" @click="uploadFile = null" class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -71,34 +71,34 @@
             <div class="space-y-4 mb-6">
                 <!-- Title -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Titolo documento <span class="text-red-600">*</span>
                     </label>
                     <input type="text"
                            x-model="newDocument.title"
                            required
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                            placeholder="Es: Relazione di scavo 2024">
                 </div>
 
                 <!-- Description -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Descrizione</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
                     <textarea x-model="newDocument.description"
                               rows="3"
-                              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                               placeholder="Breve descrizione del contenuto..."></textarea>
                 </div>
 
                 <!-- Category and Type -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Categoria <span class="text-red-600">*</span>
                         </label>
                         <select x-model="newDocument.category"
                                 required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                             <option value="">Seleziona...</option>
                             <option value="relazioni">Relazioni di scavo</option>
                             <option value="documentazione">Documentazione fotografica</option>
@@ -110,9 +110,9 @@
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo documento</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo documento</label>
                         <select x-model="newDocument.doc_type"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                             <option value="">Seleziona...</option>
                             <option value="pdf">PDF</option>
                             <option value="word">Word</option>
@@ -127,28 +127,28 @@
 
                 <!-- Tags -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tag</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tag</label>
                     <input type="text"
                            x-model="newDocument.tags"
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                            placeholder="scavo, ceramica, us, etc. (separa con virgola)">
-                    <p class="text-xs text-gray-500 mt-1">Inserisci parole chiave separate da virgola</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Inserisci parole chiave separate da virgola</p>
                 </div>
 
                 <!-- Date and Author -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Data documento</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data documento</label>
                         <input type="date"
                                x-model="newDocument.doc_date"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Autore</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autore</label>
                         <input type="text"
                                x-model="newDocument.author"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                                placeholder="Nome autore">
                     </div>
                 </div>
@@ -158,29 +158,29 @@
                     <label class="flex items-center">
                         <input type="checkbox"
                                x-model="newDocument.is_public"
-                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                        <span class="ml-2 text-sm text-gray-700">Documento pubblico (visibile a tutti i membri del team)</span>
+                               class="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-700">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Documento pubblico (visibile a tutti i membri del team)</span>
                     </label>
                 </div>
             </div>
 
             <!-- Upload Progress -->
             <div x-show="uploadProgress > 0 && uploadProgress < 100" class="mb-4">
-                <div class="flex items-center justify-between text-sm text-gray-700 mb-1">
+                <div class="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300 mb-1">
                     <span>Caricamento in corso...</span>
                     <span x-text="`${uploadProgress}%`"></span>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                     <div class="bg-blue-600 h-2 rounded-full transition-all duration-300"
                          :style="`width: ${uploadProgress}%`"></div>
                 </div>
             </div>
 
             <!-- Actions -->
-            <div class="flex justify-end space-x-3 pt-4 border-t">
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button type="button"
                         @click="showUploadModal = false; resetUploadForm()"
-                        class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                        class="px-4 py-2 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
                     Annulla
                 </button>
                 <button type="submit"

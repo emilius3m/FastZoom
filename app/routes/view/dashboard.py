@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id
-from app.models import Photo, UserSitePermission
+from app.models import Photo, UserSitePermission, Document
 from app.models import UserActivity, User
 from app.models.sites import ArchaeologicalSite
 from app.templates import templates
@@ -56,8 +56,20 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
     )
     storage_mb = (storage_query.scalar() or 0) / (1024 * 1024)
 
+    # Conta documenti
+    documents_count = await db.execute(
+        select(func.count(Document.id)).where(
+            and_(
+                Document.site_id == site_id,
+                Document.is_deleted == False
+            )
+        )
+    )
+    documents_count = documents_count.scalar() or 0
+
     return {
         "photos_count": photos_count,
+        "documents_count": documents_count,
         "users_count": users_count,
         "recent_photos": recent_photos,
         "storage_mb": round(storage_mb, 2),
