@@ -287,10 +287,11 @@ app.include_router(
 
 
 
-# Import del router giornale cantiere
+# Import del router giornale cantiere (DEPRECATED - Now using v1 only)
 try:
     from app.routes.api.giornale_cantiere import router as giornale_cantiere_api_router
     GIORNALE_API_EXISTS = True
+    logger.warning("DEPRECATED: Using old giornale_cantiere API. Please migrate to v1.")
 except ImportError:
     logger.warning("Giornale cantiere API route not found")
     GIORNALE_API_EXISTS = False
@@ -302,13 +303,17 @@ except ImportError:
     logger.warning("Giornale cantiere view route not found")
     GIORNALE_VIEW_EXISTS = False
 
-# Registrazione router API
-if GIORNALE_API_EXISTS:
-    app.include_router(
-        giornale_cantiere_api_router,
-        tags=["giornale-cantiere"],
-        dependencies=[Depends(get_current_user_id_with_blacklist)]
-    )
+# Registrazione router API - DISABLED: Use API v1 instead
+# All functionality moved to API v1 in /api/v1/giornale/
+# Old API completely disabled to prevent conflicts with main app routes
+# if GIORNALE_API_EXISTS:
+#     app.include_router(
+#         giornale_cantiere_api_router,
+#         tags=["giornale-cantiere - DEPRECATED"],
+#         dependencies=[Depends(get_current_user_id_with_blacklist)]
+#     )
+#     logger.warning("Deprecated giornale_cantiere API loaded. Use /api/v1/giornale/ instead.")
+logger.info("Old giornale_cantiere API disabled. Using API v1 only.")
 
 # Registrazione router view
 if GIORNALE_VIEW_EXISTS:
