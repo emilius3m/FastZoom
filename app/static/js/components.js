@@ -67,7 +67,7 @@ document.addEventListener("alpine:init", () => {
         password: this.password,
       };
       try {
-        const response = await fetch("/auth/register", {
+        const response = await fetch("/api/v1/auth/register", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -128,7 +128,7 @@ document.addEventListener("alpine:init", () => {
       formData.append("client_id", "");
       formData.append("client_secret", "");
 
-      fetch("/auth/token", {
+      fetch("/api/v1/auth/token", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
