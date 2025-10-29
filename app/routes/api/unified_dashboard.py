@@ -125,7 +125,7 @@ async def get_overview_stats(
             return {
                 "sites_count": 0,
                 "photos_count": 0,
-                "documents_count": 0,
+                "us_usm_count": 0,
                 "users_count": 0
             }
         
@@ -147,10 +147,25 @@ async def get_overview_stats(
         )
         users_count = users_result.scalar() or 0
         
+        # Count US/USM (Unità Stratigrafiche e Unità Stratigrafiche Murarie)
+        from app.models import UnitaStratigrafica, UnitaStratigraficaMuraria
+        
+        us_result = await db.execute(
+            select(func.count(UnitaStratigrafica.id)).where(UnitaStratigrafica.site_id.in_(site_ids))
+        )
+        us_count = us_result.scalar() or 0
+        
+        usm_result = await db.execute(
+            select(func.count(UnitaStratigraficaMuraria.id)).where(UnitaStratigraficaMuraria.site_id.in_(site_ids))
+        )
+        usm_count = usm_result.scalar() or 0
+        
+        us_usm_count = us_count + usm_count
+        
         return {
             "sites_count": len(user_sites),
             "photos_count": photos_count,
-            "documents_count": 0,  # Mock count
+            "us_usm_count": us_usm_count,
             "users_count": users_count
         }
         

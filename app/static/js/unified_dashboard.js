@@ -16,7 +16,7 @@ document.addEventListener("alpine:init", () => {
         overviewStats: {
             sites_count: 0,
             photos_count: 0,
-            documents_count: 0,
+            us_usm_count: 0,
             users_count: 0
         },
         giornaleStats: {
@@ -81,7 +81,7 @@ document.addEventListener("alpine:init", () => {
         overviewStats: {
             sites_count: 0,
             photos_count: 0,
-            documents_count: 0,
+            us_usm_count: 0,
             users_count: 0
         },
         giornaleStats: {
@@ -255,25 +255,25 @@ document.addEventListener("alpine:init", () => {
                 this.overviewStats = {
                     sites_count: sitesCount,
                     photos_count: parseInt(photosCount),
-                    documents_count: 0, // Will be loaded from API
+                    us_usm_count: 0, // Will be loaded from API
                     users_count: parseInt(usersCount)
                 };
                 
-                // Load documents count with retry mechanism
-                const docsResponse = await this.apiCallWithRetry(
-                    '/api/unified/documents/count',
+                // Load US/USM count with retry mechanism
+                const usResponse = await this.apiCallWithRetry(
+                    '/api/unified/stats/overview',
                     {
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRFToken': this.getCSRFToken()
                         }
                     },
-                    'documents'
+                    'us_usm'
                 );
                 
-                if (docsResponse) {
-                    const docsData = await docsResponse.json();
-                    this.overviewStats.documents_count = docsData.count || 0;
+                if (usResponse) {
+                    const usData = await usResponse.json();
+                    this.overviewStats.us_usm_count = usData.us_usm_count || 0;
                 }
                 
             } catch (error) {

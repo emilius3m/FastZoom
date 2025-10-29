@@ -67,9 +67,27 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
     )
     documents_count = documents_count.scalar() or 0
 
+    # Conta US/USM (Unità Stratigrafiche e Unità Stratigrafiche Murarie)
+    from app.models import UnitaStratigrafica, UnitaStratigraficaMuraria
+    
+    us_count = await db.execute(
+        select(func.count(UnitaStratigrafica.id)).where(UnitaStratigrafica.site_id == site_id)
+    )
+    us_count = us_count.scalar() or 0
+    
+    usm_count = await db.execute(
+        select(func.count(UnitaStratigraficaMuraria.id)).where(UnitaStratigraficaMuraria.site_id == site_id)
+    )
+    usm_count = usm_count.scalar() or 0
+    
+    us_usm_count = us_count + usm_count
+
     return {
         "photos_count": photos_count,
         "documents_count": documents_count,
+        "us_usm_count": us_usm_count,
+        "us_count": us_count,
+        "usm_count": usm_count,
         "users_count": users_count,
         "recent_photos": recent_photos,
         "storage_mb": round(storage_mb, 2),
