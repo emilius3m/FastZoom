@@ -19,10 +19,10 @@ from app.services.deep_zoom_background_service import deep_zoom_background_servi
 from app.services.deep_zoom_minio_service import deep_zoom_minio_service
 from app.services.archaeological_minio_service import archaeological_minio_service
 
-deepzoom_router = APIRouter()
+deepzoom_tiles_router = APIRouter()
 
 
-@deepzoom_router.post("/deepzoom/process-missing")
+@deepzoom_tiles_router.post("/deepzoom/process-missing")
 async def process_missing_tiles(
     photo_id: UUID,
     site_id: UUID,
@@ -157,7 +157,7 @@ async def process_missing_tiles(
         )
 
 
-@deepzoom_router.post("/deepzoom/verify-and-repair")
+@deepzoom_tiles_router.post("/deepzoom/verify-and-repair")
 async def verify_and_repair_tiles(
     photo_id: UUID,
     site_id: UUID,
@@ -327,7 +327,7 @@ async def verify_and_repair_tiles(
         )
 
 
-@deepzoom_router.get("/deepzoom/batch-status")
+@deepzoom_tiles_router.get("/deepzoom/batch-status")
 async def get_batch_tiles_status(
     site_id: UUID,
     photo_ids: Optional[List[UUID]] = None,
@@ -439,7 +439,7 @@ async def get_batch_tiles_status(
         )
 
 
-@deepzoom_router.get("/deepzoom/verification/status")
+@deepzoom_tiles_router.get("/deepzoom/verification/status")
 async def get_verification_status(
     site_access: tuple = Depends(get_site_access)
 ):
@@ -472,7 +472,7 @@ async def get_verification_status(
         )
 
 
-@deepzoom_router.post("/deepzoom/verification/trigger")
+@deepzoom_tiles_router.post("/deepzoom/verification/trigger")
 async def trigger_manual_verification(
     site_id: Optional[UUID] = None,
     site_access: tuple = Depends(get_site_access),
@@ -545,7 +545,7 @@ async def trigger_manual_verification(
         )
 
 
-@deepzoom_router.put("/deepzoom/verification/configure")
+@deepzoom_tiles_router.put("/deepzoom/verification/configure")
 async def configure_verification_service(
     verification_interval_hours: Optional[int] = None,
     batch_size: Optional[int] = None,
@@ -628,7 +628,7 @@ async def configure_verification_service(
         )
 
 
-@deepzoom_router.post("/deepzoom/verification/start")
+@deepzoom_tiles_router.post("/deepzoom/verification/start")
 async def start_verification_service(
     site_access: tuple = Depends(get_site_access),
     current_user_id: UUID = Depends(get_current_user_id),
@@ -685,7 +685,7 @@ async def start_verification_service(
         )
 
 
-@deepzoom_router.post("/deepzoom/verification/stop")
+@deepzoom_tiles_router.post("/deepzoom/verification/stop")
 async def stop_verification_service(
     site_access: tuple = Depends(get_site_access),
     current_user_id: UUID = Depends(get_current_user_id),
@@ -742,7 +742,7 @@ async def stop_verification_service(
         )
 
 
-@deepzoom_router.post("/deepzoom/batch-repair")
+@deepzoom_tiles_router.post("/deepzoom/batch-repair")
 async def batch_repair_tiles(
     site_id: UUID,
     photo_ids: List[UUID],

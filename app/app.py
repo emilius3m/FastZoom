@@ -54,7 +54,7 @@ from app.routes.api.queue_monitoring import queue_monitoring_router
 # 📊 NUOVO IMPORT - Router Performance Monitoring API
 from app.routes.api.performance_monitoring import router as performance_monitoring_router
 # 🔧 NUOVO IMPORT - Router DeepZoom Tiles Management
-from app.routes.api.deepzoom_tiles import deepzoom_router
+from app.routes.api.deepzoom_tiles import deepzoom_tiles_router
 
 from app.routes import photo_metadata
 from app.routes.api.us import us_router
@@ -147,6 +147,14 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Include route API
 app.include_router(auth_api_router, tags=["Authentication"])
+
+# 🆕 NUOVO: Includi router API v1 riorganizzato con backward compatibility
+from app.routes.api.v1 import api_v1_router
+app.include_router(
+    api_v1_router,
+    tags=["API v1 - Riorganizzata"],
+    responses={404: {"description": "Not found"}}
+)
 
 
 from app.core.middleware import (
@@ -383,7 +391,7 @@ app.include_router(
 
 # 🔧 INCLUSIONE ROUTER DEEPZOOM TILES - API per gestione tiles deep zoom
 app.include_router(
-    deepzoom_router,
+    deepzoom_tiles_router,
     tags=["deepzoom-tiles"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
