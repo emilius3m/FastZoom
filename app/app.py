@@ -303,18 +303,6 @@ except ImportError:
     logger.warning("Giornale cantiere view route not found")
     GIORNALE_VIEW_EXISTS = False
 
-# Registrazione router API - DISABLED: Use API v1 instead
-# All functionality moved to API v1 in /api/v1/giornale/
-# Old API completely disabled to prevent conflicts with main app routes
-# if GIORNALE_API_EXISTS:
-#     app.include_router(
-#         giornale_cantiere_api_router,
-#         tags=["giornale-cantiere - DEPRECATED"],
-#         dependencies=[Depends(get_current_user_id_with_blacklist)]
-#     )
-#     logger.warning("Deprecated giornale_cantiere API loaded. Use /api/v1/giornale/ instead.")
-logger.info("Old giornale_cantiere API disabled. Using API v1 only.")
-
 # Registrazione router view
 if GIORNALE_VIEW_EXISTS:
     app.include_router(
