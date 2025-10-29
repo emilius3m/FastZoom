@@ -145,8 +145,8 @@ def get_csrf_config():
 # Static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Include route API
-app.include_router(auth_api_router, tags=["Authentication"])
+# Include route API - DEPRECATED: Will be replaced by API v1
+##app.include_router(auth_api_router, tags=["Authentication - Deprecated"])
 
 # 🆕 NUOVO: Includi router API v1 riorganizzato con backward compatibility
 from app.routes.api.v1 import api_v1_router

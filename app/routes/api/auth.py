@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from loguru import logger
 
 from app.database.session import get_async_session
 from app.services.auth_service import AuthService
@@ -18,13 +19,20 @@ from app.routes.view.view_crud import SQLAlchemyCRUD
 
 settings = get_settings()
 
+def add_deprecation_headers(response: Response, new_endpoint: str):
+    """Aggiunge headers di deprecazione per backward compatibility"""
+    response.headers["X-API-Deprecated"] = "true"
+    response.headers["X-API-Deprecated-Reason"] = "Endpoint ristrutturato. Usa la nuova API v1."
+    response.headers["X-API-New-Endpoint"] = new_endpoint
+    response.headers["X-API-Sunset"] = "2025-12-31"  # Data rimozione vecchi endpoint
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # CRUD instances for user operations
 user_crud = SQLAlchemyCRUD[User](User)
 user_profile_crud = SQLAlchemyCRUD[UserProfileModelDB](UserProfileModelDB)
 
-@router.post("/login", response_class=HTMLResponse)
+@router.post("/login", response_class=HTMLResponse, summary="[DEPRECATED] Login", tags=["Authentication - Deprecated"])
 async def login(
     request: Request,
     response: Response,
@@ -110,11 +118,13 @@ async def login(
             from fastapi.responses import RedirectResponse
             return RedirectResponse(url="/admin/sites", status_code=303)
 
-        return HTMLResponse(content="", status_code=200)
+        response = HTMLResponse(content="", status_code=200)
+        add_deprecation_headers(response, "/api/v1/auth/login")
+        return response
         
     except Exception as e:
-        print(f"Login error: {e}")
-        return HTMLResponse(
+        logger.warning(f"Legacy login endpoint used - deprecated")
+        response = HTMLResponse(
             content='''
             <div class="alert alert-danger" role="alert">
                 <strong>Errore del server:</strong> Si è verificato un errore durante l'autenticazione.
@@ -122,9 +132,11 @@ async def login(
             ''',
             status_code=500
         )
+        add_deprecation_headers(response, "/api/v1/auth/login")
+        return response
 
 
-@router.post("/register")
+@router.post("/register", summary="[DEPRECATED] Register", tags=["Authentication - Deprecated"])
 async def register(
     request: Request,
     response: Response,
@@ -180,19 +192,23 @@ async def register(
 
         print(f"User registered successfully: {user.id}")
 
-        return JSONResponse(
+        response = JSONResponse(
             status_code=201,
             content={"message": "User created successfully"}
         )
+        add_deprecation_headers(response, "/api/v1/auth/register")
+        return response
 
     except Exception as e:
-        print(f"Registration error: {e}")
-        return JSONResponse(
+        logger.warning(f"Legacy register endpoint used - deprecated")
+        response = JSONResponse(
             status_code=500,
             content={"detail": "Si è verificato un errore durante la registrazione."}
         )
+        add_deprecation_headers(response, "/api/v1/auth/register")
+        return response
 
-@router.post("/token", response_class=JSONResponse)
+@router.post("/token", response_class=JSONResponse, summary="[DEPRECATED] OAuth2 Token", tags=["Authentication - Deprecated"])
 async def login_oauth2(
     request: Request,
     response: Response,
@@ -264,13 +280,14 @@ async def login_oauth2(
         
         # Ritorna 204 No Content come si aspetta il JavaScript
         response.status_code = 204
+        add_deprecation_headers(response, "/api/v1/auth/token")
         return None
         
     except HTTPException as e:
-        print(f"HTTP Exception in OAuth2 login: {e.detail}")
+        logger.warning(f"Legacy OAuth2 token endpoint used - deprecated")
         raise
     except Exception as e:
-        print(f"OAuth2 login error: {str(e)}")
+        logger.warning(f"Legacy OAuth2 token endpoint used - deprecated")
         import traceback
         traceback.print_exc()
         raise HTTPException(
@@ -278,10 +295,10 @@ async def login_oauth2(
             detail="Internal server error"
         )
 
-@router.post("/select-site")
+@router.post("/select-site", summary="[DEPRECATED] Select Site", tags=["Authentication - Deprecated"])
 async def select_site(
     request: Request,
-    response: Response, 
+    response: Response,
     site_id: UUID = Form(),
     current_user_id: UUID = Depends(get_current_user_id),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
@@ -334,11 +351,13 @@ async def select_site(
         
         # Redirect alla dashboard del sito selezionato
         from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=f"/site/{site_id}/dashboard", status_code=303)
+        response = RedirectResponse(url=f"/site/{site_id}/dashboard", status_code=303)
+        add_deprecation_headers(response, "/api/v1/auth/select-site")
+        return response
         
     except Exception as e:
-        print(f"Site selection error: {e}")
-        return HTMLResponse(
+        logger.warning(f"Legacy select-site endpoint used - deprecated")
+        response = HTMLResponse(
             content='''
             <div class="alert alert-danger" role="alert">
                 <strong>Errore del server:</strong> Si è verificato un errore durante la selezione del sito.
@@ -346,17 +365,19 @@ async def select_site(
             ''',
             status_code=500
         )
+        add_deprecation_headers(response, "/api/v1/auth/select-site")
+        return response
 
 
 
-@router.post("/logout")
+@router.post("/logout", summary="[DEPRECATED] Logout", tags=["Authentication - Deprecated"])
 async def logout(request: Request, response: Response, db: AsyncSession = Depends(get_async_session)):
-    print("Logout endpoint called")
+    logger.warning("Legacy logout endpoint used - deprecated")
     # DEBUG: stampa l'origine della richiesta
     referer = request.headers.get("referer", "unknown")
     user_agent = request.headers.get("user-agent", "unknown")
-    print(f"LOGOUT CALLED FROM: {referer}")
-    print(f"USER AGENT: {user_agent}")
+    logger.info(f"LOGOUT CALLED FROM: {referer}")
+    logger.info(f"USER AGENT: {user_agent}")
 
     """
     Logout utente - invalida token server-side, rimuove cookie e redirect a login
@@ -401,10 +422,12 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
 
         print("Cookies deleted with matching attributes")
 
-        return JSONResponse(content={"success": True, "redirect": "/login"}, status_code=200)
+        response = JSONResponse(content={"success": True, "redirect": "/login"}, status_code=200)
+        add_deprecation_headers(response, "/api/v1/auth/logout")
+        return response
 
     except Exception as e:
-        print(f"Logout error: {e}")
+        logger.error(f"Logout error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Logout failed"
@@ -417,7 +440,7 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
 
 # Remove duplicate/typo endpoint - use the main /auth/logout
 
-@router.get("/me")
+@router.get("/me", summary="[DEPRECATED] Get Current User Info", tags=["Authentication - Deprecated"])
 async def get_current_user_info(
     current_user_id: UUID = Depends(get_current_user_id),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites)
@@ -426,11 +449,13 @@ async def get_current_user_info(
     Ottieni informazioni utente corrente e siti accessibili
     Utile per frontend che deve mostrare info utente/siti
     """
-    return JSONResponse(content={
+    response = JSONResponse(content={
         "user_id": str(current_user_id),
         "sites": user_sites,
         "total_sites": len(user_sites)
     })
+    add_deprecation_headers(response, "/api/v1/auth/me")
+    return response
 
 # Endpoint di debug per test
 @router.get("/debug/cookie-test")
@@ -473,7 +498,7 @@ async def debug_token_test(
             "raw_cookie": access_token_cookie
         }
 
-@router.post("/post_update_user/{user_id}")
+@router.post("/post_update_user/{user_id}", summary="[DEPRECATED] Update User Profile", tags=["Authentication - Deprecated"])
 async def post_update_user(
     user_id: str,
     first_name: str = Form(None),
@@ -549,7 +574,7 @@ async def post_update_user(
                 **sanitized_data
             }, db)
 
-            return JSONResponse(
+            response = JSONResponse(
                 status_code=status.HTTP_201_CREATED,
                 content={
                     "message": "User profile created successfully",
@@ -557,6 +582,8 @@ async def post_update_user(
                     "user_id": str(target_user_id)
                 }
             )
+            add_deprecation_headers(response, f"/api/v1/auth/users/{user_id}/update")
+            return response
 
         else:
             # Update existing user profile
@@ -564,7 +591,7 @@ async def post_update_user(
                 db, existing_profile.id, sanitized_data
             )
 
-            return JSONResponse(
+            response = JSONResponse(
                 status_code=status.HTTP_200_OK,
                 content={
                     "message": "User profile updated successfully",
@@ -572,6 +599,8 @@ async def post_update_user(
                     "user_id": str(target_user_id)
                 }
             )
+            add_deprecation_headers(response, f"/api/v1/auth/users/{user_id}/update")
+            return response
 
     except HTTPException:
         raise

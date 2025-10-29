@@ -4,7 +4,7 @@ Endpoints per gestione giornale di cantiere archeologico.
 Implementa backward compatibility con avvisi di deprecazione.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import JSONResponse, Response
 from uuid import UUID
 from typing import List, Dict, Any, Optional
@@ -39,28 +39,137 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     
     return site_info
 
-# NUOVI ENDPOINTS V1 - STUB IMPLEMENTATION
+# Import required models and schemas
+from app.models.giornale_cantiere import (
+    GiornaleCantiere,
+    OperatoreCantiere,
+    giornale_operatori_association,
+    CondizioniMeteoEnum
+)
+from app.schemas.giornale_cantiere import (
+    OperatoreCantiereCreate,
+    OperatoreCantiereOut,
+    OperatoreCantiereUpdate,
+)
+from datetime import date, time
+from sqlalchemy import select, func, and_, or_, desc, distinct
+from sqlalchemy.orm import selectinload
 
 @router.get("/sites/{site_id}", summary="Lista giornali sito", tags=["Giornale di Cantiere"])
 async def v1_get_site_giornali(
     site_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    data_da: Optional[date] = Query(None),
+    data_a: Optional[date] = Query(None),
+    responsabile: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Recupera tutti i giornali di cantiere di un sito.
+    Recupera tutti i giornali di cantiere di un sito con filtri avanzati.
     
-    TODO: Implementare con logica completa da app/routes/api/giornale_cantiere.py
+    Args:
+        site_id: ID del sito archeologico
+        skip: Numero di record da saltare (paginazione)
+        limit: Numero massimo di record da restituire
+        data_da: Filtra giornali da questa data
+        data_a: Filtra giornali fino a questa data
+        responsabile: Filtra per nome responsabile
+        stato: Filtra per stato (validato/in_attesa)
     """
-    site_info = verify_site_access(site_id, user_sites)
-    
-    return {
-        "site_id": str(site_id),
-        "giornali": [],
-        "count": 0,
-        "site_info": site_info
-    }
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+
+        # Query base
+        query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == site_id)
+
+        # Applica filtri
+        if data_da:
+            query = query.where(GiornaleCantiere.data >= data_da)
+        if data_a:
+            query = query.where(GiornaleCantiere.data <= data_a)
+        if responsabile:
+            query = query.where(
+                GiornaleCantiere.responsabile_nome.ilike(f"%{responsabile}%")
+            )
+        if stato:
+            if stato == "validato":
+                query = query.where(GiornaleCantiere.validato.is_(True))
+            elif stato == "in_attesa":
+                query = query.where(GiornaleCantiere.validato.is_(False))
+
+        # Load relationships
+        query = query.options(
+            selectinload(GiornaleCantiere.site),
+            selectinload(GiornaleCantiere.responsabile),
+            selectinload(GiornaleCantiere.operatori),
+        )
+        
+        # Ordinamento e paginazione
+        query = query.order_by(
+            desc(GiornaleCantiere.data), desc(GiornaleCantiere.created_at)
+        )
+        query = query.offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        giornali = result.scalars().all()
+
+        # Prepara dati di risposta
+        giornali_data = []
+        for g in giornali:
+            giornale_dict = {
+                "id": str(g.id),
+                "data": g.data.isoformat() if g.data else None,
+                "ora_inizio": g.ora_inizio.strftime("%H:%M") if g.ora_inizio else None,
+                "ora_fine": g.ora_fine.strftime("%H:%M") if g.ora_fine else None,
+                "responsabile_scavo": g.responsabile_nome
+                or (g.responsabile.email if g.responsabile else None),
+                "descrizione_lavori": g.descrizione_lavori,
+                "condizioni_meteo": g.condizioni_meteo,
+                "stato": "validato" if g.validato else "in_attesa",
+                "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
+                "operatori_presenti": [
+                    {
+                        "id": str(op.id),
+                        "nome": op.nome,
+                        "cognome": op.cognome,
+                        "ruolo": op.ruolo,
+                    }
+                    for op in (g.operatori or [])
+                ],
+                "note_generali": g.note_generali,
+                "problematiche": g.problematiche,
+                "compilatore": g.compilatore or g.responsabile_nome,
+                "created_at": g.created_at.isoformat() if g.created_at else None,
+                "updated_at": g.updated_at.isoformat() if g.updated_at else None,
+                "version": g.version or 1,
+            }
+            giornali_data.append(giornale_dict)
+
+        return {
+            "site_id": str(site_id),
+            "giornali": giornali_data,
+            "count": len(giornali_data),
+            "site_info": site_info,
+            "filters_applied": {
+                "data_da": data_da.isoformat() if data_da else None,
+                "data_a": data_a.isoformat() if data_a else None,
+                "responsabile": responsabile,
+                "stato": stato
+            }
+        }
+        
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Errore recupero giornali sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel recupero dei giornali",
+        )
 
 # MIGRATION HELPER
 

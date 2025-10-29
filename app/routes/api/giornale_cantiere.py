@@ -820,6 +820,118 @@ async def get_operatori(
         )
 
 
+@router.get("/operatori/site/{site_id}")
+async def get_operatori_by_site(
+    site_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    ruolo: Optional[str] = Query(None),
+    specializzazione: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+):
+    """
+    Restituisce gli operatori specifici per un sito archeologico.
+    Filtra gli operatori che hanno lavorato su giornali di questo sito.
+    """
+    try:
+        # Verifica accesso al sito
+        await get_site_with_verification(site_id, db, user_sites)
+
+        # Query per trovare operatori che hanno lavorato su giornali di questo sito
+        # Usiamo subquery per identificare gli operatori associati al sito
+        site_operatori_subquery = (
+            select(giornale_operatori_association.c.operatore_id)
+            .join(GiornaleCantiere, giornale_operatori_association.c.giornale_id == GiornaleCantiere.id)
+            .where(GiornaleCantiere.site_id == site_id)
+            .distinct()
+            .subquery()
+        )
+
+        query = select(OperatoreCantiere).where(
+            OperatoreCantiere.id.in_(site_operatori_subquery)
+        )
+
+        # Applica filtri aggiuntivi
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    OperatoreCantiere.nome.ilike(search_pattern),
+                    OperatoreCantiere.cognome.ilike(search_pattern),
+                    OperatoreCantiere.codice_fiscale.ilike(search_pattern),
+                )
+            )
+        if ruolo:
+            query = query.where(OperatoreCantiere.ruolo == ruolo)
+        if specializzazione:
+            query = query.where(OperatoreCantiere.specializzazione == specializzazione)
+        if stato:
+            query = query.where(OperatoreCantiere.is_active == (stato == "attivo"))
+
+        query = query.order_by(OperatoreCantiere.cognome, OperatoreCantiere.nome)
+        query = query.offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        operatori = result.scalars().all()
+
+        # Conteggio giornali per ogni operatore in questo sito
+        operatori_data = []
+        for op in operatori:
+            # Query per contare i giornali di questo sito dove questo operatore ha lavorato
+            giornali_count_result = await db.execute(
+                select(func.count(GiornaleCantiere.id))
+                .join(giornale_operatori_association, GiornaleCantiere.id == giornale_operatori_association.c.giornale_id)
+                .where(
+                    and_(
+                        GiornaleCantiere.site_id == site_id,
+                        giornale_operatori_association.c.operatore_id == op.id
+                    )
+                )
+            )
+            giornali_count = giornali_count_result.scalar() or 0
+
+            operatori_data.append({
+                "id": str(op.id),
+                "nome": op.nome,
+                "cognome": op.cognome,
+                "codice_fiscale": op.codice_fiscale,
+                "email": op.email,
+                "telefono": op.telefono,
+                "ruolo": op.ruolo,
+                "specializzazione": op.specializzazione,
+                "qualifiche": op.qualifica.split(",") if op.qualifica else [],
+                "stato": "attivo" if op.is_active else "inattivo",
+                "ore_totali": op.ore_totali or 0,
+                "giornali_count": giornali_count,  # Solo per questo sito
+                "site_id": str(site_id),
+                "note": op.note,
+            })
+
+        # Aggiungi metadati della risposta
+        return {
+            "site_id": str(site_id),
+            "operatori": operatori_data,
+            "count": len(operatori_data),
+            "site_info": {
+                "name": next((site["name"] for site in user_sites if site["id"] == str(site_id)), ""),
+                "location": next((site.get("location", "") for site in user_sites if site["id"] == str(site_id)), "")
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore recupero operatori sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel recupero degli operatori del sito",
+        )
+
+
 @router.post(
     "/operatori", response_model=OperatoreCantiereOut, status_code=status.HTTP_201_CREATED
 )
