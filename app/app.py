@@ -128,6 +128,13 @@ except ImportError:
     logger.warning("ICCD view route not found")
     ICCD_ROUTE_EXISTS = False
 
+try:
+    from app.routes.view.cantieri import router as cantieri_view_router
+    CANTIERI_ROUTE_EXISTS = True
+except ImportError:
+    logger.warning("Cantieri view route not found")
+    CANTIERI_ROUTE_EXISTS = False
+
 # Configurazione
 settings = get_settings()
 app = FastAPI(
@@ -482,6 +489,14 @@ app.include_router(
     tags=["Pages", "US/USM"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
+
+# 🏗️ INCLUSIONE ROUTER CANTIERI VIEW - Gestione cantieri lavoro
+if CANTIERI_ROUTE_EXISTS:
+    app.include_router(
+        cantieri_view_router,
+        tags=["Pages", "Cantieri"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
 
 # Route principali
 @app.get("/")
