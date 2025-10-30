@@ -10,12 +10,14 @@ from uuid import UUID
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from datetime import datetime
 
 # Imports
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.database.db import get_async_session
 from app.models.cantiere import Cantiere
 from app.models.sites import ArchaeologicalSite
+from app.models.giornale_cantiere import GiornaleCantiere
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 
@@ -193,39 +195,37 @@ async def v1_cantiere_detail_view(
     Pagina di dettaglio per un cantiere specifico.
     """
     try:
-        # Carica cantiere con relazioni
+        # Carica cantiere
         result = await db.execute(
-            select(Cantiere)
-            .options(
-                selectinload(Cantiere.site)
-            )
-            .where(
+            select(Cantiere).where(
                 and_(Cantiere.id == cantiere_id, Cantiere.is_active == True)
             )
         )
         cantiere = result.scalar_one_or_none()
-        
+
         if not cantiere:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Cantiere non trovato"
             )
-        
+
         # Verifica accesso al sito
         site_info = verify_site_access(cantiere.site_id, user_sites)
-        
-        # Calcola statistiche aggiuntive
-        from app.models.giornale_cantiere import GiornaleCantiere
-        
-        # Conteggio giornali
+
+        # Carica sito
+        site_result = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == cantiere.site_id)
+        )
+        site = site_result.scalar_one_or_none()
+
+        # Statistiche
         giornali_count_result = await db.execute(
             select(func.count(GiornaleCantiere.id)).where(
                 GiornaleCantiere.cantiere_id == cantiere_id
             )
         )
         giornali_count = giornali_count_result.scalar() or 0
-        
-        # Ultimo giornale (se presente)
+
         ultimo_giornale_result = await db.execute(
             select(GiornaleCantiere)
             .where(GiornaleCantiere.cantiere_id == cantiere_id)
@@ -233,23 +233,15 @@ async def v1_cantiere_detail_view(
             .limit(1)
         )
         ultimo_giornale = ultimo_giornale_result.scalar_one_or_none()
-        
-        # Statistiche operatori
-        from app.models.giornale_cantiere import giornale_operatori_association
-        
-        operatori_count_result = await db.execute(
-            select(func.count(func.distinct(giornale_operatori_association.c.operatore_id)))
-            .select_from(GiornaleCantiere)
-            .join(giornale_operatori_association, GiornaleCantiere.id == giornale_operatori_association.c.giornale_id)
-            .where(GiornaleCantiere.cantiere_id == cantiere_id)
-        )
-        operatori_count = operatori_count_result.scalar() or 0
-        
+
+        operatori_count = 0
+
         return templates.TemplateResponse(
             "pages/giornale_cantiere/cantiere_detail.html",
             {
                 "request": request,
                 "cantiere": cantiere,
+                "site": site,
                 "site_info": site_info,
                 "giornali_count": giornali_count,
                 "ultimo_giornale": ultimo_giornale,
