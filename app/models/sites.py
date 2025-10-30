@@ -167,6 +167,8 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
     elenchi_consegna = relationship("ElencoConsegna", back_populates="site", cascade="all, delete-orphan")
 
     # === GESTIONE CANTIERE ===
+    # Cantieri di lavoro
+    cantieri = relationship("Cantiere", back_populates="site", cascade="all, delete-orphan")
     # Giornali di cantiere (operatori sono accessibili tramite giornali_cantiere)
     giornali_cantiere = relationship("GiornaleCantiere", back_populates="site", cascade="all, delete-orphan")
 

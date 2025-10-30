@@ -102,7 +102,7 @@ async def v1_get_site_giornali(
             elif stato == "in_attesa":
                 query = query.where(GiornaleCantiere.validato.is_(False))
 
-        # Load relationships
+        # Load relationships (rimosso cantiere per evitare problemi di import)
         query = query.options(
             selectinload(GiornaleCantiere.site),
             selectinload(GiornaleCantiere.responsabile),
@@ -121,6 +121,22 @@ async def v1_get_site_giornali(
         # Prepara dati di risposta
         giornali_data = []
         for g in giornali:
+            # Gestione cantiere senza relazione diretta
+            cantiere_info = None
+            if g.cantiere_id:
+                # Query separata per ottenere informazioni del cantiere se necessario
+                from app.models.cantiere import Cantiere
+                cantiere_result = await db.execute(
+                    select(Cantiere).where(Cantiere.id == g.cantiere_id)
+                )
+                cantiere = cantiere_result.scalar_one_or_none()
+                if cantiere:
+                    cantiere_info = {
+                        "id": str(cantiere.id),
+                        "nome": cantiere.nome,
+                        "codice": cantiere.codice
+                    }
+            
             giornale_dict = {
                 "id": str(g.id),
                 "data": g.data.isoformat() if g.data else None,
@@ -132,6 +148,8 @@ async def v1_get_site_giornali(
                 "condizioni_meteo": g.condizioni_meteo,
                 "stato": "validato" if g.validato else "in_attesa",
                 "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
+                "cantiere_id": str(g.cantiere_id) if g.cantiere_id else None,
+                "cantiere": cantiere_info,
                 "operatori_presenti": [
                     {
                         "id": str(op.id),
@@ -171,6 +189,193 @@ async def v1_get_site_giornali(
             detail="Errore nel recupero dei giornali",
         )
 
+@router.post("/sites/{site_id}/giornali", summary="Crea nuovo giornale", tags=["Giornale di Cantiere"])
+async def v1_create_giornale(
+    site_id: UUID,
+    giornale_data: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Crea un nuovo giornale di cantiere per un sito specifico.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Crea nuovo giornale
+        nuovo_giornale = GiornaleCantiere(
+            site_id=site_id,
+            cantiere_id=UUID(giornale_data.get("cantiere_id")) if giornale_data.get("cantiere_id") else None,
+            data=date.fromisoformat(giornale_data.get("data")) if giornale_data.get("data") else date.today(),
+            ora_inizio=time.fromisoformat(giornale_data.get("ora_inizio", "09:00")),
+            ora_fine=time.fromisoformat(giornale_data.get("ora_fine", "18:00")),
+            descrizione_lavori=giornale_data.get("descrizione_lavori", ""),
+            condizioni_meteo=giornale_data.get("condizioni_meteo", "soleggiato"),
+            note_generali=giornale_data.get("note_generali", ""),
+            problematiche=giornale_data.get("problematiche", ""),
+            responsabile_id=current_user_id,
+            compilatore=giornale_data.get("compilatore", ""),
+            validato=False
+        )
+        
+        db.add(nuovo_giornale)
+        await db.commit()
+        await db.refresh(nuovo_giornale)
+        
+        # Aggiungi operatori se specificati
+        operatori_ids = giornale_data.get("operatori_ids", [])
+        if operatori_ids:
+            for op_id in operatori_ids:
+                await db.execute(
+                    giornale_operatori_association.insert().values(
+                        giornale_id=nuovo_giornale.id,
+                        operatore_id=UUID(op_id)
+                    )
+                )
+            await db.commit()
+        
+        return {
+            "id": str(nuovo_giornale.id),
+            "message": "Giornale creato con successo",
+            "site_info": site_info
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore creazione giornale: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nella creazione del giornale"
+        )
+
+@router.put("/sites/{site_id}/giornali/{giornale_id}", summary="Aggiorna giornale", tags=["Giornale di Cantiere"])
+async def v1_update_giornale(
+    site_id: UUID,
+    giornale_id: UUID,
+    giornale_data: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Aggiorna un giornale di cantiere esistente.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Carica giornale esistente
+        result = await db.execute(
+            select(GiornaleCantiere).where(
+                and_(
+                    GiornaleCantiere.id == giornale_id,
+                    GiornaleCantiere.site_id == site_id
+                )
+            )
+        )
+        giornale = result.scalar_one_or_none()
+        
+        if not giornale:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Giornale non trovato"
+            )
+        
+        # Aggiorna campi
+        if "data" in giornale_data:
+            giornale.data = date.fromisoformat(giornale_data["data"])
+        if "ora_inizio" in giornale_data:
+            giornale.ora_inizio = time.fromisoformat(giornale_data["ora_inizio"])
+        if "ora_fine" in giornale_data:
+            giornale.ora_fine = time.fromisoformat(giornale_data["ora_fine"])
+        if "cantiere_id" in giornale_data:
+            giornale.cantiere_id = UUID(giornale_data["cantiere_id"]) if giornale_data["cantiere_id"] else None
+        if "descrizione_lavori" in giornale_data:
+            giornale.descrizione_lavori = giornale_data["descrizione_lavori"]
+        if "condizioni_meteo" in giornale_data:
+            giornale.condizioni_meteo = giornale_data["condizioni_meteo"]
+        if "note_generali" in giornale_data:
+            giornale.note_generali = giornale_data["note_generali"]
+        if "problematiche" in giornale_data:
+            giornale.problematiche = giornale_data["problematiche"]
+        if "compilatore" in giornale_data:
+            giornale.compilatore = giornale_data["compilatore"]
+        
+        await db.commit()
+        
+        return {
+            "id": str(giornale.id),
+            "message": "Giornale aggiornato con successo",
+            "site_info": site_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore aggiornamento giornale: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nell'aggiornamento del giornale"
+        )
+
+@router.delete("/sites/{site_id}/giornali/{giornale_id}", summary="Elimina giornale", tags=["Giornale di Cantiere"])
+async def v1_delete_giornale(
+    site_id: UUID,
+    giornale_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Elimina un giornale di cantiere.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Carica giornale
+        result = await db.execute(
+            select(GiornaleCantiere).where(
+                and_(
+                    GiornaleCantiere.id == giornale_id,
+                    GiornaleCantiere.site_id == site_id
+                )
+            )
+        )
+        giornale = result.scalar_one_or_none()
+        
+        if not giornale:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Giornale non trovato"
+            )
+        
+        # Rimuovi associazioni operatori
+        await db.execute(
+            giornale_operatori_association.delete().where(
+                giornale_operatori_association.c.giornale_id == giornale_id
+            )
+        )
+        
+        # Elimina giornale
+        await db.delete(giornale)
+        await db.commit()
+        
+        return {
+            "message": "Giornale eliminato con successo",
+            "site_info": site_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore eliminazione giornale: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nell'eliminazione del giornale"
+        )
+
 # MIGRATION HELPER
 
 @router.get("/migration/help", summary="Aiuto migrazione API giornale", tags=["Giornale di Cantiere - Migration"])
@@ -183,7 +388,11 @@ async def migration_help():
             "old_endpoints": {
                 "/api/giornale-cantiere/sites/{site_id}": "/api/v1/giornale/sites/{site_id}",
                 "/api/giornale-cantiere/giornali": "/api/v1/giornale/giornali",
-                "/api/giornale-cantiere/operatori/site/{site_id}": "/api/v1/giornale/sites/{site_id}/operatori"
+                "/api/giornale-cantiere/operatori/site/{site_id}": "/api/v1/giornale/sites/{site_id}/operatori",
+                "/api/giornale-cantiere/operatori": "/api/v1/giornale/operatori",
+                "/api/giornale-cantiere/stats/general": "/api/v1/giornale/stats/general",
+                "/api/giornale-cantiere/stats/site/{site_id}": "/api/v1/giornale/stats/site/{site_id}",
+                "/api/giornale-cantiere/stats/operatori": "/api/v1/giornale/stats/operatori"
             },
             "changes": [
                 "Standardizzazione URL patterns",
@@ -216,8 +425,8 @@ async def v1_get_site_operatori(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Recupera gli operatori specifici per un sito archeologico.
-    Filtra gli operatori che hanno lavorato su giornali di questo sito.
+    Recupera tutti gli operatori disponibili per un sito archeologico.
+    Restituisce tutti gli operatori che possono lavorare su questo sito.
     
     Args:
         site_id: ID del sito archeologico
@@ -229,7 +438,7 @@ async def v1_get_site_operatori(
         stato: Filtra per stato (attivo/inattivo)
     
     Returns:
-        Lista di operatori specifici per il sito con metadati
+        Lista di tutti gli operatori disponibili per il sito con metadati
     """
     from app.models.giornale_cantiere import (
         GiornaleCantiere,
@@ -243,18 +452,8 @@ async def v1_get_site_operatori(
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
         
-        # Query per trovare operatori che hanno lavorato su giornali di questo sito
-        site_operatori_subquery = (
-            select(giornale_operatori_association.c.operatore_id)
-            .join(GiornaleCantiere, giornale_operatori_association.c.giornale_id == GiornaleCantiere.id)
-            .where(GiornaleCantiere.site_id == site_id)
-            .distinct()
-            .subquery()
-        )
-        
-        query = select(OperatoreCantiere).where(
-            OperatoreCantiere.id.in_(site_operatori_subquery)
-        )
+        # Query per tutti gli operatori attivi (non solo quelli con giornali)
+        query = select(OperatoreCantiere)
         
         # Applica filtri aggiuntivi
         if search:
@@ -279,7 +478,7 @@ async def v1_get_site_operatori(
         result = await db.execute(query)
         operatori = result.scalars().all()
         
-        # Conteggio giornali per ogni operatore in questo sito
+        # Conteggio giornali per ogni operatore in questo sito (0 se non ha ancora lavorato)
         operatori_data = []
         for op in operatori:
             # Query per contare i giornali di questo sito dove questo operatore ha lavorato
@@ -307,9 +506,10 @@ async def v1_get_site_operatori(
                 "qualifiche": op.qualifica.split(",") if op.qualifica else [],
                 "stato": "attivo" if op.is_active else "inattivo",
                 "ore_totali": op.ore_totali or 0,
-                "giornali_count": giornali_count,  # Solo per questo sito
+                "giornali_count": giornali_count,  # Potrebbe essere 0 se non ha ancora lavorato su questo sito
                 "site_id": str(site_id),
                 "note": op.note,
+                "available_for_site": True,  # Indica che questo operatore può essere assegnato al sito
             })
         
         return {
@@ -331,4 +531,290 @@ async def v1_get_site_operatori(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nel recupero degli operatori del sito",
+        )
+
+@router.post("/sites/{site_id}/operatori", summary="Crea nuovo operatore", tags=["Giornale di Cantiere"])
+async def v1_create_operatore(
+    site_id: UUID,
+    operatore_data: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Crea un nuovo operatore di cantiere.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Crea nuovo operatore
+        nuovo_operatore = OperatoreCantiere(
+            nome=operatore_data.get("nome"),
+            cognome=operatore_data.get("cognome"),
+            codice_fiscale=operatore_data.get("codice_fiscale"),
+            qualifica=operatore_data.get("qualifica"),
+            ruolo=operatore_data.get("ruolo"),
+            specializzazione=operatore_data.get("specializzazione"),
+            email=operatore_data.get("email"),
+            telefono=operatore_data.get("telefono"),
+            is_active=operatore_data.get("is_active", True),
+            note=operatore_data.get("note"),
+            ore_totali=0
+        )
+        
+        db.add(nuovo_operatore)
+        await db.commit()
+        await db.refresh(nuovo_operatore)
+        
+        return {
+            "id": str(nuovo_operatore.id),
+            "message": "Operatore creato con successo",
+            "site_info": site_info
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore creazione operatore: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nella creazione dell'operatore"
+        )
+
+@router.put("/operatori/{operatore_id}", summary="Aggiorna operatore", tags=["Giornale di Cantiere"])
+async def v1_update_operatore(
+    operatore_id: UUID,
+    operatore_data: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Aggiorna un operatore di cantiere esistente.
+    """
+    try:
+        # Carica operatore esistente
+        result = await db.execute(
+            select(OperatoreCantiere).where(OperatoreCantiere.id == operatore_id)
+        )
+        operatore = result.scalar_one_or_none()
+        
+        if not operatore:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Operatore non trovato"
+            )
+        
+        # Aggiorna campi
+        if "nome" in operatore_data:
+            operatore.nome = operatore_data["nome"]
+        if "cognome" in operatore_data:
+            operatore.cognome = operatore_data["cognome"]
+        if "codice_fiscale" in operatore_data:
+            operatore.codice_fiscale = operatore_data["codice_fiscale"]
+        if "qualifica" in operatore_data:
+            operatore.qualifica = operatore_data["qualifica"]
+        if "ruolo" in operatore_data:
+            operatore.ruolo = operatore_data["ruolo"]
+        if "specializzazione" in operatore_data:
+            operatore.specializzazione = operatore_data["specializzazione"]
+        if "email" in operatore_data:
+            operatore.email = operatore_data["email"]
+        if "telefono" in operatore_data:
+            operatore.telefono = operatore_data["telefono"]
+        if "is_active" in operatore_data:
+            operatore.is_active = operatore_data["is_active"]
+        if "note" in operatore_data:
+            operatore.note = operatore_data["note"]
+        
+        await db.commit()
+        
+        return {
+            "id": str(operatore.id),
+            "message": "Operatore aggiornato con successo"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore aggiornamento operatore: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nell'aggiornamento dell'operatore"
+        )
+
+
+@router.get("/stats/general", summary="Statistiche generali giornali", tags=["Giornale di Cantiere - Stats"])
+async def v1_get_general_stats(
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Recupera statistiche generali per tutti i siti accessibili.
+    """
+    try:
+        site_ids = [UUID(site["id"]) for site in user_sites]
+        if not site_ids:
+            return {
+                "siti_totali": 0,
+                "giornali_totali": 0,
+                "giornali_validati": 0,
+                "giornali_pendenti": 0,
+            }
+
+        # Count unique sites with journals
+        siti_result = await db.execute(
+            select(distinct(GiornaleCantiere.site_id)).where(
+                GiornaleCantiere.site_id.in_(site_ids)
+            )
+        )
+        siti_totali = len(siti_result.fetchall())
+
+        # Count total journals
+        totali_result = await db.execute(
+            select(func.count(GiornaleCantiere.id)).where(
+                GiornaleCantiere.site_id.in_(site_ids)
+            )
+        )
+        giornali_totali = totali_result.scalar() or 0
+
+        # Count validated journals
+        validati_result = await db.execute(
+            select(func.count(GiornaleCantiere.id)).where(
+                and_(
+                    GiornaleCantiere.site_id.in_(site_ids),
+                    GiornaleCantiere.validato.is_(True),
+                )
+            )
+        )
+        giornali_validati = validati_result.scalar() or 0
+
+        return {
+            "siti_totali": siti_totali,
+            "giornali_totali": giornali_totali,
+            "giornali_validati": giornali_validati,
+            "giornali_pendenti": giornali_totali - giornali_validati,
+        }
+        
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Errore statistiche generali: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel calcolo delle statistiche generali",
+        )
+
+@router.get("/stats/site/{site_id}", summary="Statistiche sito specifico", tags=["Giornale di Cantiere - Stats"])
+async def v1_get_site_stats(
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Recupera statistiche per un sito specifico.
+    """
+    try:
+        # Verify site access
+        site_info = verify_site_access(site_id, user_sites)
+
+        # Count total journals for site
+        totali_result = await db.execute(
+            select(func.count(GiornaleCantiere.id)).where(
+                GiornaleCantiere.site_id == site_id
+            )
+        )
+        total_giornali = totali_result.scalar() or 0
+
+        # Count validated journals
+        validati_result = await db.execute(
+            select(func.count(GiornaleCantiere.id)).where(
+                and_(
+                    GiornaleCantiere.site_id == site_id,
+                    GiornaleCantiere.validato.is_(True),
+                )
+            )
+        )
+        validated_giornali = validati_result.scalar() or 0
+
+        # Count unique operators for site
+        operatori_result = await db.execute(
+            select(func.count(distinct(OperatoreCantiere.id)))
+            .join(GiornaleCantiere.operatori)
+            .where(GiornaleCantiere.site_id == site_id)
+        )
+        operatori_attivi = operatori_result.scalar() or 0
+
+        validation_percentage = (
+            round((validated_giornali / total_giornali) * 100) if total_giornali else 0
+        )
+
+        return {
+            "total_giornali": total_giornali,
+            "validated_giornali": validated_giornali,
+            "pending_giornali": total_giornali - validated_giornali,
+            "operatori_attivi": operatori_attivi,
+            "validation_percentage": validation_percentage,
+            "site_info": site_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Errore statistiche sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel calcolo delle statistiche del sito",
+        )
+
+@router.get("/stats/operatori", summary="Statistiche operatori", tags=["Giornale di Cantiere - Stats"])
+async def v1_get_operatori_stats(
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Recupera statistiche generali per gli operatori.
+    """
+    try:
+        # Count total operators
+        totali_result = await db.execute(select(func.count(OperatoreCantiere.id)))
+        totali = totali_result.scalar() or 0
+
+        # Count active operators (those who have worked on journals)
+        attivi_result = await db.execute(
+            select(func.count(distinct(OperatoreCantiere.id))).join(
+                GiornaleCantiere.operatori
+            )
+        )
+        attivi = attivi_result.scalar() or 0
+
+        # Count specialized operators
+        specialisti_result = await db.execute(
+            select(func.count(OperatoreCantiere.id)).where(
+                OperatoreCantiere.specializzazione.isnot(None)
+            )
+        )
+        specialisti = specialisti_result.scalar() or 0
+
+        # Count total hours
+        ore_result = await db.execute(
+            select(func.sum(OperatoreCantiere.ore_totali)).where(
+                OperatoreCantiere.ore_totali.isnot(None)
+            )
+        )
+        ore_totali = int(ore_result.scalar() or 0)
+
+        return {
+            "totali": totali,
+            "attivi": attivi,
+            "specialisti": specialisti,
+            "ore_totali": ore_totali,
+        }
+        
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Errore statistiche operatori: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel calcolo delle statistiche operatori",
         )

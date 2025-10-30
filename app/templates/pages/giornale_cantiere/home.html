@@ -18,10 +18,6 @@
             </div>
             
             <div class="flex gap-3">
-                <a href="/giornale-cantiere/operatori" 
-                   class="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition">
-                    <i class="fas fa-users mr-2"></i>Gestione Operatori
-                </a>
                 <a href="/giornale-cantiere/reports"
                    class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-200 transition">
                     <i class="fas fa-chart-bar mr-2"></i>Report Generali
@@ -190,7 +186,7 @@ function giornaleCantiereDashboard() {
         async loadStats() {
             this.loading = true;
             try {
-                const response = await fetch('/api/giornale-cantiere/stats/general', {
+                const response = await fetch('/api/v1/giornale/stats/general', {
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
@@ -216,7 +212,7 @@ function giornaleCantiereDashboard() {
                 const sites = {{ sites|tojson|safe if sites else '[]' }};
                 
                 for (const site of sites) {
-                    const response = await fetch(`/api/giornale-cantiere/stats/site/${site.id}`, {
+                    const response = await fetch(`/api/v1/giornale/stats/site/${site.id}`, {
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value

@@ -63,8 +63,8 @@
         <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-blue-500">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-600">Operatori Totali</p>
-                    <p class="text-2xl font-bold text-blue-600" x-text="stats.totali || 0"></p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Operatori Totali</p>
+                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-400" x-text="stats.totali || 0"></p>
                 </div>
                 <i class="fas fa-users text-blue-500 text-xl"></i>
             </div>
@@ -73,8 +73,8 @@
         <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-green-500">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-600">Attivi</p>
-                    <p class="text-2xl font-bold text-green-600" x-text="stats.attivi || 0"></p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Attivi</p>
+                    <p class="text-2xl font-bold text-green-600 dark:text-green-400" x-text="stats.attivi || 0"></p>
                 </div>
                 <i class="fas fa-check-circle text-green-500 text-xl"></i>
             </div>
@@ -83,8 +83,8 @@
         <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-yellow-500">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-600">Specialisti</p>
-                    <p class="text-2xl font-bold text-yellow-600" x-text="stats.specialisti || 0"></p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Specialisti</p>
+                    <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400" x-text="stats.specialisti || 0"></p>
                 </div>
                 <i class="fas fa-user-graduate text-yellow-500 text-xl"></i>
             </div>
@@ -93,8 +93,8 @@
         <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-purple-500">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-600">Ore Totali</p>
-                    <p class="text-2xl font-bold text-purple-600" x-text="stats.ore_totali || 0"></p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Ore Totali</p>
+                    <p class="text-2xl font-bold text-purple-600 dark:text-purple-400" x-text="stats.ore_totali || 0"></p>
                 </div>
                 <i class="fas fa-clock text-purple-500 text-xl"></i>
             </div>
@@ -105,14 +105,14 @@
     <div x-show="showFilters" x-cloak class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Ricerca</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ricerca</label>
                 <input type="text" x-model="filters.search" placeholder="Nome, cognome, codice fiscale..."
-                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                       class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Ruolo</label>
-                <select x-model="filters.ruolo" 
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ruolo</label>
+                <select x-model="filters.ruolo"
+                        class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Tutti</option>
                     <option value="responsabile_scavo">Responsabile Scavo</option>
                     <option value="assistente">Assistente</option>
@@ -122,9 +122,9 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Specializzazione</label>
-                <select x-model="filters.specializzazione" 
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Specializzazione</label>
+                <select x-model="filters.specializzazione"
+                        class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Tutte</option>
                     <option value="ceramica">Ceramica</option>
                     <option value="numismatica">Numismatica</option>
@@ -136,9 +136,9 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Stato</label>
-                <select x-model="filters.stato" 
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stato</label>
+                <select x-model="filters.stato"
+                        class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Tutti</option>
                     <option value="attivo">Attivo</option>
                     <option value="inattivo">Inattivo</option>
@@ -254,9 +254,9 @@
         </template>
 
         <!-- Messaggio vuoto -->
-        <div x-show="operatoriList.length === 0 && !loading" 
+        <div x-show="operatoriList.length === 0 && !loading"
              class="col-span-full text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-            <i class="fas fa-users text-6xl text-gray-300 mb-4"></i>
+            <i class="fas fa-users text-6xl text-gray-300 dark:text-gray-600 mb-4"></i>
             <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Nessun operatore trovato</h3>
             <p class="text-gray-500 dark:text-gray-400 mb-4">Non ci sono operatori per i filtri selezionati.</p>
             <button @click="openCreateModal()" 
@@ -268,7 +268,7 @@
 
     <!-- Loading spinner -->
     <div x-show="loading" class="text-center py-12">
-        <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
+        <i class="fas fa-spinner fa-spin text-4xl text-gray-400 dark:text-gray-600 mb-4"></i>
         <p class="text-gray-600 dark:text-gray-400">Caricamento operatori...</p>
     </div>
     
@@ -319,35 +319,35 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nome *</label>
                                 <input type="text" x-model="formData.nome" required
-                                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                       class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Cognome -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cognome *</label>
                                 <input type="text" x-model="formData.cognome" required
-                                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                       class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Codice Fiscale -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Codice Fiscale</label>
                                 <input type="text" x-model="formData.codice_fiscale" maxlength="16"
-                                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                       class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Qualifica -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Qualifica *</label>
                                 <input type="text" x-model="formData.qualifica" required
-                                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                       class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Ruolo -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ruolo</label>
                                 <select x-model="formData.ruolo"
-                                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <option value="">Seleziona ruolo</option>
                                     <option value="responsabile_scavo">Responsabile Scavo</option>
                                     <option value="assistente">Assistente</option>
@@ -361,7 +361,7 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Specializzazione</label>
                                 <select x-model="formData.specializzazione"
-                                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                        class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                                     <option value="">Seleziona specializzazione</option>
                                     <option value="ceramica">Ceramica</option>
                                     <option value="numismatica">Numismatica</option>
@@ -377,20 +377,20 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
                                 <input type="email" x-model="formData.email"
-                                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                       class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Telefono -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Telefono</label>
                                 <input type="tel" x-model="formData.telefono"
-                                       class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                       class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                             </div>
                             
                             <!-- Stato -->
                             <div class="md:col-span-2">
                                 <label class="flex items-center">
-                                    <input type="checkbox" x-model="formData.is_active" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                    <input type="checkbox" x-model="formData.is_active" class="rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
                                     <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Operatore attivo</span>
                                 </label>
                             </div>
@@ -399,7 +399,7 @@
                             <div class="md:col-span-2">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Note</label>
                                 <textarea x-model="formData.note" rows="3"
-                                          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                                          class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
                             </div>
                         </div>
                         
@@ -416,7 +416,7 @@
                             <span x-text="saving ? 'Salvataggio...' : (modalMode === 'create' ? 'Crea Operatore' : 'Salva Modifiche')"></span>
                         </button>
                         <button type="button" @click="closeModal()" :disabled="saving"
-                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                             Annulla
                         </button>
                     </div>
@@ -483,21 +483,31 @@ function operatoriApp() {
         // Caricamento statistiche operatori
         async loadStats() {
             try {
-                const response = await fetch('/api/giornale-cantiere/stats/operatori', {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
-                    }
-                });
-                
-                if (response.ok) {
-                    this.stats = await response.json();
+                // Se siamo in modalità site-specific, non carichiamo statistiche generali
+                const isSiteSpecific = {{ 'true' if is_site_specific else 'false' | safe }};
+                if (isSiteSpecific) {
+                    // In modalità site-specific, le statistiche sono già incluse nella risposta API
+                    this.stats = {
+                        totali: this.operatoriList.length,
+                        attivi: this.operatoriList.filter(op => op.stato === 'attivo').length,
+                        specialisti: this.operatoriList.filter(op => op.specializzazione && op.specializzazione !== '').length,
+                        ore_totali: this.operatoriList.reduce((sum, op) => sum + (op.ore_totali || 0), 0)
+                    };
                 } else {
-                    console.error('Errore caricamento statistiche operatori:', response.statusText);
+                    // Reindirizza alla dashboard per selezionare un sito
+                    window.location.href = '/dashboard';
+                    return;
                 }
                 
             } catch (error) {
                 console.error('Errore caricamento statistiche operatori:', error);
+                // Fallback a statistiche calcolate localmente
+                this.stats = {
+                    totali: this.operatoriList.length,
+                    attivi: this.operatoriList.filter(op => op.stato === 'attivo').length,
+                    specialisti: this.operatoriList.filter(op => op.specializzazione && op.specializzazione !== '').length,
+                    ore_totali: this.operatoriList.reduce((sum, op) => sum + (op.ore_totali || 0), 0)
+                };
             }
         },
         
@@ -505,6 +515,10 @@ function operatoriApp() {
         async loadOperatori() {
             this.loading = true;
             try {
+                // Verifica se siamo in modalità site-specific
+                const isSiteSpecific = {{ 'true' if is_site_specific else 'false' | safe }};
+                const siteId = '{{ site_id | default('null') | safe }}';
+                
                 const params = new URLSearchParams();
                 
                 // Aggiungi filtri
@@ -513,7 +527,16 @@ function operatoriApp() {
                 if (this.filters.specializzazione) params.append('specializzazione', this.filters.specializzazione);
                 if (this.filters.stato) params.append('stato', this.filters.stato);
                 
-                const url = `/api/giornale-cantiere/operatori?${params.toString()}`;
+                let url;
+                if (isSiteSpecific && siteId !== 'null') {
+                    // Usa sempre URL RESTful per operatori site-specific
+                    url = `/api/v1/giornale/sites/${siteId}/operatori?${params.toString()}`;
+                } else {
+                    // Non dovrebbe mai accadere - reindirizza alla dashboard per selezionare un sito
+                    window.location.href = '/dashboard';
+                    return;
+                }
+                
                 const response = await fetch(url, {
                     headers: {
                         'Content-Type': 'application/json',
@@ -522,7 +545,15 @@ function operatoriApp() {
                 });
                 
                 if (response.ok) {
-                    this.operatoriList = await response.json();
+                    const data = await response.json();
+                    // Gestisci formato risposta differente tra endpoints
+                    if (data.operatori) {
+                        // Endpoint site-specific restituisce { operatori: [...], ... }
+                        this.operatoriList = data.operatori;
+                    } else {
+                        // Endpoint generico restituisce direttamente l'array
+                        this.operatoriList = Array.isArray(data) ? data : [];
+                    }
                 } else {
                     console.error('Errore caricamento operatori:', response.statusText);
                     this.operatoriList = [];
@@ -566,14 +597,29 @@ function operatoriApp() {
             this.errorMessage = '';
             
             try {
-                const url = this.modalMode === 'create'
-                    ? '/api/giornale-cantiere/operatori'
-                    : `/api/giornale-cantiere/operatori/${this.currentOperatoreId}`;
+                // Verifica se siamo in modalità site-specific
+                const isSiteSpecific = {{ 'true' if is_site_specific else 'false' | safe }};
+                const siteId = '{{ site_id | default('null') | safe }}';
+                
+                let url;
+                if (this.modalMode === 'create') {
+                    if (isSiteSpecific && siteId !== 'null') {
+                        // Usa URL RESTful per creazione site-specific
+                        url = `/api/v1/giornale/sites/${siteId}/operatori`;
+                    } else {
+                        // Errore - dovrebbe essere sempre site-specific
+                        this.errorMessage = 'Errore: nessun sito specificato';
+                        return;
+                    }
+                } else {
+                    // Per modifiche, usa endpoint di aggiornamento site-specific
+                    url = `/api/v1/giornale/operatori/${this.currentOperatoreId}`;
+                }
                 
                 const method = this.modalMode === 'create' ? 'POST' : 'PUT';
                 
                 // Log the data being sent for debugging
-                console.log('Sending data:', this.formData);
+                console.log('Sending data to:', url, this.formData);
                 
                 const response = await fetch(url, {
                     method: method,

@@ -43,6 +43,10 @@
             </div>
             
             <div class="flex gap-3">
+                <a :href="`/sites/{{ site.id if site else 'unknown' }}/cantieri`"
+                   class="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-4 py-2 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800/40 transition">
+                    <i class="fas fa-hard-hat mr-2"></i>Gestione Cantieri
+                </a>
                 <a :href="`/giornale-cantiere/site/{{ site.id if site else 'unknown' }}/operatori`"
                    class="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/40 transition">
                     <i class="fas fa-users mr-2"></i>Gestione Operatori
@@ -64,7 +68,17 @@
     </div>
 
     <!-- Statistiche sito -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-purple-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Cantieri Totali</p>
+                    <p class="text-2xl font-bold text-purple-600" x-text="stats.total_cantieri || 0"></p>
+                </div>
+                <i class="fas fa-hard-hat text-purple-500 text-xl"></i>
+            </div>
+        </div>
+        
         <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-orange-500">
             <div class="flex items-center justify-between">
                 <div>
@@ -116,6 +130,60 @@
         </div>
     </div>
 
+    <!-- Riepilogo Cantieri -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                <i class="fas fa-hard-hat mr-2 text-purple-600"></i>Cantieri Attivi
+            </h2>
+            <a :href="`/sites/{{ site.id if site else 'unknown' }}/cantieri`"
+               class="text-purple-600 hover:text-purple-700 text-sm font-medium">
+                Vedi tutti <i class="fas fa-arrow-right ml-1"></i>
+            </a>
+        </div>
+        
+        <div x-show="!loadingCantieri" class="space-y-3">
+            <template x-for="cantiere in cantieriList.slice(0, 3)" :key="cantiere.id">
+                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3">
+                            <h3 class="font-medium text-gray-900 dark:text-white" x-text="cantiere.nome"></h3>
+                            <span class="inline-flex items-center px-2 py-1 text-xs rounded-full"
+                                  :class="getCantiereStateBadge(cantiere.stato)">
+                                <i :class="getCantiereStateIcon(cantiere.stato)" class="mr-1"></i>
+                                <span x-text="cantiere.stato_formattato"></span>
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            <span x-show="cantiere.codice">Cod: <span x-text="cantiere.codice"></span> •</span>
+                            <span x-text="cantiere.giornali_count || 0"></span> giornali
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-gray-500 dark:text-gray-400">
+                            <i class="fas fa-users mr-1"></i>
+                            <span x-text="cantiere.operatori_count || 0"></span>
+                        </span>
+                        <a :href="`/cantieri/${cantiere.id}`"
+                           class="text-purple-600 hover:text-purple-700">
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </div>
+                </div>
+            </template>
+            
+            <div x-show="cantieriList.length === 0"
+                 class="text-center py-6 text-gray-500 dark:text-gray-400">
+                <i class="fas fa-hard-hat text-4xl mb-2"></i>
+                <p>Nessun cantiere attivo</p>
+            </div>
+        </div>
+        
+        <div x-show="loadingCantieri" class="text-center py-6">
+            <i class="fas fa-spinner fa-spin text-gray-400"></i>
+        </div>
+    </div>
+
     <!-- Filtri avanzati -->
     <div x-show="showFilters" x-cloak class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -161,6 +229,12 @@
 
     <!-- Lista Giornali -->
     <div class="space-y-4" x-show="!loading">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                <i class="fas fa-book mr-2 text-orange-600"></i>Giornali del Sito
+            </h2>
+        </div>
+        
         <template x-for="giornale in giornaliList" :key="giornale.id">
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow duration-200 border-l-4"
                  :class="getStateBorderColor(giornale.stato)">
@@ -172,6 +246,13 @@
                                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white"
                                     x-text="formatDate(giornale.data) || 'Data non specificata'"></h3>
                                 
+                                <!-- Badge cantiere -->
+                                <span x-show="giornale.cantiere"
+                                      class="inline-flex items-center px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">
+                                    <i class="fas fa-hard-hat mr-1"></i>
+                                    <span x-text="giornale.cantiere.nome"></span>
+                                </span>
+                                
                                 <!-- Badge stato -->
                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
                                       :class="getStateBadge(giornale.stato)">
@@ -180,7 +261,7 @@
                                 </span>
                                 
                                 <!-- Badge condizioni meteo -->
-                                <span x-show="giornale.condizioni_meteo" 
+                                <span x-show="giornale.condizioni_meteo"
                                       class="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
                                     <i :class="getWeatherIcon(giornale.condizioni_meteo)" class="mr-1"></i>
                                     <span x-text="giornale.condizioni_meteo"></span>
@@ -332,12 +413,16 @@
 function giornaleSitoAppCompleto() {
     return {
         // Dati base
+        siteId: '{{ site.id if site else "unknown" }}',
         giornaliList: [],
+        cantieriList: [],
         loading: false,
+        loadingCantieri: false,
         showFilters: false,
         
         // Statistiche
         stats: {
+            total_cantieri: 0,
             total_giornali: 0,
             validated_giornali: 0,
             pending_giornali: 0,
@@ -364,6 +449,7 @@ function giornaleSitoAppCompleto() {
             data: new Date().toISOString().split('T')[0],
             ora_inizio: '08:00',
             ora_fine: '17:00',
+            cantiere_id: '',
             responsabile_nome: '',
             compilatore: '',
             condizioni_meteo: '',
@@ -387,10 +473,12 @@ function giornaleSitoAppCompleto() {
         ],
         
         operatori_disponibili: [],
+        cantieri_disponibili: [],
         
         // Inizializzazione
         async init() {
             await this.loadStats();
+            await this.loadCantieri();
             await this.loadGiornali();
         },
         
@@ -400,7 +488,44 @@ function giornaleSitoAppCompleto() {
         async loadStats() {
             try {
                 const siteId = '{{ site.id if site else "unknown" }}';
-                const response = await fetch(`/api/v1/giornale/stats/site/${siteId}`, {
+                
+                // Carica statistiche giornali
+                const giornaliResponse = await fetch(`/api/v1/giornale/stats/site/${siteId}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (giornaliResponse.ok) {
+                    const giornaliStats = await giornaliResponse.json();
+                    this.stats = { ...this.stats, ...giornaliStats };
+                }
+                
+                // Carica statistiche cantieri
+                const cantieriResponse = await fetch(`/api/v1/cantieri/sites/${siteId}/stats/cantieri`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                    }
+                });
+                
+                if (cantieriResponse.ok) {
+                    const cantieriStats = await cantieriResponse.json();
+                    this.stats.total_cantieri = cantieriStats.total_cantieri || 0;
+                }
+                
+            } catch (error) {
+                console.error('Errore caricamento statistiche:', error);
+            }
+        },
+        
+        // Caricamento cantieri
+        async loadCantieri() {
+            this.loadingCantieri = true;
+            try {
+                const siteId = '{{ site.id if site else "unknown" }}';
+                const response = await fetch(`/api/v1/cantieri/sites/${siteId}?limit=5`, {
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
@@ -408,13 +533,18 @@ function giornaleSitoAppCompleto() {
                 });
                 
                 if (response.ok) {
-                    this.stats = await response.json();
+                    const data = await response.json();
+                    this.cantieriList = data.cantieri || [];
                 } else {
-                    console.error('Errore caricamento statistiche sito:', response.statusText);
+                    console.error('Errore caricamento cantieri:', response.statusText);
+                    this.cantieriList = [];
                 }
                 
             } catch (error) {
-                console.error('Errore caricamento statistiche:', error);
+                console.error('Errore caricamento cantieri:', error);
+                this.cantieriList = [];
+            } finally {
+                this.loadingCantieri = false;
             }
         },
         
@@ -588,8 +718,8 @@ function giornaleSitoAppCompleto() {
                 delete payload.apparecchiature_input;
                 
                 const url = this.editingGiornale ?
-                    `/api/v1/giornale/giornali/${this.editingGiornale.id}` :
-                    '/api/v1/giornale/giornali';
+                    `/api/v1/giornale/sites/${this.siteId}/giornali/${this.editingGiornale.id}` :
+                    `/api/v1/giornale/sites/${this.siteId}/giornali`;
                 
                 const method = this.editingGiornale ? 'PUT' : 'POST';
                 
@@ -630,7 +760,7 @@ function giornaleSitoAppCompleto() {
             }
             
             try {
-                const response = await fetch(`/api/v1/giornale/giornali/${giornale.id}`, {
+                const response = await fetch(`/api/v1/giornale/sites/${this.siteId}/giornali/${giornale.id}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
@@ -691,7 +821,7 @@ function giornaleSitoAppCompleto() {
                 exportButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Export...';
                 exportButton.disabled = true;
 
-                const url = `/api/v1/giornale/giornali/${giornale.id}/word-export`;
+                const url = `/api/v1/giornale/sites/${this.siteId}/giornali/${giornale.id}/word-export`;
                 
                 // Esegui richiesta
                 const response = await fetch(url, {
@@ -910,6 +1040,29 @@ function giornaleSitoAppCompleto() {
         truncateText(text, length) {
             if (!text) return '';
             return text.length > length ? text.substring(0, length) + '...' : text;
+        },
+        
+        // Metodi per i cantieri
+        getCantiereStateBadge(stato) {
+            const badges = {
+                'pianificato': 'bg-gray-100 text-gray-800',
+                'in_corso': 'bg-blue-100 text-blue-800',
+                'completato': 'bg-green-100 text-green-800',
+                'annullato': 'bg-red-100 text-red-800',
+                'sospeso': 'bg-yellow-100 text-yellow-800'
+            };
+            return badges[stato] || 'bg-gray-100 text-gray-800';
+        },
+        
+        getCantiereStateIcon(stato) {
+            const icons = {
+                'pianificato': 'fas fa-calendar',
+                'in_corso': 'fas fa-play-circle',
+                'completato': 'fas fa-check-circle',
+                'annullato': 'fas fa-times-circle',
+                'sospeso': 'fas fa-pause-circle'
+            };
+            return icons[stato] || 'fas fa-circle';
         }
     }
 }

@@ -328,7 +328,7 @@ function giornaleReportsApp() {
         async loadReports() {
             this.loading = true;
             try {
-                const response = await fetch('/api/giornale-cantiere/reports', {
+                const response = await fetch('/api/v1/giornale/reports', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

@@ -271,9 +271,9 @@ function modalFunctions() {
     return {
         async saveGiornale() {
             try {
-                const url = this.editingGiornale 
-                    ? `/api/giornale-cantiere/${this.editingGiornale.id}`
-                    : '/api/giornale-cantiere/';
+                const url = this.editingGiornale
+                    ? `/api/v1/giornale/sites/${this.siteId}/giornali/${this.editingGiornale.id}`
+                    : `/api/v1/giornale/sites/${this.siteId}/giornali`;
                 
                 const method = this.editingGiornale ? 'PUT' : 'POST';
                 const data = this.editingGiornale ? this.form : { ...this.form, site_id: '{{ site.id }}' };

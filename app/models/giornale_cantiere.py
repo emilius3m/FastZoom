@@ -117,8 +117,9 @@ class GiornaleCantiere(Base):
     # Chiave primaria UUID
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     
-    # Riferimento al sito archeologico
+    # Riferimenti al sito archeologico e al cantiere specifico
     site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
+    cantiere_id = Column(UUID(as_uuid=True), ForeignKey("cantieri.id", ondelete="CASCADE"), nullable=True, index=True)
     
     # ===== INFORMAZIONI TEMPORALI =====
     data = Column(Date, nullable=False, index=True)
@@ -197,13 +198,16 @@ class GiornaleCantiere(Base):
     # Relazione con il sito archeologico
     site = relationship("ArchaeologicalSite", back_populates="giornali_cantiere")
     
+    # Relazione con il cantiere (se presente)
+    cantiere = relationship("Cantiere", back_populates="giornali_cantiere", foreign_keys=[cantiere_id])
+    
     # Relazione con l'utente responsabile
     responsabile = relationship("User", foreign_keys=[responsabile_id], back_populates="giornali_cantiere")
     
     # Relazione many-to-many con operatori
     operatori = relationship(
-        "OperatoreCantiere", 
-        secondary=giornale_operatori_association, 
+        "OperatoreCantiere",
+        secondary=giornale_operatori_association,
         back_populates="giornali"
     )
     

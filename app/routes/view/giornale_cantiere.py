@@ -1,4 +1,4 @@
-# app/routes/view/giornale_cantiere.py.old
+# app/routes/view/giornale_cantiere.py
 """
 View Routes HTML per il Giornale di Cantiere Archeologico
 Pagine web con template Jinja2 e Alpine.js per interfaccia utente
@@ -20,6 +20,7 @@ from app.database.db import get_async_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.models.sites import ArchaeologicalSite
 from app.models import User
+from app.models.user_profiles import UserProfile
 from app.models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere, CondizioniMeteoEnum
 from app.templates import templates
 from app.core.csrf_settings import _csrf_tokens_optional
@@ -344,54 +345,101 @@ async def operatori_management(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Pagina gestione operatori di cantiere
+    Pagina gestione operatori - Reindirizza alla home per selezionare un sito
     """
     try:
         # Ottieni informazioni utente
         user_result = await db.execute(select(User).where(User.id == current_user_id))
         user = user_result.scalar_one_or_none()
         
-        # Solo superuser o utenti con permessi di scrittura possono gestire operatori
-        has_write_permission = any(
-            site.get('permission_level') in ['write', 'admin'] for site in user_sites
-        ) or (user and user.is_superuser)
+        # Se l'utente ha accesso a un solo sito, reindirizza direttamente alla pagina operatori del sito
+        if len(user_sites) == 1:
+            site_id = user_sites[0]['id']
+            return templates.RedirectResponse(f"/giornale-cantiere/site/{site_id}/operatori", status_code=302)
         
-        if not has_write_permission:
+        # Altrimenti, reindirizza alla home per selezionare un sito
+        return templates.RedirectResponse("/giornale-cantiere", status_code=302)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore reindirizzamento operatori: {str(e)}")
+        return templates.RedirectResponse("/giornale-cantiere", status_code=302)
+    
+
+@router.get("/site/{site_id}/operatori", response_class=HTMLResponse)
+async def site_operatori_view(
+    site_id: UUID,
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Visualizza gli operatori specifici per un sito archeologico
+    URL RESTful: /giornale-cantiere/site/{site_id}/operatori
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = next(
+            (site for site in user_sites if site["id"] == str(site_id)),
+            None
+        )
+        
+        if not site_info:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Permessi insufficienti per gestire gli operatori"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Sito {site_id} non trovato o access denied"
             )
         
-        # Statistiche operatori
-        total_result = await db.execute(
-            select(func.count(OperatoreCantiere.id))
-        )
-        total_operatori = total_result.scalar() or 0
+        # Ottieni informazioni utente
+        user_result = await db.execute(select(User).where(User.id == current_user_id))
+        user = user_result.scalar_one_or_none()
         
-        active_result = await db.execute(
-            select(func.count(OperatoreCantiere.id)).where(OperatoreCantiere.is_active == True)
+        # Ottieni profilo utente
+        user_profile_result = await db.execute(
+            select(UserProfile).where(UserProfile.user_id == current_user_id)
         )
-        active_operatori = active_result.scalar() or 0
+        user_profile = user_profile_result.scalar_one_or_none()
         
-        # CSRF token
+        # CSRF opzionale
         csrf_token, signed_token, csrf_instance = _csrf_tokens_optional()
         
+        # Prepare context for template
         context = {
             "request": request,
-            "title": "Gestione Operatori | Sistema Archeologico",
-            "current_page": "giornale_cantiere",
-            "user": user,
+            "title": f"Gestione Operatori - {site_info['name']} | Sistema Archeologico",
+            "message": f"Operatori del sito: {site_info['name']}",
+            
+            # Site-specific context
+            "site_id": str(site_id),
+            "site": site_info,
+            "site_info": site_info,
+            "site_name": site_info["name"],
+            "site_code": site_info.get("code", ""),
+            "site_location": site_info.get("location", ""),
+            
+            # User context
+            "user_email": user.email if user else None,
+            "user_type": "superuser" if user and user.is_superuser else "user",
+            "current_user": user,
+            "user_profile": user_profile,
+            "csrf_token": csrf_token,
+            
+            # Navigation context
+            "current_page": "giornale-operatori",
+            "current_site_name": site_info["name"],
             "sites": user_sites,
-            "stats": {
-                "total_operatori": total_operatori,
-                "active_operatori": active_operatori,
-                "inactive_operatori": total_operatori - active_operatori
-            },
-            "csrf_token": csrf_token
+            "sites_count": len(user_sites),
+            
+            # Flag to indicate this is site-specific operator view
+            "is_site_specific": True
         }
         
+        logger.info(f"Site operatori view rendered: user_id={current_user_id}, site_id={site_id}, site_name={site_info['name']}")
         response = templates.TemplateResponse("pages/giornale_cantiere/operatori.html", context)
         
+        # Se CSRF disponibile, imposta cookie firmato
         if csrf_instance and signed_token:
             csrf_instance.set_csrf_cookie(signed_token, response)
         
@@ -400,10 +448,10 @@ async def operatori_management(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Errore pagina operatori: {str(e)}")
+        logger.error(f"Site operatori view error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel caricamento della gestione operatori"
+            detail="Errore interno visualizzazione operatori sito"
         )
 
 
