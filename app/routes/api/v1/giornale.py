@@ -64,6 +64,7 @@ async def v1_get_site_giornali(
     data_a: Optional[date] = Query(None),
     responsabile: Optional[str] = Query(None),
     stato: Optional[str] = Query(None),
+    cantiere_id: Optional[UUID] = Query(None),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -79,6 +80,7 @@ async def v1_get_site_giornali(
         data_a: Filtra giornali fino a questa data
         responsabile: Filtra per nome responsabile
         stato: Filtra per stato (validato/in_attesa)
+        cantiere_id: Filtra per cantiere specifico
     """
     try:
         # Verifica accesso al sito
@@ -86,6 +88,10 @@ async def v1_get_site_giornali(
 
         # Query base
         query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == site_id)
+        
+        # Filtra per cantiere specifico se specificato
+        if cantiere_id:
+            query = query.where(GiornaleCantiere.cantiere_id == cantiere_id)
 
         # Applica filtri
         if data_da:
@@ -177,7 +183,8 @@ async def v1_get_site_giornali(
                 "data_da": data_da.isoformat() if data_da else None,
                 "data_a": data_a.isoformat() if data_a else None,
                 "responsabile": responsabile,
-                "stato": stato
+                "stato": stato,
+                "cantiere_id": str(cantiere_id) if cantiere_id else None
             }
         }
         
@@ -187,6 +194,148 @@ async def v1_get_site_giornali(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nel recupero dei giornali",
+        )
+ 
+@router.get("/sites/{site_id}/cantieri/{cantiere_id}/giornali", summary="Lista giornali cantiere", tags=["Giornale di Cantiere"])
+async def v1_get_cantiere_giornali(
+    site_id: UUID,
+    cantiere_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    data_da: Optional[date] = Query(None),
+    data_a: Optional[date] = Query(None),
+    responsabile: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Recupera tutti i giornali di un cantiere specifico con filtri avanzati.
+    
+    Args:
+        site_id: ID del sito archeologico
+        cantiere_id: ID del cantiere specifico
+        skip: Numero di record da saltare (paginazione)
+        limit: Numero massimo di record da restituire
+        data_da: Filtra giornali da questa data
+        data_a: Filtra giornali fino a questa data
+        responsabile: Filtra per nome responsabile
+        stato: Filtra per stato (validato/in_attesa)
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+
+        # Query base per il cantiere specifico
+        query = select(GiornaleCantiere).where(
+            and_(
+                GiornaleCantiere.site_id == site_id,
+                GiornaleCantiere.cantiere_id == cantiere_id
+            )
+        )
+
+        # Applica filtri
+        if data_da:
+            query = query.where(GiornaleCantiere.data >= data_da)
+        if data_a:
+            query = query.where(GiornaleCantiere.data <= data_a)
+        if responsabile:
+            query = query.where(
+                GiornaleCantiere.responsabile_nome.ilike(f"%{responsabile}%")
+            )
+        if stato:
+            if stato == "validato":
+                query = query.where(GiornaleCantiere.validato.is_(True))
+            elif stato == "in_attesa":
+                query = query.where(GiornaleCantiere.validato.is_(False))
+
+        # Load relationships
+        query = query.options(
+            selectinload(GiornaleCantiere.site),
+            selectinload(GiornaleCantiere.responsabile),
+            selectinload(GiornaleCantiere.operatori),
+        )
+        
+        # Ordinamento e paginazione
+        query = query.order_by(
+            desc(GiornaleCantiere.data), desc(GiornaleCantiere.created_at)
+        )
+        query = query.offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        giornali = result.scalars().all()
+
+        # Prepara dati di risposta
+        giornali_data = []
+        for g in giornali:
+            # Gestione cantiere senza relazione diretta
+            cantiere_info = None
+            if g.cantiere_id:
+                # Query separata per ottenere informazioni del cantiere se necessario
+                from app.models.cantiere import Cantiere
+                cantiere_result = await db.execute(
+                    select(Cantiere).where(Cantiere.id == g.cantiere_id)
+                )
+                cantiere = cantiere_result.scalar_one_or_none()
+                if cantiere:
+                    cantiere_info = {
+                        "id": str(cantiere.id),
+                        "nome": cantiere.nome,
+                        "codice": cantiere.codice
+                    }
+             
+            giornale_dict = {
+                "id": str(g.id),
+                "data": g.data.isoformat() if g.data else None,
+                "ora_inizio": g.ora_inizio.strftime("%H:%M") if g.ora_inizio else None,
+                "ora_fine": g.ora_fine.strftime("%H:%M") if g.ora_fine else None,
+                "responsabile_scavo": g.responsabile_nome
+                or (g.responsabile.email if g.responsabile else None),
+                "descrizione_lavori": g.descrizione_lavori,
+                "condizioni_meteo": g.condizioni_meteo,
+                "stato": "validato" if g.validato else "in_attesa",
+                "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
+                "cantiere_id": str(g.cantiere_id) if g.cantiere_id else None,
+                "cantiere": cantiere_info,
+                "operatori_presenti": [
+                    {
+                        "id": str(op.id),
+                        "nome": op.nome,
+                        "cognome": op.cognome,
+                        "ruolo": op.ruolo,
+                    }
+                    for op in (g.operatori or [])
+                ],
+                "note_generali": g.note_generali,
+                "problematiche": g.problematiche,
+                "compilatore": g.compilatore or g.responsabile_nome,
+                "created_at": g.created_at.isoformat() if g.created_at else None,
+                "updated_at": g.updated_at.isoformat() if g.updated_at else None,
+                "version": g.version or 1,
+            }
+            giornali_data.append(giornale_dict)
+
+        return {
+            "site_id": str(site_id),
+            "cantiere_id": str(cantiere_id),
+            "giornali": giornali_data,
+            "count": len(giornali_data),
+            "site_info": site_info,
+            "filters_applied": {
+                "data_da": data_da.isoformat() if data_da else None,
+                "data_a": data_a.isoformat() if data_a else None,
+                "responsabile": responsabile,
+                "stato": stato
+            }
+        }
+        
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Errore recupero giornali cantiere {cantiere_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel recupero dei giornali del cantiere",
         )
 
 @router.post("/sites/{site_id}/giornali", summary="Crea nuovo giornale", tags=["Giornale di Cantiere"])

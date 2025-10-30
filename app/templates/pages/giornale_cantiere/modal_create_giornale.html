@@ -1,6 +1,6 @@
 <!-- app/templates/pages/giornale_cantiere/modal_create_giornale.html -->
-<!-- Modal Creazione/Modifica Giornale di Cantiere -->
-<div x-show="showCreateModal" x-cloak 
+<!-- Modal Creazione/Modifica Giornale di Cantiere e Modifica Cantiere -->
+<div x-show="showCreateModal" x-cloak
      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
      @click.self="closeModal()">
     
@@ -8,7 +8,7 @@
         
         <!-- Header Modal -->
         <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center z-10">
-            <h3 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="editingGiornale ? 'Modifica Giornale' : 'Nuovo Giornale di Cantiere'"></h3>
+            <h3 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="getModalTitle()"></h3>
             <button @click="closeModal()" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
                 <i class="fas fa-times text-xl"></i>
             </button>
@@ -16,7 +16,7 @@
         
         <!-- Form Content -->
         <div class="max-h-80vh overflow-y-auto">
-            <form @submit.prevent="saveGiornale()" class="p-6">
+            <form @submit.prevent="saveData()" class="p-6">
                 
                 <!-- Alert Errori -->
                 <div x-show="errorMessage" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 mb-6">
@@ -26,8 +26,123 @@
                     </div>
                 </div>
                 
-                <!-- Informazioni Base -->
-                <div class="mb-8">
+                <!-- CANTIERE EDIT MODE -->
+                <div x-show="modalMode === 'edit-cantiere'" class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-hard-hat mr-2 text-blue-600"></i>
+                        Informazioni Cantiere
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Nome -->
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Nome Cantiere <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text"
+                                   x-model="formData.nome"
+                                   required
+                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+
+                        <!-- Codice -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Codice</label>
+                            <input type="text"
+                                   x-model="formData.codice"
+                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+
+                        <!-- Stato -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stato</label>
+                            <select x-model="formData.stato"
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="pianificato">Pianificato</option>
+                                <option value="in_corso">In Corso</option>
+                                <option value="sospeso">Sospeso</option>
+                                <option value="completato">Completato</option>
+                                <option value="annullato">Annullato</option>
+                            </select>
+                        </div>
+
+                        <!-- Responsabile -->
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Responsabile</label>
+                            <input type="text"
+                                   x-model="formData.responsabile_cantiere"
+                                   placeholder="Nome del responsabile"
+                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+
+                        <!-- Date -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Inizio Prevista</label>
+                            <input type="date"
+                                   x-model="formData.data_inizio_prevista"
+                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Fine Prevista</label>
+                            <input type="date"
+                                   x-model="formData.data_fine_prevista"
+                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+
+                        <!-- Tipologia Intervento -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipologia Intervento</label>
+                            <select x-model="formData.tipologia_intervento"
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="">Seleziona tipologia</option>
+                                <option value="scavo">Scavo Archeologico</option>
+                                <option value="prospezione">Prospezione Geofisica</option>
+                                <option value="ricerca">Ricerca di Superficie</option>
+                                <option value="documentazione">Documentazione</option>
+                                <option value="conservazione">Conservazione e Restauro</option>
+                                <option value="monitoraggio">Monitoraggio</option>
+                                <option value="altro">Altro</option>
+                            </select>
+                        </div>
+
+                        <!-- Priorità -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Priorità</label>
+                            <select x-model="formData.priorita"
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                <option value="1">Alta</option>
+                                <option value="2">Media-Alta</option>
+                                <option value="3">Media</option>
+                                <option value="4">Bassa</option>
+                                <option value="5">Molto Bassa</option>
+                            </select>
+                        </div>
+
+                        <!-- Area Descrizione -->
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Area Descrizione</label>
+                            <input type="text"
+                                   x-model="formData.area_descrizione"
+                                   placeholder="Descrizione dell'area specifica"
+                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+
+                        <!-- Descrizione -->
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
+                            <textarea x-model="formData.descrizione"
+                                      rows="4"
+                                      placeholder="Descrizione dettagliata del cantiere..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GIORNALE MODE -->
+                <div x-show="modalMode === 'giornale'">
+                    <!-- Informazioni Base -->
+                    <div class="mb-8">
                     <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
                         <i class="fas fa-calendar mr-2 text-orange-600"></i>
                         Informazioni Base
@@ -250,7 +365,7 @@
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Apparecchiature Utilizzate</label>
-                        <textarea x-model="formData.apparecchiature_input" 
+                        <textarea x-model="formData.apparecchiature_input"
                                   rows="3"
                                   placeholder="Es: Piccone, Cazzuola, Pennellino, Metal detector (separate da virgole o a capo)"
                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
@@ -259,18 +374,18 @@
                 
                 <!-- Actions -->
                 <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <button type="button" 
+                    <button type="button"
                             @click="closeModal()"
                             :disabled="saving"
                             class="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
                         Annulla
                     </button>
                     
-                    <button type="submit" 
+                    <button type="submit"
                             :disabled="saving"
                             class="px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 flex items-center">
                         <i x-show="saving" class="fas fa-spinner fa-spin mr-2"></i>
-                        <span x-text="saving ? 'Salvataggio...' : (editingGiornale ? 'Salva Modifiche' : 'Crea Giornale')"></span>
+                        <span x-text="saving ? 'Salvataggio...' : getSaveButtonText()"></span>
                     </button>
                 </div>
                 

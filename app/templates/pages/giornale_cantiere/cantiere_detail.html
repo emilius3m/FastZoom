@@ -473,6 +473,7 @@ function cantiereDetailApp() {
         editingGiornale: false,
         saving: false,
         errorMessage: '',
+        modalMode: 'giornale', // 'giornale' or 'edit-cantiere'
         
         // Form data for the complete modal
         formData: {
@@ -520,15 +521,35 @@ function cantiereDetailApp() {
             console.log('Cantiere detail initialized');
         },
 
+        // Helper methods for modal title and button text
+        getModalTitle() {
+            if (this.modalMode === 'edit-cantiere') {
+                return 'Modifica Cantiere';
+            } else {
+                return this.editingGiornale ? 'Modifica Giornale' : 'Nuovo Giornale di Cantiere';
+            }
+        },
+
+        getSaveButtonText() {
+            if (this.modalMode === 'edit-cantiere') {
+                return 'Salva Modifiche Cantiere';
+            } else {
+                return this.editingGiornale ? 'Salva Modifiche' : 'Crea Giornale';
+            }
+        },
+
         // Modal methods
         openGiornaleModal() {
+            this.modalMode = 'giornale';
             this.showCreateModal = true;
             this.editingGiornale = false;
             this.resetForm();
         },
 
         openEditModal() {
-            this.showAlert('info', 'Funzionalità modifica in fase di sviluppo');
+            this.modalMode = 'edit-cantiere';
+            this.showCreateModal = true;
+            this.loadCantiereData();
         },
 
         closeModal() {
@@ -537,23 +558,123 @@ function cantiereDetailApp() {
         },
 
         resetForm() {
-            this.formData = {
-                data: new Date().toISOString().split('T')[0],
-                ora_inizio: '',
-                ora_fine: '',
-                cantiere_id: '{{ cantiere.id }}',
-                responsabile_nome: '',
-                compilatore: '',
-                condizioni_meteo: '',
-                temperatura_min: null,
-                temperatura_max: null,
-                descrizione_lavori: '',
-                note_generali: '',
-                problematiche: '',
-                us_elaborate_input: '',
-                apparecchiature_input: '',
-                operatori_ids: []
-            };
+            if (this.modalMode === 'edit-cantiere') {
+                // Reset for cantiere editing
+                this.formData = {
+                    nome: '',
+                    codice: '',
+                    stato: 'pianificato',
+                    responsabile_cantiere: '',
+                    data_inizio_prevista: '',
+                    data_fine_prevista: '',
+                    descrizione: '',
+                    area_descrizione: '',
+                    tipologia_intervento: '',
+                    priorita: 3
+                };
+            } else {
+                // Reset for giornale
+                this.formData = {
+                    data: new Date().toISOString().split('T')[0],
+                    ora_inizio: '',
+                    ora_fine: '',
+                    cantiere_id: '{{ cantiere.id }}',
+                    responsabile_nome: '',
+                    compilatore: '',
+                    condizioni_meteo: '',
+                    temperatura_min: null,
+                    temperatura_max: null,
+                    descrizione_lavori: '',
+                    note_generali: '',
+                    problematiche: '',
+                    us_elaborate_input: '',
+                    apparecchiature_input: '',
+                    operatori_ids: []
+                };
+            }
+        },
+
+        async loadCantiereData() {
+            try {
+                const response = await fetch(`/api/v1/cantieri/cantieri/{{ cantiere.id }}`);
+                
+                if (!response.ok) {
+                    throw new Error('Errore nel caricamento dei dati del cantiere');
+                }
+                
+                const cantiereData = await response.json();
+                
+                // Load cantiere data into form
+                this.formData = {
+                    nome: cantiereData.nome || '',
+                    codice: cantiereData.codice || '',
+                    stato: cantiereData.stato || 'pianificato',
+                    responsabile_cantiere: cantiereData.responsabile_cantiere || '',
+                    data_inizio_prevista: cantiereData.data_inizio_prevista || '',
+                    data_fine_prevista: cantiereData.data_fine_prevista || '',
+                    descrizione: cantiereData.descrizione || '',
+                    area_descrizione: cantiereData.area_descrizione || '',
+                    tipologia_intervento: cantiereData.tipologia_intervento || '',
+                    priorita: cantiereData.priorita || 3
+                };
+                
+            } catch (error) {
+                this.showAlert('error', error.message || 'Errore nel caricamento dei dati del cantiere');
+                console.error('Error loading cantiere data:', error);
+            }
+        },
+
+        async saveData() {
+            if (this.modalMode === 'edit-cantiere') {
+                await this.saveCantiere();
+            } else {
+                await this.saveGiornale();
+            }
+        },
+
+        async saveCantiere() {
+            if (!this.formData.nome?.trim()) {
+                this.errorMessage = 'Il nome del cantiere è obbligatorio';
+                return;
+            }
+
+            if (this.formData.data_inizio_prevista && this.formData.data_fine_prevista) {
+                if (new Date(this.formData.data_inizio_prevista) > new Date(this.formData.data_fine_prevista)) {
+                    this.errorMessage = 'La data di fine deve essere successiva alla data di inizio';
+                    return;
+                }
+            }
+
+            this.saving = true;
+            this.errorMessage = '';
+
+            try {
+                const response = await fetch(`/api/v1/cantieri/cantieri/{{ cantiere.id }}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(this.formData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Errore durante il salvataggio del cantiere');
+                }
+
+                const result = await response.json();
+                
+                this.showAlert('success', 'Cantiere aggiornato con successo');
+                this.closeModal();
+
+                // Ricarica pagina per mostrare le modifiche
+                setTimeout(() => location.reload(), 1500);
+            } catch (error) {
+                this.errorMessage = error.message || 'Errore durante il salvataggio del cantiere';
+                console.error('Error saving cantiere:', error);
+            } finally {
+                this.saving = false;
+            }
         },
 
         async saveGiornale() {
@@ -656,7 +777,7 @@ function giornaliListApp() {
             this.error = '';
             
             try {
-                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}`);
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/giornali`);
                 
                 if (!response.ok) {
                     throw new Error('Errore nel caricamento dei giornali');
