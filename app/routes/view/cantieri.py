@@ -123,6 +123,31 @@ async def v1_cantieri_sito_view(
             {"value": 5, "label": "Molto Bassa", "color": "gray"}
         ]
         
+        # Serialize cantieri data for Alpine.js
+        cantieri_data = []
+        for cantiere in cantieri:
+            cantieri_data.append({
+                "id": str(cantiere.id),
+                "nome": cantiere.nome,
+                "codice": cantiere.codice,
+                "descrizione": cantiere.descrizione,
+                "stato": cantiere.stato,
+                "stato_formattato": cantiere.stato_formattato,
+                "priorita": cantiere.priorita,
+                "data_inizio_prevista": cantiere.data_inizio_prevista.isoformat() if cantiere.data_inizio_prevista else None,
+                "data_fine_prevista": cantiere.data_fine_prevista.isoformat() if cantiere.data_fine_prevista else None,
+                "data_inizio_effettiva": cantiere.data_inizio_effettiva.isoformat() if cantiere.data_inizio_effettiva else None,
+                "data_fine_effettiva": cantiere.data_fine_effettiva.isoformat() if cantiere.data_fine_effettiva else None,
+                "area_descrizione": cantiere.area_descrizione,
+                "responsabile_cantiere": cantiere.responsabile_cantiere,
+                "tipologia_intervento": cantiere.tipologia_intervento,
+                "e_in_corso": cantiere.e_in_corso,
+                "durata_giorni": cantiere.durata_giorni,
+                "created_at": cantiere.created_at.isoformat() if cantiere.created_at else None,
+                "updated_at": cantiere.updated_at.isoformat() if cantiere.updated_at else None,
+                "quota": cantiere.quota
+            })
+
         return templates.TemplateResponse(
             "pages/giornale_cantiere/cantieri.html",
             {
@@ -130,7 +155,7 @@ async def v1_cantieri_sito_view(
                 "site_id": str(site_id),
                 "site": site_info,  # Template expects 'site', not 'site_info'
                 "site_info": site_info,
-                "cantieri": cantieri,
+                "cantieri": cantieri_data,  # Pass serialized data
                 "total_cantieri": total_cantieri,
                 "stati": stati,
                 "stati_options": stati_options,

@@ -42,6 +42,87 @@ from datetime import date
 from sqlalchemy import select, func, and_, or_, desc, distinct
 from sqlalchemy.orm import selectinload
 
+@router.get("/sites/{site_id}", summary="Lista cantieri sito", tags=["Cantieri"])
+async def v1_get_cantieri_sito_direct(
+    site_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Recupera tutti i cantieri di un sito archeologico.
+    Endpoint principale per compatibilità con frontend.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Query base
+        query = select(Cantiere).where(
+            and_(Cantiere.site_id == site_id, Cantiere.is_active == True)
+        )
+        
+        # Applica filtri
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    Cantiere.nome.ilike(search_pattern),
+                    Cantiere.codice.ilike(search_pattern),
+                    Cantiere.descrizione.ilike(search_pattern)
+                )
+            )
+        if stato:
+            query = query.where(Cantiere.stato == stato)
+        
+        # Ordinamento e paginazione
+        query = query.order_by(
+            Cantiere.priorita.asc(), Cantiere.created_at.desc()
+        )
+        query = query.offset(skip).limit(limit)
+        
+        result = await db.execute(query)
+        cantieri = result.scalars().all()
+        
+        # Prepara dati di risposta
+        cantieri_data = []
+        for cantiere in cantieri:
+            # Conteggio giornali per ogni cantiere
+            giornali_count_result = await db.execute(
+                select(func.count(GiornaleCantiere.id)).where(
+                    GiornaleCantiere.cantiere_id == cantiere.id
+                )
+            )
+            giornali_count = giornali_count_result.scalar() or 0
+            
+            cantieri_data.append({
+                "id": str(cantiere.id),
+                "nome": cantiere.nome,
+                "codice": cantiere.codice,
+                "stato": cantiere.stato,
+                "giornali_count": giornali_count,
+                "site_info": site_info
+            })
+        
+        return {
+            "site_id": str(site_id),
+            "cantieri": cantieri_data,
+            "count": len(cantieri_data),
+            "site_info": site_info
+        }
+        
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Errore recupero cantieri sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel recupero dei cantieri"
+        )
+
 @router.get("/sites/{site_id}/cantieri", summary="Lista cantieri sito", tags=["Cantieri"])
 async def v1_get_cantieri_sito(
     site_id: UUID,
@@ -105,15 +186,17 @@ async def v1_get_cantieri_sito(
             )
             giornali_count = giornali_count_result.scalar() or 0
             
-            # Conteggio operatori che hanno lavorato su questo cantiere
+            # Conteggio operatori che hanno lavorato su questo cantiere (SQLite compatible)
+            operatori_subquery = (
+                select(giornale_operatori_association.c.operatore_id)
+                .join(GiornaleCantiere, GiornaleCantiere.id == giornale_operatori_association.c.giornale_id)
+                .where(GiornaleCantiere.cantiere_id == cantiere.id)
+                .distinct()
+            )
+            
             operatori_count_result = await db.execute(
-                select(func.count(distinct(giornale_operatori_association.c.operatore_id))
-                .join(GiornaleCantiere, GiornaleCantiere.cantiere_id == cantiere.id)
-                .join(
-                    giornale_operatori_association, 
-                    GiornaleCantiere.id == giornale_operatori_association.c.giornale_id
-                )
-            ))
+                select(func.count()).select_from(operatori_subquery.subquery())
+            )
             operatori_count = operatori_count_result.scalar() or 0
             
             cantieri_data.append({
@@ -518,9 +601,9 @@ async def v1_get_site_cantieri_stats(
         for stato, count in stati:
             stats[stato] = count
         
-        # Get cantieri with giornali
-        cantieri_con_giornali_result = await db.execute(
-            select(func.count(distinct(GiornaleCantiere.cantiere_id)))
+        # Get cantieri with giornali (SQLite compatible)
+        cantieri_con_giornali_subquery = (
+            select(GiornaleCantiere.cantiere_id)
             .where(
                 and_(
                     GiornaleCantiere.site_id == site_id,
@@ -534,6 +617,11 @@ async def v1_get_site_cantieri_stats(
                     )
                 )
             )
+            .distinct()
+        )
+        
+        cantieri_con_giornali_result = await db.execute(
+            select(func.count()).select_from(cantieri_con_giornali_subquery.subquery())
         )
         cantieri_con_giornali = cantieri_con_giornali_result.scalar() or 0
         
