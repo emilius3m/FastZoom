@@ -311,41 +311,86 @@
                 </div>
 
                 <!-- Lista Giornali -->
-                <div class="space-y-4">
-                    {% if ultimo_giornale %}
-                    <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6">
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <div class="flex items-center mb-2">
-                                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                                        {{ ultimo_giornale.data[:10] if ultimo_giornale.data is string else ultimo_giornale.data }}
-                                    </span>
-                                    {% if ultimo_giornale.condizioni_meteo %}
-                                    <span class="ml-3 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded dark:bg-blue-900 dark:text-blue-300">
-                                        <i class="fas fa-cloud-sun mr-1"></i>{{ ultimo_giornale.condizioni_meteo }}
-                                    </span>
-                                    {% endif %}
+                <div class="space-y-4" x-data="giornaliListApp()">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Elenco Completo Giornali</h3>
+                        <button
+                            @click="loadGiornali()"
+                            type="button"
+                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 text-sm">
+                            <i class="fas fa-sync-alt mr-2"></i>Aggiorna
+                        </button>
+                    </div>
+                    
+                    <!-- Loading state -->
+                    <div x-show="loading" class="text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
+                        <p class="text-gray-500 dark:text-gray-400 mt-2">Caricamento giornali...</p>
+                    </div>
+                    
+                    <!-- Error state -->
+                    <div x-show="error" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 mb-4">
+                        <div class="flex">
+                            <i class="fas fa-exclamation-triangle text-red-400 dark:text-red-400 mr-3 mt-1"></i>
+                            <div class="text-red-700 dark:text-red-400" x-text="error"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Giornali list -->
+                    <div x-show="!loading && !error">
+                        <template x-for="giornale in giornali" :key="giornale.id">
+                            <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6 mb-4">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center mb-2">
+                                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                                <span x-text="giornale.data"></span>
+                                            </span>
+                                            <span x-show="giornale.condizioni_meteo" class="ml-3 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded dark:bg-blue-900 dark:text-blue-300">
+                                                <i class="fas fa-cloud-sun mr-1"></i>
+                                                <span x-text="giornale.condizioni_meteo"></span>
+                                            </span>
+                                        </div>
+                                        <p class="text-gray-700 dark:text-gray-300 mb-2" x-text="giornale.descrizione_lavori || 'Nessuna descrizione'"></p>
+                                        <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                                            <span x-show="giornale.responsabile_scavo">
+                                                <i class="fas fa-user mr-1"></i>
+                                                <span x-text="giornale.responsabile_scavo"></span>
+                                            </span>
+                                            <span x-show="giornale.compilatore" class="ml-3">
+                                                <i class="fas fa-edit mr-1"></i>
+                                                <span x-text="giornale.compilatore"></span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" class="text-blue-600 hover:text-blue-800 dark:text-blue-400" @click="viewGiornale(giornale)">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button type="button" class="text-green-600 hover:text-green-800 dark:text-green-400" @click="editGiornale(giornale)">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button" class="text-red-600 hover:text-red-800 dark:text-red-400" @click="deleteGiornale(giornale)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                                <p class="text-gray-700 dark:text-gray-300">Ultimo giornale registrato</p>
                             </div>
-                            <button type="button" class="text-blue-600 hover:text-blue-800 dark:text-blue-400">
-                                <i class="fas fa-arrow-right"></i>
+                        </template>
+                        
+                        <!-- Empty state -->
+                        <div x-show="!loading && !error && giornali.length === 0" class="text-center py-12 bg-white dark:bg-gray-700 rounded-lg">
+                            <i class="fas fa-book text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
+                            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Nessun giornale registrato</h3>
+                            <p class="text-gray-500 dark:text-gray-400 mb-4">Inizia documentando le attività del cantiere</p>
+                            <button
+                                @click="openGiornaleModal()"
+                                type="button"
+                                class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
+                                <i class="fas fa-plus mr-2"></i>Crea Primo Giornale
                             </button>
                         </div>
                     </div>
-                    {% else %}
-                    <div class="text-center py-12 bg-white dark:bg-gray-700 rounded-lg">
-                        <i class="fas fa-book text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
-                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Nessun giornale registrato</h3>
-                        <p class="text-gray-500 dark:text-gray-400 mb-4">Inizia documentando le attività del cantiere</p>
-                        <button 
-                            @click="openGiornaleModal()"
-                            type="button" 
-                            class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
-                            <i class="fas fa-plus mr-2"></i>Crea Primo Giornale
-                        </button>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
 
@@ -415,127 +460,53 @@
         </div>
     </div>
 
-    <!-- Modal Giornale Flowbite -->
-    <div 
-        x-show="modal.isOpen"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        tabindex="-1"
-        aria-hidden="true"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-gray-900 bg-opacity-50"
-        @click.self="closeModal()">
-
-        <div 
-            x-show="modal.isOpen"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-            class="relative w-full max-w-2xl max-h-full p-4">
-
-            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
-                <!-- Modal header -->
-                <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
-                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="modal.title"></h3>
-                    <button 
-                        @click="closeModal()"
-                        type="button" 
-                        class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
-                        <i class="fas fa-times"></i>
-                        <span class="sr-only">Chiudi</span>
-                    </button>
-                </div>
-
-                <!-- Modal body -->
-                <form @submit.prevent="submitModal()" class="p-4 md:p-5">
-                    <div class="grid gap-4 mb-4 grid-cols-2">
-                        <div class="col-span-2">
-                            <label for="data" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Data <span class="text-red-500">*</span></label>
-                            <input 
-                                type="date" 
-                                id="data"
-                                x-model="modal.formData.data"
-                                required
-                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
-                        </div>
-
-                        <div class="col-span-2">
-                            <label for="descrizione" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Descrizione Lavori</label>
-                            <textarea 
-                                id="descrizione"
-                                x-model="modal.formData.descrizione"
-                                rows="4"
-                                class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-600 focus:border-blue-600 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                placeholder="Descrivi le attività svolte..."></textarea>
-                        </div>
-
-                        <div class="col-span-2 sm:col-span-1">
-                            <label for="condizioni_meteo" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Meteo</label>
-                            <select 
-                                id="condizioni_meteo"
-                                x-model="modal.formData.condizioni_meteo"
-                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
-                                <option value="">Seleziona</option>
-                                <option value="Sereno">Sereno</option>
-                                <option value="Nuvoloso">Nuvoloso</option>
-                                <option value="Pioggia">Pioggia</option>
-                                <option value="Neve">Neve</option>
-                            </select>
-                        </div>
-
-                        <div class="col-span-2 sm:col-span-1">
-                            <label for="temperatura" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Temperatura (°C)</label>
-                            <input 
-                                type="number" 
-                                id="temperatura"
-                                x-model="modal.formData.temperatura"
-                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                placeholder="20">
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-end gap-3">
-                        <button 
-                            @click="closeModal()"
-                            type="button"
-                            class="py-2.5 px-5 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">
-                            Annulla
-                        </button>
-                        <button 
-                            type="submit"
-                            :disabled="modal.loading"
-                            class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <span x-show="!modal.loading">
-                                <i class="fas fa-save mr-2"></i>Salva
-                            </span>
-                            <span x-show="modal.loading">
-                                <i class="fas fa-spinner fa-spin mr-2"></i>Salvataggio...
-                            </span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    <!-- Include the complete modal for giornale creation -->
+    {% include "pages/giornale_cantiere/modal_create_giornale.html" %}
 
 </div>
 
 <script>
 function cantiereDetailApp() {
     return {
-        // Modal state
-        modal: {
-            isOpen: false,
-            title: '',
-            loading: false,
-            formData: {}
+        // Modal state for the complete modal
+        showCreateModal: false,
+        editingGiornale: false,
+        saving: false,
+        errorMessage: '',
+        
+        // Form data for the complete modal
+        formData: {
+            data: new Date().toISOString().split('T')[0],
+            ora_inizio: '',
+            ora_fine: '',
+            cantiere_id: '{{ cantiere.id }}',
+            responsabile_nome: '',
+            compilatore: '',
+            condizioni_meteo: '',
+            temperatura_min: null,
+            temperatura_max: null,
+            descrizione_lavori: '',
+            note_generali: '',
+            problematiche: '',
+            us_elaborate_input: '',
+            apparecchiature_input: '',
+            operatori_ids: []
         },
+
+        // Available options (these would normally be loaded from API)
+        condizioni_meteo: [
+            { value: 'Sereno', label: 'Sereno' },
+            { value: 'Nuvoloso', label: 'Nuvoloso' },
+            { value: 'Pioggia', label: 'Pioggia' },
+            { value: 'Neve', label: 'Neve' },
+            { value: 'Foglia', label: 'Foglia' }
+        ],
+        
+        cantieri_disponibili: [
+            { id: '{{ cantiere.id }}', nome: '{{ cantiere.nome }}', codice: '{{ cantiere.codice }}' }
+        ],
+        
+        operatori_disponibili: [],
 
         // Alert state
         alert: {
@@ -551,17 +522,9 @@ function cantiereDetailApp() {
 
         // Modal methods
         openGiornaleModal() {
-            this.modal = {
-                isOpen: true,
-                title: 'Nuovo Giornale di Cantiere',
-                loading: false,
-                formData: {
-                    data: new Date().toISOString().split('T')[0],
-                    descrizione: '',
-                    condizioni_meteo: '',
-                    temperatura: null
-                }
-            };
+            this.showCreateModal = true;
+            this.editingGiornale = false;
+            this.resetForm();
         },
 
         openEditModal() {
@@ -569,26 +532,78 @@ function cantiereDetailApp() {
         },
 
         closeModal() {
-            this.modal.isOpen = false;
+            this.showCreateModal = false;
+            this.errorMessage = '';
         },
 
-        async submitModal() {
-            if (!this.modal.formData.data) {
-                this.showAlert('error', 'La data è obbligatoria');
+        resetForm() {
+            this.formData = {
+                data: new Date().toISOString().split('T')[0],
+                ora_inizio: '',
+                ora_fine: '',
+                cantiere_id: '{{ cantiere.id }}',
+                responsabile_nome: '',
+                compilatore: '',
+                condizioni_meteo: '',
+                temperatura_min: null,
+                temperatura_max: null,
+                descrizione_lavori: '',
+                note_generali: '',
+                problematiche: '',
+                us_elaborate_input: '',
+                apparecchiature_input: '',
+                operatori_ids: []
+            };
+        },
+
+        async saveGiornale() {
+            if (!this.formData.data) {
+                this.errorMessage = 'La data è obbligatoria';
                 return;
             }
 
-            this.modal.loading = true;
+            this.saving = true;
+            this.errorMessage = '';
 
-            // Simula chiamata API
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+                // Prepara i dati per l'API, gestendo campi vuoti
+                const apiData = {
+                    ...this.formData,
+                    // Solo invia i campi orario se non sono vuoti
+                    ora_inizio: this.formData.ora_inizio || null,
+                    ora_fine: this.formData.ora_fine || null,
+                    // Gestisci temperature
+                    temperatura_min: this.formData.temperatura_min || null,
+                    temperatura_max: this.formData.temperatura_max || null
+                };
 
-            this.showAlert('success', 'Giornale salvato con successo');
-            this.modal.loading = false;
-            this.closeModal();
+                // Chiama API reale per salvare il giornale
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(apiData)
+                });
 
-            // Ricarica pagina (in produzione fai refresh dati)
-            setTimeout(() => location.reload(), 1500);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Errore nel salvataggio del giornale');
+                }
+
+                const result = await response.json();
+                
+                this.showAlert('success', 'Giornale creato con successo');
+                this.closeModal();
+
+                // Ricarica pagina per mostrare il nuovo giornale
+                setTimeout(() => location.reload(), 1500);
+            } catch (error) {
+                this.errorMessage = error.message || 'Errore durante il salvataggio del giornale';
+                console.error('Error saving giornale:', error);
+            } finally {
+                this.saving = false;
+            }
         },
 
         // Delete
@@ -609,6 +624,174 @@ function cantiereDetailApp() {
             setTimeout(() => {
                 this.alert.show = false;
             }, 5000);
+        }
+    }
+}
+
+// Second Alpine.js component for giornali list
+function giornaliListApp() {
+    return {
+        loading: false,
+        error: '',
+        giornali: [],
+        
+        // Modal states
+        showViewModal: false,
+        showEditModal: false,
+        viewingGiornale: null,
+        editingGiornale: null,
+        viewFormData: {},
+        editFormData: {},
+        editSaving: false,
+        editErrorMessage: '',
+        
+        // Init
+        init() {
+            this.loadGiornali();
+        },
+        
+        // Load giornali from API
+        async loadGiornali() {
+            this.loading = true;
+            this.error = '';
+            
+            try {
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}`);
+                
+                if (!response.ok) {
+                    throw new Error('Errore nel caricamento dei giornali');
+                }
+                
+                const data = await response.json();
+                this.giornali = data.giornali || [];
+            } catch (error) {
+                this.error = error.message || 'Errore nel caricamento dei giornali';
+                console.error('Error loading giornali:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        // View giornale details
+        viewGiornale(giornale) {
+            // Open modal to view giornale details
+            this.openViewModal(giornale);
+        },
+        
+        // Edit giornale
+        editGiornale(giornale) {
+            // Open modal to edit giornale
+            this.openEditModal(giornale);
+        },
+        
+        // Open view modal
+        openViewModal(giornale) {
+            this.viewingGiornale = giornale;
+            this.viewFormData = {
+                data: giornale.data,
+                ora_inizio: giornale.ora_inizio,
+                ora_fine: giornale.ora_fine,
+                descrizione_lavori: giornale.descrizione_lavori,
+                condizioni_meteo: giornale.condizioni_meteo,
+                note_generali: giornale.note_generali || '',
+                problematiche: giornale.problematiche || '',
+                compilatore: giornale.compilatore || '',
+                us_elaborate_input: giornale.us_elaborate ? giornale.us_elaborate.join(', ') : '',
+                apparecchiature_input: giornale.apparecchiature || ''
+            };
+            this.showViewModal = true;
+        },
+        
+        // Open edit modal
+        openEditModal(giornale) {
+            this.editingGiornale = giornale;
+            this.editFormData = {
+                data: giornale.data,
+                ora_inizio: giornale.ora_inizio,
+                ora_fine: giornale.ora_fine,
+                descrizione_lavori: giornale.descrizione_lavori,
+                condizioni_meteo: giornale.condizioni_meteo,
+                note_generali: giornale.note_generali || '',
+                problematiche: giornale.problematiche || '',
+                compilatore: giornale.compilatore || '',
+                us_elaborate_input: giornale.us_elaborate ? giornale.us_elaborate.join(', ') : '',
+                apparecchiature_input: giornale.apparecchiature || ''
+            };
+            this.showEditModal = true;
+        },
+        
+        // Close view modal
+        closeViewModal() {
+            this.showViewModal = false;
+            this.viewingGiornale = null;
+        },
+        
+        // Close edit modal
+        closeEditModal() {
+            this.showEditModal = false;
+            this.editingGiornale = null;
+        },
+        
+        // Save edited giornale
+        async saveEditedGiornale() {
+            if (!this.editFormData.data) {
+                this.editErrorMessage = 'La data è obbligatoria';
+                return;
+            }
+
+            this.editSaving = true;
+            this.editErrorMessage = '';
+
+            try {
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornale.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(this.editFormData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Errore nell\'aggiornamento del giornale');
+                }
+
+                const result = await response.json();
+                
+                this.showAlert('success', 'Giornale aggiornato con successo');
+                this.closeEditModal();
+                
+                // Reload the list
+                this.loadGiornali();
+            } catch (error) {
+                this.editErrorMessage = error.message || 'Errore durante l\'aggiornamento del giornale';
+                console.error('Error updating giornale:', error);
+            } finally {
+                this.editSaving = false;
+            }
+        },
+        
+        // Delete giornale
+        async deleteGiornale(giornale) {
+            if (!confirm(`Sei sicuro di voler eliminare il giornale del ${giornale.data}?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Errore nell\'eliminazione del giornale');
+                }
+                
+                // Reload list
+                await this.loadGiornali();
+            } catch (error) {
+                this.error = error.message || 'Errore nell\'eliminazione del giornale';
+                console.error('Error deleting giornale:', error);
+            }
         }
     }
 }
