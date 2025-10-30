@@ -1,0 +1,215 @@
+<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" id="create-cantiere-modal">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+        <div class="mt-3">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-hard-hat mr-2 text-blue-600"></i>
+                    Nuovo Cantiere
+                </h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Form -->
+            <form hx-post="/sites/{{ site.id }}/cantieri" 
+                  hx-target="#cantieri-list"
+                  hx-swap="outerHTML"
+                  onsubmit="closeModal()">
+                
+                <!-- Informazioni base -->
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Nome Cantiere <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" 
+                                   name="nome" 
+                                   required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="Es: Area Nord, Settore A, Scavo principale">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Codice Identificativo
+                            </label>
+                            <input type="text" 
+                                   name="codice"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="Es: CN-001, SET-A, SC-PRINC">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Descrizione
+                        </label>
+                        <textarea name="descrizione" 
+                                  rows="3"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="Descrizione dell'area di lavoro, obiettivi principali, ecc."></textarea>
+                    </div>
+
+                    <!-- Informazioni temporali -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-sm font-medium text-gray-700 mb-3">Periodo Programmato</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Data Inizio Prevista
+                                </label>
+                                <input type="date" 
+                                       name="data_inizio_prevista"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Data Fine Prevista
+                                </label>
+                                <input type="date" 
+                                       name="data_fine_prevista"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stato e responsabile -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Stato
+                            </label>
+                            <select name="stato" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="pianificato">Pianificato</option>
+                                <option value="in_corso">In Corso</option>
+                                <option value="sospeso">Sospeso</option>
+                                <option value="completato">Completato</option>
+                                <option value="annullato">Annullato</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Responsabile Cantiere
+                            </label>
+                            <input type="text" 
+                                   name="responsabile_cantiere"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="Nome del responsabile">
+                        </div>
+                    </div>
+
+                    <!-- Localizzazione specifica -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-sm font-medium text-gray-700 mb-3">Localizzazione Specifica</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Descrizione Area
+                                </label>
+                                <input type="text" 
+                                       name="area_descrizione"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                       placeholder="Es: Quadrante B2, Settore nord-ovest, Area vicino al muro perimetrale">
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Latitudine
+                                    </label>
+                                    <input type="text" 
+                                           name="coordinate_lat"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                           placeholder="41.9028">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Longitudine
+                                    </label>
+                                    <input type="text" 
+                                           name="coordinate_lon"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                           placeholder="12.4964">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Quota
+                                    </label>
+                                    <input type="text" 
+                                           name="quota"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                           placeholder="Es: 45m s.l.m.">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metadati aggiuntivi -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Tipologia Intervento
+                            </label>
+                            <input type="text" 
+                                   name="tipologia_intervento"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="Es: Scavo stratigrafico, Sondaggio, Prospeczione">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Priorità
+                            </label>
+                            <select name="priorita" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="1">1 - Molto Alta</option>
+                                <option value="2">2 - Alta</option>
+                                <option value="3" selected>3 - Media</option>
+                                <option value="4">4 - Bassa</option>
+                                <option value="5">5 - Molto Bassa</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                    <button type="button" 
+                            onclick="closeModal()"
+                            class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors">
+                        Annulla
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-save mr-2"></i>
+                        Crea Cantiere
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function closeModal() {
+    const modal = document.getElementById('create-cantiere-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Chiudi il modal quando si clicca fuori
+document.getElementById('create-cantiere-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+
+// Chiudi il modal con ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeModal();
+    }
+});
+</script>
