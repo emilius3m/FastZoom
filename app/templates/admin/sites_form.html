@@ -421,7 +421,7 @@
                         <span class="text-sm text-gray-600 dark:text-gray-400">Creato il:</span>
                         <span class="text-sm font-medium text-gray-900 dark:text-white">
                             {% if site.created_at %}
-                                {{ site.created_at.strftime('%d/%m/%Y') }}
+                                {{ site.created_at[:10] if site.created_at and site.created_at is string else (site.created_at.strftime('%d/%m/%Y') if site.created_at else '') }}
                             {% else %}
                                 N/A
                             {% endif %}
@@ -431,7 +431,7 @@
                         <span class="text-sm text-gray-600 dark:text-gray-400">Ultimo aggiornamento:</span>
                         <span class="text-sm font-medium text-gray-900 dark:text-white">
                             {% if site.updated_at %}
-                                {{ site.updated_at.strftime('%d/%m/%Y') }}
+                                {{ site.updated_at[:10] if site.updated_at and site.updated_at is string else (site.updated_at.strftime('%d/%m/%Y') if site.updated_at else '') }}
                             {% else %}
                                 N/A
                             {% endif %}

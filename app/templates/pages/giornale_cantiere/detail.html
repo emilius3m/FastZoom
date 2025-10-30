@@ -33,7 +33,7 @@
                     <div class="flex items-center">
                         <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
                         <span class="text-gray-500 dark:text-gray-400">
-                            {{ giornale.data.strftime('%d/%m/%Y') if giornale and giornale.data else "Dettaglio" }}
+                            {{ giornale.data[:10] if giornale and giornale.data and giornale.data is string else (giornale.data.strftime('%d/%m/%Y') if giornale and giornale.data else "Dettaglio") }}
                         </span>
                     </div>
                 </li>
@@ -44,7 +44,7 @@
             <div>
                 <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
                     <i class="fas fa-file-alt mr-3 text-orange-600"></i>
-                    Giornale • {{ giornale.data.strftime('%d/%m/%Y') if giornale and giornale.data else "Dettaglio" }}
+                    Giornale • {{ giornale.data[:10] if giornale and giornale.data and giornale.data is string else (giornale.data.strftime('%d/%m/%Y') if giornale and giornale.data else "Dettaglio") }}
                 </h1>
                 {% if site %}
                 <p class="text-xl text-gray-600 dark:text-gray-400 mt-1">{{ site.name }} ({{ site.code }})</p>
@@ -84,7 +84,7 @@
         
         {% if giornale.data_validazione and giornale.validato_da %}
         <span class="ml-4 text-sm text-gray-600 dark:text-gray-400">
-            Validato da {{ giornale.validato_da }} il {{ giornale.data_validazione.strftime('%d/%m/%Y %H:%M') }}
+            Validato da {{ giornale.validato_da }} il {{ giornale.data_validazione[:16] if giornale.data_validazione and giornale.data_validazione is string else (giornale.data_validazione.strftime('%d/%m/%Y %H:%M') if giornale.data_validazione else '') }}
         </span>
         {% endif %}
     </div>
@@ -107,7 +107,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data</label>
                             <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                {{ giornale.data.strftime('%A, %d %B %Y') if giornale.data else "Non specificata" }}
+                                {{ giornale.data[:10] if giornale and giornale.data and giornale.data is string else (giornale.data.strftime('%A, %d %B %Y') if giornale.data else "Non specificata") }}
                             </p>
                         </div>
                         
@@ -115,7 +115,7 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Orario Lavori</label>
                             <p class="mt-1 text-gray-900 dark:text-white">
                                 {% if giornale.ora_inizio and giornale.ora_fine %}
-                                    Dalle {{ giornale.ora_inizio.strftime('%H:%M') }} alle {{ giornale.ora_fine.strftime('%H:%M') }}
+                                    Dalle {{ giornale.ora_inizio[:5] if giornale.ora_inizio and giornale.ora_inizio is string else (giornale.ora_inizio.strftime('%H:%M') if giornale.ora_inizio else '') }} alle {{ giornale.ora_fine[:5] if giornale.ora_fine and giornale.ora_fine is string else (giornale.ora_fine.strftime('%H:%M') if giornale.ora_fine else '') }}
                                     <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">
                                         ({{ ((giornale.ora_fine.hour - giornale.ora_inizio.hour) * 60 + (giornale.ora_fine.minute - giornale.ora_inizio.minute))|round|int // 60 }}h {{ ((giornale.ora_fine.hour - giornale.ora_inizio.hour) * 60 + (giornale.ora_fine.minute - giornale.ora_inizio.minute))|round|int % 60 }}m)
                                     </span>
@@ -288,13 +288,13 @@
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-600 dark:text-gray-400">Creato:</span>
-                        <span class="text-gray-900 dark:text-white">{{ giornale.created_at.strftime('%d/%m/%Y %H:%M') if giornale.created_at else "N/A" }}</span>
+                        <span class="text-gray-900 dark:text-white">{{ giornale.created_at[:16] if giornale.created_at and giornale.created_at is string else (giornale.created_at.strftime('%d/%m/%Y %H:%M') if giornale.created_at else "N/A") }}</span>
                     </div>
                     
                     {% if giornale.updated_at %}
                     <div class="flex justify-between">
                         <span class="text-gray-600 dark:text-gray-400">Aggiornato:</span>
-                        <span class="text-gray-900 dark:text-white">{{ giornale.updated_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                        <span class="text-gray-900 dark:text-white">{{ giornale.updated_at[:16] if giornale.updated_at and giornale.updated_at is string else (giornale.updated_at.strftime('%d/%m/%Y %H:%M') if giornale.updated_at else '') }}</span>
                     </div>
                     {% endif %}
                     
@@ -380,7 +380,7 @@ function giornaleDetailApp() {
                 // const url = window.URL.createObjectURL(blob);
                 // const a = document.createElement('a');
                 // a.href = url;
-                // a.download = `giornale_{{ giornale.data.strftime('%Y%m%d') if giornale and giornale.data else 'export' }}.pdf`;
+                // a.download = `giornale_{{ giornale.data[:10].replace('-', '') if giornale and giornale.data and giornale.data is string else (giornale.data.strftime('%Y%m%d') if giornale and giornale.data else 'export') }}.pdf`;
                 // a.click();
                 
                 alert('Export PDF - da implementare');

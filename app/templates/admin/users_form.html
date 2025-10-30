@@ -312,7 +312,7 @@
                         <span class="text-sm text-gray-600 dark:text-gray-400">Ultimo accesso:</span>
                         <span class="text-sm font-medium text-gray-900 dark:text-white">
                             {% if user_data.last_login %}
-                                {{ user_data.last_login.strftime('%d/%m/%Y %H:%M') }}
+                                {{ user_data.last_login[:16] if user_data.last_login and user_data.last_login is string else (user_data.last_login.strftime('%d/%m/%Y %H:%M') if user_data.last_login else '') }}
                             {% else %}
                                 Mai
                             {% endif %}
@@ -320,7 +320,7 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-sm text-gray-600 dark:text-gray-400">Account creato:</span>
-                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ user_data.created_at.strftime('%d/%m/%Y') }}</span>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ user_data.created_at[:10] if user_data.created_at and user_data.created_at is string else (user_data.created_at.strftime('%d/%m/%Y') if user_data.created_at else '') }}</span>
                     </div>
                 </div>
             </div>

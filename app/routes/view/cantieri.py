@@ -10,7 +10,7 @@ from uuid import UUID
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
-from datetime import datetime
+from datetime import datetime, date
 
 # Imports
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
@@ -136,17 +136,17 @@ async def v1_cantieri_sito_view(
                 "stato": cantiere.stato,
                 "stato_formattato": cantiere.stato_formattato,
                 "priorita": cantiere.priorita,
-                "data_inizio_prevista": cantiere.data_inizio_prevista.isoformat() if cantiere.data_inizio_prevista else None,
-                "data_fine_prevista": cantiere.data_fine_prevista.isoformat() if cantiere.data_fine_prevista else None,
-                "data_inizio_effettiva": cantiere.data_inizio_effettiva.isoformat() if cantiere.data_inizio_effettiva else None,
-                "data_fine_effettiva": cantiere.data_fine_effettiva.isoformat() if cantiere.data_fine_effettiva else None,
+                "data_inizio_prevista": cantiere.data_inizio_prevista.isoformat() if hasattr(cantiere.data_inizio_prevista, 'isoformat') else None,
+                "data_fine_prevista": cantiere.data_fine_prevista.isoformat() if hasattr(cantiere.data_fine_prevista, 'isoformat') else None,
+                "data_inizio_effettiva": cantiere.data_inizio_effettiva.isoformat() if hasattr(cantiere.data_inizio_effettiva, 'isoformat') else None,
+                "data_fine_effettiva": cantiere.data_fine_effettiva.isoformat() if hasattr(cantiere.data_fine_effettiva, 'isoformat') else None,
                 "area_descrizione": cantiere.area_descrizione,
                 "responsabile_cantiere": cantiere.responsabile_cantiere,
                 "tipologia_intervento": cantiere.tipologia_intervento,
                 "e_in_corso": cantiere.e_in_corso,
                 "durata_giorni": cantiere.durata_giorni,
-                "created_at": cantiere.created_at.isoformat() if cantiere.created_at else None,
-                "updated_at": cantiere.updated_at.isoformat() if cantiere.updated_at else None,
+                "created_at": cantiere.created_at.isoformat() if hasattr(cantiere.created_at, 'isoformat') else None,
+                "updated_at": cantiere.updated_at.isoformat() if hasattr(cantiere.updated_at, 'isoformat') else None,
                 "quota": cantiere.quota
             })
 
@@ -195,9 +195,11 @@ async def v1_cantiere_detail_view(
     Pagina di dettaglio per un cantiere specifico.
     """
     try:
-        # Carica cantiere
+        # Carica cantiere con relazioni
         result = await db.execute(
-            select(Cantiere).where(
+            select(Cantiere)
+            .options(selectinload(Cantiere.site))
+            .where(
                 and_(Cantiere.id == cantiere_id, Cantiere.is_active == True)
             )
         )
@@ -212,20 +214,26 @@ async def v1_cantiere_detail_view(
         # Verifica accesso al sito
         site_info = verify_site_access(cantiere.site_id, user_sites)
 
-        # Carica sito
-        site_result = await db.execute(
-            select(ArchaeologicalSite).where(ArchaeologicalSite.id == cantiere.site_id)
-        )
-        site = site_result.scalar_one_or_none()
-
-        # Statistiche
+        # IMPORTANTE: Accedi alla relazione PRIMA di fare altre query async
+        # Questo forza il caricamento mentre la sessione è ancora attiva
+        site = cantiere.site
+        
+        # Se site è None, caricalo esplicitamente
+        if not site:
+            site_result = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == cantiere.site_id)
+            )
+            site = site_result.scalar_one_or_none()
+        
+        # Statistiche giornali di cantiere
         giornali_count_result = await db.execute(
             select(func.count(GiornaleCantiere.id)).where(
                 GiornaleCantiere.cantiere_id == cantiere_id
             )
         )
         giornali_count = giornali_count_result.scalar() or 0
-
+        
+        # Ultimo giornale
         ultimo_giornale_result = await db.execute(
             select(GiornaleCantiere)
             .where(GiornaleCantiere.cantiere_id == cantiere_id)
@@ -233,22 +241,61 @@ async def v1_cantiere_detail_view(
             .limit(1)
         )
         ultimo_giornale = ultimo_giornale_result.scalar_one_or_none()
-
+        
         operatori_count = 0
-
+        
+        # Serializza i dati del cantiere per evitare lazy loading nel template
+        cantiere_data = {
+            "id": str(cantiere.id),
+            "nome": cantiere.nome,
+            "codice": cantiere.codice,
+            "descrizione": cantiere.descrizione,
+            "stato": cantiere.stato,
+            "stato_formattato": cantiere.stato_formattato,
+            "priorita": cantiere.priorita,
+            "data_inizio_prevista": cantiere.data_inizio_prevista.isoformat() if hasattr(cantiere.data_inizio_prevista, 'isoformat') else None,
+            "data_fine_prevista": cantiere.data_fine_prevista.isoformat() if hasattr(cantiere.data_fine_prevista, 'isoformat') else None,
+            "data_inizio_effettiva": cantiere.data_inizio_effettiva.isoformat() if hasattr(cantiere.data_inizio_effettiva, 'isoformat') else None,
+            "data_fine_effettiva": cantiere.data_fine_effettiva.isoformat() if hasattr(cantiere.data_fine_effettiva, 'isoformat') else None,
+            "area_descrizione": cantiere.area_descrizione,
+            "responsabile_cantiere": cantiere.responsabile_cantiere,
+            "tipologia_intervento": cantiere.tipologia_intervento,
+            "e_in_corso": cantiere.e_in_corso,
+            "durata_giorni": cantiere.durata_giorni,
+            "quota": cantiere.quota,
+            "created_at": cantiere.created_at.isoformat() if hasattr(cantiere.created_at, 'isoformat') else None,
+            "updated_at": cantiere.updated_at.isoformat() if hasattr(cantiere.updated_at, 'isoformat') else None,
+        }
+        
+        # Serializza il sito
+        site_data = {
+            "id": str(site.id),
+            "name": site.name,
+            "codice": site.codice if hasattr(site, 'codice') else None,
+        } if site else None
+        
+        # Serializza ultimo giornale se presente
+        ultimo_giornale_data = None
+        if ultimo_giornale:
+            ultimo_giornale_data = {
+                "id": str(ultimo_giornale.id),
+                "data": ultimo_giornale.data.isoformat() if hasattr(ultimo_giornale.data, 'isoformat') else None,
+                "condizioni_meteo": ultimo_giornale.condizioni_meteo if hasattr(ultimo_giornale, 'condizioni_meteo') else None,
+            }
+        
         return templates.TemplateResponse(
             "pages/giornale_cantiere/cantiere_detail.html",
             {
                 "request": request,
-                "cantiere": cantiere,
-                "site": site,
+                "cantiere": cantiere_data,  # Usa dati serializzati
+                "site": site_data,           # Usa dati serializzati
                 "site_info": site_info,
                 "giornali_count": giornali_count,
-                "ultimo_giornale": ultimo_giornale,
+                "ultimo_giornale": ultimo_giornale_data,  # Usa dati serializzati
                 "operatori_count": operatori_count
             }
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
