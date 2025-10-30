@@ -1,0 +1,438 @@
+
+{% extends "base/site_base.html" %}
+
+{% block title %}{{ cantiere.nome_completo }} - {{ site.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.cantiere-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 0.75rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-weight: 600;
+}
+
+.status-pianificato {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.status-in_corso {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.status-sospeso {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.status-completato {
+    background-color: #f3f4f6;
+    color: #374151;
+}
+
+.status-annullato {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.info-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 2rem;
+    margin-bottom: 1rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0.5rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: #667eea;
+}
+
+.timeline-item::after {
+    content: '';
+    position: absolute;
+    left: 0.875rem;
+    top: 1.25rem;
+    width: 1px;
+    height: calc(100% - 0.5rem);
+    background: #e5e7eb;
+}
+
+.timeline-item:last-child::after {
+    display: none;
+}
+
+.giornale-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #e5e7eb;
+}
+
+.giornale-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="cantiere-header">
+        <nav class="flex mb-4 text-white/80" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2">
+                <li><a href="/dashboard" class="hover:text-white">Dashboard</a></li>
+                <li>/</li>
+                <li><a href="/sites/{{ site.id }}" class="hover:text-white">{{ site.name }}</a></li>
+                <li>/</li>
+                <li><a href="/sites/{{ site.id }}/cantieri" class="hover:text-white">Cantieri</a></li>
+                <li>/</li>
+                <li class="text-white font-medium">{{ cantiere.nome_completo }}</li>
+            </ol>
+        </nav>
+        
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-3xl font-bold mb-2">{{ cantiere.nome_completo }}</h1>
+                <p class="text-white/90">{{ cantiere.descrizione or "Nessuna descrizione disponibile" }}</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="status-badge status-{{ cantiere.stato }} bg-white/20 text-white border border-white/30">
+                    {{ cantiere.stato_formattato }}
+                </span>
+                {% if cantiere.e_in_corso %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-500 text-white">
+                        <span class="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></span>
+                        Attivo
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Colonna principale -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Informazioni Generali -->
+            <div class="info-card">
+                <h3><i class="fas fa-info-circle mr-2 text-blue-600"></i>Informazioni Generali</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-sm text-gray-500">Codice Identificativo</div>
+                        <div class="font-medium">{{ cantiere.codice or "Non specificato" }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Responsabile</div>
+                        <div class="font-medium">{{ cantiere.responsabile_cantiere or "Non specificato" }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Tipologia Intervento</div>
+                        <div class="font-medium">{{ cantiere.tipologia_intervento or "Non specificata" }}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Priorità</div>
+                        <div class="font-medium">
+                            {% set priorita_labels = {
+                                1: "1 - Molto Alta",
+                                2: "2 - Alta", 
+                                3: "3 - Media",
+                                4: "4 - Bassa",
+                                5: "5 - Molto Bassa"
+                            } %}
+                            {{ priorita_labels.get(cantiere.priorita, cantiere.priorita) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Periodo e Stato -->
+            <div class="info-card">
+                <h3><i class="fas fa-calendar-alt mr-2 text-blue-600"></i>Periodo e Stato</h3>
+                <div class="space-y-3">
+                    <!-- Periodo Programmato -->
+                    <div class="bg-blue-50 rounded p-3">
+                        <div class="text-sm font-medium text-blue-900 mb-1">Periodo Programmato</div>
+                        <div class="text-blue-700">
+                            {% if cantiere.data_inizio_prevista %}
+                                Dal {{ cantiere.data_inizio_prevista.strftime('%d/%m/%Y') }}
+                                {% if cantiere.data_fine_prevista %}
+                                    al {{ cantiere.data_fine_prevista.strftime('%d/%m/%Y') }}
+                                    {% if cantiere.durata_giorni %}
+                                        ({{ cantiere.durata_giorni }} giorni)
+                                    {% endif %}
+                                {% else %}
+                                    (data fine non specificata)
+                                {% endif %}
+                            {% else %}
+                                Periodo non definito
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Periodo Effettivo -->
+                    {% if cantiere.data_inizio_effettiva %}
+                    <div class="bg-green-50 rounded p-3">
+                        <div class="text-sm font-medium text-green-900 mb-1">Periodo Effettivo</div>
+                        <div class="text-green-700">
+                            Dal {{ cantiere.data_inizio_effettiva.strftime('%d/%m/%Y') }}
+                            {% if cantiere.data_fine_effettiva %}
+                                al {{ cantiere.data_fine_effettiva.strftime('%d/%m/%Y') }}
+                            {% else %}
+                                (in corso)
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Localizzazione -->
+            {% if cantiere.area_descrizione or cantiere.coordinate_lat or cantiere.quota %}
+            <div class="info-card">
+                <h3><i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>Localizzazione Specifica</h3>
+                <div class="space-y-3">
+                    {% if cantiere.area_descrizione %}
+                    <div>
+                        <div class="text-sm text-gray-500">Area Descrizione</div>
+                        <div class="font-medium">{{ cantiere.area_descrizione }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {% if cantiere.coordinate_lat %}
+                        <div>
+                            <div class="text-sm text-gray-500">Latitudine</div>
+                            <div class="font-medium">{{ cantiere.coordinate_lat }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if cantiere.coordinate_lon %}
+                        <div>
+                            <div class="text-sm text-gray-500">Longitudine</div>
+                            <div class="font-medium">{{ cantiere.coordinate_lon }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if cantiere.quota %}
+                        <div>
+                            <div class="text-sm text-gray-500">Quota</div>
+                            <div class="font-medium">{{ cantiere.quota }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if cantiere.coordinate_lat and cantiere.coordinate_lon %}
+                    <div class="mt-3">
+                        <a href="https://www.google.com/maps?q={{ cantiere.coordinate_lat }},{{ cantiere.coordinate_lon }}" 
+                           target="_blank"
+                           class="inline-flex items-center text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-external-link-alt mr-2"></i>
+                            Visualizza su Google Maps
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Giornali di Cantiere -->
+            <div class="info-card">
+                <div class="flex justify-between items-center mb-4">
+                    <h3><i class="fas fa-book mr-2 text-blue-600"></i>Giornali di Cantiere ({{ cantiere.giornali_cantiere|length }})</h3>
+                    <button 
+                        hx-get="/sites/{{ site.id }}/giornali/create?cantiere_id={{ cantiere.id }}"
+                        hx-target="#modal-container"
+                        class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                        <i class="fas fa-plus mr-1"></i>Nuovo Giornale
+                    </button>
+                </div>
+                
+                {% if cantiere.giornali_cantiere %}
+                <div class="space-y-3">
+                    {% for giornale in cantiere.giornali_cantiere|sort(attribute='data', reverse=true) %}
+                    <div class="giornale-card bg-gray-50 rounded-lg p-4">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <span class="font-medium text-gray-900">
+                                        {{ giornale.data.strftime('%d/%m/%Y') }}
+                                    </span>
+                                    {% if giornale.ora_inizio and giornale.ora_fine %}
+                                        <span class="text-sm text-gray-500">
+                                            ({{ giornale.ora_inizio.strftime('%H:%M') }} - {{ giornale.ora_fine.strftime('%H:%M') }})
+                                        </span>
+                                    {% endif %}
+                                    {% if giornale.validato %}
+                                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                                            <i class="fas fa-check mr-1"></i>Validato
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                <p class="text-gray-600 text-sm mb-2 line-clamp-2">
+                                    {{ giornale.descrizione_lavori }}
+                                </p>
+                                <div class="flex items-center space-x-4 text-xs text-gray-500">
+                                    <span><i class="fas fa-users mr-1"></i>{{ giornale.operatori|length }} operatori</span>
+                                    {% if giornale.us_elaborate %}
+                                        <span><i class="fas fa-layer-group mr-1"></i>{{ giornale.us_elaborate.split(',')|length }} US</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <a href="/sites/{{ site.id }}/giornali/{{ giornale.id }}" 
+                                   class="text-blue-600 hover:text-blue-800 text-sm">
+                                    <i class="fas fa-eye mr-1"></i>Dettagli
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-book text-4xl mb-3 text-gray-300"></i>
+                    <p>Nessun giornale registrato per questo cantiere</p>
+                    <button 
+                        hx-get="/sites/{{ site.id }}/giornali/create?cantiere_id={{ cantiere.id }}"
+                        hx-target="#modal-container"
+                        class="mt-3 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                        <i class="fas fa-plus mr-2"></i>Crea primo giornale
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Colonna laterale -->
+        <div class="space-y-6">
+            <!-- Statistiche -->
+            <div class="info-card">
+                <h3><i class="fas fa-chart-bar mr-2 text-blue-600"></i>Statistiche</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Giornali totali</span>
+                        <span class="font-medium">{{ cantiere.giornali_cantiere|length }}</span>
+                    </div>
+                    {% if cantiere.durata_giorni %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Durata programmata</span>
+                        <span class="font-medium">{{ cantiere.durata_giorni }} giorni</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Operatori totali</span>
+                        <span class="font-medium">
+                            {% set operatori_totali = [] %}
+                            {% for giornale in cantiere.giornali_cantiere %}
+                                {% for operatore in giornale.operatori %}
+                                    {% if operatore.id not in operatori_totali %}
+                                        {% set _ = operatori_totali.append(operatore.id) %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                            {{ operatori_totali|length }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Azioni -->
+            <div class="info-card">
+                <h3><i class="fas fa-tools mr-2 text-blue-600"></i>Azioni</h3>
+                <div class="space-y-2">
+                    <button 
+                        hx-get="/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/edit"
+                        hx-target="#modal-container"
+                        class="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition-colors text-left">
+                        <i class="fas fa-edit mr-2"></i>Modifica Cantiere
+                    </button>
+                    <a href="/sites/{{ site.id }}/giornali?cantiere_id={{ cantiere.id }}" 
+                       class="w-full bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200 transition-colors text-left block">
+                        <i class="fas fa-book mr-2"></i>Gestisci Giornali
+                    </a>
+                    <button 
+                        hx-delete="/sites/{{ site.id }}/cantieri/{{ cantiere.id }}"
+                        hx-confirm="Sei sicuro di voler eliminare questo cantiere? Questa azione eliminerà anche tutti i giornali associati."
+                        hx-target="body"
+                        hx-swap="outerHTML"
+                        class="w-full bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200 transition-colors text-left">
+                        <i class="fas fa-trash mr-2"></i>Elimina Cantiere
+                    </button>
+                </div>
+            </div>
+
+            <!-- Metadati -->
+            <div class="info-card">
+                <h3><i class="fas fa-info mr-2 text-blue-600"></i>Metadati</h3>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Creato il</span>
+                        <span class="font-medium">{{ cantiere.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                    </div>
+                    {% if cantiere.updated_at != cantiere.created_at %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Modificato il</span>
+                        <span class="font-medium">{{ cantiere.updated_at.strftime('%d/%m/%Y %H:%M') }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">ID</span>
+                        <span class="font-medium font-mono text-xs">{{ cantiere.id }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal container -->
+<div id="modal-container"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('cantiereDetail', () => ({
+        loading: false,
+        
+        refreshData() {
+            this.loading = true;
+            // Ricarica i dati se necessario
+            setTimeout(() => {
+                this.loading = false;
+            }, 1000);
+        }
+    }));
+});
+</script>
+{% endblock %}

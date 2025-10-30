@@ -1,0 +1,299 @@
+{% extends "base/site_base.html" %}
+
+{% block title %}Cantieri - {{ site.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.cantiere-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #e5e7eb;
+}
+
+.cantiere-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-weight: 600;
+}
+
+.status-pianificato {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.status-in_corso {
+    background-color: #dcfce7;
+    color: #166534;
+}
+
+.status-sospeso {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.status-completato {
+    background-color: #f3f4f6;
+    color: #374151;
+}
+
+.status-annullato {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+}
+
+.stats-number {
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6b7280;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <nav class="flex mb-4" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2">
+                <li><a href="/dashboard" class="text-gray-500 hover:text-gray-700">Dashboard</a></li>
+                <li class="text-gray-500">/</li>
+                <li><a href="/sites/{{ site.id }}" class="text-gray-500 hover:text-gray-700">{{ site.name }}</a></li>
+                <li class="text-gray-500">/</li>
+                <li class="text-gray-900 font-medium">Cantieri</li>
+            </ol>
+        </nav>
+        
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Cantieri di {{ site.name }}</h1>
+                <p class="text-gray-600 mt-2">Gestione delle aree di lavoro archeologica</p>
+            </div>
+            <button 
+                hx-get="/sites/{{ site.id }}/cantieri/create"
+                hx-target="#modal-container"
+                hx-trigger="click"
+                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-plus mr-2"></i>Nuovo Cantiere
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistiche -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.total }}</div>
+            <div class="text-sm opacity-90">Totale Cantieri</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+            <div class="text-2xl font-bold text-green-600">{{ stats.in_corso }}</div>
+            <div class="text-sm text-gray-600">In Corso</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+            <div class="text-2xl font-bold text-blue-600">{{ stats.pianificati }}</div>
+            <div class="text-sm text-gray-600">Pianificati</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-gray-500">
+            <div class="text-2xl font-bold text-gray-600">{{ stats.completati }}</div>
+            <div class="text-sm text-gray-600">Completati</div>
+        </div>
+    </div>
+
+    <!-- Filtri -->
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+        <div class="flex flex-wrap gap-4 items-center">
+            <div class="flex-1 min-w-0">
+                <input 
+                    type="text" 
+                    id="search-cantieri"
+                    placeholder="Cerca cantieri..."
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    hx-get="/sites/{{ site.id }}/cantieri/search"
+                    hx-trigger="keyup changed delay:300ms"
+                    hx-target="#cantieri-list">
+            </div>
+            <select 
+                id="filter-stato"
+                class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                hx-get="/sites/{{ site.id }}/cantieri/filter"
+                hx-trigger="change"
+                hx-target="#cantieri-list">
+                <option value="">Tutti gli stati</option>
+                <option value="pianificato">Pianificati</option>
+                <option value="in_corso">In Corso</option>
+                <option value="sospeso">Sospesi</option>
+                <option value="completato">Completati</option>
+                <option value="annullato">Annullati</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Lista Cantieri -->
+    <div id="cantieri-list" class="space-y-4">
+        {% if cantieri %}
+            {% for cantiere in cantieri %}
+            <div class="cantiere-card bg-white rounded-lg shadow-md p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <h3 class="text-xl font-semibold text-gray-900">
+                            {{ cantiere.nome }}
+                            {% if cantiere.codice %}
+                                <span class="text-gray-500 font-normal">({{ cantiere.codice }})</span>
+                            {% endif %}
+                        </h3>
+                        <p class="text-gray-600 mt-1">{{ cantiere.descrizione or "Nessuna descrizione" }}</p>
+                    </div>
+                    <div class="flex items-center space-x-2 ml-4">
+                        <span class="status-badge status-{{ cantiere.stato }}">
+                            {{ cantiere.stato_formattato }}
+                        </span>
+                        {% if cantiere.e_in_corso %}
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <span class="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span>
+                                Attivo
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Informazioni dettagliate -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="text-sm">
+                        <div class="text-gray-500">Responsabile</div>
+                        <div class="font-medium">{{ cantiere.responsabile_cantiere or "Non specificato" }}</div>
+                    </div>
+                    <div class="text-sm">
+                        <div class="text-gray-500">Periodo</div>
+                        <div class="font-medium">
+                            {% if cantiere.data_inizio_prevista %}
+                                {{ cantiere.data_inizio_prevista.strftime('%d/%m/%Y') }}
+                                {% if cantiere.data_fine_prevista %}
+                                    - {{ cantiere.data_fine_prevista.strftime('%d/%m/%Y') }}
+                                {% endif %}
+                            {% else %}
+                                Non definito
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="text-sm">
+                        <div class="text-gray-500">Giornali registrati</div>
+                        <div class="font-medium">{{ cantiere.giornali_cantiere|length }}</div>
+                    </div>
+                </div>
+
+                <!-- Localizzazione se presente -->
+                {% if cantiere.area_descrizione or cantiere.quota %}
+                <div class="bg-gray-50 rounded p-3 mb-4">
+                    <div class="text-sm text-gray-600">
+                        {% if cantiere.area_descrizione %}
+                            <div><strong>Area:</strong> {{ cantiere.area_descrizione }}</div>
+                        {% endif %}
+                        {% if cantiere.quota %}
+                            <div><strong>Quota:</strong> {{ cantiere.quota }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Azioni -->
+                <div class="flex justify-between items-center">
+                    <div class="text-sm text-gray-500">
+                        Creato il {{ cantiere.created_at.strftime('%d/%m/%Y %H:%M') }}
+                        {% if cantiere.updated_at != cantiere.created_at %}
+                            <br>Modificato il {{ cantiere.updated_at.strftime('%d/%m/%Y %H:%M') }}
+                        {% endif %}
+                    </div>
+                    <div class="flex space-x-2">
+                        <a href="/sites/{{ site.id }}/cantieri/{{ cantiere.id }}" 
+                           class="text-blue-600 hover:text-blue-800 px-3 py-1 rounded hover:bg-blue-50">
+                            <i class="fas fa-eye mr-1"></i>Dettagli
+                        </a>
+                        <button 
+                            hx-get="/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/edit"
+                            hx-target="#modal-container"
+                            class="text-gray-600 hover:text-gray-800 px-3 py-1 rounded hover:bg-gray-50">
+                            <i class="fas fa-edit mr-1"></i>Modifica
+                        </button>
+                        <button 
+                            hx-delete="/sites/{{ site.id }}/cantieri/{{ cantiere.id }}"
+                            hx-target="#cantieri-list"
+                            hx-confirm="Sei sicuro di voler eliminare questo cantiere?"
+                            class="text-red-600 hover:text-red-800 px-3 py-1 rounded hover:bg-red-50">
+                            <i class="fas fa-trash mr-1"></i>Elimina
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="mb-4">
+                    <i class="fas fa-hard-hat text-6xl text-gray-300"></i>
+                </div>
+                <h3 class="text-xl font-medium text-gray-900 mb-2">Nessun cantiere trovato</h3>
+                <p class="text-gray-600 mb-4">
+                    {% if request.query_params.get('search') %}
+                        Nessun cantiere corrisponde ai criteri di ricerca.
+                    {% else %}
+                        Non ci sono ancora cantieri per questo sito archeologico.
+                    {% endif %}
+                </p>
+                <button 
+                    hx-get="/sites/{{ site.id }}/cantieri/create"
+                    hx-target="#modal-container"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-plus mr-2"></i>Crea primo cantiere
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal container -->
+<div id="modal-container"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Inizializzazione Alpine.js per la gestione dinamica
+document.addEventListener('alpine:init', () => {
+    Alpine.data('cantieriManager', () => ({
+        loading: false,
+        
+        async refreshCantieri() {
+            this.loading = true;
+            try {
+                const response = await htmx.ajax('GET', `/sites/{{ site.id }}/cantieri/list`, '#cantieri-list');
+                this.loading = false;
+            } catch (error) {
+                console.error('Errore nel caricamento dei cantieri:', error);
+                this.loading = false;
+            }
+        },
+        
+        // Auto-refresh ogni 30 secondi per cantieri attivi
+        init() {
+            setInterval(() => {
+                this.refreshCantieri();
+            }, 30000);
+        }
+    }));
+});
+</script>
+{% endblock %}
