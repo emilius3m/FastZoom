@@ -1,0 +1,386 @@
+"""
+View Routes - Cantieri (Work Sites) Management
+Routes HTML per gestione cantieri all'interno di siti archeologici.
+"""
+
+from fastapi import APIRouter, Depends, Request, HTTPException, status, Query
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from uuid import UUID
+from typing import List, Dict, Any, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from loguru import logger
+
+# Imports
+from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
+from app.database.db import get_async_session
+from app.models.cantiere import Cantiere
+from app.models.sites import ArchaeologicalSite
+from sqlalchemy import select, and_, or_, func
+from sqlalchemy.orm import selectinload
+
+router = APIRouter()
+templates = Jinja2Templates(directory="app/templates")
+
+def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Verifica accesso al sito e restituisce informazioni sul sito"""
+    site_info = next(
+        (site for site in user_sites if site["id"] == str(site_id)),
+        None
+    )
+    
+    if not site_info:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sito {site_id} non trovato o access denied"
+        )
+    
+    return site_info
+
+@router.get("/sites/{site_id}/cantieri", response_class=HTMLResponse, summary="Pagina gestione cantieri sito", tags=["Cantieri - Views"])
+async def v1_cantieri_sito_view(
+    request: Request,
+    site_id: UUID,
+    search: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Pagina principale per la gestione dei cantieri di un sito archeologico.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Query base per cantieri
+        query = select(Cantiere).where(
+            and_(Cantiere.site_id == site_id, Cantiere.is_active == True)
+        )
+        
+        # Applica filtri
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    Cantiere.nome.ilike(search_pattern),
+                    Cantiere.codice.ilike(search_pattern),
+                    Cantiere.descrizione.ilike(search_pattern)
+                )
+            )
+        if stato:
+            query = query.where(Cantiere.stato == stato)
+        
+        # Ordinamento
+        query = query.order_by(
+            Cantiere.priorita.asc(), Cantiere.created_at.desc()
+        )
+        
+        result = await db.execute(query)
+        cantieri = result.scalars().all()
+        
+        # Statistiche
+        total_cantieri_result = await db.execute(
+            select(func.count(Cantiere.id)).where(
+                and_(
+                    Cantiere.site_id == site_id,
+                    Cantiere.is_active == True
+                )
+            )
+        )
+        total_cantieri = total_cantieri_result.scalar() or 0
+        
+        stati_result = await db.execute(
+            select(
+                Cantiere.stato,
+                func.count(Cantiere.id).label("count")
+            )
+            .where(
+                and_(
+                    Cantiere.site_id == site_id,
+                    Cantiere.is_active == True
+                )
+            )
+            .group_by(Cantiere.stato)
+        )
+        stati = {stato: count for stato, count in stati_result.all()}
+        
+        # Opzioni per filtri
+        stati_options = [
+            {"value": "pianificato", "label": "Pianificato", "count": stati.get("pianificato", 0)},
+            {"value": "in_corso", "label": "In Corso", "count": stati.get("in_corso", 0)},
+            {"value": "completato", "label": "Completato", "count": stati.get("completato", 0)},
+            {"value": "annullato", "label": "Annullato", "count": stati.get("annullato", 0)},
+            {"value": "sospeso", "label": "Sospeso", "count": stati.get("sospeso", 0)}
+        ]
+        
+        priorita_options = [
+            {"value": 1, "label": "Alta", "color": "red"},
+            {"value": 2, "label": "Media-Alta", "color": "orange"},
+            {"value": 3, "label": "Media", "color": "yellow"},
+            {"value": 4, "label": "Bassa", "color": "green"},
+            {"value": 5, "label": "Molto Bassa", "color": "gray"}
+        ]
+        
+        return templates.TemplateResponse(
+            "pages/giornale_cantiere/cantieri.html",
+            {
+                "request": request,
+                "site_id": str(site_id),
+                "site": site_info,  # Template expects 'site', not 'site_info'
+                "site_info": site_info,
+                "cantieri": cantieri,
+                "total_cantieri": total_cantieri,
+                "stati": stati,
+                "stati_options": stati_options,
+                "priorita_options": priorita_options,
+                "current_search": search,
+                "current_stato": stato,
+                # Add stats dict for template compatibility
+                "stats": {
+                    "total": total_cantieri,
+                    "in_corso": stati.get("in_corso", 0),
+                    "pianificati": stati.get("pianificato", 0),
+                    "completati": stati.get("completato", 0)
+                }
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore pagina cantieri sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel caricamento della pagina cantieri"
+        )
+
+@router.get("/cantieri/{cantiere_id}", response_class=HTMLResponse, summary="Pagina dettaglio cantiere", tags=["Cantieri - Views"])
+async def v1_cantiere_detail_view(
+    request: Request,
+    cantiere_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Pagina di dettaglio per un cantiere specifico.
+    """
+    try:
+        # Carica cantiere con relazioni
+        result = await db.execute(
+            select(Cantiere)
+            .options(
+                selectinload(Cantiere.site)
+            )
+            .where(
+                and_(Cantiere.id == cantiere_id, Cantiere.is_active == True)
+            )
+        )
+        cantiere = result.scalar_one_or_none()
+        
+        if not cantiere:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cantiere non trovato"
+            )
+        
+        # Verifica accesso al sito
+        site_info = verify_site_access(cantiere.site_id, user_sites)
+        
+        # Calcola statistiche aggiuntive
+        from app.models.giornale_cantiere import GiornaleCantiere
+        
+        # Conteggio giornali
+        giornali_count_result = await db.execute(
+            select(func.count(GiornaleCantiere.id)).where(
+                GiornaleCantiere.cantiere_id == cantiere_id
+            )
+        )
+        giornali_count = giornali_count_result.scalar() or 0
+        
+        # Ultimo giornale (se presente)
+        ultimo_giornale_result = await db.execute(
+            select(GiornaleCantiere)
+            .where(GiornaleCantiere.cantiere_id == cantiere_id)
+            .order_by(GiornaleCantiere.data.desc())
+            .limit(1)
+        )
+        ultimo_giornale = ultimo_giornale_result.scalar_one_or_none()
+        
+        # Statistiche operatori
+        from app.models.giornale_cantiere import giornale_operatori_association
+        
+        operatori_count_result = await db.execute(
+            select(func.count(func.distinct(giornale_operatori_association.c.operatore_id)))
+            .select_from(GiornaleCantiere)
+            .join(giornale_operatori_association, GiornaleCantiere.id == giornale_operatori_association.c.giornale_id)
+            .where(GiornaleCantiere.cantiere_id == cantiere_id)
+        )
+        operatori_count = operatori_count_result.scalar() or 0
+        
+        return templates.TemplateResponse(
+            "pages/giornale_cantiere/cantiere_detail.html",
+            {
+                "request": request,
+                "cantiere": cantiere,
+                "site_info": site_info,
+                "giornali_count": giornali_count,
+                "ultimo_giornale": ultimo_giornale,
+                "operatori_count": operatori_count
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore pagina dettaglio cantiere {cantiere_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel caricamento della pagina dettaglio cantiere"
+        )
+
+@router.get("/sites/{site_id}/cantieri/nuovo", response_class=HTMLResponse, summary="Pagina nuovo cantiere", tags=["Cantieri - Views"])
+async def v1_nuovo_cantiere_view(
+    request: Request,
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Pagina per la creazione di un nuovo cantiere.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Opzioni per il form
+        stati_options = [
+            {"value": "pianificato", "label": "Pianificato"},
+            {"value": "in_corso", "label": "In Corso"},
+            {"value": "completato", "label": "Completato"},
+            {"value": "annullato", "label": "Annullato"},
+            {"value": "sospeso", "label": "Sospeso"}
+        ]
+        
+        priorita_options = [
+            {"value": 1, "label": "Alta"},
+            {"value": 2, "label": "Media-Alta"},
+            {"value": 3, "label": "Media"},
+            {"value": 4, "label": "Bassa"},
+            {"value": 5, "label": "Molto Bassa"}
+        ]
+        
+        tipologie_intervento = [
+            {"value": "scavo", "label": "Scavo Archeologico"},
+            {"value": "prospezione", "label": "Prospezione Geofisica"},
+            {"value": "ricerca", "label": "Ricerca di Superficie"},
+            {"value": "documentazione", "label": "Documentazione"},
+            {"value": "conservazione", "label": "Conservazione e Restauro"},
+            {"value": "monitoraggio", "label": "Monitoraggio"},
+            {"value": "altro", "label": "Altro"}
+        ]
+        
+        return templates.TemplateResponse(
+            "pages/giornale_cantiere/nuovo_cantiere.html",
+            {
+                "request": request,
+                "site_id": str(site_id),
+                "site_info": site_info,
+                "stati_options": stati_options,
+                "priorita_options": priorita_options,
+                "tipologie_intervento": tipologie_intervento
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore pagina nuovo cantiere sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel caricamento della pagina nuovo cantiere"
+        )
+
+@router.get("/cantieri/{cantiere_id}/modifica", response_class=HTMLResponse, summary="Pagina modifica cantiere", tags=["Cantieri - Views"])
+async def v1_modifica_cantiere_view(
+    request: Request,
+    cantiere_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Pagina per la modifica di un cantiere esistente.
+    """
+    try:
+        # Carica cantiere esistente
+        result = await db.execute(
+            select(Cantiere)
+            .options(
+                selectinload(Cantiere.site)
+            )
+            .where(
+                and_(Cantiere.id == cantiere_id, Cantiere.is_active == True)
+            )
+        )
+        cantiere = result.scalar_one_or_none()
+        
+        if not cantiere:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cantiere non trovato"
+            )
+        
+        # Verifica accesso al sito
+        site_info = verify_site_access(cantiere.site_id, user_sites)
+        
+        # Opzioni per il form
+        stati_options = [
+            {"value": "pianificato", "label": "Pianificato"},
+            {"value": "in_corso", "label": "In Corso"},
+            {"value": "completato", "label": "Completato"},
+            {"value": "annullato", "label": "Annullato"},
+            {"value": "sospeso", "label": "Sospeso"}
+        ]
+        
+        priorita_options = [
+            {"value": 1, "label": "Alta"},
+            {"value": 2, "label": "Media-Alta"},
+            {"value": 3, "label": "Media"},
+            {"value": 4, "label": "Bassa"},
+            {"value": 5, "label": "Molto Bassa"}
+        ]
+        
+        tipologie_intervento = [
+            {"value": "scavo", "label": "Scavo Archeologico"},
+            {"value": "prospezione", "label": "Prospezione Geofisica"},
+            {"value": "ricerca", "label": "Ricerca di Superficie"},
+            {"value": "documentazione", "label": "Documentazione"},
+            {"value": "conservazione", "label": "Conservazione e Restauro"},
+            {"value": "monitoraggio", "label": "Monitoraggio"},
+            {"value": "altro", "label": "Altro"}
+        ]
+        
+        return templates.TemplateResponse(
+            "pages/giornale_cantiere/modifica_cantiere.html",
+            {
+                "request": request,
+                "cantiere": cantiere,
+                "site_info": site_info,
+                "stati_options": stati_options,
+                "priorita_options": priorita_options,
+                "tipologie_intervento": tipologie_intervento
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore pagina modifica cantiere {cantiere_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel caricamento della pagina modifica cantiere"
+        )
