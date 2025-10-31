@@ -278,12 +278,7 @@ app.include_router(
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 
-# 🏺 INCLUSIONE ROUTER ICCD API (draft) - API ICCD draft
-#app.include_router(
-#    iccd_api_router,
-#    tags=["iccd-api-draft"],
-#    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-#)
+
 
 # 🌍 INCLUSIONE ROUTER GEOGRAPHIC MAPS - API per mappe geografiche
 app.include_router(
