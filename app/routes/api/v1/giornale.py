@@ -133,7 +133,7 @@ async def v1_get_site_giornali(
                 # Query separata per ottenere informazioni del cantiere se necessario
                 from app.models.cantiere import Cantiere
                 cantiere_result = await db.execute(
-                    select(Cantiere).where(Cantiere.id == g.cantiere_id)
+                    select(Cantiere).where(Cantiere.id == UUID(g.cantiere_id))  # 🔥 FIX: Convert string to UUID object for proper comparison
                 )
                 cantiere = cantiere_result.scalar_one_or_none()
                 if cantiere:
@@ -275,7 +275,7 @@ async def v1_get_cantiere_giornali(
                 # Query separata per ottenere informazioni del cantiere se necessario
                 from app.models.cantiere import Cantiere
                 cantiere_result = await db.execute(
-                    select(Cantiere).where(Cantiere.id == g.cantiere_id)
+                    select(Cantiere).where(Cantiere.id == UUID(g.cantiere_id))  # 🔥 FIX: Convert string to UUID object for proper comparison
                 )
                 cantiere = cantiere_result.scalar_one_or_none()
                 if cantiere:
@@ -362,7 +362,7 @@ async def v1_create_giornale(
             cantiere_result = await db.execute(
                 select(Cantiere).where(
                     and_(
-                        Cantiere.id == UUID(cantiere_id),
+                        Cantiere.id == UUID(cantiere_id),  # 🔥 FIX: Convert string to UUID object for proper comparison with UUID column
                         Cantiere.site_id == str(site_id)  # 🔥 CRUCIALE: Il cantiere deve appartenere al sito
                     )
                 )
@@ -403,7 +403,7 @@ async def v1_create_giornale(
                 operatore_result = await db.execute(
                     select(OperatoreCantiere).where(
                         and_(
-                            OperatoreCantiere.id == UUID(op_id),  # Use UUID object directly
+                            OperatoreCantiere.id == op_id,
                             OperatoreCantiere.site_id == str(site_id)  # 🔥 CRUCIALE: L'operatore deve essere assegnato al sito
                         )
                     )
@@ -482,7 +482,7 @@ async def v1_update_giornale(
             cantiere_result = await db.execute(
                 select(Cantiere).where(
                     and_(
-                        Cantiere.id == UUID(giornale_data["cantiere_id"]),
+                        Cantiere.id == UUID(giornale_data["cantiere_id"]),  # 🔥 FIX: Convert string to UUID object for proper comparison with UUID column
                         Cantiere.site_id == str(site_id)  # 🔥 CRUCIALE: Il cantiere deve appartenere al sito
                     )
                 )
@@ -511,7 +511,7 @@ async def v1_update_giornale(
                     operatore_result = await db.execute(
                         select(OperatoreCantiere).where(
                             and_(
-                                OperatoreCantiere.id == UUID(op_id),  # Use UUID object directly
+                                OperatoreCantiere.id == op_id,
                                 OperatoreCantiere.site_id == str(site_id)  # 🔥 CRUCIALE: L'operatore deve essere assegnato al sito
                             )
                         )
