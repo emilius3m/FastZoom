@@ -10,7 +10,6 @@ from uuid import uuid4
 from typing import List
 
 from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Time, Integer, ForeignKey, Table, func
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database.base import Base
@@ -32,9 +31,9 @@ class CondizioniMeteoEnum(PyEnum):
 giornale_operatori_association = Table(
     'giornale_operatori',
     Base.metadata,
-    Column('id', UUID(as_uuid=True), primary_key=True, default=uuid4),
-    Column('giornale_id', UUID(as_uuid=True), ForeignKey('giornali_cantiere.id', ondelete='CASCADE'), nullable=False),
-    Column('operatore_id', UUID(as_uuid=True), ForeignKey('operatori_cantiere.id', ondelete='CASCADE'), nullable=False),
+    Column('id', String(36), primary_key=True, default=lambda: str(uuid4())),
+    Column('giornale_id', String(36), ForeignKey('giornali_cantiere.id', ondelete='CASCADE'), nullable=False),
+    Column('operatore_id', String(36), ForeignKey('operatori_cantiere.id', ondelete='CASCADE'), nullable=False),
     Column('created_at', DateTime(timezone=True), server_default=func.now())
 )
 
@@ -50,8 +49,8 @@ class OperatoreCantiere(Base):
     """
     __tablename__ = "operatori_cantiere"
     
-    # Chiave primaria UUID
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    # Chiave primaria UUID - Convertita in stringa per SQLite compatibility
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
     
     # Foreign key al sito archeologico
     site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=True, index=True)
@@ -123,12 +122,12 @@ class GiornaleCantiere(Base):
     """
     __tablename__ = "giornali_cantiere"
     
-    # Chiave primaria UUID
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    # Chiave primaria UUID - Convertita in stringa per SQLite compatibility
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
     
     # Riferimenti al sito archeologico e al cantiere specifico
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
-    cantiere_id = Column(UUID(as_uuid=True), ForeignKey("cantieri.id", ondelete="CASCADE"), nullable=True, index=True)
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
+    cantiere_id = Column(String(36), ForeignKey("cantieri.id", ondelete="CASCADE"), nullable=True, index=True)
     
     # ===== INFORMAZIONI TEMPORALI =====
     data = Column(Date, nullable=False, index=True)
@@ -184,7 +183,7 @@ class GiornaleCantiere(Base):
     forniture = Column(Text, nullable=True)  # Materiali consegnati in cantiere
     
     # ===== VALIDAZIONE E RESPONSABILITÀ =====
-    responsabile_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    responsabile_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     responsabile_nome = Column(String(200), nullable=True)  # Nome leggibile per report
     
     # Firma digitale e validazione

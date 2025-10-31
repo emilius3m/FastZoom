@@ -702,11 +702,19 @@ async def v1_get_site_operatori(
     from sqlalchemy.orm import selectinload
     
     try:
+        # 🐛 DEBUG LOG: Inizio funzione
+        from loguru import logger
+        logger.info(f"🐛 [DEBUG] v1_get_site_operatori - site_id={site_id}, type={type(site_id)}")
+        logger.info(f"🐛 [DEBUG] site_id str representation: {str(site_id)}")
+        
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
+        logger.info(f"🐛 [DEBUG] site_info: {site_info}")
         
         # 🔥 NUOVA LOGICA: Query solo per operatori assegnati a questo sito
-        query = select(OperatoreCantiere).where(OperatoreCantiere.site_id == str(site_id))
+        site_id_str = str(site_id)
+        logger.info(f"🐛 [DEBUG] site_id_str per query: {site_id_str}")
+        query = select(OperatoreCantiere).where(OperatoreCantiere.site_id == site_id_str)
         
         # Applica filtri aggiuntivi
         if search:
@@ -730,23 +738,33 @@ async def v1_get_site_operatori(
         
         result = await db.execute(query)
         operatori = result.scalars().all()
+        logger.info(f"🐛 [DEBUG] Trovati {len(operatori)} operatori per il sito")
         
         # Conteggio giornali per ogni operatore in questo sito
         operatori_data = []
-        for op in operatori:
+        for i, op in enumerate(operatori):
+            logger.info(f"🐛 [DEBUG] Operatore {i+1}: id={op.id}, type={type(op.id)}, str={str(op.id)}")
+            logger.info(f"🐛 [DEBUG] Operatore {i+1}: nome={op.nome} {op.cognome}")
+            logger.info(f"🐛 [DEBUG] Operatore {i+1}: site_id={op.site_id}, type={type(op.site_id)}")
+            
             # Query per contare i giornali di questo sito dove questo operatore ha lavorato
             # Convert both values to strings for consistent comparison
+            op_id_str = str(op.id)
+            logger.info(f"🐛 [DEBUG] op_id_str: {op_id_str}")
+            
+            logger.info(f"🐛 [DEBUG] Eseguendo query per contare giornali dell'operatore...")
             giornali_count_result = await db.execute(
                 select(func.count(GiornaleCantiere.id))
                 .join(giornale_operatori_association, GiornaleCantiere.id == giornale_operatori_association.c.giornale_id)
                 .where(
                     and_(
-                        GiornaleCantiere.site_id == str(site_id),
-                        giornale_operatori_association.c.operatore_id == str(op.id)  # Convert UUID to string for comparison
+                        GiornaleCantiere.site_id == site_id_str,
+                        giornale_operatori_association.c.operatore_id == op_id_str  # Convert UUID to string for comparison
                     )
                 )
             )
             giornali_count = giornali_count_result.scalar() or 0
+            logger.info(f"🐛 [DEBUG] Operatore {i+1}: trovati {giornali_count} giornali")
            
             operatori_data.append({
                 "id": str(op.id),
@@ -767,7 +785,8 @@ async def v1_get_site_operatori(
                 "can_work_on_site": op.site_id == str(site_id),  # 🔥 NUOVO: Verifica se può lavorare su questo sito
             })
         
-        return {
+        logger.info(f"🐛 [DEBUG] Preparando risposta finale con {len(operatori_data)} operatori")
+        response_data = {
             "site_id": str(site_id),
             "operatori": operatori_data,
             "count": len(operatori_data),
@@ -779,10 +798,15 @@ async def v1_get_site_operatori(
                 "stato": stato
             }
         }
+        logger.info(f"🐛 [DEBUG] Risposta preparata con successo")
+        return response_data
         
     except Exception as e:
         from loguru import logger
-        logger.error(f"Errore recupero operatori sito {site_id}: {str(e)}")
+        logger.error(f"🐛 [DEBUG] Errore recupero operatori sito {site_id}: {str(e)}")
+        logger.error(f"🐛 [DEBUG] Tipo di errore: {type(e)}")
+        import traceback
+        logger.error(f"🐛 [DEBUG] Stack trace completo: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nel recupero degli operatori del sito",
