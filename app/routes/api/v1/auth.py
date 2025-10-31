@@ -221,8 +221,7 @@ async def v1_login_json(
         user = await AuthService.authenticate_user(db, credentials.username, credentials.password)
         
         if not user:
-            # Log tentativo fallito
-            await UserActivity.log_login(db, None, success=False, ip_address=request.client.host)
+            # Skip logging failed login attempts without user_id to avoid NOT NULL constraint
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Username o password non corretti",
@@ -254,7 +253,7 @@ async def v1_login_json(
         await db.commit()
         
         # Log login riuscito
-        await UserActivity.log_login(db, str(user.id), success=True, ip_address=request.client.host)
+        await UserActivity.log_login(db, UUID(str(user.id)), success=True, ip_address=request.client.host)
         
         # Ottieni siti utente
         user_sites = await AuthService.get_user_sites(db, str(user.id))

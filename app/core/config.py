@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     default_site_redirect: bool = True
     jwt_multi_site_enabled: bool = True
     jwt_expires_hours: int = 24
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # Access tokens last 15 minutes
     max_sites_per_user: int = 50
 
     # Storage Fotografico

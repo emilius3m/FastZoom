@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from fastapi import HTTPException, status
+from loguru import logger
 
 from app.models import User
 from app.models.sites import ArchaeologicalSite, SiteStatusEnum
@@ -268,3 +269,22 @@ class AuthService:
             "site_selection_enabled": settings.site_selection_enabled,
             "museum_name": settings.museum_name
         }
+
+    @staticmethod
+    async def get_user_sites(db: AsyncSession, user_id: str) -> List[Dict[str, Any]]:
+        """
+        Ottieni siti accessibili dall'utente (versione legacy per compatibilità)
+        
+        Args:
+            db: Sessione database
+            user_id: ID utente come stringa
+            
+        Returns:
+            Lista dizionari con info siti
+        """
+        try:
+            user_uuid = UUID(user_id)
+            return await AuthService.get_user_sites_with_permissions(db, user_uuid)
+        except ValueError:
+            logger.error(f"Invalid user_id format: {user_id}")
+            return []

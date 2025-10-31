@@ -6,6 +6,7 @@ from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from loguru import logger
 
 from app.core.config import get_settings
 from app.database.db import get_async_session
@@ -16,11 +17,13 @@ from app.models import User
 settings = get_settings()
 
 # Configurazione sicurezza - usa bcrypt con handling per compatibilità
+# Fix for bcrypt 5.0.0 compatibility issue with passlib
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto",
     bcrypt__rounds=12,
-    bcrypt__ident="2b"  # Usa identificatore standard per compatibilità
+    # Remove bcrypt-specific settings that cause compatibility issues
+    # Use default passlib settings for better compatibility
 )
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
@@ -36,10 +39,36 @@ class SecurityService:
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """Verifica password con hash bcrypt"""
-        # Tronca la password a 72 byte come richiesto da bcrypt
-        if len(plain_password.encode('utf-8')) > 72:
-            plain_password = plain_password[:72]
-        return pwd_context.verify(plain_password, hashed_password)
+        try:
+            # DIAGNOSTIC: Log password details
+            password_bytes = plain_password.encode('utf-8')
+            password_length = len(password_bytes)
+            logger.info(f"[DEBUG] Password verification: length={password_length} bytes, truncated={password_length > 72}")
+            
+            # Tronca la password a 72 byte come richiesto da bcrypt
+            if password_length > 72:
+                plain_password = plain_password[:72]
+                logger.info(f"[DEBUG] Password truncated to 72 characters")
+            
+            # DIAGNOSTIC: Try to get bcrypt version
+            try:
+                import bcrypt
+                bcrypt_version = getattr(bcrypt, '__version__', 'unknown')
+                logger.info(f"[DEBUG] Bcrypt version: {bcrypt_version}")
+            except Exception as e:
+                logger.error(f"[DEBUG] Error getting bcrypt version: {e}")
+            
+            # DIAGNOSTIC: Log before verification
+            logger.info(f"[DEBUG] Attempting password verification with passlib")
+            result = pwd_context.verify(plain_password, hashed_password)
+            logger.info(f"[DEBUG] Password verification result: {result}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"[DEBUG] Password verification failed: {str(e)}")
+            logger.error(f"[DEBUG] Exception type: {type(e).__name__}")
+            raise
     
     @staticmethod
     def get_password_hash(password: str) -> str:
