@@ -1,8 +1,18 @@
+import sys
 import os
 import multiprocessing
 from loguru import logger
 import uvicorn
 from app.core.config import get_settings
+
+# Configure Loguru for development visibility
+logger.remove()  # Remove default handler
+logger.add(
+    sys.stderr,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+    level="DEBUG",  # Show all levels including DEBUG
+    colorize=True
+)
 
 def get_worker_count():
     """
@@ -23,7 +33,7 @@ def run_development():
         host="127.0.0.1",
         reload=True,
         port=8000,
-        log_level="info"
+        log_level="debug"
     )
 
 def run_production():
@@ -48,7 +58,7 @@ def run_production():
         "timeout_keep_alive": 30,   # Timeout keep-alive
         "preload": True,            # Pre-carica l'applicazione prima di forkare i worker
         "access_log": True,         # Abilita log di accesso
-        "log_level": "info",
+        "log_level": "debug",
         "loop": "uvloop",           # Event loop ad alte prestazioni
         "http": "httptools"         # HTTP parser ad alte prestazioni
     }
