@@ -438,15 +438,26 @@ function giornaleSitoAppCompleto() {
             };
         },
         
-        // API Calls per Modal
+        // API Calls per Modal - FIXED VERSION
         async loadOperatoriDisponibili() {
             console.log('DEBUG: Inizio caricamento operatori per sito:', this.siteId);
+            
+            // Check if user is authenticated first
+            if (!window.currentUser || !window.currentUser.isAuthenticated) {
+                console.error('DEBUG: User not authenticated, cannot load operatori');
+                this.operatori_disponibili = [];
+                return;
+            }
+            
             try {
                 const response = await fetch(`/api/v1/giornale/sites/${this.siteId}/operatori`, {
+                    method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
-                    }
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'include'  // Include cookies for session-based authentication
                 });
                 
                 console.log('DEBUG: Response status:', response.status);
@@ -466,20 +477,47 @@ function giornaleSitoAppCompleto() {
                         console.warn('DEBUG: Formato risposta non previsto:', data);
                         this.operatori_disponibili = [];
                     }
+                } else if (response.status === 401) {
+                    console.error('DEBUG: Unauthorized - user not authenticated');
+                    window.location.href = '/login';
+                    this.operatori_disponibili = [];
+                } else if (response.status === 403) {
+                    console.error('DEBUG: Forbidden - user does not have access to this site');
+                    this.operatori_disponibili = [];
+                    alert('Non hai i permessi per accedere agli operatori di questo sito.');
+                } else if (response.status === 404) {
+                    console.error('DEBUG: Site not found');
+                    this.operatori_disponibili = [];
+                    alert('Sito non trovato.');
                 } else {
                     console.log('DEBUG: Errore caricamento operatori, status:', response.status);
                     const errorText = await response.text();
                     console.log('DEBUG: Error response:', errorText);
+                    
+                    // Check if it's a redirect to login page
+                    if (response.redirected && response.url.includes('/login')) {
+                        console.error('DEBUG: Redirected to login page - authentication required');
+                        window.location.href = response.url;
+                    } else {
+                        alert(`Errore nel caricamento degli operatori: ${response.status}`);
+                    }
                     this.operatori_disponibili = [];
                 }
                 
             } catch (error) {
                 console.error('Errore caricamento operatori:', error);
                 this.operatori_disponibili = [];
+                
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    console.error('DEBUG: Network error - server may be down');
+                    alert('Errore di connessione al server. Riprova più tardi.');
+                } else {
+                    alert('Errore durante il caricamento degli operatori.');
+                }
             }
             
             console.log('DEBUG: Fine caricamento operatori, operatori_disponibili.length:', this.operatori_disponibili.length);
-        },
+        },      },
         
         async saveGiornale() {
             this.saving = true;

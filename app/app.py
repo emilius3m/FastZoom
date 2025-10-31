@@ -18,7 +18,6 @@ from app.core.security import get_current_user_id_with_blacklist, get_current_us
 from app.core.config import get_settings
 
 # Route imports
-from app.routes.api.auth import router as auth_api_router
 from app.database.db import create_db_and_tables, get_async_session
 from app.exception import http_exception_handler
 
@@ -152,8 +151,7 @@ def get_csrf_config():
 # Static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Include route API - DEPRECATED: Will be replaced by API v1
-##app.include_router(auth_api_router, tags=["Authentication - Deprecated"])
+# Include route API - DEPRECATED: Removed old auth.py router, now using API v1
 
 # 🆕 NUOVO: Includi router API v1 riorganizzato con backward compatibility
 from app.routes.api.v1 import api_v1_router

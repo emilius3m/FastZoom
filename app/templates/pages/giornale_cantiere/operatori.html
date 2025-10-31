@@ -23,10 +23,18 @@
                         <a href="/giornale-cantiere" class="text-gray-700 hover:text-blue-600">Giornale Cantiere</a>
                     </div>
                 </li>
+                {% if site %}
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <a href="/giornale-cantiere/site/{{ site.id if site else 'unknown' }}" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">{{ site.name if site else "Sito" }}</a>
+                    </div>
+                </li>
+                {% endif %}
                 <li aria-current="page">
                     <div class="flex items-center">
                         <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <span class="text-gray-500">Operatori</span>
+                        <span class="text-gray-500 dark:text-gray-400">Operatori</span>
                     </div>
                 </li>
             </ol>
@@ -42,6 +50,12 @@
             </div>
             
             <div class="flex gap-3">
+                {% if site %}
+                <a href="/giornale-cantiere/site/{{ site.id if site else 'unknown' }}"
+                   class="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-4 py-2 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800/40 transition">
+                    <i class="fas fa-arrow-left mr-2"></i>Torna al Sito
+                </a>
+                {% endif %}
                 <button @click="showFilters = !showFilters"
                         class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition">
                     <i class="fas fa-filter mr-2"></i>Filtri
@@ -50,7 +64,7 @@
                         class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-200 transition">
                     <i class="fas fa-download mr-2"></i>Export
                 </button>
-                <button @click="openCreateModal()" 
+                <button @click="openCreateModal()"
                         class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
                     <i class="fas fa-plus mr-2"></i>Nuovo Operatore
                 </button>
