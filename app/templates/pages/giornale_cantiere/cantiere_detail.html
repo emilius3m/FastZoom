@@ -539,11 +539,12 @@ function cantiereDetailApp() {
         },
 
         // Modal methods
-        openGiornaleModal() {
+        async openGiornaleModal() {
             this.modalMode = 'giornale';
             this.showCreateModal = true;
             this.editingGiornale = false;
             this.resetForm();
+            await this.loadOperatoriDisponibili();
         },
 
         openEditModal() {
@@ -758,6 +759,67 @@ function cantiereDetailApp() {
             setTimeout(() => {
                 this.alert.show = false;
             }, 5000);
+        },
+
+        // Load operators for the modal
+        async loadOperatoriDisponibili() {
+            console.log('DEBUG: Inizio caricamento operatori per sito:', '{{ site.id }}');
+            
+            try {
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/operatori`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'include'
+                });
+                
+                console.log('DEBUG: Response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('DEBUG: Operatori response:', data);
+                    
+                    // Handle site-specific response format
+                    if (data.operatori && Array.isArray(data.operatori)) {
+                        this.operatori_disponibili = data.operatori;
+                        console.log('DEBUG: Operatori caricati (site-specific):', this.operatori_disponibili.length);
+                    } else if (Array.isArray(data)) {
+                        this.operatori_disponibili = data;
+                        console.log('DEBUG: Operatori caricati (array):', this.operatori_disponibili.length);
+                    } else {
+                        console.warn('DEBUG: Formato risposta non previsto:', data);
+                        this.operatori_disponibili = [];
+                    }
+                } else {
+                    console.error('DEBUG: Errore caricamento operatori, status:', response.status);
+                    const errorText = await response.text();
+                    console.log('DEBUG: Error response:', errorText);
+                    
+                    // Check if it's a redirect to login page
+                    if (response.redirected && response.url.includes('/login')) {
+                        console.error('DEBUG: Redirected to login page - authentication required');
+                        window.location.href = response.url;
+                    } else {
+                        console.error('DEBUG: Errore nel caricamento degli operatori');
+                    }
+                    this.operatori_disponibili = [];
+                }
+                
+            } catch (error) {
+                console.error('Errore caricamento operatori:', error);
+                this.operatori_disponibili = [];
+                
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    console.error('DEBUG: Network error - server may be down');
+                } else {
+                    console.error('DEBUG: Errore durante il caricamento degli operatori');
+                }
+            }
+            
+            console.log('DEBUG: Fine caricamento operatori, operatori_disponibili.length:', this.operatori_disponibili.length);
         }
     }
 }
