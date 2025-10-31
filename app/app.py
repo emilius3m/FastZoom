@@ -294,29 +294,12 @@ app.include_router(
 
 
 
-# Import del router giornale cantiere (LEGACY - For backward compatibility)
-try:
-    from app.routes.api.giornale_cantiere import router as giornale_cantiere_api_router
-    GIORNALE_API_EXISTS = True
-    logger.info("Legacy giornale_cantiere API router loaded for backward compatibility")
-except ImportError:
-    logger.warning("Giornale cantiere API route not found")
-    GIORNALE_API_EXISTS = False
-
 try:
     from app.routes.view.giornale_cantiere import router as giornale_cantiere_view_router
     GIORNALE_VIEW_EXISTS = True
 except ImportError:
     logger.warning("Giornale cantiere view route not found")
     GIORNALE_VIEW_EXISTS = False
-
-# Registrazione router API legacy per backward compatibility
-if GIORNALE_API_EXISTS:
-    app.include_router(
-        giornale_cantiere_api_router,
-        tags=["API - Giornale Cantiere Legacy"],
-        dependencies=[Depends(get_current_user_id_with_blacklist)]
-    )
 
 # Registrazione router view
 if GIORNALE_VIEW_EXISTS:

@@ -46,6 +46,13 @@ try:
 except ImportError:
     print("WARNING: Giornale di cantiere models not found - create them if needed")
 
+# 🆕 AGGIUNTO: Import modello Cantiere
+try:
+    from app.models.cantiere import Cantiere
+    print("SUCCESS: Cantiere model imported")
+except ImportError:
+    print("WARNING: Cantiere model not found - create it if needed")
+
 # Verifica che tutti i modelli siano stati importati
 print("Imported models:")
 for cls in Base.registry._class_registry.values():

@@ -87,11 +87,11 @@ async def v1_get_site_giornali(
         site_info = verify_site_access(site_id, user_sites)
 
         # Query base
-        query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == site_id)
+        query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == str(site_id))
         
         # Filtra per cantiere specifico se specificato
         if cantiere_id:
-            query = query.where(GiornaleCantiere.cantiere_id == cantiere_id)
+            query = query.where(GiornaleCantiere.cantiere_id == str(cantiere_id))
 
         # Applica filtri
         if data_da:
@@ -133,7 +133,7 @@ async def v1_get_site_giornali(
                 # Query separata per ottenere informazioni del cantiere se necessario
                 from app.models.cantiere import Cantiere
                 cantiere_result = await db.execute(
-                    select(Cantiere).where(Cantiere.id == g.cantiere_id)
+                    select(Cantiere).where(Cantiere.id == str(g.cantiere_id))
                 )
                 cantiere = cantiere_result.scalar_one_or_none()
                 if cantiere:
@@ -230,8 +230,8 @@ async def v1_get_cantiere_giornali(
         # Query base per il cantiere specifico
         query = select(GiornaleCantiere).where(
             and_(
-                GiornaleCantiere.site_id == site_id,
-                GiornaleCantiere.cantiere_id == cantiere_id
+                GiornaleCantiere.site_id == str(site_id),
+                GiornaleCantiere.cantiere_id == str(cantiere_id)
             )
         )
 
@@ -275,7 +275,7 @@ async def v1_get_cantiere_giornali(
                 # Query separata per ottenere informazioni del cantiere se necessario
                 from app.models.cantiere import Cantiere
                 cantiere_result = await db.execute(
-                    select(Cantiere).where(Cantiere.id == g.cantiere_id)
+                    select(Cantiere).where(Cantiere.id == str(g.cantiere_id))
                 )
                 cantiere = cantiere_result.scalar_one_or_none()
                 if cantiere:
@@ -348,15 +348,37 @@ async def v1_create_giornale(
 ):
     """
     Crea un nuovo giornale di cantiere per un sito specifico.
+    
+    🔥 NUOVA VALIDAZIONE: Verifica che gli operatori possano lavorare solo su cantieri del loro sito.
     """
     try:
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
         
+        # 🔥 NUOVA VALIDAZIONE: Verifica che il cantiere appartenga al sito specificato
+        cantiere_id = giornale_data.get("cantiere_id")
+        if cantiere_id:
+            from app.models.cantiere import Cantiere
+            cantiere_result = await db.execute(
+                select(Cantiere).where(
+                    and_(
+                        Cantiere.id == str(UUID(cantiere_id)),
+                        Cantiere.site_id == str(site_id)  # 🔥 CRUCIALE: Il cantiere deve appartenere al sito
+                    )
+                )
+            )
+            cantiere = cantiere_result.scalar_one_or_none()
+            
+            if not cantiere:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Il cantiere {cantiere_id} non appartiene al sito {site_id}"
+                )
+        
         # Crea nuovo giornale
         nuovo_giornale = GiornaleCantiere(
-            site_id=site_id,
-            cantiere_id=UUID(giornale_data.get("cantiere_id")) if giornale_data.get("cantiere_id") else None,
+            site_id=str(site_id),  # Convert UUID to string for SQLite compatibility
+            cantiere_id=str(UUID(cantiere_id)) if cantiere_id else None,
             data=date.fromisoformat(giornale_data.get("data")) if giornale_data.get("data") else date.today(),
             ora_inizio=time.fromisoformat(giornale_data.get("ora_inizio", "09:00")),
             ora_fine=time.fromisoformat(giornale_data.get("ora_fine", "18:00")),
@@ -364,7 +386,7 @@ async def v1_create_giornale(
             condizioni_meteo=giornale_data.get("condizioni_meteo", "soleggiato"),
             note_generali=giornale_data.get("note_generali", ""),
             problematiche=giornale_data.get("problematiche", ""),
-            responsabile_id=current_user_id,
+            responsabile_id=str(current_user_id),  # Convert UUID to string for SQLite compatibility
             compilatore=giornale_data.get("compilatore", ""),
             validato=False
         )
@@ -373,24 +395,45 @@ async def v1_create_giornale(
         await db.commit()
         await db.refresh(nuovo_giornale)
         
-        # Aggiungi operatori se specificati
+        # 🔥 NUOVA VALIDAZIONE: Verifica che gli operatori possano lavorare su questo sito
         operatori_ids = giornale_data.get("operatori_ids", [])
         if operatori_ids:
             for op_id in operatori_ids:
+                # Verifica che l'operatore esista e sia assegnato a questo sito
+                operatore_result = await db.execute(
+                    select(OperatoreCantiere).where(
+                        and_(
+                            OperatoreCantiere.id == str(UUID(op_id)),  # Convert UUID to string
+                            OperatoreCantiere.site_id == str(site_id)  # 🔥 CRUCIALE: L'operatore deve essere assegnato al sito
+                        )
+                    )
+                )
+                operatore = operatore_result.scalar_one_or_none()
+                
+                if not operatore:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"L'operatore {op_id} non è assegnato al sito {site_id} e non può lavorare su questo giornale"
+                    )
+                
+                # Aggiungi l'operatore al giornale
                 await db.execute(
                     giornale_operatori_association.insert().values(
-                        giornale_id=nuovo_giornale.id,
-                        operatore_id=UUID(op_id)
+                        giornale_id=str(nuovo_giornale.id),  # Convert UUID to string
+                        operatore_id=str(UUID(op_id))  # Convert UUID to string
                     )
                 )
             await db.commit()
         
         return {
             "id": str(nuovo_giornale.id),
-            "message": "Giornale creato con successo",
-            "site_info": site_info
+            "message": "Giornale creato con successo con validazione operatori-sito",
+            "site_info": site_info,
+            "operatori_validati": len(operatori_ids) if operatori_ids else 0
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Errore creazione giornale: {str(e)}")
         raise HTTPException(
@@ -409,6 +452,8 @@ async def v1_update_giornale(
 ):
     """
     Aggiorna un giornale di cantiere esistente.
+    
+    🔥 NUOVA VALIDAZIONE: Verifica che cantieri e operatori appartengano al sito.
     """
     try:
         # Verifica accesso al sito
@@ -418,8 +463,8 @@ async def v1_update_giornale(
         result = await db.execute(
             select(GiornaleCantiere).where(
                 and_(
-                    GiornaleCantiere.id == giornale_id,
-                    GiornaleCantiere.site_id == site_id
+                    GiornaleCantiere.id == str(giornale_id),
+                    GiornaleCantiere.site_id == str(site_id)
                 )
             )
         )
@@ -431,7 +476,63 @@ async def v1_update_giornale(
                 detail="Giornale non trovato"
             )
         
-        # Aggiorna campi
+        # 🔥 NUOVA VALIDAZIONE: Verifica che il cantiere appartenga al sito
+        if "cantiere_id" in giornale_data and giornale_data["cantiere_id"]:
+            from app.models.cantiere import Cantiere
+            cantiere_result = await db.execute(
+                select(Cantiere).where(
+                    and_(
+                        Cantiere.id == str(UUID(giornale_data["cantiere_id"])),
+                        Cantiere.site_id == str(site_id)  # 🔥 CRUCIALE: Il cantiere deve appartenere al sito
+                    )
+                )
+            )
+            cantiere = cantiere_result.scalar_one_or_none()
+            
+            if not cantiere:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Il cantiere {giornale_data['cantiere_id']} non appartiene al sito {site_id}"
+                )
+        
+        # 🔥 NUOVA VALIDAZIONE: Verifica che gli operatori possano lavorare su questo sito
+        if "operatori_ids" in giornale_data:
+            operatori_ids = giornale_data["operatori_ids"]
+            if operatori_ids:
+                # Rimuovi vecchie associazioni
+                await db.execute(
+                    giornale_operatori_association.delete().where(
+                        giornale_operatori_association.c.giornale_id == str(giornale_id)  # Convert UUID to string
+                    )
+                )
+                
+                # Aggiungi nuove associazioni con validazione
+                for op_id in operatori_ids:
+                    operatore_result = await db.execute(
+                        select(OperatoreCantiere).where(
+                            and_(
+                                OperatoreCantiere.id == str(UUID(op_id)),  # Convert UUID to string
+                                OperatoreCantiere.site_id == str(site_id)  # 🔥 CRUCIALE: L'operatore deve essere assegnato al sito
+                            )
+                        )
+                    )
+                    operatore = operatore_result.scalar_one_or_none()
+                    
+                    if not operatore:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"L'operatore {op_id} non è assegnato al sito {site_id}"
+                        )
+                    
+                    # Aggiungi l'operatore al giornale
+                    await db.execute(
+                        giornale_operatori_association.insert().values(
+                            giornale_id=str(giornale_id),  # Convert UUID to string
+                            operatore_id=str(UUID(op_id))  # Convert UUID to string
+                        )
+                    )
+        
+        # Aggiorna campi base
         if "data" in giornale_data:
             giornale.data = date.fromisoformat(giornale_data["data"])
         if "ora_inizio" in giornale_data:
@@ -439,7 +540,7 @@ async def v1_update_giornale(
         if "ora_fine" in giornale_data:
             giornale.ora_fine = time.fromisoformat(giornale_data["ora_fine"])
         if "cantiere_id" in giornale_data:
-            giornale.cantiere_id = UUID(giornale_data["cantiere_id"]) if giornale_data["cantiere_id"] else None
+            giornale.cantiere_id = str(UUID(giornale_data["cantiere_id"])) if giornale_data["cantiere_id"] else None
         if "descrizione_lavori" in giornale_data:
             giornale.descrizione_lavori = giornale_data["descrizione_lavori"]
         if "condizioni_meteo" in giornale_data:
@@ -455,8 +556,9 @@ async def v1_update_giornale(
         
         return {
             "id": str(giornale.id),
-            "message": "Giornale aggiornato con successo",
-            "site_info": site_info
+            "message": "Giornale aggiornato con successo con validazione operatori-sito",
+            "site_info": site_info,
+            "operatori_validati": len(operatori_ids) if "operatori_ids" in giornale_data else 0
         }
         
     except HTTPException:
@@ -487,8 +589,8 @@ async def v1_delete_giornale(
         result = await db.execute(
             select(GiornaleCantiere).where(
                 and_(
-                    GiornaleCantiere.id == giornale_id,
-                    GiornaleCantiere.site_id == site_id
+                    GiornaleCantiere.id == str(giornale_id),
+                    GiornaleCantiere.site_id == str(site_id)
                 )
             )
         )
@@ -503,7 +605,7 @@ async def v1_delete_giornale(
         # Rimuovi associazioni operatori
         await db.execute(
             giornale_operatori_association.delete().where(
-                giornale_operatori_association.c.giornale_id == giornale_id
+                giornale_operatori_association.c.giornale_id == str(giornale_id)  # Convert UUID to string
             )
         )
         
@@ -574,8 +676,10 @@ async def v1_get_site_operatori(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Recupera tutti gli operatori disponibili per un sito archeologico.
-    Restituisce tutti gli operatori che possono lavorare su questo sito.
+    Recupera tutti gli operatori assegnati a un sito archeologico specifico.
+    
+    🔥 NUOVA LOGICA: Restituisce SOLO gli operatori con site_id == site_id.
+    Gli operatori possono lavorare solo su cantieri del loro sito di assegnazione.
     
     Args:
         site_id: ID del sito archeologico
@@ -587,7 +691,7 @@ async def v1_get_site_operatori(
         stato: Filtra per stato (attivo/inattivo)
     
     Returns:
-        Lista di tutti gli operatori disponibili per il sito con metadati
+        Lista degli operatori assegnati a questo sito con metadati
     """
     from app.models.giornale_cantiere import (
         GiornaleCantiere,
@@ -601,8 +705,8 @@ async def v1_get_site_operatori(
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
         
-        # Query per tutti gli operatori attivi (non solo quelli con giornali)
-        query = select(OperatoreCantiere)
+        # 🔥 NUOVA LOGICA: Query solo per operatori assegnati a questo sito
+        query = select(OperatoreCantiere).where(OperatoreCantiere.site_id == str(site_id))
         
         # Applica filtri aggiuntivi
         if search:
@@ -627,7 +731,7 @@ async def v1_get_site_operatori(
         result = await db.execute(query)
         operatori = result.scalars().all()
         
-        # Conteggio giornali per ogni operatore in questo sito (0 se non ha ancora lavorato)
+        # Conteggio giornali per ogni operatore in questo sito
         operatori_data = []
         for op in operatori:
             # Query per contare i giornali di questo sito dove questo operatore ha lavorato
@@ -636,13 +740,13 @@ async def v1_get_site_operatori(
                 .join(giornale_operatori_association, GiornaleCantiere.id == giornale_operatori_association.c.giornale_id)
                 .where(
                     and_(
-                        GiornaleCantiere.site_id == site_id,
-                        giornale_operatori_association.c.operatore_id == op.id
+                        GiornaleCantiere.site_id == str(site_id),
+                        giornale_operatori_association.c.operatore_id == str(op.id)
                     )
                 )
             )
             giornali_count = giornali_count_result.scalar() or 0
-            
+           
             operatori_data.append({
                 "id": str(op.id),
                 "nome": op.nome,
@@ -655,10 +759,11 @@ async def v1_get_site_operatori(
                 "qualifiche": op.qualifica.split(",") if op.qualifica else [],
                 "stato": "attivo" if op.is_active else "inattivo",
                 "ore_totali": op.ore_totali or 0,
-                "giornali_count": giornali_count,  # Potrebbe essere 0 se non ha ancora lavorato su questo sito
-                "site_id": str(site_id),
+                "giornali_count": giornali_count,
+                "site_id": str(op.site_id),  # 🔥 NUOVO: Include il site_id dell'operatore
                 "note": op.note,
-                "available_for_site": True,  # Indica che questo operatore può essere assegnato al sito
+                "assigned_to_site": True,  # 🔥 NUOVO: Indica che l'operatore è assegnato a questo sito
+                "can_work_on_site": op.site_id == site_id,  # 🔥 NUOVO: Verifica se può lavorare su questo sito
             })
         
         return {
@@ -691,14 +796,17 @@ async def v1_create_operatore(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Crea un nuovo operatore di cantiere.
+    Crea un nuovo operatore di cantiere assegnato a un sito specifico.
+    
+    L'operatore potrà lavorare solo su cantieri appartenenti a questo sito.
     """
     try:
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
         
-        # Crea nuovo operatore
+        # Crea nuovo operatore con site_id obbligatorio
         nuovo_operatore = OperatoreCantiere(
+            site_id=str(site_id),  # 🔥 NUOVO: Associa l'operatore al sito (convert UUID to string)
             nome=operatore_data.get("nome"),
             cognome=operatore_data.get("cognome"),
             codice_fiscale=operatore_data.get("codice_fiscale"),
@@ -718,7 +826,8 @@ async def v1_create_operatore(
         
         return {
             "id": str(nuovo_operatore.id),
-            "message": "Operatore creato con successo",
+            "site_id": str(site_id),  # 🔥 NUOVO: Include site_id nella risposta
+            "message": "Operatore creato con successo e assegnato al sito",
             "site_info": site_info
         }
         
@@ -742,7 +851,7 @@ async def v1_update_operatore(
     try:
         # Carica operatore esistente
         result = await db.execute(
-            select(OperatoreCantiere).where(OperatoreCantiere.id == operatore_id)
+            select(OperatoreCantiere).where(OperatoreCantiere.id == str(operatore_id))
         )
         operatore = result.scalar_one_or_none()
         
@@ -801,7 +910,7 @@ async def v1_get_general_stats(
     Recupera statistiche generali per tutti i siti accessibili.
     """
     try:
-        site_ids = [UUID(site["id"]) for site in user_sites]
+        site_ids = [str(UUID(site["id"])) for site in user_sites]
         if not site_ids:
             return {
                 "siti_totali": 0,
@@ -869,7 +978,7 @@ async def v1_get_site_stats(
         # Count total journals for site
         totali_result = await db.execute(
             select(func.count(GiornaleCantiere.id)).where(
-                GiornaleCantiere.site_id == site_id
+                GiornaleCantiere.site_id == str(site_id)
             )
         )
         total_giornali = totali_result.scalar() or 0
@@ -878,7 +987,7 @@ async def v1_get_site_stats(
         validati_result = await db.execute(
             select(func.count(GiornaleCantiere.id)).where(
                 and_(
-                    GiornaleCantiere.site_id == site_id,
+                    GiornaleCantiere.site_id == str(site_id),
                     GiornaleCantiere.validato.is_(True),
                 )
             )
@@ -889,7 +998,7 @@ async def v1_get_site_stats(
         operatori_result = await db.execute(
             select(func.count(distinct(OperatoreCantiere.id)))
             .join(GiornaleCantiere.operatori)
-            .where(GiornaleCantiere.site_id == site_id)
+            .where(GiornaleCantiere.site_id == str(site_id))
         )
         operatori_attivi = operatori_result.scalar() or 0
 
@@ -976,11 +1085,15 @@ async def v1_get_all_operatori(
     ruolo: Optional[str] = Query(None),
     specializzazione: Optional[str] = Query(None),
     stato: Optional[str] = Query(None),
+    site_id: Optional[UUID] = Query(None, description="Filtra operatori per sito specifico"),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
     Recupera tutti gli operatori disponibili nel sistema.
+    
+    🔥 NUOVA LOGICA: Se specificato site_id, filtra solo operatori assegnati a quel sito.
     
     Args:
         skip: Numero di record da saltare (paginazione)
@@ -989,13 +1102,23 @@ async def v1_get_all_operatori(
         ruolo: Filtra per ruolo dell'operatore
         specializzazione: Filtra per specializzazione
         stato: Filtra per stato (attivo/inattivo)
+        site_id: 🔥 NUOVO: Filtra operatori per sito specifico
     
     Returns:
         Lista di tutti gli operatori disponibili con metadati
     """
     try:
-        # Query per tutti gli operatori
+        # 🔥 NUOVA LOGICA: Verifica accesso al sito se specificato
+        site_info = None
+        if site_id:
+            site_info = verify_site_access(site_id, user_sites)
+        
+        # Query base per operatori
         query = select(OperatoreCantiere)
+        
+        # 🔥 NUOVA LOGICA: Filtra per sito se specificato
+        if site_id:
+            query = query.where(OperatoreCantiere.site_id == str(site_id))
         
         # Applica filtri aggiuntivi
         if search:
@@ -1023,7 +1146,7 @@ async def v1_get_all_operatori(
         # Prepara dati di risposta
         operatori_data = []
         for op in operatori:
-            operatori_data.append({
+            operatore_dict = {
                 "id": str(op.id),
                 "nome": op.nome,
                 "cognome": op.cognome,
@@ -1036,9 +1159,34 @@ async def v1_get_all_operatori(
                 "stato": "attivo" if op.is_active else "inattivo",
                 "ore_totali": op.ore_totali or 0,
                 "note": op.note,
-            })
+            }
+            
+            # 🔥 NUOVO: Include site_id se disponibile
+            if hasattr(op, 'site_id') and op.site_id:
+                operatore_dict["site_id"] = str(op.site_id)
+                operatore_dict["assigned_to_site"] = True
+            else:
+                operatore_dict["assigned_to_site"] = False
+            
+            operatori_data.append(operatore_dict)
         
-        return operatori_data
+        # 🔥 NUOVO: Include informazioni sul sito se filtrato
+        response_data = operatori_data
+        if site_id:
+            response_data = {
+                "site_id": str(site_id),
+                "operatori": operatori_data,
+                "count": len(operatori_data),
+                "site_info": site_info,
+                "filters_applied": {
+                    "search": search,
+                    "ruolo": ruolo,
+                    "specializzazione": specializzazione,
+                    "stato": stato
+                }
+            }
+        
+        return response_data
         
     except Exception as e:
         from loguru import logger
