@@ -624,6 +624,19 @@ function cantiereDetailApp() {
             }
         },
 
+        validateAndSave() {
+            // First check if form is valid using HTML5 validation
+            const form = document.querySelector('form');
+            if (!form.checkValidity()) {
+                // If form is invalid, let browser show validation errors
+                form.reportValidity();
+                return;
+            }
+            
+            // If form is valid, proceed with save
+            this.saveData();
+        },
+
         async saveData() {
             if (this.modalMode === 'edit-cantiere') {
                 await this.saveCantiere();

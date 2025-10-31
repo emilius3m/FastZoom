@@ -348,7 +348,7 @@ function giornaleSitoApp() {
         async loadStats() {
             try {
                 const siteId = '{{ site.id if site else "unknown" }}';
-                const response = await fetch(`/api/giornale-cantiere/stats/site/${siteId}`, {
+                const response = await fetch(`/api/v1/giornale/stats/site/${siteId}`, {
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
@@ -379,7 +379,7 @@ function giornaleSitoApp() {
                 if (this.filters.responsabile) params.append('responsabile', this.filters.responsabile);
                 if (this.filters.stato) params.append('stato', this.filters.stato);
                 
-                const url = `/api/giornale-cantiere/site/${siteId}?${params.toString()}`;
+                const url = `/api/v1/giornale/sites/${siteId}?${params.toString()}`;
                 const response = await fetch(url, {
                     headers: {
                         'Content-Type': 'application/json',
@@ -409,7 +409,7 @@ function giornaleSitoApp() {
             }
             
             try {
-                const response = await fetch(`/api/giornale-cantiere/validate/${giornale.id}`, {
+                const response = await fetch(`/api/v1/giornale/sites/${siteId}/giornali/${giornale.id}/validate`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

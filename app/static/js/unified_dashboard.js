@@ -293,7 +293,7 @@ document.addEventListener("alpine:init", () => {
             try {
                 // Load giornale statistics with retry mechanism
                 const statsResponse = await this.apiCallWithRetry(
-                    '/api/giornale-cantiere/stats/general',
+                    '/api/v1/giornale/stats/general',
                     {
                         headers: {
                             'Content-Type': 'application/json',
@@ -325,7 +325,7 @@ document.addEventListener("alpine:init", () => {
                 for (const site of this.giornaleSites) {
                     try {
                         const response = await this.apiCall(
-                            `/api/giornale-cantiere/stats/site/${site.id}`,
+                            `/api/v1/giornale/stats/site/${site.id}`,
                             {
                                 headers: {
                                     'Content-Type': 'application/json',

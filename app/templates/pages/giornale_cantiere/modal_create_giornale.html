@@ -16,7 +16,7 @@
         
         <!-- Form Content -->
         <div class="max-h-80vh overflow-y-auto">
-            <form @submit.prevent="saveData()" class="p-6">
+            <form @submit.prevent="validateAndSave()" class="p-6">
                 
                 <!-- Alert Errori -->
                 <div x-show="errorMessage" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 mb-6">
@@ -40,8 +40,9 @@
                                 Nome Cantiere <span class="text-red-500">*</span>
                             </label>
                             <input type="text"
+                                   name="nome"
                                    x-model="formData.nome"
-                                   required
+                                   :required="modalMode === 'edit-cantiere'"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
 
@@ -49,6 +50,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Codice</label>
                             <input type="text"
+                                   name="codice"
                                    x-model="formData.codice"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
@@ -56,7 +58,8 @@
                         <!-- Stato -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stato</label>
-                            <select x-model="formData.stato"
+                            <select name="stato"
+                                    x-model="formData.stato"
                                     class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                                 <option value="pianificato">Pianificato</option>
                                 <option value="in_corso">In Corso</option>
@@ -70,6 +73,7 @@
                         <div class="col-span-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Responsabile</label>
                             <input type="text"
+                                   name="responsabile_cantiere"
                                    x-model="formData.responsabile_cantiere"
                                    placeholder="Nome del responsabile"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
@@ -79,6 +83,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Inizio Prevista</label>
                             <input type="date"
+                                   name="data_inizio_prevista"
                                    x-model="formData.data_inizio_prevista"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
@@ -86,6 +91,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Fine Prevista</label>
                             <input type="date"
+                                   name="data_fine_prevista"
                                    x-model="formData.data_fine_prevista"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
@@ -93,7 +99,8 @@
                         <!-- Tipologia Intervento -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipologia Intervento</label>
-                            <select x-model="formData.tipologia_intervento"
+                            <select name="tipologia_intervento"
+                                    x-model="formData.tipologia_intervento"
                                     class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                                 <option value="">Seleziona tipologia</option>
                                 <option value="scavo">Scavo Archeologico</option>
@@ -109,7 +116,8 @@
                         <!-- Priorità -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Priorità</label>
-                            <select x-model="formData.priorita"
+                            <select name="priorita"
+                                    x-model="formData.priorita"
                                     class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                                 <option value="1">Alta</option>
                                 <option value="2">Media-Alta</option>
@@ -123,6 +131,7 @@
                         <div class="col-span-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Area Descrizione</label>
                             <input type="text"
+                                   name="area_descrizione"
                                    x-model="formData.area_descrizione"
                                    placeholder="Descrizione dell'area specifica"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
@@ -131,7 +140,8 @@
                         <!-- Descrizione -->
                         <div class="col-span-2">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
-                            <textarea x-model="formData.descrizione"
+                            <textarea name="descrizione"
+                                      x-model="formData.descrizione"
                                       rows="4"
                                       placeholder="Descrizione dettagliata del cantiere..."
                                       class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
@@ -153,23 +163,26 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Data <span class="text-red-500">*</span>
                             </label>
-                            <input type="date" 
-                                   x-model="formData.data" 
-                                   required 
+                            <input type="date"
+                                   name="data"
+                                   x-model="formData.data"
+                                   :required="modalMode === 'giornale'"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ora Inizio</label>
-                            <input type="time" 
-                                   x-model="formData.ora_inizio" 
+                            <input type="time"
+                                   name="ora_inizio"
+                                   x-model="formData.ora_inizio"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ora Fine</label>
-                            <input type="time" 
-                                   x-model="formData.ora_fine" 
+                            <input type="time"
+                                   name="ora_fine"
+                                   x-model="formData.ora_fine"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
                     </div>
@@ -179,8 +192,9 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Cantiere <span class="text-red-500">*</span>
                             </label>
-                            <select x-model="formData.cantiere_id"
-                                    required
+                            <select name="cantiere_id"
+                                    x-model="formData.cantiere_id"
+                                    :required="modalMode === 'giornale'"
                                     class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                                 <option value="">Seleziona un cantiere</option>
                                 <template x-for="cantiere in cantieri_disponibili" :key="cantiere.id">
@@ -198,8 +212,9 @@
                                 Responsabile Scavo <span class="text-red-500">*</span>
                             </label>
                             <input type="text"
+                                   name="responsabile_nome"
                                    x-model="formData.responsabile_nome"
-                                   required
+                                   :required="modalMode === 'giornale'"
                                    placeholder="Nome del responsabile"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
@@ -209,6 +224,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Compilatore</label>
                             <input type="text"
+                                   name="compilatore"
                                    x-model="formData.compilatore"
                                    placeholder="Nome del compilatore"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
@@ -228,8 +244,9 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Condizioni Meteo <span class="text-red-500">*</span>
                             </label>
-                            <select x-model="formData.condizioni_meteo" 
-                                    required 
+                            <select name="condizioni_meteo"
+                                    x-model="formData.condizioni_meteo"
+                                    :required="modalMode === 'giornale'"
                                     class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                                 <option value="">Seleziona condizioni</option>
                                 <template x-for="condition in condizioni_meteo" :key="condition.value">
@@ -240,19 +257,21 @@
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Temperatura Min (°C)</label>
-                            <input type="number" 
-                                   x-model="formData.temperatura_min" 
-                                   min="-30" 
-                                   max="50" 
+                            <input type="number"
+                                   name="temperatura_min"
+                                   x-model="formData.temperatura_min"
+                                   min="-30"
+                                   max="50"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Temperatura Max (°C)</label>
-                            <input type="number" 
-                                   x-model="formData.temperatura_max" 
-                                   min="-30" 
-                                   max="50" 
+                            <input type="number"
+                                   name="temperatura_max"
+                                   x-model="formData.temperatura_max"
+                                   min="-30"
+                                   max="50"
                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         </div>
                     </div>
@@ -269,8 +288,9 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Descrizione Lavori <span class="text-red-500">*</span>
                         </label>
-                        <textarea x-model="formData.descrizione_lavori" 
-                                  required
+                        <textarea name="descrizione_lavori"
+                                  x-model="formData.descrizione_lavori"
+                                  :required="modalMode === 'giornale'"
                                   rows="4"
                                   placeholder="Descrizione dettagliata delle attività svolte durante la giornata..."
                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
@@ -287,7 +307,8 @@
                     <div class="max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-4 bg-gray-50 dark:bg-gray-700">
                         <template x-for="operatore in operatori_disponibili" :key="operatore.id">
                             <label class="flex items-center p-2 hover:bg-white dark:hover:bg-gray-600 rounded cursor-pointer">
-                                <input type="checkbox" 
+                                <input type="checkbox"
+                                       name="operatori_ids"
                                        :value="operatore.id"
                                        x-model="formData.operatori_ids"
                                        class="rounded border-gray-300 dark:border-gray-600 text-orange-600 focus:ring-orange-500">
@@ -320,8 +341,9 @@
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">US Elaborate</label>
-                        <input type="text" 
-                               x-model="formData.us_elaborate_input" 
+                        <input type="text"
+                               name="us_elaborate_input"
+                               x-model="formData.us_elaborate_input"
                                placeholder="Es: US001, US002, US003 (separate da virgole)"
                                class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -340,7 +362,8 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note Generali</label>
-                            <textarea x-model="formData.note_generali" 
+                            <textarea name="note_generali"
+                                      x-model="formData.note_generali"
                                       rows="4"
                                       placeholder="Note e osservazioni generali..."
                                       class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
@@ -348,7 +371,8 @@
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Problematiche</label>
-                            <textarea x-model="formData.problematiche" 
+                            <textarea name="problematiche"
+                                      x-model="formData.problematiche"
                                       rows="4"
                                       placeholder="Problematiche incontrate durante i lavori..."
                                       class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 border-red-300 dark:border-red-600"></textarea>
@@ -365,7 +389,8 @@
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Apparecchiature Utilizzate</label>
-                        <textarea x-model="formData.apparecchiature_input"
+                        <textarea name="apparecchiature_input"
+                                  x-model="formData.apparecchiature_input"
                                   rows="3"
                                   placeholder="Es: Piccone, Cazzuola, Pennellino, Metal detector (separate da virgole o a capo)"
                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
