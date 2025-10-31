@@ -967,3 +967,83 @@ async def v1_get_operatori_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nel calcolo delle statistiche operatori",
         )
+
+@router.get("/operatori", summary="Lista tutti operatori", tags=["Giornale di Cantiere"])
+async def v1_get_all_operatori(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    ruolo: Optional[str] = Query(None),
+    specializzazione: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Recupera tutti gli operatori disponibili nel sistema.
+    
+    Args:
+        skip: Numero di record da saltare (paginazione)
+        limit: Numero massimo di record da restituire
+        search: Testo di ricerca per nome, cognome o codice fiscale
+        ruolo: Filtra per ruolo dell'operatore
+        specializzazione: Filtra per specializzazione
+        stato: Filtra per stato (attivo/inattivo)
+    
+    Returns:
+        Lista di tutti gli operatori disponibili con metadati
+    """
+    try:
+        # Query per tutti gli operatori
+        query = select(OperatoreCantiere)
+        
+        # Applica filtri aggiuntivi
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    OperatoreCantiere.nome.ilike(search_pattern),
+                    OperatoreCantiere.cognome.ilike(search_pattern),
+                    OperatoreCantiere.codice_fiscale.ilike(search_pattern),
+                )
+            )
+        if ruolo:
+            query = query.where(OperatoreCantiere.ruolo == ruolo)
+        if specializzazione:
+            query = query.where(OperatoreCantiere.specializzazione == specializzazione)
+        if stato:
+            query = query.where(OperatoreCantiere.is_active == (stato == "attivo"))
+        
+        query = query.order_by(OperatoreCantiere.cognome, OperatoreCantiere.nome)
+        query = query.offset(skip).limit(limit)
+        
+        result = await db.execute(query)
+        operatori = result.scalars().all()
+        
+        # Prepara dati di risposta
+        operatori_data = []
+        for op in operatori:
+            operatori_data.append({
+                "id": str(op.id),
+                "nome": op.nome,
+                "cognome": op.cognome,
+                "codice_fiscale": op.codice_fiscale,
+                "email": op.email,
+                "telefono": op.telefono,
+                "ruolo": op.ruolo,
+                "specializzazione": op.specializzazione,
+                "qualifiche": op.qualifica.split(",") if op.qualifica else [],
+                "stato": "attivo" if op.is_active else "inattivo",
+                "ore_totali": op.ore_totali or 0,
+                "note": op.note,
+            })
+        
+        return operatori_data
+        
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Errore recupero operatori: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel recupero degli operatori",
+        )

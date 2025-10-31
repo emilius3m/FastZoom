@@ -298,10 +298,11 @@
                 </div>
                 
                 <!-- Operatori Presenti -->
-                <div class="mb-8" x-show="operatori_disponibili.length > 0">
+                <div class="mb-8">
                     <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
                         <i class="fas fa-users mr-2 text-green-600"></i>
                         Operatori Presenti
+                        <span class="ml-2 text-sm text-gray-500" x-show="operatori_disponibili.length === 0">(Nessun operatore disponibile)</span>
                     </h4>
                     
                     <div class="max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-4 bg-gray-50 dark:bg-gray-700">
@@ -323,7 +324,14 @@
                         </template>
                         
                         <div x-show="operatori_disponibili.length === 0" class="text-center text-gray-500 dark:text-gray-400 py-4">
-                            Nessun operatore disponibile
+                            <p>Nessun operatore disponibile</p>
+                            <p class="text-sm mt-2">Verifica che gli operatori siano stati creati nel sistema.</p>
+                        </div>
+                        
+                        <!-- Debug info -->
+                        <div x-show="operatori_disponibili.length === 0" class="mt-4 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
+                            <p><strong>Debug:</strong> Caricamento operatori in corso...</p>
+                            <p>Endpoint: /api/v1/giornale/operatori</p>
                         </div>
                     </div>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">

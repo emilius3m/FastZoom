@@ -9,6 +9,7 @@ from app.database.session import get_async_session
 from app.core.security import get_current_user_id
 from app.models.sites import ArchaeologicalSite
 from app.models import UserSitePermission
+from app.models import User
 from app.templates import templates
 
 geographic_map_router = APIRouter(prefix="/view", tags=["geographic-map"])
@@ -29,6 +30,11 @@ async def geographic_map_view(
     
     if not site:
         raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
+    
+    # Get current user information
+    user_query = select(User).where(User.id == current_user_id)
+    user = await db.execute(user_query)
+    user = user.scalar_one_or_none()
     
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
@@ -54,5 +60,7 @@ async def geographic_map_view(
         "site": site,
         "can_read": can_read,
         "can_write": can_write,
-        "user_id": str(current_user_id)
+        "user_id": str(current_user_id),
+        "user": user,
+        "current_user": user  # Add current_user for profile modal
     })

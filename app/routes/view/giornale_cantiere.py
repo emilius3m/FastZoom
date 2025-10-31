@@ -90,6 +90,7 @@ async def giornale_cantiere_home(
             "title": "Giornale di Cantiere | Sistema Archeologico",
             "current_page": "giornale_cantiere",
             "user": user,
+            "current_user": user,  # Add current_user for profile modal
             "sites": user_sites,
             "sites_count": len(user_sites),
             "total_giornali": total_giornali,
@@ -198,6 +199,7 @@ async def giornale_cantiere_site(
             "title": f"Giornale di Cantiere - {site.name} | Sistema Archeologico",
             "current_page": "giornale_cantiere",
             "user": user,
+            "current_user": user,  # Add current_user for profile modal
             "site": site,
             "site_info": site_info,
             "sites": user_sites,
@@ -206,7 +208,7 @@ async def giornale_cantiere_site(
                     "id": str(op.id),
                     "nome_completo": op.nome_completo,
                     "qualifica": op.qualifica
-                } 
+                }
                 for op in operatori
             ],
             "condizioni_meteo": condizioni_meteo,
@@ -308,6 +310,7 @@ async def giornale_cantiere_detail(
             "title": f"Giornale {giornale.data.strftime('%d/%m/%Y')} - {giornale.site.name} | Sistema Archeologico",
             "current_page": "giornale_cantiere",
             "user": user,
+            "current_user": user,  # Add current_user for profile modal
             "site": giornale.site,
             "site_info": site_info,
             "sites": user_sites,
@@ -422,7 +425,7 @@ async def site_operatori_view(
             # User context
             "user_email": user.email if user else None,
             "user_type": "superuser" if user and user.is_superuser else "user",
-            "current_user": user,
+            "current_user": user,  # Already included but ensuring consistency
             "user_profile": user_profile,
             "csrf_token": csrf_token,
             
@@ -524,6 +527,7 @@ async def giornale_reports(
             "title": "Report Giornali di Cantiere | Sistema Archeologico",
             "current_page": "giornale_cantiere",
             "user": user,
+            "current_user": user,  # Add current_user for profile modal
             "sites": user_sites,
             "stats": {
                 "total_giornali": total_giornali,

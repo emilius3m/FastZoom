@@ -21,7 +21,7 @@
                 <div id="profile-view">
                     <h4 class="text-lg font-medium text-gray-900 dark:text-white">Profile Information</h4>
                     <div class="mt-4 space-y-2">
-                        <p class="text-sm text-gray-500"><strong>Email:</strong> {{ current_user.email }}</p>
+                        <p class="text-sm text-gray-500"><strong>Email:</strong> {{ (current_user or user).email }}</p>
                         {% if user_profile %}
                             <p class="text-sm text-gray-500"><strong>First Name:</strong> {{ user_profile.first_name or 'Not set' }}</p>
                             <p class="text-sm text-gray-500"><strong>Last Name:</strong> {{ user_profile.last_name or 'Not set' }}</p>
@@ -43,7 +43,7 @@
 
                 <!-- Edit Form (hidden initially) -->
                 <div id="profile-edit" class="hidden">
-                    <form method="post" action="/auth/post_update_user/{{ current_user.id }}">
+                    <form method="post" action="/auth/post_update_user/{{ (current_user or user).id }}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <div class="space-y-4">
                             <div>

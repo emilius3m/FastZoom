@@ -170,7 +170,11 @@ async def v1_cantieri_sito_view(
                     "in_corso": stati.get("in_corso", 0),
                     "pianificati": stati.get("pianificato", 0),
                     "completati": stati.get("completato", 0)
-                }
+                },
+                # Add site selector variables for multi-site functionality
+                "sites": user_sites,
+                "sites_count": len(user_sites),
+                "current_site_name": site_info.get("name", "")
             }
         )
         
@@ -292,7 +296,11 @@ async def v1_cantiere_detail_view(
                 "site_info": site_info,
                 "giornali_count": giornali_count,
                 "ultimo_giornale": ultimo_giornale_data,  # Usa dati serializzati
-                "operatori_count": operatori_count
+                "operatori_count": operatori_count,
+                # Add site selector variables for multi-site functionality
+                "sites": user_sites,
+                "sites_count": len(user_sites),
+                "current_site_name": site_info.get("name", "")
             }
         )
 
@@ -355,7 +363,11 @@ async def v1_nuovo_cantiere_view(
                 "site_info": site_info,
                 "stati_options": stati_options,
                 "priorita_options": priorita_options,
-                "tipologie_intervento": tipologie_intervento
+                "tipologie_intervento": tipologie_intervento,
+                # Add site selector variables for multi-site functionality
+                "sites": user_sites,
+                "sites_count": len(user_sites),
+                "current_site_name": site_info.get("name", "")
             }
         )
         
@@ -436,7 +448,11 @@ async def v1_modifica_cantiere_view(
                 "site_info": site_info,
                 "stati_options": stati_options,
                 "priorita_options": priorita_options,
-                "tipologie_intervento": tipologie_intervento
+                "tipologie_intervento": tipologie_intervento,
+                # Add site selector variables for multi-site functionality
+                "sites": user_sites,
+                "sites_count": len(user_sites),
+                "current_site_name": site_info.get("name", "")
             }
         )
         

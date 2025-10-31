@@ -29,6 +29,10 @@
         id: "{{ current_user.id }}",
         email: "{{ current_user.email }}",
         isAuthenticated: true
+      }{% elif user %}{
+        id: "{{ user.id }}",
+        email: "{{ user.email }}",
+        isAuthenticated: true
       }{% else %}{ isAuthenticated: false }{% endif %};
       
       // Debug logging for current user exposure
@@ -39,16 +43,16 @@
         try {
           console.log('DEBUG: Initializing profile modal...');
           
-          // Check if user is authenticated
-          if (!window.currentUser.isAuthenticated) {
-            console.log('DEBUG: User not authenticated, skipping modal initialization');
+          // Check if modal element exists first (before checking authentication)
+          const profileModal = document.getElementById('profile-modal');
+          if (!profileModal) {
+            console.log('DEBUG: Profile modal element not found in DOM, skipping initialization');
             return;
           }
           
-          // Check if modal element exists
-          const profileModal = document.getElementById('profile-modal');
-          if (!profileModal) {
-            console.warn('DEBUG: Profile modal element not found in DOM');
+          // Check if user is authenticated
+          if (!window.currentUser.isAuthenticated) {
+            console.log('DEBUG: User not authenticated, skipping modal initialization');
             return;
           }
           
@@ -88,6 +92,11 @@
       function setupModalEventListeners() {
         try {
           const profileModal = document.getElementById('profile-modal');
+          if (!profileModal) {
+            console.log('DEBUG: Profile modal not found, skipping event listener setup');
+            return;
+          }
+          
           const profileModalTriggers = document.querySelectorAll('[data-modal-target="profile-modal"]');
           
           console.log('DEBUG: Setting up event listeners...');
@@ -162,6 +171,10 @@
       function closeModal() {
         try {
           const profileModal = document.getElementById('profile-modal');
+          if (!profileModal) {
+            console.log('DEBUG: Profile modal not found, cannot close');
+            return;
+          }
           
           // Try Flowbite modal first
           if (window.profileModalInstance) {
@@ -200,7 +213,10 @@
       document.addEventListener('DOMContentLoaded', function() {
         console.log('DEBUG: DOM content loaded');
         
-        // Initialize Flowbite components first
+        // Initialize profile modal first (it will check if modal exists)
+        initializeProfileModal();
+        
+        // Then initialize Flowbite components (this will handle any remaining components)
         if (typeof initFlowbite === 'function') {
           try {
             initFlowbite();
@@ -209,9 +225,6 @@
             console.error('DEBUG: Error initializing Flowbite:', error);
           }
         }
-        
-        // Initialize profile modal
-        initializeProfileModal();
       });
       
       // Fallback initialization for dynamic content
@@ -219,7 +232,12 @@
         console.log('DEBUG: Window fully loaded');
         
         // Re-initialize if modal wasn't found earlier (might be loaded dynamically)
-        if (!document.getElementById('profile-modal') && window.currentUser.isAuthenticated) {
+        if (!document.getElementById('profile-modal')) {
+          console.log('DEBUG: Profile modal still not found after full load, skipping retry');
+          return;
+        }
+        
+        if (window.currentUser.isAuthenticated) {
           console.log('DEBUG: Retrying modal initialization after full load');
           setTimeout(initializeProfileModal, 100);
         }
@@ -269,7 +287,7 @@
     {% block additional_scripts %}{% endblock %}
 
     <!-- User-specific components (only shown when authenticated) -->
-    {% if current_user %}
+    {% if current_user or user %}
       {% include "partials/profile_modal.html" %}
     {% endif %}
 
@@ -279,6 +297,13 @@
       function reinitializeProfileModal() {
         console.log('DEBUG: Re-initializing profile modal for dynamic content...');
         
+        // Check if modal exists first
+        const profileModal = document.getElementById('profile-modal');
+        if (!profileModal) {
+          console.log('DEBUG: Profile modal not found, skipping re-initialization');
+          return;
+        }
+        
         // Only proceed if user is authenticated
         if (!window.currentUser || !window.currentUser.isAuthenticated) {
           console.log('DEBUG: User not authenticated, skipping re-initialization');
@@ -286,8 +311,7 @@
         }
         
         // Check if modal exists but wasn't initialized
-        const profileModal = document.getElementById('profile-modal');
-        if (profileModal && !window.profileModalInstance) {
+        if (!window.profileModalInstance) {
           console.log('DEBUG: Modal found but not initialized, re-initializing...');
           initializeProfileModal();
         }
@@ -305,7 +329,10 @@
                   if (node.nodeType === 1) { // Element node
                     if (node.id === 'profile-modal' || node.querySelector('#profile-modal')) {
                       console.log('DEBUG: Profile modal detected via mutation observer');
-                      setTimeout(reinitializeProfileModal, 50);
+                      // Check if modal actually exists before trying to initialize
+                      if (document.getElementById('profile-modal')) {
+                        setTimeout(reinitializeProfileModal, 50);
+                      }
                       return;
                     }
                   }

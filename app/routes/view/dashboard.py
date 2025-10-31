@@ -194,6 +194,11 @@ async def dashboard_view(
     if not site:
         raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
 
+    # Get current user information
+    user_query = select(User).where(User.id == current_user_id)
+    user = await db.execute(user_query)
+    user = user.scalar_one_or_none()
+
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
@@ -234,6 +239,8 @@ async def dashboard_view(
         "can_write": can_write,
         "can_admin": can_admin,
         "user_permission": permission,
+        "user": user,
+        "current_user": user,  # Add current_user for profile modal
         "current_page": "dashboard"
     }
 
