@@ -10,7 +10,6 @@ from enum import Enum as PyEnum
 from typing import List, Optional, Dict, Any
 
 from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, JSON, Float, Integer, Index
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from decimal import Decimal
@@ -57,7 +56,7 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
     __tablename__ = "archaeological_sites"
 
     # Chiave primaria
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
 
     # === IDENTIFICAZIONE SITO ===
     name = Column(String(200), nullable=False, index=True)

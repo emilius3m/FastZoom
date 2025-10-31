@@ -10,7 +10,6 @@ from typing import Optional, Dict, Any
 import json
 
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,21 +24,21 @@ class UserActivity(Base):
     """
     __tablename__ = "user_activities"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     
     # ===== IDENTIFICAZIONE ATTIVITÀ =====
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(String(36), ForeignKey('users.id'), nullable=False, index=True)
     activity_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     activity_type = Column(String(200), nullable=False, index=True)
     activity_desc = Column(String(1024), nullable=True)
     
     # ===== CONTESTO ARCHEOLOGICO =====
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=True, index=True)
-    photo_id = Column(UUID(as_uuid=True), nullable=True)  # Per tracking modifiche foto
-    us_id = Column(UUID(as_uuid=True), nullable=True)     # Per tracking modifiche US
-    usm_id = Column(UUID(as_uuid=True), nullable=True)    # Per tracking modifiche USM
-    tomba_id = Column(UUID(as_uuid=True), nullable=True)  # Per tracking modifiche tombe
-    reperto_id = Column(UUID(as_uuid=True), nullable=True)  # Per tracking modifiche reperti
+    site_id = Column(String(36), ForeignKey('archaeological_sites.id'), nullable=True, index=True)
+    photo_id = Column(String(36), nullable=True)  # Per tracking modifiche foto
+    us_id = Column(String(36), nullable=True)     # Per tracking modifiche US
+    usm_id = Column(String(36), nullable=True)    # Per tracking modifiche USM
+    tomba_id = Column(String(36), nullable=True)  # Per tracking modifiche tombe
+    reperto_id = Column(String(36), nullable=True)  # Per tracking modifiche reperti
     
     # ===== INFORMAZIONI TECNICHE =====
     ip_address = Column(String(45), nullable=True)        # IPv6 support
@@ -92,17 +91,17 @@ class UserActivity(Base):
     
     @classmethod
     async def log_activity(
-        cls, 
+        cls,
         db: AsyncSession,
-        user_id: uuid.UUID, 
+        user_id: str,
         activity_type: str,
         description: Optional[str] = None,
-        site_id: Optional[uuid.UUID] = None,
-        photo_id: Optional[uuid.UUID] = None,
-        us_id: Optional[uuid.UUID] = None,
-        usm_id: Optional[uuid.UUID] = None,
-        tomba_id: Optional[uuid.UUID] = None,
-        reperto_id: Optional[uuid.UUID] = None,
+        site_id: Optional[str] = None,
+        photo_id: Optional[str] = None,
+        us_id: Optional[str] = None,
+        usm_id: Optional[str] = None,
+        tomba_id: Optional[str] = None,
+        reperto_id: Optional[str] = None,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
         extra_data: Optional[Dict[str, Any]] = None
@@ -112,15 +111,15 @@ class UserActivity(Base):
         Metodo helper per logging centralizzato
         """
         activity = cls(
-            user_id=user_id,
+            user_id=str(user_id),
             activity_type=activity_type,
             activity_desc=description,
-            site_id=site_id,
-            photo_id=photo_id,
-            us_id=us_id,
-            usm_id=usm_id,
-            tomba_id=tomba_id,
-            reperto_id=reperto_id,
+            site_id=str(site_id) if site_id else None,
+            photo_id=str(photo_id) if photo_id else None,
+            us_id=str(us_id) if us_id else None,
+            usm_id=str(usm_id) if usm_id else None,
+            tomba_id=str(tomba_id) if tomba_id else None,
+            reperto_id=str(reperto_id) if reperto_id else None,
             ip_address=ip_address,
             user_agent=user_agent
         )
@@ -137,7 +136,7 @@ class UserActivity(Base):
     async def log_login(
         cls,
         db: AsyncSession,
-        user_id: uuid.UUID,
+        user_id: str,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
         success: bool = True
@@ -157,7 +156,7 @@ class UserActivity(Base):
     async def log_logout(
         cls,
         db: AsyncSession,
-        user_id: uuid.UUID,
+        user_id: str,
         ip_address: Optional[str] = None
     ) -> 'UserActivity':
         """Log logout utente"""
@@ -173,10 +172,10 @@ class UserActivity(Base):
     async def log_us_action(
         cls,
         db: AsyncSession,
-        user_id: uuid.UUID,
+        user_id: str,
         action: str,  # 'create', 'update', 'delete', 'validate'
-        us_id: uuid.UUID,
-        site_id: uuid.UUID,
+        us_id: str,
+        site_id: str,
         us_code: str,
         description: Optional[str] = None
     ) -> 'UserActivity':
@@ -198,10 +197,10 @@ class UserActivity(Base):
     async def log_usm_action(
         cls,
         db: AsyncSession,
-        user_id: uuid.UUID,
+        user_id: str,
         action: str,
-        usm_id: uuid.UUID,
-        site_id: uuid.UUID,
+        usm_id: str,
+        site_id: str,
         usm_code: str,
         description: Optional[str] = None
     ) -> 'UserActivity':
@@ -223,10 +222,10 @@ class UserActivity(Base):
     async def log_photo_action(
         cls,
         db: AsyncSession,
-        user_id: uuid.UUID,
+        user_id: str,
         action: str,  # 'upload', 'update', 'delete', 'validate'
-        photo_id: uuid.UUID,
-        site_id: uuid.UUID,
+        photo_id: str,
+        site_id: str,
         filename: str,
         description: Optional[str] = None
     ) -> 'UserActivity':
@@ -248,9 +247,9 @@ class UserActivity(Base):
     async def log_export_action(
         cls,
         db: AsyncSession,
-        user_id: uuid.UUID,
+        user_id: str,
         export_type: str,  # 'word', 'pdf', 'excel', 'zip'
-        site_id: uuid.UUID,
+        site_id: str,
         entity_count: int,
         description: Optional[str] = None
     ) -> 'UserActivity':
@@ -276,8 +275,8 @@ class UserActivity(Base):
     async def get_user_activities(
         cls,
         db: AsyncSession,
-        user_id: uuid.UUID,
-        site_id: Optional[uuid.UUID] = None,
+        user_id: str,
+        site_id: Optional[str] = None,
         activity_types: Optional[list] = None,
         limit: int = 100,
         offset: int = 0
@@ -302,7 +301,7 @@ class UserActivity(Base):
     async def get_site_activities(
         cls,
         db: AsyncSession,
-        site_id: uuid.UUID,
+        site_id: str,
         activity_types: Optional[list] = None,
         limit: int = 100,
         offset: int = 0
@@ -320,12 +319,12 @@ class UserActivity(Base):
         result = await db.execute(query)
         return list(result.scalars().all())
     
-    @classmethod 
+    @classmethod
     async def get_activity_stats(
         cls,
         db: AsyncSession,
-        user_id: Optional[uuid.UUID] = None,
-        site_id: Optional[uuid.UUID] = None,
+        user_id: Optional[str] = None,
+        site_id: Optional[str] = None,
         days: int = 30
     ) -> Dict[str, int]:
         """Statistiche attività per periodo"""

@@ -133,7 +133,7 @@ async def v1_get_site_giornali(
                 # Query separata per ottenere informazioni del cantiere se necessario
                 from app.models.cantiere import Cantiere
                 cantiere_result = await db.execute(
-                    select(Cantiere).where(Cantiere.id == UUID(g.cantiere_id))  # 🔥 FIX: Convert string to UUID object for proper comparison
+                    select(Cantiere).where(Cantiere.id == g.cantiere_id)  # 🔥 FIX: Direct string-to-string comparison for SQLite compatibility
                 )
                 cantiere = cantiere_result.scalar_one_or_none()
                 if cantiere:
@@ -275,7 +275,7 @@ async def v1_get_cantiere_giornali(
                 # Query separata per ottenere informazioni del cantiere se necessario
                 from app.models.cantiere import Cantiere
                 cantiere_result = await db.execute(
-                    select(Cantiere).where(Cantiere.id == UUID(g.cantiere_id))  # 🔥 FIX: Convert string to UUID object for proper comparison
+                    select(Cantiere).where(Cantiere.id == g.cantiere_id)  # 🔥 FIX: Direct string-to-string comparison for SQLite compatibility
                 )
                 cantiere = cantiere_result.scalar_one_or_none()
                 if cantiere:
@@ -362,7 +362,7 @@ async def v1_create_giornale(
             cantiere_result = await db.execute(
                 select(Cantiere).where(
                     and_(
-                        Cantiere.id == UUID(cantiere_id),  # 🔥 FIX: Convert string to UUID object for proper comparison with UUID column
+                        Cantiere.id == cantiere_id,  # 🔥 FIX: Direct string-to-string comparison for SQLite compatibility
                         Cantiere.site_id == str(site_id)  # 🔥 CRUCIALE: Il cantiere deve appartenere al sito
                     )
                 )
@@ -482,7 +482,7 @@ async def v1_update_giornale(
             cantiere_result = await db.execute(
                 select(Cantiere).where(
                     and_(
-                        Cantiere.id == UUID(giornale_data["cantiere_id"]),  # 🔥 FIX: Convert string to UUID object for proper comparison with UUID column
+                        Cantiere.id == giornale_data["cantiere_id"],  # 🔥 FIX: Direct string-to-string comparison for SQLite compatibility
                         Cantiere.site_id == str(site_id)  # 🔥 CRUCIALE: Il cantiere deve appartenere al sito
                     )
                 )
@@ -502,7 +502,7 @@ async def v1_update_giornale(
                 # Rimuovi vecchie associazioni
                 await db.execute(
                     giornale_operatori_association.delete().where(
-                        giornale_operatori_association.c.giornale_id == giornale_id  # Use UUID object directly
+                        giornale_operatori_association.c.giornale_id == str(giornale_id)  # 🔥 FIX: Convert UUID to string for SQLite compatibility
                     )
                 )
                 
@@ -605,7 +605,7 @@ async def v1_delete_giornale(
         # Rimuovi associazioni operatori
         await db.execute(
             giornale_operatori_association.delete().where(
-                giornale_operatori_association.c.giornale_id == giornale_id  # Use UUID object directly
+                giornale_operatori_association.c.giornale_id == str(giornale_id)  # 🔥 FIX: Convert UUID to string for SQLite compatibility
             )
         )
         

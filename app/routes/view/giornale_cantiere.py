@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
@@ -358,16 +358,16 @@ async def operatori_management(
         # Se l'utente ha accesso a un solo sito, reindirizza direttamente alla pagina operatori del sito
         if len(user_sites) == 1:
             site_id = user_sites[0]['id']
-            return templates.RedirectResponse(f"/giornale-cantiere/site/{site_id}/operatori", status_code=302)
+            return RedirectResponse(url=f"/giornale-cantiere/site/{site_id}/operatori", status_code=302)
         
         # Altrimenti, reindirizza alla home per selezionare un sito
-        return templates.RedirectResponse("/giornale-cantiere", status_code=302)
+        return RedirectResponse(url="/giornale-cantiere", status_code=302)
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Errore reindirizzamento operatori: {str(e)}")
-        return templates.RedirectResponse("/giornale-cantiere", status_code=302)
+        return RedirectResponse(url="/giornale-cantiere", status_code=302)
     
 
 @router.get("/site/{site_id}/operatori", response_class=HTMLResponse)

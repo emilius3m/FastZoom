@@ -2,10 +2,9 @@
 
 from datetime import datetime
 from typing import Optional
-from uuid import uuid4, UUID
+from uuid import uuid4
 
 from sqlalchemy import String, Text, DateTime
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.schema import ForeignKey
 
@@ -16,11 +15,11 @@ class UserProfile(Base):
     __tablename__ = "user_profiles"
 
     # Chiave primaria UUID
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
 
     # Foreign key to User
-    user_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id"), nullable=False, index=True
     )
 
     # Informazioni personali - Centralizzate qui (rimosse da User per eliminare ridondanza)

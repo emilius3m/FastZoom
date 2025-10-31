@@ -10,8 +10,7 @@ from datetime import datetime
 from enum import Enum as PyEnum
 from typing import List, Optional
 
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Table, Index, Integer
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Table, Index, Integer, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -45,10 +44,10 @@ class PermissionLevel(str, PyEnum):
 user_roles_association = Table(
     'user_roles_associations',
     Base.metadata,
-    Column('user_id', UUID(as_uuid=True), ForeignKey('users.id'), primary_key=True),
-    Column('role_id', UUID(as_uuid=True), ForeignKey('roles.id'), primary_key=True),
+    Column('user_id', String(36), ForeignKey('users.id'), primary_key=True),
+    Column('role_id', String(36), ForeignKey('roles.id'), primary_key=True),
     Column('assigned_at', DateTime, default=datetime.utcnow),
-    Column('assigned_by', UUID(as_uuid=True), ForeignKey('users.id'))
+    Column('assigned_by', String(36), ForeignKey('users.id'))
 )
 
 
@@ -59,7 +58,7 @@ class User(Base, SoftDeleteMixin):
     __tablename__ = "users"
 
     # Chiave primaria
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
 
     # Credenziali
     email = Column(String(255), unique=True, nullable=False, index=True)
@@ -204,7 +203,7 @@ class Role(Base):
     """Modello ruoli sistema"""
     __tablename__ = "roles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 
     # Definizione ruolo
     name = Column(String(50), unique=True, nullable=False, index=True)  # admin, archaeologist, student, etc.
@@ -243,11 +242,11 @@ class UserSitePermission(Base):
     """
     __tablename__ = "user_site_permissions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 
     # Relazioni
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(String(36), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    site_id = Column(String(36), ForeignKey('archaeological_sites.id', ondelete='CASCADE'), nullable=False)
 
     # RIPRISTINATO: Livello di permesso con enum
     permission_level = Column(String(50), nullable=False, default=PermissionLevel.READ.value)
@@ -259,7 +258,7 @@ class UserSitePermission(Base):
     site_role = Column(String(50), nullable=True)  # 'director', 'supervisor', 'collaborator', 'observer'
 
     # Metadati
-    granted_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    granted_by = Column(String(36), ForeignKey('users.id'), nullable=True)
     granted_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=True)  # Permessi temporanei
     notes = Column(Text, nullable=True)  # Note sul permesso

@@ -253,7 +253,7 @@ async def v1_login_json(
         await db.commit()
         
         # Log login riuscito
-        await UserActivity.log_login(db, UUID(str(user.id)), success=True, ip_address=request.client.host)
+        await UserActivity.log_login(db, user.id, success=True, ip_address=request.client.host)
         
         # Ottieni siti utente
         user_sites = await AuthService.get_user_sites(db, str(user.id))

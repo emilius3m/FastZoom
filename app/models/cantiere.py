@@ -6,10 +6,9 @@ Un sito può avere più cantieri contemporanei, e ogni giornale è associato a u
 
 from datetime import datetime, date
 from typing import List, Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from sqlalchemy import Column, String, Text, DateTime, Date, Boolean, ForeignKey, Integer
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -26,13 +25,13 @@ class Cantiere(Base):
     __tablename__ = "cantieri"
     
     # Primary key
-    id = Column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
     
     # Foreign key to ArchaeologicalSite
     site_id = Column(
-        PostgresUUID(as_uuid=True), 
-        ForeignKey("archaeological_sites.id", ondelete="CASCADE"), 
-        nullable=False, 
+        String(36),
+        ForeignKey("archaeological_sites.id", ondelete="CASCADE"),
+        nullable=False,
         index=True
     )
     

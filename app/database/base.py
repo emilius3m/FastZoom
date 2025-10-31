@@ -4,11 +4,11 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy
+import uuid
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import DateTime, Column, Boolean, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, Column, Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.functions import func
 
@@ -30,11 +30,11 @@ class BaseSQLModel(Base):
     """
     __abstract__ = True
 
-    # ID primario UUID
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+    # ID primario UUID (stringa per SQLite compatibility)
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        default=lambda: uuid.uuid4(),
+        default=lambda: str(uuid.uuid4()),
         index=True
     )
 
@@ -62,20 +62,20 @@ class TimestampMixin:
 
 class SiteMixin:
     """Mixin per modelli associati a un sito archeologico"""
-    site_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    site_id = Column(String(36), nullable=False, index=True)
 
 
 class UserMixin:
     """Mixin per modelli che richiedono tracciamento utente"""
-    created_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
-    updated_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    created_by = Column(String(36), ForeignKey('users.id'), nullable=False)
+    updated_by = Column(String(36), ForeignKey('users.id'), nullable=True)
 
 
 class SoftDeleteMixin:
     """Mixin per soft delete"""
     is_deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime, nullable=True)
-    deleted_by = Column(UUID(as_uuid=True), nullable=True)
+    deleted_by = Column(String(36), nullable=True)
 
 
 DATABASE_URL = os.environ["DATABASE_URL"]

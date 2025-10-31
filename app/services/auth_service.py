@@ -225,9 +225,9 @@ class AuthService:
             payload = SecurityService.verify_token(token)
             
             # Verifica che l'utente sia ancora attivo
-            user_id = UUID(payload.get("sub"))
+            user_id_str = payload.get("sub")
             user_query = select(User).where(
-                and_(User.id == user_id, User.is_active == True)
+                and_(User.id == user_id_str, User.is_active == True)
             )
             
             result = await db.execute(user_query)
@@ -282,9 +282,5 @@ class AuthService:
         Returns:
             Lista dizionari con info siti
         """
-        try:
-            user_uuid = UUID(user_id)
-            return await AuthService.get_user_sites_with_permissions(db, user_uuid)
-        except ValueError:
-            logger.error(f"Invalid user_id format: {user_id}")
-            return []
+        # Since user_id is already a string, we can use it directly
+        return await AuthService.get_user_sites_with_permissions(db, UUID(user_id))

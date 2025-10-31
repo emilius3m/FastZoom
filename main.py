@@ -5,14 +5,29 @@ from loguru import logger
 import uvicorn
 from app.core.config import get_settings
 
-# Configure Loguru for development visibility
-logger.remove()  # Remove default handler
+# Configure logging to preserve both Uvicorn access logs and enhanced Loguru formatting
+import logging
+
+# First, configure standard logging for Uvicorn access logs
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+
+# Then configure Loguru for enhanced application logging
+logger.remove()  # Remove only Loguru's default handler
 logger.add(
     sys.stderr,
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
     level="DEBUG",  # Show all levels including DEBUG
     colorize=True
 )
+
+# Ensure Uvicorn access logger is properly configured
+uvicorn_access_logger = logging.getLogger("uvicorn.access")
+uvicorn_access_logger.setLevel(logging.INFO)
+uvicorn_access_logger.propagate = True
 
 def get_worker_count():
     """
@@ -33,7 +48,8 @@ def run_development():
         host="127.0.0.1",
         reload=True,
         port=8000,
-        log_level="debug"
+        log_level="debug",
+        access_log=True  # Explicitly enable access logging in development mode
     )
 
 def run_production():
