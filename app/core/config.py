@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./archaeological_catalog.db"
     secret_key: str = "archaeological-site-secret-key-2025"
     algorithm: str = "HS256"
+
     
     # Database Connection Pool Configuration
     # CRITICO: Ottimizzato per supportare 50+ richieste concorrenti (stress test)

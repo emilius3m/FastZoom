@@ -26,8 +26,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # Costanti JWT
 SECRET_KEY = settings.secret_key
-ALGORITHM = "HS256"
+ALGORITHM = settings.algorithm
 ACCESS_TOKEN_EXPIRE_HOURS = settings.jwt_expires_hours
+REFRESH_TOKEN_EXPIRE_DAYS = 7  # Refresh tokens last 7 days
 
 class SecurityService:
     """Servizio per autenticazione e sicurezza multi-sito"""
@@ -216,6 +217,84 @@ class SecurityService:
             return False
         except Exception:
             return False
+    
+    @staticmethod
+    def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+        """
+        Crea un access token JWT
+        
+        Args:
+            data: Dati da includere nel payload
+            expires_delta: Durata custom del token
+            
+        Returns:
+            Token JWT access
+        """
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(minutes=15)  # Access tokens last 15 minutes
+        
+        # Genera JTI (JWT ID) univoco per questo token
+        import uuid
+        token_jti = str(uuid.uuid4())
+        
+        to_encode = data.copy()
+        to_encode.update({
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "jti": token_jti,
+            "type": "access"
+        })
+        
+        return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    
+    @staticmethod
+    def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+        """
+        Crea un refresh token JWT
+        
+        Args:
+            data: Dati da includere nel payload
+            expires_delta: Durata custom del token
+            
+        Returns:
+            Token JWT refresh
+        """
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        
+        # Genera JTI (JWT ID) univoco per questo token
+        import uuid
+        token_jti = str(uuid.uuid4())
+        
+        to_encode = data.copy()
+        to_encode.update({
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "jti": token_jti,
+            "type": "refresh"
+        })
+        
+        return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    
+    @staticmethod
+    def decode_token(token: str) -> dict:
+        """
+        Decodifica un token JWT senza controllo blacklist
+        
+        Args:
+            token: Token JWT da decodificare
+            
+        Returns:
+            Payload decodificato
+            
+        Raises:
+            jwt.PyJWTError: Se token non valido
+        """
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
 # DEPENDENCY CORRETTE: Leggono dal cookie invece che dall'header
 async def get_current_user_token(request: Request) -> Dict[str, Any]:

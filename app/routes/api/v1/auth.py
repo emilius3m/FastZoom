@@ -6,7 +6,7 @@ Implementa backward compatibility con avvisi di deprecazione.
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import JSONResponse, Response
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
@@ -18,7 +18,7 @@ from app.core.security import get_current_user_id, get_current_user_sites
 from app.database.session import get_async_session
 from app.core.config import get_settings
 from app.core.security import current_active_user
-from app.models import User
+from app.models import User, UserActivity, TokenBlacklist
 
 # Get settings instance
 settings = get_settings()
@@ -185,6 +185,207 @@ async def v1_login(
             </div>
             ''',
             status_code=500
+        )
+
+@router.post(
+    "/login/json",
+    response_model=LoginResponse,
+    summary="Login API (JSON)",
+    tags=["Authentication - API"]
+)
+async def v1_login_json(
+    credentials: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Login endpoint per API/script Python con risposta JSON.
+    
+    Restituisce:
+    - access_token: Token JWT per autenticazione API (15 min)
+    - refresh_token: Token per rinnovare access_token (7 giorni)
+    - user: Informazioni utente complete con siti
+    
+    Esempio uso:
+    ```
+    response = requests.post(
+        "http://localhost:8000/api/v1/auth/login/json",
+        json={"username": "admin@example.com", "password": "password"}
+    )
+    tokens = response.json()
+    access_token = tokens["access_token"]
+    ```
+    """
+    try:
+        # Autentica utente
+        user = await AuthService.authenticate_user(db, credentials.username, credentials.password)
+        
+        if not user:
+            # Log tentativo fallito
+            await UserActivity.log_login(db, None, success=False, ip_address=request.client.host)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Username o password non corretti",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Verifica utente attivo
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Utente disabilitato. Contatta l'amministratore."
+            )
+        
+        # Genera JWT tokens
+        jti = str(uuid4())  # Unique token ID per revoca
+        
+        token_data = {
+            "sub": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "jti": jti
+        }
+        
+        access_token = SecurityService.create_access_token(token_data)
+        refresh_token = SecurityService.create_refresh_token(token_data)
+        
+        # Aggiorna ultimo login
+        user.last_login = datetime.utcnow()
+        await db.commit()
+        
+        # Log login riuscito
+        await UserActivity.log_login(db, str(user.id), success=True, ip_address=request.client.host)
+        
+        # Ottieni siti utente
+        user_sites = await AuthService.get_user_sites(db, str(user.id))
+        
+        logger.info(f"Login API riuscito per {user.email} da {request.client.host}")
+        
+        return LoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            user={
+                "id": str(user.id),
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.full_name,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+                "sites": user_sites,
+                "sites_count": len(user_sites)
+            }
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore login JSON: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore durante il login: {str(e)}"
+        )
+
+# ===== REFRESH TOKEN =====
+
+@router.post(
+    "/refresh",
+    response_model=RefreshResponse,
+    summary="Refresh Access Token",
+    tags=["Authentication - API"]
+)
+async def v1_refresh_token(
+    refresh_request: RefreshRequest,
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Rinnova access token usando refresh token.
+    
+    Quando l'access token scade (dopo 15 minuti), usa questo endpoint
+    per ottenere un nuovo access token senza dover rifare login.
+    
+    Il refresh token dura 7 giorni.
+    
+    Esempio uso:
+    ```
+    response = requests.post(
+        "http://localhost:8000/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token}
+    )
+    new_access_token = response.json()["access_token"]
+    ```
+    """
+    try:
+        # Decodifica refresh token
+        payload = SecurityService.decode_token(refresh_request.refresh_token)
+        
+        # Verifica che sia refresh token
+        if payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token non valido. Usa un refresh token."
+            )
+        
+        # Verifica blacklist
+        jti = payload.get("jti")
+        if jti:
+            blacklisted = await db.execute(
+                select(TokenBlacklist).where(TokenBlacklist.token_jti == jti)
+            )
+            if blacklisted.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token revocato. Esegui nuovo login."
+                )
+        
+        # Estrai user_id
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token non valido"
+            )
+        
+        # Verifica che utente esista e sia attivo
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Utente non trovato"
+            )
+        
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Utente disabilitato"
+            )
+        
+        # Genera nuovo access token (mantieni stesso jti per revoca)
+        new_access_token = SecurityService.create_access_token({
+            "sub": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "jti": jti
+        })
+        
+        logger.info(f"Access token rinnovato per {user.email}")
+        
+        return RefreshResponse(
+            access_token=new_access_token,
+            token_type="bearer",
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore refresh token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Refresh token non valido: {str(e)}"
         )
 
 @router.post("/register", summary="Registra nuovo utente", tags=["Authentication"])
