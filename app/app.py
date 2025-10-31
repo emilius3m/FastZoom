@@ -510,7 +510,7 @@ async def logout_endpoint(request: Request, response: Response, db: AsyncSession
             # Ottieni l'ID utente dal token per la blacklist
             try:
                 payload = await SecurityService.verify_token(token, db)
-                user_id = UUID(payload.get("sub"))
+                user_id = payload.get("sub")  # Keep as string
 
                 # Invalida il token server-side
                 await SecurityService.blacklist_token(token, db, user_id, "user_logout")
