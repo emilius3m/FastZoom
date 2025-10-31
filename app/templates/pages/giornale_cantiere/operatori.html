@@ -483,16 +483,20 @@ function operatoriApp() {
         // Caricamento statistiche operatori
         async loadStats() {
             try {
-                // Se siamo in modalità site-specific, non carichiamo statistiche generali
+                // Verifica se siamo in modalità site-specific
                 const isSiteSpecific = {{ 'true' if is_site_specific else 'false' | safe }};
                 if (isSiteSpecific) {
-                    // In modalità site-specific, le statistiche sono già incluse nella risposta API
+                    // Calcola statistiche basate sugli operatori caricati
+                    console.log('DEBUG: Calcolo statistiche per', this.operatoriList.length, 'operatori');
+                    
                     this.stats = {
                         totali: this.operatoriList.length,
                         attivi: this.operatoriList.filter(op => op.stato === 'attivo').length,
                         specialisti: this.operatoriList.filter(op => op.specializzazione && op.specializzazione !== '').length,
                         ore_totali: this.operatoriList.reduce((sum, op) => sum + (op.ore_totali || 0), 0)
                     };
+                    
+                    console.log('DEBUG: Statistiche calcolate:', this.stats);
                 } else {
                     // Reindirizza alla dashboard per selezionare un sito
                     window.location.href = '/dashboard';
@@ -546,13 +550,20 @@ function operatoriApp() {
                 
                 if (response.ok) {
                     const data = await response.json();
-                    // Gestisci formato risposta differente tra endpoints
-                    if (data.operatori) {
+                    console.log('DEBUG: Operatori response:', data);
+                    
+                    // Gestisci formato risposta site-specific
+                    if (data.operatori && Array.isArray(data.operatori)) {
                         // Endpoint site-specific restituisce { operatori: [...], ... }
                         this.operatoriList = data.operatori;
+                        console.log('DEBUG: Operatori caricati:', this.operatoriList.length);
+                    } else if (Array.isArray(data)) {
+                        // Fallback per array diretto
+                        this.operatoriList = data;
+                        console.log('DEBUG: Operatori caricati (array):', this.operatoriList.length);
                     } else {
-                        // Endpoint generico restituisce direttamente l'array
-                        this.operatoriList = Array.isArray(data) ? data : [];
+                        console.warn('DEBUG: Formato risposta non previsto:', data);
+                        this.operatoriList = [];
                     }
                 } else {
                     console.error('Errore caricamento operatori:', response.statusText);
@@ -606,20 +617,26 @@ function operatoriApp() {
                     if (isSiteSpecific && siteId !== 'null') {
                         // Usa URL RESTful per creazione site-specific
                         url = `/api/v1/giornale/sites/${siteId}/operatori`;
+                        console.log('DEBUG: Creazione operatore site-specific per sito:', siteId);
                     } else {
                         // Errore - dovrebbe essere sempre site-specific
                         this.errorMessage = 'Errore: nessun sito specificato';
                         return;
                     }
                 } else {
-                    // Per modifiche, usa endpoint di aggiornamento site-specific
+                    // Per modifiche, usa endpoint di aggiornamento generico
                     url = `/api/v1/giornale/operatori/${this.currentOperatoreId}`;
+                    console.log('DEBUG: Modifica operatore:', this.currentOperatoreId);
                 }
                 
                 const method = this.modalMode === 'create' ? 'POST' : 'PUT';
                 
+                // Prepara i dati per l'invio
+                const payload = { ...this.formData };
+                
                 // Log the data being sent for debugging
-                console.log('Sending data to:', url, this.formData);
+                console.log('DEBUG: Sending data to:', url);
+                console.log('DEBUG: Payload:', payload);
                 
                 const response = await fetch(url, {
                     method: method,
@@ -627,10 +644,13 @@ function operatoriApp() {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
                     },
-                    body: JSON.stringify(this.formData)
+                    body: JSON.stringify(payload)
                 });
                 
                 if (response.ok) {
+                    const result = await response.json();
+                    console.log('DEBUG: Operatore salvato con successo:', result);
+                    
                     await this.loadOperatori();
                     await this.loadStats();
                     this.closeModal();
@@ -639,11 +659,11 @@ function operatoriApp() {
                     alert(this.modalMode === 'create' ? 'Operatore creato con successo!' : 'Operatore aggiornato con successo!');
                 } else {
                     const error = await response.json();
-                    console.error('Error response:', error);
+                    console.error('DEBUG: Error response:', error);
                     this.errorMessage = error.detail || 'Errore durante il salvataggio';
                 }
             } catch (error) {
-                console.error('Errore submit operatore:', error);
+                console.error('DEBUG: Errore submit operatore:', error);
                 this.errorMessage = 'Errore di connessione al server';
             } finally {
                 this.saving = false;

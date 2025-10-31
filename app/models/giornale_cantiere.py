@@ -44,11 +44,17 @@ class OperatoreCantiere(Base):
     """
     Modello per gli operatori che lavorano nel cantiere archeologico
     Include archeologo, tecnici, operai specializzati, ecc.
+    
+    NOTA: Gli operatori sono ora associati direttamente a un sito archeologico
+    e possono lavorare su diversi cantieri solo all'interno dello stesso sito.
     """
     __tablename__ = "operatori_cantiere"
     
     # Chiave primaria UUID
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    
+    # Foreign key al sito archeologico
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=True, index=True)
     
     # Informazioni anagrafiche
     nome = Column(String(100), nullable=False, index=True)
@@ -86,10 +92,13 @@ class OperatoreCantiere(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # ===== RELAZIONI =====
+    # Relazione con il sito archeologico
+    site = relationship("ArchaeologicalSite", back_populates="operatori_cantiere")
+    
     # Relazione many-to-many con giornali di cantiere
     giornali = relationship(
-        "GiornaleCantiere", 
-        secondary=giornale_operatori_association, 
+        "GiornaleCantiere",
+        secondary=giornale_operatori_association,
         back_populates="operatori"
     )
     

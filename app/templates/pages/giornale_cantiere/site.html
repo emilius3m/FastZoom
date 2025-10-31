@@ -440,9 +440,9 @@ function giornaleSitoAppCompleto() {
         
         // API Calls per Modal
         async loadOperatoriDisponibili() {
-            console.log('DEBUG: Inizio caricamento operatori...');
+            console.log('DEBUG: Inizio caricamento operatori per sito:', this.siteId);
             try {
-                const response = await fetch('/api/v1/giornale/operatori?limit=100', {
+                const response = await fetch(`/api/v1/giornale/sites/${this.siteId}/operatori`, {
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
@@ -450,13 +450,22 @@ function giornaleSitoAppCompleto() {
                 });
                 
                 console.log('DEBUG: Response status:', response.status);
-                console.log('DEBUG: Response headers:', response.headers);
                 
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('DEBUG: Operatori caricati:', data);
-                    console.log('DEBUG: Numero operatori:', data.length);
-                    this.operatori_disponibili = data;
+                    console.log('DEBUG: Operatori response:', data);
+                    
+                    // Gestisci formato risposta site-specific
+                    if (data.operatori && Array.isArray(data.operatori)) {
+                        this.operatori_disponibili = data.operatori;
+                        console.log('DEBUG: Operatori caricati (site-specific):', this.operatori_disponibili.length);
+                    } else if (Array.isArray(data)) {
+                        this.operatori_disponibili = data;
+                        console.log('DEBUG: Operatori caricati (array):', this.operatori_disponibili.length);
+                    } else {
+                        console.warn('DEBUG: Formato risposta non previsto:', data);
+                        this.operatori_disponibili = [];
+                    }
                 } else {
                     console.log('DEBUG: Errore caricamento operatori, status:', response.status);
                     const errorText = await response.text();
