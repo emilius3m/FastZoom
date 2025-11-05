@@ -38,6 +38,14 @@ async def get_admin_template_context(
     user = await db.execute(select(User).where(User.id == current_user_id))
     user = user.scalar_one_or_none()
     
+    # 🔧 MENU LATERALE FIX: Crea un sito virtuale per le pagine admin per abilitare il menu laterale
+    admin_site = {
+        "id": "admin",
+        "name": "Pannello Amministrazione",
+        "location": "Sistema",
+        "permission_level": "admin"
+    }
+    
     return {
         "request": request,
         # Variabili richieste da auth_navigation.html
@@ -45,8 +53,12 @@ async def get_admin_template_context(
         "sites_count": len(user_sites) if user_sites else 0,
         "user_email": user.email if user else None,
         "user_type": "superuser" if user and user.is_superuser else "user",
-        "current_site_name": user_sites[0]["name"] if user_sites else None,
-        "current_page": request.url.path.split("/")[-1] or "admin"
+        "current_site_name": user_sites[0]["name"] if user_sites else "Amministrazione",
+        "current_page": request.url.path.split("/")[-1] or "admin",
+        # 🔧 MENU LATERALE FIX: Aggiungi sito virtuale per attivare il menu laterale nelle pagine admin
+        "site": admin_site,
+        # Mantieni anche il primo sito reale se disponibile
+        "first_site": user_sites[0] if user_sites else admin_site
     }
 
 # Middleware per verificare che l'utente sia superuser
