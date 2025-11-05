@@ -26,8 +26,13 @@ def add_deprecation_headers(response: Response, new_endpoint: str):
 
 def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Verifica accesso al sito e restituisce informazioni sul sito"""
+    # Handle both hyphenated and non-hyphenated UUID formats
+    site_id_str = str(site_id)
     site_info = next(
-        (site for site in user_sites if site["id"] == str(site_id)),
+        (site for site in user_sites if
+         site["id"] == site_id_str or
+         site["id"].replace("-", "") == site_id_str.replace("-", "")
+        ),
         None
     )
     

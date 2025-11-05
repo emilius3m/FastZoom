@@ -878,6 +878,10 @@ async def on_shutdown():
 async def on_startup():
     """Inizializzazione sistema archeologico"""
     try:
+        # Initialize models first to ensure proper relationship mapping
+        from app.database.base import init_models
+        init_models()
+        
         await create_db_and_tables()
         
         # Avvia il servizio di background processing per deep zoom tiles

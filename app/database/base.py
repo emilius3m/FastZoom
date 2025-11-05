@@ -107,6 +107,9 @@ def init_models():
     from ..models import Photo # noqa: F401
     from ..models.iccd_records import ICCDRecord, ICCDBaseRecord, ICCDSchemaTemplate # noqa: F401
     from ..models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria, USFile # noqa: F401
+    # Import cantiere model
+    from ..models.cantiere import Cantiere  # noqa: F401
+    
     # Import giornale di cantiere (nota: file con trattini richiede importlib)
     import importlib
     giornale_module = importlib.import_module('app.models.giornale_cantiere')

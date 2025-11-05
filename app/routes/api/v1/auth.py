@@ -210,7 +210,7 @@ async def v1_login_json(
     ```
     response = requests.post(
         "http://localhost:8000/api/v1/auth/login/json",
-        json={"username": "admin@example.com", "password": "password"}
+        json={"username": "user@user.com", "password": "user@user.com"}
     )
     tokens = response.json()
     access_token = tokens["access_token"]
