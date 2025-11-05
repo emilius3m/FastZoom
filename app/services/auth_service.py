@@ -71,12 +71,20 @@ class AuthService:
         Returns:
             Lista dizionari con info siti e permessi
         """
+        # 🔍 DEBUG LOG: Log user info
+        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - user_id: {user_id}")
+        
         # Prima verifica se è superuser
         user_query = select(User).where(User.id == user_id)
         user_result = await db.execute(user_query)
         user = user_result.scalar_one_or_none()
         
+        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - user found: {user is not None}")
+        if user:
+            logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - user.email: {user.email}, is_superuser: {user.is_superuser}")
+        
         if user and user.is_superuser:
+            logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Superuser detected, getting all sites")
             # SUPERADMIN: accesso a tutti i siti attivi
             return await AuthService.get_all_sites_for_superuser(db)
         
@@ -96,14 +104,22 @@ class AuthService:
             and_(
                 UserSitePermission.user_id == user_id,
                 UserSitePermission.is_active == True,
-                ArchaeologicalSite.status == SiteStatusEnum.ACTIVE
+                ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value  # 🔥 FIX: Use .value to get string value
             )
         ).order_by(ArchaeologicalSite.name)
         
+        # 🔍 DEBUG: Log the query being executed
+        logger.info(f"🐛 [DEBUG] Query filter - user_id: {user_id}")
+        logger.info(f"🐛 [DEBUG] Query filter - SiteStatusEnum.ACTIVE value: '{SiteStatusEnum.ACTIVE}'")
+        logger.info(f"🐛 [DEBUG] Query filter - Type of SiteStatusEnum.ACTIVE: {type(SiteStatusEnum.ACTIVE)}")
+        
+        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Executing site permissions query...")
         result = await db.execute(query)
         sites_data = []
         
+        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Processing query results...")
         for row in result:
+            logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Found site: {row.name} (ID: {row.id}) with permission: {row.permission_level}")
             sites_data.append({
                 "id": str(row.id),
                 "name": row.name,
@@ -111,6 +127,10 @@ class AuthService:
                 "location": row.municipality or "",
                 "permission_level": row.permission_level
             })
+        
+        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Final sites_data count: {len(sites_data)}")
+        if not sites_data:
+            logger.warning(f"🐛 [DEBUG] get_user_sites_with_permissions - No sites found for user {user_id}")
         
         return sites_data
 
@@ -133,7 +153,7 @@ class AuthService:
             ArchaeologicalSite.code,
             ArchaeologicalSite.municipality,
         ).where(
-            ArchaeologicalSite.status == SiteStatusEnum.ACTIVE
+            ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value  # 🔥 FIX: Use .value to get string value
         ).order_by(ArchaeologicalSite.name)
         
         result = await db.execute(query)

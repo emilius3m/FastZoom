@@ -935,8 +935,16 @@ async def v1_get_general_stats(
     Recupera statistiche generali per tutti i siti accessibili.
     """
     try:
+        # 🔍 DEBUG LOG: Log current user and user sites information
+        logger.info(f"🐛 [DEBUG] Current user: {current_user_id}")
+        logger.info(f"🐛 [DEBUG] User sites count: {len(user_sites) if user_sites else 0}")
+        logger.info(f"🐛 [DEBUG] User sites: {user_sites}")
+        
         site_ids = [str(UUID(site["id"])) for site in user_sites]
+        logger.info(f"🐛 [DEBUG] v1_get_general_stats - Converted site_ids: {site_ids}")
+        
         if not site_ids:
+            logger.warning(f"🐛 [DEBUG] v1_get_general_stats - No site_ids available, returning zeros")
             return {
                 "siti_totali": 0,
                 "giornali_totali": 0,
@@ -979,7 +987,6 @@ async def v1_get_general_stats(
         }
         
     except Exception as e:
-        from loguru import logger
         logger.error(f"Errore statistiche generali: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
