@@ -11,10 +11,10 @@ from typing import Optional, List, Dict, Any
 from decimal import Decimal
 
 from sqlalchemy import (
-    Column, String, Text, Boolean, DateTime, Date, ForeignKey, 
-    Integer, Numeric, JSON, Index, UniqueConstraint, Float
+    Column, String, Text, Boolean, DateTime, Date, ForeignKey,
+    Integer, Numeric, JSON, Index, UniqueConstraint, Float, UUID
 )
-from sqlalchemy.dialects.postgresql import UUID
+
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 

@@ -25,23 +25,79 @@ def add_deprecation_headers(response: Response, new_endpoint: str):
     response.headers["X-API-Sunset"] = "2025-12-31"  # Data rimozione vecchi endpoint
 
 def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Verifica accesso al sito e restituisce informazioni sul sito"""
-    # Handle both hyphenated and non-hyphenated UUID formats
+    """
+    Verifica accesso al sito e restituisce informazioni sul sito
+    
+    🔧 ENHANCED: Improved UUID format handling with comprehensive logging
+    Handles various UUID formats and provides detailed debugging information
+    """
+    from loguru import logger
+    
+    # 🔍 DEBUG: Log input parameters
+    logger.info(f"🐛 [DEBUG] verify_site_access - site_id: {site_id}, type: {type(site_id)}")
+    logger.info(f"🐛 [DEBUG] verify_site_access - user_sites count: {len(user_sites)}")
+    
+    # Convert site_id to string in multiple formats for robust matching
     site_id_str = str(site_id)
-    site_info = next(
-        (site for site in user_sites if
-         site["id"] == site_id_str or
-         site["id"].replace("-", "") == site_id_str.replace("-", "")
-        ),
-        None
-    )
+    site_id_no_hyphens = site_id_str.replace("-", "")
+    site_id_lower = site_id_str.lower()
+    site_id_no_hyphens_lower = site_id_no_hyphens.lower()
+    
+    # 🔍 DEBUG: Log all UUID format variations
+    logger.info(f"🐛 [DEBUG] verify_site_access - site_id_str: {site_id_str}")
+    logger.info(f"🐛 [DEBUG] verify_site_access - site_id_no_hyphens: {site_id_no_hyphens}")
+    logger.info(f"🐛 [DEBUG] verify_site_access - site_id_lower: {site_id_lower}")
+    logger.info(f"🐛 [DEBUG] verify_site_access - site_id_no_hyphens_lower: {site_id_no_hyphens_lower}")
+    
+    # 🔍 DEBUG: Log all user sites for comparison
+    for i, site in enumerate(user_sites):
+        logger.info(f"🐛 [DEBUG] user_site[{i}]: id={site.get('id', 'MISSING')}, name={site.get('name', 'MISSING')}")
+        if site.get('id'):
+            site_id_from_user = str(site["id"])
+            logger.info(f"🐛 [DEBUG] user_site[{i}] - raw: {site_id_from_user}")
+            logger.info(f"🐛 [DEBUG] user_site[{i}] - no_hyphens: {site_id_from_user.replace('-', '')}")
+            logger.info(f"🐛 [DEBUG] user_site[{i}] - lower: {site_id_from_user.lower()}")
+    
+    # Enhanced matching with multiple format variations
+    site_info = None
+    for site in user_sites:
+        if not site.get("id"):
+            logger.warning(f"🐛 [DEBUG] Site missing 'id' field: {site}")
+            continue
+            
+        site_user_id = str(site["id"])
+        site_user_id_no_hyphens = site_user_id.replace("-", "")
+        site_user_id_lower = site_user_id.lower()
+        site_user_id_no_hyphens_lower = site_user_id_no_hyphens.lower()
+        
+        # Try multiple matching strategies
+        if (site_user_id == site_id_str or
+            site_user_id_no_hyphens == site_id_no_hyphens or
+            site_user_id_lower == site_id_lower or
+            site_user_id_no_hyphens_lower == site_id_no_hyphens_lower):
+            
+            site_info = site
+            logger.info(f"🐛 [DEBUG] FOUND MATCH! Site: {site.get('name', 'Unknown')} (ID: {site_user_id})")
+            break
     
     if not site_info:
+        # 🔍 DEBUG: Detailed failure logging
+        logger.error(f"🐛 [DEBUG] verify_site_access - NO MATCH FOUND")
+        logger.error(f"🐛 [DEBUG] Looking for site_id variations:")
+        logger.error(f"🐛 [DEBUG]  - Original: {site_id_str}")
+        logger.error(f"🐛 [DEBUG]  - No hyphens: {site_id_no_hyphens}")
+        logger.error(f"🐛 [DEBUG]  - Lower: {site_id_lower}")
+        logger.error(f"🐛 [DEBUG]  - No hyphens lower: {site_id_no_hyphens_lower}")
+        logger.error(f"🐛 [DEBUG] Available user sites:")
+        for i, site in enumerate(user_sites):
+            logger.error(f"🐛 [DEBUG]  - Site {i}: {site.get('name', 'Unknown')} (ID: {site.get('id', 'MISSING')})")
+        
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied"
+            detail=f"Sito {site_id} non trovato o access denied. User has access to {len(user_sites)} sites."
         )
     
+    logger.info(f"🐛 [DEBUG] verify_site_access - SUCCESS: User has access to site '{site_info.get('name', 'Unknown')}'")
     return site_info
 
 # Import required models and schemas
@@ -77,6 +133,8 @@ async def v1_get_site_giornali(
     """
     Recupera tutti i giornali di cantiere di un sito con filtri avanzati.
     
+    🔧 ENHANCED: Improved error handling and comprehensive logging
+    
     Args:
         site_id: ID del sito archeologico
         skip: Numero di record da saltare (paginazione)
@@ -88,11 +146,35 @@ async def v1_get_site_giornali(
         cantiere_id: Filtra per cantiere specifico
     """
     try:
+        # 🔍 DEBUG: Enhanced logging for troubleshooting
+        logger.info(f"🐛 [DEBUG] v1_get_site_giornali - START")
+        logger.info(f"🐛 [DEBUG] Current user: {current_user_id}")
+        logger.info(f"🐛 [DEBUG] Requested site_id: {site_id} (type: {type(site_id)})")
+        logger.info(f"🐛 [DEBUG] User sites count: {len(user_sites)}")
+        
+        # 🔍 DEBUG: Validate user_sites before proceeding
+        if not user_sites:
+            logger.warning(f"🐛 [DEBUG] User has NO accessible sites!")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no accessible sites. Please contact administrator."
+            )
+        
+        # 🔍 DEBUG: Log user sites details
+        for i, site in enumerate(user_sites):
+            logger.info(f"🐛 [DEBUG] User site {i}: {site.get('name', 'Unknown')} (ID: {site.get('id', 'MISSING')})")
+        
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
+        logger.info(f"🐛 [DEBUG] Site access verified: {site_info.get('name', 'Unknown')}")
 
+        # 🔍 DEBUG: Prepare query with enhanced logging
+        site_id_str = str(site_id)
+        logger.info(f"🐛 [DEBUG] Querying journals for site_id_str: {site_id_str}")
+        
         # Query base
-        query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == str(site_id))
+        query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == site_id_str)
+        logger.info(f"🐛 [DEBUG] Base query prepared")
         
         # Filtra per cantiere specifico se specificato
         if cantiere_id:
@@ -126,8 +208,11 @@ async def v1_get_site_giornali(
         )
         query = query.offset(skip).limit(limit)
 
+        # 🔍 DEBUG: Execute query with logging
+        logger.info(f"🐛 [DEBUG] Executing database query...")
         result = await db.execute(query)
         giornali = result.scalars().all()
+        logger.info(f"🐛 [DEBUG] Query executed. Found {len(giornali)} giornali")
 
         # Prepara dati di risposta
         giornali_data = []
@@ -179,7 +264,8 @@ async def v1_get_site_giornali(
             }
             giornali_data.append(giornale_dict)
 
-        return {
+        # 🔍 DEBUG: Prepare successful response with logging
+        response_data = {
             "site_id": str(site_id),
             "giornali": giornali_data,
             "count": len(giornali_data),
@@ -193,12 +279,22 @@ async def v1_get_site_giornali(
             }
         }
         
+        logger.info(f"🐛 [DEBUG] v1_get_site_giornali - SUCCESS: Returning {len(giornali_data)} giornali")
+        return response_data
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404 from verify_site_access)
+        raise
     except Exception as e:
-        from loguru import logger
-        logger.error(f"Errore recupero giornali sito {site_id}: {str(e)}")
+        # 🔍 DEBUG: Enhanced error logging
+        logger.error(f"🐛 [DEBUG] v1_get_site_giornali - ERROR: {str(e)}")
+        logger.error(f"🐛 [DEBUG] Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"🐛 [DEBUG] Full traceback: {traceback.format_exc()}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel recupero dei giornali",
+            detail=f"Errore nel recupero dei giornali: {str(e)}",
         )
  
 @router.get("/sites/{site_id}/cantieri/{cantiere_id}/giornali", summary="Lista giornali cantiere", tags=["Giornale di Cantiere"])
@@ -938,42 +1034,69 @@ async def v1_get_general_stats(
 ):
     """
     Recupera statistiche generali per tutti i siti accessibili.
+    
+    🔧 ENHANCED: Improved error handling and UUID format validation
     """
     try:
-        # 🔍 DEBUG LOG: Log current user and user sites information
+        # 🔍 DEBUG LOG: Enhanced logging for troubleshooting
+        logger.info(f"🐛 [DEBUG] v1_get_general_stats - START")
         logger.info(f"🐛 [DEBUG] Current user: {current_user_id}")
         logger.info(f"🐛 [DEBUG] User sites count: {len(user_sites) if user_sites else 0}")
-        logger.info(f"🐛 [DEBUG] User sites: {user_sites}")
         
-        site_ids = [str(UUID(site["id"])) for site in user_sites]
-        logger.info(f"🐛 [DEBUG] v1_get_general_stats - Converted site_ids: {site_ids}")
-        
-        if not site_ids:
-            logger.warning(f"🐛 [DEBUG] v1_get_general_stats - No site_ids available, returning zeros")
+        # 🔍 DEBUG: Validate user_sites before processing
+        if not user_sites:
+            logger.warning(f"🐛 [DEBUG] User has NO accessible sites for general stats")
             return {
                 "siti_totali": 0,
                 "giornali_totali": 0,
                 "giornali_validati": 0,
                 "giornali_pendenti": 0,
+                "debug_info": "User has no accessible sites"
+            }
+        
+        # 🔍 DEBUG: Enhanced site_id processing with validation
+        site_ids = []
+        for site in user_sites:
+            try:
+                site_id_str = str(site["id"])
+                site_ids.append(site_id_str)
+                logger.info(f"🐛 [DEBUG] Processing site: {site.get('name', 'Unknown')} (ID: {site_id_str})")
+            except (KeyError, ValueError) as e:
+                logger.error(f"🐛 [DEBUG] Invalid site data: {site}, error: {e}")
+                continue
+        
+        logger.info(f"🐛 [DEBUG] Final site_ids for query: {site_ids}")
+        
+        if not site_ids:
+            logger.warning(f"🐛 [DEBUG] No valid site_ids after processing, returning zeros")
+            return {
+                "siti_totali": 0,
+                "giornali_totali": 0,
+                "giornali_validati": 0,
+                "giornali_pendenti": 0,
+                "debug_info": "No valid site IDs found after processing"
             }
 
-        # Count unique sites with journals
+        # 🔍 DEBUG: Execute database queries with enhanced logging
+        logger.info(f"🐛 [DEBUG] Querying unique sites with journals...")
         siti_result = await db.execute(
             select(distinct(GiornaleCantiere.site_id)).where(
                 GiornaleCantiere.site_id.in_(site_ids)
             )
         )
         siti_totali = len(siti_result.fetchall())
+        logger.info(f"🐛 [DEBUG] Found {siti_totali} unique sites with journals")
 
-        # Count total journals
+        logger.info(f"🐛 [DEBUG] Querying total journals count...")
         totali_result = await db.execute(
             select(func.count(GiornaleCantiere.id)).where(
                 GiornaleCantiere.site_id.in_(site_ids)
             )
         )
         giornali_totali = totali_result.scalar() or 0
+        logger.info(f"🐛 [DEBUG] Found {giornali_totali} total journals")
 
-        # Count validated journals
+        logger.info(f"🐛 [DEBUG] Querying validated journals count...")
         validati_result = await db.execute(
             select(func.count(GiornaleCantiere.id)).where(
                 and_(
@@ -983,19 +1106,29 @@ async def v1_get_general_stats(
             )
         )
         giornali_validati = validati_result.scalar() or 0
+        logger.info(f"🐛 [DEBUG] Found {giornali_validati} validated journals")
 
-        return {
+        response_data = {
             "siti_totali": siti_totali,
             "giornali_totali": giornali_totali,
             "giornali_validati": giornali_validati,
             "giornali_pendenti": giornali_totali - giornali_validati,
+            "debug_info": f"Processed {len(site_ids)} sites"
         }
         
+        logger.info(f"🐛 [DEBUG] v1_get_general_stats - SUCCESS: {response_data}")
+        return response_data
+        
     except Exception as e:
-        logger.error(f"Errore statistiche generali: {str(e)}")
+        # 🔍 DEBUG: Enhanced error logging
+        logger.error(f"🐛 [DEBUG] v1_get_general_stats - ERROR: {str(e)}")
+        logger.error(f"🐛 [DEBUG] Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"🐛 [DEBUG] Full traceback: {traceback.format_exc()}")
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel calcolo delle statistiche generali",
+            detail=f"Errore nel calcolo delle statistiche generali: {str(e)}",
         )
 
 @router.get("/stats/site/{site_id}", summary="Statistiche sito specifico", tags=["Giornale di Cantiere - Stats"])

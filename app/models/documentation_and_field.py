@@ -12,9 +12,9 @@ from typing import Optional, List, Dict, Any
 
 from sqlalchemy import (
     Column, String, Text, Boolean, DateTime, Date, Time, ForeignKey,
-    Integer, BigInteger, JSON, Index, UniqueConstraint, Table, Float
+    Integer, BigInteger, JSON, Index, UniqueConstraint, Table, Float, UUID
 )
-from sqlalchemy.dialects.postgresql import UUID
+
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 

@@ -13,6 +13,14 @@
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
       ]
+    },
+    "sqlite": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-sqlite",
+        "--db-path",
+        "C:/Users/E3M/OneDrive - beniculturali.it/Desktop/FastZoom/archaeological.db"
+      ]
     }
   }
 }

@@ -64,6 +64,8 @@ class AuthService:
         Ottiene siti accessibili dall'utente con dettagli permessi
         Se è superuser, ha accesso a TUTTI i siti attivi
         
+        🔧 ENHANCED: Improved error handling and comprehensive debugging
+        
         Args:
             db: Sessione database
             user_id: ID utente
@@ -71,68 +73,129 @@ class AuthService:
         Returns:
             Lista dizionari con info siti e permessi
         """
-        # 🔍 DEBUG LOG: Log user info
-        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - user_id: {user_id}")
-        
-        # Prima verifica se è superuser
-        user_query = select(User).where(User.id == user_id)
-        user_result = await db.execute(user_query)
-        user = user_result.scalar_one_or_none()
-        
-        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - user found: {user is not None}")
-        if user:
-            logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - user.email: {user.email}, is_superuser: {user.is_superuser}")
-        
-        if user and user.is_superuser:
-            logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Superuser detected, getting all sites")
-            # SUPERADMIN: accesso a tutti i siti attivi
-            return await AuthService.get_all_sites_for_superuser(db)
-        
-        # UTENTE NORMALE: solo siti con permessi espliciti
-        query = select(
-            ArchaeologicalSite.id,
-            ArchaeologicalSite.name,
-            ArchaeologicalSite.code,
-            ArchaeologicalSite.municipality,
-            UserSitePermission.permission_level
-        ).select_from(
-            ArchaeologicalSite
-        ).join(
-            UserSitePermission,
-            ArchaeologicalSite.id == UserSitePermission.site_id
-        ).where(
-            and_(
-                UserSitePermission.user_id == user_id,
-                UserSitePermission.is_active == True,
-                ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value  # 🔥 FIX: Use .value to get string value
+        try:
+            # 🔍 DEBUG: Enhanced logging for troubleshooting
+            logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - START")
+            logger.info(f"🐛 [DEBUG] Input user_id: {user_id} (type: {type(user_id)})")
+            
+            # 🔍 DEBUG: Validate input user_id
+            if not user_id:
+                logger.error(f"🐛 [DEBUG] Invalid user_id provided: {user_id}")
+                return []
+            
+            # Prima verifica se è superuser
+            logger.info(f"🐛 [DEBUG] Checking if user {user_id} is superuser...")
+            
+            # 🔧 UUID FORMAT FIX: Handle both dashed and non-dashed UUID formats
+            user_id_str = str(user_id)
+            user_id_no_dashes = user_id_str.replace('-', '')
+            
+            logger.info(f"🐛 [DEBUG] UUID formats to try:")
+            logger.info(f"🐛 [DEBUG]  - With dashes: {user_id_str}")
+            logger.info(f"🐛 [DEBUG]  - Without dashes: {user_id_no_dashes}")
+            
+            # Try with dashes first, then without dashes
+            user_query = select(User).where(
+                (User.id == user_id_str) | (User.id == user_id_no_dashes)
             )
-        ).order_by(ArchaeologicalSite.name)
-        
-        # 🔍 DEBUG: Log the query being executed
-        logger.info(f"🐛 [DEBUG] Query filter - user_id: {user_id}")
-        logger.info(f"🐛 [DEBUG] Query filter - SiteStatusEnum.ACTIVE value: '{SiteStatusEnum.ACTIVE}'")
-        logger.info(f"🐛 [DEBUG] Query filter - Type of SiteStatusEnum.ACTIVE: {type(SiteStatusEnum.ACTIVE)}")
-        
-        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Executing site permissions query...")
-        result = await db.execute(query)
-        sites_data = []
-        
-        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Processing query results...")
-        for row in result:
-            logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Found site: {row.name} (ID: {row.id}) with permission: {row.permission_level}")
-            sites_data.append({
-                "id": str(row.id),
-                "name": row.name,
-                "code": row.code,
-                "location": row.municipality or "",
-                "permission_level": row.permission_level
-            })
-        
-        logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - Final sites_data count: {len(sites_data)}")
-        if not sites_data:
-            logger.warning(f"🐛 [DEBUG] get_user_sites_with_permissions - No sites found for user {user_id}")
-        
-        return sites_data
+            user_result = await db.execute(user_query)
+            user = user_result.scalar_one_or_none()
+            
+            logger.info(f"🐛 [DEBUG] User found: {user is not None}")
+            if user:
+                logger.info(f"🐛 [DEBUG] User details - email: {user.email}, is_active: {user.is_active}, is_superuser: {user.is_superuser}")
+            else:
+                logger.error(f"🐛 [DEBUG] User {user_id} not found in database!")
+                return []
+            
+            if user and user.is_superuser:
+                logger.info(f"🐛 [DEBUG] Superuser detected, getting all active sites")
+                # SUPERADMIN: accesso a tutti i siti attivi
+                return await AuthService.get_all_sites_for_superuser(db)
+            
+            # 🔍 DEBUG: Enhanced logging for normal user permissions
+            logger.info(f"🐛 [DEBUG] Normal user detected, checking explicit permissions...")
+            logger.info(f"🐛 [DEBUG] User is_active: {user.is_active}")
+            
+            if not user.is_active:
+                logger.warning(f"🐛 [DEBUG] User {user_id} is not active, no site access")
+                return []
+            
+            # 🔍 DEBUG: Enhanced query construction with validation
+            logger.info(f"🐛 [DEBUG] Building site permissions query...")
+            logger.info(f"🐛 [DEBUG] Query filters:")
+            logger.info(f"🐛 [DEBUG]  - user_id: {user_id}")
+            logger.info(f"🐛 [DEBUG]  - permission_active: True")
+            logger.info(f"🐛 [DEBUG]  - site_status: {SiteStatusEnum.ACTIVE.value} (type: {type(SiteStatusEnum.ACTIVE.value)})")
+            
+            # UTENTE NORMALE: solo siti con permessi espliciti
+            query = select(
+                ArchaeologicalSite.id,
+                ArchaeologicalSite.name,
+                ArchaeologicalSite.code,
+                ArchaeologicalSite.municipality,
+                UserSitePermission.permission_level
+            ).select_from(
+                ArchaeologicalSite
+            ).join(
+                UserSitePermission,
+                ArchaeologicalSite.id == UserSitePermission.site_id
+            ).where(
+                and_(
+                    (UserSitePermission.user_id == user_id_str) | (UserSitePermission.user_id == user_id_no_dashes),  # 🔧 FIX: Handle both UUID formats
+                    UserSitePermission.is_active == True,
+                    ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value
+                )
+            ).order_by(ArchaeologicalSite.name)
+            
+            logger.info(f"🐛 [DEBUG] Executing site permissions query...")
+            result = await db.execute(query)
+            sites_data = []
+            
+            logger.info(f"🐛 [DEBUG] Processing query results...")
+            row_count = 0
+            for row in result:
+                row_count += 1
+                logger.info(f"🐛 [DEBUG] Site {row_count}: {row.name} (ID: {row.id}, permission: {row.permission_level})")
+                
+                # 🔍 DEBUG: Validate site data before adding
+                if row.id and row.name:
+                    sites_data.append({
+                        "id": str(row.id),  # 🔧 FIX: Ensure consistent UUID string format
+                        "name": str(row.name),
+                        "code": str(row.code) if row.code else "",
+                        "location": str(row.municipality) if row.municipality else "",
+                        "permission_level": str(row.permission_level) if row.permission_level else "read"
+                    })
+                else:
+                    logger.warning(f"🐛 [DEBUG] Skipping invalid site row: {row}")
+            
+            logger.info(f"🐛 [DEBUG] Query processing complete. Processed {row_count} rows, returning {len(sites_data)} valid sites")
+            
+            if not sites_data:
+                logger.warning(f"🐛 [DEBUG] No accessible sites found for user {user_id}")
+                logger.warning(f"🐛 [DEBUG] This could mean:")
+                logger.warning(f"🐛 [DEBUG]  - User has no explicit permissions")
+                logger.warning(f"🐛 [DEBUG]  - All accessible sites are inactive")
+                logger.warning(f"🐛 [DEBUG]  - Permission records are inactive")
+            else:
+                logger.info(f"🐛 [DEBUG] Successfully found {len(sites_data)} accessible sites for user {user_id}")
+                for site in sites_data:
+                    logger.info(f"🐛 [DEBUG]  - {site['name']} (ID: {site['id']}, permission: {site['permission_level']})")
+            
+            return sites_data
+            
+        except Exception as e:
+            # 🔍 DEBUG: Enhanced error logging
+            logger.error(f"🐛 [DEBUG] get_user_sites_with_permissions - ERROR: {str(e)}")
+            logger.error(f"🐛 [DEBUG] Error type: {type(e).__name__}")
+            logger.error(f"🐛 [DEBUG] User ID: {user_id} (type: {type(user_id)})")
+            import traceback
+            logger.error(f"🐛 [DEBUG] Full traceback: {traceback.format_exc()}")
+            
+            # Return empty list on error to prevent system crashes
+            logger.error(f"🐛 [DEBUG] Returning empty sites list due to error")
+            return []
 
     # NUOVO METODO - MANCAVA QUESTO
     @staticmethod
