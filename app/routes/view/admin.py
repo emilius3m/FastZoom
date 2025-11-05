@@ -7,6 +7,7 @@ Mantiene l'interfaccia web ma delega la logica alla API v1.
 from fastapi import APIRouter, Depends, Request, HTTPException, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from loguru import logger

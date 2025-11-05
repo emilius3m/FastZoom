@@ -27,7 +27,8 @@ from fastapi_csrf_protect import CsrfProtect
 from fastapi import APIRouter, Request
 from app.core.csrf_settings import CsrfSettings, _csrf_tokens_optional
 from app.templates import templates
-from app.routes.admin import admin_router
+# VECCHIO ADMIN ROUTER - Migrato in API v1
+# from app.routes.admin import admin_router
 # 🔧 NUOVO IMPORT - Router Sites
 from app.routes.sites_router import sites_router
 # 🔧 NUOVO IMPORT - Router Photos (senza prefisso /sites)
@@ -403,11 +404,11 @@ app.include_router(
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 
-# Router esistenti
-app.include_router(
-    admin_router,
-    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Admin richiede autenticazione con blacklist
-)
+# Router esistenti - VECCHIO ADMIN ROUTER DISABILITATO (migrato in API v1)
+##### app.include_router(
+#####     admin_router,
+#####     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Admin richiede autenticazione con blacklist
+##### )
 
 # Include route view condizionali
 if LOGIN_ROUTE_EXISTS:
@@ -473,6 +474,14 @@ if ICCD_ROUTE_EXISTS:
 app.include_router(
     us_view_router,
     tags=["Pages", "US/USM"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
+
+# 🛠️ NUOVO INCLUSIONE ROUTER ADMIN VIEW - Interfaccia web che usa API v1
+from app.routes.view.admin import admin_view_router
+app.include_router(
+    admin_view_router,
+    tags=["Pages", "Administration"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
 
