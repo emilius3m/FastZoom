@@ -1,11 +1,10 @@
 {
   "mcpServers": {
-    "sqlite": {
-      "command": "uvx",
+    "puppeteer": {
+      "command": "npx",
       "args": [
-        "mcp-server-sqlite",
-        "--db-path",
-        "C:/Users/E3M/OneDrive - beniculturali.it/Desktop/FastZoom/archaeological.db"
+        "-y",
+        "@modelcontextprotocol/server-puppeteer"
       ]
     }
   }

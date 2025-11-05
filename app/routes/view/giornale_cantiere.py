@@ -127,9 +127,13 @@ async def giornale_cantiere_site(
     Pagina giornale di cantiere per un sito specifico
     """
     try:
-        # Verifica accesso al sito
+        # Verifica accesso al sito - Handle both hyphenated and non-hyphenated UUID formats
+        site_id_str = str(site_id)
         site_info = next(
-            (site for site in user_sites if site["id"] == str(site_id)),
+            (site for site in user_sites if
+             site["id"] == site_id_str or
+             site["id"].replace("-", "") == site_id_str.replace("-", "")
+            ),
             None
         )
         
@@ -252,9 +256,13 @@ async def giornale_cantiere_detail(
     Pagina dettaglio di una voce specifica del giornale di cantiere
     """
     try:
-        # Verifica accesso al sito
+        # Verifica accesso al sito - Handle both hyphenated and non-hyphenated UUID formats
+        site_id_str = str(site_id)
         site_info = next(
-            (site for site in user_sites if site["id"] == str(site_id)),
+            (site for site in user_sites if
+             site["id"] == site_id_str or
+             site["id"].replace("-", "") == site_id_str.replace("-", "")
+            ),
             None
         )
         
@@ -383,9 +391,13 @@ async def site_operatori_view(
     URL RESTful: /giornale-cantiere/site/{site_id}/operatori
     """
     try:
-        # Verifica accesso al sito
+        # Verifica accesso al sito - Handle both hyphenated and non-hyphenated UUID formats
+        site_id_str = str(site_id)
         site_info = next(
-            (site for site in user_sites if site["id"] == str(site_id)),
+            (site for site in user_sites if
+             site["id"] == site_id_str or
+             site["id"].replace("-", "") == site_id_str.replace("-", "")
+            ),
             None
         )
         
