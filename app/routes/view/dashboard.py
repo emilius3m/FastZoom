@@ -27,6 +27,25 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
     )
     photos_count = photos_count.scalar() or 0
 
+    # 🔥 NUOVO: Conta giornali di cantiere
+    from app.models.giornale_cantiere import GiornaleCantiere
+    
+    giornali_totali_result = await db.execute(
+        select(func.count(GiornaleCantiere.id)).where(GiornaleCantiere.site_id == str(site_id))
+    )
+    giornali_totali = giornali_totali_result.scalar() or 0
+
+    # Conta giornali validati
+    giornali_validati_result = await db.execute(
+        select(func.count(GiornaleCantiere.id)).where(
+            and_(
+                GiornaleCantiere.site_id == str(site_id),
+                GiornaleCantiere.validato.is_(True)
+            )
+        )
+    )
+    giornali_validati = giornali_validati_result.scalar() or 0
+
     # Conta utenti autorizzati
     users_count = await db.execute(
         select(func.count(UserSitePermission.id)).where(
@@ -88,6 +107,9 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
         "us_usm_count": us_usm_count,
         "us_count": us_count,
         "usm_count": usm_count,
+        "giornali_totali": giornali_totali,  # 🔥 NUOVO
+        "giornali_validati": giornali_validati,  # 🔥 NUOVO
+        "giornali_pendenti": giornali_totali - giornali_validati,  # 🔥 NUOVO
         "users_count": users_count,
         "recent_photos": recent_photos,
         "storage_mb": round(storage_mb, 2),

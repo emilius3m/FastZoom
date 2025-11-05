@@ -161,6 +161,32 @@
                 </div>
             </div>
         </div>
+
+        <!-- Giornali di Cantiere Count -->
+        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Giornali di Cantiere</dt>
+                            <dd class="text-lg font-medium text-gray-900 dark:text-white" x-text="stats.giornali_totali">{{ stats.giornali_totali }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700 px-5 py-3">
+                <div class="text-sm">
+                    <a href="/view/{{ site.id }}/giornale" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300">
+                        Visualizza giornali
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Main Content Grid -->
@@ -426,6 +452,9 @@ document.addEventListener('alpine:init', () => {
             us_usm_count: {{ stats.us_usm_count }},
             us_count: {{ stats.us_count }},
             usm_count: {{ stats.usm_count }},
+            giornali_totali: {{ stats.giornali_totali }},
+            giornali_validati: {{ stats.giornali_validati }},
+            giornali_pendenti: {{ stats.giornali_pendenti }},
             users_count: {{ stats.users_count }},
             recent_photos: {{ stats.recent_photos }},
             storage_mb: {{ stats.storage_mb }}

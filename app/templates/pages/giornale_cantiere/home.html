@@ -189,6 +189,7 @@ function giornaleCantiereDashboard() {
                 const response = await fetch('/api/v1/giornale/stats/general', {
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
                     }
                 });
@@ -215,6 +216,7 @@ function giornaleCantiereDashboard() {
                     const response = await fetch(`/api/v1/giornale/stats/site/${site.id}`, {
                         headers: {
                             'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
                             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
                         }
                     });
