@@ -49,10 +49,10 @@ class SiteCreate(BaseModel):
     municipality: Optional[str] = None
     description: Optional[str] = None
     historical_period: Optional[str] = None
-    site_type: Optional[str] = None
+    site_type: Optional[str] = "other"  # Default to SiteTypeEnum.OTHER
     coordinates_lat: Optional[str] = None
     coordinates_lng: Optional[str] = None
-    research_status: Optional[str] = None
+    research_status: Optional[str] = "survey"  # Default to ResearchStatusEnum.SURVEY
     is_active: bool = True
     is_public: bool = True
 
@@ -65,10 +65,10 @@ class SiteUpdate(BaseModel):
     municipality: Optional[str] = None
     description: Optional[str] = None
     historical_period: Optional[str] = None
-    site_type: Optional[str] = None
+    site_type: Optional[str] = "other"  # Default to SiteTypeEnum.OTHER
     coordinates_lat: Optional[str] = None
     coordinates_lng: Optional[str] = None
-    research_status: Optional[str] = None
+    research_status: Optional[str] = "survey"  # Default to ResearchStatusEnum.SURVEY
     is_active: bool = True
     is_public: bool = True
 
@@ -244,7 +244,7 @@ async def v1_admin_create_site(
             )
         
         site = ArchaeologicalSite(
-            id=uuid4(),
+            id=str(uuid4()),  # Convert UUID to string for SQLite compatibility
             name=site_data.name,
             code=site_data.code,
             locality=site_data.location,
@@ -259,7 +259,7 @@ async def v1_admin_create_site(
             research_status=site_data.research_status,
             status="active" if site_data.is_active else "planned",
             is_public=site_data.is_public,
-            created_by=current_user_id
+            created_by=str(current_user_id)  # Convert UUID to string for SQLite compatibility
         )
         
         db.add(site)
@@ -360,23 +360,38 @@ async def v1_admin_update_site(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
         
         # Verifica unicità codice (escludendo il sito corrente)
-        existing = await db.execute(
-            select(ArchaeologicalSite).where(
-                and_(
-                    ArchaeologicalSite.code == site_data.code,
-                    ArchaeologicalSite.id != site_id
+        # Solo se il codice non è vuoto
+        if site_data.code and site_data.code.strip():
+            existing = await db.execute(
+                select(ArchaeologicalSite).where(
+                    and_(
+                        ArchaeologicalSite.code == site_data.code.strip(),
+                        ArchaeologicalSite.id != site_id
+                    )
                 )
             )
-        )
-        if existing.scalar_one_or_none():
+            if existing.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Codice sito '{site_data.code}' già esistente"
+                )
+        elif site_data.code and not site_data.code.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Codice sito '{site_data.code}' già esistente"
+                detail="Il codice sito non può contenere solo spazi"
             )
         
         # Aggiorna campi
         site.name = site_data.name
-        site.code = site_data.code
+        # Only update code if it's not empty and different from current
+        if site_data.code and site_data.code.strip() and site_data.code != site.code:
+            site.code = site_data.code
+        # Don't update code if it's empty or same as current to avoid validation issues
+        elif site_data.code and site_data.code.strip() and site_data.code == site.code:
+            # Code unchanged, no update needed
+            pass
+        # If code is empty, keep the existing code (don't update)
+        
         site.locality = site_data.location
         site.region = site_data.region
         site.province = site_data.province

@@ -173,7 +173,7 @@ async def v1_login(
             return RedirectResponse(url=f"/site/{site_id}/dashboard", status_code=303)
         elif len(sites_data) > 1:
             # Più siti: redirect a selezione sito
-            return RedirectResponse(url="/auth/select-site", status_code=303)
+            return RedirectResponse(url="/api/v1/auth/select-site", status_code=303)
         elif user.is_superuser and len(sites_data) == 0:
             # Superuser senza siti: redirect all'admin per creare siti e configurare
             return RedirectResponse(url="/admin/sites", status_code=303)

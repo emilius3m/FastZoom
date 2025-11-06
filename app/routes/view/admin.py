@@ -201,7 +201,7 @@ async def admin_sites_create(
 @admin_view_router.get("/admin/site/{site_id}/edit/", response_class=HTMLResponse)
 async def admin_sites_edit(
     request: Request,
-    site_id: UUID,
+    site_id: str,
     db: AsyncSession = Depends(get_async_session),
     auth_data: tuple = Depends(require_superuser)
 ):
@@ -209,14 +209,20 @@ async def admin_sites_edit(
     superuser, base_context = auth_data
     
     try:
+        # Converti site_id da stringa a UUID
+        try:
+            site_uuid = UUID(site_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID sito non valido")
+            
         # Chiama la API v1 per ottenere i dati del sito
         # Estrai i cookie dalla richiesta originale e passali alla richiesta API
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-            
+             
         async with httpx.AsyncClient(cookies=cookies) as client:
-            response = await client.get(f"{API_V1_BASE_URL}/sites/{site_id}")
+            response = await client.get(f"{API_V1_BASE_URL}/sites/{site_uuid}")
             
             if response.status_code != 200:
                 logger.error(f"API v1 error: {response.status_code} - {response.text}")
@@ -238,43 +244,41 @@ async def admin_sites_edit(
 
 @admin_view_router.post("/admin/site/{site_id}/edit/")
 async def admin_sites_update(
-    site_id: UUID,
-    name: str = Form(),
-    code: str = Form(),
-    location: Optional[str] = Form(None),
-    region: Optional[str] = Form(None),
-    province: Optional[str] = Form(None),
-    municipality: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    historical_period: Optional[str] = Form(None),
-    site_type: Optional[str] = Form(None),
-    coordinates_lat: Optional[str] = Form(None),
-    coordinates_lng: Optional[str] = Form(None),
-    research_status: Optional[str] = Form(None),
-    is_active: bool = Form(True),
-    is_public: bool = Form(True),
+    site_id: str,
+    request: Request,
     auth_data: tuple = Depends(require_superuser)
 ):
     """Aggiorna sito archeologico"""
     superuser, base_context = auth_data
     
     try:
+        # Converti site_id da stringa a UUID
+        try:
+            site_uuid = UUID(site_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID sito non valido")
+            
+        # Get form data from request
+        form_data = await request.form()
+        
         # Prepara i dati per la API v1
+        # Handle empty strings for optional fields by converting them to None
+        # Use default enum values for fields with NOT NULL constraints
         site_data = {
-            "name": name,
-            "code": code,
-            "location": location,
-            "region": region,
-            "province": province,
-            "municipality": municipality,
-            "description": description,
-            "historical_period": historical_period,
-            "site_type": site_type,
-            "coordinates_lat": coordinates_lat,
-            "coordinates_lng": coordinates_lng,
-            "research_status": research_status,
-            "is_active": is_active,
-            "is_public": is_public
+            "name": form_data.get("name", ""),
+            "code": form_data.get("code", ""),
+            "location": form_data.get("location"),
+            "region": form_data.get("region") if form_data.get("region") else None,
+            "province": form_data.get("province") if form_data.get("province") else None,
+            "municipality": form_data.get("municipality") if form_data.get("municipality") else None,
+            "description": form_data.get("description"),
+            "historical_period": form_data.get("historical_period") if form_data.get("historical_period") else None,
+            "site_type": form_data.get("site_type") if form_data.get("site_type") else "other",  # Use default enum value
+            "coordinates_lat": form_data.get("coordinates_lat") if form_data.get("coordinates_lat") else None,
+            "coordinates_lng": form_data.get("coordinates_lng") if form_data.get("coordinates_lng") else None,
+            "research_status": form_data.get("research_status") if form_data.get("research_status") else "survey",  # Use default enum value
+            "is_active": form_data.get("is_active") == "on",
+            "is_public": form_data.get("is_public") == "on"
         }
         
         # Chiama la API v1 per aggiornare il sito
@@ -282,9 +286,9 @@ async def admin_sites_update(
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-            
+             
         async with httpx.AsyncClient(cookies=cookies) as client:
-            response = await client.put(f"{API_V1_BASE_URL}/sites/{site_id}", json=site_data)
+            response = await client.put(f"{API_V1_BASE_URL}/sites/{site_uuid}", json=site_data)
             
             if response.status_code != 200:
                 logger.error(f"API v1 error: {response.status_code} - {response.text}")
@@ -421,7 +425,7 @@ async def admin_users_create(
 @admin_view_router.get("/admin/users/{user_id}/edit/", response_class=HTMLResponse)
 async def admin_users_edit(
     request: Request,
-    user_id: UUID,
+    user_id: str,
     db: AsyncSession = Depends(get_async_session),
     auth_data: tuple = Depends(require_superuser)
 ):
@@ -429,14 +433,20 @@ async def admin_users_edit(
     superuser, base_context = auth_data
     
     try:
+        # Converti user_id da stringa a UUID
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID utente non valido")
+            
         # Chiama la API v1 per ottenere i dati dell'utente
         # Estrai i cookie dalla richiesta originale e passali alla richiesta API
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-            
+             
         async with httpx.AsyncClient(cookies=cookies) as client:
-            response = await client.get(f"{API_V1_BASE_URL}/users/{user_id}")
+            response = await client.get(f"{API_V1_BASE_URL}/users/{user_uuid}")
             
             if response.status_code != 200:
                 logger.error(f"API v1 error: {response.status_code} - {response.text}")
@@ -458,7 +468,7 @@ async def admin_users_edit(
 
 @admin_view_router.post("/admin/users/{user_id}/edit/")
 async def admin_users_update(
-    user_id: UUID,
+    user_id: str,
     email: str = Form(),
     password: Optional[str] = Form(None),
     first_name: Optional[str] = Form(None),
@@ -472,6 +482,12 @@ async def admin_users_update(
     superuser, base_context = auth_data
     
     try:
+        # Converti user_id da stringa a UUID
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID utente non valido")
+            
         # Prepara i dati per la API v1
         user_data = {
             "email": email,
@@ -491,9 +507,9 @@ async def admin_users_update(
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-            
+             
         async with httpx.AsyncClient(cookies=cookies) as client:
-            response = await client.put(f"{API_V1_BASE_URL}/users/{user_id}", json=user_data)
+            response = await client.put(f"{API_V1_BASE_URL}/users/{user_uuid}", json=user_data)
             
             if response.status_code != 200:
                 logger.error(f"API v1 error: {response.status_code} - {response.text}")
@@ -517,21 +533,27 @@ async def admin_users_update(
 
 @admin_view_router.post("/admin/users/{user_id}/toggle-status/")
 async def admin_users_toggle_status(
-    user_id: UUID,
+    user_id: str,
     auth_data: tuple = Depends(require_superuser)
 ):
     """Toggle stato attivo/inattivo utente"""
     superuser, base_context = auth_data
     
     try:
+        # Converti user_id da stringa a UUID
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID utente non valido")
+            
         # Chiama la API v1 per toggolare lo stato
         # Estrai i cookie dalla richiesta originale e passali alla richiesta API
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-            
+             
         async with httpx.AsyncClient(cookies=cookies) as client:
-            response = await client.post(f"{API_V1_BASE_URL}/users/{user_id}/toggle-status")
+            response = await client.post(f"{API_V1_BASE_URL}/users/{user_uuid}/toggle-status")
             
             if response.status_code != 200:
                 logger.error(f"API v1 error: {response.status_code} - {response.text}")
@@ -550,21 +572,27 @@ async def admin_users_toggle_status(
 
 @admin_view_router.post("/admin/users/{user_id}/delete/")
 async def admin_users_delete(
-    user_id: UUID,
+    user_id: str,
     auth_data: tuple = Depends(require_superuser)
 ):
     """Elimina utente (soft delete)"""
     superuser, base_context = auth_data
     
     try:
+        # Converti user_id da stringa a UUID
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID utente non valido")
+            
         # Chiama la API v1 per eliminare l'utente
         # Estrai i cookie dalla richiesta originale e passali alla richiesta API
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-            
+             
         async with httpx.AsyncClient(cookies=cookies) as client:
-            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_id}")
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}")
             
             if response.status_code != 200:
                 logger.error(f"API v1 error: {response.status_code} - {response.text}")
