@@ -20,7 +20,7 @@ from app.routes.api.v1.cantieri import router as cantieri_router
 # from app.routes.api.v1.teams import router as teams_router
 # from app.routes.api.v1.storage import router as storage_router
 # from app.routes.api.v1.monitoring import router as monitoring_router
-# from app.routes.api.v1.admin import router as admin_router
+from app.routes.api.v1.admin import router as admin_router
 # from app.routes.api.v1.unified import router as unified_router
 
 # Router principale API v1
@@ -48,7 +48,7 @@ api_v1_router.include_router(cantieri_router, prefix="/cantieri", tags=["Cantier
 # api_v1_router.include_router(teams_router, prefix="/teams", tags=["Team Management"])
 # api_v1_router.include_router(storage_router, prefix="/storage", tags=["Storage"])
 # api_v1_router.include_router(monitoring_router, prefix="/monitoring", tags=["System Monitoring"])
-# api_v1_router.include_router(admin_router, prefix="/admin", tags=["Administration"])
+api_v1_router.include_router(admin_router, prefix="/admin", tags=["Administration"])
 # api_v1_router.include_router(unified_router, prefix="/unified", tags=["Unified Dashboard"])
 
 # Esporta il router principale

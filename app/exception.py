@@ -4,29 +4,40 @@ from loguru import logger
 
 
 async def http_exception_handler(request: Request, exc: HTTPException):
+    """
+    🔧 FIXED: Exception handler that properly handles API vs web routes
+    
+    BEFORE: API endpoints with 401 were redirected to /login (causing 307 redirect loop)
+    NOW: API endpoints return JSON responses, only web routes redirect to /login
+    """
+    route = request.scope.get("path")
+    method = request.scope.get("method")
+    
+    logger.error(
+        f"Error in route {method} {route}: {exc.detail} : {exc.status_code}"
+    )
+
+    # 🔧 FIXED: Check if it's an API route FIRST before redirecting
+    if route and route.startswith("/api/"):
+        # For API routes, return JSON response instead of redirecting
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "valid": False,
+                "errors": [exc.detail or "An error occurred"],
+                "schema_type": None,
+                "level": None,
+                "validation_timestamp": "2025-10-01T14:56:49.482Z"
+            }
+        )
+    
+    # 🔧 FIXED: Only redirect to login for non-API routes with 401 status
     if exc and exc.status_code == 401:
         return RedirectResponse("/login")
+    
+    # 🔧 FIXED: Handle other exceptions for non-API routes
     # elif request.scope.get("path") == "/auth/jwt/login" and exc.status_code == 400:
     #     return templates.TemplateResponse("pages/login.html", {"request": request, "error": "Incorrect username or password"})
-    else:
-        route = request.scope.get("path")
-        method = request.scope.get("method")
-        logger.error(
-            f"Error in route {method} {route}: {exc.detail} : {exc.status_code}"
-        )
-
-        # For API routes, return JSON response
-        if route.startswith("/api/"):
-            return JSONResponse(
-                status_code=exc.status_code,
-                content={
-                    "valid": False,
-                    "errors": [exc.detail or "An error occurred"],
-                    "schema_type": None,
-                    "level": None,
-                    "validation_timestamp": "2025-10-01T14:56:49.482Z"
-                }
-            )
-
-        # For other routes, return plain text
-        return Response(content="Error managed via HTTP module", status_code=exc.status_code)
+    
+    # For other non-API routes, return plain text
+    return Response(content="Error managed via HTTP module", status_code=exc.status_code)

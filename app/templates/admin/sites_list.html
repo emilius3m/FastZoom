@@ -537,6 +537,9 @@
     </div>
 </div>
 
+<!-- API Client Script -->
+<script src="/static/js/api-client.js"></script>
+
 <!-- Alpine.js Component Script -->
 <script>
 document.addEventListener('alpine:init', () => {
@@ -725,12 +728,7 @@ document.addEventListener('alpine:init', () => {
             if (!confirm(`Vuoi ${action} questo sito?`)) return;
             
             try {
-                const response = await fetch(`/admin/sites/${site.id}/toggle-status/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
+                const response = await api.post(`/api/v1/admin/sites/${site.id}/toggle-status/`);
                 
                 if (response.ok) {
                     site.is_active = !site.is_active;
@@ -773,18 +771,10 @@ document.addEventListener('alpine:init', () => {
             this.passwordError = '';
             
             try {
-                const response = await fetch(`/admin/sites/${this.siteToDelete.id}/dangerous-delete/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        admin_password: this.confirmPassword,
-                        confirm_delete: this.confirmDelete
-                    })
+                const response = await api.post(`/api/v1/admin/sites/${this.siteToDelete.id}/dangerous-delete/`, {
+                    admin_password: this.confirmPassword,
+                    confirm_delete: this.confirmDelete
                 });
-                
-                const result = await response.json();
                 
                 if (response.ok) {
                     // Remove site from local arrays
@@ -794,6 +784,7 @@ document.addEventListener('alpine:init', () => {
                     this.closeDangerModal();
                     this.showSuccess('Sito archeologico eliminato definitivamente');
                 } else {
+                    const result = response.data;
                     if (result.detail && result.detail.includes('password')) {
                         this.passwordError = 'Password amministratore non corretta';
                     } else {

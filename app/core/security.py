@@ -330,16 +330,24 @@ async def get_current_user_token(request: Request) -> Dict[str, Any]:
     """
     Dependency: ottiene e verifica token utente corrente DAL COOKIE
     """
+    # DEBUG: Log cookie details
+    logger.debug(f"🔍 [DEBUG] get_current_user_token - Request path: {request.url.path}")
+    logger.debug(f"🔍 [DEBUG] get_current_user_token - Available cookies: {list(request.cookies.keys())}")
+    
     # Leggi token dal cookie
     access_token_cookie = request.cookies.get("access_token")
 
     if not access_token_cookie:
+        logger.warning(f"🔍 [DEBUG] get_current_user_token - No access_token cookie found for path: {request.url.path}")
+        logger.warning(f"🔍 [DEBUG] get_current_user_token - All cookies received: {dict(request.cookies)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token di accesso non trovato nei cookie",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    logger.debug(f"🔍 [DEBUG] get_current_user_token - Found access_token cookie: {access_token_cookie[:50]}...")
+    
     # Rimuovi "Bearer " prefix se presente
     token = access_token_cookie.replace("Bearer ", "")
 
@@ -353,22 +361,95 @@ async def get_current_user_token_with_blacklist(
 ) -> Dict[str, Any]:
     """
     Dependency: ottiene e verifica token utente corrente DAL COOKIE con controllo blacklist
+    Enhanced with detailed logging for cookie debugging
     """
+    # DEBUG: Enhanced logging for cookie debugging
+    request_path = str(request.url.path)
+    request_method = request.method
+    user_agent = request.headers.get('user-agent', 'unknown')
+    referer = request.headers.get('referer', 'unknown')
+    origin = request.headers.get('origin', 'unknown')
+    
+    logger.info(f"🍪 [COOKIE_DEBUG] get_current_user_token_with_blacklist called")
+    logger.info(f"🍪 [COOKIE_DEBUG] Path: {request_path}")
+    logger.info(f"🍪 [COOKIE_DEBUG] Method: {request_method}")
+    logger.info(f"🍪 [COOKIE_DEBUG] User-Agent: {user_agent}")
+    logger.info(f"🍪 [COOKIE_DEBUG] Referer: {referer}")
+    logger.info(f"🍪 [COOKIE_DEBUG] Origin: {origin}")
+    
+    # Log all available cookies with details
+    available_cookies = dict(request.cookies)
+    logger.info(f"🍪 [COOKIE_DEBUG] Available cookies count: {len(available_cookies)}")
+    logger.info(f"🍪 [COOKIE_DEBUG] Available cookie names: {list(available_cookies.keys())}")
+    
+    for cookie_name, cookie_value in available_cookies.items():
+        if cookie_name == 'access_token':
+            # Log first 50 chars of access token for debugging
+            masked_value = cookie_value[:50] + "..." if len(cookie_value) > 50 else cookie_value
+            logger.info(f"🍪 [COOKIE_DEBUG] Cookie '{cookie_name}': {masked_value}")
+        else:
+            logger.info(f"🍪 [COOKIE_DEBUG] Cookie '{cookie_name}': {cookie_value[:30]}...")
+    
     # Leggi token dal cookie
     access_token_cookie = request.cookies.get("access_token")
 
     if not access_token_cookie:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token di accesso non trovato nei cookie",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        logger.error(f"🍪 [COOKIE_DEBUG] CRITICAL: NO access_token cookie found!")
+        logger.error(f"🍪 [COOKIE_DEBUG] Request details:")
+        logger.error(f"🍪 [COOKIE_DEBUG]   - Path: {request_path}")
+        logger.error(f"🍪 [COOKIE_DEBUG]   - Method: {request_method}")
+        logger.error(f"🍪 [COOKIE_DEBUG]   - User-Agent: {user_agent}")
+        logger.error(f"🍪 [COOKIE_DEBUG]   - Referer: {referer}")
+        logger.error(f"🍪 [COOKIE_DEBUG]   - Origin: {origin}")
+        logger.error(f"🍪 [COOKIE_DEBUG]   - All cookies: {available_cookies}")
+        
+        # Try fallback mechanisms
+        logger.warning(f"🍪 [COOKIE_DEBUG] Attempting fallback token retrieval...")
+        
+        # Try Authorization header as fallback
+        auth_header = request.headers.get('authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            logger.info(f"🍪 [COOKIE_DEBUG] Found token in Authorization header as fallback")
+            access_token_cookie = auth_header
+        else:
+            logger.error(f"🍪 [COOKIE_DEBUG] No fallback token found in Authorization header")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token di accesso non trovato nei cookie o headers",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
+    logger.info(f"🍪 [COOKIE_DEBUG] Found access token (source: {'cookie' if 'access_token' in request.cookies else 'header'})")
+    logger.debug(f"🍪 [COOKIE_DEBUG] Token preview: {access_token_cookie[:50]}...")
+    
     # Rimuovi "Bearer " prefix se presente
     token = access_token_cookie.replace("Bearer ", "")
+    
+    # Log token details for debugging
+    logger.debug(f"🍪 [COOKIE_DEBUG] Token length after Bearer removal: {len(token)}")
+    if len(token) < 10:
+        logger.warning(f"🍪 [COOKIE_DEBUG] Suspiciously short token: {token}")
 
-    # Verifica token usando SecurityService CON controllo blacklist
-    return await SecurityService.verify_token(token, db)
+    try:
+        # Verifica token usando SecurityService CON controllo blacklist
+        logger.info(f"🍪 [COOKIE_DEBUG] Attempting token verification with blacklist check...")
+        payload = await SecurityService.verify_token(token, db)
+        user_id = payload.get('sub')
+        logger.info(f"🍪 [COOKIE_DEBUG] Token verified successfully for user: {user_id}")
+        logger.debug(f"🍪 [COOKIE_DEBUG] Token payload keys: {list(payload.keys())}")
+        if 'sites' in payload:
+            logger.debug(f"🍪 [COOKIE_DEBUG] Sites in token: {len(payload['sites'])}")
+        return payload
+    except HTTPException as e:
+        logger.error(f"🍪 [COOKIE_DEBUG] HTTP Exception during token verification: {e.detail}")
+        logger.error(f"🍪 [COOKIE_DEBUG] Status code: {e.status_code}")
+        raise
+    except Exception as e:
+        logger.error(f"🍪 [COOKIE_DEBUG] Unexpected error during token verification: {str(e)}")
+        logger.error(f"🍪 [COOKIE_DEBUG] Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"🍪 [COOKIE_DEBUG] Traceback: {traceback.format_exc()}")
+        raise
 
 async def get_current_user_id(request: Request) -> UUID:
     """
@@ -510,18 +591,47 @@ def require_site_access(
     
     return _verify_access
 
-# Utility per debug
+# Enhanced utility per debug e fallback
 def get_token_from_cookie_or_header(request: Request) -> Optional[str]:
-    """Utility per ottenere token da cookie o header (fallback)"""
-    # Prima prova dal cookie
+    """
+    Utility per ottenere token da cookie o header con fallback robusto.
+    Priorità: 1) Cookie access_token, 2) Header Authorization, 3) Altri metodi
+    """
+    logger.debug(f"🔧 [FALLBACK] get_token_from_cookie_or_header called for path: {request.url.path}")
+    
+    # 1. Prima prova dal cookie standard
     cookie_token = request.cookies.get("access_token")
     if cookie_token:
+        logger.debug(f"🔧 [FALLBACK] Token found in access_token cookie")
         return cookie_token.replace("Bearer ", "")
     
-    # Poi prova dall'header Authorization
+    # 2. Prova dall'header Authorization (standard OAuth2)
     auth_header = request.headers.get("authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        return auth_header.replace("Bearer ", "")
+    if auth_header:
+        logger.debug(f"🔧 [FALLBACK] Authorization header found: {auth_header[:20]}...")
+        if auth_header.startswith("Bearer "):
+            logger.debug(f"🔧 [FALLBACK] Token extracted from Authorization header")
+            return auth_header.replace("Bearer ", "")
+        else:
+            logger.warning(f"🔧 [FALLBACK] Authorization header doesn't start with 'Bearer '")
+    
+    # 3. Prova altri nomi di cookie (fallback per configurazioni diverse)
+    alternative_cookie_names = ["auth_token", "jwt_token", "token"]
+    for alt_name in alternative_cookie_names:
+        alt_cookie = request.cookies.get(alt_name)
+        if alt_cookie:
+            logger.info(f"🔧 [FALLBACK] Token found in alternative cookie: {alt_name}")
+            return alt_cookie.replace("Bearer ", "")
+    
+    # 4. Prova parametri query (ultima risorsa, solo per debugging)
+    if "token" in request.query_params:
+        logger.warning(f"🔧 [FALLBACK] Token found in query params - this should not be used in production!")
+        return request.query_params["token"]
+    
+    # 5. Log dettagliato del fallimento
+    logger.error(f"🔧 [FALLBACK] No token found in any location")
+    logger.error(f"🔧 [FALLBACK] Available cookies: {list(request.cookies.keys())}")
+    logger.error(f"🔧 [FALLBACK] Available headers: {list(request.headers.keys())}")
     
     return None
 

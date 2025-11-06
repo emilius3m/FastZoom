@@ -3,6 +3,9 @@
 
 {% block title %}Gestione Utenti | Sistema Archeologico{% endblock %}
 
+<!-- Include the centralized API client for authentication cookie handling -->
+<script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
+
 {% block content %}
 <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6 mb-6">
     <div class="flex items-center">
@@ -593,19 +596,12 @@ document.addEventListener('alpine:init', () => {
             if (!confirm(`Vuoi ${action} questo utente?`)) return;
             
             try {
-                const response = await fetch(`/admin/users/${user.id}/toggle-status/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
+                // FIXED: Using centralized API client with automatic credentials inclusion
+                const response = await api.post(`/api/v1/admin/users/${user.id}/toggle-status/`);
                 
-                if (response.ok) {
-                    user.is_active = !user.is_active;
-                    this.showSuccess(`Utente ${user.is_active ? 'attivato' : 'disattivato'} con successo`);
-                } else {
-                    throw new Error('Errore nel cambio stato utente');
-                }
+                // The api client automatically includes credentials and handles JSON
+                user.is_active = !user.is_active;
+                this.showSuccess(`Utente ${user.is_active ? 'attivato' : 'disattivato'} con successo`);
                 
             } catch (error) {
                 this.showError('Errore: ' + error.message);
@@ -616,18 +612,14 @@ document.addEventListener('alpine:init', () => {
             if (!confirm(`Vuoi eliminare l'utente ${user.email}? Questa azione non può essere annullata.`)) return;
             
             try {
-                const response = await fetch(`/admin/users/${user.id}/delete/`, {
-                    method: 'POST'
-                });
+                // FIXED: Using centralized API client with automatic credentials inclusion
+                const response = await api.post(`/api/v1/admin/users/${user.id}/delete/`);
                 
-                if (response.ok) {
-                    // Remove user from local arrays
-                    this.users = this.users.filter(u => u.id !== user.id);
-                    this.filterUsers();
-                    this.showSuccess('Utente eliminato con successo');
-                } else {
-                    throw new Error('Errore nell\'eliminazione utente');
-                }
+                // The api client automatically includes credentials and handles JSON
+                // Remove user from local arrays
+                this.users = this.users.filter(u => u.id !== user.id);
+                this.filterUsers();
+                this.showSuccess('Utente eliminato con successo');
                 
             } catch (error) {
                 this.showError('Errore: ' + error.message);

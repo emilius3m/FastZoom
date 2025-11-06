@@ -6,7 +6,7 @@ Implementa backward compatibility con avvisi di deprecazione.
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from fastapi.responses import JSONResponse, Response
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, update, text, func
@@ -110,21 +110,43 @@ def add_deprecation_headers(response: Response, new_endpoint: str):
     response.headers["X-API-New-Endpoint"] = new_endpoint
     response.headers["X-API-Sunset"] = "2025-12-31"  # Data rimozione vecchi endpoint
 
-def verify_admin_access(user_sites: List[Dict[str, Any]]) -> bool:
-    """Verifica che l'utente abbia privilegi di amministrazione"""
-    if not user_sites:
+async def verify_admin_access(
+    current_user_id: UUID,
+    user_sites: List[Dict[str, Any]],
+    db: AsyncSession
+) -> bool:
+    """
+    Verifica che l'utente abbia privilegi di amministrazione.
+    
+    Per essere admin è necessario essere superuser nel sistema.
+    Gli utenti normali non possono accedere alle funzioni admin
+    anche se hanno permessi sui siti.
+    """
+    # 🔧 FIX: Check superuser status directly from database
+    # This is more reliable than checking site data which may not include superuser info
+    
+    # Query the user directly from database to get accurate superuser status
+    user_query = select(User).where(User.id == current_user_id)
+    user_result = await db.execute(user_query)
+    user = user_result.scalar_one_or_none()
+    
+    if not user:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accesso negato - nessun sito accessibile"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Utente non trovato"
         )
     
-    # Verifica se è superutente
-    is_admin = any(site.get("is_superuser") for site in user_sites)
-    
-    if not is_admin:
+    if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accesso negato - privilegi insufficienti per funzioni admin"
+            detail="Utente non attivo"
+        )
+    
+    # Only superusers can access admin functions
+    if not user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accesso negato - privilegi insufficienti per funzioni admin. Richiesto superuser."
         )
     
     return True
@@ -132,6 +154,7 @@ def verify_admin_access(user_sites: List[Dict[str, Any]]) -> bool:
 # ===== GESTIONE SITI ARCHEOLOGICI =====
 
 @router.get("/sites", summary="Lista siti amministrazione", tags=["Administration"])
+@router.get("/sites/", summary="Lista siti amministrazione", tags=["Administration"])
 async def v1_admin_get_sites(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
@@ -142,7 +165,7 @@ async def v1_admin_get_sites(
     
     Solo superutenti possono accedere.
     """
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     # Query con conteggi utenti e foto per ogni sito
     sites_query = (
@@ -207,7 +230,7 @@ async def v1_admin_create_site(
     
     Solo superutenti possono creare siti.
     """
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         # Verifica che il codice sia unico
@@ -267,7 +290,7 @@ async def v1_admin_get_site(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni dettagli di un sito specifico"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     site = await db.execute(
         select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
@@ -325,7 +348,7 @@ async def v1_admin_update_site(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Aggiorna sito archeologico esistente"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         site = await db.execute(
@@ -399,7 +422,7 @@ async def v1_admin_delete_site(
     Elimina definitivamente un sito archeologico e tutti i dati correlati.
     Operazione PERICOLOSA che richiede conferma password amministratore.
     """
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         # Ottieni utente corrente per verifica password
@@ -487,6 +510,7 @@ async def v1_admin_delete_site(
 # ===== GESTIONE UTENTI =====
 
 @router.get("/users", summary="Lista utenti amministrazione", tags=["Administration"])
+@router.get("/users/", summary="Lista utenti amministrazione", tags=["Administration"])
 async def v1_admin_get_users(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
@@ -497,7 +521,7 @@ async def v1_admin_get_users(
     
     Solo superutenti possono accedere.
     """
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     # Query base utenti con eager loading del profilo
     users_query = select(User).options(selectinload(User.profile)).order_by(User.email)
@@ -552,7 +576,7 @@ async def v1_admin_create_user(
     
     Solo superutenti possono creare utenti.
     """
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         # Verifica che l'email sia unica
@@ -608,7 +632,7 @@ async def v1_admin_get_user(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni dettagli di un utente specifico"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     # Carica utente con relazioni
     user_query = select(User).options(selectinload(User.profile)).where(User.id == user_id)
@@ -669,7 +693,7 @@ async def v1_admin_update_user(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Aggiorna utente esistente"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         user = await db.execute(select(User).where(User.id == user_id))
@@ -746,7 +770,7 @@ async def v1_admin_toggle_user_status(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Toggle stato attivo/inattivo utente"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         user = await db.execute(select(User).where(User.id == user_id))
@@ -787,7 +811,7 @@ async def v1_admin_delete_user(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Elimina utente (soft delete)"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         user = await db.execute(select(User).where(User.id == user_id))
@@ -830,13 +854,14 @@ async def v1_admin_delete_user(
 # ===== GESTIONE PERMESSI =====
 
 @router.get("/permissions", summary="Lista permessi", tags=["Administration"])
+@router.get("/permissions/", summary="Lista permessi", tags=["Administration"])
 async def v1_admin_get_permissions(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """Lista permessi utenti-siti"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     permissions = await db.execute(
         select(UserSitePermission, User, ArchaeologicalSite)
@@ -878,7 +903,7 @@ async def v1_admin_create_permission(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Crea nuovo permesso utente-sito"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         # Verifica che non esista già
@@ -946,7 +971,7 @@ async def v1_admin_add_user_permission(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Aggiungi permesso sito per utente"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         # Verifica esistenza utente e sito
@@ -1023,7 +1048,7 @@ async def v1_admin_delete_permission(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Elimina permesso"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         permission = await db.execute(
@@ -1058,7 +1083,7 @@ async def v1_admin_remove_user_permission(
     db: AsyncSession = Depends(get_async_session)
 ):
     """Rimuovi permesso sito da utente"""
-    verify_admin_access(user_sites)
+    await verify_admin_access(current_user_id, user_sites, db)
     
     try:
         permission = await db.execute(

@@ -498,6 +498,9 @@
     </div>
 </div>
 
+<!-- API Client Script -->
+<script src="/static/js/api-client.js?v=20251106123000"></script>
+
 <!-- Alpine.js Component Script -->
 <script>
 document.addEventListener('alpine:init', () => {
@@ -638,23 +641,16 @@ document.addEventListener('alpine:init', () => {
                 });
 
                 const url = '{{ "/admin/site/" + site.id|string + "/edit/" if site else "/admin/sites/new/" }}';
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: submitData
-                });
+                const response = await api.postForm(url, submitData);
 
-                if (response.ok) {
-                    this.showSuccess('{{ "Sito aggiornato" if site else "Sito creato" }} con successo');
-                    {% if not site %}
-                    // Redirect to sites list after creating
-                    setTimeout(() => {
-                        window.location.href = '/admin/sites/';
-                    }, 1500);
-                    {% endif %}
-                } else {
-                    const errorText = await response.text();
-                    this.showError('Errore nel salvataggio: ' + errorText);
-                }
+                // The API client returns data directly on success, throws error on failure
+                this.showSuccess('{{ "Sito aggiornato" if site else "Sito creato" }} con successo');
+                {% if not site %}
+                // Redirect to sites list after creating
+                setTimeout(() => {
+                    window.location.href = '/admin/sites/';
+                }, 1500);
+                {% endif %}
 
             } catch (error) {
                 this.showError('Errore di connessione: ' + error.message);
@@ -688,25 +684,20 @@ document.addEventListener('alpine:init', () => {
         {% if site %}
         async exportSiteData() {
             try {
-                const response = await fetch('/admin/sites/{{ site.id }}/export/', {
-                    method: 'GET'
-                });
+                const response = await api.get('/api/v1/admin/sites/{{ site.id }}/export/');
                 
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `sito_{{ site.code }}_${new Date().toISOString().split('T')[0]}.json`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    
-                    this.showSuccess('Export completato');
-                } else {
-                    this.showError('Errore durante l\'export');
-                }
+                // The API client returns data directly on success
+                const blob = new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `sito_{{ site.code }}_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                this.showSuccess('Export completato');
             } catch (error) {
                 this.showError('Errore: ' + error.message);
             }

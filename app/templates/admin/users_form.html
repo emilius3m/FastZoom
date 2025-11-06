@@ -3,6 +3,9 @@
 
 {% block title %}{{ 'Modifica' if user_data else 'Nuovo' }} Utente | Sistema Archeologico{% endblock %}
 
+<!-- Include the centralized API client for authentication cookie handling -->
+<script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
+
 {% block content %}
 <div class="mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="userForm">
     <!-- Header Section -->
@@ -421,30 +424,25 @@ document.addEventListener('alpine:init', () => {
             this.isSubmitting = true;
             
             try {
-                const formData = new FormData();
+                // FIXED: Convert form data to JSON for API client
+                const submitData = {};
                 Object.keys(this.formData).forEach(key => {
                     if (this.formData[key] !== null && this.formData[key] !== '') {
-                        formData.append(key, this.formData[key]);
+                        submitData[key] = this.formData[key];
                     }
                 });
                 
                 const url = '{{ "/admin/users/" + user_data.id|string + "/edit/" if user_data else "/admin/users/new/" }}';
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData
-                });
                 
-                if (response.ok) {
-                    this.showSuccess('{{ "Utente aggiornato" if user_data else "Utente creato" }} con successo');
-                    {% if not user_data %}
-                    setTimeout(() => {
-                        window.location.href = '/admin/users/';
-                    }, 1500);
-                    {% endif %}
-                } else {
-                    const error = await response.text();
-                    this.showError('Errore nel salvataggio: ' + error);
-                }
+                // FIXED: Using centralized API client with automatic credentials inclusion
+                const response = await api.post(url, submitData);
+                
+                this.showSuccess('{{ "Utente aggiornato" if user_data else "Utente creato" }} con successo');
+                {% if not user_data %}
+                setTimeout(() => {
+                    window.location.href = '/admin/users/';
+                }, 1500);
+                {% endif %}
                 
             } catch (error) {
                 this.showError('Errore di connessione: ' + error.message);
@@ -463,29 +461,23 @@ document.addEventListener('alpine:init', () => {
             this.isAddingPermission = true;
             
             try {
-                const formData = new FormData();
+                // FIXED: Convert to JSON for API client
+                const permissionData = {};
                 Object.keys(this.newPermission).forEach(key => {
                     if (this.newPermission[key]) {
-                        formData.append(key, this.newPermission[key]);
+                        permissionData[key] = this.newPermission[key];
                     }
                 });
                 
-                const response = await fetch('/admin/users/{{ user_data.id }}/permissions/', {
-                    method: 'POST',
-                    body: formData
-                });
+                // FIXED: Using centralized API client with automatic credentials inclusion
+                const response = await api.post(`/api/v1/admin/users/{{ user_data.id }}/permissions/`, permissionData);
                 
-                if (response.ok) {
-                    this.showSuccess('Permesso aggiunto con successo');
-                    // Reset form
-                    this.newPermission = { site_id: '', permission_level: '', expires_at: '', notes: '' };
-                    this.showExpiryDate = false;
-                    // Reload page to show new permission
-                    setTimeout(() => window.location.reload(), 1500);
-                } else {
-                    const error = await response.text();
-                    this.showError('Errore nell\'aggiunta del permesso: ' + error);
-                }
+                this.showSuccess('Permesso aggiunto con successo');
+                // Reset form
+                this.newPermission = { site_id: '', permission_level: '', expires_at: '', notes: '' };
+                this.showExpiryDate = false;
+                // Reload page to show new permission
+                setTimeout(() => window.location.reload(), 1500);
                 
             } catch (error) {
                 this.showError('Errore di connessione: ' + error.message);
@@ -498,16 +490,11 @@ document.addEventListener('alpine:init', () => {
             if (!confirm('Rimuovere questo permesso?')) return;
             
             try {
-                const response = await fetch(`/admin/users/{{ user_data.id }}/permissions/${permissionId}/delete/`, {
-                    method: 'POST'
-                });
+                // FIXED: Using centralized API client with automatic credentials inclusion
+                const response = await api.post(`/api/v1/admin/users/{{ user_data.id }}/permissions/${permissionId}/delete/`);
                 
-                if (response.ok) {
-                    this.showSuccess('Permesso rimosso con successo');
-                    setTimeout(() => window.location.reload(), 1500);
-                } else {
-                    this.showError('Errore nella rimozione del permesso');
-                }
+                this.showSuccess('Permesso rimosso con successo');
+                setTimeout(() => window.location.reload(), 1500);
                 
             } catch (error) {
                 this.showError('Errore di connessione: ' + error.message);

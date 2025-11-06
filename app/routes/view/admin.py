@@ -24,7 +24,7 @@ from app.models.user_profiles import UserProfile
 # Base URL per la API v1
 API_V1_BASE_URL = "http://127.0.0.1:8000/api/v1/admin"
 
-admin_view_router = APIRouter(prefix="/admin", tags=["Admin - Views"])
+admin_view_router = APIRouter(tags=["Admin - Views"])
 
 # Helper function per creare il context base per tutti i template admin
 async def get_admin_template_context(
@@ -83,7 +83,7 @@ async def require_superuser(
 
 # ===== GESTIONE SITI ARCHEOLOGICI =====
 
-@admin_view_router.get("/sites/", response_class=HTMLResponse)
+@admin_view_router.get("/admin/sites/", response_class=HTMLResponse)
 async def admin_sites_list(
     request: Request,
     db: AsyncSession = Depends(get_async_session),
@@ -94,7 +94,12 @@ async def admin_sites_list(
     
     try:
         # Chiama la API v1 per ottenere i dati
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.get(f"{API_V1_BASE_URL}/sites")
             
             if response.status_code != 200:
@@ -118,7 +123,7 @@ async def admin_sites_list(
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
 
-@admin_view_router.get("/sites/new/", response_class=HTMLResponse)
+@admin_view_router.get("/admin/sites/new/", response_class=HTMLResponse)
 async def admin_sites_new(
     request: Request,
     auth_data: tuple = Depends(require_superuser)
@@ -134,49 +139,43 @@ async def admin_sites_new(
     
     return templates.TemplateResponse("admin/sites_form.html", context)
 
-@admin_view_router.post("/sites/new/")
+@admin_view_router.post("/admin/sites/new/")
 async def admin_sites_create(
     request: Request,
-    name: str = Form(),
-    code: str = Form(),
-    location: Optional[str] = Form(None),
-    region: Optional[str] = Form(None),
-    province: Optional[str] = Form(None),
-    municipality: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    historical_period: Optional[str] = Form(None),
-    site_type: Optional[str] = Form(None),
-    coordinates_lat: Optional[str] = Form(None),
-    coordinates_lng: Optional[str] = Form(None),
-    research_status: Optional[str] = Form(None),
-    is_active: bool = Form(True),
-    is_public: bool = Form(True),
     auth_data: tuple = Depends(require_superuser)
 ):
     """Crea nuovo sito archeologico"""
     superuser, base_context = auth_data
     
     try:
+        # Get form data from request
+        form_data = await request.form()
+        
         # Prepara i dati per la API v1
         site_data = {
-            "name": name,
-            "code": code,
-            "location": location,
-            "region": region,
-            "province": province,
-            "municipality": municipality,
-            "description": description,
-            "historical_period": historical_period,
-            "site_type": site_type,
-            "coordinates_lat": coordinates_lat,
-            "coordinates_lng": coordinates_lng,
-            "research_status": research_status,
-            "is_active": is_active,
-            "is_public": is_public
+            "name": form_data.get("name", ""),
+            "code": form_data.get("code", ""),
+            "location": form_data.get("location"),
+            "region": form_data.get("region"),
+            "province": form_data.get("province"),
+            "municipality": form_data.get("municipality"),
+            "description": form_data.get("description"),
+            "historical_period": form_data.get("historical_period"),
+            "site_type": form_data.get("site_type"),
+            "coordinates_lat": form_data.get("coordinates_lat"),
+            "coordinates_lng": form_data.get("coordinates_lng"),
+            "research_status": form_data.get("research_status"),
+            "is_active": form_data.get("is_active") == "on",
+            "is_public": form_data.get("is_public") == "on"
         }
         
         # Chiama la API v1 per creare il sito
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+         
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.post(f"{API_V1_BASE_URL}/sites", json=site_data)
             
             if response.status_code != 200:
@@ -199,7 +198,7 @@ async def admin_sites_create(
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
 
-@admin_view_router.get("/site/{site_id}/edit/", response_class=HTMLResponse)
+@admin_view_router.get("/admin/site/{site_id}/edit/", response_class=HTMLResponse)
 async def admin_sites_edit(
     request: Request,
     site_id: UUID,
@@ -211,7 +210,12 @@ async def admin_sites_edit(
     
     try:
         # Chiama la API v1 per ottenere i dati del sito
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.get(f"{API_V1_BASE_URL}/sites/{site_id}")
             
             if response.status_code != 200:
@@ -232,7 +236,7 @@ async def admin_sites_edit(
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
 
-@admin_view_router.post("/site/{site_id}/edit/")
+@admin_view_router.post("/admin/site/{site_id}/edit/")
 async def admin_sites_update(
     site_id: UUID,
     name: str = Form(),
@@ -274,7 +278,12 @@ async def admin_sites_update(
         }
         
         # Chiama la API v1 per aggiornare il sito
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.put(f"{API_V1_BASE_URL}/sites/{site_id}", json=site_data)
             
             if response.status_code != 200:
@@ -299,7 +308,7 @@ async def admin_sites_update(
 
 # ===== GESTIONE UTENTI =====
 
-@admin_view_router.get("/users/", response_class=HTMLResponse)
+@admin_view_router.get("/admin/users/", response_class=HTMLResponse)
 async def admin_users_list(
     request: Request,
     db: AsyncSession = Depends(get_async_session),
@@ -310,7 +319,12 @@ async def admin_users_list(
     
     try:
         # Chiama la API v1 per ottenere i dati
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.get(f"{API_V1_BASE_URL}/users")
             
             if response.status_code != 200:
@@ -334,7 +348,7 @@ async def admin_users_list(
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
 
-@admin_view_router.get("/users/new/", response_class=HTMLResponse)
+@admin_view_router.get("/admin/users/new/", response_class=HTMLResponse)
 async def admin_users_new(
     request: Request,
     auth_data: tuple = Depends(require_superuser)
@@ -350,7 +364,7 @@ async def admin_users_new(
     
     return templates.TemplateResponse("admin/users_form.html", context)
 
-@admin_view_router.post("/users/new/")
+@admin_view_router.post("/admin/users/new/")
 async def admin_users_create(
     request: Request,
     email: str = Form(),
@@ -376,7 +390,12 @@ async def admin_users_create(
         }
         
         # Chiama la API v1 per creare l'utente
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.post(f"{API_V1_BASE_URL}/users", json=user_data)
             
             if response.status_code != 200:
@@ -399,7 +418,7 @@ async def admin_users_create(
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
 
-@admin_view_router.get("/users/{user_id}/edit/", response_class=HTMLResponse)
+@admin_view_router.get("/admin/users/{user_id}/edit/", response_class=HTMLResponse)
 async def admin_users_edit(
     request: Request,
     user_id: UUID,
@@ -411,7 +430,12 @@ async def admin_users_edit(
     
     try:
         # Chiama la API v1 per ottenere i dati dell'utente
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.get(f"{API_V1_BASE_URL}/users/{user_id}")
             
             if response.status_code != 200:
@@ -432,7 +456,7 @@ async def admin_users_edit(
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
 
-@admin_view_router.post("/users/{user_id}/edit/")
+@admin_view_router.post("/admin/users/{user_id}/edit/")
 async def admin_users_update(
     user_id: UUID,
     email: str = Form(),
@@ -463,7 +487,12 @@ async def admin_users_update(
             user_data["password"] = password
         
         # Chiama la API v1 per aggiornare l'utente
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.put(f"{API_V1_BASE_URL}/users/{user_id}", json=user_data)
             
             if response.status_code != 200:
@@ -486,7 +515,7 @@ async def admin_users_update(
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
 
-@admin_view_router.post("/users/{user_id}/toggle-status/")
+@admin_view_router.post("/admin/users/{user_id}/toggle-status/")
 async def admin_users_toggle_status(
     user_id: UUID,
     auth_data: tuple = Depends(require_superuser)
@@ -496,7 +525,12 @@ async def admin_users_toggle_status(
     
     try:
         # Chiama la API v1 per toggolare lo stato
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.post(f"{API_V1_BASE_URL}/users/{user_id}/toggle-status")
             
             if response.status_code != 200:
@@ -514,7 +548,7 @@ async def admin_users_toggle_status(
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
 
-@admin_view_router.post("/users/{user_id}/delete/")
+@admin_view_router.post("/admin/users/{user_id}/delete/")
 async def admin_users_delete(
     user_id: UUID,
     auth_data: tuple = Depends(require_superuser)
@@ -524,7 +558,12 @@ async def admin_users_delete(
     
     try:
         # Chiama la API v1 per eliminare l'utente
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.delete(f"{API_V1_BASE_URL}/users/{user_id}")
             
             if response.status_code != 200:
@@ -542,7 +581,7 @@ async def admin_users_delete(
 
 # ===== GESTIONE PERMESSI =====
 
-@admin_view_router.get("/permissions/", response_class=HTMLResponse)
+@admin_view_router.get("/admin/permissions/", response_class=HTMLResponse)
 async def admin_permissions_list(
     request: Request,
     db: AsyncSession = Depends(get_async_session),
@@ -553,7 +592,12 @@ async def admin_permissions_list(
     
     try:
         # Chiama la API v1 per ottenere i dati
-        async with httpx.AsyncClient() as client:
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+            
+        async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.get(f"{API_V1_BASE_URL}/permissions")
             
             if response.status_code != 200:
