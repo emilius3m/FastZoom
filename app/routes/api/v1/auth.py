@@ -13,8 +13,8 @@ from loguru import logger
 from pydantic import BaseModel
 from datetime import datetime
 
-# Dependencies
-from app.core.security import get_current_user_id, get_current_user_sites
+# Dependencies - Use blacklist versions for consistency with API routes
+from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.database.session import get_async_session
 from app.core.config import get_settings
 from app.core.security import current_active_user
@@ -129,21 +129,18 @@ async def v1_login(
         sites_data = await AuthService.get_user_sites_with_permissions(db, user.id)
         logger.info(f"User sites: {len(sites_data) if sites_data else 0}")
 
-        # Verifica accesso ai siti (eccetto per superuser che può accedere per configurare)
+        # 🔧 FIX: Allow authentication without blocking on site permissions
+        # All authenticated users can get cookies, site access handled later
         if not sites_data:
             if user.is_superuser:
                 logger.info("Superuser accessing system without sites - allowing access for configuration")
                 # Per superuser senza siti, consentiamo l'accesso
             else:
-                # Nessun sito accessibile
-                return HTMLResponse(
-                    content='''
-                    <div class="alert alert-warning" role="alert">
-                        <strong>Accesso negato:</strong> Il tuo account non ha permessi per accedere ad alcun sito.
-                    </div>
-                    ''',
-                    status_code=403
-                )
+                logger.info("User has no site permissions, but will receive authentication cookies")
+                logger.info("User will need to be assigned site permissions by admin")
+                # 🔧 CRITICAL FIX: Don't block authentication - allow users to get cookies
+                # They can access admin or need site assignment from admin
+                sites_data = []
         
         # Crea token JWT multi-sito
         token = SecurityService.create_site_aware_token(
@@ -151,7 +148,11 @@ async def v1_login(
             sites_data=sites_data
         )
         
-        # Imposta cookie di autenticazione
+        # Imposta cookie di autenticazione con logging dettagliato
+        logger.info(f"🍪 [COOKIE_SET] Setting access_token cookie in v1_login")
+        logger.info(f"🍪 [COOKIE_SET] Token preview: {token[:50]}...")
+        logger.info(f"🍪 [COOKIE_SET] Cookie attributes: httponly=True, secure=False, samesite=lax, max_age={settings.jwt_expires_hours * 3600}, path=/")
+        
         response.set_cookie(
             key="access_token",
             value=f"Bearer {token}",
@@ -159,8 +160,11 @@ async def v1_login(
             secure=False,  # False per sviluppo locale
             samesite="lax",
             max_age=settings.jwt_expires_hours * 3600,
-            path="/"
+            path="/",
+            domain=None  # Esplicito per consistenza
         )
+        
+        logger.info(f"🍪 [COOKIE_SET] Cookie set successfully")
         
         # Logica di redirect intelligente
         if len(sites_data) == 1:
@@ -483,18 +487,19 @@ async def v1_oauth2_token(
 
         logger.info(f"Sites found: {len(sites_data) if sites_data else 0}")
 
-        # Verifica che abbia almeno un sito (eccetto per superuser che può accedere per configurare)
+        # 🔧 FIX: Authentication should not be blocked by site permissions
+        # Allow all authenticated users to receive cookies, then handle site access later
         if not sites_data:
             if user.is_superuser:
                 logger.info("Superuser accessing system without sites - allowing access for configuration")
                 # Per superuser senza siti, creiamo una lista vuota ma consentiamo l'accesso
                 sites_data = []
             else:
-                logger.info("No sites accessible for user")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied: no site permissions"
-                )
+                logger.info("User has no site permissions, but will receive authentication cookies")
+                logger.info("Site access will be verified per-request later")
+                # 🔧 CRITICAL FIX: Don't block authentication - allow users to get cookies
+                # Site-specific access control happens at the resource level, not at authentication level
+                sites_data = []
         
         # Crea token JWT multi-sito
         token = SecurityService.create_site_aware_token(
@@ -504,7 +509,11 @@ async def v1_oauth2_token(
         
         logger.info("Token created successfully")
         
-        # Imposta cookie HttpOnly
+        # Imposta cookie HttpOnly con logging dettagliato
+        logger.info(f"🍪 [COOKIE_SET] Setting access_token cookie in v1_oauth2_token")
+        logger.info(f"🍪 [COOKIE_SET] Token preview: {token[:50]}...")
+        logger.info(f"🍪 [COOKIE_SET] Cookie attributes: httponly=True, secure=False, samesite=lax, max_age={settings.jwt_expires_hours * 3600}, path=/, domain=None")
+        
         response.set_cookie(
             key="access_token",
             value=f"Bearer {token}",
@@ -513,10 +522,10 @@ async def v1_oauth2_token(
             samesite="lax",
             max_age=settings.jwt_expires_hours * 3600,
             path="/",
-            domain=None  # Lascia che FastAPI gestisca automaticamente
+            domain=None  # Esplicito per consistenza
         )
         
-        logger.info("Cookie set successfully")
+        logger.info(f"🍪 [COOKIE_SET] OAuth2 cookie set successfully")
         
         # Ritorna 204 No Content come si aspetta il JavaScript
         response.status_code = 204
@@ -539,8 +548,8 @@ async def v1_select_site(
     request: Request,
     response: Response,
     site_id: UUID = Form(),
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """Selezione sito specifico dopo login multi-sito"""
@@ -574,7 +583,11 @@ async def v1_select_site(
                 status_code=404
             )
         
-        # Aggiorna cookie con sito selezionato (opzionale)
+        # Aggiorna cookie con sito selezionato (opzionale) con logging
+        logger.info(f"🍪 [COOKIE_SET] Setting selected_site_id cookie in v1_select_site")
+        logger.info(f"🍪 [COOKIE_SET] Site ID: {site_id}")
+        logger.info(f"🍪 [COOKIE_SET] Cookie attributes: httponly=True, secure=False, samesite=lax, max_age={settings.jwt_expires_hours * 3600}, path=/")
+        
         response.set_cookie(
             key="selected_site_id",
             value=str(site_id),
@@ -582,8 +595,11 @@ async def v1_select_site(
             secure=False,
             samesite="lax",
             max_age=settings.jwt_expires_hours * 3600,
-            path="/"
+            path="/",
+            domain=None  # Esplicito per consistenza
         )
+        
+        logger.info(f"🍪 [COOKIE_SET] Selected site cookie set successfully")
         
         # Redirect alla dashboard del sito selezionato
         return RedirectResponse(url=f"/site/{site_id}/dashboard", status_code=303)
@@ -635,22 +651,27 @@ async def v1_logout(request: Request, response: Response, db: AsyncSession = Dep
                 # Continua comunque con il logout
 
         # IMPORTANTE: Usa gli STESSI attributi usati per impostare il cookie
+        logger.info(f"🍪 [COOKIE_DELETE] Deleting cookies in v1_logout")
+        logger.info(f"🍪 [COOKIE_DELETE] Cookie attributes for deletion: path=/, secure=False, samesite=lax, httponly=True, domain=None")
+        
         response.delete_cookie(
             key="access_token",
             path="/",
             secure=False,  # Stesso valore usato nel login
             samesite="lax",  # Stesso valore usato nel login
-            httponly=True   # Stesso valore usato nel login
+            httponly=True,   # Stesso valore usato nel login
+            domain=None      # Stesso valore usato nel login
         )
         response.delete_cookie(
             key="selected_site_id",
             path="/",
             secure=False,
             samesite="lax",
-            httponly=True
+            httponly=True,
+            domain=None
         )
 
-        logger.info("Cookies deleted with matching attributes")
+        logger.info(f"🍪 [COOKIE_DELETE] Cookies deleted successfully with matching attributes")
 
         return JSONResponse(content={"success": True, "redirect": "/login"}, status_code=200)
 
@@ -663,8 +684,8 @@ async def v1_logout(request: Request, response: Response, db: AsyncSession = Dep
 
 @router.get("/me", summary="Info utente corrente", tags=["Authentication"])
 async def v1_me(
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites)
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Ottieni informazioni utente corrente e siti accessibili"""
     return JSONResponse(content={
