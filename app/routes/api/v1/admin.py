@@ -525,6 +525,150 @@ async def v1_admin_delete_site(
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+@router.post("/sites/{site_id}/toggle-status", summary="Toggle stato sito", tags=["Administration"])
+async def v1_admin_toggle_site_status(
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Toggle stato attivo/inattivo sito"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        site = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+        )
+        site = site.scalar_one_or_none()
+        
+        if not site:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Toggle stato
+        current_status = site.status
+        site.status = "planned" if current_status == "active" else "active"
+        await db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Sito {'attivato' if site.status == 'active' else 'disattivato'} con successo",
+            "is_active": site.status == "active",
+            "site_id": str(site.id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/sites/{site_id}/dangerous-delete", summary="Eliminazione pericolosa sito", tags=["Administration"])
+async def v1_admin_dangerous_delete_site(
+    site_id: UUID,
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Eliminazione pericolosa sito - endpoint alternativo che accetta JSON body
+    Operazione PERICOLOSA che richiede conferma password amministratore.
+    """
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        # Try to get JSON body first, then fallback to query params
+        try:
+            body = await request.json()
+            admin_password = body.get("admin_password", "")
+            confirm_delete = body.get("confirm_delete", False)
+        except:
+            # Fallback to query params for backward compatibility
+            admin_password = request.query_params.get("admin_password", "")
+            confirm_delete = request.query_params.get("confirm_delete") == "true"
+        
+        # Ottieni utente corrente per verifica password
+        user = await db.execute(select(User).where(User.id == current_user_id))
+        user = user.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+        
+        # Verifica password amministratore
+        if not SecurityService.verify_password(admin_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Password amministratore non corretta"
+            )
+        
+        if not confirm_delete:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Conferma eliminazione richiesta"
+            )
+        
+        # Verifica esistenza sito
+        site = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+        )
+        site = site.scalar_one_or_none()
+        
+        if not site:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Conta dati correlati per log
+        users_count = await db.execute(
+            select(func.count(UserSitePermission.id)).where(
+                and_(
+                    UserSitePermission.site_id == site_id,
+                    UserSitePermission.is_active == True
+                )
+            )
+        )
+        users_count = users_count.scalar() or 0
+        
+        photos_count = await db.execute(
+            select(func.count(Photo.id)).where(Photo.site_id == site_id)
+        )
+        photos_count = photos_count.scalar() or 0
+        
+        # Log operazione pericolosa
+        logger.warning(
+            f"ELIMINAZIONE PERICOLOSA: Sito '{site.name}' ({site.code}) "
+            f"da parte di {user.email}. "
+            f"Dati correlati: {users_count} utenti, {photos_count} foto"
+        )
+        
+        # Elimina sito - CASCADE gestirà eliminazione automatica
+        await db.delete(site)
+        await db.commit()
+        
+        logger.info(
+            f"Sito '{site.name}' eliminato definitivamente da {user.email}"
+        )
+        
+        return {
+            "success": True,
+            "message": f"Sito '{site.name}' eliminato definitivamente",
+            "deleted_data": {
+                "site": {
+                    "id": str(site.id),
+                    "name": site.name,
+                    "code": site.code
+                },
+                "related_data": {
+                    "users_permissions": users_count,
+                    "photos": photos_count
+                }
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 # ===== GESTIONE UTENTI =====
 
 @router.get("/users", summary="Lista utenti amministrazione", tags=["Administration"])
