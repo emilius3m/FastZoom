@@ -1,80 +1,83 @@
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
+from uuid import UUID
+import uuid
+import traceback
+
 import jwt
+import bcrypt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
 from loguru import logger
 
 from app.core.config import get_settings
 from app.database.db import get_async_session
 from app.services.site_service import SiteService
-from app.models import PermissionLevel
-from app.models import User
+from app.models import PermissionLevel, User
 
 settings = get_settings()
 
-# Configurazione sicurezza - usa bcrypt con handling per compatibilità
-# Fix for bcrypt 5.0.0 compatibility issue with passlib
+# Configurazione sicurezza
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto",
     bcrypt__rounds=12,
-    # Remove bcrypt-specific settings that cause compatibility issues
-    # Use default passlib settings for better compatibility
 )
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # Costanti JWT
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
 ACCESS_TOKEN_EXPIRE_HOURS = settings.jwt_expires_hours
-REFRESH_TOKEN_EXPIRE_DAYS = 7  # Refresh tokens last 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = 15
+REFRESH_TOKEN_EXPIRE_DAYS = 7
+BCRYPT_MAX_PASSWORD_LENGTH = 72
+
+# Gerarchia permessi (costante globale)
+PERMISSION_HIERARCHY = {
+    "read": 1,
+    "write": 2,
+    "admin": 3,
+    "regional_admin": 4
+}
+
 
 class SecurityService:
     """Servizio per autenticazione e sicurezza multi-sito"""
-    
+
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """Verifica password con hash bcrypt"""
         try:
-            # DIAGNOSTIC: Log password details
-            password_bytes = plain_password.encode('utf-8')
-            password_length = len(password_bytes)
-            logger.info(f"[DEBUG] Password verification: length={password_length} bytes, truncated={password_length > 72}")
-            
             # Tronca la password a 72 byte come richiesto da bcrypt
-            if password_length > 72:
-                plain_password = plain_password[:72]
-                logger.info(f"[DEBUG] Password truncated to 72 characters")
-            
-            # DIAGNOSTIC: Try to get bcrypt version
-            try:
-                import bcrypt
-                bcrypt_version = getattr(bcrypt, '__version__', 'unknown')
-                logger.info(f"[DEBUG] Bcrypt version: {bcrypt_version}")
-            except Exception as e:
-                logger.error(f"[DEBUG] Error getting bcrypt version: {e}")
-            
-            # DIAGNOSTIC: Log before verification
-            logger.info(f"[DEBUG] Attempting password verification with passlib")
-            result = pwd_context.verify(plain_password, hashed_password)
-            logger.info(f"[DEBUG] Password verification result: {result}")
-            
-            return result
-            
+            if len(plain_password.encode('utf-8')) > BCRYPT_MAX_PASSWORD_LENGTH:
+                plain_password = plain_password[:BCRYPT_MAX_PASSWORD_LENGTH]
+                logger.debug("Password truncated to 72 bytes for bcrypt compatibility")
+
+            return pwd_context.verify(plain_password, hashed_password)
+
         except Exception as e:
-            logger.error(f"[DEBUG] Password verification failed: {str(e)}")
-            logger.error(f"[DEBUG] Exception type: {type(e).__name__}")
+            logger.error(f"Password verification failed: {type(e).__name__} - {str(e)}")
             raise
-    
+
     @staticmethod
     def get_password_hash(password: str) -> str:
         """Genera hash bcrypt per password"""
         return pwd_context.hash(password)
-    
+
+    @staticmethod
+    def _generate_jti() -> str:
+        """Genera JWT ID univoco"""
+        return str(uuid.uuid4())
+
+    @staticmethod
+    def _get_current_utc() -> datetime:
+        """Ottiene timestamp UTC corrente"""
+        return datetime.utcnow()
+
     @staticmethod
     def create_site_aware_token(
         user_id: UUID,
@@ -92,32 +95,29 @@ class SecurityService:
         Returns:
             Token JWT multi-sito
         """
+        now = SecurityService._get_current_utc()
+        
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = now + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+            expire = now + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
 
-        # Genera JTI (JWT ID) univoco per questo token
-        import uuid
-        token_jti = str(uuid.uuid4())
-
-        # Payload JWT multi-sito con JTI
         payload = {
-            "sub": str(user_id),  # Subject = User ID
-            "exp": expire,        # Expiration
-            "iat": datetime.utcnow(),  # Issued at
-            "jti": token_jti,     # JWT ID per blacklist
-            "sites": sites_data,  # Lista siti accessibili
+            "sub": str(user_id),
+            "exp": expire,
+            "iat": now,
+            "jti": SecurityService._generate_jti(),
+            "sites": sites_data,
             "multi_site_enabled": True,
             "app_context": "archaeological_catalog"
         }
 
         return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-    
+
     @staticmethod
     async def verify_token(token: str, db: Optional[AsyncSession] = None) -> Dict[str, Any]:
         """
-        Verifica e decodifica token JWT con controllo blacklist
+        Verifica e decodifica token JWT con controllo blacklist opzionale
 
         Args:
             token: Token JWT da verificare
@@ -141,7 +141,7 @@ class SecurityService:
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
-            # Controlla se il token è nella blacklist (se DB disponibile)
+            # Controlla blacklist solo se DB disponibile e JTI presente
             if db and token_jti:
                 from app.models import TokenBlacklist
                 if await TokenBlacklist.is_token_blacklisted(db, token_jti):
@@ -165,26 +165,26 @@ class SecurityService:
                 detail="Token non valido",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-    
+
     @staticmethod
     def get_sites_from_token(token_payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Estrae informazioni siti dal payload JWT"""
         return token_payload.get("sites", [])
-    
+
     @staticmethod
     def verify_site_access_in_token(
-        token_payload: Dict[str, Any], 
+        token_payload: Dict[str, Any],
         site_id: UUID,
         required_permission: PermissionLevel = PermissionLevel.READ
     ) -> bool:
         """
         Verifica accesso a sito specifico dal token
-        
+
         Args:
             token_payload: Payload JWT decodificato
             site_id: ID sito da verificare
             required_permission: Permesso minimo richiesto
-            
+
         Returns:
             True se autorizzato
         """
@@ -192,30 +192,28 @@ class SecurityService:
         
         # Cerca sito nel token
         site_info = next(
-            (site for site in sites if site.get("id") == str(site_id)), 
+            (site for site in sites if site.get("id") == str(site_id)),
             None
         )
-        
+
         if not site_info:
             return False
-        
-        # Verifica permesso (gerarchia: REGIONAL_ADMIN > ADMIN > WRITE > READ)
-        permission_hierarchy = {
-            "read": 1,
-            "write": 2,
-            "admin": 3,
-            "regional_admin": 4
-        }
-        
-        user_level = permission_hierarchy.get(
+
+        # Verifica permesso usando gerarchia globale
+        user_level = PERMISSION_HIERARCHY.get(
             site_info.get("permission_level", "").lower(), 0
         )
-        required_level = permission_hierarchy.get(required_permission.value.lower(), 0)
+        required_level = PERMISSION_HIERARCHY.get(required_permission.value.lower(), 0)
         
         return user_level >= required_level
 
     @staticmethod
-    async def blacklist_token(token: str, db: AsyncSession, user_id: UUID, reason: Optional[str] = None) -> bool:
+    async def blacklist_token(
+        token: str, 
+        db: AsyncSession, 
+        user_id: UUID, 
+        reason: Optional[str] = None
+    ) -> bool:
         """
         Invalida un token aggiungendolo alla blacklist
 
@@ -229,261 +227,203 @@ class SecurityService:
             True se il token è stato invalidato con successo
         """
         try:
-            # Decodifica il token per ottenere il JTI (senza verifica firma per velocità)
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_signature": False, "verify_exp": False})
+            # Decodifica senza verifica per velocità
+            payload = jwt.decode(
+                token, 
+                SECRET_KEY, 
+                algorithms=[ALGORITHM], 
+                options={"verify_signature": False, "verify_exp": False}
+            )
             token_jti = payload.get("jti")
-
+            
             if not token_jti:
                 return False
 
-            # Aggiungi alla blacklist
             from app.models.users import TokenBlacklist
             await TokenBlacklist.blacklist_token(db, token_jti, user_id, reason)
-
             return True
 
-        except jwt.PyJWTError:
+        except (jwt.PyJWTError, Exception):
             return False
-        except Exception:
-            return False
-    
+
     @staticmethod
     def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """
         Crea un access token JWT
-        
+
         Args:
             data: Dati da includere nel payload
             expires_delta: Durata custom del token
-            
+
         Returns:
             Token JWT access
         """
+        now = SecurityService._get_current_utc()
+        
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = now + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=15)  # Access tokens last 15 minutes
-        
-        # Genera JTI (JWT ID) univoco per questo token
-        import uuid
-        token_jti = str(uuid.uuid4())
-        
+            expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
         to_encode = data.copy()
         to_encode.update({
             "exp": expire,
-            "iat": datetime.utcnow(),
-            "jti": token_jti,
+            "iat": now,
+            "jti": SecurityService._generate_jti(),
             "type": "access"
         })
         
         return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    
+
     @staticmethod
     def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """
         Crea un refresh token JWT
-        
+
         Args:
             data: Dati da includere nel payload
             expires_delta: Durata custom del token
-            
+
         Returns:
             Token JWT refresh
         """
+        now = SecurityService._get_current_utc()
+        
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = now + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-        
-        # Genera JTI (JWT ID) univoco per questo token
-        import uuid
-        token_jti = str(uuid.uuid4())
-        
+            expire = now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+
         to_encode = data.copy()
         to_encode.update({
             "exp": expire,
-            "iat": datetime.utcnow(),
-            "jti": token_jti,
+            "iat": now,
+            "jti": SecurityService._generate_jti(),
             "type": "refresh"
         })
         
         return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    
+
     @staticmethod
     def decode_token(token: str) -> dict:
         """
         Decodifica un token JWT senza controllo blacklist
-        
+
         Args:
             token: Token JWT da decodificare
-            
+
         Returns:
             Payload decodificato
-            
+
         Raises:
             jwt.PyJWTError: Se token non valido
         """
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-# DEPENDENCY CORRETTE: Leggono dal cookie invece che dall'header
-async def get_current_user_token(request: Request) -> Dict[str, Any]:
-    """
-    Dependency: ottiene e verifica token utente corrente DAL COOKIE
-    """
-    # DEBUG: Log cookie details
-    logger.debug(f"🔍 [DEBUG] get_current_user_token - Request path: {request.url.path}")
-    logger.debug(f"🔍 [DEBUG] get_current_user_token - Available cookies: {list(request.cookies.keys())}")
-    
-    # Leggi token dal cookie
-    access_token_cookie = request.cookies.get("access_token")
 
-    if not access_token_cookie:
-        logger.warning(f"🔍 [DEBUG] get_current_user_token - No access_token cookie found for path: {request.url.path}")
-        logger.warning(f"🔍 [DEBUG] get_current_user_token - All cookies received: {dict(request.cookies)}")
+# Utility per estrarre token da richiesta
+def _extract_token_from_request(request: Request) -> str:
+    """
+    Estrae token da cookie o header Authorization con fallback
+
+    Args:
+        request: FastAPI Request object
+
+    Returns:
+        Token pulito (senza 'Bearer ')
+
+    Raises:
+        HTTPException: Se token non trovato
+    """
+    # 1. Prova dal cookie access_token
+    token = request.cookies.get("access_token")
+    
+    # 2. Fallback: prova dall'header Authorization
+    if not token:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header
+    
+    if not token:
+        logger.warning(
+            f"No access token found - Path: {request.url.path}, "
+            f"Cookies: {list(request.cookies.keys())}"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token di accesso non trovato nei cookie",
+            detail="Token di accesso non trovato",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    logger.debug(f"🔍 [DEBUG] get_current_user_token - Found access_token cookie: {access_token_cookie[:50]}...")
     
-    # Rimuovi "Bearer " prefix se presente
-    token = access_token_cookie.replace("Bearer ", "")
+    # Rimuovi prefisso "Bearer " se presente
+    return token.replace("Bearer ", "")
 
-    # Verifica token usando SecurityService (senza DB per compatibilità)
-    return await SecurityService.verify_token(token, None)
 
-# NUOVE DEPENDENCY CON BLACKLIST CHECK - PER ENDPOINT PROTETTI
+# DEPENDENCY: Token e User Info (senza blacklist check)
+async def get_current_user_token(request: Request) -> Dict[str, Any]:
+    """
+    Dependency: ottiene e verifica token utente corrente dal cookie/header
+    """
+    token = _extract_token_from_request(request)
+    return await SecurityService.verify_token(token, db=None)
+
+
+async def get_current_user_id(request: Request) -> UUID:
+    """
+    Dependency: ottiene ID utente corrente dal token
+    """
+    token_payload = await get_current_user_token(request)
+    user_id = token_payload.get("sub")
+    
+    try:
+        return UUID(user_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="ID utente non valido nel token"
+        )
+
+
+async def get_current_user_sites(request: Request) -> List[Dict[str, Any]]:
+    """
+    Dependency: ottiene siti accessibili dal token
+    """
+    token_payload = await get_current_user_token(request)
+    return SecurityService.get_sites_from_token(token_payload)
+
+
+# DEPENDENCY: Con blacklist check (per endpoint protetti)
 async def get_current_user_token_with_blacklist(
     request: Request,
     db: AsyncSession = Depends(get_async_session)
 ) -> Dict[str, Any]:
     """
-    Dependency: ottiene e verifica token utente corrente DAL COOKIE con controllo blacklist
-    Enhanced with detailed logging for cookie debugging
+    Dependency: ottiene e verifica token con controllo blacklist
     """
-    # DEBUG: Enhanced logging for cookie debugging
-    request_path = str(request.url.path)
-    request_method = request.method
-    user_agent = request.headers.get('user-agent', 'unknown')
-    referer = request.headers.get('referer', 'unknown')
-    origin = request.headers.get('origin', 'unknown')
+    token = _extract_token_from_request(request)
     
-    logger.info(f"🍪 [COOKIE_DEBUG] get_current_user_token_with_blacklist called")
-    logger.info(f"🍪 [COOKIE_DEBUG] Path: {request_path}")
-    logger.info(f"🍪 [COOKIE_DEBUG] Method: {request_method}")
-    logger.info(f"🍪 [COOKIE_DEBUG] User-Agent: {user_agent}")
-    logger.info(f"🍪 [COOKIE_DEBUG] Referer: {referer}")
-    logger.info(f"🍪 [COOKIE_DEBUG] Origin: {origin}")
-    
-    # Log all available cookies with details
-    available_cookies = dict(request.cookies)
-    logger.info(f"🍪 [COOKIE_DEBUG] Available cookies count: {len(available_cookies)}")
-    logger.info(f"🍪 [COOKIE_DEBUG] Available cookie names: {list(available_cookies.keys())}")
-    
-    for cookie_name, cookie_value in available_cookies.items():
-        if cookie_name == 'access_token':
-            # Log first 50 chars of access token for debugging
-            masked_value = cookie_value[:50] + "..." if len(cookie_value) > 50 else cookie_value
-            logger.info(f"🍪 [COOKIE_DEBUG] Cookie '{cookie_name}': {masked_value}")
-        else:
-            logger.info(f"🍪 [COOKIE_DEBUG] Cookie '{cookie_name}': {cookie_value[:30]}...")
-    
-    # Leggi token dal cookie
-    access_token_cookie = request.cookies.get("access_token")
-
-    if not access_token_cookie:
-        logger.error(f"🍪 [COOKIE_DEBUG] CRITICAL: NO access_token cookie found!")
-        logger.error(f"🍪 [COOKIE_DEBUG] Request details:")
-        logger.error(f"🍪 [COOKIE_DEBUG]   - Path: {request_path}")
-        logger.error(f"🍪 [COOKIE_DEBUG]   - Method: {request_method}")
-        logger.error(f"🍪 [COOKIE_DEBUG]   - User-Agent: {user_agent}")
-        logger.error(f"🍪 [COOKIE_DEBUG]   - Referer: {referer}")
-        logger.error(f"🍪 [COOKIE_DEBUG]   - Origin: {origin}")
-        logger.error(f"🍪 [COOKIE_DEBUG]   - All cookies: {available_cookies}")
-        
-        # Try fallback mechanisms
-        logger.warning(f"🍪 [COOKIE_DEBUG] Attempting fallback token retrieval...")
-        
-        # Try Authorization header as fallback
-        auth_header = request.headers.get('authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            logger.info(f"🍪 [COOKIE_DEBUG] Found token in Authorization header as fallback")
-            access_token_cookie = auth_header
-        else:
-            logger.error(f"🍪 [COOKIE_DEBUG] No fallback token found in Authorization header")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token di accesso non trovato nei cookie o headers",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-    logger.info(f"🍪 [COOKIE_DEBUG] Found access token (source: {'cookie' if 'access_token' in request.cookies else 'header'})")
-    logger.debug(f"🍪 [COOKIE_DEBUG] Token preview: {access_token_cookie[:50]}...")
-    
-    # Rimuovi "Bearer " prefix se presente
-    token = access_token_cookie.replace("Bearer ", "")
-    
-    # Log token details for debugging
-    logger.debug(f"🍪 [COOKIE_DEBUG] Token length after Bearer removal: {len(token)}")
-    if len(token) < 10:
-        logger.warning(f"🍪 [COOKIE_DEBUG] Suspiciously short token: {token}")
-
     try:
-        # Verifica token usando SecurityService CON controllo blacklist
-        logger.info(f"🍪 [COOKIE_DEBUG] Attempting token verification with blacklist check...")
         payload = await SecurityService.verify_token(token, db)
-        user_id = payload.get('sub')
-        logger.info(f"🍪 [COOKIE_DEBUG] Token verified successfully for user: {user_id}")
-        logger.debug(f"🍪 [COOKIE_DEBUG] Token payload keys: {list(payload.keys())}")
-        if 'sites' in payload:
-            logger.debug(f"🍪 [COOKIE_DEBUG] Sites in token: {len(payload['sites'])}")
+        logger.debug(f"Token verified successfully for user: {payload.get('sub')}")
         return payload
-    except HTTPException as e:
-        logger.error(f"🍪 [COOKIE_DEBUG] HTTP Exception during token verification: {e.detail}")
-        logger.error(f"🍪 [COOKIE_DEBUG] Status code: {e.status_code}")
+    except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"🍪 [COOKIE_DEBUG] Unexpected error during token verification: {str(e)}")
-        logger.error(f"🍪 [COOKIE_DEBUG] Exception type: {type(e).__name__}")
-        import traceback
-        logger.error(f"🍪 [COOKIE_DEBUG] Traceback: {traceback.format_exc()}")
+        logger.error(f"Unexpected error during token verification: {type(e).__name__} - {str(e)}")
+        logger.debug(f"Traceback: {traceback.format_exc()}")
         raise
 
-async def get_current_user_id(request: Request) -> UUID:
-    """
-    Dependency: ottiene ID utente corrente dal token nel cookie
-    """
-    token_payload = await get_current_user_token(request)
-    user_id = token_payload.get("sub")
-    
-    try:
-        return UUID(user_id)
-    except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="ID utente non valido nel token"
-        )
 
-async def get_current_user_sites(request: Request) -> List[Dict[str, Any]]:
-    """
-    Dependency: ottiene siti accessibili dal token nel cookie
-    """
-    token_payload = await get_current_user_token(request)
-    return SecurityService.get_sites_from_token(token_payload)
-
-# NUOVE DEPENDENCY CON BLACKLIST CHECK
 async def get_current_user_id_with_blacklist(
     request: Request,
     db: AsyncSession = Depends(get_async_session)
 ) -> UUID:
     """
-    Dependency: ottiene ID utente corrente dal token nel cookie con controllo blacklist
+    Dependency: ottiene ID utente corrente con controllo blacklist
     """
     token_payload = await get_current_user_token_with_blacklist(request, db)
     user_id = token_payload.get("sub")
-
+    
     try:
         return UUID(user_id)
     except (ValueError, TypeError):
@@ -491,6 +431,7 @@ async def get_current_user_id_with_blacklist(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="ID utente non valido nel token"
         )
+
 
 async def get_current_user_sites_with_blacklist(
     request: Request,
@@ -498,9 +439,8 @@ async def get_current_user_sites_with_blacklist(
 ) -> List[Dict[str, Any]]:
     """
     Dependency: ottiene siti accessibili dal DATABASE in tempo reale
-    NON usa più il token JWT per evitare dati cached non sicuri
+    NON usa il token JWT per evitare dati cached
     """
-    # Verifica token e ottieni user_id
     token_payload = await get_current_user_token_with_blacklist(request, db)
     user_id_str = token_payload.get("sub")
     
@@ -511,13 +451,18 @@ async def get_current_user_sites_with_blacklist(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="ID utente non valido nel token"
         )
-    
-    # Interroga il database per ottenere i siti accessibili in tempo reale
-    # Import locale per evitare circular import
+
+    # Interroga il database per siti in tempo reale
     from app.services.auth_service import AuthService
-    sites_data = await AuthService.get_user_sites_with_permissions(db, user_id)
+    
+    try:
+        sites_data = await AuthService.get_user_sites_with_permissions(db, user_id)
+    except Exception as e:
+        logger.error(f"Error in get_user_sites_with_permissions: {str(e)}")
+        sites_data = []  # Fallback sicuro
     
     return sites_data
+
 
 async def current_active_user(
     user_id: UUID = Depends(get_current_user_id),
@@ -527,28 +472,34 @@ async def current_active_user(
     Dependency: ottiene l'utente corrente attivo dal database
     """
     user = await db.get(User, user_id)
+    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
+    
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user"
         )
+    
     return user
 
-# Versioni alternative per compatibilità OAuth2 (header-based)
+
+# DEPENDENCY: Header-based (per compatibilità OAuth2 API)
 async def get_current_user_token_header(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
     """Dependency: ottiene token dall'Authorization header (per API)"""
-    return SecurityService.verify_token(token)
+    return await SecurityService.verify_token(token, db=None)
+
 
 async def get_current_user_id_header(
     token_payload: Dict[str, Any] = Depends(get_current_user_token_header)
 ) -> UUID:
     """Dependency: ottiene ID utente dal token nell'header"""
     user_id = token_payload.get("sub")
+    
     try:
         return UUID(user_id)
     except (ValueError, TypeError):
@@ -557,29 +508,32 @@ async def get_current_user_id_header(
             detail="ID utente non valido nel token"
         )
 
+
 async def get_current_user_sites_header(
     token_payload: Dict[str, Any] = Depends(get_current_user_token_header)
 ) -> List[Dict[str, Any]]:
     """Dependency: ottiene siti dal token nell'header"""
     return SecurityService.get_sites_from_token(token_payload)
 
-# CORREZIONE: Funzione async corretta
+
+# Dependency factory per accesso a sito specifico
 def require_site_access(
-    site_id: UUID, 
+    site_id: UUID,
     required_permission: PermissionLevel = PermissionLevel.READ
 ):
     """
     Dependency factory: verifica accesso a sito specifico
-    Usa cookie-based authentication
     
     Usage:
         @app.get("/site/{site_id}/photos")
         async def get_photos(
             authorized: bool = Depends(require_site_access(site_id, PermissionLevel.READ))
         ):
+            ...
     """
-    async def _verify_access(request: Request) -> bool:  # AGGIUNTO async qui
+    async def _verify_access(request: Request) -> bool:
         token_payload = await get_current_user_token(request)
+        
         if not SecurityService.verify_site_access_in_token(
             token_payload, site_id, required_permission
         ):
@@ -587,64 +541,18 @@ def require_site_access(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Accesso negato al sito {site_id}: permesso {required_permission.value} richiesto"
             )
+        
         return True
     
     return _verify_access
 
-# Enhanced utility per debug e fallback
-def get_token_from_cookie_or_header(request: Request) -> Optional[str]:
-    """
-    Utility per ottenere token da cookie o header con fallback robusto.
-    Priorità: 1) Cookie access_token, 2) Header Authorization, 3) Altri metodi
-    """
-    logger.debug(f"🔧 [FALLBACK] get_token_from_cookie_or_header called for path: {request.url.path}")
-    
-    # 1. Prima prova dal cookie standard
-    cookie_token = request.cookies.get("access_token")
-    if cookie_token:
-        logger.debug(f"🔧 [FALLBACK] Token found in access_token cookie")
-        return cookie_token.replace("Bearer ", "")
-    
-    # 2. Prova dall'header Authorization (standard OAuth2)
-    auth_header = request.headers.get("authorization")
-    if auth_header:
-        logger.debug(f"🔧 [FALLBACK] Authorization header found: {auth_header[:20]}...")
-        if auth_header.startswith("Bearer "):
-            logger.debug(f"🔧 [FALLBACK] Token extracted from Authorization header")
-            return auth_header.replace("Bearer ", "")
-        else:
-            logger.warning(f"🔧 [FALLBACK] Authorization header doesn't start with 'Bearer '")
-    
-    # 3. Prova altri nomi di cookie (fallback per configurazioni diverse)
-    alternative_cookie_names = ["auth_token", "jwt_token", "token"]
-    for alt_name in alternative_cookie_names:
-        alt_cookie = request.cookies.get(alt_name)
-        if alt_cookie:
-            logger.info(f"🔧 [FALLBACK] Token found in alternative cookie: {alt_name}")
-            return alt_cookie.replace("Bearer ", "")
-    
-    # 4. Prova parametri query (ultima risorsa, solo per debugging)
-    if "token" in request.query_params:
-        logger.warning(f"🔧 [FALLBACK] Token found in query params - this should not be used in production!")
-        return request.query_params["token"]
-    
-    # 5. Log dettagliato del fallimento
-    logger.error(f"🔧 [FALLBACK] No token found in any location")
-    logger.error(f"🔧 [FALLBACK] Available cookies: {list(request.cookies.keys())}")
-    logger.error(f"🔧 [FALLBACK] Available headers: {list(request.headers.keys())}")
-    
-    return None
 
-# Debug utilities
+# Debug utility
 async def debug_current_token(request: Request) -> Dict[str, Any]:
     """Utility di debug per vedere il token corrente"""
     try:
-        cookie_token = request.cookies.get("access_token")
-        if not cookie_token:
-            return {"error": "No access_token cookie found", "cookies": list(request.cookies.keys())}
-        
-        token = cookie_token.replace("Bearer ", "")
-        payload = SecurityService.verify_token(token)
+        token = _extract_token_from_request(request)
+        payload = await SecurityService.verify_token(token, db=None)
         
         return {
             "success": True,
