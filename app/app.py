@@ -6,6 +6,7 @@ from loguru import logger
 from typing import List, Dict, Any
 from uuid import UUID
 
+
 # IMPORT MANCANTI - Aggiungi questi:
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -139,13 +140,15 @@ except ImportError:
 
 # Configurazione
 settings = get_settings()
+# Configurazione FastAPI con Swagger UI personalizzato
 app = FastAPI(
-    title="Sistema Archeologico Multi-Sito",
+    title="Archaeological Catalog API",
     description="Catalogazione digitale per siti archeologici",
-    version="1.0.1",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
     exception_handlers={HTTPException: http_exception_handler},
     swagger_ui_parameters={
-        "dom_id": "#swagger-ui",
         "deepLinking": True,
         "displayOperationId": True,
         "defaultModelsExpandDepth": 1,
@@ -153,11 +156,11 @@ app = FastAPI(
         "displayRequestDuration": True,
         "docExpansion": "list",
         "tryItOutEnabled": True,
-        "persistAuthorization": True
+        "persistAuthorization": True,
+        "filter": True,
+        "showExtensions": True,
+        "showCommonExtensions": True
     },
-    swagger_css_url="/static/css/swagger-ui.min.css",
-    swagger_js_url="/static/js/swagger-ui-bundle.min.js",
-    swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect",
     openapi_url="/openapi.json"
 )
 
