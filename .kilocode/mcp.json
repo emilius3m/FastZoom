@@ -5,6 +5,9 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-puppeteer"
+      ],
+      "alwaysAllow": [
+        "puppeteer_evaluate"
       ]
     },
     "sequentialthinking": {
