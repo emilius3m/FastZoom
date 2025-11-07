@@ -143,7 +143,22 @@ app = FastAPI(
     title="Sistema Archeologico Multi-Sito",
     description="Catalogazione digitale per siti archeologici",
     version="1.0.1",
-    exception_handlers={HTTPException: http_exception_handler}
+    exception_handlers={HTTPException: http_exception_handler},
+    swagger_ui_parameters={
+        "dom_id": "#swagger-ui",
+        "deepLinking": True,
+        "displayOperationId": True,
+        "defaultModelsExpandDepth": 1,
+        "defaultModelExpandDepth": 1,
+        "displayRequestDuration": True,
+        "docExpansion": "list",
+        "tryItOutEnabled": True,
+        "persistAuthorization": True
+    },
+    swagger_css_url="/static/css/swagger-ui.min.css",
+    swagger_js_url="/static/js/swagger-ui-bundle.min.js",
+    swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect",
+    openapi_url="/openapi.json"
 )
 
 # 🆕 NUOVO: CSRF Protection per forms HTMX
