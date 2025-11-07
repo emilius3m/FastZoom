@@ -81,6 +81,26 @@ async def require_superuser(
     context = await get_admin_template_context(request, current_user_id, user_sites, db)
     return user, context
 
+def _get_permission_display_name(permission_level: str) -> str:
+    """Get display name for permission level"""
+    permission_names = {
+        "read": "Visualizzatore",
+        "write": "Curatore", 
+        "admin": "Amministratore Sito",
+        "regional_admin": "Amministratore Regionale"
+    }
+    return permission_names.get(permission_level, permission_level.title())
+
+def _get_permission_badge_class(permission_level: str) -> str:
+    """Get CSS badge class for permission level"""
+    badge_classes = {
+        "read": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+        "write": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300", 
+        "admin": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+        "regional_admin": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+    }
+    return badge_classes.get(permission_level, "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300")
+
 # ===== GESTIONE SITI ARCHEOLOGICI =====
 
 @admin_view_router.get("/admin/sites/", response_class=HTMLResponse)
@@ -220,7 +240,7 @@ async def admin_sites_edit(
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-             
+            
         async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.get(f"{API_V1_BASE_URL}/sites/{site_uuid}")
             
@@ -286,7 +306,7 @@ async def admin_sites_update(
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-             
+            
         async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.put(f"{API_V1_BASE_URL}/sites/{site_uuid}", json=site_data)
             
@@ -392,7 +412,7 @@ async def admin_site_users(
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-             
+            
         async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.get(f"{API_V1_BASE_URL}/sites/{site_uuid}/users")
             
@@ -553,20 +573,66 @@ async def admin_users_edit(
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-             
-        async with httpx.AsyncClient(cookies=cookies) as client:
-            response = await client.get(f"{API_V1_BASE_URL}/users/{user_uuid}")
             
-            if response.status_code != 200:
-                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            # Get user data
+            user_response = await client.get(f"{API_V1_BASE_URL}/users/{user_uuid}")
+            
+            if user_response.status_code != 200:
+                logger.error(f"API v1 error: {user_response.status_code} - {user_response.text}")
                 raise HTTPException(status_code=404, detail="Utente non trovato")
             
-            user_data = response.json().get("user", {})
+            # Extract user data with better error handling and debugging
+            try:
+                response_data = user_response.json()
+                logger.info(f"API response data type: {type(response_data)}")
+                logger.info(f"API response data: {response_data}")
+                
+                if isinstance(response_data, dict):
+                    user_data = response_data.get("user", {})
+                else:
+                    logger.error(f"Expected dict but got {type(response_data)}")
+                    user_data = {}
+                    
+                logger.info(f"Extracted user_data: {user_data}")
+                
+                # Validate user_data structure
+                if not user_data or not isinstance(user_data, dict):
+                    logger.error(f"Invalid user_data structure: {user_data}")
+                    user_data = {}
+                    
+            except Exception as e:
+                logger.error(f"Error parsing user API response: {e}")
+                logger.error(f"Response content: {user_response.text}")
+                user_data = {}
+            
+            # Get available sites for the dropdown
+            sites_response = await client.get(f"{API_V1_BASE_URL}/sites")
+            
+            if sites_response.status_code != 200:
+                logger.error(f"API v1 sites error: {sites_response.status_code} - {sites_response.text}")
+                raise HTTPException(status_code=500, detail="Errore nel caricamento dei siti")
+            
+            sites_data = sites_response.json()
+        
+        # Process user permissions for display
+        user_permissions_processed = []
+        if "permissions" in user_data:
+            for permission in user_data["permissions"]:
+                permission_dict = {
+                    "id": permission["id"],
+                    "site_id": permission["site_id"],
+                    "permission_display_name": _get_permission_display_name(permission["permission_level"]),
+                    "status_badge_class": _get_permission_badge_class(permission["permission_level"])
+                }
+                user_permissions_processed.append((permission_dict, {"name": permission["site_name"], "code": ""}))
         
         context = {
             **base_context,
             "user_data": user_data,
-            "action": "edit"
+            "action": "edit",
+            "available_sites": sites_data.get("sites", []),
+            "user_permissions": user_permissions_processed
         }
         
         return templates.TemplateResponse("admin/users_form.html", context)
@@ -616,7 +682,7 @@ async def admin_users_update(
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-             
+            
         async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.put(f"{API_V1_BASE_URL}/users/{user_uuid}", json=user_data)
             
@@ -655,12 +721,12 @@ async def admin_users_toggle_status(
         except ValueError:
             raise HTTPException(status_code=404, detail="ID utente non valido")
             
-        # Chiama la API v1 per toggolare lo stato
+        # Chiama la API v1 per togglare lo stato
         # Estrai i cookie dalla richiesta originale e passali alla richiesta API
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-             
+            
         async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.post(f"{API_V1_BASE_URL}/users/{user_uuid}/toggle-status")
             
@@ -699,7 +765,7 @@ async def admin_users_delete(
         cookies = {}
         for cookie_name, cookie_value in request.cookies.items():
             cookies[cookie_name] = cookie_value
-             
+            
         async with httpx.AsyncClient(cookies=cookies) as client:
             response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}")
             
@@ -943,3 +1009,438 @@ async def admin_user_remove_permission(
     except httpx.RequestError as e:
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+@admin_view_router.post("/admin/users/{user_id}/permissions/{permission_id}/delete/")
+async def admin_user_remove_permission(
+    user_id: str,
+    permission_id: str,
+    request: Request,
+    auth_data: tuple = Depends(require_superuser)
+):
+    """Rimuovi permesso sito da utente"""
+    superuser, base_context = auth_data
+    
+    try:
+        # Converti IDs da stringa a UUID
+        try:
+            user_uuid = UUID(user_id)
+            permission_uuid = UUID(permission_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID non valido")
+        
+        # Chiama la API v1 per rimuovere il permesso
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+@admin_view_router.post("/admin/users/{user_id}/permissions/{permission_id}/delete/")
+async def admin_user_remove_permission(
+    user_id: str,
+    permission_id: str,
+    request: Request,
+    auth_data: tuple = Depends(require_superuser)
+):
+    """Rimuovi permesso sito da utente"""
+    superuser, base_context = auth_data
+    
+    try:
+        # Converti IDs da stringa a UUID
+        try:
+            user_uuid = UUID(user_id)
+            permission_uuid = UUID(permission_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID non valido")
+        
+        # Chiama la API v1 per rimuovere il permesso
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+@admin_view_router.post("/admin/users/{user_id}/permissions/{permission_id}/delete/")
+async def admin_user_remove_permission(
+    user_id: str,
+    permission_id: str,
+    request: Request,
+    auth_data: tuple = Depends(require_superuser)
+):
+    """Rimuovi permesso sito da utente"""
+    superuser, base_context = auth_data
+    
+    try:
+        # Converti IDs da stringa a UUID
+        try:
+            user_uuid = UUID(user_id)
+            permission_uuid = UUID(permission_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID non valido")
+        
+        # Chiama la API v1 per rimuovere il permesso
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+
