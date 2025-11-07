@@ -631,17 +631,33 @@ document.addEventListener('alpine:init', () => {
             this.isSubmitting = true;
 
             try {
-                // Prepare form data
-                const submitData = new FormData();
-                Object.keys(this.formData).forEach(key => {
-                    // Include all fields, even if empty, to match endpoint expectations
-                    if (this.formData[key] !== null) {
-                        submitData.append(key, this.formData[key]);
-                    }
-                });
+                // Prepare data for API
+                const submitData = {
+                    name: this.formData.name,
+                    code: this.formData.code,
+                    location: this.formData.location,
+                    region: this.formData.region,
+                    province: this.formData.province,
+                    municipality: this.formData.municipality,
+                    description: this.formData.description,
+                    historical_period: this.formData.historical_period,
+                    site_type: this.formData.site_type,
+                    coordinates_lat: this.formData.coordinates_lat,
+                    coordinates_lng: this.formData.coordinates_lng,
+                    research_status: this.formData.research_status,
+                    is_active: this.formData.is_active,
+                    is_public: this.formData.is_public
+                };
 
-                const url = '{{ "/admin/site/" + site.id|string + "/edit/" if site else "/admin/sites/new/" }}';
-                const response = await api.postForm(url, submitData);
+                {% if site %}
+                // Update existing site
+                const url = '/api/v1/admin/sites/{{ site.id }}';
+                const response = await api.put(url, submitData);
+                {% else %}
+                // Create new site
+                const url = '/api/v1/admin/sites';
+                const response = await api.post(url, submitData);
+                {% endif %}
 
                 // The API client returns data directly on success, throws error on failure
                 this.showSuccess('{{ "Sito aggiornato" if site else "Sito creato" }} con successo');
@@ -684,7 +700,7 @@ document.addEventListener('alpine:init', () => {
         {% if site %}
         async exportSiteData() {
             try {
-                const response = await api.get('/api/v1/admin/sites/{{ site.id }}/export/');
+                const response = await api.get('/api/v1/admin/sites/{{ site.id }}');
                 
                 // The API client returns data directly on success
                 const blob = new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' });

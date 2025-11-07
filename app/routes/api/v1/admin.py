@@ -427,8 +427,7 @@ async def v1_admin_update_site(
 @router.delete("/sites/{site_id}", summary="Elimina sito", tags=["Administration"])
 async def v1_admin_delete_site(
     site_id: UUID,
-    admin_password: str,
-    confirm_delete: bool = False,
+    request: Request,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -440,6 +439,10 @@ async def v1_admin_delete_site(
     await verify_admin_access(current_user_id, user_sites, db)
     
     try:
+        # Get parameters from query string (for view layer compatibility)
+        admin_password = request.query_params.get("admin_password", "")
+        confirm_delete = request.query_params.get("confirm_delete") == "true"
+        
         # Ottieni utente corrente per verifica password
         user = await db.execute(select(User).where(User.id == current_user_id))
         user = user.scalar_one_or_none()
@@ -649,13 +652,25 @@ async def v1_admin_get_user(
     """Ottieni dettagli di un utente specifico"""
     await verify_admin_access(current_user_id, user_sites, db)
     
+    logger.info(f"Looking up user with ID: {user_id} (type: {type(user_id)})")
+    
     # Carica utente con relazioni
-    user_query = select(User).options(selectinload(User.profile)).where(User.id == user_id)
-    user = await db.execute(user_query)
-    user = user.scalar_one_or_none()
+    user_query = select(User).options(selectinload(User.profile)).where(User.id == str(user_id))
+    user_result = await db.execute(user_query)
+    user = user_result.scalar_one_or_none()
+    
+    logger.info(f"User query result: {user}")
     
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+        # Try alternative lookup with UUID object directly
+        logger.info("Trying alternative lookup with UUID object")
+        user_query_alt = select(User).options(selectinload(User.profile)).where(User.id == user_id)
+        user_result_alt = await db.execute(user_query_alt)
+        user = user_result_alt.scalar_one_or_none()
+        logger.info(f"Alternative query result: {user}")
+    
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Utente non trovato: {user_id}")
     
     # Carica permessi utente
     permissions_query = (
@@ -674,7 +689,7 @@ async def v1_admin_get_user(
             "id": str(permission.id),
             "site_id": str(permission.site_id),
             "site_name": site.name,
-            "permission_level": permission.permission_level.value,
+            "permission_level": str(permission.permission_level),  # Fix: use string value directly
             "granted_by": str(permission.granted_by),
             "granted_at": permission.granted_at.isoformat() if permission.granted_at else None,
             "expires_at": permission.expires_at.isoformat() if permission.expires_at else None,
@@ -866,6 +881,104 @@ async def v1_admin_delete_user(
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+# ===== GESTIONE UTENTI PER SITO =====
+
+@router.get("/sites/{site_id}/users", summary="Lista utenti per sito", tags=["Administration"])
+async def v1_admin_get_site_users(
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Lista tutti gli utenti con permessi per un sito specifico.
+    
+    Solo superutenti possono accedere.
+    """
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        # Verifica esistenza sito
+        site = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+        )
+        site = site.scalar_one_or_none()
+        
+        if not site:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Query utenti con permessi per questo sito
+        users_permissions_query = (
+            select(UserSitePermission, User, ArchaeologicalSite)
+            .join(User, UserSitePermission.user_id == User.id)
+            .join(ArchaeologicalSite, UserSitePermission.site_id == ArchaeologicalSite.id)
+            .options(selectinload(User.profile))
+            .where(UserSitePermission.site_id == site_id)
+            .order_by(User.email)
+        )
+        
+        users_permissions = await db.execute(users_permissions_query)
+        users_permissions = users_permissions.all()
+        
+        # Query tutti gli utenti disponibili per aggiungere al sito
+        all_users_query = select(User).options(selectinload(User.profile)).order_by(User.email)
+        all_users = await db.execute(all_users_query)
+        all_users = all_users.scalars().all()
+        
+        # Converti dati utenti con permessi
+        site_users = []
+        for permission, user, site_info in users_permissions:
+            user_dict = {
+                "id": str(user.id),
+                "email": user.email,
+                "first_name": user.profile.first_name if user.profile else None,
+                "last_name": user.profile.last_name if user.profile else None,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+                "permission_level": str(permission.permission_level),
+                "granted_by": str(permission.granted_by),
+                "granted_at": permission.granted_at.isoformat() if permission.granted_at else None,
+                "expires_at": permission.expires_at.isoformat() if permission.expires_at else None,
+                "is_active_permission": permission.is_active,
+                "notes": permission.notes
+            }
+            site_users.append(user_dict)
+        
+        # Converti tutti gli utenti disponibili
+        available_users = []
+        user_ids_with_permission = [user["id"] for user in site_users]
+        
+        for user in all_users:
+            if str(user.id) not in user_ids_with_permission:
+                user_dict = {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "first_name": user.profile.first_name if user.profile else None,
+                    "last_name": user.profile.last_name if user.profile else None,
+                    "is_active": user.is_active,
+                    "is_superuser": user.is_superuser
+                }
+                available_users.append(user_dict)
+        
+        return {
+            "site": {
+                "id": str(site.id),
+                "name": site.name,
+                "code": site.code,
+                "location": site.locality
+            },
+            "users": site_users,
+            "available_users": available_users,
+            "count": len(site_users),
+            "admin_user_id": str(current_user_id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 # ===== GESTIONE PERMESSI =====
 
 @router.get("/permissions", summary="Lista permessi", tags=["Administration"])
@@ -878,16 +991,27 @@ async def v1_admin_get_permissions(
     """Lista permessi utenti-siti"""
     await verify_admin_access(current_user_id, user_sites, db)
     
+    # Fix: Add eager loading for user profiles to prevent MissingGreenlet error
     permissions = await db.execute(
         select(UserSitePermission, User, ArchaeologicalSite)
         .join(User, UserSitePermission.user_id == User.id)
         .join(ArchaeologicalSite, UserSitePermission.site_id == ArchaeologicalSite.id)
+        .options(selectinload(User.profile))  # Eager load user profile
         .order_by(User.email, ArchaeologicalSite.name)
     )
     permissions = permissions.all()
     
     permissions_data = []
     for permission, user, site in permissions:
+        # Fix: permission_level is stored as string, not as enum with .value attribute
+        permission_level_value = permission.permission_level
+        if hasattr(permission, 'permission_level_enum'):
+            # If the model has the enum property, use it
+            permission_level_value = permission.permission_level_enum.value
+        else:
+            # Otherwise, use the string value directly
+            permission_level_value = str(permission.permission_level)
+        
         permission_dict = {
             "id": str(permission.id),
             "user_id": str(permission.user_id),
@@ -895,7 +1019,7 @@ async def v1_admin_get_permissions(
             "user_name": f"{user.profile.first_name if user.profile else ''} {user.profile.last_name if user.profile else ''}".strip(),
             "site_id": str(permission.site_id),
             "site_name": site.name,
-            "permission_level": permission.permission_level.value,
+            "permission_level": permission_level_value,
             "granted_by": str(permission.granted_by),
             "granted_at": permission.granted_at.isoformat() if permission.granted_at else None,
             "expires_at": permission.expires_at.isoformat() if permission.expires_at else None,
@@ -966,7 +1090,7 @@ async def v1_admin_create_permission(
                 "id": str(permission.id),
                 "user_id": str(permission.user_id),
                 "site_id": str(permission.site_id),
-                "permission_level": permission.permission_level.value,
+                "permission_level": str(permission.permission_level),  # Fix: use string value directly
                 "granted_by": str(current_user_id)
             }
         }
@@ -1044,7 +1168,7 @@ async def v1_admin_add_user_permission(
                 "id": str(permission.id),
                 "user_id": str(user_id),
                 "site_id": str(permission_data.site_id),
-                "permission_level": permission.permission_level.value,
+                "permission_level": str(permission.permission_level),  # Fix: use string value directly
                 "granted_by": str(current_user_id)
             }
         }

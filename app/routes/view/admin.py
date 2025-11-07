@@ -310,6 +310,115 @@ async def admin_sites_update(
         logger.error(f"HTTP request error: {e}")
         raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
 
+@admin_view_router.post("/admin/site/{site_id}/dangerous-delete/")
+async def admin_sites_dangerous_delete(
+    site_id: str,
+    request: Request,
+    auth_data: tuple = Depends(require_superuser)
+):
+    """
+    Elimina definitivamente un sito archeologico e tutti i dati correlati.
+    Operazione PERICOLOSA che richiede conferma password amministratore.
+    """
+    superuser, base_context = auth_data
+    
+    try:
+        # Converti site_id da stringa a UUID
+        try:
+            site_uuid = UUID(site_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID sito non valido")
+            
+        # Get form data from request
+        form_data = await request.form()
+        
+        # Prepara i dati per la API v1
+        delete_data = {
+            "admin_password": form_data.get("admin_password", ""),
+            "confirm_delete": form_data.get("confirm_delete") == "on"
+        }
+        
+        # Chiama la API v1 per eliminare il sito
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(
+                f"{API_V1_BASE_URL}/sites/{site_uuid}",
+                params=delete_data
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina con errore
+                return RedirectResponse(
+                    url=f"/admin/site/{site_id}/edit/?error=delete_failed",
+                    status_code=303
+                )
+            
+            result = response.json()
+        
+        return RedirectResponse(
+            url="/admin/sites/?success=deleted",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+
+# ===== GESTIONE UTENTI PER SITO =====
+
+@admin_view_router.get("/admin/site/{site_id}/users/", response_class=HTMLResponse)
+async def admin_site_users(
+    request: Request,
+    site_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    auth_data: tuple = Depends(require_superuser)
+):
+    """Gestione utenti per un sito specifico"""
+    superuser, base_context = auth_data
+    
+    try:
+        # Converti site_id da stringa a UUID
+        try:
+            site_uuid = UUID(site_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID sito non valido")
+            
+        # Chiama la API v1 per ottenere i dati degli utenti del sito
+        # Estrai i cookie dalla richiesta originale e passali alla richiesta API
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+             
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.get(f"{API_V1_BASE_URL}/sites/{site_uuid}/users")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail="Errore nel caricamento degli utenti del sito"
+                )
+            
+            api_data = response.json()
+        
+        context = {
+            **base_context,
+            "site": api_data.get("site", {}),
+            "users": api_data.get("users", []),
+            "available_users": api_data.get("available_users", []),
+            "count": api_data.get("count", 0)
+        }
+        
+        return templates.TemplateResponse("admin/site_users.html", context)
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+
 # ===== GESTIONE UTENTI =====
 
 @admin_view_router.get("/admin/users/", response_class=HTMLResponse)
@@ -644,6 +753,192 @@ async def admin_permissions_list(
         }
         
         return templates.TemplateResponse("admin/permissions_list.html", context)
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+
+@admin_view_router.get("/admin/permissions/new/", response_class=HTMLResponse)
+async def admin_permissions_new(
+    request: Request,
+    db: AsyncSession = Depends(get_async_session),
+    auth_data: tuple = Depends(require_superuser)
+):
+    """Form per nuovo permesso utente-sito"""
+    superuser, base_context = auth_data
+    
+    try:
+        # Chiama la API v1 per ottenere la lista utenti e siti
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+        
+        # Get users and sites for the form
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            users_response = await client.get(f"{API_V1_BASE_URL}/users")
+            sites_response = await client.get(f"{API_V1_BASE_URL}/sites")
+            
+            if users_response.status_code != 200 or sites_response.status_code != 200:
+                logger.error(f"API v1 error: users={users_response.status_code}, sites={sites_response.status_code}")
+                raise HTTPException(status_code=500, detail="Errore nel caricamento dei dati")
+            
+            users_data = users_response.json()
+            sites_data = sites_response.json()
+        
+        context = {
+            **base_context,
+            "users": users_data.get("users", []),
+            "sites_list": sites_data.get("sites", []),
+            "permission_levels": ["viewer", "editor", "admin"],
+            "permission": None,
+            "action": "create",
+        }
+        
+        return templates.TemplateResponse("admin/permissions_form.html", context)
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+
+@admin_view_router.post("/admin/permissions/new/")
+async def admin_permissions_create(
+    request: Request,
+    auth_data: tuple = Depends(require_superuser)
+):
+    """Crea nuovo permesso utente-sito"""
+    superuser, base_context = auth_data
+    
+    try:
+        # Get form data from request
+        form_data = await request.form()
+        
+        # Prepara i dati per la API v1
+        permission_data = {
+            "user_id": form_data.get("user_id", ""),
+            "site_id": form_data.get("site_id", ""),
+            "permission_level": form_data.get("permission_level", ""),
+            "notes": form_data.get("notes")
+        }
+        
+        # Chiama la API v1 per creare il permesso
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.post(f"{API_V1_BASE_URL}/permissions", json=permission_data)
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna al form con errore
+                context = {
+                    **base_context,
+                    "permission": permission_data,
+                    "action": "create",
+                    "error": response.json().get("detail", "Errore nella creazione del permesso")
+                }
+                return templates.TemplateResponse("admin/permissions_form.html", context)
+        
+        return RedirectResponse(
+            url="/admin/permissions/?success=created",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+
+# Gestione permessi utente nel form di modifica utente
+@admin_view_router.post("/admin/users/{user_id}/permissions/")
+async def admin_user_add_permission(
+    user_id: str,
+    request: Request,
+    auth_data: tuple = Depends(require_superuser)
+):
+    """Aggiungi permesso sito per utente"""
+    superuser, base_context = auth_data
+    
+    try:
+        # Converti user_id da stringa a UUID
+        try:
+            user_uuid = UUID(user_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID utente non valido")
+        
+        # Get form data from request
+        form_data = await request.form()
+        
+        # Prepara i dati per la API v1
+        permission_data = {
+            "site_id": form_data.get("site_id", ""),
+            "permission_level": form_data.get("permission_level", ""),
+            "expires_at": form_data.get("expires_at"),
+            "notes": form_data.get("notes")
+        }
+        
+        # Chiama la API v1 per aggiungere il permesso
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.post(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions", json=permission_data)
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_added",
+            status_code=303
+        )
+        
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request error: {e}")
+        raise HTTPException(status_code=500, detail="Errore di connessione al servizio API")
+
+@admin_view_router.post("/admin/users/{user_id}/permissions/{permission_id}/delete/")
+async def admin_user_remove_permission(
+    user_id: str,
+    permission_id: str,
+    request: Request,
+    auth_data: tuple = Depends(require_superuser)
+):
+    """Rimuovi permesso sito da utente"""
+    superuser, base_context = auth_data
+    
+    try:
+        # Converti IDs da stringa a UUID
+        try:
+            user_uuid = UUID(user_id)
+            permission_uuid = UUID(permission_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="ID non valido")
+        
+        # Chiama la API v1 per rimuovere il permesso
+        cookies = {}
+        for cookie_name, cookie_value in request.cookies.items():
+            cookies[cookie_name] = cookie_value
+        
+        async with httpx.AsyncClient(cookies=cookies) as client:
+            response = await client.delete(f"{API_V1_BASE_URL}/users/{user_uuid}/permissions/{permission_uuid}")
+            
+            if response.status_code != 200:
+                logger.error(f"API v1 error: {response.status_code} - {response.text}")
+                # Torna alla pagina utente con errore
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit/?error=permission_remove_failed",
+                    status_code=303
+                )
+        
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit/?success=permission_removed",
+            status_code=303
+        )
         
     except httpx.RequestError as e:
         logger.error(f"HTTP request error: {e}")

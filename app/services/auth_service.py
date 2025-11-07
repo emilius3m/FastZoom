@@ -83,6 +83,11 @@ class AuthService:
                 logger.error(f"🐛 [DEBUG] Invalid user_id provided: {user_id}")
                 return []
             
+            # 🔧 FIX: Ensure we're in proper async context
+            if not hasattr(db, 'execute'):
+                logger.error(f"🐛 [DEBUG] Invalid database session provided: {db}")
+                return []
+            
             # Prima verifica se è superuser
             logger.info(f"🐛 [DEBUG] Checking if user {user_id} is superuser...")
             
@@ -210,28 +215,34 @@ class AuthService:
         Returns:
             Lista di tutti i siti attivi con permesso REGIONAL_ADMIN
         """
-        query = select(
-            ArchaeologicalSite.id,
-            ArchaeologicalSite.name,
-            ArchaeologicalSite.code,
-            ArchaeologicalSite.municipality,
-        ).where(
-            ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value  # 🔥 FIX: Use .value to get string value
-        ).order_by(ArchaeologicalSite.name)
-        
-        result = await db.execute(query)
-        sites_data = []
-        
-        for row in result:
-            sites_data.append({
-                "id": str(row.id),
-                "name": row.name,
-                "code": row.code,
-                "location": row.municipality or "",
-                "permission_level": "regional_admin"  # Massimo livello per superadmin
-            })
-        
-        return sites_data
+        try:
+            query = select(
+                ArchaeologicalSite.id,
+                ArchaeologicalSite.name,
+                ArchaeologicalSite.code,
+                ArchaeologicalSite.municipality,
+            ).where(
+                ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value  # 🔥 FIX: Use .value to get string value
+            ).order_by(ArchaeologicalSite.name)
+            
+            result = await db.execute(query)
+            sites_data = []
+            
+            for row in result:
+                sites_data.append({
+                    "id": str(row.id),
+                    "name": row.name,
+                    "code": row.code,
+                    "location": row.municipality or "",
+                    "permission_level": "regional_admin"  # Massimo livello per superadmin
+                })
+            
+            return sites_data
+        except Exception as e:
+            logger.error(f"Error in get_all_sites_for_superuser: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return []
 
     @staticmethod
     async def create_login_response(
