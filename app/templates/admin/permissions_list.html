@@ -49,18 +49,18 @@
                            </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                           {% for permission, user, site in permissions %}
+                           {% for permission in permissions %}
                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                               <td class="whitespace-nowrap py-5 pl-4 pr-3 text-sm sm:pl-0">
                                  <div class="flex items-center">
                                     <div class="h-11 w-11 flex-shrink-0">
                                        <div class="h-11 w-11 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-                                          <span class="text-sm font-medium text-white">{{ user.email[0].upper() }}</span>
+                                          <span class="text-sm font-medium text-white">{{ permission.user_email[0].upper() }}</span>
                                        </div>
                                     </div>
                                     <div class="ml-4">
-                                       <div class="font-medium text-gray-900 dark:text-white">{{ user.email }}</div>
-                                       {% if user.is_superuser %}
+                                       <div class="font-medium text-gray-900 dark:text-white">{{ permission.user_email }}</div>
+                                       {% if permission.user_is_superuser %}
                                           <div class="text-purple-600 text-xs"><i class="fas fa-crown me-1"></i>Superadmin</div>
                                        {% endif %}
                                     </div>
@@ -68,12 +68,12 @@
                               </td>
                               <td class="px-3 py-5 text-sm text-gray-500 dark:text-gray-400">
                                  <div>
-                                    <div class="font-medium text-gray-900 dark:text-white">{{ site.name }}</div>
-                                    <div class="text-gray-500 dark:text-gray-400">{{ site.code }}</div>
+                                    <div class="font-medium text-gray-900 dark:text-white">{{ permission.site_name }}</div>
+                                    <div class="text-gray-500 dark:text-gray-400">{{ permission.site_code or '-' }}</div>
                                  </div>
                               </td>
                               <td class="whitespace-nowrap px-3 py-5 text-sm text-gray-500 dark:text-gray-400">
-                                 {% set level = permission.permission_level.value %}
+                                 {% set level = permission.permission_level %}
                                  {% if level == 'regional_admin' %}
                                     <span class="inline-flex items-center rounded-full bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-600/20 dark:bg-purple-900/50 dark:text-purple-400">
                                        <i class="fas fa-crown me-1"></i>Regional Admin

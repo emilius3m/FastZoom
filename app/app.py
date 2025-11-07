@@ -166,9 +166,8 @@ app.include_router(
 
 
 from app.core.middleware import (
-    RequestLoggingMiddleware,
-    AuditMiddleware,
-    PerformanceMonitoringMiddleware,
+    UnifiedLoggingMiddleware,
+    AuditMiddleware,setup_middleware, create_health_check_endpoint,
     SecurityHeadersMiddleware
 )
 # 📊 NUOVO IMPORT - Performance Tracking Middleware
@@ -181,9 +180,8 @@ from app.middleware.performance_tracking_middleware import (
 from app.middleware.queue_middleware import QueueMiddleware, QueueStatusMiddleware, register_queue_handlers
 
 # Aggiungi middleware all'app
-app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(UnifiedLoggingMiddleware)
 app.add_middleware(AuditMiddleware)
-app.add_middleware(PerformanceMonitoringMiddleware)
 # 📊 NUOVO: Aggiungi Performance Tracking Middleware
 app.add_middleware(RequestCountMiddleware)
 app.add_middleware(PerformanceTrackingMiddleware)
@@ -224,6 +222,23 @@ if settings.queue_enabled:
     logger.info("Queue middleware enabled")
 
 
+# Setup tutti i middleware in una riga
+setup_middleware(app, {
+    'enable_rate_limit': True,
+    'requests_per_minute': 100,
+    'enable_audit': True,
+    'enable_cors': True,
+    'cors_origins': ["http://localhost:3000", "http://localhost:8000"],
+    'slow_threshold': 2.0,
+    'strict_csp': False
+})
+
+# Aggiungi health check endpoint
+@app.get("/health")
+async def health_check():
+    return create_health_check_endpoint(
+        logging_middleware=app.state.logging_middleware
+    )()
 
 from app.routes.photo_metadata import router as photo_metadata_router
 

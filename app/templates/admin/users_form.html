@@ -242,14 +242,14 @@
                     {% endif %}
 
                     <!-- Add Permission Form -->
-                    <div class="border-t border-gray-200 dark:border-gray-70 pt-4">
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
                         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-3">Aggiungi Permesso</h4>
                         
                         <form @submit.prevent="addPermission" class="space-y-3">
                             <div>
                                 <select x-model="newPermission.site_id"
                                         required
-                                        class="bg-gray-50 dark:bg-gray-700 border border-gray-30 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                        class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                                     <option value="" class="dark:bg-gray-700 dark:text-white">Seleziona sito...</option>
                                     {% for site in available_sites %}
                                     <option value="{{ site.id }}" class="dark:bg-gray-700 dark:text-white">{{ site.name }}</option>
@@ -260,7 +260,7 @@
                             <div>
                                 <select x-model="newPermission.permission_level"
                                         required
-                                        class="bg-gray-50 dark:bg-gray-700 border border-gray-30 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                        class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                                     <option value="" class="dark:bg-gray-700 dark:text-white">Livello permesso...</option>
                                     <option value="read" class="dark:bg-gray-700 dark:text-white">Visualizzatore</option>
                                     <option value="write" class="dark:bg-gray-700 dark:text-white">Curatore</option>
@@ -272,7 +272,7 @@
                             <div x-show="showExpiryDate">
                                 <input type="datetime-local"
                                        x-model="newPermission.expires_at"
-                                       class="bg-gray-50 dark:bg-gray-700 border border-gray-30 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                                       class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                             </div>
 
                             <div class="flex items-center mb-3">
