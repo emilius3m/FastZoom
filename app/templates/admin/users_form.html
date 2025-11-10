@@ -434,6 +434,11 @@ document.addEventListener('alpine:init', () => {
                 
                 const url = '{{ "/admin/users/" + user_data.id|string + "/edit/" if user_data else "/admin/users/new/" }}';
                 
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh page.');
+                }
+                
                 // FIXED: Using centralized API client with automatic credentials inclusion
                 const response = await api.post(url, submitData);
                 
@@ -469,6 +474,11 @@ document.addEventListener('alpine:init', () => {
                     }
                 });
                 
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh page.');
+                }
+                
                 // FIXED: Using centralized API client with automatic credentials inclusion
                 const response = await api.post(`/api/v1/admin/users/{{ user_data.id }}/permissions/`, permissionData);
                 
@@ -490,6 +500,11 @@ document.addEventListener('alpine:init', () => {
             if (!confirm('Rimuovere questo permesso?')) return;
             
             try {
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh page.');
+                }
+                
                 // FIXED: Using centralized API client with automatic credentials inclusion
                 const response = await api.post(`/api/v1/admin/users/{{ user_data.id }}/permissions/${permissionId}/delete/`);
                 

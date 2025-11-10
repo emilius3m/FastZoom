@@ -3,6 +3,11 @@
 
 {% block title %}{{ 'Modifica' if site else 'Nuovo' }} Sito Archeologico | Sistema Archeologico{% endblock %}
 
+{% block head %}
+<!-- API Client Script -->
+<script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6 mb-6">
     <div class="flex items-center">
@@ -498,11 +503,14 @@
     </div>
 </div>
 
-<!-- API Client Script -->
-<script src="/static/js/api-client.js?v=20251106123000"></script>
-
 <!-- Alpine.js Component Script -->
 <script>
+// Ensure API client is loaded before Alpine.js initializes
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof api === 'undefined') {
+    console.error('API client not loaded');
+  }
+});
 document.addEventListener('alpine:init', () => {
     Alpine.data('siteForm', () => ({
         // Form Data
@@ -652,10 +660,22 @@ document.addEventListener('alpine:init', () => {
                 {% if site %}
                 // Update existing site
                 const url = '/api/v1/admin/sites/{{ site.id }}';
+                
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh the page.');
+                }
+                
                 const response = await api.put(url, submitData);
                 {% else %}
                 // Create new site
                 const url = '/api/v1/admin/sites';
+                
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh the page.');
+                }
+                
                 const response = await api.post(url, submitData);
                 {% endif %}
 
@@ -700,6 +720,11 @@ document.addEventListener('alpine:init', () => {
         {% if site %}
         async exportSiteData() {
             try {
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh the page.');
+                }
+                
                 const response = await api.get('/api/v1/admin/sites/{{ site.id }}');
                 
                 // The API client returns data directly on success

@@ -2,192 +2,360 @@
 
 {% block title %}Gestione Siti Archeologici | Sistema Archeologico{% endblock %}
 
-{% block content %}
-<div class="mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
+{% block head %}
+<!-- API Client Script -->
+<script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
 
-  <!-- Page Header -->
-  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gestione Siti Archeologici</h1>
-          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Amministra i siti del sistema archeologico e i relativi utenti autorizzati
-          </p>
-        </div>
-        <div class="flex items-center space-x-3 mt-4 sm:mt-0">
-          <!-- Export Button -->
-          <button @click="exportSites()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2">
-            <i class="fas fa-download"></i>
-            <span>Esporta CSV</span>
-          </button>
-          <!-- New Site Button -->
-          <a href="/admin/sites/new" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2">
-            <i class="fas fa-plus"></i>
-            <span>Nuovo Sito</span>
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="sitesList()" x-init="init()">
+
+  <!-- Breadcrumb Navigation -->
+  <div class="mb-6">
+    <nav class="flex" aria-label="Breadcrumb">
+      <ol class="inline-flex items-center space-x-1 md:space-x-3">
+        <li class="inline-flex items-center">
+          <a href="/" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white">
+            <i class="fas fa-home mr-2"></i>Home
           </a>
+        </li>
+        <li>
+          <div class="flex items-center">
+            <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+            <a href="/admin" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white">Admin</a>
+          </div>
+        </li>
+        <li aria-current="page">
+          <div class="flex items-center">
+            <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Siti Archeologici</span>
+          </div>
+        </li>
+      </ol>
+    </nav>
+  </div>
+
+  <!-- Header Section -->
+  <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6 mb-6 shadow-lg">
+    <div class="flex items-start justify-between">
+      <div class="flex items-center">
+        <i class="fas fa-landmark text-5xl mr-6"></i>
+        <div>
+          <h1 class="text-4xl font-bold">Gestione Siti Archeologici</h1>
+          <p class="mt-2 text-blue-100">Sistema di gestione completo per i siti del patrimonio culturale</p>
         </div>
+      </div>
+      <div class="text-right">
+        <div class="text-4xl font-bold" x-text="totalSitesCount"></div>
+        <div class="text-blue-100 text-sm">Siti totali</div>
       </div>
     </div>
   </div>
 
-  <!-- Search & Filter Section -->
-  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6 p-4">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ricerca per nome</label>
-        <input type="text" x-model="filters.search" placeholder="Nome o codice sito..." 
-               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+  <!-- Statistics Dashboard -->
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border-l-4 border-blue-500">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 dark:text-gray-400 text-sm font-medium">Totale Siti</p>
+          <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1" x-text="totalSitesCount"></p>
+        </div>
+        <i class="fas fa-landmark text-4xl text-blue-200 dark:text-blue-900"></i>
       </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Regione</label>
-        <input type="text" x-model="filters.region" placeholder="Filtra per regione..." 
-               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border-l-4 border-green-500">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 dark:text-gray-400 text-sm font-medium">Attivi</p>
+          <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1" x-text="activeSitesCount"></p>
+        </div>
+        <i class="fas fa-check-circle text-4xl text-green-200 dark:text-green-900"></i>
       </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border-l-4 border-red-500">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 dark:text-gray-400 text-sm font-medium">Inattivi</p>
+          <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1" x-text="inactiveSitesCount"></p>
+        </div>
+        <i class="fas fa-times-circle text-4xl text-red-200 dark:text-red-900"></i>
+      </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border-l-4 border-purple-500">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 dark:text-gray-400 text-sm font-medium">Pubblici</p>
+          <p class="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1" x-text="publicSitesCount"></p>
+        </div>
+        <i class="fas fa-globe text-4xl text-purple-200 dark:text-purple-900"></i>
+      </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border-l-4 border-orange-500">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-600 dark:text-gray-400 text-sm font-medium">Foto Totali</p>
+          <p class="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1" x-text="totalPhotosCount"></p>
+        </div>
+        <i class="fas fa-image text-4xl text-orange-200 dark:text-orange-900"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="flex flex-wrap gap-3 mb-6">
+    <a href="/admin/sites/new" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition">
+      <i class="fas fa-plus mr-2"></i>Nuovo Sito
+    </a>
+    <button @click="exportSites()" :disabled="isLoading" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition disabled:opacity-50">
+      <i :class="isExporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'" class="mr-2"></i>
+      <span x-text="isExporting ? 'Esportazione...' : 'Esporta CSV'"></span>
+    </button>
+    <button @click="refreshSites()" :disabled="isLoading" class="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition disabled:opacity-50">
+      <i :class="isLoading ? 'fas fa-spinner fa-spin' : 'fas fa-sync'" class="mr-2"></i>Aggiorna
+    </button>
+  </div>
+
+  <!-- Search and Filter Section -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6 mb-6">
+    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Filtri e Ricerca</h3>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <!-- Search Input -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stato</label>
-        <select x-model="filters.status" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ricerca Nome/Codice</label>
+        <div class="relative">
+          <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+          <input type="text" x-model="searchTerm" @input="applyFilters()" 
+                 placeholder="Digita nome o codice..."
+                 class="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <!-- Region Filter -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Regione</label>
+        <select x-model="selectedRegion" @change="applyFilters()"
+                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Tutte le regioni</option>
+          <template x-for="region in availableRegions" :key="region">
+            <option :value="region" x-text="region"></option>
+          </template>
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stato</label>
+        <select x-model="selectedStatus" @change="applyFilters()"
+                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">Tutti gli stati</option>
           <option value="active">Attivi</option>
           <option value="inactive">Inattivi</option>
+          <option value="public">Pubblici</option>
+          <option value="private">Privati</option>
+        </select>
+      </div>
+
+      <!-- Sort By -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ordina per</label>
+        <select x-model="orderBy" @change="applyFilters()"
+                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="name_asc">Nome (A-Z)</option>
+          <option value="name_desc">Nome (Z-A)</option>
+          <option value="created_desc">Più Recenti</option>
+          <option value="photos_desc">Più Foto</option>
+          <option value="users_desc">Più Utenti</option>
         </select>
       </div>
     </div>
-    <div class="flex justify-between mt-4">
-      <button @click="filterSites()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+
+    <!-- Filter Controls -->
+    <div class="flex flex-wrap gap-2 items-center">
+      <button @click="applyFilters()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition">
         <i class="fas fa-filter mr-2"></i>Applica Filtri
       </button>
-      <button @click="resetFilters()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm">
-        Ripristina
+      <button @click="resetFilters()" class="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg font-medium transition">
+        <i class="fas fa-redo mr-2"></i>Ripristina
       </button>
+      <div class="text-sm text-gray-600 dark:text-gray-300 ml-auto">
+        <i class="fas fa-info-circle mr-2"></i>
+        <span x-text="`${filteredSites.length} risultato${filteredSites.length !== 1 ? 'i' : ''}`"></span>
+      </div>
     </div>
   </div>
 
-  <!-- Error Message -->
-  <div x-show="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 flex justify-between items-center">
-    <div>
-      <p class="font-bold">Errore</p>
-      <p x-text="error"></p>
+  <!-- Alert Messages -->
+  <div x-show="alertMessage" x-transition class="mb-6 p-4 rounded-lg border" 
+       :class="alertType === 'success' ? 'bg-green-100 border-green-400 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-200' : 'bg-red-100 border-red-400 text-red-700 dark:bg-red-900/30 dark:border-red-700 dark:text-red-200'">
+    <div class="flex justify-between items-center">
+      <div class="flex items-center">
+        <i :class="alertType === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'" class="mr-2"></i>
+        <span x-text="alertMessage"></span>
+      </div>
+      <button @click="alertMessage = ''" class="text-lg">&times;</button>
     </div>
-    <button @click="error = null" class="text-red-700 hover:text-red-900 text-lg">&times;</button>
-  </div>
-
-  <!-- Success Message -->
-  <div x-show="success" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-6 flex justify-between items-center">
-    <div>
-      <p class="font-bold">Successo</p>
-      <p x-text="success"></p>
-    </div>
-    <button @click="success = null" class="text-green-700 hover:text-green-900 text-lg">&times;</button>
   </div>
 
   <!-- Loading State -->
-  <div x-show="loading" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 text-center">
-    <div class="inline-block">
-      <svg class="animate-spin h-12 w-12 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-    </div>
-    <p class="text-gray-600 dark:text-gray-400">Caricamento siti...</p>
+  <div x-show="isLoading" class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-12 text-center">
+    <svg class="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    <p class="text-gray-600 dark:text-gray-400 font-medium">Caricamento siti...</p>
   </div>
 
-  <!-- Sites Table -->
-  <div x-show="!loading && filteredSites.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+  <!-- Table Section -->
+  <div x-show="!isLoading && paginatedSites.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full">
-        <thead class="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+        <thead class="bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600">
           <tr>
-            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Sito</th>
-            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Codice</th>
-            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Ubicazione</th>
-            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Regione</th>
-            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Stato</th>
-            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Utenti</th>
-            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Foto</th>
-            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Azioni</th>
+            <th class="px-6 py-4 text-left">
+              <button @click="setSortBy('name')" class="flex items-center font-semibold text-gray-900 dark:text-white hover:text-blue-600">
+                Sito
+                <i :class="orderBy === 'name_asc' ? 'fas fa-arrow-up' : orderBy === 'name_desc' ? 'fas fa-arrow-down' : 'fas fa-sort'" class="ml-2 text-xs" x-show="orderBy.startsWith('name') || orderBy === 'name_asc'"></i>
+              </button>
+            </th>
+            <th class="px-6 py-4 text-left">
+              <button @click="setSortBy('code')" class="flex items-center font-semibold text-gray-900 dark:text-white hover:text-blue-600">
+                Codice
+                <i :class="orderBy === 'code_asc' ? 'fas fa-arrow-up' : orderBy === 'code_desc' ? 'fas fa-arrow-down' : 'fas fa-sort'" class="ml-2 text-xs" x-show="orderBy.startsWith('code')"></i>
+              </button>
+            </th>
+            <th class="px-6 py-4 text-left">Ubicazione</th>
+            <th class="px-6 py-4 text-left">Regione</th>
+            <th class="px-6 py-4 text-left">Stato</th>
+            <th class="px-6 py-4 text-center">
+              <button @click="setSortBy('users')" class="flex items-center justify-center font-semibold text-gray-900 dark:text-white hover:text-blue-600 w-full">
+                Utenti
+                <i :class="orderBy === 'users_asc' ? 'fas fa-arrow-up' : orderBy === 'users_desc' ? 'fas fa-arrow-down' : 'fas fa-sort'" class="ml-2 text-xs" x-show="orderBy.startsWith('users')"></i>
+              </button>
+            </th>
+            <th class="px-6 py-4 text-center">
+              <button @click="setSortBy('photos')" class="flex items-center justify-center font-semibold text-gray-900 dark:text-white hover:text-blue-600 w-full">
+                Foto
+                <i :class="orderBy === 'photos_asc' ? 'fas fa-arrow-up' : orderBy === 'photos_desc' ? 'fas fa-arrow-down' : 'fas fa-sort'" class="ml-2 text-xs" x-show="orderBy.startsWith('photos')"></i>
+              </button>
+            </th>
+            <th class="px-6 py-4 text-left">Azioni</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-          <template x-for="site in filteredSites" :key="site.id">
-            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-              <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                <div class="font-medium" x-text="site.name"></div>
-                <div class="text-xs text-gray-500 dark:text-gray-400" x-show="site.description" x-text="site.description.substring(0, 50) + (site.description.length > 50 ? '...' : '')"></div>
+          <template x-for="site in paginatedSites" :key="site.id">
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+              <td class="px-6 py-4">
+                <div class="font-medium text-gray-900 dark:text-white" x-text="site.name"></div>
+                <div x-show="site.description" class="text-xs text-gray-500 dark:text-gray-400 truncate" :title="site.description" x-text="site.description"></div>
               </td>
-              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" x-text="site.code"></code>
+              <td class="px-6 py-4">
+                <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs font-mono text-gray-900 dark:text-white" x-text="site.code"></code>
               </td>
-              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300" x-text="site.location || '-'"></td>
-              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300" x-text="site.region || '-'"></td>
-              <td class="px-6 py-4 text-sm">
-                <span :class="site.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'" class="px-3 py-1 rounded-full text-xs font-medium">
-                  <i :class="site.is_active ? 'fas fa-check-circle mr-1' : 'fas fa-times-circle mr-1'"></i>
-                  <span x-text="site.is_active ? 'Attivo' : 'Inattivo'"></span>
-                </span>
+              <td class="px-6 py-4 text-gray-700 dark:text-gray-300" x-text="site.location || '-'"></td>
+              <td class="px-6 py-4 text-gray-700 dark:text-gray-300" x-text="site.region || '-'"></td>
+              <td class="px-6 py-4">
+                <div class="flex flex-wrap gap-1">
+                  <span x-show="site.is_active" class="inline-block px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 rounded text-xs font-medium">
+                    <i class="fas fa-check-circle mr-1"></i>Attivo
+                  </span>
+                  <span x-show="!site.is_active" class="inline-block px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 rounded text-xs font-medium">
+                    <i class="fas fa-times-circle mr-1"></i>Inattivo
+                  </span>
+                  <span x-show="site.is_public" class="inline-block px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 rounded text-xs font-medium">
+                    <i class="fas fa-globe mr-1"></i>Pubblico
+                  </span>
+                </div>
               </td>
-              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 text-center">
-                <span class="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium" x-text="site.users_count || 0"></span>
+              <td class="px-6 py-4 text-center">
+                <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 rounded-full font-bold text-sm" x-text="site.users_count || 0"></span>
               </td>
-              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 text-center">
-                <span class="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 px-2 py-1 rounded text-xs font-medium" x-text="site.photos_count || 0"></span>
+              <td class="px-6 py-4 text-center">
+                <span class="inline-block px-3 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200 rounded-full font-bold text-sm" x-text="site.photos_count || 0"></span>
               </td>
-              <td class="px-6 py-4 text-sm space-x-2 flex flex-wrap gap-2">
-                <!-- View Users -->
-                <a :href="`/admin/sites/${site.id}/users`" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
-                  <i class="fas fa-users mr-1"></i>Utenti
-                </a>
-                <!-- Edit -->
-                <a :href="`/admin/sites/${site.id}/edit`" class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
-                  <i class="fas fa-edit mr-1"></i>Modifica
-                </a>
-                <!-- Toggle Status -->
-                <button @click="toggleStatus(site.id)" :class="site.is_active ? 'text-orange-600 dark:text-orange-400 hover:text-orange-800' : 'text-green-600 dark:text-green-400 hover:text-green-800'" class="text-xs bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded">
-                  <i :class="site.is_active ? 'fas fa-ban' : 'fas fa-check'" class="mr-1"></i>
-                  <span x-text="site.is_active ? 'Disattiva' : 'Attiva'"></span>
-                </button>
-                <!-- Delete -->
-                <button @click="confirmDelete(site.id)" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
-                  <i class="fas fa-trash mr-1"></i>Elimina
-                </button>
+              <td class="px-6 py-4">
+                <div class="flex gap-1 flex-wrap">
+                  <a :href="`/admin/sites/${site.id}/users`" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded transition" title="Gestisci utenti">
+                    <i class="fas fa-users mr-1"></i>Utenti
+                  </a>
+                  <a :href="`/admin/sites/${site.id}/edit`" class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded transition" title="Modifica sito">
+                    <i class="fas fa-edit mr-1"></i>Modifica
+                  </a>
+                  <button @click="toggleStatus(site.id)" :title="site.is_active ? 'Disattiva' : 'Attiva'" :class="site.is_active ? 'text-orange-600 dark:text-orange-400 hover:text-orange-800' : 'text-green-600 dark:text-green-400 hover:text-green-800'" class="text-xs bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded transition">
+                    <i :class="site.is_active ? 'fas fa-ban' : 'fas fa-check'" class="mr-1"></i>
+                    <span x-text="site.is_active ? 'Disattiva' : 'Attiva'"></span>
+                  </button>
+                  <button @click="confirmDelete(site.id)" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded transition" title="Elimina sito">
+                    <i class="fas fa-trash mr-1"></i>Elimina
+                  </button>
+                </div>
               </td>
             </tr>
           </template>
         </tbody>
       </table>
     </div>
-    
+
     <!-- Pagination -->
-    <div class="bg-gray-50 dark:bg-gray-700 px-6 py-3 border-t border-gray-200 dark:border-gray-600 flex justify-between items-center">
+    <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600 flex flex-col md:flex-row justify-between items-center gap-4">
       <div class="text-sm text-gray-600 dark:text-gray-300">
-        Mostra da <span x-text="(currentPage - 1) * itemsPerPage + 1"></span> 
-        a <span x-text="Math.min(currentPage * itemsPerPage, filteredSites.length)"></span> 
-        di <span x-text="filteredSites.length"></span> risultati
+        Mostra da <strong x-text="(currentPage - 1) * itemsPerPage + 1"></strong> 
+        a <strong x-text="Math.min(currentPage * itemsPerPage, filteredSites.length)"></strong> 
+        di <strong x-text="filteredSites.length"></strong> risultati
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <select x-model="itemsPerPage" @change="currentPage = 1; applyFilters()" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+          <option value="10">10 per pagina</option>
+          <option value="25">25 per pagina</option>
+          <option value="50">50 per pagina</option>
+          <option value="100">100 per pagina</option>
+        </select>
+      </div>
+
+      <div class="flex gap-1">
+        <button @click="previousPage()" :disabled="currentPage === 1" class="px-3 py-1 bg-gray-300 dark:bg-gray-600 text-gray-900 dark:text-white rounded disabled:opacity-50 hover:bg-gray-400 dark:hover:bg-gray-500 transition">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        
+        <template x-for="page in pageNumbers" :key="page">
+          <button x-show="page !== '...'" @click="goToPage(page)" :class="page === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-300 dark:bg-gray-600 text-gray-900 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-500'" class="w-8 h-8 rounded text-sm transition" x-text="page"></button>
+          <span x-show="page === '...'" class="px-2 text-gray-600 dark:text-gray-300">...</span>
+        </template>
+
+        <button @click="nextPage()" :disabled="currentPage === totalPages" class="px-3 py-1 bg-gray-300 dark:bg-gray-600 text-gray-900 dark:text-white rounded disabled:opacity-50 hover:bg-gray-400 dark:hover:bg-gray-500 transition">
+          <i class="fas fa-chevron-right"></i>
+        </button>
       </div>
     </div>
   </div>
 
   <!-- Empty State -->
-  <div x-show="!loading && filteredSites.length === 0 && sites.length === 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+  <div x-show="!isLoading && filteredSites.length === 0 && sites.length === 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-12 text-center">
     <div class="mb-4">
-      <i class="fas fa-inbox text-6xl text-gray-400"></i>
+      <i class="fas fa-inbox text-6xl text-gray-300 dark:text-gray-600"></i>
     </div>
-    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Nessun sito trovato</h3>
-    <p class="text-gray-600 dark:text-gray-400 mb-6">Non ci sono ancora siti archeologici nel sistema.</p>
-    <a href="/admin/sites/new" class="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg">
+    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nessun sito trovato</h3>
+    <p class="text-gray-600 dark:text-gray-400 mb-6">Non ci sono ancora siti archeologici nel sistema. Inizia creando il primo sito!</p>
+    <a href="/admin/sites/new" class="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition">
       <i class="fas fa-plus"></i>
       <span>Crea il primo sito</span>
     </a>
   </div>
 
-  <!-- No Results State (after filtering) -->
-  <div x-show="!loading && filteredSites.length === 0 && sites.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+  <!-- No Results State -->
+  <div x-show="!isLoading && filteredSites.length === 0 && sites.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-12 text-center">
     <div class="mb-4">
-      <i class="fas fa-search text-6xl text-gray-400"></i>
+      <i class="fas fa-search text-6xl text-gray-300 dark:text-gray-600"></i>
     </div>
-    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Nessun risultato</h3>
+    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Nessun risultato</h3>
     <p class="text-gray-600 dark:text-gray-400 mb-6">Prova a modificare i filtri di ricerca.</p>
-    <button @click="resetFilters()" class="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg">
+    <button @click="resetFilters()" class="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition">
       <i class="fas fa-redo"></i>
       <span>Ripristina filtri</span>
     </button>
@@ -195,150 +363,300 @@
 </div>
 
 <!-- Delete Confirmation Modal -->
-<div x-show="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showDeleteModal = false">
-  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full mx-4">
+<div x-show="showDeleteModal" x-transition class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="showDeleteModal = false">
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+    <!-- Modal Header -->
     <div class="bg-red-50 dark:bg-red-900/30 px-6 py-4 border-b border-red-200 dark:border-red-800">
       <h3 class="text-lg font-bold text-red-900 dark:text-red-100">
-        <i class="fas fa-exclamation-triangle mr-2"></i>Eliminazione Pericolosa
+        <i class="fas fa-exclamation-triangle mr-2"></i>Eliminazione Permanente
       </h3>
     </div>
-    
-    <div class="px-6 py-4">
-      <p class="text-gray-700 dark:text-gray-300 mb-4">
-        L'eliminazione del sito <strong x-text="deleteTarget.name"></strong> comporterà la perdita permanente di tutti questi dati:
+
+    <!-- Modal Body -->
+    <div class="px-6 py-4 space-y-4">
+      <p class="text-gray-700 dark:text-gray-300">
+        L'eliminazione del sito <strong class="text-red-600 dark:text-red-400" x-text="deleteTarget.name"></strong> comporterà la perdita permanente di tutti questi dati!
       </p>
-      <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 mb-6">
-        <li><span x-text="deleteTarget.users_count || 0"></span> permessi utente</li>
-        <li><span x-text="deleteTarget.photos_count || 0"></span> foto e metadati</li>
+      
+      <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
+        <li><strong x-text="deleteTarget.users_count || 0"></strong> permessi utente</li>
+        <li><strong x-text="deleteTarget.photos_count || 0"></strong> foto e metadati</li>
         <li>Tutta la documentazione archeologica</li>
       </ul>
-      
-      <div class="mb-4">
+
+      <div>
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Inserisci la tua password di amministratore per confermare:
+          Per procedere con l'eliminazione, inserisci la tua password di amministratore:
         </label>
-        <input type="password" x-model="deletePassword" placeholder="Password..." @keyup.enter="executeDelete()"
-               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+        <input type="password" x-model="deletePassword" placeholder="Password..." @keyup.enter="executeDelete()" 
+               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500">
       </div>
-      
-      <label class="flex items-center">
-        <input type="checkbox" x-model="deleteConfirmed" class="w-4 h-4 text-red-600">
-        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">
-          Sono consapevole che questa azione non può essere annullata.
+
+      <label class="flex items-center space-x-2">
+        <input type="checkbox" x-model="deleteConfirmed" class="w-4 h-4 text-red-600 rounded">
+        <span class="text-sm text-gray-700 dark:text-gray-300">
+          Sono consapevole che questa azione <strong>NON può essere annullata</strong>.
         </span>
       </label>
     </div>
-    
-    <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-end space-x-3">
+
+    <!-- Modal Footer -->
+    <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600 flex justify-end gap-2">
       <button @click="showDeleteModal = false; deletePassword = ''; deleteConfirmed = false" 
-              class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg">
+              class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg font-medium transition">
         Annulla
       </button>
-      <button @click="executeDelete()" :disabled="!deletePassword || !deleteConfirmed || deleting" 
-              :class="deleting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-700'"
-              class="px-4 py-2 bg-red-600 text-white rounded-lg transition">
-        <i :class="deleting ? 'fas fa-spinner fa-spin' : 'fas fa-trash'" class="mr-2"></i>
-        <span x-text="deleting ? 'Eliminazione...' : 'Elimina permanentemente'"></span>
+      <button @click="executeDelete()" :disabled="!deletePassword || !deleteConfirmed || isDeleting" 
+              :class="isDeleting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-700'"
+              class="px-4 py-2 bg-red-600 text-white rounded-lg font-medium transition">
+        <i :class="isDeleting ? 'fas fa-spinner fa-spin' : 'fas fa-trash'" class="mr-2"></i>
+        <span x-text="isDeleting ? 'Eliminazione...' : 'Elimina permanentemente'"></span>
       </button>
     </div>
   </div>
 </div>
 
 <script>
+// Ensure API client is loaded before Alpine.js initializes
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof api === 'undefined') {
+    console.error('API client not loaded');
+  }
+});
+
 document.addEventListener('alpine:init', () => {
   Alpine.data('sitesList', () => ({
+    // Data
     sites: [],
     filteredSites: [],
-    loading: false,
-    error: null,
-    success: null,
     
-    // Filters
-    filters: {
-      search: '',
-      region: '',
-      status: ''
-    },
+    // UI State
+    isLoading: false,
+    isExporting: false,
+    isDeleting: false,
+    alertMessage: '',
+    alertType: 'success',
+    
+    // Search & Filters
+    searchTerm: '',
+    selectedRegion: '',
+    selectedStatus: '',
+    orderBy: 'name_asc',
     
     // Pagination
     currentPage: 1,
     itemsPerPage: 25,
     
-    // Delete modal
+    // Delete Modal
     showDeleteModal: false,
     deleteTarget: { name: '', id: '', users_count: 0, photos_count: 0 },
     deletePassword: '',
     deleteConfirmed: false,
-    deleting: false,
-    
-    // Load sites on component init
+
+    // Computed Properties
+    get availableRegions() {
+      const regions = new Set();
+      this.sites.forEach(site => {
+        if (site.region) regions.add(site.region);
+      });
+      return Array.from(regions).sort();
+    },
+
+    get totalSitesCount() {
+      return this.sites.length;
+    },
+
+    get activeSitesCount() {
+      return this.sites.filter(s => s.is_active).length;
+    },
+
+    get inactiveSitesCount() {
+      return this.sites.filter(s => !s.is_active).length;
+    },
+
+    get publicSitesCount() {
+      return this.sites.filter(s => s.is_public).length;
+    },
+
+    get totalPhotosCount() {
+      return this.sites.reduce((sum, s) => sum + (s.photos_count || 0), 0);
+    },
+
+    get totalPages() {
+      return Math.ceil(this.filteredSites.length / parseInt(this.itemsPerPage));
+    },
+
+    get paginatedSites() {
+      const start = (this.currentPage - 1) * parseInt(this.itemsPerPage);
+      const end = start + parseInt(this.itemsPerPage);
+      return this.filteredSites.slice(start, end);
+    },
+
+    get pageNumbers() {
+      const pages = [];
+      const start = Math.max(1, this.currentPage - 2);
+      const end = Math.min(this.totalPages, this.currentPage + 2);
+      
+      if (start > 1) {
+        pages.push(1);
+        if (start > 2) pages.push('...');
+      }
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      if (end < this.totalPages) {
+        if (end < this.totalPages - 1) pages.push('...');
+        pages.push(this.totalPages);
+      }
+      
+      return pages;
+    },
+
+    // Methods
     async init() {
+      // Wait a bit to ensure API client is fully loaded
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Check if API is available
+      if (typeof api === 'undefined') {
+        this.alertMessage = 'API client not loaded. Please refresh the page.';
+        this.alertType = 'error';
+        console.error('API client not available');
+        return;
+      }
+      
       await this.loadSites();
     },
-    
-    // Load all sites via API
+
     async loadSites() {
-      this.loading = true;
-      this.error = null;
+      this.isLoading = true;
+      this.alertMessage = '';
       
       try {
+        // Ensure api is available
+        if (typeof api === 'undefined') {
+          throw new Error('API client not loaded. Please refresh the page.');
+        }
+        
         const response = await api.get('/api/v1/admin/sites');
         this.sites = response.sites || [];
-        this.filteredSites = [...this.sites];
+        this.applyFilters();
       } catch (error) {
-        this.error = error.message || 'Errore nel caricamento dei siti';
+        this.alertMessage = error.message || 'Errore nel caricamento dei siti';
+        this.alertType = 'error';
         console.error('Error loading sites:', error);
       } finally {
-        this.loading = false;
+        this.isLoading = false;
       }
     },
-    
-    // Filter sites based on search and filters
-    filterSites() {
+
+    async refreshSites() {
+      await this.loadSites();
+    },
+
+    applyFilters() {
       this.filteredSites = this.sites.filter(site => {
-        const matchSearch = !this.filters.search || 
-          site.name.toLowerCase().includes(this.filters.search.toLowerCase()) ||
-          site.code.toLowerCase().includes(this.filters.search.toLowerCase());
+        const matchSearch = !this.searchTerm || 
+          site.name.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+          (site.code && site.code.toLowerCase().includes(this.searchTerm.toLowerCase()));
         
-        const matchRegion = !this.filters.region || 
-          (site.region && site.region.toLowerCase().includes(this.filters.region.toLowerCase()));
+        const matchRegion = !this.selectedRegion || site.region === this.selectedRegion;
         
-        const matchStatus = !this.filters.status || 
-          (this.filters.status === 'active' ? site.is_active : !site.is_active);
+        let matchStatus = true;
+        if (this.selectedStatus) {
+          if (this.selectedStatus === 'active') matchStatus = site.is_active;
+          else if (this.selectedStatus === 'inactive') matchStatus = !site.is_active;
+          else if (this.selectedStatus === 'public') matchStatus = site.is_public;
+          else if (this.selectedStatus === 'private') matchStatus = !site.is_public;
+        }
         
         return matchSearch && matchRegion && matchStatus;
       });
+
+      this.applySorting();
+      this.currentPage = 1;
+    },
+
+    applySorting() {
+      const [field, direction] = this.orderBy.split('_');
       
-      this.currentPage = 1;
+      this.filteredSites.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(field) {
+          case 'name':
+            aVal = (a.name || '').toLowerCase();
+            bVal = (b.name || '').toLowerCase();
+            return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+          case 'code':
+            aVal = (a.code || '').toLowerCase();
+            bVal = (b.code || '').toLowerCase();
+            return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+          case 'location':
+            aVal = (a.location || '').toLowerCase();
+            bVal = (b.location || '').toLowerCase();
+            return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+          case 'users':
+            aVal = a.users_count || 0;
+            bVal = b.users_count || 0;
+            return direction === 'asc' ? aVal - bVal : bVal - aVal;
+          case 'photos':
+            aVal = a.photos_count || 0;
+            bVal = b.photos_count || 0;
+            return direction === 'asc' ? aVal - bVal : bVal - aVal;
+          case 'created':
+            aVal = new Date(a.created_at || 0);
+            bVal = new Date(b.created_at || 0);
+            return direction === 'asc' ? aVal - bVal : bVal - aVal;
+          default:
+            return 0;
+        }
+      });
     },
-    
-    // Reset all filters
+
+    setSortBy(field) {
+      const [currentField, currentDir] = this.orderBy.split('_');
+      
+      if (currentField === field) {
+        this.orderBy = field + '_' + (currentDir === 'asc' ? 'desc' : 'asc');
+      } else {
+        this.orderBy = field + '_asc';
+      }
+      
+      this.applySorting();
+    },
+
     resetFilters() {
-      this.filters = { search: '', region: '', status: '' };
-      this.filteredSites = [...this.sites];
+      this.searchTerm = '';
+      this.selectedRegion = '';
+      this.selectedStatus = '';
+      this.orderBy = 'name_asc';
       this.currentPage = 1;
+      this.applyFilters();
     },
-    
-    // Toggle site status (active/inactive)
+
     async toggleStatus(siteId) {
       try {
-        const response = await api.post(`/api/v1/admin/sites/${siteId}/toggle-status`);
+        // Ensure api is available
+        if (typeof api === 'undefined') {
+          throw new Error('API client not loaded. Please refresh the page.');
+        }
         
-        // Update local site
+        const response = await api.post(`/api/v1/admin/sites/${encodeURIComponent(siteId)}/toggle-status`);
         const site = this.sites.find(s => s.id === siteId);
         if (site) {
           site.is_active = !site.is_active;
-          this.filterSites();
+          this.applyFilters();
         }
-        
-        this.success = response.message || 'Stato aggiornato con successo';
-        setTimeout(() => this.success = null, 3000);
+        this.alertMessage = response.message || 'Stato aggiornato con successo';
+        this.alertType = 'success';
+        setTimeout(() => this.alertMessage = '', 3000);
       } catch (error) {
-        this.error = error.message || 'Errore nell\'aggiornamento dello stato';
+        this.alertMessage = error.message || 'Errore nell\'aggiornamento dello stato';
+        this.alertType = 'error';
       }
     },
-    
-    // Confirm delete
+
     confirmDelete(siteId) {
       const site = this.sites.find(s => s.id === siteId);
       if (site) {
@@ -348,67 +666,75 @@ document.addEventListener('alpine:init', () => {
         this.showDeleteModal = true;
       }
     },
-    
-    // Execute deletion
+
     async executeDelete() {
       if (!this.deletePassword || !this.deleteConfirmed) {
-        this.error = 'Completa tutti i campi obbligatori';
+        this.alertMessage = 'Completa tutti i campi obbligatori';
+        this.alertType = 'error';
         return;
       }
       
-      this.deleting = true;
-      this.error = null;
+      this.isDeleting = true;
       
       try {
-        const response = await api.delete(`/api/v1/admin/sites/${this.deleteTarget.id}`, {
+        // Ensure api is available
+        if (typeof api === 'undefined') {
+          throw new Error('API client not loaded. Please refresh the page.');
+        }
+        
+        const response = await api.delete(`/api/v1/admin/sites/${encodeURIComponent(this.deleteTarget.id)}`, {
           data: {
             admin_password: this.deletePassword,
             confirm_delete: true
           }
         });
         
-        // Remove site from list
         this.sites = this.sites.filter(s => s.id !== this.deleteTarget.id);
-        this.filterSites();
+        this.applyFilters();
         
         this.showDeleteModal = false;
-        this.success = response.message || 'Sito eliminato definitivamente';
-        setTimeout(() => this.success = null, 3000);
+        this.alertMessage = response.message || 'Sito eliminato definitivamente';
+        this.alertType = 'success';
+        setTimeout(() => this.alertMessage = '', 3000);
       } catch (error) {
-        this.error = error.message || 'Errore nell\'eliminazione del sito';
+        this.alertMessage = error.message || 'Errore nell\'eliminazione del sito';
+        this.alertType = 'error';
       } finally {
-        this.deleting = false;
+        this.isDeleting = false;
       }
     },
-    
-    // Export sites to CSV
+
     async exportSites() {
+      this.isExporting = true;
       try {
         const csv = this.generateCSV();
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `siti_archeologici_${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `siti_archeologici_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         
-        this.success = 'Esportazione completata';
-        setTimeout(() => this.success = null, 3000);
+        this.alertMessage = 'Esportazione completata';
+        this.alertType = 'success';
+        setTimeout(() => this.alertMessage = '', 3000);
       } catch (error) {
-        this.error = 'Errore nell\'esportazione CSV';
+        this.alertMessage = 'Errore nell\'esportazione CSV';
+        this.alertType = 'error';
+      } finally {
+        this.isExporting = false;
       }
     },
-    
-    // Generate CSV from sites
+
     generateCSV() {
-      const headers = ['ID', 'Nome', 'Codice', 'Ubicazione', 'Regione', 'Provincia', 'Comune', 'Stato', 'Pubblico', 'Utenti', 'Foto'];
+      const headers = ['ID', 'Nome', 'Codice', 'Ubicazione', 'Regione', 'Provincia', 'Comune', 'Stato', 'Pubblico', 'Utenti', 'Foto', 'Descrizione'];
       const rows = this.sites.map(site => [
         site.id,
         `"${(site.name || '').replace(/"/g, '""')}"`,
-        site.code,
+        site.code || '',
         `"${(site.location || '').replace(/"/g, '""')}"`,
         site.region || '',
         site.province || '',
@@ -416,13 +742,32 @@ document.addEventListener('alpine:init', () => {
         site.is_active ? 'Attivo' : 'Inattivo',
         site.is_public ? 'Sì' : 'No',
         site.users_count || 0,
-        site.photos_count || 0
+        site.photos_count || 0,
+        `"${(site.description || '').replace(/"/g, '""')}"`
       ]);
       
-      return [headers, ...rows].map(row => row.join(',')).join('\n');
+      return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    },
+
+    goToPage(page) {
+      if (typeof page === 'number' && page >= 1 && page <= this.totalPages) {
+        this.currentPage = page;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    },
+
+    nextPage() {
+      if (this.currentPage < this.totalPages) {
+        this.currentPage++;
+      }
+    },
+
+    previousPage() {
+      if (this.currentPage > 1) {
+        this.currentPage--;
+      }
     }
   }));
 });
 </script>
-
 {% endblock %}

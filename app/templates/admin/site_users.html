@@ -3,6 +3,11 @@
 
 {% block title %}Gestione Utenti - {{ site.name }} | Sistema Archeologico{% endblock %}
 
+{% block head %}
+<!-- API Client Script -->
+<script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="siteUsersManager">
     <!-- Page Header -->
@@ -382,11 +387,14 @@
     </div>
 </div>
 
-<!-- API Client Script -->
-<script src="/static/js/api-client.js"></script>
-
 <!-- Alpine.js Component Script -->
 <script>
+// Ensure API client is loaded before Alpine.js initializes
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof api === 'undefined') {
+    console.error('API client not loaded');
+  }
+});
 document.addEventListener('alpine:init', () => {
     Alpine.data('siteUsersManager', () => ({
         // Data
@@ -469,6 +477,11 @@ document.addEventListener('alpine:init', () => {
             this.isAddingUser = true;
             
             try {
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh page.');
+                }
+                
                 const response = await api.post(`/api/v1/admin/users/${encodeURIComponent(this.selectedUserId)}/permissions`, {
                     site_id: this.site.id,
                     permission_level: this.newPermissionLevel,
@@ -515,6 +528,11 @@ document.addEventListener('alpine:init', () => {
             this.isRemovingUser = true;
             
             try {
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh page.');
+                }
+                
                 // Find the permission ID for this user-site combination
                 const response = await api.get('/api/v1/admin/permissions');
                 if (response.ok) {
@@ -524,6 +542,11 @@ document.addEventListener('alpine:init', () => {
                     );
                     
                     if (permission) {
+                        // Ensure api is available
+                        if (typeof api === 'undefined') {
+                          throw new Error('API client not loaded. Please refresh page.');
+                        }
+                        
                         const deleteResponse = await api.delete(`/api/v1/admin/permissions/${permission.id}`);
                         
                         if (deleteResponse.ok) {

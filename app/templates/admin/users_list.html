@@ -596,6 +596,11 @@ document.addEventListener('alpine:init', () => {
             if (!confirm(`Vuoi ${action} questo utente?`)) return;
             
             try {
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh the page.');
+                }
+                
                 // FIXED: Using centralized API client with automatic credentials inclusion
                 const response = await api.post(`/api/v1/admin/users/${user.id}/toggle-status/`);
                 
@@ -612,6 +617,11 @@ document.addEventListener('alpine:init', () => {
             if (!confirm(`Vuoi eliminare l'utente ${user.email}? Questa azione non può essere annullata.`)) return;
             
             try {
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh the page.');
+                }
+                
                 // FIXED: Using centralized API client with automatic credentials inclusion
                 const response = await api.post(`/api/v1/admin/users/${user.id}/delete/`);
                 
