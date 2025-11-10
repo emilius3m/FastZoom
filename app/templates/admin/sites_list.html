@@ -1,873 +1,428 @@
-<!-- templates/admin/sites_list.html - VERSIONE COMPLETA CON PROTEZIONE ELIMINAZIONE -->
 {% extends "base/site_base.html" %}
 
 {% block title %}Gestione Siti Archeologici | Sistema Archeologico{% endblock %}
 
 {% block content %}
-<div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6 mb-6">
-    <div class="flex items-center">
-      <i class="fas fa-landmark text-3xl mr-4"></i>
+<div class="mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
 
+  <!-- Page Header -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gestione Siti Archeologici</h1>
+          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Amministra i siti del sistema archeologico e i relativi utenti autorizzati
+          </p>
+        </div>
+        <div class="flex items-center space-x-3 mt-4 sm:mt-0">
+          <!-- Export Button -->
+          <button @click="exportSites()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2">
+            <i class="fas fa-download"></i>
+            <span>Esporta CSV</span>
+          </button>
+          <!-- New Site Button -->
+          <a href="/admin/sites/new" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2">
+            <i class="fas fa-plus"></i>
+            <span>Nuovo Sito</span>
+          </a>
+        </div>
+      </div>
     </div>
   </div>
-<div class=" mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="sitesList">
-    <!-- Page Header -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                        Gestione Siti Archeologici
-                    </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        Amministra i siti del sistema archeologico e i relativi utenti autorizzati
-                    </p>
-                </div>
-                <div class="flex items-center space-x-3 mt-4 sm:mt-0">
-                    <!-- Export Button -->
-                    <button @click="exportSites"
-                            class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        Esporta
-                    </button>
 
-                    <!-- New Site Button -->
-                    <a href="/admin/sites/new/"
-                       class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                        </svg>
-                        Nuovo Sito Archeologico
-                    </a>
-                </div>
-            </div>
-        </div>
+  <!-- Search & Filter Section -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6 p-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ricerca per nome</label>
+        <input type="text" x-model="filters.search" placeholder="Nome o codice sito..." 
+               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Regione</label>
+        <input type="text" x-model="filters.region" placeholder="Filtra per regione..." 
+               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stato</label>
+        <select x-model="filters.status" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+          <option value="">Tutti gli stati</option>
+          <option value="active">Attivi</option>
+          <option value="inactive">Inattivi</option>
+        </select>
+      </div>
     </div>
-
-    <!-- Success/Error Messages -->
-    <div x-show="showAlert"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 transform translate-y-2"
-         x-transition:enter-end="opacity-100 transform translate-y-0"
-         class="mb-6 p-4 rounded-lg border"
-         :class="alertType === 'success' ? 'text-green-800 dark:text-green-300 bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-700' : 'text-red-800 dark:text-red-300 bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-700'"
-         role="alert">
-        <div class="flex items-center">
-            <svg x-show="alertType === 'success'" class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-            </svg>
-            <svg x-show="alertType === 'error'" class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-            </svg>
-            <span x-text="alertMessage"></span>
-        </div>
+    <div class="flex justify-between mt-4">
+      <button @click="filterSites()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+        <i class="fas fa-filter mr-2"></i>Applica Filtri
+      </button>
+      <button @click="resetFilters()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm">
+        Ripristina
+      </button>
     </div>
+  </div>
 
-    <!-- Filters and Search -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <!-- Search -->
-                <div class="md:col-span-2">
-                    <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cerca</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
-                        </div>
-                        <input type="text"
-                               id="search"
-                               x-model="searchTerm"
-                               @input="filterSites"
-                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                               placeholder="Cerca per nome, codice, ubicazione...">
-                    </div>
-                </div>
-
-                <!-- Region Filter -->
-                <div>
-                    <label for="regionFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Regione</label>
-                    <select id="regionFilter"
-                            x-model="regionFilter"
-                            @change="filterSites"
-                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        <option value="">Tutte le regioni</option>
-                        <template x-for="region in availableRegions" :key="region">
-                            <option :value="region" x-text="region"></option>
-                        </template>
-                    </select>
-                </div>
-
-                <!-- Status Filter -->
-                <div>
-                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stato</label>
-                    <select id="statusFilter"
-                            x-model="statusFilter"
-                            @change="filterSites"
-                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        <option value="">Tutti</option>
-                        <option value="active">Attivi</option>
-                        <option value="inactive">Inattivi</option>
-                        <option value="public">Pubblici</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Quick Stats -->
-            <div class="flex flex-wrap items-center justify-center gap-6 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div class="flex items-center space-x-2">
-                    <div class="text-2xl font-bold text-blue-600" x-text="stats.total"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Totale</div>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <div class="text-2xl font-bold text-green-600" x-text="stats.active"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Attivi</div>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <div class="text-2xl font-bold text-purple-600" x-text="stats.public"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Pubblici</div>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <div class="text-2xl font-bold text-orange-600" x-text="stats.withUsers"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Con Utenti</div>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <div class="text-2xl font-bold text-red-600" x-text="stats.withPhotos"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Con Foto</div>
-                </div>
-            </div>
-        </div>
+  <!-- Error Message -->
+  <div x-show="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6 flex justify-between items-center">
+    <div>
+      <p class="font-bold">Errore</p>
+      <p x-text="error"></p>
     </div>
+    <button @click="error = null" class="text-red-700 hover:text-red-900 text-lg">&times;</button>
+  </div>
 
-    <!-- Sites Table -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex justify-between items-center">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                    Siti Archeologici (<span x-text="filteredSites.length"></span>)
-                </h2>
-                <div class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                    <span>Mostra:</span>
-                    <select x-model.number="pageSize"
-                            @change="currentPage = 1"
-                            class="border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        <option value="10">10</option>
-                        <option value="25">25</option>
-                        <option value="50">50</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- Loading State -->
-        <div x-show="isLoading" class="flex items-center justify-center py-12">
-            <div class="flex items-center space-x-2">
-                <svg class="animate-spin h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span class="text-gray-500">Caricamento siti...</span>
-            </div>
-        </div>
-
-        <!-- Table -->
-        <div x-show="!isLoading" class="overflow-x-auto">
-            <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                        <th @click="setSortBy('name')"
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            <div class="flex items-center space-x-1">
-                                <span>Sito</span>
-                                <svg x-show="sortBy === 'name'" class="w-4 h-4" :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </div>
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Codice</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ubicazione</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Regione</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Stato</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Utenti</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Foto</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Azioni</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    <!-- Empty State -->
-                    <tr x-show="paginatedSites.length === 0">
-                        <td colspan="8" class="px-6 py-12 text-center">
-                            <div class="flex flex-col items-center">
-                                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                                </svg>
-                                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Nessun sito trovato</h3>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                    <span x-show="searchTerm || regionFilter || statusFilter">Prova a modificare i filtri di ricerca.</span>
-                                    <span x-show="!searchTerm && !regionFilter && !statusFilter">Inizia creando il primo sito archeologico del sistema.</span>
-                                </p>
-                                <div class="mt-6">
-                                    <a href="/admin/sites/new/"
-                                       class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                        <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                        </svg>
-                                        Nuovo Sito Archeologico
-                                    </a>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-
-                    <!-- Site Rows -->
-                    <template x-for="site in paginatedSites" :key="site.id">
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <!-- Site Info -->
-                            <td class="px-6 py-4">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-10 w-10">
-                                        <div class="h-10 w-10 rounded-lg bg-blue-500 flex items-center justify-center text-white font-medium text-sm"
-                                             x-text="getSiteInitials(site)">
-                                        </div>
-                                    </div>
-                                    <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="site.name"></div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="site.historical_period || 'Periodo non specificato'"></div>
-                                    </div>
-                                </div>
-                            </td>
-
-                            <!-- Code -->
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300" x-text="site.code"></span>
-                            </td>
-
-                            <!-- Location -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                <span x-text="site.location || 'Non specificata'"></span>
-                            </td>
-
-                            <!-- Region -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                <span x-text="site.region || 'N/A'"></span>
-                            </td>
-
-                            <!-- Status -->
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="flex flex-col space-y-1">
-                                    <span x-show="site.is_active" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300">
-                                        Attivo
-                                    </span>
-                                    <span x-show="!site.is_active" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300">
-                                        Inattivo
-                                    </span>
-                                    <span x-show="site.is_public" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300">
-                                        Pubblico
-                                    </span>
-                                </div>
-                            </td>
-
-                            <!-- Users Count -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                <div class="flex items-center">
-                                    <svg class="w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                    </svg>
-                                    <span x-text="site.users_count || 0"></span>
-                                </div>
-                            </td>
-
-                            <!-- Photos Count -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                <div class="flex items-center">
-                                    <svg class="w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                    <span x-text="site.photos_count || 0"></span>
-                                </div>
-                            </td>
-
-                            <!-- Actions -->
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <div class="flex items-center justify-end space-x-2">
-                                    <!-- View/Edit Button -->
-                                    <a :href="'/admin/site/' + encodeURIComponent(site.id) + '/edit/'"
-                                       class="text-blue-600 hover:text-blue-900 p-1 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900"
-                                       title="Modifica sito">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                        </svg>
-                                    </a>
-
-                                    <!-- Users Management -->
-                                    <a :href="'/admin/site/' + encodeURIComponent(site.id) + '/users/'"
-                                       class="text-purple-600 hover:text-purple-900 p-1 rounded-full hover:bg-purple-100 dark:hover:bg-purple-900"
-                                       title="Gestisci utenti">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                        </svg>
-                                    </a>
-
-                                    <!-- Toggle Active Button -->
-                                    <button @click="toggleSiteStatus(site)"
-                                            :class="site.is_active ? 'text-red-600 hover:text-red-900 hover:bg-red-100 dark:hover:bg-red-900' : 'text-green-600 hover:text-green-900 hover:bg-green-100 dark:hover:bg-green-900'"
-                                            class="p-1 rounded-full"
-                                            :title="site.is_active ? 'Disattiva sito' : 'Attiva sito'">
-                                        <svg x-show="site.is_active" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                        <svg x-show="!site.is_active" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                    </button>
-
-                                    <!-- DANGEROUS DELETE Button -->
-                                    <button @click="initiateDangerousDelete(site)"
-                                            class="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900"
-                                            title="ELIMINA SITO - OPERAZIONE PERICOLOSA">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Pagination -->
-        <div x-show="totalPages > 1" class="bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6">
-            <div class="flex items-center justify-between">
-                <div class="flex-1 flex justify-between sm:hidden">
-                    <button @click="previousPage"
-                            :disabled="currentPage === 1"
-                            class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                        Precedente
-                    </button>
-                    <button @click="nextPage"
-                            :disabled="currentPage === totalPages"
-                            class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                        Successivo
-                    </button>
-                </div>
-                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                    <div>
-                        <p class="text-sm text-gray-700 dark:text-gray-300">
-                            Mostra da <span class="font-medium" x-text="(currentPage - 1) * pageSize + 1"></span>
-                            a <span class="font-medium" x-text="Math.min(currentPage * pageSize, filteredSites.length)"></span>
-                            di <span class="font-medium" x-text="filteredSites.length"></span> risultati
-                        </p>
-                    </div>
-                    <div>
-                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                            <button @click="previousPage"
-                                    :disabled="currentPage === 1"
-                                    class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                                </svg>
-                            </button>
-
-                            <template x-for="page in getVisiblePages()" :key="page">
-                                <button @click="currentPage = page"
-                                        :class="page === currentPage ? 'bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-600 dark:text-blue-300' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'"
-                                        class="relative inline-flex items-center px-4 py-2 border text-sm font-medium"
-                                        x-text="page">
-                                </button>
-                            </template>
-
-                            <button @click="nextPage"
-                                    :disabled="currentPage === totalPages"
-                                    class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-                                </svg>
-                            </button>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Success Message -->
+  <div x-show="success" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-6 flex justify-between items-center">
+    <div>
+      <p class="font-bold">Successo</p>
+      <p x-text="success"></p>
     </div>
+    <button @click="success = null" class="text-green-700 hover:text-green-900 text-lg">&times;</button>
+  </div>
 
-    <!-- 🚨 MODAL DI CONFERMA ELIMINAZIONE PERICOLOSA 🚨 -->
-    <div x-show="showDangerModal"
-          x-transition:enter="transition ease-out duration-300"
-          x-transition:enter-start="opacity-0"
-          x-transition:enter-end="opacity-100"
-          x-transition:leave="transition ease-in duration-200"
-          x-transition:leave-start="opacity-100"
-          x-transition:leave-end="opacity-0"
-          class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50"
-          @click.self="closeDangerModal">
+  <!-- Loading State -->
+  <div x-show="loading" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 text-center">
+    <div class="inline-block">
+      <svg class="animate-spin h-12 w-12 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </div>
+    <p class="text-gray-600 dark:text-gray-400">Caricamento siti...</p>
+  </div>
 
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-            <!-- Header -->
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center">
-                    <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900">
-                        <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                        </svg>
-                    </div>
-                    <h3 class="text-xl font-bold text-red-600 dark:text-red-400 ml-3">⚠️ ELIMINAZIONE PERICOLOSA ⚠️</h3>
-                </div>
-                <button @click="closeDangerModal" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
+  <!-- Sites Table -->
+  <div x-show="!loading && filteredSites.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+          <tr>
+            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Sito</th>
+            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Codice</th>
+            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Ubicazione</th>
+            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Regione</th>
+            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Stato</th>
+            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Utenti</th>
+            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Foto</th>
+            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Azioni</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+          <template x-for="site in filteredSites" :key="site.id">
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+              <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                <div class="font-medium" x-text="site.name"></div>
+                <div class="text-xs text-gray-500 dark:text-gray-400" x-show="site.description" x-text="site.description.substring(0, 50) + (site.description.length > 50 ? '...' : '')"></div>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded" x-text="site.code"></code>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300" x-text="site.location || '-'"></td>
+              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300" x-text="site.region || '-'"></td>
+              <td class="px-6 py-4 text-sm">
+                <span :class="site.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'" class="px-3 py-1 rounded-full text-xs font-medium">
+                  <i :class="site.is_active ? 'fas fa-check-circle mr-1' : 'fas fa-times-circle mr-1'"></i>
+                  <span x-text="site.is_active ? 'Attivo' : 'Inattivo'"></span>
+                </span>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 text-center">
+                <span class="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium" x-text="site.users_count || 0"></span>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 text-center">
+                <span class="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 px-2 py-1 rounded text-xs font-medium" x-text="site.photos_count || 0"></span>
+              </td>
+              <td class="px-6 py-4 text-sm space-x-2 flex flex-wrap gap-2">
+                <!-- View Users -->
+                <a :href="`/admin/sites/${site.id}/users`" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                  <i class="fas fa-users mr-1"></i>Utenti
+                </a>
+                <!-- Edit -->
+                <a :href="`/admin/sites/${site.id}/edit`" class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded">
+                  <i class="fas fa-edit mr-1"></i>Modifica
+                </a>
+                <!-- Toggle Status -->
+                <button @click="toggleStatus(site.id)" :class="site.is_active ? 'text-orange-600 dark:text-orange-400 hover:text-orange-800' : 'text-green-600 dark:text-green-400 hover:text-green-800'" class="text-xs bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded">
+                  <i :class="site.is_active ? 'fas fa-ban' : 'fas fa-check'" class="mr-1"></i>
+                  <span x-text="site.is_active ? 'Disattiva' : 'Attiva'"></span>
                 </button>
-            </div>
-
-            <!-- Danger Information -->
-            <div class="mb-6 p-4 bg-red-50 dark:bg-red-900 border-l-4 border-red-400 rounded">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <h4 class="text-lg font-medium text-red-800 dark:text-red-300">Stai per eliminare definitivamente un sito archeologico</h4>
-                        <div class="mt-2 text-sm text-red-700 dark:text-red-200">
-                            <p><strong>Sito:</strong> <span x-text="siteToDelete?.name"></span> (<span x-text="siteToDelete?.code"></span>)</p>
-                            <p><strong>Ubicazione:</strong> <span x-text="siteToDelete?.location || 'Non specificata'"></span></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Data Warning -->
-            <div x-show="siteToDelete?.users_count > 0 || siteToDelete?.photos_count > 0" class="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-700 rounded-lg">
-                <h4 class="text-lg font-semibold text-yellow-800 dark:text-yellow-300 mb-2">🚨 ATTENZIONE: Dati collegati rilevati</h4>
-                <ul class="list-disc list-inside text-yellow-700 dark:text-yellow-200 space-y-1">
-                    <li x-show="siteToDelete?.users_count > 0">
-                        <strong x-text="siteToDelete?.users_count"></strong> utenti hanno permessi su questo sito
-                    </li>
-                    <li x-show="siteToDelete?.photos_count > 0">
-                        <strong x-text="siteToDelete?.photos_count"></strong> fotografie sono collegate a questo sito
-                    </li>
-                </ul>
-                <p class="mt-3 text-sm font-semibold text-yellow-800 dark:text-yellow-300">
-                    L'eliminazione del sito comporterà la perdita permanente di tutti questi dati!
-                </p>
-            </div>
-
-            <!-- Password Confirmation Form -->
-            <div class="mb-6">
-                <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <h4 class="font-semibold text-gray-900 dark:text-white mb-3">Conferma con password amministratore</h4>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        Per procedere con l'eliminazione, inserisci la tua password di amministratore:
-                    </p>
-
-                    <div class="space-y-4">
-                        <div>
-                            <label for="admin_password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Password Amministratore *
-                            </label>
-                            <div class="relative">
-                                <input type="password"
-                                        id="admin_password"
-                                        x-model="confirmPassword"
-                                        @input="passwordError = ''"
-                                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-red-500 focus:border-red-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                        placeholder="Inserisci la tua password..."
-                                        required>
-                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
-                                    <svg class="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
-                                    </svg>
-                                </div>
-                            </div>
-                            <p x-show="passwordError" x-text="passwordError" class="mt-2 text-sm text-red-600"></p>
-                        </div>
-
-                        <!-- Confirmation Checkbox -->
-                        <div class="flex items-start">
-                            <div class="flex items-center h-5">
-                                <input id="confirm_delete"
-                                        type="checkbox"
-                                        x-model="confirmDelete"
-                                        class="focus:ring-red-500 h-4 w-4 text-red-600 border-gray-300 rounded">
-                            </div>
-                            <div class="ml-3 text-sm">
-                                <label for="confirm_delete" class="font-medium text-gray-900 dark:text-white">
-                                    Confermo di voler eliminare definitivamente questo sito archeologico
-                                </label>
-                                <p class="text-gray-500 dark:text-gray-400">Sono consapevole che questa azione non può essere annullata.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="flex items-center justify-between pt-4 border-t">
-                <button @click="closeDangerModal" 
-                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500">
-                    Annulla
+                <!-- Delete -->
+                <button @click="confirmDelete(site.id)" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                  <i class="fas fa-trash mr-1"></i>Elimina
                 </button>
-                
-                <button @click="executeDangerousDelete" 
-                        :disabled="!confirmPassword || !confirmDelete || isDeletingSite"
-                        :class="(!confirmPassword || !confirmDelete || isDeletingSite) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-800'"
-                        class="px-6 py-2 bg-red-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-                    <span x-show="!isDeletingSite" class="flex items-center">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                        ELIMINA DEFINITIVAMENTE
-                    </span>
-                    <span x-show="isDeletingSite" class="flex items-center">
-                        <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Eliminando...
-                    </span>
-                </button>
-            </div>
-        </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
     </div>
+    
+    <!-- Pagination -->
+    <div class="bg-gray-50 dark:bg-gray-700 px-6 py-3 border-t border-gray-200 dark:border-gray-600 flex justify-between items-center">
+      <div class="text-sm text-gray-600 dark:text-gray-300">
+        Mostra da <span x-text="(currentPage - 1) * itemsPerPage + 1"></span> 
+        a <span x-text="Math.min(currentPage * itemsPerPage, filteredSites.length)"></span> 
+        di <span x-text="filteredSites.length"></span> risultati
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div x-show="!loading && filteredSites.length === 0 && sites.length === 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+    <div class="mb-4">
+      <i class="fas fa-inbox text-6xl text-gray-400"></i>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Nessun sito trovato</h3>
+    <p class="text-gray-600 dark:text-gray-400 mb-6">Non ci sono ancora siti archeologici nel sistema.</p>
+    <a href="/admin/sites/new" class="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg">
+      <i class="fas fa-plus"></i>
+      <span>Crea il primo sito</span>
+    </a>
+  </div>
+
+  <!-- No Results State (after filtering) -->
+  <div x-show="!loading && filteredSites.length === 0 && sites.length > 0" class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+    <div class="mb-4">
+      <i class="fas fa-search text-6xl text-gray-400"></i>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Nessun risultato</h3>
+    <p class="text-gray-600 dark:text-gray-400 mb-6">Prova a modificare i filtri di ricerca.</p>
+    <button @click="resetFilters()" class="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg">
+      <i class="fas fa-redo"></i>
+      <span>Ripristina filtri</span>
+    </button>
+  </div>
 </div>
 
-<!-- API Client Script -->
-<script src="/static/js/api-client.js"></script>
+<!-- Delete Confirmation Modal -->
+<div x-show="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showDeleteModal = false">
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md w-full mx-4">
+    <div class="bg-red-50 dark:bg-red-900/30 px-6 py-4 border-b border-red-200 dark:border-red-800">
+      <h3 class="text-lg font-bold text-red-900 dark:text-red-100">
+        <i class="fas fa-exclamation-triangle mr-2"></i>Eliminazione Pericolosa
+      </h3>
+    </div>
+    
+    <div class="px-6 py-4">
+      <p class="text-gray-700 dark:text-gray-300 mb-4">
+        L'eliminazione del sito <strong x-text="deleteTarget.name"></strong> comporterà la perdita permanente di tutti questi dati:
+      </p>
+      <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 mb-6">
+        <li><span x-text="deleteTarget.users_count || 0"></span> permessi utente</li>
+        <li><span x-text="deleteTarget.photos_count || 0"></span> foto e metadati</li>
+        <li>Tutta la documentazione archeologica</li>
+      </ul>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Inserisci la tua password di amministratore per confermare:
+        </label>
+        <input type="password" x-model="deletePassword" placeholder="Password..." @keyup.enter="executeDelete()"
+               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+      </div>
+      
+      <label class="flex items-center">
+        <input type="checkbox" x-model="deleteConfirmed" class="w-4 h-4 text-red-600">
+        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">
+          Sono consapevole che questa azione non può essere annullata.
+        </span>
+      </label>
+    </div>
+    
+    <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex justify-end space-x-3">
+      <button @click="showDeleteModal = false; deletePassword = ''; deleteConfirmed = false" 
+              class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg">
+        Annulla
+      </button>
+      <button @click="executeDelete()" :disabled="!deletePassword || !deleteConfirmed || deleting" 
+              :class="deleting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-700'"
+              class="px-4 py-2 bg-red-600 text-white rounded-lg transition">
+        <i :class="deleting ? 'fas fa-spinner fa-spin' : 'fas fa-trash'" class="mr-2"></i>
+        <span x-text="deleting ? 'Eliminazione...' : 'Elimina permanentemente'"></span>
+      </button>
+    </div>
+  </div>
+</div>
 
-<!-- Alpine.js Component Script -->
 <script>
 document.addEventListener('alpine:init', () => {
-    Alpine.data('sitesList', () => ({
-        // Data
-        sites: {{ sites|tojson if sites else '[]' }},
-        filteredSites: [],
+  Alpine.data('sitesList', () => ({
+    sites: [],
+    filteredSites: [],
+    loading: false,
+    error: null,
+    success: null,
+    
+    // Filters
+    filters: {
+      search: '',
+      region: '',
+      status: ''
+    },
+    
+    // Pagination
+    currentPage: 1,
+    itemsPerPage: 25,
+    
+    // Delete modal
+    showDeleteModal: false,
+    deleteTarget: { name: '', id: '', users_count: 0, photos_count: 0 },
+    deletePassword: '',
+    deleteConfirmed: false,
+    deleting: false,
+    
+    // Load sites on component init
+    async init() {
+      await this.loadSites();
+    },
+    
+    // Load all sites via API
+    async loadSites() {
+      this.loading = true;
+      this.error = null;
+      
+      try {
+        const response = await api.get('/api/v1/admin/sites');
+        this.sites = response.sites || [];
+        this.filteredSites = [...this.sites];
+      } catch (error) {
+        this.error = error.message || 'Errore nel caricamento dei siti';
+        console.error('Error loading sites:', error);
+      } finally {
+        this.loading = false;
+      }
+    },
+    
+    // Filter sites based on search and filters
+    filterSites() {
+      this.filteredSites = this.sites.filter(site => {
+        const matchSearch = !this.filters.search || 
+          site.name.toLowerCase().includes(this.filters.search.toLowerCase()) ||
+          site.code.toLowerCase().includes(this.filters.search.toLowerCase());
         
-        // Filters
-        searchTerm: '',
-        regionFilter: '',
-        statusFilter: '',
-        sortBy: 'name',
-        sortDirection: 'asc',
+        const matchRegion = !this.filters.region || 
+          (site.region && site.region.toLowerCase().includes(this.filters.region.toLowerCase()));
         
-        // Pagination
-        currentPage: 1,
-        pageSize: 25,
+        const matchStatus = !this.filters.status || 
+          (this.filters.status === 'active' ? site.is_active : !site.is_active);
         
-        // UI State
-        isLoading: false,
-        showAlert: false,
-        alertType: 'success',
-        alertMessage: '',
+        return matchSearch && matchRegion && matchStatus;
+      });
+      
+      this.currentPage = 1;
+    },
+    
+    // Reset all filters
+    resetFilters() {
+      this.filters = { search: '', region: '', status: '' };
+      this.filteredSites = [...this.sites];
+      this.currentPage = 1;
+    },
+    
+    // Toggle site status (active/inactive)
+    async toggleStatus(siteId) {
+      try {
+        const response = await api.post(`/api/v1/admin/sites/${siteId}/toggle-status`);
         
-        // Dangerous Delete Modal
-        showDangerModal: false,
-        siteToDelete: null,
-        confirmPassword: '',
-        confirmDelete: false,
-        passwordError: '',
-        isDeletingSite: false,
-        
-        // Computed
-        get paginatedSites() {
-            const start = (this.currentPage - 1) * this.pageSize;
-            const end = start + this.pageSize;
-            return this.filteredSites.slice(start, end);
-        },
-        
-        get totalPages() {
-            return Math.ceil(this.filteredSites.length / this.pageSize);
-        },
-        
-        get availableRegions() {
-            const regions = [...new Set(this.sites.map(s => s.region).filter(r => r))];
-            return regions.sort();
-        },
-        
-        get stats() {
-            const total = this.sites.length;
-            const active = this.sites.filter(s => s.is_active).length;
-            const public = this.sites.filter(s => s.is_public).length;
-            const withUsers = this.sites.filter(s => s.users_count > 0).length;
-            const withPhotos = this.sites.filter(s => s.photos_count > 0).length;
-            
-            return { total, active, public: public, withUsers, withPhotos };
-        },
-        
-        init() {
-            this.filteredSites = [...this.sites];
-            this.checkUrlParams();
-        },
-        
-        checkUrlParams() {
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('success')) {
-                this.showAlert = true;
-                this.alertType = 'success';
-                
-                const successType = urlParams.get('success');
-                const messages = {
-                    'created': 'Sito archeologico creato con successo',
-                    'updated': 'Sito archeologico aggiornato con successo',
-                    'deleted': 'Sito archeologico eliminato con successo',
-                    'activated': 'Sito attivato con successo',
-                    'deactivated': 'Sito disattivato con successo'
-                };
-                
-                this.alertMessage = messages[successType] || 'Operazione completata con successo';
-                
-                setTimeout(() => {
-                    this.showAlert = false;
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }, 5000);
-            }
-        },
-        
-        filterSites() {
-            let filtered = [...this.sites];
-            
-            // Search filter
-            if (this.searchTerm) {
-                const term = this.searchTerm.toLowerCase();
-                filtered = filtered.filter(site => 
-                    site.name.toLowerCase().includes(term) ||
-                    site.code.toLowerCase().includes(term) ||
-                    (site.location && site.location.toLowerCase().includes(term)) ||
-                    (site.historical_period && site.historical_period.toLowerCase().includes(term))
-                );
-            }
-            
-            // Region filter
-            if (this.regionFilter) {
-                filtered = filtered.filter(site => site.region === this.regionFilter);
-            }
-            
-            // Status filter
-            if (this.statusFilter) {
-                filtered = filtered.filter(site => {
-                    switch (this.statusFilter) {
-                        case 'active': return site.is_active;
-                        case 'inactive': return !site.is_active;
-                        case 'public': return site.is_public;
-                        default: return true;
-                    }
-                });
-            }
-            
-            this.filteredSites = filtered;
-            this.currentPage = 1;
-            this.sortSites();
-        },
-        
-        setSortBy(column) {
-            if (this.sortBy === column) {
-                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                this.sortBy = column;
-                this.sortDirection = 'asc';
-            }
-            this.sortSites();
-        },
-        
-        sortSites() {
-            this.filteredSites.sort((a, b) => {
-                let aVal = a[this.sortBy] || '';
-                let bVal = b[this.sortBy] || '';
-                
-                if (typeof aVal === 'string') {
-                    aVal = aVal.toLowerCase();
-                    bVal = bVal.toLowerCase();
-                }
-                
-                if (aVal < bVal) return this.sortDirection === 'asc' ? -1 : 1;
-                if (aVal > bVal) return this.sortDirection === 'asc' ? 1 : -1;
-                return 0;
-            });
-        },
-        
-        // Pagination methods
-        previousPage() {
-            if (this.currentPage > 1) {
-                this.currentPage--;
-            }
-        },
-        
-        nextPage() {
-            if (this.currentPage < this.totalPages) {
-                this.currentPage++;
-            }
-        },
-        
-        getVisiblePages() {
-            const pages = [];
-            const maxVisible = 7;
-            const half = Math.floor(maxVisible / 2);
-            
-            let start = Math.max(1, this.currentPage - half);
-            let end = Math.min(this.totalPages, start + maxVisible - 1);
-            
-            if (end - start < maxVisible - 1) {
-                start = Math.max(1, end - maxVisible + 1);
-            }
-            
-            for (let i = start; i <= end; i++) {
-                pages.push(i);
-            }
-            
-            return pages;
-        },
-        
-        // Site actions
-        async toggleSiteStatus(site) {
-            const action = site.is_active ? 'disattivare' : 'attivare';
-            if (!confirm(`Vuoi ${action} questo sito?`)) return;
-            
-            try {
-                const response = await api.post(`/api/v1/admin/sites/${encodeURIComponent(site.id)}/toggle-status/`);
-                
-                if (response.ok) {
-                    site.is_active = !site.is_active;
-                    this.showSuccess(`Sito ${site.is_active ? 'attivato' : 'disattivato'} con successo`);
-                } else {
-                    throw new Error('Errore nel cambio stato sito');
-                }
-                
-            } catch (error) {
-                this.showError('Errore: ' + error.message);
-            }
-        },
-        
-        // 🚨 DANGEROUS DELETE METHODS 🚨
-        initiateDangerousDelete(site) {
-            this.siteToDelete = site;
-            this.confirmPassword = '';
-            this.confirmDelete = false;
-            this.passwordError = '';
-            this.showDangerModal = true;
-            
-            // Focus password field after modal opens
-            setTimeout(() => {
-                document.getElementById('admin_password')?.focus();
-            }, 300);
-        },
-        
-        closeDangerModal() {
-            this.showDangerModal = false;
-            this.siteToDelete = null;
-            this.confirmPassword = '';
-            this.confirmDelete = false;
-            this.passwordError = '';
-        },
-        
-        async executeDangerousDelete() {
-            if (!this.confirmPassword || !this.confirmDelete) return;
-            
-            this.isDeletingSite = true;
-            this.passwordError = '';
-            
-            try {
-                const response = await api.post(`/api/v1/admin/sites/${encodeURIComponent(this.siteToDelete.id)}/dangerous-delete/`, {
-                    admin_password: this.confirmPassword,
-                    confirm_delete: this.confirmDelete
-                });
-                
-                if (response.ok) {
-                    // Remove site from local arrays
-                    this.sites = this.sites.filter(s => s.id !== this.siteToDelete.id);
-                    this.filterSites();
-                    
-                    this.closeDangerModal();
-                    this.showSuccess('Sito archeologico eliminato definitivamente');
-                } else {
-                    const result = response.data;
-                    if (result.detail && result.detail.includes('password')) {
-                        this.passwordError = 'Password amministratore non corretta';
-                    } else {
-                        throw new Error(result.detail || 'Errore nell\'eliminazione del sito');
-                    }
-                }
-                
-            } catch (error) {
-                this.showError('Errore: ' + error.message);
-            } finally {
-                this.isDeletingSite = false;
-            }
-        },
-        
-        exportSites() {
-            // Create CSV content
-            const headers = ['Nome', 'Codice', 'Ubicazione', 'Regione', 'Periodo Storico', 'Stato', 'Pubblico', 'Utenti', 'Foto', 'Creato'];
-            const csvContent = [
-                headers.join(','),
-                ...this.filteredSites.map(site => [
-                    site.name,
-                    site.code,
-                    site.location || '',
-                    site.region || '',
-                    site.historical_period || '',
-                    site.is_active ? 'Attivo' : 'Inattivo',
-                    site.is_public ? 'Sì' : 'No',
-                    site.users_count || 0,
-                    site.photos_count || 0,
-                    this.formatDate(site.created_at)
-                ].join(','))
-            ].join('\n');
-            
-            // Download file
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `siti_archeologici_${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            this.showSuccess('Export completato');
-        },
-        
-        // Utility methods
-        getSiteInitials(site) {
-            return site.name.substring(0, 2).toUpperCase();
-        },
-        
-        formatDate(dateString) {
-            if (!dateString) return null;
-            return new Date(dateString).toLocaleDateString('it-IT', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            });
-        },
-        
-        showSuccess(message) {
-            this.alertMessage = message;
-            this.alertType = 'success';
-            this.showAlert = true;
-            setTimeout(() => { this.showAlert = false; }, 5000);
-        },
-        
-        showError(message) {
-            this.alertMessage = message;
-            this.alertType = 'error';
-            this.showAlert = true;
-            setTimeout(() => { this.showAlert = false; }, 8000);
+        // Update local site
+        const site = this.sites.find(s => s.id === siteId);
+        if (site) {
+          site.is_active = !site.is_active;
+          this.filterSites();
         }
-    }));
+        
+        this.success = response.message || 'Stato aggiornato con successo';
+        setTimeout(() => this.success = null, 3000);
+      } catch (error) {
+        this.error = error.message || 'Errore nell\'aggiornamento dello stato';
+      }
+    },
+    
+    // Confirm delete
+    confirmDelete(siteId) {
+      const site = this.sites.find(s => s.id === siteId);
+      if (site) {
+        this.deleteTarget = { ...site };
+        this.deletePassword = '';
+        this.deleteConfirmed = false;
+        this.showDeleteModal = true;
+      }
+    },
+    
+    // Execute deletion
+    async executeDelete() {
+      if (!this.deletePassword || !this.deleteConfirmed) {
+        this.error = 'Completa tutti i campi obbligatori';
+        return;
+      }
+      
+      this.deleting = true;
+      this.error = null;
+      
+      try {
+        const response = await api.delete(`/api/v1/admin/sites/${this.deleteTarget.id}`, {
+          data: {
+            admin_password: this.deletePassword,
+            confirm_delete: true
+          }
+        });
+        
+        // Remove site from list
+        this.sites = this.sites.filter(s => s.id !== this.deleteTarget.id);
+        this.filterSites();
+        
+        this.showDeleteModal = false;
+        this.success = response.message || 'Sito eliminato definitivamente';
+        setTimeout(() => this.success = null, 3000);
+      } catch (error) {
+        this.error = error.message || 'Errore nell\'eliminazione del sito';
+      } finally {
+        this.deleting = false;
+      }
+    },
+    
+    // Export sites to CSV
+    async exportSites() {
+      try {
+        const csv = this.generateCSV();
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `siti_archeologici_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        this.success = 'Esportazione completata';
+        setTimeout(() => this.success = null, 3000);
+      } catch (error) {
+        this.error = 'Errore nell\'esportazione CSV';
+      }
+    },
+    
+    // Generate CSV from sites
+    generateCSV() {
+      const headers = ['ID', 'Nome', 'Codice', 'Ubicazione', 'Regione', 'Provincia', 'Comune', 'Stato', 'Pubblico', 'Utenti', 'Foto'];
+      const rows = this.sites.map(site => [
+        site.id,
+        `"${(site.name || '').replace(/"/g, '""')}"`,
+        site.code,
+        `"${(site.location || '').replace(/"/g, '""')}"`,
+        site.region || '',
+        site.province || '',
+        site.municipality || '',
+        site.is_active ? 'Attivo' : 'Inattivo',
+        site.is_public ? 'Sì' : 'No',
+        site.users_count || 0,
+        site.photos_count || 0
+      ]);
+      
+      return [headers, ...rows].map(row => row.join(',')).join('\n');
+    }
+  }));
 });
-
-// Theme management
-if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    document.documentElement.classList.add('dark');
-}
 </script>
+
 {% endblock %}
-
-
-

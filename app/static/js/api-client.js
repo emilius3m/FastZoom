@@ -1,27 +1,44 @@
 /**
  * Centralized API Client for FastAPI Authentication
- * 
+ * FastZoom Archaeological Site Management System
+ *
  * This utility provides a centralized fetch wrapper that automatically includes credentials,
  * consistent error handling, and easy-to-use methods for HTTP operations.
- * 
+ *
  * Key Features:
  * - Automatic inclusion of credentials (cookies) in all requests
  * - Consistent error handling and response processing
  * - Support for token refresh if needed in the future
- * - Easy-to-use methods for GET, POST, PUT, DELETE operations
- * 
- * Usage:
+ * - Easy-to-use methods for GET, POST, PUT, PATCH, DELETE operations
+ * - Form data and file upload support
+ * - Automatic 401 redirect to login page
+ *
+ * Usage Examples:
+ *
  * // Basic GET request
  * const users = await api.get('/api/v1/admin/users');
- * 
+ *
  * // POST request with data
- * const result = await api.post('/api/v1/admin/users', userData);
- * 
- * // Custom options
- * const response = await api.get('/custom/endpoint', {
- *     headers: { 'Custom-Header': 'value' }
+ * const result = await api.post('/api/v1/admin/sites', {
+ *     name: 'Nuovo Sito',
+ *     code: 'NS001',
+ *     location: 'Roma'
  * });
+ *
+ * // PUT request for updates
+ * await api.put('/api/v1/admin/sites/123', { name: 'Sito Aggiornato' });
+ *
+ * // DELETE with optional body
+ * await api.delete('/api/v1/admin/sites/123', {
+ *     data: { admin_password: 'secret', confirm_delete: true }
+ * });
+ *
+ * // Upload files
+ * const formData = new FormData();
+ * formData.append('file', fileInput.files[0]);
+ * await api.upload('/api/v1/photos/upload', formData);
  */
+
 class ApiClient {
     constructor(baseUrl = '') {
         this.baseUrl = baseUrl;
@@ -31,77 +48,95 @@ class ApiClient {
      * Core request method that handles all API calls
      * @param {string} url - The API endpoint URL
      * @param {Object} options - Fetch options
-     * @returns {Promise<Object>} - JSON response data
+     * @returns {Promise} - Parsed response data
+     * @throws {Error} - With detailed error message
      */
     async request(url, options = {}) {
-        // Ensure credentials are always included for authentication cookies
-        const defaultOptions = {
-            credentials: 'include',
+        // Default fetch options with credentials
+        const fetchOptions = {
+            credentials: 'include', // Always include cookies for authentication
             headers: {
                 'Content-Type': 'application/json',
-                ...options.headers
-            }
+                ...options.headers,
+            },
+            ...options,
         };
 
-        // Merge default options with provided options
-        const fetchOptions = { ...defaultOptions, ...options };
+        // Remove Content-Type for FormData (browser sets it automatically with boundary)
+        if (options.body instanceof FormData) {
+            delete fetchOptions.headers['Content-Type'];
+        }
+
+        // Full URL with base path
+        const fullUrl = this.baseUrl + url;
 
         try {
-            console.log(`API Request: ${this.baseUrl + url}`, fetchOptions);
-            
-            const response = await fetch(this.baseUrl + url, fetchOptions);
-            
-            // Log response for debugging
-            console.log(`API Response: ${response.status} ${response.statusText}`, {
-                url: this.baseUrl + url,
-                ok: response.ok,
-                status: response.status
-            });
+            console.log(`API Request: ${fullUrl}`, fetchOptions);
 
-            // Handle 401 Unauthorized errors (potential session expiry)
+            const response = await fetch(fullUrl, fetchOptions);
+
+            console.log(`API Response: ${response.status}`, { ok: response.ok });
+
+            // Handle successful responses
+            if (response.ok) {
+                // Check if response has content
+                const contentType = response.headers.get('content-type');
+
+                if (contentType && contentType.includes('application/json')) {
+                    return await response.json();
+                } else if (response.status === 204) {
+                    // No content response
+                    return null;
+                } else {
+                    // Return text for non-JSON responses
+                    return await response.text();
+                }
+            }
+
+            // Handle error responses
+            let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            let errorText = '';
+
+            try {
+                errorText = await response.text();
+
+                // Try to parse as JSON for structured error messages
+                if (errorText) {
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.detail || errorData.message || errorMessage;
+                    } catch (e) {
+                        // If not JSON, use the text directly
+                        errorMessage = `${errorMessage} - ${errorText}`;
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing error response:', e);
+            }
+
+            // Special handling for 401 Unauthorized - redirect to login
             if (response.status === 401) {
-                console.warn('Unauthorized response received. Session may have expired.');
-                // TODO: Implement token refresh logic if needed
-                // For now, redirect to login page
-                if (window.location.pathname !== '/login') {
-                    window.location.href = '/login';
-                }
-                throw new Error('Authentication required. Please log in again.');
+                console.warn('Authentication failed, redirecting to login...');
+                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                throw new Error('Session expired, redirecting to login...');
             }
 
-            // Handle other HTTP errors
-            if (!response.ok) {
-                const errorText = await response.text();
-                let errorMessage = `HTTP error! status: ${response.status}`;
-                
-                try {
-                    const errorData = JSON.parse(errorText);
-                    errorMessage = errorData.detail || errorData.message || errorMessage;
-                } catch (e) {
-                    // If JSON parsing fails, use the raw text
-                    errorMessage = `${errorMessage} - ${errorText}`;
-                }
-                
-                console.error('API Error:', {
-                    url: this.baseUrl + url,
-                    status: response.status,
-                    statusText: response.statusText,
-                    error: errorMessage
-                });
-                
-                throw new Error(errorMessage);
+            // Special handling for 403 Forbidden
+            if (response.status === 403) {
+                throw new Error('Accesso negato: permessi insufficienti');
             }
 
-            // Parse and return JSON response
-            const data = await response.json();
-            console.log('API Response Data:', data);
-            return data;
-            
+            // Throw error with message
+            throw new Error(errorMessage);
+
         } catch (error) {
-            console.error('Network or parsing error:', {
-                url: this.baseUrl + url,
-                error: error.message
-            });
+            // Network errors or other fetch errors
+            if (error instanceof TypeError) {
+                console.error('Network error:', error);
+                throw new Error('Errore di rete. Verifica la connessione.');
+            }
+
+            // Re-throw other errors
             throw error;
         }
     }
@@ -109,11 +144,19 @@ class ApiClient {
     /**
      * GET request method
      * @param {string} url - The API endpoint URL
+     * @param {Object} params - Query parameters
      * @param {Object} options - Additional fetch options
-     * @returns {Promise<Object>} - Response data
+     * @returns {Promise} - Response data
      */
-    async get(url, options = {}) {
-        return this.request(url, { ...options, method: 'GET' });
+    async get(url, params = {}, options = {}) {
+        // Build query string from params
+        const queryString = new URLSearchParams(params).toString();
+        const fullUrl = queryString ? `${url}?${queryString}` : url;
+
+        return this.request(fullUrl, {
+            method: 'GET',
+            ...options,
+        });
     }
 
     /**
@@ -121,13 +164,13 @@ class ApiClient {
      * @param {string} url - The API endpoint URL
      * @param {Object} data - Request body data
      * @param {Object} options - Additional fetch options
-     * @returns {Promise<Object>} - Response data
+     * @returns {Promise} - Response data
      */
-    async post(url, data, options = {}) {
+    async post(url, data = {}, options = {}) {
         return this.request(url, {
-            ...options,
             method: 'POST',
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
+            ...options,
         });
     }
 
@@ -136,24 +179,14 @@ class ApiClient {
      * @param {string} url - The API endpoint URL
      * @param {Object} data - Request body data
      * @param {Object} options - Additional fetch options
-     * @returns {Promise<Object>} - Response data
+     * @returns {Promise} - Response data
      */
-    async put(url, data, options = {}) {
+    async put(url, data = {}, options = {}) {
         return this.request(url, {
-            ...options,
             method: 'PUT',
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
+            ...options,
         });
-    }
-
-    /**
-     * DELETE request method
-     * @param {string} url - The API endpoint URL
-     * @param {Object} options - Additional fetch options
-     * @returns {Promise<Object>} - Response data
-     */
-    async delete(url, options = {}) {
-        return this.request(url, { ...options, method: 'DELETE' });
     }
 
     /**
@@ -161,64 +194,125 @@ class ApiClient {
      * @param {string} url - The API endpoint URL
      * @param {Object} data - Request body data
      * @param {Object} options - Additional fetch options
-     * @returns {Promise<Object>} - Response data
+     * @returns {Promise} - Response data
      */
-    async patch(url, data, options = {}) {
+    async patch(url, data = {}, options = {}) {
         return this.request(url, {
-            ...options,
             method: 'PATCH',
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
+            ...options,
         });
     }
 
     /**
-     * POST form data method (for form submissions with FormData)
+     * DELETE request method with optional body
      * @param {string} url - The API endpoint URL
-     * @param {FormData} formData - Form data object
-     * @param {Object} options - Additional fetch options
-     * @returns {Promise<Object>} - Response data
+     * @param {Object} options - Additional fetch options (can include 'data' property)
+     * @returns {Promise} - Response data
+     *
+     * Usage:
+     * // Without body
+     * await api.delete('/api/v1/admin/sites/123');
+     *
+     * // With body (password confirmation, etc.)
+     * await api.delete('/api/v1/admin/sites/123', {
+     *     data: { admin_password: 'secret', confirm_delete: true }
+     * });
      */
-    async postForm(url, formData, options = {}) {
-        const formOptions = {
-            credentials: 'include',
-            method: 'POST',
-            body: formData,
-            // Don't set Content-Type header for FormData - browser sets it with boundary
-            ...options
-        };
-        
-        return this.request(url, formOptions);
+    async delete(url, options = {}) {
+        const requestOptions = { method: 'DELETE', ...options };
+
+        // If 'data' is provided, convert it to JSON body
+        if (options.data) {
+            requestOptions.body = JSON.stringify(options.data);
+            delete requestOptions.data;
+        }
+
+        return this.request(url, requestOptions);
     }
 
     /**
-     * Upload form data (for file uploads)
+     * POST request with form data (multipart/form-data)
+     * Used for file uploads
      * @param {string} url - The API endpoint URL
-     * @param {FormData} formData - Form data with files
+     * @param {FormData} formData - FormData object containing files and fields
      * @param {Object} options - Additional fetch options
-     * @returns {Promise<Object>} - Response data
+     * @returns {Promise} - Response data
+     *
+     * Usage:
+     * const formData = new FormData();
+     * formData.append('file', fileInput.files[0]);
+     * formData.append('site_id', '123');
+     * await api.postForm('/api/v1/photos/upload', formData);
+     */
+    async postForm(url, formData, options = {}) {
+        return this.request(url, {
+            method: 'POST',
+            body: formData,
+            headers: {}, // Don't set Content-Type, browser will set it with boundary
+            ...options,
+        });
+    }
+
+    /**
+     * Alias for postForm - more intuitive for file uploads
+     * @param {string} url - The API endpoint URL
+     * @param {FormData} formData - FormData object containing files and fields
+     * @param {Object} options - Additional fetch options
+     * @returns {Promise} - Response data
      */
     async upload(url, formData, options = {}) {
-        const uploadOptions = {
-            credentials: 'include',
-            body: formData,
-            // Don't set Content-Type header for FormData - browser sets it with boundary
-            ...options
-        };
-        
-        return this.request(url, uploadOptions);
+        return this.postForm(url, formData, options);
+    }
+
+    /**
+     * Download a file from the server
+     * @param {string} url - The API endpoint URL
+     * @param {string} filename - Suggested filename for download
+     * @returns {Promise<Blob>} - File blob
+     *
+     * Usage:
+     * const blob = await api.download('/api/v1/export/sites', 'sites.csv');
+     * // The file download will start automatically
+     */
+    async download(url, filename = 'download') {
+        try {
+            const response = await fetch(this.baseUrl + url, {
+                method: 'GET',
+                credentials: 'include',
+            });
+
+            if (!response.ok) {
+                throw new Error(`Download failed: ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
+
+            // Create download link and trigger download
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+
+            return blob;
+        } catch (error) {
+            console.error('Download error:', error);
+            throw error;
+        }
     }
 }
 
-// Create a global instance for easy use throughout the application
+// Create and export global instance
 const api = new ApiClient();
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ApiClient, api };
-}
+// Make it available globally for Alpine.js components
+window.api = api;
 
-// Global availability
-if (typeof window !== 'undefined') {
-    window.ApiClient = ApiClient;
-    window.api = api;
+// Export for module systems (if needed)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ApiClient;
 }
