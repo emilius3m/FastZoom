@@ -439,9 +439,15 @@ async def v1_admin_delete_site(
     await verify_admin_access(current_user_id, user_sites, db)
     
     try:
-        # Get parameters from query string (for view layer compatibility)
-        admin_password = request.query_params.get("admin_password", "")
-        confirm_delete = request.query_params.get("confirm_delete") == "true"
+        # Try to get JSON body first, then fallback to query params
+        try:
+            body = await request.json()
+            admin_password = body.get("admin_password", "")
+            confirm_delete = body.get("confirm_delete", False)
+        except:
+            # Fallback to query params for backward compatibility
+            admin_password = request.query_params.get("admin_password", "")
+            confirm_delete = request.query_params.get("confirm_delete") == "true"
         
         # Ottieni utente corrente per verifica password
         user = await db.execute(select(User).where(User.id == current_user_id))

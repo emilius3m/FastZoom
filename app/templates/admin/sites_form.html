@@ -1,7 +1,6 @@
-<!-- templates/admin/sites_form.html - VERSIONE COMPLETA CRUD SITI ARCHEOLOGICI -->
 {% extends "base/site_base.html" %}
 
-{% block title %}{{ 'Modifica' if site else 'Nuovo' }} Sito Archeologico | Sistema Archeologico{% endblock %}
+{% block title %}{{ 'Modifica' if action == 'edit' else 'Nuovo' }} Sito Archeologico | Sistema Archeologico{% endblock %}
 
 {% block head %}
 <!-- API Client Script -->
@@ -9,768 +8,627 @@
 {% endblock %}
 
 {% block content %}
-<div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6 mb-6">
-    <div class="flex items-center">
-      <i class="fas fa-landmark text-3xl mr-4"></i>
+<!-- MAIN CONTAINER WITH ALPINE.JS DATA -->
+<div class="mx-auto max-w-4xl p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="siteForm()" x-init="init()">
 
+  <!-- Breadcrumb Navigation -->
+  <div class="mb-6">
+    <nav class="flex" aria-label="Breadcrumb">
+      <ol class="inline-flex items-center space-x-1 md:space-x-3">
+        <li class="inline-flex items-center">
+          <a href="/" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white">
+            <i class="fas fa-home mr-2"></i>Home
+          </a>
+        </li>
+        <li>
+          <div class="flex items-center">
+            <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+            <a href="/admin" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white">Admin</a>
+          </div>
+        </li>
+        <li>
+          <div class="flex items-center">
+            <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+            <a href="/admin/sites" class="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white">Siti</a>
+          </div>
+        </li>
+        <li aria-current="page">
+          <div class="flex items-center">
+            <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+            <span class="text-sm font-medium text-gray-500 dark:text-gray-400" x-text="action === 'edit' ? 'Modifica' : 'Nuovo'"></span>
+          </div>
+        </li>
+      </ol>
+    </nav>
+  </div>
+
+  <!-- Header Section -->
+  <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6 mb-6 shadow-lg">
+    <div class="flex items-center">
+      <i class="fas fa-landmark text-5xl mr-6"></i>
+      <div>
+        <h1 class="text-3xl font-bold" x-text="action === 'edit' ? 'Modifica Sito Archeologico' : 'Nuovo Sito Archeologico'"></h1>
+        <p class="mt-2 text-blue-100" x-text="action === 'edit' ? 'Modifica i dettagli del sito' : 'Inserisci i dettagli del nuovo sito archeologico'"></p>
+      </div>
     </div>
   </div>
-<div class=" mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="siteForm">
-    <!-- Page Header -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                        {{ 'Modifica Sito Archeologico' if site else 'Nuovo Sito Archeologico' }}
-                    </h1>
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                        {{ 'Modifica i dettagli del sito' if site else 'Inserisci i dettagli del nuovo sito archeologico' }}
-                    </p>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <a href="/admin/sites/"
-                       class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                        </svg>
-                        Torna alla Lista
-                    </a>
-                </div>
-            </div>
+
+  <!-- Alert Messages -->
+  <div x-show="errorMessage" x-transition class="mb-6 p-4 rounded-lg border bg-red-100 border-red-400 text-red-700 dark:bg-red-900/30 dark:border-red-700 dark:text-red-200">
+    <div class="flex justify-between items-center">
+      <div class="flex items-center">
+        <i class="fas fa-exclamation-circle mr-2"></i>
+        <span x-text="errorMessage"></span>
+      </div>
+      <button @click="errorMessage = ''" class="text-lg">&times;</button>
+    </div>
+  </div>
+
+  <div x-show="successMessage" x-transition class="mb-6 p-4 rounded-lg border bg-green-100 border-green-400 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-200">
+    <div class="flex justify-between items-center">
+      <div class="flex items-center">
+        <i class="fas fa-check-circle mr-2"></i>
+        <span x-text="successMessage"></span>
+      </div>
+      <button @click="successMessage = ''" class="text-lg">&times;</button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div x-show="isLoading" class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-12 text-center">
+    <svg class="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    <p class="text-gray-600 dark:text-gray-400 font-medium" x-text="action === 'edit' ? 'Caricamento dati...' : 'Creazione sito...'"></p>
+  </div>
+
+  <!-- Form -->
+  <form x-show="!isLoading" @submit.prevent="submitForm()" class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6 mb-6">
+
+    <!-- Section 1: Basic Information -->
+    <div class="mb-8">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+        <i class="fas fa-info-circle mr-2"></i>Informazioni Base
+      </h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Nome Sito -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Nome Sito <span class="text-red-500">*</span>
+          </label>
+          <input type="text" x-model="formData.name" required
+                 placeholder="Es. Necropoli di Cassino"
+                 @blur="validateField('name')"
+                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 :class="{'border-red-500': errors.name}">
+          <p x-show="errors.name" class="text-red-500 text-sm mt-1" x-text="errors.name"></p>
         </div>
+
+        <!-- Codice Sito -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Codice Sito <span class="text-red-500">*</span>
+          </label>
+          <input type="text" x-model="formData.code" required
+                 placeholder="Es. NERO001"
+                 @blur="validateField('code')"
+                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 :class="{'border-red-500': errors.code}">
+          <p x-show="errors.code" class="text-red-500 text-sm mt-1" x-text="errors.code"></p>
+        </div>
+
+        <!-- Ubicazione -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ubicazione</label>
+          <input type="text" x-model="formData.location"
+                 placeholder="Es. Via Roma 123"
+                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Descrizione -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrizione</label>
+          <textarea x-model="formData.description" rows="4"
+                    placeholder="Descrizione del sito archeologico..."
+                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+      </div>
     </div>
 
-    <!-- Alert Messages -->
-    <div x-show="showAlert"
-          x-transition:enter="transition ease-out duration-300"
-          x-transition:enter-start="opacity-0 transform translate-y-2"
-          x-transition:enter-end="opacity-100 transform translate-y-0"
-          class="mb-6 p-4 rounded-lg border"
-          :class="alertType === 'success' ? 'text-green-800 dark:text-green-300 bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-700' : 'text-red-800 dark:text-red-300 bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-700'"
-          role="alert">
-        <div class="flex items-center">
-            <svg x-show="alertType === 'success'" class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-            </svg>
-            <svg x-show="alertType === 'error'" class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-            </svg>
-            <span x-text="alertMessage"></span>
+    <!-- Section 2: Location Details -->
+    <div class="mb-8">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+        <i class="fas fa-map mr-2"></i>Localizzazione
+      </h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Regione -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Regione</label>
+          <select x-model="formData.region"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">-- Seleziona Regione --</option>
+            <option value="Abruzzo">Abruzzo</option>
+            <option value="Basilicata">Basilicata</option>
+            <option value="Calabria">Calabria</option>
+            <option value="Campania">Campania</option>
+            <option value="Emilia-Romagna">Emilia-Romagna</option>
+            <option value="Friuli-Venezia Giulia">Friuli-Venezia Giulia</option>
+            <option value="Lazio">Lazio</option>
+            <option value="Liguria">Liguria</option>
+            <option value="Lombardia">Lombardia</option>
+            <option value="Marche">Marche</option>
+            <option value="Molise">Molise</option>
+            <option value="Piemonte">Piemonte</option>
+            <option value="Puglia">Puglia</option>
+            <option value="Sardegna">Sardegna</option>
+            <option value="Sicilia">Sicilia</option>
+            <option value="Toscana">Toscana</option>
+            <option value="Trentino-Alto Adige">Trentino-Alto Adige</option>
+            <option value="Umbria">Umbria</option>
+            <option value="Valle d'Aosta">Valle d'Aosta</option>
+            <option value="Veneto">Veneto</option>
+          </select>
         </div>
+
+        <!-- Provincia -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provincia</label>
+          <select x-model="formData.province"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">-- Seleziona Provincia --</option>
+            <!-- Abruzzo -->
+            <optgroup label="Abruzzo" x-show="formData.region === 'Abruzzo'">
+              <option value="AQ">L'Aquila (AQ)</option>
+              <option value="TE">Teramo (TE)</option>
+              <option value="PE">Pescara (PE)</option>
+              <option value="CH">Chieti (CH)</option>
+            </optgroup>
+            <!-- Basilicata -->
+            <optgroup label="Basilicata" x-show="formData.region === 'Basilicata'">
+              <option value="PZ">Potenza (PZ)</option>
+              <option value="MT">Matera (MT)</option>
+            </optgroup>
+            <!-- Calabria -->
+            <optgroup label="Calabria" x-show="formData.region === 'Calabria'">
+              <option value="CS">Cosenza (CS)</option>
+              <option value="CZ">Catanzaro (CZ)</option>
+              <option value="KR">Crotone (KR)</option>
+              <option value="VV">Vibo Valentia (VV)</option>
+              <option value="RC">Reggio Calabria (RC)</option>
+            </optgroup>
+            <!-- Campania -->
+            <optgroup label="Campania" x-show="formData.region === 'Campania'">
+              <option value="NA">Napoli (NA)</option>
+              <option value="AV">Avellino (AV)</option>
+              <option value="BN">Benevento (BN)</option>
+              <option value="CE">Caserta (CE)</option>
+              <option value="SA">Salerno (SA)</option>
+            </optgroup>
+            <!-- Emilia-Romagna -->
+            <optgroup label="Emilia-Romagna" x-show="formData.region === 'Emilia-Romagna'">
+              <option value="PC">Piacenza (PC)</option>
+              <option value="PR">Parma (PR)</option>
+              <option value="RE">Reggio Emilia (RE)</option>
+              <option value="MO">Modena (MO)</option>
+              <option value="BO">Bologna (BO)</option>
+              <option value="FE">Ferrara (FE)</option>
+              <option value="RA">Ravenna (RA)</option>
+              <option value="FC">Forlì-Cesena (FC)</option>
+              <option value="RN">Rimini (RN)</option>
+            </optgroup>
+            <!-- Friuli-Venezia Giulia -->
+            <optgroup label="Friuli-Venezia Giulia" x-show="formData.region === 'Friuli-Venezia Giulia'">
+              <option value="UD">Udine (UD)</option>
+              <option value="GO">Gorizia (GO)</option>
+              <option value="TS">Trieste (TS)</option>
+              <option value="PN">Pordenone (PN)</option>
+            </optgroup>
+            <!-- Lazio -->
+            <optgroup label="Lazio" x-show="formData.region === 'Lazio'">
+              <option value="RM">Roma (RM)</option>
+              <option value="VT">Viterbo (VT)</option>
+              <option value="RI">Rieti (RI)</option>
+              <option value="FR">Frosinone (FR)</option>
+              <option value="LT">Latina (LT)</option>
+            </optgroup>
+            <!-- Liguria -->
+            <optgroup label="Liguria" x-show="formData.region === 'Liguria'">
+              <option value="IM">Imperia (IM)</option>
+              <option value="SV">Savona (SV)</option>
+              <option value="GE">Genova (GE)</option>
+              <option value="SP">La Spezia (SP)</option>
+            </optgroup>
+            <!-- Lombardia -->
+            <optgroup label="Lombardia" x-show="formData.region === 'Lombardia'">
+              <option value="VA">Varese (VA)</option>
+              <option value="CO">Como (CO)</option>
+              <option value="LC">Lecco (LC)</option>
+              <option value="MI">Milano (MI)</option>
+              <option value="BG">Bergamo (BG)</option>
+              <option value="BS">Brescia (BS)</option>
+              <option value="PV">Pavia (PV)</option>
+              <option value="LO">Lodi (LO)</option>
+              <option value="CR">Cremona (CR)</option>
+              <option value="MN">Mantova (MN)</option>
+            </optgroup>
+            <!-- Marche -->
+            <optgroup label="Marche" x-show="formData.region === 'Marche'">
+              <option value="PS">Pesaro e Urbino (PS)</option>
+              <option value="AN">Ancona (AN)</option>
+              <option value="MC">Macerata (MC)</option>
+              <option value="AP">Ascoli Piceno (AP)</option>
+            </optgroup>
+            <!-- Molise -->
+            <optgroup label="Molise" x-show="formData.region === 'Molise'">
+              <option value="CB">Campobasso (CB)</option>
+              <option value="IS">Isernia (IS)</option>
+            </optgroup>
+            <!-- Piemonte -->
+            <optgroup label="Piemonte" x-show="formData.region === 'Piemonte'">
+              <option value="AL">Alessandria (AL)</option>
+              <option value="AT">Asti (AT)</option>
+              <option value="BI">Biella (BI)</option>
+              <option value="CN">Cuneo (CN)</option>
+              <option value="NO">Novara (NO)</option>
+              <option value="TO">Torino (TO)</option>
+              <option value="VB">Verbano-Cusio-Ossola (VB)</option>
+              <option value="VC">Vercelli (VC)</option>
+            </optgroup>
+            <!-- Puglia -->
+            <optgroup label="Puglia" x-show="formData.region === 'Puglia'">
+              <option value="FG">Foggia (FG)</option>
+              <option value="BA">Bari (BA)</option>
+              <option value="TA">Taranto (TA)</option>
+              <option value="BR">Brindisi (BR)</option>
+              <option value="LE">Lecce (LE)</option>
+            </optgroup>
+            <!-- Sardegna -->
+            <optgroup label="Sardegna" x-show="formData.region === 'Sardegna'">
+              <option value="SS">Sassari (SS)</option>
+              <option value="CA">Cagliari (CA)</option>
+              <option value="NU">Nuoro (NU)</option>
+              <option value="OR">Oristano (OR)</option>
+            </optgroup>
+            <!-- Sicilia -->
+            <optgroup label="Sicilia" x-show="formData.region === 'Sicilia'">
+              <option value="PA">Palermo (PA)</option>
+              <option value="TP">Trapani (TP)</option>
+              <option value="AG">Agrigento (AG)</option>
+              <option value="CL">Caltanissetta (CL)</option>
+              <option value="EN">Enna (EN)</option>
+              <option value="CT">Catania (CT)</option>
+              <option value="SR">Siracusa (SR)</option>
+              <option value="RG">Ragusa (RG)</option>
+              <option value="ME">Messina (ME)</option>
+            </optgroup>
+            <!-- Toscana -->
+            <optgroup label="Toscana" x-show="formData.region === 'Toscana'">
+              <option value="AR">Arezzo (AR)</option>
+              <option value="FI">Firenze (FI)</option>
+              <option value="GR">Grosseto (GR)</option>
+              <option value="LI">Livorno (LI)</option>
+              <option value="LU">Lucca (LU)</option>
+              <option value="MS">Massa-Carrara (MS)</option>
+              <option value="PI">Pisa (PI)</option>
+              <option value="PT">Pistoia (PT)</option>
+              <option value="SI">Siena (SI)</option>
+            </optgroup>
+            <!-- Trentino-Alto Adige -->
+            <optgroup label="Trentino-Alto Adige" x-show="formData.region === 'Trentino-Alto Adige'">
+              <option value="BZ">Bolzano (BZ)</option>
+              <option value="TN">Trento (TN)</option>
+            </optgroup>
+            <!-- Umbria -->
+            <optgroup label="Umbria" x-show="formData.region === 'Umbria'">
+              <option value="PG">Perugia (PG)</option>
+              <option value="TR">Terni (TR)</option>
+            </optgroup>
+            <!-- Valle d'Aosta -->
+            <optgroup label="Valle d'Aosta" x-show="formData.region === 'Valle d\\'Aosta'">
+              <option value="AO">Aosta (AO)</option>
+            </optgroup>
+            <!-- Veneto -->
+            <optgroup label="Veneto" x-show="formData.region === 'Veneto'">
+              <option value="BL">Belluno (BL)</option>
+              <option value="PD">Padova (PD)</option>
+              <option value="RO">Rovigo (RO)</option>
+              <option value="TV">Treviso (TV)</option>
+              <option value="VE">Venezia (VE)</option>
+              <option value="VR">Verona (VR)</option>
+              <option value="VI">Vicenza (VI)</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <!-- Comune -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Comune</label>
+          <input type="text" x-model="formData.municipality"
+                 placeholder="Es. Cassino"
+                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Lat/Lng -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Latitudine</label>
+          <input type="number" x-model="formData.coordinates_lat" step="0.000001"
+                 placeholder="Es. 41.4933"
+                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Longitudine</label>
+          <input type="number" x-model="formData.coordinates_lng" step="0.000001"
+                 placeholder="Es. 13.8331"
+                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
     </div>
 
-    <!-- Main Form Layout -->
-    <div id="form-container" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <!-- Section 3: Archaeological Details -->
+    <div class="mb-8">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+        <i class="fas fa-flask mr-2"></i>Dettagli Archeologici
+      </h2>
 
-        <!-- Main Form - 2/3 width -->
-        <div class="xl:col-span-2 space-y-6">
-            
-            <!-- Basic Information Card -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Informazioni Principali</h2>
-                </div>
-                
-                <form @submit.prevent="submitForm" class="p-6 space-y-6">
-                    
-                    <!-- Site Name & Code Row -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="md:col-span-2">
-                            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Nome Sito *
-                            </label>
-                            <input type="text"
-                                   id="name"
-                                   name="name"
-                                   x-model="formData.name"
-                                   @blur="validateField('name')"
-                                   :class="{'border-red-500 bg-red-50 dark:bg-red-900': errors.name, 'border-green-500 bg-green-50 dark:bg-green-900': !errors.name && formData.name && touched.name}"
-                                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                   placeholder="es. Scavi di Pompei"
-                                   required>
-                            <p x-show="errors.name" x-text="errors.name" class="mt-1 text-sm text-red-600"></p>
-                        </div>
-                        
-                        <div>
-                            <label for="code" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Codice Identificativo *
-                            </label>
-                            <input type="text"
-                                   id="code"
-                                   name="code"
-                                   x-model="formData.code"
-                                   @blur="validateField('code')"
-                                   @input="formData.code = formData.code.toUpperCase()"
-                                   :class="{'border-red-500 bg-red-50 dark:bg-red-900': errors.code}"
-                                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 font-mono bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                   placeholder="PMP001"
-                                   pattern="[A-Z0-9]{3,10}"
-                                   required>
-                            <p x-show="errors.code" x-text="errors.code" class="mt-1 text-sm text-red-600"></p>
-                        </div>
-                    </div>
-
-                    <!-- Description -->
-                    <div>
-                        <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Descrizione
-                        </label>
-                        <textarea id="description"
-                                  name="description"
-                                  x-model="formData.description"
-                                  rows="4"
-                                  class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                  placeholder="Descrizione dettagliata del sito archeologico..."></textarea>
-                    </div>
-
-                    <!-- Historical Context Row -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label for="historical_period" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Periodo Storico
-                            </label>
-                            <select id="historical_period"
-                                    name="historical_period"
-                                    x-model="formData.historical_period"
-                                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                                <option value="">Seleziona periodo...</option>
-                                <option value="Preistorico">Preistorico</option>
-                                <option value="Protostorico">Protostorico</option>
-                                <option value="Età del Bronzo">Età del Bronzo</option>
-                                <option value="Età del Ferro">Età del Ferro</option>
-                                <option value="Etrusco">Etrusco</option>
-                                <option value="Romano Repubblicano">Romano Repubblicano</option>
-                                <option value="Romano Imperiale">Romano Imperiale</option>
-                                <option value="Tardo Antico">Tardo Antico</option>
-                                <option value="Medievale">Medievale</option>
-                                <option value="Rinascimentale">Rinascimentale</option>
-                                <option value="Moderno">Moderno</option>
-                                <option value="Contemporaneo">Contemporaneo</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label for="site_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Tipologia Sito
-                            </label>
-                            <select id="site_type"
-                                    name="site_type"
-                                    x-model="formData.site_type"
-                                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                                <option value="">Seleziona tipologia...</option>
-                                <option value="Abitato">Abitato</option>
-                                <option value="Necropoli">Necropoli</option>
-                                <option value="Santuario">Santuario</option>
-                                <option value="Villa">Villa</option>
-                                <option value="Fortificazione">Fortificazione</option>
-                                <option value="Porto">Porto</option>
-                                <option value="Cave">Cave</option>
-                                <option value="Strada">Strada</option>
-                                <option value="Acquedotto">Acquedotto</option>
-                                <option value="Teatro">Teatro</option>
-                                <option value="Anfiteatro">Anfiteatro</option>
-                                <option value="Terme">Terme</option>
-                                <option value="Altro">Altro</option>
-                            </select>
-                        </div>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Geographic Location Card -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Localizzazione Geografica</h2>
-                </div>
-                
-                <div class="p-6 space-y-6">
-                    <!-- Administrative Location -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label for="region" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Regione *
-                            </label>
-                            <select id="region"
-                                    name="region"
-                                    x-model="formData.region"
-                                    class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                    required>
-                                <option value="">Seleziona regione...</option>
-                                <template x-for="region in italianRegions" :key="region">
-                                    <option :value="region" x-text="region"></option>
-                                </template>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label for="province" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Provincia
-                            </label>
-                            <input type="text"
-                                   id="province"
-                                   name="province"
-                                   x-model="formData.province"
-                                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                   placeholder="Nome della provincia">
-                        </div>
-                        
-                        <div>
-                            <label for="municipality" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Comune
-                            </label>
-                            <input type="text"
-                                   id="municipality"
-                                   name="municipality"
-                                   x-model="formData.municipality"
-                                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                   placeholder="Nome del comune">
-                        </div>
-                    </div>
-
-                    <!-- Detailed Location -->
-                    <div>
-                        <label for="location" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Ubicazione Dettagliata
-                        </label>
-                        <textarea id="location"
-                                  name="location"
-                                  x-model="formData.location"
-                                  rows="2"
-                                  class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                  placeholder="es. Località Monte Castello, 2 km a nord del centro abitato"></textarea>
-                    </div>
-
-                    <!-- Coordinates -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label for="latitude" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Latitudine
-                            </label>
-                            <div class="relative">
-                                <input type="number"
-                                       id="latitude"
-                                       name="coordinates_lat"
-                                       x-model="formData.coordinates_lat"
-                                       step="0.0000001"
-                                       min="36"
-                                       max="47"
-                                       class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                       placeholder="41.8902">
-                                <button type="button" 
-                                        @click="getCurrentLocation"
-                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-blue-600"
-                                        title="Rileva posizione corrente">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label for="longitude" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Longitudine
-                            </label>
-                            <input type="number"
-                                   id="longitude"
-                                   name="coordinates_lng"
-                                   x-model="formData.coordinates_lng"
-                                   step="0.0000001"
-                                   min="6"
-                                   max="19"
-                                   class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                                   placeholder="12.4922">
-                        </div>
-                    </div>
-
-                    <!-- Map Integration -->
-                    <div x-show="formData.coordinates_lat && formData.coordinates_lng"
-                         x-transition:enter="transition ease-out duration-300"
-                         class="mt-4">
-                        <div class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
-                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Anteprima Posizione</h4>
-                            <div class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-3 text-sm text-blue-800 dark:text-blue-200">
-                                <div class="flex items-center">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    </svg>
-                                    Coordinate: <span x-text="formData.coordinates_lat || 'N/A'"></span>, <span x-text="formData.coordinates_lng || 'N/A'"></span>
-                                </div>
-                                <a :href="'https://www.google.com/maps?q=' + formData.coordinates_lat + ',' + formData.coordinates_lng"
-                                   target="_blank"
-                                   class="inline-flex items-center mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                    Visualizza su Google Maps
-                                    <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                                    </svg>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Form Actions -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="px-6 py-4">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            <span>I campi contrassegnati con * sono obbligatori</span>
-                        </div>
-                        
-                        <div class="flex items-center space-x-3">
-                            <button type="button"
-                                    @click="resetForm"
-                                    class="px-4 py-2 text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:ring-4 focus:outline-none focus:ring-blue-300">
-                                Reset
-                            </button>
-                            
-                            <button type="submit"
-                                    @click="submitForm"
-                                    :disabled="isSubmitting"
-                                    :class="isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-800'"
-                                    class="px-6 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg focus:ring-4 focus:outline-none focus:ring-blue-300">
-                                <span x-show="!isSubmitting">{{ 'Aggiorna Sito' if site else 'Crea Sito' }}</span>
-                                <span x-show="isSubmitting" class="flex items-center">
-                                    <svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Salvando...
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Periodo Storico -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Periodo Storico</label>
+          <input type="text" x-model="formData.historical_period"
+                 placeholder="Es. Età Romana"
+                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
 
-        <!-- Sidebar - 1/3 width -->
-        <div class="space-y-6">
-            
-            <!-- Site Status Card -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Stato Sito</h3>
-                </div>
-                <div class="p-4 space-y-4">
-                    <!-- Active Status -->
-                    <div class="flex items-center">
-                        <input id="is_active"
-                               name="is_active"
-                               type="checkbox"
-                               x-model="formData.is_active"
-                               class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
-                        <label for="is_active" class="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                            Sito Attivo
-                        </label>
-                    </div>
-                    
-                    <!-- Public Status -->
-                    <div class="flex items-start">
-                        <input id="is_public"
-                               name="is_public"
-                               type="checkbox"
-                               x-model="formData.is_public"
-                               class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
-                        <div class="ml-2">
-                            <label for="is_public" class="text-sm font-medium text-gray-900 dark:text-white">
-                                Visibile al Pubblico
-                            </label>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Il sito apparirà nei cataloghi pubblici</p>
-                        </div>
-                    </div>
-
-                    <!-- Research Status -->
-                    <div>
-                        <label for="research_status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Stato della Ricerca
-                        </label>
-                        <select id="research_status"
-                                name="research_status"
-                                x-model="formData.research_status"
-                                class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                            <option value="">Seleziona stato...</option>
-                            <option value="Pianificato">Pianificato</option>
-                            <option value="In corso">In corso</option>
-                            <option value="Completato">Completato</option>
-                            <option value="Sospeso">Sospeso</option>
-                            <option value="Abbandonato">Abbandonato</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            {% if site %}
-            <!-- Site Statistics Card -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Statistiche Sito</h3>
-                </div>
-                <div class="p-4 space-y-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">Utenti autorizzati:</span>
-                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ site.users_count or 0 }}</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">Fotografie:</span>
-                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ site.photos_count or 0 }}</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">Creato il:</span>
-                        <span class="text-sm font-medium text-gray-900 dark:text-white">
-                            {% if site.created_at %}
-                                {{ site.created_at[:10] if site.created_at and site.created_at is string else (site.created_at.strftime('%d/%m/%Y') if site.created_at else '') }}
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">Ultimo aggiornamento:</span>
-                        <span class="text-sm font-medium text-gray-900 dark:text-white">
-                            {% if site.updated_at %}
-                                {{ site.updated_at[:10] if site.updated_at and site.updated_at is string else (site.updated_at.strftime('%d/%m/%Y') if site.updated_at else '') }}
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions Card -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Azioni Rapide</h3>
-                </div>
-                <div class="p-4 space-y-2">
-                    <a href="/admin/site/{{ site.id }}/users/"
-                       class="w-full inline-flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                        </svg>
-                        Gestisci Utenti
-                    </a>
-                    <a href="/admin/sites/{{ site.id }}/photos/"
-                       class="w-full inline-flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                        Collezione Foto
-                    </a>
-                    <button @click="exportSiteData"
-                            class="w-full inline-flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        Esporta Dati
-                    </button>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Help Card -->
-            <div class="bg-blue-50 dark:bg-blue-900 rounded-lg border border-blue-200 dark:border-blue-700">
-                <div class="p-4">
-                    <div class="flex items-start">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-blue-400 dark:text-blue-300" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <h4 class="text-sm font-medium text-blue-800 dark:text-blue-300">Suggerimento</h4>
-                            <div class="mt-2 text-sm text-blue-700 dark:text-blue-200">
-                                <ul class="list-disc list-inside space-y-1">
-                                    <li>Usa codici identificativi univoci e descrittivi</li>
-                                    <li>Inserisci coordinate precise per la geolocalizzazione</li>
-                                    <li>La descrizione aiuta altri ricercatori a comprendere il sito</li>
-                                    <li>Mantieni aggiornate le informazioni del sito</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <!-- Tipo Sito -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo Sito</label>
+          <select x-model="formData.site_type"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="settlement">Insediamento</option>
+            <option value="necropolis">Necropoli</option>
+            <option value="temple">Tempio</option>
+            <option value="fortification">Fortezza</option>
+            <option value="road">Strada</option>
+            <option value="amphitheater">Anfiteatro</option>
+            <option value="villa">Villa</option>
+            <option value="other">Altro</option>
+          </select>
         </div>
+
+        <!-- Stato Ricerca -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stato Ricerca</label>
+          <select x-model="formData.research_status"
+                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="survey">Survey</option>
+            <option value="excavation">Scavo</option>
+            <option value="study">Studio</option>
+            <option value="conservation">Conservazione</option>
+            <option value="other">Altro</option>
+          </select>
+        </div>
+      </div>
     </div>
-</div>
 
-<!-- Alpine.js Component Script -->
+    <!-- Section 4: Status -->
+    <div class="mb-8">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+        <i class="fas fa-toggle-on mr-2"></i>Stato e Visibilità
+      </h2>
+
+      <div class="space-y-4">
+        <!-- Active Status -->
+        <label class="flex items-center space-x-3 cursor-pointer">
+          <input type="checkbox" x-model="formData.is_active" class="w-4 h-4 text-blue-600 rounded">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Sito Attivo</span>
+        </label>
+
+        <!-- Public Status -->
+        <label class="flex items-center space-x-3 cursor-pointer">
+          <input type="checkbox" x-model="formData.is_public" class="w-4 h-4 text-blue-600 rounded">
+          <div>
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Il sito apparirà nei cataloghi pubblici</span>
+            <p class="text-xs text-gray-600 dark:text-gray-400">Se disabilitato, il sito sarà visibile solo agli utenti autorizzati</p>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
+      <a href="/admin/sites" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg font-medium transition">
+        <i class="fas fa-arrow-left mr-2"></i>Annulla
+      </a>
+
+      <div class="flex gap-3">
+        <button type="reset" @click="resetForm()" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg font-medium transition">
+          <i class="fas fa-redo mr-2"></i>Ripristina
+        </button>
+
+        <button type="submit" :disabled="isSubmitting" :class="isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium transition">
+          <i :class="isSubmitting ? 'fas fa-spinner fa-spin' : 'fas fa-save'" class="mr-2"></i>
+          <span x-text="isSubmitting ? 'Salvataggio...' : (action === 'edit' ? 'Aggiorna' : 'Crea')"></span>
+        </button>
+      </div>
+    </div>
+
+  </form>
+
+</div> <!-- CHIUSURA del div x-data -->
+
 <script>
-// Ensure API client is loaded before Alpine.js initializes
-document.addEventListener('DOMContentLoaded', function() {
-  if (typeof api === 'undefined') {
-    console.error('API client not loaded');
-  }
-});
 document.addEventListener('alpine:init', () => {
-    Alpine.data('siteForm', () => ({
-        // Form Data
-        formData: {
-            name: '{{ site.name if site else "" }}',
-            code: '{{ site.code if site else "" }}',
-            description: '{{ site.description if site else "" }}',
-            historical_period: '{{ site.historical_period if site else "" }}',
-            site_type: '{{ site.site_type if site else "" }}',
-            region: '{{ site.region if site else "" }}',
-            province: '{{ site.province if site else "" }}',
-            municipality: '{{ site.municipality if site else "" }}',
-            location: '{{ site.locality if site else "" }}',
-            coordinates_lat: {{ site.coordinates_lat if site and site.coordinates_lat else 'null' }},
-            coordinates_lng: {{ site.coordinates_lng if site and site.coordinates_lng else 'null' }},
-            is_active: {{ 'true' if not site or site.status == 'active' else 'false' }},
-            is_public: {{ 'true' if site and site.is_public else 'false' }},
-            research_status: '{{ site.research_status if site else "" }}'
-        },
-        
-        // Italian Regions (based on web:116)
-        italianRegions: [
-            'Abruzzo', 'Basilicata', 'Calabria', 'Campania', 'Emilia-Romagna',
-            'Friuli-Venezia Giulia', 'Lazio', 'Liguria', 'Lombardia', 'Marche',
-            'Molise', 'Piemonte', 'Puglia', 'Sardegna', 'Sicilia',
-            'Toscana', 'Trentino-Alto Adige', 'Umbria', "Valle d'Aosta", 'Veneto'
-        ],
+  Alpine.data('siteForm', () => ({
+    // Form Data
+    formData: {
+      name: '',
+      code: '',
+      location: '',
+      region: '',
+      province: '',
+      municipality: '',
+      description: '',
+      historical_period: '',
+      site_type: 'other',
+      coordinates_lat: null,
+      coordinates_lng: null,
+      research_status: 'survey',
+      is_active: true,
+      is_public: true
+    },
 
-        
-        // Validation
-        errors: {},
-        touched: {},
-        
-        // UI State
-        isSubmitting: false,
-        showAlert: false,
-        alertType: 'success',
-        alertMessage: '',
-        
-        
-        init() {
-            // Check for URL parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('success')) {
-                this.showSuccess('Operazione completata con successo');
-            }
-        },
-        
-        
-        validateField(field) {
-            this.touched[field] = true;
-            
-            switch(field) {
-                case 'name':
-                    if (!this.formData.name || this.formData.name.length < 3) {
-                        this.errors.name = 'Nome sito richiesto (minimo 3 caratteri)';
-                    } else {
-                        delete this.errors.name;
-                    }
-                    break;
-                    
-                case 'code':
-                    if (!this.formData.code) {
-                        this.errors.code = 'Codice identificativo richiesto';
-                    } else if (!/^[A-Z0-9]{3,10}$/.test(this.formData.code)) {
-                        this.errors.code = 'Codice deve essere 3-10 caratteri alfanumerici maiuscoli';
-                    } else {
-                        delete this.errors.code;
-                    }
-                    break;
-            }
-        },
-        
-        async getCurrentLocation() {
-            if (!navigator.geolocation) {
-                this.showError('Geolocalizzazione non supportata dal browser');
-                return;
-            }
-            
-            this.showInfo('Rilevamento posizione in corso...');
-            
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    this.formData.coordinates_lat = position.coords.latitude.toFixed(7);
-                    this.formData.coordinates_lng = position.coords.longitude.toFixed(7);
-                    this.showSuccess('Posizione rilevata con successo');
-                },
-                (error) => {
-                    let message = 'Errore nel rilevamento della posizione';
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            message = 'Accesso alla posizione negato';
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            message = 'Posizione non disponibile';
-                            break;
-                        case error.TIMEOUT:
-                            message = 'Timeout rilevamento posizione';
-                            break;
-                    }
-                    this.showError(message);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 60000
-                }
-            );
-        },
+    // UI State
+    isLoading: false,
+    isSubmitting: false,
+    errorMessage: '',
+    successMessage: '',
+    action: 'create',
+    siteId: null,
 
-        async submitForm() {
-            // Validate all required fields
-            this.validateField('name');
-            this.validateField('code');
+    // Validation
+    errors: {
+      name: '',
+      code: ''
+    },
 
-            if (Object.keys(this.errors).length > 0) {
-                this.showError('Correggi gli errori nel modulo prima di salvare');
-                return;
-            }
+    // Methods
+    async init() {
+      // Get action from body data attribute or URL
+      const body = document.querySelector('body');
+      this.action = body?.dataset?.action || '{{ action }}' || 'create';
+      this.siteId = body?.dataset?.siteId || '{{ site_id | default("") }}';
 
-            if (!this.formData.region) {
-                this.showError('Seleziona almeno la regione');
-                return;
-            }
+      if (this.action === 'edit' && this.siteId) {
+        await this.loadSite();
+      }
+    },
 
-            this.isSubmitting = true;
+    async loadSite() {
+      this.isLoading = true;
+      this.errorMessage = '';
 
-            try {
-                // Prepare data for API
-                const submitData = {
-                    name: this.formData.name,
-                    code: this.formData.code,
-                    location: this.formData.location,
-                    region: this.formData.region,
-                    province: this.formData.province,
-                    municipality: this.formData.municipality,
-                    description: this.formData.description,
-                    historical_period: this.formData.historical_period,
-                    site_type: this.formData.site_type,
-                    coordinates_lat: this.formData.coordinates_lat,
-                    coordinates_lng: this.formData.coordinates_lng,
-                    research_status: this.formData.research_status,
-                    is_active: this.formData.is_active,
-                    is_public: this.formData.is_public
-                };
+      try {
+        const response = await api.get(`/api/v1/admin/sites/${encodeURIComponent(this.siteId)}`);
+        const site = response.site;
 
-                {% if site %}
-                // Update existing site
-                const url = '/api/v1/admin/sites/{{ site.id }}';
-                
-                // Ensure api is available
-                if (typeof api === 'undefined') {
-                  throw new Error('API client not loaded. Please refresh the page.');
-                }
-                
-                const response = await api.put(url, submitData);
-                {% else %}
-                // Create new site
-                const url = '/api/v1/admin/sites';
-                
-                // Ensure api is available
-                if (typeof api === 'undefined') {
-                  throw new Error('API client not loaded. Please refresh the page.');
-                }
-                
-                const response = await api.post(url, submitData);
-                {% endif %}
+        // Populate form
+        this.formData = {
+          name: site.name || '',
+          code: site.code || '',
+          location: site.location || '',
+          region: site.region || '',
+          province: site.province || '',
+          municipality: site.municipality || '',
+          description: site.description || '',
+          historical_period: site.historical_period || '',
+          site_type: site.site_type || 'other',
+          coordinates_lat: site.coordinates_lat ? parseFloat(site.coordinates_lat) : null,
+          coordinates_lng: site.coordinates_lng ? parseFloat(site.coordinates_lng) : null,
+          research_status: site.research_status || 'survey',
+          is_active: site.is_active || true,
+          is_public: site.is_public || true
+        };
+      } catch (error) {
+        this.errorMessage = error.message || 'Errore nel caricamento dei dati';
+        console.error('Error loading site:', error);
+      } finally {
+        this.isLoading = false;
+      }
+    },
 
-                // The API client returns data directly on success, throws error on failure
-                this.showSuccess('{{ "Sito aggiornato" if site else "Sito creato" }} con successo');
-                {% if not site %}
-                // Redirect to sites list after creating
-                setTimeout(() => {
-                    window.location.href = '/admin/sites/';
-                }, 1500);
-                {% endif %}
+    validateField(field) {
+      this.errors[field] = '';
 
-            } catch (error) {
-                this.showError('Errore di connessione: ' + error.message);
-            } finally {
-                this.isSubmitting = false;
-            }
-        },
-
-        resetForm() {
-            // Reset to original values
-            this.formData = {
-                name: '{{ site.name if site else "" }}',
-                code: '{{ site.code if site else "" }}',
-                description: '{{ site.description if site else "" }}',
-                historical_period: '{{ site.historical_period if site else "" }}',
-                site_type: '{{ site.site_type if site else "" }}',
-                region: '{{ site.region if site else "" }}',
-                province: '{{ site.province if site else "" }}',
-                municipality: '{{ site.municipality if site else "" }}',
-                location: '{{ site.locality if site else "" }}',
-                coordinates_lat: {{ site.coordinates_lat if site and site.coordinates_lat else 'null' }},
-                coordinates_lng: {{ site.coordinates_lng if site and site.coordinates_lng else 'null' }},
-                is_active: {{ 'true' if not site or site.status == 'active' else 'false' }},  
-                is_public: {{ 'true' if site and site.is_public else 'false' }},
-                research_status: '{{ site.research_status if site else "" }}'
-            };
-            this.errors = {};
-            this.touched = {};
-        },
-        
-        {% if site %}
-        async exportSiteData() {
-            try {
-                // Ensure api is available
-                if (typeof api === 'undefined') {
-                  throw new Error('API client not loaded. Please refresh the page.');
-                }
-                
-                const response = await api.get('/api/v1/admin/sites/{{ site.id }}');
-                
-                // The API client returns data directly on success
-                const blob = new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `sito_{{ site.code }}_${new Date().toISOString().split('T')[0]}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                this.showSuccess('Export completato');
-            } catch (error) {
-                this.showError('Errore: ' + error.message);
-            }
-        },
-        {% endif %}
-        
-        showSuccess(message) {
-            this.alertMessage = message;
-            this.alertType = 'success';
-            this.showAlert = true;
-            setTimeout(() => { this.showAlert = false; }, 5000);
-        },
-        
-        showError(message) {
-            this.alertMessage = message;
-            this.alertType = 'error';
-            this.showAlert = true;
-            setTimeout(() => { this.showAlert = false; }, 8000);
-        },
-        
-        showInfo(message) {
-            this.alertMessage = message;
-            this.alertType = 'info';
-            this.showAlert = true;
-            setTimeout(() => { this.showAlert = false; }, 3000);
+      if (field === 'name') {
+        if (!this.formData.name || !this.formData.name.trim()) {
+          this.errors.name = 'Il nome del sito è obbligatorio';
+        } else if (this.formData.name.length < 3) {
+          this.errors.name = 'Il nome deve avere almeno 3 caratteri';
         }
-    }));
-});
+      }
 
-// Theme management
-if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    document.documentElement.classList.add('dark');
-}
+      if (field === 'code') {
+        if (!this.formData.code || !this.formData.code.trim()) {
+          this.errors.code = 'Il codice del sito è obbligatorio';
+        } else if (this.formData.code.length < 3) {
+          this.errors.code = 'Il codice deve avere almeno 3 caratteri';
+        }
+      }
+    },
+
+    validateForm() {
+      this.validateField('name');
+      this.validateField('code');
+      return !this.errors.name && !this.errors.code;
+    },
+
+    async submitForm() {
+      if (!this.validateForm()) {
+        this.errorMessage = 'Completa tutti i campi obbligatori correttamente';
+        return;
+      }
+
+      this.isSubmitting = true;
+      this.errorMessage = '';
+      this.successMessage = '';
+
+      try {
+        let response;
+
+        if (this.action === 'edit') {
+          response = await api.put(
+            `/api/v1/admin/sites/${encodeURIComponent(this.siteId)}`,
+            this.formData
+          );
+        } else {
+          response = await api.post('/api/v1/admin/sites', this.formData);
+        }
+
+        this.successMessage = response.message || 'Sito salvato con successo';
+        
+        // Redirect after 2 seconds
+        setTimeout(() => {
+          window.location.href = '/admin/sites?success=saved';
+        }, 2000);
+      } catch (error) {
+        this.errorMessage = error.message || 'Errore nel salvataggio del sito';
+        console.error('Error submitting form:', error);
+      } finally {
+        this.isSubmitting = false;
+      }
+    },
+
+    resetForm() {
+      if (this.action === 'edit' && this.siteId) {
+        this.loadSite();
+      } else {
+        this.formData = {
+          name: '',
+          code: '',
+          location: '',
+          region: '',
+          province: '',
+          municipality: '',
+          description: '',
+          historical_period: '',
+          site_type: 'other',
+          coordinates_lat: null,
+          coordinates_lng: null,
+          research_status: 'survey',
+          is_active: true,
+          is_public: true
+        };
+      }
+      this.errors = { name: '', code: '' };
+      this.errorMessage = '';
+      this.successMessage = '';
+    }
+  }));
+});
 </script>
 {% endblock %}
