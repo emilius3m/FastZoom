@@ -87,7 +87,7 @@ class TokenBlacklist(Base):
         """
         blacklist_entry = cls(
             token_jti=token_jti,
-            user_id=user_id,
+            user_id=str(user_id),  # Convert UUID to string for SQLite compatibility
             reason=reason or 'logout',
             ip_address=ip_address,
             user_agent=user_agent

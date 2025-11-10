@@ -33,6 +33,49 @@ admin_view_router = APIRouter(tags=["Admin - Views"], prefix="/admin")
 # HELPER FUNCTIONS
 # ============================================================================
 
+def normalize_site_id(site_id: str) -> Optional[str]:
+    """
+    Normalizza l'ID del sito per supportare diversi formati.
+    
+    Supporta:
+    - UUID standard con trattini: eb8d88e1-74e3-46d3-8e86-81f926c01cab
+    - Hash esadecimali senza trattini: eeedd3ceda34bf3b47d749a971b22ba
+    
+    Returns:
+        str: L'ID normalizzato o None se non valido
+    """
+    if not site_id:
+        return None
+    
+    # Rimuovi spazi bianchi
+    site_id = site_id.strip()
+    
+    # Se è un UUID standard con trattini, valida e restituiscilo
+    if '-' in site_id:
+        try:
+            # Crea un oggetto UUID per validare il formato
+            uuid_obj = UUID(site_id)
+            # Restituisci la stringa originale (già nel formato corretto)
+            return site_id
+        except (ValueError, AttributeError):
+            return None
+    
+    # Se è un hash esadecimale senza trattini
+    if len(site_id) == 32:
+        try:
+            # Verifica che sia esadecimale
+            int(site_id, 16)
+            # Converti in formato UUID standard (inserisci trattini)
+            uuid_formatted = f"{site_id[0:8]}-{site_id[8:12]}-{site_id[12:16]}-{site_id[16:20]}-{site_id[20:32]}"
+            # Valida il formato UUID risultante
+            UUID(uuid_formatted)
+            return uuid_formatted
+        except (ValueError, AttributeError):
+            return None
+    
+    # Altri formati non supportati
+    return None
+
 async def get_admin_template_context(
     request: Request,
     current_user_id: UUID,
@@ -181,27 +224,26 @@ async def admin_sites_edit(
     """
     superuser, base_context = authdata
 
-    # Validazione UUID
-    try:
-        UUID(site_id)
-    except ValueError:
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
         logger.warning(f"Invalid site_id format: {site_id}")
         raise HTTPException(status_code=404, detail="ID sito non valido")
 
     context = {
         **base_context,
         "page_title": "Modifica Sito Archeologico",
-        "site_id": site_id,
+        "site_id": normalized_site_id,
         "action": "edit",
         "breadcrumb": [
             {"label": "Home", "url": "/"},
             {"label": "Admin", "url": "/admin"},
             {"label": "Siti", "url": "/admin/sites"},
-            {"label": "Modifica", "url": f"/admin/sites/{site_id}/edit", "active": True}
+            {"label": "Modifica", "url": f"/admin/sites/{normalized_site_id}/edit", "active": True}
         ]
     }
 
-    logger.debug(f"User {superuser.email} editing site {site_id}")
+    logger.debug(f"User {superuser.email} editing site {normalized_site_id}")
 
     return templates.TemplateResponse("admin/sites_form.html", context)
 
@@ -218,26 +260,25 @@ async def admin_site_users(
     """
     superuser, base_context = authdata
 
-    # Validazione UUID
-    try:
-        UUID(site_id)
-    except ValueError:
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
         logger.warning(f"Invalid site_id format: {site_id}")
         raise HTTPException(status_code=404, detail="ID sito non valido")
 
     context = {
         **base_context,
         "page_title": "Gestione Utenti del Sito",
-        "site_id": site_id,
+        "site_id": normalized_site_id,
         "breadcrumb": [
             {"label": "Home", "url": "/"},
             {"label": "Admin", "url": "/admin"},
             {"label": "Siti", "url": "/admin/sites"},
-            {"label": "Utenti", "url": f"/admin/sites/{site_id}/users", "active": True}
+            {"label": "Utenti", "url": f"/admin/sites/{normalized_site_id}/users", "active": True}
         ]
     }
 
-    logger.debug(f"User {superuser.email} managing users for site {site_id}")
+    logger.debug(f"User {superuser.email} managing users for site {normalized_site_id}")
 
     return templates.TemplateResponse("admin/site_users.html", context)
 
@@ -339,101 +380,6 @@ async def admin_users_edit(
     return templates.TemplateResponse("admin/users_form.html", context)
 
 
-# ============================================================================
-# GESTIONE PERMESSI
-# ============================================================================
-
-@admin_view_router.get("/permissions", response_class=HTMLResponse, name="admin_permissions_list")
-async def admin_permissions_list(
-    request: Request,
-    authdata: tuple = Depends(require_superuser)
-):
-    """
-    Pagina lista permessi utenti-siti.
-    Alpine.js carica i dati tramite API GET /api/v1/admin/permissions
-    """
-    superuser, base_context = authdata
-
-    context = {
-        **base_context,
-        "page_title": "Gestione Permessi",
-        "breadcrumb": [
-            {"label": "Home", "url": "/"},
-            {"label": "Admin", "url": "/admin"},
-            {"label": "Permessi", "url": "/admin/permissions", "active": True}
-        ]
-    }
-
-    logger.debug(f"Loading admin permissions list for {superuser.email}")
-
-    return templates.TemplateResponse("admin/permissions_list.html", context)
-
-
-@admin_view_router.get("/permissions/new", response_class=HTMLResponse, name="admin_permissions_new")
-async def admin_permissions_new(
-    request: Request,
-    authdata: tuple = Depends(require_superuser)
-):
-    """
-    Form per assegnare un nuovo permesso a un utente per un sito.
-    Template: admin_permissions_form.html con action='create'
-    """
-    superuser, base_context = authdata
-
-    context = {
-        **base_context,
-        "page_title": "Assegna Permesso",
-        "action": "create",
-        "permission": None,
-        "breadcrumb": [
-            {"label": "Home", "url": "/"},
-            {"label": "Admin", "url": "/admin"},
-            {"label": "Permessi", "url": "/admin/permissions"},
-            {"label": "Nuovo", "url": "/admin/permissions/new", "active": True}
-        ]
-    }
-
-    logger.debug(f"User {superuser.email} accessing new permission form")
-
-    return templates.TemplateResponse("admin/permissions_form.html", context)
-
-
-@admin_view_router.get("/permissions/{permission_id}/edit", response_class=HTMLResponse, name="admin_permissions_edit")
-async def admin_permissions_edit(
-    request: Request,
-    permission_id: str,
-    authdata: tuple = Depends(require_superuser)
-):
-    """
-    Form per modificare un permesso.
-    Alpine.js carica i dati tramite API GET /api/v1/admin/permissions/{permission_id}
-    Template: admin_permissions_form.html con action='edit'
-    """
-    superuser, base_context = authdata
-
-    # Validazione UUID
-    try:
-        UUID(permission_id)
-    except ValueError:
-        logger.warning(f"Invalid permission_id format: {permission_id}")
-        raise HTTPException(status_code=404, detail="ID permesso non valido")
-
-    context = {
-        **base_context,
-        "page_title": "Modifica Permesso",
-        "permission_id": permission_id,
-        "action": "edit",
-        "breadcrumb": [
-            {"label": "Home", "url": "/"},
-            {"label": "Admin", "url": "/admin"},
-            {"label": "Permessi", "url": "/admin/permissions"},
-            {"label": "Modifica", "url": f"/admin/permissions/{permission_id}/edit", "active": True}
-        ]
-    }
-
-    logger.debug(f"User {superuser.email} editing permission {permission_id}")
-
-    return templates.TemplateResponse("admin/permissions_form.html", context)
 
 
 # ============================================================================

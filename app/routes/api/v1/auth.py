@@ -429,6 +429,7 @@ async def v1_register(
 
         # Create new user
         user = User(
+            id=str(uuid4()),  # Convert UUID to string for SQLite compatibility
             email=email,
             username=email.split("@")[0],  # Generate username from email
             hashed_password=hashed_password,
@@ -762,7 +763,7 @@ async def v1_update_user(
         if existing_profile is None:
             # Create new UserProfile
             new_profile = await user_profile_crud.create({
-                "user_id": target_user_id,
+                "user_id": str(target_user_id),  # Convert UUID to string for SQLite compatibility
                 **sanitized_data
             }, db)
 

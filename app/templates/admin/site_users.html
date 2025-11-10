@@ -290,8 +290,8 @@
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Livello Permesso</label>
                 <select x-model="newPermissionLevel"
                         class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                    <option value="viewer">Visualizzatore</option>
-                    <option value="editor">Editor</option>
+                    <option value="read">Visualizzatore</option>
+                    <option value="write">Editor</option>
                     <option value="admin">Amministratore Sito</option>
                 </select>
             </div>
@@ -496,8 +496,8 @@ document.addEventListener('alpine:init', () => {
         
         getPermissionLevelLabel(level) {
             const labels = {
-                'viewer': 'Visualizzatore',
-                'editor': 'Editor',
+                'read': 'Visualizzatore',
+                'write': 'Editor',
                 'admin': 'Amministratore Sito'
             };
             return labels[level] || level;
@@ -523,11 +523,16 @@ document.addEventListener('alpine:init', () => {
                   throw new Error('API client not loaded. Please refresh page.');
                 }
                 
-                const response = await api.post(`/api/v1/admin/users/${encodeURIComponent(this.selectedUserId)}/permissions`, {
+                // Convert user_id to proper UUID format if needed
+                const userId = this.selectedUserId;
+                const response = await api.post(`/api/v1/admin/users/${encodeURIComponent(userId)}/permissions`, {
+                    user_id: userId,
                     site_id: this.site.id,
                     permission_level: this.newPermissionLevel,
                     notes: this.newPermissionNotes
                 });
+                
+                console.log('Add permission response:', response);
                 
                 if (response.ok) {
                     // Add user to local arrays

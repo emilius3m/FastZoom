@@ -327,6 +327,23 @@ class UserSitePermission(Base):
         """Controlla se ha permessi di amministrazione"""
         level = self.permission_level_enum
         return self.is_valid() and level in [PermissionLevel.ADMIN, PermissionLevel.REGIONAL_ADMIN]
+    
+    def has_permission_level(self, required_level: PermissionLevel) -> bool:
+        """Controlla se il permesso ha il livello richiesto o superiore"""
+        if not self.is_valid():
+            return False
+        
+        level_hierarchy = {
+            PermissionLevel.READ: 1,
+            PermissionLevel.WRITE: 2,
+            PermissionLevel.ADMIN: 3,
+            PermissionLevel.REGIONAL_ADMIN: 4
+        }
+        
+        current_level = level_hierarchy.get(self.permission_level_enum, 0)
+        required_hierarchy = level_hierarchy.get(required_level, 0)
+        
+        return current_level >= required_hierarchy
 
     @property
     def permission_display_name(self) -> str:

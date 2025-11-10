@@ -407,7 +407,7 @@ class GeographicMapService:
             
             # Generate layer ID first to ensure consistency between MinIO and database
             from uuid import uuid4
-            layer_id = uuid4()
+            layer_id = str(uuid4())  # Convert UUID to string for SQLite compatibility
             
             # Prepare layer data for creation first
             layer = {

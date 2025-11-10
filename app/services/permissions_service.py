@@ -1,7 +1,7 @@
 # app/services/permissions_service.py
 
 from typing import List, Dict, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from datetime import datetime, timezone
@@ -54,45 +54,87 @@ class PermissionsService:
     ) -> UserSitePermission:
         """Assegna un permesso a un utente per un sito"""
         
+        # DEBUG: Log incoming parameters
+        from loguru import logger
+        logger.info(f"[DEBUG] PermissionsService.assign_permission called")
+        logger.info(f"[DEBUG] user_id: {user_id} (type: {type(user_id)})")
+        logger.info(f"[DEBUG] site_id: {site_id} (type: {type(site_id)})")
+        logger.info(f"[DEBUG] permission_level: {permission_level} (type: {type(permission_level)})")
+        logger.info(f"[DEBUG] granted_by: {granted_by} (type: {type(granted_by)})")
+        logger.info(f"[DEBUG] expires_at: {expires_at}")
+        logger.info(f"[DEBUG] notes: {notes}")
+        logger.info(f"[DEBUG] replace_existing: {replace_existing}")
+        
         # Controlla se esiste già un permesso per questo user-site
+        logger.info(f"[DEBUG] Checking for existing permission...")
         existing = await db.execute(
             select(UserSitePermission).where(
                 and_(
-                    UserSitePermission.user_id == user_id,
-                    UserSitePermission.site_id == site_id
+                    UserSitePermission.user_id == str(user_id),
+                    UserSitePermission.site_id == str(site_id)
                 )
             )
         )
         existing_permission = existing.scalar_one_or_none()
+        logger.info(f"[DEBUG] Existing permission found: {existing_permission}")
         
         if existing_permission:
+            logger.info(f"[DEBUG] Existing permission found, updating...")
             if replace_existing:
                 # Aggiorna il permesso esistente
                 existing_permission.permission_level = permission_level
-                existing_permission.granted_by = granted_by
+                existing_permission.granted_by = str(granted_by)
                 existing_permission.expires_at = expires_at
                 existing_permission.notes = notes
                 existing_permission.is_active = True
                 existing_permission.updated_at = datetime.now(timezone.utc)
                 
+                logger.info(f"[DEBUG] Updated existing permission: {existing_permission}")
                 await db.commit()
+                logger.info(f"[DEBUG] Database commit completed for updated permission")
+                
+                # Verify the update
+                verify_query = await db.execute(
+                    select(UserSitePermission).where(UserSitePermission.id == existing_permission.id)
+                )
+                verified_permission = verify_query.scalar_one_or_none()
+                logger.info(f"[DEBUG] Verified updated permission: {verified_permission}")
+                
                 return existing_permission
             else:
                 raise ValueError("Permesso già esistente per questo utente e sito")
         
         # Crea nuovo permesso
+        logger.info(f"[DEBUG] Creating new permission...")
+        new_permission_id = str(uuid4())
+        logger.info(f"[DEBUG] New permission ID: {new_permission_id}")
+        
         new_permission = UserSitePermission(
-            user_id=user_id,
-            site_id=site_id,
+            id=new_permission_id,  # Convert UUID to string for SQLite compatibility
+            user_id=str(user_id),  # Convert UUID to string for SQLite compatibility
+            site_id=str(site_id),  # Convert UUID to string for SQLite compatibility
             permission_level=permission_level,
-            granted_by=granted_by,
+            permissions=[],  # Initialize with empty list to satisfy NOT NULL constraint
+            granted_by=str(granted_by),  # Convert UUID to string for SQLite compatibility
             expires_at=expires_at,
             notes=notes,
             is_active=True
         )
         
+        logger.info(f"[DEBUG] New permission object created: {new_permission}")
+        
         db.add(new_permission)
+        logger.info(f"[DEBUG] Permission added to session")
+        
         await db.commit()
+        logger.info(f"[DEBUG] Database commit completed for new permission")
+        
+        # Verify the permission was actually saved
+        verify_query = await db.execute(
+            select(UserSitePermission).where(UserSitePermission.id == new_permission_id)
+        )
+        verified_permission = verify_query.scalar_one_or_none()
+        logger.info(f"[DEBUG] Verified new permission: {verified_permission}")
         
         return new_permission
     

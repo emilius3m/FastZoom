@@ -8,7 +8,7 @@ e #2 (Introduzione Service Layer).
 
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import HTTPException, status, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
@@ -324,8 +324,9 @@ class PhotoUploadService:
             from app.models import UserActivity
 
             activity = UserActivity(
-                user_id=user_id,
-                site_id=site_id,
+                id=str(uuid4()),  # Convert UUID to string for SQLite compatibility
+                user_id=str(user_id),  # Convert UUID to string for SQLite compatibility
+                site_id=str(site_id),  # Convert UUID to string for SQLite compatibility
                 activity_type="UPLOAD",
                 activity_desc=f"Caricata foto: {filename}",
                 extra_data={

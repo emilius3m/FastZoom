@@ -191,6 +191,11 @@ from app.models.documentation_and_field import (
     get_photos_by_types
 )
 
+# ===== IMPORT CANTIERE =====
+from app.models.cantiere import (
+    Cantiere
+)
+
 # ===== IMPORT DOCUMENTAZIONE GRAFICA =====
 from app.models.documentazione_grafica import (
     FotografiaArcheologica,
@@ -360,7 +365,10 @@ __all__ = [
     'TipoDestinatarioEnum',
     'StatoRelazioneEnum',
     'TipoElencoEnum',
-    'TEMPLATE_ELENCHI'
+    'TEMPLATE_ELENCHI',
+    
+    # Cantiere
+    'Cantiere'
 ]
 
 # ===== METADATA INFO =====

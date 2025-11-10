@@ -138,7 +138,7 @@ async def upload_document(
 
         # Crea record nel database
         new_document = Document(
-            site_id=site_id,
+            site_id=str(site_id),  # Convert UUID to string for SQLite compatibility
             title=title,
             description=description,
             category=category,
@@ -151,8 +151,8 @@ async def upload_document(
             doc_date=datetime.fromisoformat(doc_date) if doc_date else None,
             author=author,
             is_public=is_public,
-            uploaded_by=current_user_id,
-            created_by=current_user_id  # Add required created_by field
+            uploaded_by=str(current_user_id),  # Convert UUID to string for SQLite compatibility
+            created_by=str(current_user_id)  # Add required created_by field
         )
 
         db.add(new_document)

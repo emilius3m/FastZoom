@@ -83,7 +83,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 
 engine = create_async_engine(
     DATABASE_URL,
-    echo=False,
+    echo=True,  # Enable SQL logging for debugging
     future=True,
     # Connection Pool Configuration - Ottimizzato per 15-20 richieste concorrenti
     pool_size=20,           # 20 connessioni permanenti
@@ -92,7 +92,14 @@ engine = create_async_engine(
     pool_recycle=3600,      # 1 ora riciclo connessioni
     pool_pre_ping=True,     # Verifica connessioni prima dell'uso
 )
+
+# DEBUG: Log engine creation
+from loguru import logger
+logger.info(f"[DEBUG] Database engine created with URL: {DATABASE_URL}")
+logger.info(f"[DEBUG] Engine pool configuration: pool_size=20, max_overflow=30")
+
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
+logger.info(f"[DEBUG] Async session maker created")
 
 
 def init_models():

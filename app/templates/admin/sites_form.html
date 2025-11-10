@@ -513,7 +513,7 @@ document.addEventListener('alpine:init', () => {
       this.errorMessage = '';
 
       try {
-        const response = await api.get(`/api/v1/admin/sites/${encodeURIComponent(this.siteId)}`);
+        const response = await api.get(`/api/v1/admin/sites/${encodeURIComponent(this.normalizeSiteId(this.siteId))}`);
         const site = response.site;
 
         // Populate form
@@ -582,7 +582,7 @@ document.addEventListener('alpine:init', () => {
 
         if (this.action === 'edit') {
           response = await api.put(
-            `/api/v1/admin/sites/${encodeURIComponent(this.siteId)}`,
+            `/api/v1/admin/sites/${encodeURIComponent(this.normalizeSiteId(this.siteId))}`,
             this.formData
           );
         } else {
@@ -627,6 +627,28 @@ document.addEventListener('alpine:init', () => {
       this.errors = { name: '', code: '' };
       this.errorMessage = '';
       this.successMessage = '';
+    },
+
+    // Funzione per normalizzare l'ID del sito (simile a quella lato server)
+    normalizeSiteId(siteId) {
+      if (!siteId) return siteId;
+      
+      // Rimuovi spazi bianchi
+      siteId = siteId.trim();
+      
+      // Se è un UUID standard con trattini, restituiscilo
+      if (siteId.includes('-')) {
+        return siteId;
+      }
+      
+      // Se è un hash esadecimale senza trattini (32 caratteri)
+      if (siteId.length === 32) {
+        // Converti in formato UUID standard (inserisci trattini)
+        return `${siteId.slice(0,8)}-${siteId.slice(8,12)}-${siteId.slice(12,16)}-${siteId.slice(16,20)}-${siteId.slice(20)}`;
+      }
+      
+      // Altri formati, restituisci come sono
+      return siteId;
     }
   }));
 });

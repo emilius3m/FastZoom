@@ -67,8 +67,14 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """Dependency per ottenere sessione database asincrona"""
     async with async_session_maker() as session:
         try:
+            # DEBUG: Log session creation
+            from loguru import logger
+            logger.debug(f"[DEBUG] New database session created: {id(session)}")
             yield session
         finally:
+            # DEBUG: Log session closure
+            from loguru import logger
+            logger.debug(f"[DEBUG] Database session closed: {id(session)}")
             await session.close()
 
 # 🔧 RIMUOVI QUESTA FUNZIONE - non serve più senza fastapi-users

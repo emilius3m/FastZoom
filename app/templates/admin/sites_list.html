@@ -275,17 +275,17 @@
               </td>
               <td class="px-6 py-4">
                 <div class="flex gap-1 flex-wrap">
-                  <a :href="`/admin/sites/${site.id}/users`" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded transition" title="Gestisci utenti">
+                  <a :href="`/admin/sites/${normalizeSiteId(site.id)}/users`" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded transition" title="Gestisci utenti">
                     <i class="fas fa-users mr-1"></i>Utenti
                   </a>
-                  <a :href="`/admin/sites/${site.id}/edit`" class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded transition" title="Modifica sito">
+                  <a :href="`/admin/sites/${normalizeSiteId(site.id)}/edit`" class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-xs bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded transition" title="Modifica sito">
                     <i class="fas fa-edit mr-1"></i>Modifica
                   </a>
-                  <button @click="toggleStatus(site.id)" :title="site.is_active ? 'Disattiva' : 'Attiva'" :class="site.is_active ? 'text-orange-600 dark:text-orange-400 hover:text-orange-800' : 'text-green-600 dark:text-green-400 hover:text-green-800'" class="text-xs bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded transition">
+                  <button @click="toggleStatus(normalizeSiteId(site.id))" :title="site.is_active ? 'Disattiva' : 'Attiva'" :class="site.is_active ? 'text-orange-600 dark:text-orange-400 hover:text-orange-800' : 'text-green-600 dark:text-green-400 hover:text-green-800'" class="text-xs bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded transition">
                     <i :class="site.is_active ? 'fas fa-ban' : 'fas fa-check'" class="mr-1"></i>
                     <span x-text="site.is_active ? 'Disattiva' : 'Attiva'"></span>
                   </button>
-                  <button @click="confirmDelete(site.id)" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded transition" title="Elimina sito">
+                  <button @click="confirmDelete(normalizeSiteId(site.id))" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded transition" title="Elimina sito">
                     <i class="fas fa-trash mr-1"></i>Elimina
                   </button>
                 </div>
@@ -608,9 +608,31 @@ document.addEventListener('alpine:init', () => {
       this.applyFilters();
     },
 
+    // Funzione per normalizzare l'ID del sito (simile a quella lato server)
+    normalizeSiteId(siteId) {
+      if (!siteId) return siteId;
+      
+      // Rimuovi spazi bianchi
+      siteId = siteId.trim();
+      
+      // Se è un UUID standard con trattini, restituiscilo
+      if (siteId.includes('-')) {
+        return siteId;
+      }
+      
+      // Se è un hash esadecimale senza trattini (32 caratteri)
+      if (siteId.length === 32) {
+        // Converti in formato UUID standard (inserisci trattini)
+        return `${siteId.slice(0,8)}-${siteId.slice(8,12)}-${siteId.slice(12,16)}-${siteId.slice(16,20)}-${siteId.slice(20)}`;
+      }
+      
+      // Altri formati, restituisci come sono
+      return siteId;
+    },
+
     async toggleStatus(siteId) {
       try {
-        const response = await api.post(`/api/v1/admin/sites/${encodeURIComponent(siteId)}/toggle-status`);
+        const response = await api.post(`/api/v1/admin/sites/${encodeURIComponent(this.normalizeSiteId(siteId))}/toggle-status`);
         const site = this.sites.find(s => s.id === siteId);
         if (site) {
           site.is_active = !site.is_active;
@@ -645,7 +667,7 @@ document.addEventListener('alpine:init', () => {
       this.isDeleting = true;
       
       try {
-        const response = await api.delete(`/api/v1/admin/sites/${encodeURIComponent(this.deleteTarget.id)}`, {
+        const response = await api.delete(`/api/v1/admin/sites/${encodeURIComponent(this.normalizeSiteId(this.deleteTarget.id))}`, {
           data: {
             admin_password: this.deletePassword,
             confirm_delete: true
