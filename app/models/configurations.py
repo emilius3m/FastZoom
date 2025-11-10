@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any
 
 from sqlalchemy import (
     Column, String, Text, Boolean, DateTime, Date, ForeignKey,
-    Integer, JSON, Index, UniqueConstraint, UUID
+    Integer, JSON, Index, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -71,8 +71,8 @@ class ConfigurazioneExport(Base, SiteMixin, UserMixin):
     """
     __tablename__ = "configurazioni_export"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey('archaeological_sites.id'), nullable=False)
 
     # ===== IDENTIFICAZIONE =====
     nome_configurazione = Column(String(200), nullable=False)
@@ -158,8 +158,8 @@ class RelazioneFinaleScavo(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     """
     __tablename__ = "relazioni_finali_scavo"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey('archaeological_sites.id'), nullable=False)
 
     # ===== IDENTIFICAZIONE =====
     titolo = Column(String(300), nullable=False)
@@ -207,7 +207,7 @@ class RelazioneFinaleScavo(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     elenco_tavole = Column(JSON, default=list)                     # ID Tavole incluse
     
     # ===== EXPORT E FORMATO =====
-    configurazione_export_id = Column(UUID(as_uuid=True), ForeignKey('configurazioni_export.id'), nullable=True)
+    configurazione_export_id = Column(String(36), ForeignKey('configurazioni_export.id'), nullable=True)
     formato_finale = Column(String(20), default='pdf')
     include_allegati_digitali = Column(Boolean, default=True)       # DVD, USB
     
@@ -220,7 +220,7 @@ class RelazioneFinaleScavo(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     stato = Column(String(20), default='bozza', nullable=False)     # Enum stati
     
     # Approvazioni
-    approvata_da = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
+    approvata_da = Column(String(36), ForeignKey('users.id'), nullable=True)
     data_approvazione = Column(DateTime, nullable=True)
     note_approvazione = Column(Text, nullable=True)
     
@@ -232,7 +232,7 @@ class RelazioneFinaleScavo(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     # ===== VERSIONING =====
     versione = Column(String(10), default="1.0")
     note_versione = Column(Text, nullable=True)
-    versione_precedente_id = Column(UUID(as_uuid=True), ForeignKey('relazioni_finali_scavo.id'), nullable=True)
+    versione_precedente_id = Column(String(36), ForeignKey('relazioni_finali_scavo.id'), nullable=True)
     
     # ===== SISTEMA =====
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -328,8 +328,8 @@ class TemplateRelazione(Base, SiteMixin, UserMixin):
     """
     __tablename__ = "template_relazioni"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey('archaeological_sites.id'), nullable=False)
     
     # ===== IDENTIFICAZIONE =====
     nome_template = Column(String(200), nullable=False)

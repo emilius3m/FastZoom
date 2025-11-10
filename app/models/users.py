@@ -95,8 +95,8 @@ class User(Base, SoftDeleteMixin):
     preferences = Column(JSON, default=dict)  # Theme, lingua, etc.
 
     # Timestamp
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # Relazioni
     roles = relationship("Role", secondary=user_roles_association,
@@ -218,8 +218,8 @@ class Role(Base):
     base_permissions = Column(JSON, default=list)  # ['read_sites', 'create_us', etc.]
 
     # Metadati
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
 
     # Relazioni
     users = relationship("User", secondary=user_roles_association,
@@ -266,8 +266,8 @@ class UserSitePermission(Base):
     is_active = Column(Boolean, default=True)
 
     # Timestamp
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # Relazioni
     user = relationship("User", foreign_keys=[user_id], back_populates="site_permissions")

@@ -41,8 +41,8 @@ class GeographicMap(Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)  # Mappa di default del sito
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
     created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Relazioni
@@ -113,8 +113,8 @@ class GeographicMapLayer(Base):
     bounds_west: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
     created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Relazioni
@@ -175,8 +175,8 @@ class GeographicMapMarker(Base):
     marker_metadata: Mapped[Optional[dict]] = mapped_column('metadata', JSON, nullable=True)
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
     created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Relazioni
@@ -225,7 +225,7 @@ class GeographicMapMarkerPhoto(Base):
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)  # Foto principale del marker
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Relazioni

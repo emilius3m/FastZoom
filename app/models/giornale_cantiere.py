@@ -34,7 +34,7 @@ giornale_operatori_association = Table(
     Column('id', String(36), primary_key=True, default=lambda: str(uuid4())),
     Column('giornale_id', String(36), ForeignKey('giornali_cantiere.id', ondelete='CASCADE'), nullable=False),
     Column('operatore_id', String(36), ForeignKey('operatori_cantiere.id', ondelete='CASCADE'), nullable=False),
-    Column('created_at', DateTime(timezone=True), server_default=func.now())
+    Column('created_at', DateTime, server_default=func.now())
 )
 
 
@@ -87,8 +87,8 @@ class OperatoreCantiere(Base):
     ore_totali = Column(Integer, default=0, nullable=False)  # Ore totali lavorate
     
     # Timestamp automatici
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
     
     # ===== RELAZIONI =====
     # Relazione con il sito archeologico
@@ -188,7 +188,7 @@ class GiornaleCantiere(Base):
     
     # Firma digitale e validazione
     validato = Column(Boolean, default=False, nullable=False)
-    data_validazione = Column(DateTime(timezone=True), nullable=True)
+    data_validazione = Column(DateTime, nullable=True)
     firma_digitale_hash = Column(String(500), nullable=True)  # Hash della firma digitale
     
     # ===== ALLEGATI E DOCUMENTAZIONE =====
@@ -196,8 +196,8 @@ class GiornaleCantiere(Base):
     allegati_paths = Column(Text, nullable=True)  # JSON array di path
     
     # ===== METADATI DI SISTEMA =====
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
     
     # Versioning per modifiche
     version = Column(Integer, default=1, nullable=False)

@@ -28,7 +28,7 @@ class UserActivity(Base):
     
     # ===== IDENTIFICAZIONE ATTIVITÀ =====
     user_id = Column(String(36), ForeignKey('users.id'), nullable=False, index=True)
-    activity_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    activity_date = Column(DateTime, server_default=func.now(), nullable=False)
     activity_type = Column(String(200), nullable=False, index=True)
     activity_desc = Column(String(1024), nullable=True)
     
@@ -46,7 +46,7 @@ class UserActivity(Base):
     extra_data = Column(Text, nullable=True)              # JSON string - metadati aggiuntivi
     
     # ===== TIMESTAMP =====
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now())
     
     # ===== RELAZIONI =====
     user = relationship("User", back_populates="activities")

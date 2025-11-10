@@ -309,8 +309,8 @@ class ICCDSchemaTemplate(Base):
     standard_compliant: Mapped[bool] = mapped_column(Boolean, default=True)  # Conforme agli standard ICCD
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     def __repr__(self):
         return f"<ICCDSchemaTemplate(type='{self.schema_type}', name='{self.name}')>"

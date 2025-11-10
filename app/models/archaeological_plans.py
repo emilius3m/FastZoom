@@ -56,8 +56,8 @@ class ArchaeologicalPlan(Base):
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)  # Pianta principale del sito
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
     created_by: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     # Relazioni
@@ -164,8 +164,8 @@ class ExcavationUnit(Base):
     documentation_level: Mapped[str] = mapped_column(String(20), default="standard")  # "basic", "standard", "detailed"
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
     created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Relazioni
@@ -267,8 +267,8 @@ class ArchaeologicalData(Base):
     validation_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
     
     # Relazioni
     site = relationship("ArchaeologicalSite")

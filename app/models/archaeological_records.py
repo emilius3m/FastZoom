@@ -12,7 +12,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Column, String, Text, Boolean, DateTime, Date, ForeignKey,
-    Integer, Numeric, JSON, Index, UniqueConstraint, Float, UUID
+    Integer, Numeric, JSON, Index, UniqueConstraint, Float
 )
 
 from sqlalchemy.orm import relationship
@@ -100,8 +100,8 @@ class SchedaTomba(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     """
     __tablename__ = "schede_tombe"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
 
     # ===== IDENTIFICAZIONE =====
     numero_tomba = Column(String(20), nullable=False, index=True)  # T001, T002
@@ -221,8 +221,8 @@ class InventarioReperto(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     """
     __tablename__ = "inventario_reperti"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
 
     # ===== IDENTIFICAZIONE =====
     numero_inventario = Column(String(50), nullable=False, index=True)  # INV001, REP2024-001
@@ -231,9 +231,9 @@ class InventarioReperto(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     
     # ===== PROVENIENZA =====
     # Provenienza stratigrafica
-    unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche.id"), nullable=True)
-    unita_stratigrafica_completa_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
-    tomba_id = Column(UUID(as_uuid=True), ForeignKey("schede_tombe.id"), nullable=True)
+    unita_stratigrafica_id = Column(String(36), ForeignKey("unita_stratigrafiche.id"), nullable=True)
+    unita_stratigrafica_completa_id = Column(String(36), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
+    tomba_id = Column(String(36), ForeignKey("schede_tombe.id"), nullable=True)
     
     # Localizzazione
     settore = Column(String(50), nullable=True)
@@ -347,8 +347,8 @@ class CampioneScientifico(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     """
     __tablename__ = "campioni_scientifici"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
 
     # ===== IDENTIFICAZIONE =====
     numero_campione = Column(String(50), nullable=False, index=True)  # CAMP001, C14-001
@@ -356,11 +356,11 @@ class CampioneScientifico(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     descrizione_campione = Column(String(200), nullable=False)       # Carbone di quercia, osso lungo...
     
     # ===== PROVENIENZA =====
-    unita_stratigrafica_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche.id"), nullable=True)
-    unita_stratigrafica_completa_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
-    unita_stratigrafica_muraria_id = Column(UUID(as_uuid=True), ForeignKey("unita_stratigrafiche_murarie.id"), nullable=True)
-    tomba_id = Column(UUID(as_uuid=True), ForeignKey("schede_tombe.id"), nullable=True)
-    reperto_id = Column(UUID(as_uuid=True), ForeignKey("inventario_reperti.id"), nullable=True)
+    unita_stratigrafica_id = Column(String(36), ForeignKey("unita_stratigrafiche.id"), nullable=True)
+    unita_stratigrafica_completa_id = Column(String(36), ForeignKey("unita_stratigrafiche_complete.id"), nullable=True)
+    unita_stratigrafica_muraria_id = Column(String(36), ForeignKey("unita_stratigrafiche_murarie.id"), nullable=True)
+    tomba_id = Column(String(36), ForeignKey("schede_tombe.id"), nullable=True)
+    reperto_id = Column(String(36), ForeignKey("inventario_reperti.id"), nullable=True)
     
     # Localizzazione specifica
     settore = Column(String(50), nullable=True)
@@ -406,8 +406,8 @@ class CampioneScientifico(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     note_analisi = Column(Text, nullable=True)
     
     # ===== SISTEMA =====
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
 
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="campioni_scientifici")

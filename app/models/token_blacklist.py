@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy import Column, String, DateTime, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,14 +25,14 @@ class TokenBlacklist(Base):
     """
     __tablename__ = "token_blacklist"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     
     # ===== TOKEN INFO =====
     token_jti = Column(String(255), unique=True, nullable=False, index=True)  # JWT ID
-    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    user_id = Column(String(36), ForeignKey('users.id'), nullable=False)
     
     # ===== INVALIDATION INFO =====
-    invalidated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    invalidated_at = Column(DateTime, server_default=func.now(), nullable=False)
     reason = Column(String(100), nullable=True)  # logout, security, admin_revoke, etc.
     
     # ===== OPTIONAL METADATA =====

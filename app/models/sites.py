@@ -127,8 +127,8 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
     storage_quota_mb = Column(Integer, default=10240)  # Quota storage (10GB default)
 
     # === TIMESTAMP E UTENTI ===
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # === RELAZIONI ===
     # Utenti e permessi

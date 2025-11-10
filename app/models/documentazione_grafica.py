@@ -11,7 +11,7 @@ from uuid import uuid4
 from typing import List, Optional
 from decimal import Decimal
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Integer, ForeignKey, Numeric, JSON, func, UUID
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Integer, ForeignKey, Numeric, JSON, func
 
 from sqlalchemy.orm import relationship
 
@@ -83,8 +83,8 @@ class TavolaGrafica(Base):
     """
     __tablename__ = "tavole_grafiche"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
     
     # Numerazione
     numero_tavola = Column(String(20), nullable=False, index=True)  # es: "TAV001"
@@ -140,8 +140,8 @@ class TavolaGrafica(Base):
     note_generali = Column(Text, nullable=True)
     
     # Metadati
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
     
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="tavole_grafiche")
@@ -163,8 +163,8 @@ class FotografiaArcheologica(Base):
     """
     __tablename__ = "fotografie_archeologiche"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
     
     # Numerazione standardizzata
     numero_foto = Column(String(20), nullable=False, unique=True, index=True)  # es: "PMP001_001"
@@ -201,9 +201,9 @@ class FotografiaArcheologica(Base):
     
     # Contesto archeologico - riferimenti a modelli esistenti
     # Nota: questi campi sono opzionali fino all'implementazione dei modelli correlati
-    us_fotografata_id = Column(UUID(as_uuid=True), nullable=True)  # Riferimento a US quando disponibile
-    tomba_fotografata_id = Column(UUID(as_uuid=True), nullable=True)  # Riferimento a tomba quando disponibile
-    reperto_fotografato_id = Column(UUID(as_uuid=True), nullable=True)  # Riferimento a reperto quando disponibile
+    us_fotografata_id = Column(String(36), nullable=True)  # Riferimento a US quando disponibile
+    tomba_fotografata_id = Column(String(36), nullable=True)  # Riferimento a tomba quando disponibile
+    reperto_fotografato_id = Column(String(36), nullable=True)  # Riferimento a reperto quando disponibile
     
     # Tecnica fotografica
     direzione_scatto = Column(String(20), nullable=True)  # N, S, E, W, NE, etc.
@@ -241,8 +241,8 @@ class FotografiaArcheologica(Base):
     note_contenuto = Column(Text, nullable=True)
     
     # Sistema
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
     
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="fotografie_archeologiche")
@@ -265,8 +265,8 @@ class MatrixHarris(Base):
     """
     __tablename__ = "matrix_harris"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
     
     # Identificativi
     nome_matrix = Column(String(200), nullable=False)
@@ -310,8 +310,8 @@ class MatrixHarris(Base):
     data_revisione = Column(Date, nullable=True)
     
     # Sistema
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
     
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="matrix_harris")
@@ -328,8 +328,8 @@ class ElencoConsegna(Base):
     """
     __tablename__ = "elenchi_consegna"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
     
     # Tipo elenco
     tipo_elenco = Column(String(50), nullable=False)  # tavole, foto, us, tombe, reperti, campioni, casse
@@ -351,8 +351,8 @@ class ElencoConsegna(Base):
     note = Column(Text, nullable=True)
     
     # Sistema
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
     
     # ===== RELAZIONI =====
     site = relationship("ArchaeologicalSite", back_populates="elenchi_consegna")

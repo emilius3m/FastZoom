@@ -11,7 +11,7 @@ from uuid import uuid4
 from typing import List, Optional, Dict, Any
 from decimal import Decimal
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Integer, ForeignKey, Table, Numeric, JSON, func, UUID
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Integer, ForeignKey, Table, Numeric, JSON, func
 from sqlalchemy.orm import relationship
 
 from app.database.base import Base
@@ -85,21 +85,21 @@ class StatoConservazione(str, PyEnum):
 matrix_harris_relations = Table(
     'matrix_harris_relations',
     Base.metadata,
-    Column('id', UUID(as_uuid=True), primary_key=True, default=uuid4),
-    Column('us_superiore_id', UUID(as_uuid=True), ForeignKey('unita_stratigrafiche_complete.id', ondelete='CASCADE'), nullable=False),
-    Column('us_inferiore_id', UUID(as_uuid=True), ForeignKey('unita_stratigrafiche_complete.id', ondelete='CASCADE'), nullable=False),
+    Column('id', String(36), primary_key=True, default=lambda: str(uuid4())),
+    Column('us_superiore_id', String(36), ForeignKey('unita_stratigrafiche_complete.id', ondelete='CASCADE'), nullable=False),
+    Column('us_inferiore_id', String(36), ForeignKey('unita_stratigrafiche_complete.id', ondelete='CASCADE'), nullable=False),
     Column('tipo_relazione', String(50), nullable=False),  # "copre", "taglia", "riempie", etc.
-    Column('created_at', DateTime(timezone=True), server_default=func.now())
+    Column('created_at', DateTime, server_default=func.now())
 )
 
 reperti_materiali_association = Table(
     'reperti_materiali',
     Base.metadata,
-    Column('id', UUID(as_uuid=True), primary_key=True, default=uuid4),
-    Column('reperto_id', UUID(as_uuid=True), ForeignKey('inventario_reperti.id', ondelete='CASCADE')),
-    Column('materiale_id', UUID(as_uuid=True), ForeignKey('materiali_archeologici.id', ondelete='CASCADE')),
+    Column('id', String(36), primary_key=True, default=lambda: str(uuid4())),
+    Column('reperto_id', String(36), ForeignKey('inventario_reperti.id', ondelete='CASCADE')),
+    Column('materiale_id', String(36), ForeignKey('materiali_archeologici.id', ondelete='CASCADE')),
     Column('quantita', Integer, default=1),
-    Column('created_at', DateTime(timezone=True), server_default=func.now())
+    Column('created_at', DateTime, server_default=func.now())
 )
 
 
@@ -112,8 +112,8 @@ class UnitaStratigraficaCompleta(Base):
     __tablename__ = "unita_stratigrafiche_complete"
     
     # Identificativi
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False)
     numero_us = Column(String(20), nullable=False, index=True)  # es: "US001"
     
     # Informazioni base
@@ -171,8 +171,8 @@ class UnitaStratigraficaCompleta(Base):
     data_revisione = Column(Date, nullable=True)
     
     # Sistema
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
     version = Column(Integer, default=1, nullable=False)
     
     # ===== RELAZIONI =====
@@ -230,7 +230,7 @@ class MaterialeArcheologico(Base):
     """
     __tablename__ = "materiali_archeologici"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
     
     # Classificazione
     categoria = Column(String(30), nullable=False)  # Enum TipoMateriale
@@ -251,8 +251,8 @@ class MaterialeArcheologico(Base):
     bibliografia_tipo = Column(Text, nullable=True)
     
     # Metadati
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
     
     # ===== RELAZIONI =====
     reperti = relationship(

@@ -11,10 +11,9 @@ from enum import Enum as PyEnum
 from typing import Optional, List, Dict, Any
 
 from sqlalchemy import (
-    Column, String, Text, Boolean, DateTime, Date, ForeignKey, 
-    Integer, Numeric, Table, Index, UniqueConstraint
+    Column, String, Text, Boolean, DateTime, Date, ForeignKey,
+    Integer, Numeric, Table, Index, UniqueConstraint, JSON
 )
-from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -27,19 +26,19 @@ from app.models.base import Base, SiteMixin, UserMixin, SoftDeleteMixin
 us_files_association = Table(
     'us_files_associations',
     Base.metadata,
-    Column('us_id', UUID(as_uuid=True), ForeignKey('unita_stratigrafiche.id'), primary_key=True),
-    Column('file_id', UUID(as_uuid=True), ForeignKey('us_files.id'), primary_key=True),
+    Column('us_id', String(36), ForeignKey('unita_stratigrafiche.id'), primary_key=True),
+    Column('file_id', String(36), ForeignKey('us_files.id'), primary_key=True),
     Column('file_type', String(50), nullable=False),  # 'sezione', 'fotografia', 'pianta', 'prospetto'
     Column('created_at', DateTime, default=datetime.utcnow),
     Column('ordine', Integer, default=0)  # Per ordinamento file dello stesso tipo
 )
 
-# USM - File associazioni  
+# USM - File associazioni
 usm_files_association = Table(
     'usm_files_associations',
     Base.metadata,
-    Column('usm_id', UUID(as_uuid=True), ForeignKey('unita_stratigrafiche_murarie.id'), primary_key=True),
-    Column('file_id', UUID(as_uuid=True), ForeignKey('us_files.id'), primary_key=True),
+    Column('usm_id', String(36), ForeignKey('unita_stratigrafiche_murarie.id'), primary_key=True),
+    Column('file_id', String(36), ForeignKey('us_files.id'), primary_key=True),
     Column('file_type', String(50), nullable=False),
     Column('created_at', DateTime, default=datetime.utcnow),
     Column('ordine', Integer, default=0)
@@ -82,8 +81,8 @@ class USFile(Base, SiteMixin, UserMixin):
     """File associati a US/USM (sezioni, fotografie, piante, prospetti)"""
     __tablename__ = 'us_files'
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey('archaeological_sites.id'), nullable=False)
     
     # Info file
     filename = Column(String(255), nullable=False)
@@ -118,10 +117,10 @@ class USFile(Base, SiteMixin, UserMixin):
     thumbnail_path = Column(String(500))
     
     # Gestione
-    uploaded_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    uploaded_by = Column(String(36), ForeignKey('users.id'), nullable=False)
     is_published = Column(Boolean, default=False)
     is_validated = Column(Boolean, default=False)
-    validated_by = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    validated_by = Column(String(36), ForeignKey('users.id'))
     validated_at = Column(DateTime)
     
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -170,8 +169,8 @@ class UnitaStratigrafica(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     """
     __tablename__ = "unita_stratigrafiche"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
 
     # ===== INTESTAZIONE E IDENTIFICAZIONE =====
     us_code = Column(String(16), nullable=False, index=True)  # US003
@@ -360,8 +359,8 @@ class UnitaStratigraficaMuraria(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     """
     __tablename__ = "unita_stratigrafiche_murarie"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
 
     # ===== INTESTAZIONE E IDENTIFICAZIONE =====
     usm_code = Column(String(16), nullable=False, index=True)  # USM001

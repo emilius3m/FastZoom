@@ -12,7 +12,7 @@ from typing import Optional, List, Dict, Any
 
 from sqlalchemy import (
     Column, String, Text, Boolean, DateTime, Date, Time, ForeignKey,
-    Integer, BigInteger, JSON, Index, UniqueConstraint, Table, Float, UUID
+    Integer, BigInteger, JSON, Index, UniqueConstraint, Table, Float
 )
 
 from sqlalchemy.orm import relationship
@@ -76,8 +76,8 @@ class QualificaOperatoreEnum(str, PyEnum):
 giornale_operatori_association = Table(
     'giornale_operatori_associations',
     Base.metadata,
-    Column('giornale_id', UUID(as_uuid=True), ForeignKey('giornali_cantiere.id'), primary_key=True),
-    Column('operatore_id', UUID(as_uuid=True), ForeignKey('operatori_cantiere.id'), primary_key=True),
+    Column('giornale_id', String(36), ForeignKey('giornali_cantiere.id'), primary_key=True),
+    Column('operatore_id', String(36), ForeignKey('operatori_cantiere.id'), primary_key=True),
     Column('ore_lavorate', Float, default=8.0),
     Column('note_giornaliere', Text, nullable=True)
 )
@@ -92,8 +92,8 @@ class Document(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     """
     __tablename__ = "documents"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey('archaeological_sites.id'), nullable=False)
 
     # ===== METADATI DOCUMENTO =====
     title = Column(String(500), nullable=False)
@@ -121,7 +121,7 @@ class Document(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     
     # ===== TIMESTAMP =====
     uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    uploaded_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    uploaded_by = Column(String(36), ForeignKey('users.id'), nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Note: is_deleted, deleted_at, and deleted_by are provided by SoftDeleteMixin
@@ -152,8 +152,8 @@ class Photo(Base, SiteMixin, UserMixin):
     """
     __tablename__ = "photos"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=lambda: uuid.uuid4())
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey('archaeological_sites.id'), nullable=False)
 
     # ===== INFO FILE =====
     filename = Column(String(255), nullable=False, index=True)
@@ -266,7 +266,7 @@ class Photo(Base, SiteMixin, UserMixin):
     # ===== GESTIONE =====
     photographer = Column(String(200), nullable=True)
     photo_date = Column(DateTime, nullable=True)        # Data scatto (da EXIF o manuale)
-    uploaded_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    uploaded_by = Column(String(36), ForeignKey('users.id'), nullable=False)
     
     is_featured = Column(Boolean, default=False)        # Foto in evidenza
     is_public = Column(Boolean, default=True)           # Visibilità pubblica
@@ -502,8 +502,8 @@ class FormSchema(Base, SiteMixin, UserMixin):
     """Form personalizzati per siti archeologici"""
     __tablename__ = "form_schemas"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    site_id = Column(UUID(as_uuid=True), ForeignKey('archaeological_sites.id'), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey('archaeological_sites.id'), nullable=False)
 
     name = Column(String(255), nullable=False)
     description = Column(Text)
@@ -512,7 +512,7 @@ class FormSchema(Base, SiteMixin, UserMixin):
     
     is_active = Column(Boolean, default=True)
     
-    created_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    created_by = Column(String(36), ForeignKey('users.id'), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

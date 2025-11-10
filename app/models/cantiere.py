@@ -62,12 +62,12 @@ class Cantiere(Base):
     priorita = Column(Integer, nullable=False, default=3)  # Priorità (1-5)
     
     # Timestamp
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     # Soft delete
     is_active = Column(Boolean, nullable=False, default=True)
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
     
     # Relationships
     site = relationship("ArchaeologicalSite", back_populates="cantieri")
