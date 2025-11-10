@@ -106,6 +106,49 @@ router = APIRouter( tags=["Administration"])
 
 # ===== UTILITY FUNCTIONS =====
 
+def normalize_site_id(site_id: str) -> Optional[str]:
+    """
+    Normalizza l'ID del sito per supportare diversi formati.
+    
+    Supporta:
+    - UUID standard con trattini: eb8d88e1-74e3-46d3-8e86-81f926c01cab
+    - Hash esadecimali senza trattini: eeedd3ceda34bf3b47d749a971b22ba
+    
+    Returns:
+        str: L'ID normalizzato o None se non valido
+    """
+    if not site_id:
+        return None
+    
+    # Rimuovi spazi bianchi
+    site_id = site_id.strip()
+    
+    # Se è un UUID standard con trattini, valida e restituiscilo
+    if '-' in site_id:
+        try:
+            # Crea un oggetto UUID per validare il formato
+            uuid_obj = UUID(site_id)
+            # Restituisci la stringa originale (già nel formato corretto)
+            return site_id
+        except (ValueError, AttributeError):
+            return None
+    
+    # Se è un hash esadecimale senza trattini
+    if len(site_id) == 32:
+        try:
+            # Verifica che sia esadecimale
+            int(site_id, 16)
+            # Converti in formato UUID standard (inserisci trattini)
+            uuid_formatted = f"{site_id[0:8]}-{site_id[8:12]}-{site_id[12:16]}-{site_id[16:20]}-{site_id[20:32]}"
+            # Valida il formato UUID risultante
+            UUID(uuid_formatted)
+            return uuid_formatted
+        except (ValueError, AttributeError):
+            return None
+    
+    # Altri formati non supportati
+    return None
+
 async def verify_admin_access(current_user_id: UUID, db: AsyncSession) -> User:
     """Verifica superuser e restituisce utente"""
     # Normalize UUID to handle both hyphenated and non-hyphenated formats
@@ -355,16 +398,39 @@ async def get_site(
     """Dettagli sito"""
     await verify_admin_access(current_user_id, db)
     
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
+        logger.warning(f"Invalid site_id format: {site_id}")
+        raise HTTPException(status_code=404, detail="ID sito non valido")
+    
     try:
+        # Prima prova con l'ID normalizzato
         site_result = await db.execute(
-            select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
         )
         site = site_result.scalar_one_or_none()
+        
+        # Se non trovato, prova con l'ID originale
+        if not site:
+            site_result = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            )
+            site = site_result.scalar_one_or_none()
+        
+        # Se ancora non trovato, prova con l'hash senza trattini (se l'input è un UUID)
+        if not site and '-' in site_id:
+            hash_id = site_id.replace('-', '')
+            if len(hash_id) == 32:
+                site_result = await db.execute(
+                    select(ArchaeologicalSite).where(ArchaeologicalSite.id == hash_id)
+                )
+                site = site_result.scalar_one_or_none()
         
         if not site:
             raise HTTPException(status_code=404, detail="Sito non trovato")
         
-        users_count, photos_count = await get_site_counts(site_id, db)
+        users_count, photos_count = await get_site_counts(str(site.id), db)
         
         return {"site": site_to_dict(site, users_count, photos_count)}
     except HTTPException:

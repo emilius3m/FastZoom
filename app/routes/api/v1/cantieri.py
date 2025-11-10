@@ -19,17 +19,78 @@ router = APIRouter()
 # Import association table for operatori
 from app.models.giornale_cantiere import giornale_operatori_association
 
+def normalize_site_id(site_id: str) -> Optional[str]:
+    """
+    Normalizza l'ID del sito per supportare diversi formati.
+    
+    Supporta:
+    - UUID standard con trattini: eb8d88e1-74e3-46d3-8e86-81f926c01cab
+    - Hash esadecimali senza trattini: eeedd3ceda34bf3b47d749a971b22ba
+    
+    Returns:
+        str: L'ID normalizzato o None se non valido
+    """
+    if not site_id:
+        return None
+    
+    # Rimuovi spazi bianchi
+    site_id = site_id.strip()
+    
+    # Se è un UUID standard con trattini, valida e restituiscilo
+    if '-' in site_id:
+        try:
+            # Crea un oggetto UUID per validare il formato
+            uuid_obj = UUID(site_id)
+            # Restituisci la stringa originale (già nel formato corretto)
+            return site_id
+        except (ValueError, AttributeError):
+            return None
+    
+    # Se è un hash esadecimale senza trattini
+    if len(site_id) == 32:
+        try:
+            # Verifica che sia esadecimale
+            int(site_id, 16)
+            # Converti in formato UUID standard (inserisci trattini)
+            uuid_formatted = f"{site_id[0:8]}-{site_id[8:12]}-{site_id[12:16]}-{site_id[16:20]}-{site_id[20:32]}"
+            # Valida il formato UUID risultante
+            UUID(uuid_formatted)
+            return uuid_formatted
+        except (ValueError, AttributeError):
+            return None
+    
+    # Altri formati non supportati
+    return None
+
 def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Verifica accesso al sito e restituisce informazioni sul sito"""
-    site_info = next(
-        (site for site in user_sites if site["id"] == str(site_id)),
-        None
-    )
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(str(site_id))
+    if not normalized_site_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"ID sito non valido: {site_id}"
+        )
+    
+    site_info = None
+    for site in user_sites:
+        if not site.get("id"):
+            continue
+        
+        site_user_id = str(site["id"])
+        
+        # Try multiple matching strategies
+        if (site_user_id == normalized_site_id or
+            site_user_id == str(site_id) or
+            site_user_id.replace("-", "") == normalized_site_id.replace("-", "")):
+        
+            site_info = site
+            break
     
     if not site_info:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied"
+            detail=f"Sito {site_id} non trovato o access denied. User has access to {len(user_sites)} sites."
         )
     
     return site_info

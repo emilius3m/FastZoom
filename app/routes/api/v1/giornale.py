@@ -17,6 +17,49 @@ from app.database.db import get_async_session
 
 router = APIRouter()
 
+def normalize_site_id(site_id: str) -> Optional[str]:
+    """
+    Normalizza l'ID del sito per supportare diversi formati.
+    
+    Supporta:
+    - UUID standard con trattini: eb8d88e1-74e3-46d3-8e86-81f926c01cab
+    - Hash esadecimali senza trattini: eeedd3ceda34bf3b47d749a971b22ba
+    
+    Returns:
+        str: L'ID normalizzato o None se non valido
+    """
+    if not site_id:
+        return None
+    
+    # Rimuovi spazi bianchi
+    site_id = site_id.strip()
+    
+    # Se è un UUID standard con trattini, valida e restituiscilo
+    if '-' in site_id:
+        try:
+            # Crea un oggetto UUID per validare il formato
+            uuid_obj = UUID(site_id)
+            # Restituisci la stringa originale (già nel formato corretto)
+            return site_id
+        except (ValueError, AttributeError):
+            return None
+    
+    # Se è un hash esadecimale senza trattini
+    if len(site_id) == 32:
+        try:
+            # Verifica che sia esadecimale
+            int(site_id, 16)
+            # Converti in formato UUID standard (inserisci trattini)
+            uuid_formatted = f"{site_id[0:8]}-{site_id[8:12]}-{site_id[12:16]}-{site_id[16:20]}-{site_id[20:32]}"
+            # Valida il formato UUID risultante
+            UUID(uuid_formatted)
+            return uuid_formatted
+        except (ValueError, AttributeError):
+            return None
+    
+    # Altri formati non supportati
+    return None
+
 def add_deprecation_headers(response: Response, new_endpoint: str):
     """Aggiunge headers di deprecazione per backward compatibility"""
     response.headers["X-API-Deprecated"] = "true"
@@ -37,17 +80,18 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     logger.info(f"🐛 [DEBUG] verify_site_access - site_id: {site_id}, type: {type(site_id)}")
     logger.info(f"🐛 [DEBUG] verify_site_access - user_sites count: {len(user_sites)}")
     
-    # Convert site_id to string in multiple formats for robust matching
-    site_id_str = str(site_id)
-    site_id_no_hyphens = site_id_str.replace("-", "")
-    site_id_lower = site_id_str.lower()
-    site_id_no_hyphens_lower = site_id_no_hyphens.lower()
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(str(site_id))
+    if not normalized_site_id:
+        logger.warning(f"🐛 [DEBUG] Invalid site_id format: {site_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"ID sito non valido: {site_id}"
+        )
     
     # 🔍 DEBUG: Log all UUID format variations
-    logger.info(f"🐛 [DEBUG] verify_site_access - site_id_str: {site_id_str}")
-    logger.info(f"🐛 [DEBUG] verify_site_access - site_id_no_hyphens: {site_id_no_hyphens}")
-    logger.info(f"🐛 [DEBUG] verify_site_access - site_id_lower: {site_id_lower}")
-    logger.info(f"🐛 [DEBUG] verify_site_access - site_id_no_hyphens_lower: {site_id_no_hyphens_lower}")
+    logger.info(f"🐛 [DEBUG] verify_site_access - site_id_str: {str(site_id)}")
+    logger.info(f"🐛 [DEBUG] verify_site_access - normalized_site_id: {normalized_site_id}")
     
     # 🔍 DEBUG: Log all user sites for comparison
     for i, site in enumerate(user_sites):
@@ -64,18 +108,14 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
         if not site.get("id"):
             logger.warning(f"🐛 [DEBUG] Site missing 'id' field: {site}")
             continue
-            
-        site_user_id = str(site["id"])
-        site_user_id_no_hyphens = site_user_id.replace("-", "")
-        site_user_id_lower = site_user_id.lower()
-        site_user_id_no_hyphens_lower = site_user_id_no_hyphens.lower()
         
-        # Try multiple matching strategies
-        if (site_user_id == site_id_str or
-            site_user_id_no_hyphens == site_id_no_hyphens or
-            site_user_id_lower == site_id_lower or
-            site_user_id_no_hyphens_lower == site_id_no_hyphens_lower):
-            
+        site_user_id = str(site["id"])
+        
+        # Try multiple matching strategies with normalized ID
+        if (site_user_id == normalized_site_id or
+            site_user_id == str(site_id) or
+            site_user_id.replace("-", "") == normalized_site_id.replace("-", "")):
+        
             site_info = site
             logger.info(f"🐛 [DEBUG] FOUND MATCH! Site: {site.get('name', 'Unknown')} (ID: {site_user_id})")
             break
@@ -84,10 +124,8 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
         # 🔍 DEBUG: Detailed failure logging
         logger.error(f"🐛 [DEBUG] verify_site_access - NO MATCH FOUND")
         logger.error(f"🐛 [DEBUG] Looking for site_id variations:")
-        logger.error(f"🐛 [DEBUG]  - Original: {site_id_str}")
-        logger.error(f"🐛 [DEBUG]  - No hyphens: {site_id_no_hyphens}")
-        logger.error(f"🐛 [DEBUG]  - Lower: {site_id_lower}")
-        logger.error(f"🐛 [DEBUG]  - No hyphens lower: {site_id_no_hyphens_lower}")
+        logger.error(f"🐛 [DEBUG]  - Original: {str(site_id)}")
+        logger.error(f"🐛 [DEBUG]  - Normalized: {normalized_site_id}")
         logger.error(f"🐛 [DEBUG] Available user sites:")
         for i, site in enumerate(user_sites):
             logger.error(f"🐛 [DEBUG]  - Site {i}: {site.get('name', 'Unknown')} (ID: {site.get('id', 'MISSING')})")
