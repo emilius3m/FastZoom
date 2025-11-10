@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="siteUsersManager">
+<div class="mx-auto p-6 bg-gray-50 dark:bg-gray-900 min-h-screen" x-data="siteUsersManager" x-init="init()">
     <!-- Page Header -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -398,12 +398,13 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('alpine:init', () => {
     Alpine.data('siteUsersManager', () => ({
         // Data
-        site: {{ site|tojson if site else '{}' }},
-        users: {{ users|tojson if users else '[]' }},
-        availableUsers: {{ available_users|tojson if available_users else '[]' }},
+        site: {},
+        users: [],
+        availableUsers: [],
+        siteId: '{{ site_id }}',
         
         // UI State
-        isLoading: false,
+        isLoading: true,
         showAlert: false,
         alertType: 'success',
         alertMessage: '',
@@ -426,21 +427,61 @@ document.addEventListener('alpine:init', () => {
         },
         
         // Methods
+        async init() {
+            await this.loadSiteUsers();
+        },
+        
+        async loadSiteUsers() {
+            this.isLoading = true;
+            
+            try {
+                // Ensure api is available
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh page.');
+                }
+                
+                console.log('Loading users for site:', this.siteId);
+                const response = await api.get(`/api/v1/admin/sites/${encodeURIComponent(this.siteId)}/users`);
+                
+                console.log('API response:', response);
+                
+                // The API returns data directly, not wrapped in a response object
+                if (response && response.site) {
+                    this.site = response.site || {};
+                    this.users = response.users || [];
+                    this.availableUsers = response.available_users || [];
+                    console.log('Loaded site:', this.site);
+                    console.log('Loaded users:', this.users);
+                    console.log('Available users:', this.availableUsers);
+                } else {
+                    console.error('API error response:', response);
+                    throw new Error('Dati non validi ricevuti dal server');
+                }
+            } catch (error) {
+                console.error('Error loading site users:', error);
+                this.showError('Errore: ' + error.message);
+            } finally {
+                this.isLoading = false;
+            }
+        },
         getUserInitials(user) {
+            if (!user) return '??';
             if (user.first_name && user.last_name) {
                 return (user.first_name[0] + user.last_name[0]).toUpperCase();
             }
-            return user.email.substring(0, 2).toUpperCase();
+            return user.email ? user.email.substring(0, 2).toUpperCase() : '??';
         },
         
         getFullName(user) {
+            if (!user) return 'Utente sconosciuto';
             if (user.first_name && user.last_name) {
                 return `${user.first_name} ${user.last_name}`;
             }
-            return user.email;
+            return user.email || 'Utente sconosciuto';
         },
         
         getSiteInitials(site) {
+            if (!site || !site.name) return '??';
             return site.name.substring(0, 2).toUpperCase();
         },
         
@@ -536,18 +577,14 @@ document.addEventListener('alpine:init', () => {
                 // Find the permission ID for this user-site combination
                 const response = await api.get('/api/v1/admin/permissions');
                 if (response.ok) {
-                    const permissions = response.data.permissions || [];
-                    const permission = permissions.find(p => 
+                    const permissions = response.permissions || [];
+                    const permission = permissions.find(p =>
                         p.user_id === this.userToRemove.id && p.site_id === this.site.id
                     );
                     
                     if (permission) {
-                        // Ensure api is available
-                        if (typeof api === 'undefined') {
-                          throw new Error('API client not loaded. Please refresh page.');
-                        }
-                        
-                        const deleteResponse = await api.delete(`/api/v1/admin/permissions/${permission.id}`);
+                        // Use the specific endpoint for removing user permission
+                        const deleteResponse = await api.delete(`/api/v1/admin/users/${encodeURIComponent(this.userToRemove.id)}/permissions/${permission.id}`);
                         
                         if (deleteResponse.ok) {
                             // Remove user from site users and add back to available users
