@@ -139,26 +139,26 @@
             </div>
 
             <!-- Quick Stats -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-6 border-t border-gray-200">
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-blue-600" x-text="stats.total"></div>
-                    <div class="text-sm text-gray-600">Totale Utenti</div>
+            <div class="flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-200">
+                <div class="flex items-center gap-1 px-3 py-1 bg-blue-50 rounded">
+                    <span class="text-lg font-bold text-blue-600" x-text="stats.total"></span>
+                    <span class="text-xs text-gray-600">Totale</span>
                 </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-green-600" x-text="stats.active"></div>
-                    <div class="text-sm text-gray-600">Attivi</div>
+                <div class="flex items-center gap-1 px-3 py-1 bg-green-50 rounded">
+                    <span class="text-lg font-bold text-green-600" x-text="stats.active"></span>
+                    <span class="text-xs text-gray-600">Attivi</span>
                 </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-yellow-600" x-text="stats.verified"></div>
-                    <div class="text-sm text-gray-600">Verificati</div>
+                <div class="flex items-center gap-1 px-3 py-1 bg-yellow-50 rounded">
+                    <span class="text-lg font-bold text-yellow-600" x-text="stats.verified"></span>
+                    <span class="text-xs text-gray-600">Verificati</span>
                 </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-red-600" x-text="stats.superusers"></div>
-                    <div class="text-sm text-gray-600">Superadmin</div>
+                <div class="flex items-center gap-1 px-3 py-1 bg-red-50 rounded">
+                    <span class="text-lg font-bold text-red-600" x-text="stats.superusers"></span>
+                    <span class="text-xs text-gray-600">Superadmin</span>
                 </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-purple-600" x-text="stats.withSites"></div>
-                    <div class="text-sm text-gray-600">Con Siti</div>
+                <div class="flex items-center gap-1 px-3 py-1 bg-purple-50 rounded">
+                    <span class="text-lg font-bold text-purple-600" x-text="stats.withSites"></span>
+                    <span class="text-xs text-gray-600">Con Siti</span>
                 </div>
             </div>
         </div>
