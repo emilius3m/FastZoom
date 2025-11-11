@@ -212,17 +212,17 @@
                 <div class="p-4">
                     {% if user_permissions %}
                     <div class="space-y-3 mb-6">
-                        {% for permission, site in user_permissions %}
+                        {% for permission_data in user_permissions %}
                         <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ site.name }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ site.code }}</p>
+                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ permission_data.site.name }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ permission_data.site.code }}</p>
                             </div>
                             <div class="flex items-center space-x-2">
-                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {{ permission.status_badge_class }}">
-                                    {{ permission.permission_display_name }}
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium {{ permission_data.status_badge_class }}">
+                                    {{ permission_data.permission_display_name }}
                                 </span>
-                                <button @click="removePermission('{{ permission.id }}')"
+                                <button @click="removePermission('{{ permission_data.id }}')"
                                         class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1 rounded-full hover:bg-red-100 dark:hover:bg-gray-600">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -432,15 +432,28 @@ document.addEventListener('alpine:init', () => {
                     }
                 });
                 
-                const url = '{{ "/admin/users/" + user_data.id|string + "/edit/" if user_data else "/admin/users/new/" }}';
+                // For new users, ensure password is included even if empty (required field)
+                {% if not user_data %}
+                if (!submitData.password) {
+                    this.showError('Password richiesta per nuovi utenti');
+                    return;
+                }
+                {% endif %}
+                
+                // Use the correct API endpoint for user updates
+                const url = '{{ "/api/v1/admin/users/" + user_data.id|string if user_data else "/api/v1/admin/users/" }}';
                 
                 // Ensure api is available
                 if (typeof api === 'undefined') {
                   throw new Error('API client not loaded. Please refresh page.');
                 }
                 
-                // FIXED: Using centralized API client with automatic credentials inclusion
+                // Use PUT for updates, POST for creates
+                {% if user_data %}
+                const response = await api.put(url, submitData);
+                {% else %}
                 const response = await api.post(url, submitData);
+                {% endif %}
                 
                 this.showSuccess('{{ "Utente aggiornato" if user_data else "Utente creato" }} con successo');
                 {% if not user_data %}
@@ -506,7 +519,7 @@ document.addEventListener('alpine:init', () => {
                 }
                 
                 // FIXED: Using centralized API client with automatic credentials inclusion
-                const response = await api.post(`/api/v1/admin/users/{{ user_data.id }}/permissions/${permissionId}/delete/`);
+                const response = await api.delete(`/api/v1/admin/users/{{ user_data.id }}/permissions/${permissionId}`);
                 
                 this.showSuccess('Permesso rimosso con successo');
                 setTimeout(() => window.location.reload(), 1500);
