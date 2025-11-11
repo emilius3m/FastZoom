@@ -18,12 +18,7 @@
 
 import asyncio
 from fastapi import APIRouter, Depends, Request, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
-from uuid import UUID
-from typing import List, Dict, Any, Optional, Tuple
-from loguru import logger
+
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id, get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
@@ -36,7 +31,6 @@ from app.routes.api.dependencies import get_site_access
 
 # Import API sub-routers
 from app.routes.api.iccd_hierarchy import iccd_hierarchy_router
-from app.routes.api.sites_dashboard import dashboard_router, get_site_statistics, get_recent_activities, get_recent_photos
 from app.routes.api.sites_photos import photos_router
 from app.routes.api.sites_storage import storage_router
 from app.routes.api.sites_deepzoom import deepzoom_router
@@ -48,7 +42,8 @@ sites_router = APIRouter(prefix="/api", tags=["sites"])
 sites_router.include_router(iccd_hierarchy_router, prefix="/{site_id}")
 
 # Include refactored API sub-routers
-sites_router.include_router(dashboard_router, tags=["dashboard"])
+# DEPRECATED: dashboard_router da sites_dashboard.py non più utilizzato
+# sites_router.include_router(dashboard_router, tags=["dashboard"])
 sites_router.include_router(photos_router, tags=["photos"])
 sites_router.include_router(storage_router, tags=["storage"])
 sites_router.include_router(deepzoom_router, tags=["deepzoom"])

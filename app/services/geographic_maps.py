@@ -27,19 +27,28 @@ class GeographicMapService:
         from app.models.sites import ArchaeologicalSite
         from app.models import UserSitePermission
         
-        # Check site existence
-        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+        # Convert site_id to string for consistent comparison
+        site_id_str = str(site_id)
+        
+        # Check site existence - try both with and without dashes
+        site_query = select(ArchaeologicalSite).where(
+            (ArchaeologicalSite.id == site_id_str) |
+            (ArchaeologicalSite.id == site_id_str.replace('-', ''))
+        )
         site_result = await self.db_session.execute(site_query)
         site = site_result.scalar_one_or_none()
         
         if not site:
+            logger.error(f"Site not found in database: {site_id_str}")
             raise BusinessLogicError("Sito archeologico non trovato", 404)
         
-        # Check user permissions
+        # Check user permissions - handle UUID format inconsistencies
         permission_query = select(UserSitePermission).where(
             and_(
-                UserSitePermission.user_id == current_user_id,
-                UserSitePermission.site_id == site_id,
+                (UserSitePermission.user_id == str(current_user_id)) |
+                (UserSitePermission.user_id == str(current_user_id).replace('-', '')),
+                (UserSitePermission.site_id == site_id_str) |
+                (UserSitePermission.site_id == site_id_str.replace('-', '')),
                 UserSitePermission.is_active == True,
                 or_(
                     UserSitePermission.expires_at.is_(None),
@@ -52,6 +61,7 @@ class GeographicMapService:
         permission = permission.scalar_one_or_none()
         
         if not permission:
+            logger.error(f"No valid permission found for user {current_user_id} on site {site_id_str}")
             raise BusinessLogicError("Non hai i permessi per accedere a questo sito archeologico", 403)
         
         return site, permission

@@ -13,7 +13,18 @@
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Documentazione Archeologica</h1>
+                    <!-- Breadcrumb Navigation -->
+                    <nav class="flex items-center space-x-4 text-sm mb-2">
+                        <i class="fas fa-home text-gray-500 text-lg"></i>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-gray-400 text-lg">→</span>
+                            <a href="/view/{{ site.id }}/dashboard" class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                {{ site.name }}
+                            </a>
+                            <span class="text-gray-400 text-lg">→</span>
+                            <span class="text-gray-700 font-semibold px-2 py-1">Documentazione Archeologica</span>
+                        </div>
+                    </nav>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         Gestione documenti, rapporti e pubblicazioni - {{ site.name }}
                     </p>

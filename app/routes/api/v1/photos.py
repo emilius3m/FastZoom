@@ -13,7 +13,7 @@ import json
 import asyncio
 
 from app.database.session import get_async_session
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id_with_blacklist
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 from app.models import UserActivity
 from app.routes.api.dependencies import get_site_access
@@ -87,7 +87,7 @@ async def v1_upload_photo(
         usage_rights: Optional[str] = Form(None),
         
         site_access: tuple = Depends(get_site_access),
-        current_user_id: UUID = Depends(get_current_user_id),
+        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """API v1 per upload foto al sito archeologico"""

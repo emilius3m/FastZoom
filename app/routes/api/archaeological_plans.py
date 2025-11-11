@@ -34,7 +34,7 @@ async def get_site_access_for_plans(
     """Verifica accesso utente al sito per operazioni su piante"""
     
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
     
@@ -44,8 +44,8 @@ async def get_site_access_for_plans(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True,
             or_(
                 UserSitePermission.expires_at.is_(None),

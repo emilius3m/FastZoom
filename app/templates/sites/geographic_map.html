@@ -141,7 +141,18 @@
                         </svg>
                     </div>
                     <div class="ml-4">
-                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Mappa Geografica</h1>
+                        <!-- Breadcrumb Navigation -->
+                        <nav class="flex items-center space-x-4 text-sm mb-2">
+                            <i class="fas fa-home text-gray-500 text-lg"></i>
+                            <div class="flex items-center space-x-4">
+                                <span class="text-gray-400 text-lg">→</span>
+                                <a href="/view/{{ site.id }}/dashboard" class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                    {{ site.name }}
+                                </a>
+                                <span class="text-gray-400 text-lg">→</span>
+                                <span class="text-gray-700 font-semibold px-2 py-1">Mappa Geografica</span>
+                            </div>
+                        </nav>
                         <p class="text-sm text-gray-600 dark:text-gray-300">{{ site.name }} - Coordinate geografiche (Lat/Lng)</p>
                     </div>
                 </div>
@@ -267,7 +278,7 @@
     <!-- Main Content with Sidebar Layout -->
     <div class="flex transition-all duration-300">
         <!-- Map and Controls (Main Content) -->
-        <div class="flex-1 transition-all duration-300" :class="showPhotosSidebar ? 'mr-4' : 'mr-0'">
+        <div class="flex-1 transition-all duration-300 z-30" :class="showPhotosSidebar ? 'mr-4' : 'mr-0'">
             <!-- Leaflet Map Container -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
                 <div id="map" 
@@ -431,7 +442,7 @@
          @click.self="showCreateMapModal = false">
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <!-- Modal Header with Close Button -->
-            <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center justify-between mb-6 z-50">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">🗺️ Crea Nuova Mappa Geografica</h3>
                 <button type="button"
                         @click="showCreateMapModal = false"
@@ -834,7 +845,7 @@ document.addEventListener('alpine:init', () => {
         
         async loadAvailableMaps() {
             try {
-                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps`);
+                const response = await fetch(`/api/v1/geographic/sites/${siteId}/maps`);
                 if (response.ok) {
                     const data = await response.json();
                     this.availableMaps = data.maps;
@@ -862,7 +873,7 @@ document.addEventListener('alpine:init', () => {
                 // Prima pulisci tutti i dati esistenti
                 this.clearMapData();
                 
-                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps/${this.selectedMapId}`);
+                const response = await fetch(`/api/v1/geographic/sites/${siteId}/maps/${this.selectedMapId}`);
                 if (response.ok) {
                     this.currentMap = await response.json();
                     
@@ -906,7 +917,7 @@ document.addEventListener('alpine:init', () => {
                     }
                 };
                 
-                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps`, {
+                const response = await fetch(`/api/v1/geographic/sites/${siteId}/maps`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1119,7 +1130,7 @@ document.addEventListener('alpine:init', () => {
         
         async loadAvailablePhotos() {
             try {
-                const response = await fetch(`/api/geographic-map/sites/${siteId}/photos?limit=100`);
+                const response = await fetch(`/api/v1/geographic/sites/${siteId}/photos?limit=100`);
                 if (response.ok) {
                     const data = await response.json();
                     this.availablePhotos = data.photos;
@@ -1175,7 +1186,7 @@ document.addEventListener('alpine:init', () => {
                     photoIds: photoIds
                 });
                 
-                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps/${this.selectedMapId}/markers/${this.selectedMarkerForPhotos.id}/photos`, {
+                const response = await fetch(`/api/v1/geographic/sites/${siteId}/maps/${this.selectedMapId}/markers/${this.selectedMarkerForPhotos.id}/photos`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1292,7 +1303,7 @@ document.addEventListener('alpine:init', () => {
                     is_visible: true
                 };
                 
-                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/layers`, {
+                const response = await fetch(`/api/v1/geographic/sites/${siteId}/maps/${this.selectedMapId}/layers`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(layerData)
@@ -1471,7 +1482,7 @@ document.addEventListener('alpine:init', () => {
                     marker_type: markerData.type
                 };
                 
-                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/markers`, {
+                const response = await fetch(`/api/v1/geographic/sites/${siteId}/maps/${this.selectedMapId}/markers`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(saveData)
@@ -1513,7 +1524,7 @@ document.addEventListener('alpine:init', () => {
                         is_visible: layer.visible
                     };
                     
-                    await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/layers`, {
+                    await fetch(`/api/v1/geographic/sites/${siteId}/maps/${this.selectedMapId}/layers`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(layerData)
@@ -1530,7 +1541,7 @@ document.addEventListener('alpine:init', () => {
                         marker_type: marker.data.type
                     };
                     
-                    await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}/markers`, {
+                    await fetch(`/api/v1/geographic/sites/${siteId}/maps/${this.selectedMapId}/markers`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(markerData)
@@ -1667,7 +1678,7 @@ document.addEventListener('alpine:init', () => {
             }
             
             try {
-                const response = await fetch(`/api/geographic-maps/sites/${siteId}/maps/${this.selectedMapId}`, {
+                const response = await fetch(`/api/v1/geographic/sites/${siteId}/maps/${this.selectedMapId}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1716,7 +1727,7 @@ document.addEventListener('alpine:init', () => {
             }
             
             try {
-                const response = await fetch(`/api/geographic-map/sites/${siteId}/maps/${this.selectedMapId}/markers/${markerId}`, {
+                const response = await fetch(`/api/v1/geographic/sites/${siteId}/maps/${this.selectedMapId}/markers/${markerId}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'

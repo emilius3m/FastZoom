@@ -175,7 +175,7 @@ async def generate_iccd_pdf(
         
         # Get site name for PDF generation
         db = iccd_service.db_session
-        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
         site_result = await db.execute(site_query)
         site = site_result.scalar_one_or_none()
         
@@ -301,7 +301,7 @@ async def initialize_iccd_for_site(
         from app.models import UserSitePermission
         from sqlalchemy import select, and_, or_, func
         
-        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
         site_result = await iccd_service.db_session.execute(site_query)
         site = site_result.scalar_one_or_none()
         
@@ -311,8 +311,8 @@ async def initialize_iccd_for_site(
         # Check user permissions
         permission_query = select(UserSitePermission).where(
             and_(
-                UserSitePermission.user_id == current_user_id,
-                UserSitePermission.site_id == site_id,
+                UserSitePermission.user_id == str(current_user_id),
+                UserSitePermission.site_id == str(site_id),
                 UserSitePermission.is_active == True,
                 or_(
                     UserSitePermission.expires_at.is_(None),
@@ -364,7 +364,7 @@ async def get_iccd_integration_status(
         from app.models import UserSitePermission
         from sqlalchemy import select, and_, or_, func
         
-        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
         site_result = await iccd_service.db_session.execute(site_query)
         site = site_result.scalar_one_or_none()
         
@@ -374,8 +374,8 @@ async def get_iccd_integration_status(
         # Check user permissions
         permission_query = select(UserSitePermission).where(
             and_(
-                UserSitePermission.user_id == current_user_id,
-                UserSitePermission.site_id == site_id,
+                UserSitePermission.user_id == str(current_user_id),
+                UserSitePermission.site_id == str(site_id),
                 UserSitePermission.is_active == True,
                 or_(
                     UserSitePermission.expires_at.is_(None),

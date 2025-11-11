@@ -370,7 +370,7 @@ document.addEventListener('alpine:init', () => {
         
         async refreshStats() {
             try {
-                const response = await fetch('/site/{{ site.id }}/dashboard/stats');
+                const response = await fetch('/api/v1/sites/{{ site.id }}/dashboard/stats');
                 if (response.ok) {
                     this.stats = await response.json();
                 }

@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from datetime import datetime, timedelta
 
 from app.database.session import get_async_session
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id_with_blacklist
 from app.models import Photo, Document
 from app.models import UserSitePermission
 from app.models import UserActivity, User
