@@ -905,10 +905,14 @@ async def list_users(
             last_name = getattr(user, 'last_name', None)
             
             # If not found in User model, try to get from profile
-            if not first_name and user.profile:
-                first_name = user.profile.first_name
-            if not last_name and user.profile:
-                last_name = user.profile.last_name
+            try:
+                if not first_name and user.profile:
+                    first_name = user.profile.first_name
+                if not last_name and user.profile:
+                    last_name = user.profile.last_name
+            except AttributeError:
+                # Profile relationship not loaded
+                pass
             
             users_data.append({
                 "id": str(user.id),
@@ -958,10 +962,14 @@ async def get_user(
         last_name = getattr(user, 'last_name', None)
         
         # If not found in User model, try to get from profile
-        if not first_name and user.profile:
-            first_name = user.profile.first_name
-        if not last_name and user.profile:
-            last_name = user.profile.last_name
+        try:
+            if not first_name and user.profile:
+                first_name = user.profile.first_name
+            if not last_name and user.profile:
+                last_name = user.profile.last_name
+        except AttributeError:
+            # Profile relationship not loaded
+            pass
         
         return {
             "user": {
@@ -1504,10 +1512,14 @@ async def list_permissions(
             last_name = getattr(user, 'last_name', None)
             
             # If not found in User model, try to get from profile
-            if not first_name and user.profile:
-                first_name = user.profile.first_name
-            if not last_name and user.profile:
-                last_name = user.profile.last_name
+            try:
+                if not first_name and user.profile:
+                    first_name = user.profile.first_name
+                if not last_name and user.profile:
+                    last_name = user.profile.last_name
+            except AttributeError:
+                # Profile relationship not loaded
+                pass
             
             perms_data.append({
                 "id": str(perm.id),

@@ -105,32 +105,52 @@ class User(Base, SoftDeleteMixin):
         return f"<User(email={self.email}, status={self.status})>"
 
     def __str__(self):
-        if self.profile and (self.profile.first_name or self.profile.last_name):
-            return f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+        try:
+            if self.profile and (self.profile.first_name or self.profile.last_name):
+                return f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+        except AttributeError:
+            # Profile relationship not loaded
+            pass
         return self.email
 
     @property
     def display_name(self) -> str:
         """Nome visualizzato per UI"""
-        if self.profile and (self.profile.first_name or self.profile.last_name):
-            return f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+        try:
+            if self.profile and (self.profile.first_name or self.profile.last_name):
+                return f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+        except AttributeError:
+            # Profile relationship not loaded
+            pass
         return self.email
 
     @property
     def first_name(self) -> str:
         """Proprietà first_name per compatibilità - accede al profilo"""
-        return self.profile.first_name if self.profile else None
+        try:
+            return self.profile.first_name if self.profile else None
+        except AttributeError:
+            # Profile relationship not loaded
+            return None
 
     @property
     def last_name(self) -> str:
         """Proprietà last_name per compatibilità - accede al profilo"""
-        return self.profile.last_name if self.profile else None
+        try:
+            return self.profile.last_name if self.profile else None
+        except AttributeError:
+            # Profile relationship not loaded
+            return None
 
     @property
     def full_name(self) -> str:
         """Nome completo dal profilo"""
-        if self.profile and (self.profile.first_name or self.profile.last_name):
-            return f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+        try:
+            if self.profile and (self.profile.first_name or self.profile.last_name):
+                return f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+        except AttributeError:
+            # Profile relationship not loaded, return None
+            pass
         return None
 
     def has_role(self, role_name: str) -> bool:

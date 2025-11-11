@@ -92,7 +92,9 @@ async def get_admin_template_context(
     user_id_no_dashes = user_id_str.replace('-', '')
     
     # Ottieni informazioni utente completa con entrambi i formati UUID
-    user_query = select(User).where(
+    # Carica anche il profilo per evitare AttributeError
+    from sqlalchemy.orm import selectinload
+    user_query = select(User).options(selectinload(User.profile)).where(
         (User.id == user_id_str) | (User.id == user_id_no_dashes)
     )
     user_result = await db.execute(user_query)
@@ -147,7 +149,9 @@ async def require_superuser(
     logger.info(f"🐛 [DEBUG] UUID formats to try: {user_id_str} (with dashes), {user_id_no_dashes} (without dashes)")
     
     # Try with both UUID formats to ensure we find the user
-    user_query = select(User).where(
+    # Carica anche il profilo per evitare AttributeError
+    from sqlalchemy.orm import selectinload
+    user_query = select(User).options(selectinload(User.profile)).where(
         (User.id == user_id_str) | (User.id == user_id_no_dashes)
     )
     user_result = await db.execute(user_query)
@@ -221,7 +225,7 @@ async def admin_sites_new(
         **base_context,
         "page_title": "Nuovo Sito Archeologico",
         "action": "create",
-        "site": None,
+        "site": base_context.get("site", {"id": "admin"}),  # Ensure site object exists for sidebar
         "breadcrumb": [
             {"label": "Home", "url": "/"},
             {"label": "Admin", "url": "/admin"},
@@ -492,10 +496,14 @@ async def admin_users_edit(
     last_name = getattr(user, 'last_name', None)
     
     # If not found in User model, try to get from profile
-    if not first_name and user.profile:
-        first_name = user.profile.first_name
-    if not last_name and user.profile:
-        last_name = user.profile.last_name
+    try:
+        if not first_name and user.profile:
+            first_name = user.profile.first_name
+        if not last_name and user.profile:
+            last_name = user.profile.last_name
+    except AttributeError:
+        # Profile relationship not loaded
+        pass
     
     user_data = {
         "id": str(user.id),
