@@ -319,11 +319,27 @@ except ImportError:
     logger.warning("Giornale cantiere view route not found")
     GIORNALE_VIEW_EXISTS = False
 
+# Import view redirect router for backward compatibility
+try:
+    from app.routes.view_redirect import router as view_redirect_router
+    VIEW_REDIRECT_EXISTS = True
+except ImportError:
+    logger.warning("View redirect route not found")
+    VIEW_REDIRECT_EXISTS = False
+
 # Registrazione router view
 if GIORNALE_VIEW_EXISTS:
     app.include_router(
         giornale_cantiere_view_router,
         tags=["Pages", "Giornale Cantiere"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+# Include view redirect router for backward compatibility
+if VIEW_REDIRECT_EXISTS:
+    app.include_router(
+        view_redirect_router,
+        tags=["Pages", "View Redirects"],
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 

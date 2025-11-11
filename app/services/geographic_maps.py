@@ -566,17 +566,27 @@ class GeographicMapService:
         
         try:
             # First, verify marker exists with detailed diagnostics
-            from sqlalchemy import select
+            from sqlalchemy import select, or_
             
-            # Check if marker exists at all
+            # Convert UUIDs to strings for consistent comparison
+            marker_id_str = str(marker_id)
+            map_id_str = str(map_id)
+            site_id_str = str(site_id)
+            
+            # Check if marker exists - try both with and without dashes
             marker_check = await self.db_session.execute(
-                select(GeographicMapMarker).where(GeographicMapMarker.id == str(marker_id))
+                select(GeographicMapMarker).where(
+                    or_(
+                        GeographicMapMarker.id == marker_id_str,
+                        GeographicMapMarker.id == marker_id_str.replace('-', '')
+                    )
+                )
             )
             marker_basic = marker_check.scalar_one_or_none()
             
             if not marker_basic:
-                logger.warning(f"Marker not found with ID: {marker_id}")
-                raise BusinessLogicError(f"Marker non trovato con ID: {marker_id}", 404)
+                logger.warning(f"Marker not found with ID: {marker_id_str}")
+                raise BusinessLogicError(f"Marker non trovato con ID: {marker_id_str}", 404)
             
             # Check if marker belongs to the correct map
             if marker_basic.map_id != str(map_id):
@@ -589,10 +599,11 @@ class GeographicMapService:
                 raise BusinessLogicError(f"Marker non appartiene al sito specificato", 400)
             
             # Delete marker (CASCADE will handle photo associations)
-            success = await self.repository.delete_marker(marker_id)
+            # Use the actual marker ID from the database to ensure consistency
+            success = await self.repository.delete_marker(UUID(marker_basic.id))
             if success:
                 await self.db_session.commit()
-                logger.info(f"Geographic marker deleted: {marker_id}")
+                logger.info(f"Geographic marker deleted: {marker_basic.id}")
                 return {"message": "Marker eliminato con successo"}
             else:
                 raise BusinessLogicError("Errore eliminazione marker", 500)
@@ -622,12 +633,25 @@ class GeographicMapService:
                 raise BusinessLogicError("Marker non trovato", 404)
             
             # Verify that the photos exist and belong to the site
-            from sqlalchemy import select, and_
+            from sqlalchemy import select, and_, or_
             from app.models import Photo
+            # Convert site_id to string for consistent comparison
+            site_id_str = str(site_id)
+            
+            # Handle UUID format inconsistencies for photo IDs
+            photo_id_conditions = []
+            for pid in photo_ids:
+                pid_str = str(pid)
+                photo_id_conditions.append(Photo.id == pid_str)
+                photo_id_conditions.append(Photo.id == pid_str.replace('-', ''))
+            
             photos_query = select(Photo).where(
                 and_(
-                    Photo.id.in_([str(pid) for pid in photo_ids]),
-                    Photo.site_id == str(site_id)
+                    or_(*photo_id_conditions),
+                    or_(
+                        Photo.site_id == site_id_str,
+                        Photo.site_id == site_id_str.replace('-', '')
+                    )
                 )
             )
             photos_result = await self.db_session.execute(photos_query)

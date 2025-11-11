@@ -119,11 +119,25 @@ class GeographicMapRepository:
 
     async def get_marker_by_id(self, marker_id: UUID, map_id: UUID, site_id: UUID) -> Optional[GeographicMapMarker]:
         """Get a specific marker by ID, map ID, and site ID."""
+        # Convert UUIDs to strings for consistent comparison
+        marker_id_str = str(marker_id)
+        map_id_str = str(map_id)
+        site_id_str = str(site_id)
+        
         query = select(GeographicMapMarker).where(
             and_(
-                GeographicMapMarker.id == str(marker_id),
-                GeographicMapMarker.map_id == str(map_id),
-                GeographicMapMarker.site_id == str(site_id)
+                or_(
+                    GeographicMapMarker.id == marker_id_str,
+                    GeographicMapMarker.id == marker_id_str.replace('-', '')
+                ),
+                or_(
+                    GeographicMapMarker.map_id == map_id_str,
+                    GeographicMapMarker.map_id == map_id_str.replace('-', '')
+                ),
+                or_(
+                    GeographicMapMarker.site_id == site_id_str,
+                    GeographicMapMarker.site_id == site_id_str.replace('-', '')
+                )
             )
         )
         
@@ -132,7 +146,18 @@ class GeographicMapRepository:
 
     async def delete_marker(self, marker_id: UUID) -> bool:
         """Delete a geographic map marker (CASCADE will handle photo associations)."""
-        stmt = delete(GeographicMapMarker).where(GeographicMapMarker.id == str(marker_id))
+        from sqlalchemy import or_
+        
+        # Convert UUID to string for consistent comparison
+        marker_id_str = str(marker_id)
+        
+        # Try both with and without dashes for UUID format consistency
+        stmt = delete(GeographicMapMarker).where(
+            or_(
+                GeographicMapMarker.id == marker_id_str,
+                GeographicMapMarker.id == marker_id_str.replace('-', '')
+            )
+        )
         result = await self.db_session.execute(stmt)
         return result.rowcount > 0
 
@@ -169,8 +194,16 @@ class GeographicMapRepository:
 
     async def delete_marker_photos(self, marker_id: UUID):
         """Delete all photo associations for a marker."""
+        from sqlalchemy import or_
+        
+        # Convert UUID to string for consistent comparison
+        marker_id_str = str(marker_id)
+        
         stmt = delete(GeographicMapMarkerPhoto).where(
-            GeographicMapMarkerPhoto.marker_id == str(marker_id)
+            or_(
+                GeographicMapMarkerPhoto.marker_id == marker_id_str,
+                GeographicMapMarkerPhoto.marker_id == marker_id_str.replace('-', '')
+            )
         )
         await self.db_session.execute(stmt)
 
@@ -194,8 +227,16 @@ class GeographicMapRepository:
 
     async def get_marker_photos(self, marker_id: UUID) -> List[Photo]:
         """Get photos associated with a marker."""
+        from sqlalchemy import or_
+        
+        # Convert UUID to string for consistent comparison
+        marker_id_str = str(marker_id)
+        
         query = select(Photo).join(GeographicMapMarkerPhoto).where(
-            GeographicMapMarkerPhoto.marker_id == str(marker_id)
+            or_(
+                GeographicMapMarkerPhoto.marker_id == marker_id_str,
+                GeographicMapMarkerPhoto.marker_id == marker_id_str.replace('-', '')
+            )
         ).order_by(GeographicMapMarkerPhoto.display_order)
         
         result = await self.db_session.execute(query)
