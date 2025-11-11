@@ -656,12 +656,34 @@ async def get_site_users(
     """Lista utenti per sito"""
     await verify_admin_access(current_user_id, db)
     
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
+        logger.warning(f"Invalid site_id format: {site_id}")
+        raise HTTPException(status_code=404, detail="ID sito non valido")
+    
     try:
-        # Verifica sito
+        # Prima prova con l'ID normalizzato
         site_result = await db.execute(
-            select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
         )
         site = site_result.scalar_one_or_none()
+        
+        # Se non trovato, prova con l'ID originale
+        if not site:
+            site_result = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            )
+            site = site_result.scalar_one_or_none()
+        
+        # Se ancora non trovato, prova con l'hash senza trattini (se l'input è un UUID)
+        if not site and '-' in site_id:
+            hash_id = site_id.replace('-', '')
+            if len(hash_id) == 32:
+                site_result = await db.execute(
+                    select(ArchaeologicalSite).where(ArchaeologicalSite.id == hash_id)
+                )
+                site = site_result.scalar_one_or_none()
         
         if not site:
             raise HTTPException(status_code=404, detail="Sito non trovato")

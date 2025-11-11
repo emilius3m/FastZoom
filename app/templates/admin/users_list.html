@@ -426,7 +426,7 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('usersList', () => ({
         // Data
-        users: {{ users|tojson if users else '[]' }},
+        users: [],
         filteredUsers: [],
         
         // Filters
@@ -440,7 +440,7 @@ document.addEventListener('alpine:init', () => {
         pageSize: 25,
         
         // UI State
-        isLoading: false,
+        isLoading: true,
         showAlert: false,
         alertType: 'success',
         alertMessage: '',
@@ -466,9 +466,24 @@ document.addEventListener('alpine:init', () => {
             return { total, active, verified, superusers, withSites };
         },
         
-        init() {
-            this.filteredUsers = [...this.users];
+        async init() {
+            await this.loadUsers();
             this.checkUrlParams();
+        },
+        
+        // Load users from API
+        async loadUsers() {
+            try {
+                this.isLoading = true;
+                const response = await api.get('/api/v1/admin/users');
+                this.users = response.users || [];
+                this.filteredUsers = [...this.users];
+            } catch (error) {
+                console.error('Error loading users:', error);
+                this.showError('Errore nel caricamento degli utenti: ' + error.message);
+            } finally {
+                this.isLoading = false;
+            }
         },
         
         checkUrlParams() {
