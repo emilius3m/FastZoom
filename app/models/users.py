@@ -65,20 +65,6 @@ class User(Base, SoftDeleteMixin):
     username = Column(String(100), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
 
-    # Profilo personale
-    first_name = Column(String(100), nullable=False)
-    last_name = Column(String(100), nullable=False)
-    full_name = Column(String(200), nullable=True)  # Calcolato automaticamente
-
-    # Dati professionali archeologici
-    qualifica_professionale = Column(String(200), nullable=True)  # Archeologo, Dottore di Ricerca, etc.
-    ente_appartenenza = Column(String(300), nullable=True)  # Università, Soprintendenza, etc.
-    codice_archeologo = Column(String(50), nullable=True)  # Codice MiC/Albo se applicabile
-
-    # Contatti
-    phone = Column(String(20), nullable=True)
-    bio = Column(Text, nullable=True)
-    avatar_url = Column(String(500), nullable=True)
 
     # Status e sicurezza
     status = Column(String(20), default=UserStatusEnum.PENDING, nullable=False)
@@ -119,14 +105,33 @@ class User(Base, SoftDeleteMixin):
         return f"<User(email={self.email}, status={self.status})>"
 
     def __str__(self):
-        return f"{self.full_name or f'{self.first_name} {self.last_name}'}"
+        if self.profile and (self.profile.first_name or self.profile.last_name):
+            return f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+        return self.email
 
     @property
     def display_name(self) -> str:
         """Nome visualizzato per UI"""
-        if self.full_name:
-            return self.full_name
-        return f"{self.first_name} {self.last_name}"
+        if self.profile and (self.profile.first_name or self.profile.last_name):
+            return f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+        return self.email
+
+    @property
+    def first_name(self) -> str:
+        """Proprietà first_name per compatibilità - accede al profilo"""
+        return self.profile.first_name if self.profile else None
+
+    @property
+    def last_name(self) -> str:
+        """Proprietà last_name per compatibilità - accede al profilo"""
+        return self.profile.last_name if self.profile else None
+
+    @property
+    def full_name(self) -> str:
+        """Nome completo dal profilo"""
+        if self.profile and (self.profile.first_name or self.profile.last_name):
+            return f"{self.profile.first_name or ''} {self.profile.last_name or ''}".strip()
+        return None
 
     def has_role(self, role_name: str) -> bool:
         """Controlla se utente ha ruolo specifico"""

@@ -340,8 +340,8 @@ document.addEventListener('alpine:init', () => {
         formData: {
             email: '{{ user_data.email if user_data else "" }}',
             password: '',
-            first_name: '{{ user_data.first_name if user_data else "" }}',
-            last_name: '{{ user_data.last_name if user_data else "" }}',
+            first_name: '{{ user_data.first_name if user_data and user_data.first_name else "" }}',
+            last_name: '{{ user_data.last_name if user_data and user_data.last_name else "" }}',
             is_active: {{ 'true' if not user_data or user_data.is_active else 'false' }},
             is_verified: {{ 'true' if user_data and user_data.is_verified else 'false' }},
             is_superuser: {{ 'true' if user_data and user_data.is_superuser else 'false' }}
@@ -534,8 +534,8 @@ document.addEventListener('alpine:init', () => {
             this.formData = {
                 email: '{{ user_data.email if user_data else "" }}',
                 password: '',
-                first_name: '{{ user_data.first_name if user_data else "" }}',
-                last_name: '{{ user_data.last_name if user_data else "" }}',
+                first_name: '{{ user_data.first_name if user_data and user_data.first_name else "" }}',
+                last_name: '{{ user_data.last_name if user_data and user_data.last_name else "" }}',
                 is_active: {{ 'true' if not user_data or user_data.is_active else 'false' }},
                 is_verified: {{ 'true' if user_data and user_data.is_verified else 'false' }},
                 is_superuser: {{ 'true' if user_data and user_data.is_superuser else 'false' }}

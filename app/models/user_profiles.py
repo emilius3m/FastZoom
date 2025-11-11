@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import String, Text, DateTime
+from sqlalchemy import String, Text, DateTime, Column, String, Boolean, DateTime, ForeignKey, Text, Table, Index, Integer, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.schema import ForeignKey
 
@@ -36,7 +36,15 @@ class UserProfile(Base):
     address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     company: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Dati professionali archeologici
+    qualifica_professionale = Column(String(200), nullable=True)  # Archeologo, Dottore di Ricerca, etc.
+    ente_appartenenza = Column(String(300), nullable=True)  # Università, Soprintendenza, etc.
+    codice_archeologo = Column(String(50), nullable=True)  # Codice MiC/Albo se applicabile
 
+    # Contatti
+    phone = Column(String(20), nullable=True)
+    bio = Column(Text, nullable=True)
+    avatar_url = Column(String(500), nullable=True)
     # Relazioni
     user: Mapped["User"] = relationship(
         "User",

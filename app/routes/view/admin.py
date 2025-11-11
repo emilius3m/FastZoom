@@ -486,11 +486,22 @@ async def admin_users_edit(
     available_sites = sites_result.scalars().all()
     
     # Prepare user data for template
+    # First try to get from User model directly (for backward compatibility)
+    # Then fallback to UserProfile if available
+    first_name = getattr(user, 'first_name', None)
+    last_name = getattr(user, 'last_name', None)
+    
+    # If not found in User model, try to get from profile
+    if not first_name and user.profile:
+        first_name = user.profile.first_name
+    if not last_name and user.profile:
+        last_name = user.profile.last_name
+    
     user_data = {
         "id": str(user.id),
         "email": user.email,
-        "first_name": user.profile.first_name if user.profile else None,
-        "last_name": user.profile.last_name if user.profile else None,
+        "first_name": first_name,
+        "last_name": last_name,
         "is_active": user.is_active,
         "is_superuser": user.is_superuser,
         "is_verified": user.is_verified,

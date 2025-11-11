@@ -705,11 +705,21 @@ async def get_site_users(
         
         users_data = []
         for perm, user, profile in users_rows:
+            # Get first_name and last_name from User model first, then fallback to UserProfile
+            first_name = getattr(user, 'first_name', None)
+            last_name = getattr(user, 'last_name', None)
+            
+            # If not found in User model, try to get from profile
+            if not first_name and profile:
+                first_name = profile.first_name
+            if not last_name and profile:
+                last_name = profile.last_name
+            
             users_data.append({
                 "user_id": str(user.id),
                 "email": user.email,
-                "first_name": profile.first_name if profile else None,
-                "last_name": profile.last_name if profile else None,
+                "first_name": first_name,
+                "last_name": last_name,
                 "permission_level": str(perm.permission_level),
                 "is_active": perm.is_active,
                 "granted_at": perm.granted_at.isoformat() if perm.granted_at else None
@@ -890,11 +900,21 @@ async def list_users(
             )
             sites_count = sites_count.scalar() or 0
             
+            # Get first_name and last_name from User model first, then fallback to UserProfile
+            first_name = getattr(user, 'first_name', None)
+            last_name = getattr(user, 'last_name', None)
+            
+            # If not found in User model, try to get from profile
+            if not first_name and user.profile:
+                first_name = user.profile.first_name
+            if not last_name and user.profile:
+                last_name = user.profile.last_name
+            
             users_data.append({
                 "id": str(user.id),
                 "email": user.email,
-                "first_name": user.profile.first_name if user.profile else None,
-                "last_name": user.profile.last_name if user.profile else None,
+                "first_name": first_name,
+                "last_name": last_name,
                 "is_active": user.is_active,
                 "is_superuser": user.is_superuser,
                 "sites_count": sites_count,
@@ -933,12 +953,22 @@ async def get_user(
         if not user:
             raise HTTPException(status_code=404, detail="Utente non trovato")
         
+        # Get first_name and last_name from User model first, then fallback to UserProfile
+        first_name = getattr(user, 'first_name', None)
+        last_name = getattr(user, 'last_name', None)
+        
+        # If not found in User model, try to get from profile
+        if not first_name and user.profile:
+            first_name = user.profile.first_name
+        if not last_name and user.profile:
+            last_name = user.profile.last_name
+        
         return {
             "user": {
                 "id": str(user.id),
                 "email": user.email,
-                "first_name": user.profile.first_name if user.profile else None,
-                "last_name": user.profile.last_name if user.profile else None,
+                "first_name": first_name,
+                "last_name": last_name,
                 "is_active": user.is_active,
                 "is_superuser": user.is_superuser,
                 "is_verified": user.is_verified,
@@ -969,6 +999,12 @@ async def create_user(
             raise HTTPException(status_code=400, detail=f"Email '{user_data.email}' già esistente")
         
         user_id = str(uuid4())
+        
+        # Generate default values for required fields if not provided
+        first_name = user_data.first_name if user_data.first_name else user_data.email.split("@")[0].capitalize()
+        last_name = user_data.last_name if user_data.last_name else "User"
+        full_name = f"{first_name} {last_name}"
+        
         user = User(
             id=user_id,
             email=user_data.email,
@@ -983,11 +1019,23 @@ async def create_user(
         await db.commit()
         await db.refresh(user)
         
+        # Create user profile with first_name and last_name
+        profile = UserProfile(
+            user_id=user.id,
+            first_name=first_name,
+            last_name=last_name
+        )
+        db.add(profile)
+        await db.commit()
+        
         return {
             "message": "Utente creato con successo",
             "user": {
                 "id": str(user.id),
                 "email": user.email,
+                "first_name": first_name,
+                "last_name": last_name,
+                "full_name": full_name,
                 "is_active": user.is_active,
                 "is_superuser": user.is_superuser
             }
@@ -1036,7 +1084,7 @@ async def update_user(
         if user_data.password and user_data.password.strip():
             user.hashed_password = SecurityService.get_password_hash(user_data.password)
         
-        # Aggiorna profilo
+        # Update UserProfile for first_name and last_name
         profile_result = await db.execute(
             select(UserProfile).where(UserProfile.user_id == str(user_id))
         )
@@ -1050,14 +1098,21 @@ async def update_user(
             )
             db.add(profile)
         else:
-            profile.first_name = user_data.first_name
-            profile.last_name = user_data.last_name
+            if user_data.first_name is not None:
+                profile.first_name = user_data.first_name
+            if user_data.last_name is not None:
+                profile.last_name = user_data.last_name
         
         await db.commit()
         
         return {
             "message": "Utente aggiornato con successo",
-            "user": {"id": str(user.id), "email": user.email}
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "first_name": user_data.first_name,
+                "last_name": user_data.last_name
+            }
         }
     except HTTPException:
         raise
@@ -1444,10 +1499,22 @@ async def list_permissions(
         
         perms_data = []
         for perm, user, site in perms:
+            # Get first_name and last_name from User model first, then fallback to UserProfile
+            first_name = getattr(user, 'first_name', None)
+            last_name = getattr(user, 'last_name', None)
+            
+            # If not found in User model, try to get from profile
+            if not first_name and user.profile:
+                first_name = user.profile.first_name
+            if not last_name and user.profile:
+                last_name = user.profile.last_name
+            
             perms_data.append({
                 "id": str(perm.id),
                 "user_id": str(user.id),
                 "user_email": user.email,
+                "user_first_name": first_name,
+                "user_last_name": last_name,
                 "site_id": str(site.id),
                 "site_name": site.name,
                 "permission_level": str(perm.permission_level),

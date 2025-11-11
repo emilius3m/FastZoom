@@ -405,8 +405,8 @@ async def v1_register(
         
         email = data.get("email")
         password = data.get("password")
-        first_name = data.get("first_name", "")
-        last_name = data.get("last_name", "")
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
 
         if not email or not password:
             return JSONResponse(
@@ -427,14 +427,20 @@ async def v1_register(
         # Hash password
         hashed_password = SecurityService.get_password_hash(password)
 
+        # Generate default values for required fields if not provided
+        if not first_name:
+            first_name = email.split("@")[0].capitalize()
+        if not last_name:
+            last_name = "User"
+        
+        full_name = f"{first_name} {last_name}"
+
         # Create new user
         user = User(
             id=str(uuid4()),  # Convert UUID to string for SQLite compatibility
             email=email,
             username=email.split("@")[0],  # Generate username from email
             hashed_password=hashed_password,
-            first_name=first_name,
-            last_name=last_name,
             is_active=True,
             is_superuser=False,
             is_verified=False  # Require admin verification or email confirmation
@@ -442,6 +448,15 @@ async def v1_register(
         db.add(user)
         await db.commit()
         await db.refresh(user)
+        
+        # Create user profile with first_name and last_name
+        profile = UserProfileModelDB(
+            user_id=user.id,
+            first_name=first_name,
+            last_name=last_name
+        )
+        db.add(profile)
+        await db.commit()
 
         logger.info(f"User registered successfully: {user.id}")
 

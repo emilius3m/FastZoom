@@ -45,12 +45,21 @@ async def create_db_and_tables():
                 hashed_password=hashed_password,
                 is_superuser=True,
                 is_active=True,
-                is_verified=True,  # Aggiungi questo campo se presente nel modello
-                first_name="Super",  # Add required first_name
-                last_name="User"     # Add required last_name
+                is_verified=True  # Aggiungi questo campo se presente nel modello
             )
             
             session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            
+            # Crea il profilo associato con first_name e last_name
+            from app.models.user_profiles import UserProfile
+            profile = UserProfile(
+                user_id=user.id,
+                first_name="Super",
+                last_name="User"
+            )
+            session.add(profile)
             await session.commit()
             
             logger.info("👤 Superuser created successfully:")
@@ -108,12 +117,21 @@ async def create_archaeological_superadmin():
                 hashed_password=hashed_password,
                 is_superuser=True,
                 is_active=True,
-                is_verified=True,
-                first_name="Admin",  # Add required first_name
-                last_name="User"     # Add required last_name
+                is_verified=True
             )
             
             session.add(admin_user)
+            await session.commit()
+            await session.refresh(admin_user)
+            
+            # Crea il profilo associato con first_name e last_name
+            from app.models.user_profiles import UserProfile
+            profile = UserProfile(
+                user_id=admin_user.id,
+                first_name="Admin",
+                last_name="User"
+            )
+            session.add(profile)
             await session.commit()
             
             logger.info("🏛️  Archaeological Superadmin created:")
