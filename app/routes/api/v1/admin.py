@@ -692,10 +692,10 @@ async def get_site_users(
             raise HTTPException(status_code=404, detail="Sito non trovato")
         
         # Utenti con permessi
-        users_query = select(UserSitePermission, User, UserProfile).join(
+        users_query = select(UserSitePermission, User).options(
+            selectinload(User.profile)
+        ).join(
             User, UserSitePermission.user_id == User.id
-        ).outerjoin(
-            UserProfile, User.id == UserProfile.user_id
         ).where(
             UserSitePermission.site_id == site_id
         ).order_by(User.email)
@@ -704,30 +704,71 @@ async def get_site_users(
         users_rows = users_result.all()
         
         users_data = []
-        for perm, user, profile in users_rows:
+        user_ids_with_permissions = set()
+        
+        for perm, user in users_rows:
             # Get first_name and last_name from User model first, then fallback to UserProfile
             first_name = getattr(user, 'first_name', None)
             last_name = getattr(user, 'last_name', None)
             
             # If not found in User model, try to get from profile
-            if not first_name and profile:
-                first_name = profile.first_name
-            if not last_name and profile:
-                last_name = profile.last_name
+            if not first_name and hasattr(user, 'profile') and user.profile:
+                first_name = user.profile.first_name
+            if not last_name and hasattr(user, 'profile') and user.profile:
+                last_name = user.profile.last_name
+            
+            user_ids_with_permissions.add(str(user.id))
             
             users_data.append({
-                "user_id": str(user.id),
+                "id": str(user.id),
                 "email": user.email,
                 "first_name": first_name,
                 "last_name": last_name,
                 "permission_level": str(perm.permission_level),
-                "is_active": perm.is_active,
-                "granted_at": perm.granted_at.isoformat() if perm.granted_at else None
+                "is_active": user.is_active,
+                "is_active_permission": perm.is_active,
+                "granted_at": perm.granted_at.isoformat() if perm.granted_at else None,
+                "is_superuser": user.is_superuser
             })
+        
+        # Get all active users who don't have permissions for this site
+        all_users_query = select(User).options(
+            selectinload(User.profile)
+        ).where(
+            User.is_active == True
+        ).order_by(User.email)
+        
+        all_users_result = await db.execute(all_users_query)
+        all_users = all_users_result.scalars().all()
+        
+        available_users_data = []
+        for user in all_users:
+            user_id_str = str(user.id)
+            if user_id_str not in user_ids_with_permissions:
+                # Get first_name and last_name from User model first, then fallback to UserProfile
+                first_name = getattr(user, 'first_name', None)
+                last_name = getattr(user, 'last_name', None)
+                
+                # If not found in User model, try to get from profile
+                if hasattr(user, 'profile') and user.profile:
+                    if not first_name:
+                        first_name = user.profile.first_name
+                    if not last_name:
+                        last_name = user.profile.last_name
+                
+                available_users_data.append({
+                    "id": user_id_str,
+                    "email": user.email,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "is_active": user.is_active,
+                    "is_superuser": user.is_superuser
+                })
         
         return {
             "site": {"id": str(site.id), "name": site.name},
-            "users": users_data
+            "users": users_data,
+            "available_users": available_users_data
         }
     except HTTPException:
         raise

@@ -254,6 +254,7 @@
         </div>
     </div>
 
+
     <!-- Add User Modal -->
     <div x-show="showAddUserModal"
          x-transition:enter="transition ease-out duration-300"
@@ -262,10 +263,10 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50"
+         class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
          @click.self="showAddUserModal = false">
 
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+        <div class="relative mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white">Aggiungi Utente al Sito</h3>
                 <button @click="showAddUserModal = false" class="text-gray-400 hover:text-gray-600">
@@ -277,7 +278,7 @@
 
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Seleziona Utente</label>
-                <select x-model="selectedUserId" 
+                <select x-model="selectedUserId"
                         class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     <option value="">Seleziona un utente...</option>
                     <template x-for="user in availableUsers" :key="user.id">
@@ -334,10 +335,10 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50"
+         class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
          @click.self="showRemoveUserModal = false">
 
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+        <div class="relative mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white">Conferma Rimozione</h3>
                 <button @click="showRemoveUserModal = false" class="text-gray-400 hover:text-gray-600">
@@ -523,18 +524,16 @@ document.addEventListener('alpine:init', () => {
                   throw new Error('API client not loaded. Please refresh page.');
                 }
                 
-                // Convert user_id to proper UUID format if needed
-                const userId = this.selectedUserId;
-                const response = await api.post(`/api/v1/admin/users/${encodeURIComponent(userId)}/permissions`, {
-                    user_id: userId,
-                    site_id: this.site.id,
+                // Use the correct endpoint for adding users to sites
+                const response = await api.post(`/api/v1/admin/sites/${encodeURIComponent(this.siteId)}/users`, {
+                    user_id: this.selectedUserId,
                     permission_level: this.newPermissionLevel,
                     notes: this.newPermissionNotes
                 });
                 
                 console.log('Add permission response:', response);
                 
-                if (response.ok) {
+                if (response.ok || response.message) {
                     // Add user to local arrays
                     const userToAdd = this.availableUsers.find(u => u.id === this.selectedUserId);
                     if (userToAdd) {
@@ -579,38 +578,27 @@ document.addEventListener('alpine:init', () => {
                   throw new Error('API client not loaded. Please refresh page.');
                 }
                 
-                // Find the permission ID for this user-site combination
-                const response = await api.get('/api/v1/admin/permissions');
-                if (response.ok) {
-                    const permissions = response.permissions || [];
-                    const permission = permissions.find(p =>
-                        p.user_id === this.userToRemove.id && p.site_id === this.site.id
-                    );
+                // Use the correct endpoint for removing user from site
+                const response = await api.delete(`/api/v1/admin/sites/${encodeURIComponent(this.siteId)}/users/${encodeURIComponent(this.userToRemove.id)}`);
+                
+                if (response.ok || response.success) {
+                    // Remove user from site users and add back to available users
+                    this.users = this.users.filter(u => u.id !== this.userToRemove.id);
+                    const userToAddBack = {
+                        id: this.userToRemove.id,
+                        email: this.userToRemove.email,
+                        first_name: this.userToRemove.first_name,
+                        last_name: this.userToRemove.last_name,
+                        is_active: this.userToRemove.is_active,
+                        is_superuser: this.userToRemove.is_superuser
+                    };
+                    this.availableUsers.push(userToAddBack);
                     
-                    if (permission) {
-                        // Use the specific endpoint for removing user permission
-                        const deleteResponse = await api.delete(`/api/v1/admin/users/${encodeURIComponent(this.userToRemove.id)}/permissions/${permission.id}`);
-                        
-                        if (deleteResponse.ok) {
-                            // Remove user from site users and add back to available users
-                            this.users = this.users.filter(u => u.id !== this.userToRemove.id);
-                            const userToAddBack = {
-                                id: this.userToRemove.id,
-                                email: this.userToRemove.email,
-                                first_name: this.userToRemove.first_name,
-                                last_name: this.userToRemove.last_name,
-                                is_active: this.userToRemove.is_active,
-                                is_superuser: this.userToRemove.is_superuser
-                            };
-                            this.availableUsers.push(userToAddBack);
-                            
-                            this.showRemoveUserModal = false;
-                            this.userToRemove = null;
-                            this.showSuccess('Utente rimosso con successo dal sito');
-                        } else {
-                            throw new Error(deleteResponse.data?.detail || 'Errore nella rimozione del permesso');
-                        }
-                    }
+                    this.showRemoveUserModal = false;
+                    this.userToRemove = null;
+                    this.showSuccess('Utente rimosso con successo dal sito');
+                } else {
+                    throw new Error(response.data?.detail || 'Errore nella rimozione del permesso');
                 }
                 
             } catch (error) {
