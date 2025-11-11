@@ -1,7 +1,6 @@
 # app/models/geographic_maps.py - Modelli per mappe geografiche con salvataggio server
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, func, Integer, Float, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Column, String, Text, Boolean, DateTime, func, Integer, Float, ForeignKey, JSON
 from sqlalchemy.orm import relationship, mapped_column, Mapped
 from uuid import uuid4
 from datetime import datetime
@@ -13,10 +12,10 @@ class GeographicMap(Base):
     __tablename__ = "geographic_maps"
     
     # Chiave primaria
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
     
     # Relazione con sito
-    site_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"), nullable=False)
+    site_id: Mapped[str] = mapped_column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
     
     # Informazioni base mappa
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -43,7 +42,7 @@ class GeographicMap(Base):
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
-    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     
     # Relazioni
     site = relationship("ArchaeologicalSite", back_populates="geographic_maps")
@@ -86,11 +85,11 @@ class GeographicMapLayer(Base):
     __tablename__ = "geographic_map_layers"
     
     # Chiave primaria
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
     
     # Relazioni
-    map_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("geographic_maps.id"), nullable=False)
-    site_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"), nullable=False)
+    map_id: Mapped[str] = mapped_column(String(36), ForeignKey("geographic_maps.id"), nullable=False)
+    site_id: Mapped[str] = mapped_column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
     
     # Informazioni layer
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -115,7 +114,7 @@ class GeographicMapLayer(Base):
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
-    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     
     # Relazioni
     map = relationship("GeographicMap", back_populates="geojson_layers")
@@ -154,11 +153,11 @@ class GeographicMapMarker(Base):
     __tablename__ = "geographic_map_markers"
     
     # Chiave primaria
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
     
     # Relazioni
-    map_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("geographic_maps.id"), nullable=False)
-    site_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"), nullable=False)
+    map_id: Mapped[str] = mapped_column(String(36), ForeignKey("geographic_maps.id"), nullable=False)
+    site_id: Mapped[str] = mapped_column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
     
     # Posizione
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
@@ -177,7 +176,7 @@ class GeographicMapMarker(Base):
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
-    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     
     # Relazioni
     map = relationship("GeographicMap", back_populates="manual_markers")
@@ -213,11 +212,11 @@ class GeographicMapMarkerPhoto(Base):
     __tablename__ = "geographic_map_marker_photos"
     
     # Chiave primaria
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
     
     # Relazioni
-    marker_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("geographic_map_markers.id"), nullable=False)
-    photo_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("photos.id"), nullable=False)
+    marker_id: Mapped[str] = mapped_column(String(36), ForeignKey("geographic_map_markers.id"), nullable=False)
+    photo_id: Mapped[str] = mapped_column(String(36), ForeignKey("photos.id"), nullable=False)
     
     # Metadati associazione
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -226,7 +225,7 @@ class GeographicMapMarkerPhoto(Base):
     
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     
     # Relazioni
     marker = relationship("GeographicMapMarker", back_populates="photo_associations")

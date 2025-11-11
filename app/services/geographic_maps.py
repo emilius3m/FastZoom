@@ -27,8 +27,9 @@ class GeographicMapService:
         from app.models.sites import ArchaeologicalSite
         from app.models import UserSitePermission
         
-        # Convert site_id to string for consistent comparison
+        # Convert UUIDs to strings for consistent comparison
         site_id_str = str(site_id)
+        user_id_str = str(current_user_id)
         
         # Check site existence - try both with and without dashes
         site_query = select(ArchaeologicalSite).where(
@@ -45,8 +46,8 @@ class GeographicMapService:
         # Check user permissions - handle UUID format inconsistencies
         permission_query = select(UserSitePermission).where(
             and_(
-                (UserSitePermission.user_id == str(current_user_id)) |
-                (UserSitePermission.user_id == str(current_user_id).replace('-', '')),
+                (UserSitePermission.user_id == user_id_str) |
+                (UserSitePermission.user_id == user_id_str.replace('-', '')),
                 (UserSitePermission.site_id == site_id_str) |
                 (UserSitePermission.site_id == site_id_str.replace('-', '')),
                 UserSitePermission.is_active == True,
@@ -61,7 +62,7 @@ class GeographicMapService:
         permission = permission.scalar_one_or_none()
         
         if not permission:
-            logger.error(f"No valid permission found for user {current_user_id} on site {site_id_str}")
+            logger.error(f"No valid permission found for user {user_id_str} on site {site_id_str}")
             raise BusinessLogicError("Non hai i permessi per accedere a questo sito archeologico", 403)
         
         return site, permission
@@ -120,7 +121,7 @@ class GeographicMapService:
             
             # Prepare map data for creation
             new_map_data = {
-                "site_id": site_id,
+                "site_id": str(site_id),
                 "name": map_data['name'],
                 "description": map_data.get('description'),
                 "bounds_north": map_data['bounds']['north'],
@@ -132,7 +133,7 @@ class GeographicMapService:
                 "default_zoom": map_data.get('default_zoom', 15),
                 "map_config": map_data.get('map_config', {}),
                 "is_default": map_data.get('is_default', False),
-                "created_by": current_user_id
+                "created_by": str(current_user_id)
             }
             
             new_map = await self.repository.create_map(new_map_data)
@@ -417,13 +418,13 @@ class GeographicMapService:
             
             # Generate layer ID first to ensure consistency between MinIO and database
             from uuid import uuid4
-            layer_id = str(uuid4())  # Convert UUID to string for SQLite compatibility
+            layer_id_str = str(uuid4())  # Generate string ID for both MinIO and database
             
             # Prepare layer data for creation first
             layer = {
-                "id": layer_id,  # Use the same ID for both MinIO and database
-                "map_id": map_id,
-                "site_id": site_id,
+                "id": layer_id_str,  # Use string ID for SQLite compatibility
+                "map_id": str(map_id),
+                "site_id": str(site_id),
                 "name": layer_data['name'],
                 "description": layer_data.get('description'),
                 "layer_type": layer_data.get('layer_type', 'geojson'),
@@ -436,16 +437,16 @@ class GeographicMapService:
                 "bounds_south": bounds.get('south') if bounds else None,
                 "bounds_east": bounds.get('east') if bounds else None,
                 "bounds_west": bounds.get('west') if bounds else None,
-                "created_by": current_user_id
+                "created_by": str(current_user_id)
             }
             
-            # Store GeoJSON data in MinIO using the same layer_id
+            # Store GeoJSON data in MinIO using the string ID
             minio_url = await geojson_minio_service.save_geojson_layer(
                 geojson_data=geojson_data,
-                layer_id=str(layer_id),
+                layer_id=layer_id_str,
                 site_id=str(site_id),
                 map_id=str(map_id),
-                layer_name=layer_data.get('name', f'Layer {layer_id}')
+                layer_name=layer_data.get('name', f'Layer {layer_id_str}')
             )
             
             # Update layer data with MinIO reference
@@ -508,8 +509,8 @@ class GeographicMapService:
             
             # Prepare marker data for creation
             marker = {
-                "map_id": map_id,
-                "site_id": site_id,
+                "map_id": str(map_id),
+                "site_id": str(site_id),
                 "latitude": marker_data['latitude'],
                 "longitude": marker_data['longitude'],
                 "title": marker_data['title'],
@@ -518,7 +519,7 @@ class GeographicMapService:
                 "icon": marker_data.get('icon', '📍'),
                 "color": marker_data.get('color', '#007bff'),
                 "marker_metadata": marker_data.get('metadata', {}),
-                "created_by": current_user_id
+                "created_by": str(current_user_id)
             }
             
             new_marker = await self.repository.create_marker(marker)
@@ -569,7 +570,7 @@ class GeographicMapService:
             
             # Check if marker exists at all
             marker_check = await self.db_session.execute(
-                select(GeographicMapMarker).where(GeographicMapMarker.id == marker_id)
+                select(GeographicMapMarker).where(GeographicMapMarker.id == str(marker_id))
             )
             marker_basic = marker_check.scalar_one_or_none()
             
@@ -578,12 +579,12 @@ class GeographicMapService:
                 raise BusinessLogicError(f"Marker non trovato con ID: {marker_id}", 404)
             
             # Check if marker belongs to the correct map
-            if marker_basic.map_id != map_id:
+            if marker_basic.map_id != str(map_id):
                 logger.warning(f"Marker {marker_id} belongs to map {marker_basic.map_id}, not {map_id}")
                 raise BusinessLogicError(f"Marker non appartiene alla mappa specificata", 400)
             
             # Check if marker belongs to the correct site
-            if marker_basic.site_id != site_id:
+            if marker_basic.site_id != str(site_id):
                 logger.warning(f"Marker {marker_id} belongs to site {marker_basic.site_id}, not {site_id}")
                 raise BusinessLogicError(f"Marker non appartiene al sito specificato", 400)
             
@@ -625,8 +626,8 @@ class GeographicMapService:
             from app.models import Photo
             photos_query = select(Photo).where(
                 and_(
-                    Photo.id.in_(photo_ids),
-                    Photo.site_id == site_id
+                    Photo.id.in_([str(pid) for pid in photo_ids]),
+                    Photo.site_id == str(site_id)
                 )
             )
             photos_result = await self.db_session.execute(photos_query)

@@ -25,7 +25,7 @@ class GeographicMapRepository:
         """Get all geographic maps for a site."""
         query = select(GeographicMap).where(
             and_(
-                GeographicMap.site_id == site_id,
+                GeographicMap.site_id == str(site_id),
                 GeographicMap.is_active == True
             )
         ).order_by(GeographicMap.is_default.desc(), GeographicMap.created_at.desc())
@@ -37,8 +37,8 @@ class GeographicMapRepository:
         """Get a specific map by ID and site ID."""
         query = select(GeographicMap).where(
             and_(
-                GeographicMap.id == map_id,
-                GeographicMap.site_id == site_id
+                GeographicMap.id == str(map_id),
+                GeographicMap.site_id == str(site_id)
             )
         )
         
@@ -56,8 +56,8 @@ class GeographicMapRepository:
             ).selectinload(GeographicMapMarkerPhoto.photo)
         ).where(
             and_(
-                GeographicMap.id == map_id,
-                GeographicMap.site_id == site_id
+                GeographicMap.id == str(map_id),
+                GeographicMap.site_id == str(site_id)
             )
         )
         
@@ -75,25 +75,25 @@ class GeographicMapRepository:
         """Update is_default status for maps in a site, setting others to False."""
         stmt = GeographicMap.__table__.update().where(
             and_(
-                GeographicMap.site_id == site_id,
+                GeographicMap.site_id == str(site_id),
                 GeographicMap.is_default == True
             )
         ).values(is_default=False)
         
         if exclude_map_id:
-            stmt = stmt.where(GeographicMap.id != exclude_map_id)
+            stmt = stmt.where(GeographicMap.id != str(exclude_map_id))
         
         await self.db_session.execute(stmt)
 
     async def delete_map(self, map_id: UUID) -> bool:
         """Delete a geographic map (CASCADE will handle layers and markers)."""
-        stmt = delete(GeographicMap).where(GeographicMap.id == map_id)
+        stmt = delete(GeographicMap).where(GeographicMap.id == str(map_id))
         result = await self.db_session.execute(stmt)
         return result.rowcount > 0
 
     async def get_map_layers(self, map_id: UUID) -> List[GeographicMapLayer]:
         """Get all layers for a specific map."""
-        query = select(GeographicMapLayer).where(GeographicMapLayer.map_id == map_id)
+        query = select(GeographicMapLayer).where(GeographicMapLayer.map_id == str(map_id))
         result = await self.db_session.execute(query)
         return result.scalars().all()
 
@@ -106,7 +106,7 @@ class GeographicMapRepository:
 
     async def get_map_markers(self, map_id: UUID) -> List[GeographicMapMarker]:
         """Get all markers for a specific map."""
-        query = select(GeographicMapMarker).where(GeographicMapMarker.map_id == map_id)
+        query = select(GeographicMapMarker).where(GeographicMapMarker.map_id == str(map_id))
         result = await self.db_session.execute(query)
         return result.scalars().all()
 
@@ -121,9 +121,9 @@ class GeographicMapRepository:
         """Get a specific marker by ID, map ID, and site ID."""
         query = select(GeographicMapMarker).where(
             and_(
-                GeographicMapMarker.id == marker_id,
-                GeographicMapMarker.map_id == map_id,
-                GeographicMapMarker.site_id == site_id
+                GeographicMapMarker.id == str(marker_id),
+                GeographicMapMarker.map_id == str(map_id),
+                GeographicMapMarker.site_id == str(site_id)
             )
         )
         
@@ -132,14 +132,14 @@ class GeographicMapRepository:
 
     async def delete_marker(self, marker_id: UUID) -> bool:
         """Delete a geographic map marker (CASCADE will handle photo associations)."""
-        stmt = delete(GeographicMapMarker).where(GeographicMapMarker.id == marker_id)
+        stmt = delete(GeographicMapMarker).where(GeographicMapMarker.id == str(marker_id))
         result = await self.db_session.execute(stmt)
         return result.rowcount > 0
 
-    async def get_site_photos(self, site_id: UUID, search: Optional[str] = None, 
+    async def get_site_photos(self, site_id: UUID, search: Optional[str] = None,
                              skip: int = 0, limit: int = 50) -> tuple[List[Photo], int]:
         """Get photos for a site with optional search and pagination."""
-        query = select(Photo).where(Photo.site_id == site_id)
+        query = select(Photo).where(Photo.site_id == str(site_id))
         
         # Apply search filter
         if search:
@@ -152,7 +152,7 @@ class GeographicMapRepository:
             query = query.where(search_filter)
         
         # Get total count
-        count_query = select(func.count(Photo.id)).where(Photo.site_id == site_id)
+        count_query = select(func.count(Photo.id)).where(Photo.site_id == str(site_id))
         if search:
             count_query = count_query.where(search_filter)
         total_result = await self.db_session.execute(count_query)
@@ -170,21 +170,21 @@ class GeographicMapRepository:
     async def delete_marker_photos(self, marker_id: UUID):
         """Delete all photo associations for a marker."""
         stmt = delete(GeographicMapMarkerPhoto).where(
-            GeographicMapMarkerPhoto.marker_id == marker_id
+            GeographicMapMarkerPhoto.marker_id == str(marker_id)
         )
         await self.db_session.execute(stmt)
 
-    async def create_marker_photo_associations(self, marker_id: UUID, photo_ids: List[UUID], 
+    async def create_marker_photo_associations(self, marker_id: UUID, photo_ids: List[UUID],
                                              created_by: UUID) -> List[GeographicMapMarkerPhoto]:
         """Create photo associations for a marker."""
         associations = []
         for i, photo_id in enumerate(photo_ids):
             association = GeographicMapMarkerPhoto(
-                marker_id=marker_id,
-                photo_id=photo_id,
+                marker_id=str(marker_id),
+                photo_id=str(photo_id),
                 display_order=i,
                 is_primary=(i == 0),
-                created_by=created_by
+                created_by=str(created_by)
             )
             associations.append(association)
             self.db_session.add(association)
@@ -195,7 +195,7 @@ class GeographicMapRepository:
     async def get_marker_photos(self, marker_id: UUID) -> List[Photo]:
         """Get photos associated with a marker."""
         query = select(Photo).join(GeographicMapMarkerPhoto).where(
-            GeographicMapMarkerPhoto.marker_id == marker_id
+            GeographicMapMarkerPhoto.marker_id == str(marker_id)
         ).order_by(GeographicMapMarkerPhoto.display_order)
         
         result = await self.db_session.execute(query)
