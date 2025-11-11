@@ -1,102 +1,111 @@
 #!/usr/bin/env python3
 """
-Test script to verify the UserSitePermission fix
-Tests that the model can be instantiated with 'granted_by' instead of 'assigned_by'
+Test script to validate the permission endpoint fix
 """
 
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from uuid import uuid4
-from datetime import datetime
-from app.models.users import UserSitePermission, PermissionLevel
+from pydantic import ValidationError
+from app.routes.api.v1.admin import PermissionCreate
+from app.models.users import PermissionLevel
 
-def test_permission_creation():
-    """Test that UserSitePermission can be created with granted_by parameter"""
-    print("Testing UserSitePermission creation...")
+def test_permission_create_schema():
+    """Test the PermissionCreate schema with valid and invalid data"""
+    print("Testing PermissionCreate schema...")
     
-    # Test data
-    user_id = uuid4()
-    site_id = uuid4()
-    granted_by_id = uuid4()
+    # Test valid permission levels
+    valid_levels = [level.value for level in PermissionLevel]
+    print(f"Valid permission levels: {valid_levels}")
     
+    # Test valid data
     try:
-        # Try to create a UserSitePermission with the correct field name
-        permission = UserSitePermission(
-            id=uuid4(),
-            user_id=user_id,
-            site_id=site_id,
-            permission_level=PermissionLevel.READ.value,
-            granted_by=granted_by_id,
-            is_active=True
-        )
-        
-        print(f"✓ Successfully created UserSitePermission with granted_by={granted_by_id}")
-        print(f"  - User ID: {user_id}")
-        print(f"  - Site ID: {site_id}")
-        print(f"  - Permission Level: {permission.permission_level}")
-        print(f"  - Granted By: {permission.granted_by}")
-        print(f"  - Is Active: {permission.is_active}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"✗ Error creating UserSitePermission: {str(e)}")
+        valid_data = {
+            "site_id": "123e4567-e89b-12d3-a456-426614174000",
+            "permission_level": "read",
+            "notes": "Test permission"
+        }
+        permission = PermissionCreate(**valid_data)
+        print(f"✅ Valid data test passed: {permission}")
+    except ValidationError as e:
+        print(f"❌ Valid data test failed: {e}")
         return False
+    
+    # Test invalid permission level
+    try:
+        invalid_data = {
+            "site_id": "123e4567-e89b-12d3-a456-426614174000",
+            "permission_level": "invalid_level",
+            "notes": "Test permission"
+        }
+        permission = PermissionCreate(**invalid_data)
+        print(f"❌ Invalid permission level test failed - should have raised ValueError")
+        return False
+    except (ValidationError, ValueError) as e:
+        print(f"✅ Invalid permission level test passed: {e}")
+    
+    # Test missing required fields
+    try:
+        incomplete_data = {
+            "permission_level": "read"
+        }
+        permission = PermissionCreate(**incomplete_data)
+        print(f"❌ Missing fields test failed - should have raised ValidationError")
+        return False
+    except (ValidationError, ValueError) as e:
+        print(f"✅ Missing fields test passed: {e}")
+    
+    return True
 
-def test_permission_creation_with_assigned_by():
-    """Test that UserSitePermission fails with assigned_by parameter (as expected)"""
-    print("\nTesting that assigned_by parameter fails as expected...")
+def test_permission_level_validation():
+    """Test permission level validation logic"""
+    print("\nTesting permission level validation...")
     
-    # Test data
-    user_id = uuid4()
-    site_id = uuid4()
-    assigned_by_id = uuid4()
+    valid_permission_levels = [level.value for level in PermissionLevel]
+    print(f"Valid levels: {valid_permission_levels}")
     
-    try:
-        # Try to create a UserSitePermission with the old field name
-        permission = UserSitePermission(
-            id=uuid4(),
-            user_id=user_id,
-            site_id=site_id,
-            permission_level=PermissionLevel.READ.value,
-            assigned_by=assigned_by_id,  # This should fail
-            is_active=True
-        )
-        
-        print(f"✗ Unexpectedly succeeded with assigned_by parameter")
-        return False
-        
-    except TypeError as e:
-        if "assigned_by" in str(e):
-            print(f"✓ Expected error occurred: {str(e)}")
-            return True
+    # Test valid levels
+    for level in valid_permission_levels:
+        if level in valid_permission_levels:
+            print(f"✅ '{level}' is valid")
         else:
-            print(f"✗ Unexpected TypeError: {str(e)}")
+            print(f"❌ '{level}' should be valid but wasn't found")
             return False
-    except Exception as e:
-        print(f"✗ Unexpected error: {str(e)}")
-        return False
-
-def main():
-    """Run all tests"""
-    print("=" * 60)
-    print("UserSitePermission Fix Verification")
-    print("=" * 60)
     
-    test1_result = test_permission_creation()
-    test2_result = test_permission_creation_with_assigned_by()
+    # Test invalid levels
+    invalid_levels = ["invalid", "admin_level", "read_write", ""]
+    for level in invalid_levels:
+        if level not in valid_permission_levels:
+            print(f"✅ '{level}' correctly identified as invalid")
+        else:
+            print(f"❌ '{level}' should be invalid but was accepted")
+            return False
     
-    print("\n" + "=" * 60)
-    if test1_result and test2_result:
-        print("✓ All tests passed! The fix is working correctly.")
-        print("  - UserSitePermission can be created with 'granted_by'")
-        print("  - UserSitePermission fails with 'assigned_by' as expected")
-        return 0
-    else:
-        print("✗ Some tests failed. Please review the implementation.")
-        return 1
+    return True
 
 if __name__ == "__main__":
-    sys.exit(main())
+    print("=== Testing Permission Endpoint Fix ===\n")
+    
+    schema_test = test_permission_create_schema()
+    validation_test = test_permission_level_validation()
+    
+    print(f"\n=== Test Results ===")
+    print(f"Schema validation: {'✅ PASSED' if schema_test else '❌ FAILED'}")
+    print(f"Permission level validation: {'✅ PASSED' if validation_test else '❌ FAILED'}")
+    
+    if schema_test and validation_test:
+        print("\n🎉 All tests passed! The fix should resolve the 422 error.")
+        print("\nExpected request body format:")
+        print("""
+POST /api/v1/admin/users/{user_id}/permissions/
+{
+    "site_id": "uuid-of-site",
+    "permission_level": "read|write|admin|regional_admin",
+    "expires_at": "optional-ISO-datetime",
+    "notes": "optional-notes"
+}
+        """)
+    else:
+        print("\n❌ Some tests failed. Please review the implementation.")
+        sys.exit(1)

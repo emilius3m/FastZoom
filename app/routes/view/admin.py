@@ -87,12 +87,19 @@ async def get_admin_template_context(
     Contiene informazioni utente e configurazione menu.
     """
 
-    # Ottieni informazioni utente completa
-    user = await db.execute(select(User).where(User.id == current_user_id))
-    user = user.scalar_one_or_none()
+    # 🔧 FIX: Handle both UUID formats for consistency
+    user_id_str = str(current_user_id)
+    user_id_no_dashes = user_id_str.replace('-', '')
+    
+    # Ottieni informazioni utente completa con entrambi i formati UUID
+    user_query = select(User).where(
+        (User.id == user_id_str) | (User.id == user_id_no_dashes)
+    )
+    user_result = await db.execute(user_query)
+    user = user_result.scalar_one_or_none()
 
     if not user:
-        logger.warning(f"User {current_user_id} not found in database")
+        logger.warning(f"User {current_user_id} not found in database (tried both UUID formats)")
 
     # Sito virtuale per il pannello amministrazione (per il menu laterale)
     admin_site = {
@@ -132,8 +139,25 @@ async def require_superuser(
     Ritorna una tupla (user, context) per le route.
     """
 
-    user = await db.execute(select(User).where(User.id == current_user_id))
-    user = user.scalar_one_or_none()
+    # 🔧 FIX: Handle both UUID formats and ensure fresh data
+    user_id_str = str(current_user_id)
+    user_id_no_dashes = user_id_str.replace('-', '')
+    
+    logger.info(f"🐛 [DEBUG] require_superuser - Checking user {current_user_id}")
+    logger.info(f"🐛 [DEBUG] UUID formats to try: {user_id_str} (with dashes), {user_id_no_dashes} (without dashes)")
+    
+    # Try with both UUID formats to ensure we find the user
+    user_query = select(User).where(
+        (User.id == user_id_str) | (User.id == user_id_no_dashes)
+    )
+    user_result = await db.execute(user_query)
+    user = user_result.scalar_one_or_none()
+    
+    logger.info(f"🐛 [DEBUG] User found in require_superuser: {user is not None}")
+    if user:
+        logger.info(f"🐛 [DEBUG] User details in require_superuser - email: {user.email}, is_active: {user.is_active}, is_superuser: {user.is_superuser}")
+    else:
+        logger.error(f"🐛 [DEBUG] User {current_user_id} not found in require_superuser!")
 
     if not user or not user.is_superuser:
         logger.warning(

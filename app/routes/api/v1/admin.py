@@ -89,11 +89,19 @@ class UserUpdate(BaseModel):
     is_verified: bool = False
 
 class PermissionCreate(BaseModel):
-    user_id: UUID
     site_id: UUID
     permission_level: str
     expires_at: Optional[str] = None
     notes: Optional[str] = None
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Validate permission_level against enum values
+        valid_permission_levels = [level.value for level in PermissionLevel]
+        if self.permission_level not in valid_permission_levels:
+            raise ValueError(
+                f"permission_level must be one of: {', '.join(valid_permission_levels)}"
+            )
 
 class SiteUserAdd(BaseModel):
     user_id: UUID
@@ -151,30 +159,25 @@ def normalize_site_id(site_id: str) -> Optional[str]:
 
 async def verify_admin_access(current_user_id: UUID, db: AsyncSession) -> User:
     """Verifica superuser e restituisce utente"""
-    # Normalize UUID to handle both hyphenated and non-hyphenated formats
+    # 🔧 FIX: Handle both UUID formats consistently with the same approach as auth_service
     user_id_str = str(current_user_id)
+    user_id_no_dashes = user_id_str.replace('-', '')
     
-    # Try with original format first
-    user_query = select(User).where(User.id == user_id_str)
+    logger.info(f"🐛 [DEBUG] verify_admin_access - Checking user {current_user_id}")
+    logger.info(f"🐛 [DEBUG] UUID formats to try: {user_id_str} (with dashes), {user_id_no_dashes} (without dashes)")
+    
+    # Try with both UUID formats in a single query for consistency
+    user_query = select(User).where(
+        (User.id == user_id_str) | (User.id == user_id_no_dashes)
+    )
     user_result = await db.execute(user_query)
     user = user_result.scalar_one_or_none()
     
-    # If not found, try with hyphenated format (remove hyphens)
-    if not user and '-' in user_id_str:
-        user_id_no_hyphens = user_id_str.replace('-', '')
-        user_query = select(User).where(User.id == user_id_no_hyphens)
-        user_result = await db.execute(user_query)
-        user = user_result.scalar_one_or_none()
-    # If not found, try adding hyphens to non-hyphenated format
-    elif not user and '-' not in user_id_str and len(user_id_str) == 32:
-        try:
-            uuid_obj = UUID(user_id_str)
-            user_id_with_hyphens = str(uuid_obj)
-            user_query = select(User).where(User.id == user_id_with_hyphens)
-            user_result = await db.execute(user_query)
-            user = user_result.scalar_one_or_none()
-        except:
-            pass
+    logger.info(f"🐛 [DEBUG] User found in verify_admin_access: {user is not None}")
+    if user:
+        logger.info(f"🐛 [DEBUG] User details in verify_admin_access - email: {user.email}, is_active: {user.is_active}, is_superuser: {user.is_superuser}")
+    else:
+        logger.error(f"🐛 [DEBUG] User {current_user_id} not found in verify_admin_access!")
 
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accesso negato")
@@ -1147,6 +1150,14 @@ async def add_user_permission(
     """Aggiungi permesso a utente"""
     await verify_admin_access(current_user_id, db)
     
+    # Validate permission_level against enum values
+    valid_permission_levels = [level.value for level in PermissionLevel]
+    if permission_data.permission_level not in valid_permission_levels:
+        raise HTTPException(
+            status_code=422,
+            detail=f"permission_level must be one of: {', '.join(valid_permission_levels)}"
+        )
+    
     # Normalize user ID to handle both hyphenated and non-hyphenated formats
     normalized_user_id = user_id
     try:
@@ -1179,13 +1190,32 @@ async def add_user_permission(
         if not user:
             raise HTTPException(status_code=404, detail="Utente non trovato")
         
-        # Verifica sito esiste
-        site_result = await db.execute(
-            select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(permission_data.site_id))
-        )
-        site = site_result.scalar_one_or_none()
+        # Normalize and verify sito esiste
+        site_id_str = str(permission_data.site_id)
+        normalized_site_id = normalize_site_id(site_id_str)
+        
+        if normalized_site_id:
+            # Try with normalized ID first
+            site_result = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
+            )
+            site = site_result.scalar_one_or_none()
+            
+            # If not found, try with original ID
+            if not site:
+                site_result = await db.execute(
+                    select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id_str)
+                )
+                site = site_result.scalar_one_or_none()
+        else:
+            # Try with original ID if normalization fails
+            site_result = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id_str)
+            )
+            site = site_result.scalar_one_or_none()
         
         if not site:
+            logger.warning(f"Site not found. Original ID: {site_id_str}, Normalized: {normalized_site_id}")
             raise HTTPException(status_code=404, detail="Sito non trovato")
         
         # Verifica permesso già esiste
