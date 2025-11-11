@@ -75,7 +75,7 @@ class UserInfoResponse(BaseModel):
     full_name: Optional[str]
     is_active: bool
     is_superuser: bool
-    last_login: Optional[datetime]
+    last_login_at: Optional[datetime]
     sites: List[Dict[str, Any]]
 
 router = APIRouter()
@@ -253,7 +253,7 @@ async def v1_login_json(
         refresh_token = SecurityService.create_refresh_token(token_data)
         
         # Aggiorna ultimo login
-        user.last_login = datetime.utcnow()
+        user.last_login_at = datetime.utcnow()
         await db.commit()
         
         # Log login riuscito

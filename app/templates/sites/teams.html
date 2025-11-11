@@ -353,7 +353,7 @@
                                     <span x-text="member.photos_uploaded || 0"></span> foto
                                 </div>
                                 <div class="text-xs text-gray-500">
-                                    Ultimo accesso: <span x-text="member.last_login ? formatDate(member.last_login) : 'Mai'"></span>
+                                    Ultimo accesso: <span x-text="member.last_login_at ? formatDate(member.last_login_at) : 'Mai'"></span>
                                 </div>
                             </td>
 
@@ -627,7 +627,7 @@ document.addEventListener('alpine:init', () => {
                     member.is_active ? (member.is_pending ? 'Pendente' : 'Attivo') : 'Inattivo',
                     this.formatDate(member.granted_at),
                     member.photos_uploaded || 0,
-                    member.last_login ? this.formatDate(member.last_login) : 'Mai'
+                    member.last_login_at ? this.formatDate(member.last_login_at) : 'Mai'
                 ].map(field => `"${field}"`).join(','))
             ].join('\n');
             

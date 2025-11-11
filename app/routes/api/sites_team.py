@@ -71,7 +71,7 @@ async def get_team_members(
             "institution": profile.get("institution"),
             # Stats
             "photos_uploaded": 0,
-            "last_login": None,
+            "last_login_at": None,
         }
 
         team_members.append(member_data)

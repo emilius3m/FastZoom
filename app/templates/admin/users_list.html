@@ -114,7 +114,7 @@
                             class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                         <option value="email">Email</option>
                         <option value="created_at">Data Creazione</option>
-                        <option value="last_login">Ultimo Accesso</option>
+                        <option value="last_login_at">Ultimo Accesso</option>
                         <option value="sites_count">Siti Accessibili</option>
                     </select>
                 </div>
@@ -210,11 +210,11 @@
                                 </svg>
                             </div>
                         </th>
-                        <th @click="setSortBy('last_login')" 
+                        <th @click="setSortBy('last_login_at')"
                             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
                             <div class="flex items-center space-x-1">
                                 <span>Ultimo Accesso</span>
-                                <svg x-show="sortBy === 'last_login'" class="w-4 h-4" :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg x-show="sortBy === 'last_login_at'" class="w-4 h-4" :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
                             </div>
@@ -318,7 +318,7 @@
 
                             <!-- Last Login -->
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <div x-text="formatDate(user.last_login) || 'Mai'"></div>
+                                <div x-text="formatDate(user.last_login_at) || 'Mai'"></div>
                             </td>
 
                             <!-- Actions -->
@@ -557,7 +557,7 @@ document.addEventListener('alpine:init', () => {
                 let bVal = b[this.sortBy];
                 
                 // Handle dates
-                if (this.sortBy === 'created_at' || this.sortBy === 'last_login') {
+                if (this.sortBy === 'created_at' || this.sortBy === 'last_login_at') {
                     aVal = aVal ? new Date(aVal) : new Date(0);
                     bVal = bVal ? new Date(bVal) : new Date(0);
                 }
@@ -665,7 +665,7 @@ document.addEventListener('alpine:init', () => {
                     user.is_superuser ? 'Sì' : 'No',
                     user.sites_count || 0,
                     this.formatDate(user.created_at),
-                    this.formatDate(user.last_login) || 'Mai'
+                    this.formatDate(user.last_login_at) || 'Mai'
                 ].join(','))
             ].join('\n');
             

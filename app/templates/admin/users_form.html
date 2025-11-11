@@ -315,7 +315,7 @@
                         <span class="text-sm text-gray-600 dark:text-gray-400">Ultimo accesso:</span>
                         <span class="text-sm font-medium text-gray-900 dark:text-white">
                             {% if user_data.last_login %}
-                                {{ user_data.last_login[:16] if user_data.last_login and user_data.last_login is string else (user_data.last_login.strftime('%d/%m/%Y %H:%M') if user_data.last_login else '') }}
+                                {{ user_data.last_login_at[:16] if user_data.last_login_at and user_data.last_login_at is string else (user_data.last_login_at.strftime('%d/%m/%Y %H:%M') if user_data.last_login_at else '') }}
                             {% else %}
                                 Mai
                             {% endif %}

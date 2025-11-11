@@ -346,27 +346,142 @@ async def admin_users_new(
 async def admin_users_edit(
     request: Request,
     user_id: str,
-    authdata: tuple = Depends(require_superuser)
+    authdata: tuple = Depends(require_superuser),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     Form per modificare un utente.
-    Alpine.js carica i dati tramite API GET /api/v1/admin/users/{user_id}
+    Fetch i dati utente tramite API GET /api/v1/admin/users/{user_id}
     Template: admin_users_form.html con action='edit'
     """
     superuser, base_context = authdata
 
-    # Validazione UUID
+    # Validazione UUID - support both hyphenated and non-hyphenated formats
+    normalized_user_id = user_id
     try:
+        # Try to validate as UUID
         UUID(user_id)
     except ValueError:
-        logger.warning(f"Invalid user_id format: {user_id}")
-        raise HTTPException(status_code=404, detail="ID utente non valido")
+        # If it's a 32-char hex string, try to format as UUID
+        if len(user_id) == 32:
+            try:
+                # Convert hex to UUID format
+                uuid_formatted = f"{user_id[0:8]}-{user_id[8:12]}-{user_id[12:16]}-{user_id[16:20]}-{user_id[20:32]}"
+                UUID(uuid_formatted)  # Validate the formatted UUID
+                normalized_user_id = uuid_formatted
+            except ValueError:
+                logger.warning(f"Invalid user_id format: {user_id}")
+                raise HTTPException(status_code=404, detail="ID utente non valido")
+        else:
+            logger.warning(f"Invalid user_id format: {user_id}")
+            raise HTTPException(status_code=404, detail="ID utente non valido")
+
+    # Fetch user data from database - try both formats
+    from app.models.user_profiles import UserProfile
+    from sqlalchemy.orm import selectinload
+    
+    # First try with normalized ID
+    user_result = await db.execute(
+        select(User).options(selectinload(User.profile))
+        .where(User.id == normalized_user_id)
+    )
+    user = user_result.scalar_one_or_none()
+
+    # If not found, try with original ID
+    if not user and user_id != normalized_user_id:
+        user_result = await db.execute(
+            select(User).options(selectinload(User.profile))
+            .where(User.id == user_id)
+        )
+        user = user_result.scalar_one_or_none()
+    
+    # If still not found, try with hyphenated format of original ID
+    if not user and '-' not in user_id and len(user_id) == 32:
+        hyphenated_id = f"{user_id[0:8]}-{user_id[8:12]}-{user_id[12:16]}-{user_id[16:20]}-{user_id[20:32]}"
+        user_result = await db.execute(
+            select(User).options(selectinload(User.profile))
+            .where(User.id == hyphenated_id)
+        )
+        user = user_result.scalar_one_or_none()
+        
+    if not user:
+        logger.warning(f"User {user_id} not found (tried: {normalized_user_id}, {user_id}, {hyphenated_id if '-' not in user_id and len(user_id) == 32 else 'N/A'})")
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+    
+    # Fetch user permissions and sites for the permissions panel
+    from app.models import UserSitePermission, ArchaeologicalSite
+    from sqlalchemy import or_
+    
+    # Get user permissions with site details - try both user ID formats
+    conditions = [
+        UserSitePermission.user_id == user_id,
+        UserSitePermission.user_id == normalized_user_id
+    ]
+    
+    # Add hyphenated ID condition if applicable
+    if '-' not in user_id and len(user_id) == 32:
+        hyphenated_id = f"{user_id[0:8]}-{user_id[8:12]}-{user_id[12:16]}-{user_id[16:20]}-{user_id[20:32]}"
+        conditions.append(UserSitePermission.user_id == hyphenated_id)
+    
+    permissions_result = await db.execute(
+        select(UserSitePermission, ArchaeologicalSite)
+        .join(ArchaeologicalSite, UserSitePermission.site_id == ArchaeologicalSite.id)
+        .where(or_(*conditions))
+        .where(UserSitePermission.is_active == True)
+    )
+    permissions_rows = permissions_result.all()
+    
+    user_permissions = []
+    for perm, site in permissions_rows:
+        user_permissions.append({
+            "id": str(perm.id),
+            "permission_level": str(perm.permission_level),
+            "permission_display_name": {
+                "read": "Visualizzatore",
+                "write": "Curatore",
+                "admin": "Amministratore Sito",
+                "regional_admin": "Amministratore Regionale"
+            }.get(str(perm.permission_level), str(perm.permission_level)),
+            "status_badge_class": {
+                "read": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+                "write": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+                "admin": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+                "regional_admin": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+            }.get(str(perm.permission_level), "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300"),
+            "site": {
+                "id": str(site.id),
+                "name": site.name,
+                "code": site.code
+            }
+        })
+    
+    # Get available sites for adding permissions
+    sites_result = await db.execute(
+        select(ArchaeologicalSite).where(ArchaeologicalSite.status == "active")
+    )
+    available_sites = sites_result.scalars().all()
+    
+    # Prepare user data for template
+    user_data = {
+        "id": str(user.id),
+        "email": user.email,
+        "first_name": user.profile.first_name if user.profile else None,
+        "last_name": user.profile.last_name if user.profile else None,
+        "is_active": user.is_active,
+        "is_superuser": user.is_superuser,
+        "is_verified": user.is_verified,
+        "created_at": user.created_at,
+        "last_login_at": user.last_login_at
+    }
 
     context = {
         **base_context,
         "page_title": "Modifica Utente",
         "user_id": user_id,
         "action": "edit",
+        "user_data": user_data,
+        "user_permissions": user_permissions,
+        "available_sites": available_sites,
         "breadcrumb": [
             {"label": "Home", "url": "/"},
             {"label": "Admin", "url": "/admin"},
