@@ -1235,7 +1235,7 @@ async def add_user_permission(
 @router.post("/users/{user_id}/permissions/{permission_id}/delete/")
 async def delete_user_permission(
     user_id: str,
-    permission_id: UUID,
+    permission_id: str,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
@@ -1259,12 +1259,101 @@ async def delete_user_permission(
             logger.warning(f"Invalid user_id format: {user_id}")
             raise HTTPException(status_code=404, detail="ID utente non valido")
     
+    # Normalize permission ID to handle both hyphenated and non-hyphenated formats
+    normalized_permission_id = permission_id
+    try:
+        UUID(permission_id)
+    except ValueError:
+        if len(permission_id) == 32:
+            try:
+                uuid_formatted = f"{permission_id[0:8]}-{permission_id[8:12]}-{permission_id[12:16]}-{permission_id[16:20]}-{permission_id[20:32]}"
+                UUID(uuid_formatted)
+                normalized_permission_id = uuid_formatted
+            except ValueError:
+                logger.warning(f"Invalid permission_id format: {permission_id}")
+                raise HTTPException(status_code=404, detail="ID permesso non valido")
+        else:
+            logger.warning(f"Invalid permission_id format: {permission_id}")
+            raise HTTPException(status_code=404, detail="ID permesso non valido")
+    
     try:
         # Verifica permesso esiste e appartiene all'utente - try both formats
         perm_result = await db.execute(
             select(UserSitePermission).where(
                 and_(
-                    UserSitePermission.id == str(permission_id),
+                    UserSitePermission.id == normalized_permission_id,
+                    or_(
+                        UserSitePermission.user_id == user_id,
+                        UserSitePermission.user_id == normalized_user_id
+                    )
+                )
+            )
+        )
+        perm = perm_result.scalar_one_or_none()
+        
+        if not perm:
+            raise HTTPException(status_code=404, detail="Permesso non trovato")
+        
+        await db.delete(perm)
+        await db.commit()
+        
+        return {"success": True, "message": "Permesso eliminato con successo"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error deleting user permission: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+@router.delete("/users/{user_id}/permissions/{permission_id}")
+async def delete_user_permission_direct(
+    user_id: str,
+    permission_id: str,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Elimina permesso utente (DELETE diretto)"""
+    await verify_admin_access(current_user_id, db)
+    
+    # Normalize user ID to handle both hyphenated and non-hyphenated formats
+    normalized_user_id = user_id
+    try:
+        UUID(user_id)
+    except ValueError:
+        if len(user_id) == 32:
+            try:
+                uuid_formatted = f"{user_id[0:8]}-{user_id[8:12]}-{user_id[12:16]}-{user_id[16:20]}-{user_id[20:32]}"
+                UUID(uuid_formatted)
+                normalized_user_id = uuid_formatted
+            except ValueError:
+                logger.warning(f"Invalid user_id format: {user_id}")
+                raise HTTPException(status_code=404, detail="ID utente non valido")
+        else:
+            logger.warning(f"Invalid user_id format: {user_id}")
+            raise HTTPException(status_code=404, detail="ID utente non valido")
+    
+    # Normalize permission ID to handle both hyphenated and non-hyphenated formats
+    normalized_permission_id = permission_id
+    try:
+        UUID(permission_id)
+    except ValueError:
+        if len(permission_id) == 32:
+            try:
+                uuid_formatted = f"{permission_id[0:8]}-{permission_id[8:12]}-{permission_id[12:16]}-{permission_id[16:20]}-{permission_id[20:32]}"
+                UUID(uuid_formatted)
+                normalized_permission_id = uuid_formatted
+            except ValueError:
+                logger.warning(f"Invalid permission_id format: {permission_id}")
+                raise HTTPException(status_code=404, detail="ID permesso non valido")
+        else:
+            logger.warning(f"Invalid permission_id format: {permission_id}")
+            raise HTTPException(status_code=404, detail="ID permesso non valido")
+    
+    try:
+        # Verifica permesso esiste e appartiene all'utente - try both formats
+        perm_result = await db.execute(
+            select(UserSitePermission).where(
+                and_(
+                    UserSitePermission.id == normalized_permission_id,
                     or_(
                         UserSitePermission.user_id == user_id,
                         UserSitePermission.user_id == normalized_user_id
@@ -1351,16 +1440,33 @@ async def list_permissions(
 
 @router.delete("/permissions/{permission_id}")
 async def delete_permission(
-    permission_id: UUID,
+    permission_id: str,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """Elimina permesso"""
     await verify_admin_access(current_user_id, db)
     
+    # Normalize permission ID to handle both hyphenated and non-hyphenated formats
+    normalized_permission_id = permission_id
+    try:
+        UUID(permission_id)
+    except ValueError:
+        if len(permission_id) == 32:
+            try:
+                uuid_formatted = f"{permission_id[0:8]}-{permission_id[8:12]}-{permission_id[12:16]}-{permission_id[16:20]}-{permission_id[20:32]}"
+                UUID(uuid_formatted)
+                normalized_permission_id = uuid_formatted
+            except ValueError:
+                logger.warning(f"Invalid permission_id format: {permission_id}")
+                raise HTTPException(status_code=404, detail="ID permesso non valido")
+        else:
+            logger.warning(f"Invalid permission_id format: {permission_id}")
+            raise HTTPException(status_code=404, detail="ID permesso non valido")
+    
     try:
         perm_result = await db.execute(
-            select(UserSitePermission).where(UserSitePermission.id == str(permission_id))
+            select(UserSitePermission).where(UserSitePermission.id == normalized_permission_id)
         )
         perm = perm_result.scalar_one_or_none()
         
