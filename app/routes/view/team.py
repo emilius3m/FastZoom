@@ -38,7 +38,7 @@ async def site_team_management(
     """Gestione team del sito (solo per admin sito)"""
 
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
 
@@ -48,8 +48,8 @@ async def site_team_management(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     )

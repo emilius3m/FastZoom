@@ -23,7 +23,7 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
 
     # Conta foto
     photos_count = await db.execute(
-        select(func.count(Photo.id)).where(Photo.site_id == site_id)
+        select(func.count(Photo.id)).where(Photo.site_id == str(site_id))
     )
     photos_count = photos_count.scalar() or 0
 
@@ -50,7 +50,7 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
     users_count = await db.execute(
         select(func.count(UserSitePermission.id)).where(
             and_(
-                UserSitePermission.site_id == site_id,
+                UserSitePermission.site_id == str(site_id),
                 UserSitePermission.is_active == True
             )
         )
@@ -62,7 +62,7 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
     recent_photos = await db.execute(
         select(func.count(Photo.id)).where(
             and_(
-                Photo.site_id == site_id,
+                Photo.site_id == str(site_id),
                 Photo.created_at >= last_month
             )
         )
@@ -71,7 +71,7 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
 
     # Storage utilizzato (MB)
     storage_query = await db.execute(
-        select(func.sum(Photo.file_size)).where(Photo.site_id == site_id)
+        select(func.sum(Photo.file_size)).where(Photo.site_id == str(site_id))
     )
     storage_mb = (storage_query.scalar() or 0) / (1024 * 1024)
 
@@ -79,7 +79,7 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
     documents_count = await db.execute(
         select(func.count(Document.id)).where(
             and_(
-                Document.site_id == site_id,
+                Document.site_id == str(site_id),
                 Document.is_deleted == False
             )
         )
@@ -90,12 +90,12 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
     from app.models import UnitaStratigrafica, UnitaStratigraficaMuraria
     
     us_count = await db.execute(
-        select(func.count(UnitaStratigrafica.id)).where(UnitaStratigrafica.site_id == site_id)
+        select(func.count(UnitaStratigrafica.id)).where(UnitaStratigrafica.site_id == str(site_id))
     )
     us_count = us_count.scalar() or 0
     
     usm_count = await db.execute(
-        select(func.count(UnitaStratigraficaMuraria.id)).where(UnitaStratigraficaMuraria.site_id == site_id)
+        select(func.count(UnitaStratigraficaMuraria.id)).where(UnitaStratigraficaMuraria.site_id == str(site_id))
     )
     usm_count = usm_count.scalar() or 0
     
@@ -123,7 +123,7 @@ async def get_recent_activities(db: AsyncSession, site_id: UUID, limit: int = 10
         select(UserActivity, User)
         .outerjoin(User, UserActivity.user_id == User.id)
         .options(selectinload(User.profile))
-        .where(UserActivity.site_id == site_id)
+        .where(UserActivity.site_id == str(site_id))
         .order_by(UserActivity.activity_date.desc())
         .limit(limit)
     )
@@ -147,7 +147,7 @@ async def get_recent_activities(db: AsyncSession, site_id: UUID, limit: int = 10
 async def get_recent_photos(db: AsyncSession, site_id: UUID, limit: int = 6) -> List[Dict]:
     """Recupera foto recenti del sito"""
     photos_query = select(Photo).where(
-        Photo.site_id == site_id
+        Photo.site_id == str(site_id)
     ).order_by(Photo.created_at.desc()).limit(limit)
 
     photos = await db.execute(photos_query)
@@ -175,7 +175,7 @@ async def get_team_members(db: AsyncSession, site_id: UUID, limit: int = 10) -> 
         .options(selectinload(User.profile))
         .where(
             and_(
-                UserSitePermission.site_id == site_id,
+                UserSitePermission.site_id == str(site_id),
                 UserSitePermission.is_active == True
             )
         )
@@ -209,7 +209,7 @@ async def dashboard_view(
     """Visualizza dashboard del sito archeologico"""
 
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
 
@@ -224,8 +224,8 @@ async def dashboard_view(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     )

@@ -24,7 +24,7 @@ async def geographic_map_view(
     """Visualizza mappa geografica con coordinate lat/lng per un sito"""
     
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
     
@@ -32,14 +32,14 @@ async def geographic_map_view(
         raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
     
     # Get current user information
-    user_query = select(User).where(User.id == current_user_id)
+    user_query = select(User).where(User.id == str(current_user_id))
     user = await db.execute(user_query)
     user = user.scalar_one_or_none()
     
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
-        UserSitePermission.user_id == current_user_id,
-        UserSitePermission.site_id == site_id,
+        UserSitePermission.user_id == str(current_user_id),
+        UserSitePermission.site_id == str(site_id),
         UserSitePermission.is_active == True
     )
     permission = await db.execute(permission_query)

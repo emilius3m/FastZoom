@@ -40,7 +40,7 @@ async def site_iccd_hierarchy(
     """Sistema gerarchico ICCD completo del sito archeologico."""
 
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
 
@@ -50,8 +50,8 @@ async def site_iccd_hierarchy(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     )
@@ -105,7 +105,7 @@ async def site_iccd_records_list(
     """Lista schede ICCD del sito archeologico."""
 
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
 
@@ -115,8 +115,8 @@ async def site_iccd_records_list(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     )
@@ -166,7 +166,7 @@ async def new_iccd_record(
     """Form per creare nuova scheda ICCD."""
 
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
 
@@ -176,8 +176,8 @@ async def new_iccd_record(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     )
@@ -256,7 +256,7 @@ async def view_iccd_record(
     """Visualizza scheda ICCD specifica."""
 
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
 
@@ -266,8 +266,8 @@ async def view_iccd_record(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     )
@@ -291,8 +291,8 @@ async def view_iccd_record(
 
         record_query = select(ICCDBaseRecord).where(
             and_(
-                ICCDBaseRecord.id == record_id,
-                ICCDBaseRecord.site_id == site_id
+                ICCDBaseRecord.id == str(record_id),
+                ICCDBaseRecord.site_id == str(site_id)
             )
         )
         result = await db.execute(record_query)
@@ -355,7 +355,7 @@ async def edit_iccd_record(
     """Form per modificare scheda ICCD esistente."""
 
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
 
@@ -365,8 +365,8 @@ async def edit_iccd_record(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     )
@@ -390,8 +390,8 @@ async def edit_iccd_record(
 
         record_query = select(ICCDBaseRecord).where(
             and_(
-                ICCDBaseRecord.id == record_id,
-                ICCDBaseRecord.site_id == site_id
+                ICCDBaseRecord.id == str(record_id),
+                ICCDBaseRecord.site_id == str(site_id)
             )
         )
         result = await db.execute(record_query)

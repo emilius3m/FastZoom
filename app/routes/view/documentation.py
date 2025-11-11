@@ -31,7 +31,7 @@ async def get_form_schemas_safe(db: AsyncSession, site_id: UUID) -> List[Dict[st
         import json
 
         form_schemas_query = select(FormSchema).where(
-            and_(FormSchema.site_id == site_id, FormSchema.is_active == True)
+            and_(FormSchema.site_id == str(site_id), FormSchema.is_active == True)
         ).order_by(FormSchema.created_at.desc())
 
         form_schemas = await db.execute(form_schemas_query)
@@ -70,7 +70,7 @@ async def site_documentation(
     """Gestione documentazione e rapporti del sito"""
 
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
 
@@ -80,8 +80,8 @@ async def site_documentation(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     )
@@ -103,7 +103,7 @@ async def site_documentation(
     try:
         documents_query = select(Document).where(
             and_(
-                Document.site_id == site_id,
+                Document.site_id == str(site_id),
                 Document.is_deleted == False
             )
         ).order_by(Document.uploaded_at.desc())

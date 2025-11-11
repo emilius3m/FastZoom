@@ -40,7 +40,7 @@ async def site_photos(
     """Gestione collezione fotografica del sito"""
 
     # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
 
@@ -50,8 +50,8 @@ async def site_photos(
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
         and_(
-            UserSitePermission.user_id == current_user_id,
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     )
@@ -70,8 +70,8 @@ async def site_photos(
     current_user = await get_current_user_with_context(current_user_id, db)
 
     # Query foto con paginazione e categorie
-    photos_query = select(Photo).where(Photo.site_id == site_id)
-    total_query = select(func.count(Photo.id)).where(Photo.site_id == site_id)
+    photos_query = select(Photo).where(Photo.site_id == str(site_id))
+    total_query = select(func.count(Photo.id)).where(Photo.site_id == str(site_id))
 
     if category:
         photos_query = photos_query.where(Photo.photo_type == category)
@@ -83,7 +83,7 @@ async def site_photos(
         db.execute(photos_query.offset((page - 1) * per_page).limit(per_page)),
         db.execute(
             select(Photo.photo_type, func.count(Photo.id))
-            .where(Photo.site_id == site_id)
+            .where(Photo.site_id == str(site_id))
             .group_by(Photo.photo_type)
         )
     )

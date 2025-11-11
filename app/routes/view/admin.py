@@ -11,7 +11,7 @@ NO httpx - Pure FastAPI view routes returning HTML.
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from loguru import logger
@@ -548,7 +548,8 @@ async def admin_users_edit(
 @admin_view_router.get("/", response_class=HTMLResponse)
 async def admin_dashboard(
     request: Request,
-    authdata: tuple = Depends(require_superuser)
+    authdata: tuple = Depends(require_superuser),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     Dashboard principale amministrazione (opzionale).
@@ -556,9 +557,40 @@ async def admin_dashboard(
     """
     superuser, base_context = authdata
 
+    # Fetch statistics for dashboard
+    try:
+        # Count total users
+        users_total_result = await db.execute(select(func.count(User.id)))
+        users_total = users_total_result.scalar() or 0
+        
+        # Count active users
+        users_active_result = await db.execute(
+            select(func.count(User.id)).where(User.is_active == True)
+        )
+        users_active = users_active_result.scalar() or 0
+        
+        # Count photos if Photo model exists
+        photos_total = 0
+        try:
+            from app.models import Photo
+            photos_result = await db.execute(select(func.count(Photo.id)))
+            photos_total = photos_result.scalar() or 0
+        except ImportError:
+            # Photo model not available, set to 0
+            photos_total = 0
+        
+    except Exception as e:
+        logger.error(f"Error fetching dashboard statistics: {e}")
+        users_total = 0
+        users_active = 0
+        photos_total = 0
+
     context = {
         **base_context,
         "page_title": "Pannello Amministrazione",
+        "users_count": users_total,
+        "users_active": users_active,
+        "photos_count": photos_total,
         "breadcrumb": [
             {"label": "Home", "url": "/"},
             {"label": "Admin", "url": "/admin", "active": True}
