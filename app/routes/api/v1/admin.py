@@ -889,6 +889,7 @@ async def list_users(
     search: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
     is_superuser: Optional[bool] = Query(None),
+    is_verified: Optional[bool] = Query(None),
     offset: int = Query(0, ge=0),
     limit: int = Query(25, ge=1, le=100),
     sort_by: str = Query("email")
@@ -913,6 +914,9 @@ async def list_users(
         
         if is_superuser is not None:
             query = query.where(User.is_superuser == is_superuser)
+        
+        if is_verified is not None:
+            query = query.where(User.is_verified == is_verified)
         
         # Ordinamento
         if sort_by == "email":
@@ -962,8 +966,10 @@ async def list_users(
                 "last_name": last_name,
                 "is_active": user.is_active,
                 "is_superuser": user.is_superuser,
+                "is_verified": user.is_verified,
                 "sites_count": sites_count,
-                "created_at": user.created_at.isoformat() if user.created_at else None
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None
             })
         
         return {
