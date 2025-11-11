@@ -1,497 +1,562 @@
-"""
-API v1 - Photo Management
-Endpoints per gestione completa delle foto archeologiche.
-Implementa backward compatibility con avvisi di deprecazione.
-"""
+# app/routes/api/v1/photos.py - Photos API v1 endpoints
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
-from fastapi.responses import JSONResponse, Response, StreamingResponse
-from uuid import UUID
-from typing import List, Dict, Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile
+from fastapi.responses import JSONResponse
 from loguru import logger
-from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_, or_
+from typing import List, Optional, Dict, Any
+from uuid import UUID
+from datetime import datetime, timezone
+from pathlib import Path
+import json
+import asyncio
 
-# Dependencies
-from app.core.security import get_current_user_id, get_current_user_sites
 from app.database.session import get_async_session
-from app.models import Photo
-
-# Import existing photo functions for backward compatibility
-# Note: These imports are commented out temporarily as they may not exist yet
-# from app.routes.photos_router import (
-#     get_site_photos_api_api_site__site_id__photos_get,
-#     upload_photo_api_site__site_id__photos_upload_post,
-#     update_photo_api_site__site_id__photos__photo_id__update_put,
-#     delete_photo_api_site__site_id__photos__photo_id__delete,
-#     stream_photo_from_minio_api_site__site_id__photos__photo_id__stream_get,
-#     get_photo_thumbnail_api_site__site_id__photos__photo_id__thumbnail_get,
-#     get_photo_full_api_site__site_id__photos__photo_id__full_get
-# )
-# from app.routes.api.sites_photos import bulk_update_photos_api_site__site_id__photos_bulk_update_post
-# from app.routes.photo_metadata import router as photo_metadata_router
-
-# Schemas
-class PhotoUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    photo_type: Optional[str] = None
-    photographer: Optional[str] = None
-    keywords: Optional[str] = None
-    # Metadati archeologici
-    inventory_number: Optional[str] = None
-    catalog_number: Optional[str] = None
-    excavation_area: Optional[str] = None
-    stratigraphic_unit: Optional[str] = None
-    material: Optional[str] = None
-    object_type: Optional[str] = None
-    chronology_period: Optional[str] = None
-    conservation_status: Optional[str] = None
-    is_published: Optional[bool] = None
-    is_validated: Optional[bool] = None
-
-class BulkPhotoUpdate(BaseModel):
-    photo_ids: List[UUID]
-    update_data: PhotoUpdate
+from app.core.security import get_current_user_id
+from app.models import Photo, PhotoType, MaterialType, ConservationStatus
+from app.models import UserActivity
+from app.routes.api.dependencies import get_site_access
+from app.services.storage_service import storage_service
+from app.services.photo_metadata_service import photo_metadata_service
+from app.services.archaeological_minio_service import archaeological_minio_service
+from app.services.deep_zoom_background_service import deep_zoom_background_service
+from app.services.storage_management_service import storage_management_service
 
 router = APIRouter()
 
-def add_deprecation_headers(response: Response, new_endpoint: str):
-    """Aggiunge headers di deprecazione per backward compatibility"""
-    response.headers["X-API-Deprecated"] = "true"
-    response.headers["X-API-Deprecated-Reason"] = "Endpoint ristrutturato. Usa la nuova API v1."
-    response.headers["X-API-New-Endpoint"] = new_endpoint
-    response.headers["X-API-Sunset"] = "2025-12-31"  # Data rimozione vecchi endpoint
 
-def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Verifica accesso al sito e restituisce informazioni sul sito"""
-    site_info = next(
-        (site for site in user_sites if site["id"] == str(site_id)),
-        None
-    )
-    
-    if not site_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied"
-        )
-    
-    return site_info
-
-# NUOVI ENDPOINTS V1
-
-@router.get("", summary="Ricerca globale foto", tags=["Photos"])
-async def v1_get_photos(
-    search: Optional[str] = None,
-    photo_type: Optional[str] = None,
-    material: Optional[str] = None,
-    is_published: Optional[bool] = None,
-    is_validated: Optional[bool] = None,
-    limit: int = 100,
-    offset: int = 0,
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Ricerca globale foto su tutti i siti accessibili.
-    
-    Supporta filtri archeologici avanzati.
-    """
-    if not user_sites:
-        return {"photos": [], "count": 0, "sites_accessible": 0}
-    
-    # Simula richiesta per sito specifico per ogni sito accessibile
-    all_photos = []
-    site_ids = [UUID(site["id"]) for site in user_sites]
-    
-    # Per semplicità, cerca sul primo sito accessibile
-    # In produzione, implementare ricerca aggregata
-    first_site_id = site_ids[0]
-    
-    class MockRequest:
-        def __init__(self):
-            self.query_params = {
-                "search": search,
-                "photo_type": photo_type,
-                "material": material,
-                "is_published": is_published,
-                "is_validated": is_validated,
-                "limit": limit,
-                "offset": offset
-            }
-    
-    mock_request = MockRequest()
-    result = await get_site_photos_api_api_site__site_id__photos_get(
-        first_site_id, mock_request, current_user_id, user_sites, db
-    )
-    
-    return {
-        "photos": result.get("photos", []),
-        "count": result.get("count", 0),
-        "sites_accessible": len(user_sites),
-        "searched_sites": [str(first_site_id)],
-        "filters_applied": {
-            "search": search,
-            "photo_type": photo_type,
-            "material": material,
-            "is_published": is_published,
-            "is_validated": is_validated
-        }
-    }
-
-@router.post("/sites/{site_id}/photos", summary="Upload foto sito", tags=["Photos"])
+@router.post("/sites/{site_id}/photos/upload", summary="Upload foto sito", tags=["Photos"])
 async def v1_upload_photo(
-    site_id: UUID,
-    photos: List[UploadFile] = File(...),
-    title: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    photo_type: Optional[str] = Form(None),
-    photographer: Optional[str] = Form(None),
-    keywords: Optional[str] = Form(None),
-    inventory_number: Optional[str] = Form(None),
-    excavation_area: Optional[str] = Form(None),
-    stratigraphic_unit: Optional[str] = Form(None),
-    material: Optional[str] = Form(None),
-    object_type: Optional[str] = Form(None),
-    chronology_period: Optional[str] = Form(None),
-    conservation_status: Optional[str] = Form(None),
-    use_queue: Optional[bool] = Form(False),
-    priority: Optional[str] = Form("normal"),
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
+        site_id: UUID,
+        photos: List[UploadFile] = File(...),
+        # Basic metadata
+        title: Optional[str] = Form(None),
+        description: Optional[str] = Form(None),
+        photo_type: Optional[str] = Form(None),
+        photographer: Optional[str] = Form(None),
+        keywords: Optional[str] = Form(None),
+        # Queue control
+        use_queue: Optional[bool] = Form(False),
+        priority: Optional[str] = Form("normal"),
+        
+        # Archaeological metadata
+        inventory_number: Optional[str] = Form(None),
+        catalog_number: Optional[str] = Form(None),
+        excavation_area: Optional[str] = Form(None),
+        stratigraphic_unit: Optional[str] = Form(None),
+        grid_square: Optional[str] = Form(None),
+        depth_level: Optional[float] = Form(None),
+        find_date: Optional[str] = Form(None),
+        finder: Optional[str] = Form(None),
+        excavation_campaign: Optional[str] = Form(None),
+        
+        # Material and object
+        material: Optional[str] = Form(None),
+        material_details: Optional[str] = Form(None),
+        object_type: Optional[str] = Form(None),
+        object_function: Optional[str] = Form(None),
+        
+        # Dimensions
+        length_cm: Optional[float] = Form(None),
+        width_cm: Optional[float] = Form(None),
+        height_cm: Optional[float] = Form(None),
+        diameter_cm: Optional[float] = Form(None),
+        weight_grams: Optional[float] = Form(None),
+        
+        # Chronology
+        chronology_period: Optional[str] = Form(None),
+        chronology_culture: Optional[str] = Form(None),
+        dating_from: Optional[str] = Form(None),
+        dating_to: Optional[str] = Form(None),
+        dating_notes: Optional[str] = Form(None),
+        
+        # Conservation
+        conservation_status: Optional[str] = Form(None),
+        conservation_notes: Optional[str] = Form(None),
+        restoration_history: Optional[str] = Form(None),
+        
+        # References
+        bibliography: Optional[str] = Form(None),
+        comparative_references: Optional[str] = Form(None),
+        external_links: Optional[str] = Form(None),
+        
+        # Rights
+        copyright_holder: Optional[str] = Form(None),
+        license_type: Optional[str] = Form(None),
+        usage_rights: Optional[str] = Form(None),
+        
+        site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    """
-    Upload foto al sito archeologico.
-    
-    Supporta upload singolo e multiplo con metadati archeologici completi.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di upload
-    if site_info.get("permission_level") not in ["admin", "editor"]:
+    """API v1 per upload foto al sito archeologico"""
+    site, permission = site_access
+
+    if not permission.can_write():
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+
+    try:
+        # Ensure MinIO buckets exist before uploading
+        try:
+            await storage_management_service.ensure_buckets_exist()
+        except Exception as storage_error:
+            logger.error(f"Storage service initialization failed: {storage_error}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage service is currently unavailable. Please try again later."
+            )
+        
+        # Check storage health before uploading
+        try:
+            storage_usage = await storage_management_service.get_storage_usage()
+            if storage_usage.get('total_size_gb', 0) > 8:  # >80% of 10GB
+                logger.warning(f"Storage usage critical ({storage_usage.get('total_size_gb', 0)}GB), triggering cleanup")
+                cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=1000)
+                logger.info(f"Pre-upload cleanup: {cleanup_result}")
+        except Exception as storage_health_error:
+            logger.error(f"Storage health check failed: {storage_health_error}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage health check failed. Please try again later."
+            )
+
+        # Prepara TUTTI i metadati archeologici da form utente (una sola volta)
+        archaeological_metadata_from_form = {}
+        
+        # Basic metadata
+        if title:
+            archaeological_metadata_from_form['title'] = title
+        if description:
+            archaeological_metadata_from_form['description'] = description
+        if photographer:
+            archaeological_metadata_from_form['photographer'] = photographer
+        if keywords:
+            archaeological_metadata_from_form['keywords'] = keywords
+        if photo_type:
+            archaeological_metadata_from_form['photo_type'] = photo_type
+        
+        # Archaeological context
+        if inventory_number:
+            archaeological_metadata_from_form['inventory_number'] = inventory_number
+        if catalog_number:
+            archaeological_metadata_from_form['catalog_number'] = catalog_number
+        if excavation_area:
+            archaeological_metadata_from_form['excavation_area'] = excavation_area
+        if stratigraphic_unit:
+            archaeological_metadata_from_form['stratigraphic_unit'] = stratigraphic_unit
+        if grid_square:
+            archaeological_metadata_from_form['grid_square'] = grid_square
+        if depth_level is not None:
+            archaeological_metadata_from_form['depth_level'] = depth_level
+        if find_date:
+            try:
+                archaeological_metadata_from_form['find_date'] = datetime.fromisoformat(find_date.replace('Z', '+00:00'))
+            except ValueError:
+                try:
+                    archaeological_metadata_from_form['find_date'] = datetime.strptime(find_date, '%Y-%m-%d')
+                except ValueError:
+                    logger.warning(f"Invalid find_date format: {find_date}")
+        if finder:
+            archaeological_metadata_from_form['finder'] = finder
+        if excavation_campaign:
+            archaeological_metadata_from_form['excavation_campaign'] = excavation_campaign
+        
+        # Material and object
+        if material:
+            archaeological_metadata_from_form['material'] = material
+        if material_details:
+            archaeological_metadata_from_form['material_details'] = material_details
+        if object_type:
+            archaeological_metadata_from_form['object_type'] = object_type
+        if object_function:
+            archaeological_metadata_from_form['object_function'] = object_function
+        
+        # Dimensions
+        if length_cm is not None:
+            archaeological_metadata_from_form['length_cm'] = length_cm
+        if width_cm is not None:
+            archaeological_metadata_from_form['width_cm'] = width_cm
+        if height_cm is not None:
+            archaeological_metadata_from_form['height_cm'] = height_cm
+        if diameter_cm is not None:
+            archaeological_metadata_from_form['diameter_cm'] = diameter_cm
+        if weight_grams is not None:
+            archaeological_metadata_from_form['weight_grams'] = weight_grams
+        
+        # Chronology
+        if chronology_period:
+            archaeological_metadata_from_form['chronology_period'] = chronology_period
+        if chronology_culture:
+            archaeological_metadata_from_form['chronology_culture'] = chronology_culture
+        if dating_from:
+            archaeological_metadata_from_form['dating_from'] = dating_from
+        if dating_to:
+            archaeological_metadata_from_form['dating_to'] = dating_to
+        if dating_notes:
+            archaeological_metadata_from_form['dating_notes'] = dating_notes
+        
+        # Conservation
+        if conservation_status:
+            archaeological_metadata_from_form['conservation_status'] = conservation_status
+        if conservation_notes:
+            archaeological_metadata_from_form['conservation_notes'] = conservation_notes
+        if restoration_history:
+            archaeological_metadata_from_form['restoration_history'] = restoration_history
+        
+        # References
+        if bibliography:
+            archaeological_metadata_from_form['bibliography'] = bibliography
+        if comparative_references:
+            archaeological_metadata_from_form['comparative_references'] = comparative_references
+        if external_links:
+            archaeological_metadata_from_form['external_links'] = external_links
+        
+        # Rights
+        if copyright_holder:
+            archaeological_metadata_from_form['copyright_holder'] = copyright_holder
+        if license_type:
+            archaeological_metadata_from_form['license_type'] = license_type
+        if usage_rights:
+            archaeological_metadata_from_form['usage_rights'] = usage_rights
+        
+        logger.info(f"📋 Processing {len(photos)} photos with metadata: {list(archaeological_metadata_from_form.keys())}")
+        
+        # Processa tutte le foto in parallelo con asyncio.gather()
+        async def process_single_photo(file: UploadFile) -> Optional[dict]:
+            """Processa una singola foto in modo asincrono con error handling completo"""
+            photo_record = None
+            filename = None
+            file_path = None
+            
+            try:
+                # 1. Salva file su MinIO con error handling
+                try:
+                    filename, file_path, file_size = await storage_service.save_upload_file(
+                        file, str(site_id), str(current_user_id)
+                    )
+                except Exception as storage_error:
+                    logger.error(f"Failed to save file {file.filename} to storage: {storage_error}")
+                    raise HTTPException(
+                        status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+                        detail=f"Storage service error: Unable to save file {file.filename}"
+                    )
+
+                # 2. Estrai metadati dal file caricato con error handling
+                try:
+                    await file.seek(0)  # Reset file pointer
+                    exif_data, metadata = await photo_metadata_service.extract_metadata_from_file(
+                        file, filename
+                    )
+                except Exception as metadata_error:
+                    logger.error(f"Failed to extract metadata from {file.filename}: {metadata_error}")
+                    # Continue with empty metadata if extraction fails
+                    exif_data, metadata = {}, {}
+
+                # 3. Crea record nel database CON metadati archeologici con error handling
+                try:
+                    photo_record = await photo_metadata_service.create_photo_record(
+                        filename=filename,
+                        original_filename=file.filename,
+                        file_path=file_path,
+                        file_size=file_size,
+                        site_id=str(site_id),
+                        uploaded_by=str(current_user_id),
+                        metadata=metadata,
+                        archaeological_metadata=archaeological_metadata_from_form
+                    )
+                except Exception as record_creation_error:
+                    logger.error(f"Failed to create photo record for {file.filename}: {record_creation_error}")
+                    # Clean up uploaded file if record creation fails
+                    try:
+                        await storage_service.delete_file(file_path)
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to cleanup file after record creation failure: {cleanup_error}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Database error: Unable to create photo record for {file.filename}"
+                    )
+
+                # 4. Create a NEW database session for this parallel task to avoid transaction conflicts
+                from app.database.base import async_session_maker
+                async with async_session_maker() as task_db:
+                    try:
+                        # Start transaction in new session
+                        async with task_db.begin():
+                            # Add photo record to transaction
+                            task_db.add(photo_record)
+                            
+                            # Flush to get ID without committing
+                            await task_db.flush()
+                            await task_db.refresh(photo_record)
+                            logger.info(f"Photo record flushed with ID: {photo_record.id}")
+                            
+                            # 5. Genera thumbnail DOPO che il record è stato salvato con error handling
+                            try:
+                                await file.seek(0)  # Reset file pointer per thumbnail
+                                thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
+                                    file, str(photo_record.id)
+                                )
+
+                                if thumbnail_path:
+                                    photo_record.thumbnail_path = thumbnail_path
+                                    logger.info(f"Thumbnail generated: {thumbnail_path}")
+                                else:
+                                    logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+                            except Exception as thumbnail_error:
+                                logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
+                                # Don't fail entire upload if thumbnail generation fails
+                                # Just log error and continue
+                            
+                            # 6. Log attività con error handling
+                            try:
+                                activity = UserActivity(
+                                    user_id=current_user_id,
+                                    site_id=site_id,
+                                    activity_type="UPLOAD",
+                                    activity_desc=f"Caricata foto: {file.filename}",
+                                    extra_data=json.dumps({
+                                        "photo_id": str(photo_record.id),
+                                        "filename": filename,
+                                        "file_size": file_size
+                                    })
+                                )
+                                task_db.add(activity)
+                                logger.info(f"Activity log added for photo {photo_record.id}")
+                            except Exception as activity_error:
+                                logger.error(f"Failed to log activity for photo {photo_record.id}: {activity_error}")
+                                # Don't fail upload if activity logging fails
+                        
+                        # Transaction commits automatically here
+                        logger.info(f"Transaction committed successfully for photo {photo_record.id}")
+                        
+                    except Exception as db_error:
+                        logger.error(f"Database transaction failed for photo {file.filename}: {db_error}")
+                        # Clean up uploaded file if database transaction fails
+                        try:
+                            await storage_service.delete_file(file_path)
+                        except Exception as cleanup_error:
+                            logger.error(f"Failed to cleanup file after DB transaction failure: {cleanup_error}")
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Database error: Unable to save photo record"
+                        )
+
+                logger.info(f"Photo {photo_record.id} saved with thumbnail_path: {photo_record.thumbnail_path}")
+                logger.info(f"Photo uploaded successfully: {photo_record.id} by user {current_user_id}")
+
+                return {
+                    "photo_id": str(photo_record.id),
+                    "filename": filename,
+                    "file_size": file_size,
+                    "file_path": file_path,
+                    "metadata": {
+                        "width": photo_record.width,
+                        "height": photo_record.height,
+                        "photo_date": photo_record.photo_date.isoformat() if photo_record.photo_date else None,
+                        "camera_model": photo_record.camera_model
+                    },
+                    "archaeological_metadata": {
+                        'inventory_number': photo_record.inventory_number,
+                        'excavation_area': photo_record.excavation_area,
+                        'material': photo_record.material,
+                        'chronology_period': photo_record.chronology_period,
+                        'photo_type': photo_record.photo_type,
+                        'photographer': photo_record.photographer,
+                        'description': photo_record.description,
+                        'keywords': photo_record.keywords
+                    }
+                }
+                
+            except HTTPException as he:
+                # Re-raise HTTP exceptions as-is
+                if he.status_code == 507:  # Storage full
+                    logger.error(f"Storage full during upload of {file.filename}")
+                    try:
+                        cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=2000)
+                        if cleanup_result['success']:
+                            logger.info(f"Emergency cleanup successful: {cleanup_result['total_freed_mb']}MB freed")
+                        else:
+                            logger.error(f"Emergency cleanup failed: {cleanup_result}")
+                    except Exception as cleanup_error:
+                        logger.error(f"Cleanup attempt failed: {cleanup_error}")
+                raise he
+                
+            except Exception as photo_error:
+                logger.error(f"Unexpected error processing photo {file.filename}: {photo_error}")
+                # Clean up file if it exists
+                if file_path:
+                    try:
+                        await storage_service.delete_file(file_path)
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to cleanup file after error: {cleanup_error}")
+                # Return None for this photo but don't fail entire batch
+                return None
+
+        # Processa tutte le foto in parallelo con error handling
+        try:
+            logger.info(f"🚀 Starting parallel processing of {len(photos)} photos")
+            upload_tasks = [process_single_photo(file) for file in photos]
+            upload_results = await asyncio.gather(*upload_tasks, return_exceptions=True)
+            
+            # Filtra risultati validi
+            uploaded_photos = []
+            failed_photos = []
+            
+            for i, result in enumerate(upload_results):
+                if isinstance(result, Exception):
+                    logger.error(f"Upload task failed for photo {photos[i].filename}: {result}")
+                    failed_photos.append({
+                        "filename": photos[i].filename,
+                        "error": str(result)
+                    })
+                elif result is not None:
+                    uploaded_photos.append(result)
+                else:
+                    # None result indicates a failed upload that was handled gracefully
+                    failed_photos.append({
+                        "filename": photos[i].filename,
+                        "error": "Processing failed but was handled gracefully"
+                    })
+            
+            logger.info(f"✅ Parallel processing completed: {len(uploaded_photos)} photos uploaded successfully, {len(failed_photos)} failed")
+            
+            # If no photos were uploaded successfully, raise an error
+            if not uploaded_photos and failed_photos:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"All photo uploads failed. First error: {failed_photos[0]['error']}"
+                )
+                
+        except Exception as parallel_error:
+            logger.error(f"Parallel processing error: {parallel_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error during parallel processing: {str(parallel_error)}"
+            )
+
+        # Prepare response metadata
+        response_metadata = {
+            "message": f"{len(uploaded_photos)} foto caricate con successo",
+            "total_uploaded": len(uploaded_photos),
+            "upload_timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+        # Include failed photos information if any
+        if 'failed_photos' in locals() and failed_photos:
+            response_metadata["failed_photos"] = failed_photos
+            response_metadata["total_failed"] = len(failed_photos)
+
+        # Return uploaded_photos as direct field with metadata
+        response_data = {
+            "uploaded_photos": uploaded_photos,
+            **response_metadata
+        }
+
+        logger.info(f"✅ Upload API response: {len(uploaded_photos)} foto caricate")
+
+        return JSONResponse(response_data)
+
+    except HTTPException as he:
+        # Re-raise HTTP exceptions with proper status codes
+        raise he
+    except Exception as e:
+        logger.error(f"Unexpected upload error: {str(e)}")
+        # Clean up any temporary files if they exist
+        try:
+            if 'file_path' in locals():
+                await storage_service.delete_file(file_path)
+        except Exception as cleanup_error:
+            logger.error(f"Failed to cleanup during error handling: {cleanup_error}")
+        
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per upload foto sul sito {site_id}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error during upload: {str(e)}"
         )
-    
-    # Simula request form data per compatibilità
-    class MockRequest:
-        def __init__(self, form_data: dict, files: List[UploadFile]):
-            self._form_data = form_data
-            self._files = files
-        
-        async def form(self):
-            return self._form_data
-        
-        def files(self):
-            return {"photos": self._files}
-    
-    form_data = {
-        "title": title,
-        "description": description,
-        "photo_type": photo_type,
-        "photographer": photographer,
-        "keywords": keywords,
-        "inventory_number": inventory_number,
-        "excavation_area": excavation_area,
-        "stratigraphic_unit": stratigraphic_unit,
-        "material": material,
-        "object_type": object_type,
-        "chronology_period": chronology_period,
-        "conservation_status": conservation_status,
-        "use_queue": use_queue,
-        "priority": priority
-    }
-    
-    mock_request = MockRequest(form_data, photos)
-    return await upload_photo_api_site__site_id__photos_upload_post(
-        site_id, mock_request, current_user_id, user_sites, db
-    )
+
 
 @router.get("/sites/{site_id}/photos", summary="Foto sito", tags=["Photos"])
 async def v1_get_site_photos(
-    site_id: UUID,
-    search: Optional[str] = None,
-    photo_type: Optional[str] = None,
-    material: Optional[str] = None,
-    conservation_status: Optional[str] = None,
-    excavation_area: Optional[str] = None,
-    chronology_period: Optional[str] = None,
-    is_published: Optional[bool] = None,
-    is_validated: Optional[bool] = None,
-    has_deep_zoom: Optional[bool] = None,
-    page: int = 1,
-    per_page: int = 24,
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
+        site_id: UUID,
+        search: str = None,
+        photo_type: str = None,
+        site_access: tuple = Depends(get_site_access),
+        db: AsyncSession = Depends(get_async_session)
 ):
-    """
-    Recupera foto di un sito con filtri archeologici completi.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    class MockRequest:
-        def __init__(self, query_params: dict):
-            self.query_params = query_params
-    
-    query_params = {
-        "search": search,
-        "photo_type": photo_type,
-        "material": material,
-        "conservation_status": conservation_status,
-        "excavation_area": excavation_area,
-        "chronology_period": chronology_period,
-        "is_published": is_published,
-        "is_validated": is_validated,
-        "has_deep_zoom": has_deep_zoom,
-        "page": page,
-        "per_page": per_page
-    }
-    
-    mock_request = MockRequest(query_params)
-    result = await get_site_photos_api_api_site__site_id__photos_get(
-        site_id, mock_request, current_user_id, user_sites, db
-    )
-    
-    # Aggiungi informazioni sito
-    result["site_info"] = site_info
-    return result
+    """API v1 per ottenere foto del sito con filtri base"""
+    site, permission = site_access
 
-@router.get("/photos/{photo_id}/stream", summary="Stream foto", tags=["Photos"])
-async def v1_stream_photo(
-    photo_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Stream dell'immagine originale dallo storage MinIO.
-    """
-    # Verifica che la foto appartenga a un sito accessibile
-    photo = await db.execute(select(Photo).where(Photo.id == photo_id))
-    photo = photo.scalar_one_or_none()
-    
-    if not photo:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Foto non trovata"
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi insufficienti")
+
+    # Query base
+    photos_query = select(Photo).where(Photo.site_id == str(site_id))
+
+    # Apply filters
+    if search:
+        search_term = f"%{search}%"
+        photos_query = photos_query.where(
+            or_(
+                Photo.filename.ilike(search_term),
+                Photo.title.ilike(search_term),
+                Photo.description.ilike(search_term),
+                Photo.inventory_number.ilike(search_term),
+                Photo.keywords.ilike(search_term)
+            )
         )
-    
-    # Verifica accesso al sito della foto
-    verify_site_access(photo.site_id, user_sites)
-    
-    return await stream_photo_from_minio_api_site__site_id__photos__photo_id__stream_get(
-        photo.site_id, photo_id, current_user_id, user_sites, db
-    )
 
-@router.get("/photos/{photo_id}/thumbnail", summary="Thumbnail foto", tags=["Photos"])
-async def v1_get_photo_thumbnail(
-    photo_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Ottieni thumbnail della foto.
-    """
-    # Verifica che la foto appartenga a un sito accessibile
-    photo = await db.execute(select(Photo).where(Photo.id == photo_id))
-    photo = photo.scalar_one_or_none()
-    
-    if not photo:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Foto non trovata"
-        )
-    
-    # Verifica accesso al sito della foto
-    verify_site_access(photo.site_id, user_sites)
-    
-    return await get_photo_thumbnail_api_site__site_id__photos__photo_id__thumbnail_get(
-        photo.site_id, photo_id, current_user_id, user_sites, db
-    )
+    if photo_type:
+        try:
+            photos_query = photos_query.where(Photo.photo_type == PhotoType(photo_type))
+        except ValueError:
+            pass
 
-@router.get("/photos/{photo_id}/full", summary="Immagine completa foto", tags=["Photos"])
-async def v1_get_photo_full(
-    photo_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Ottieni immagine completa ottimizzata della foto.
-    """
-    # Verifica che la foto appartenga a un sito accessibile
-    photo = await db.execute(select(Photo).where(Photo.id == photo_id))
-    photo = photo.scalar_one_or_none()
-    
-    if not photo:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Foto non trovata"
-        )
-    
-    # Verifica accesso al sito della foto
-    verify_site_access(photo.site_id, user_sites)
-    
-    return await get_photo_full_api_site__site_id__photos__photo_id__full_get(
-        photo.site_id, photo_id, current_user_id, user_sites, db
-    )
+    # Order by creation date desc
+    photos_query = photos_query.order_by(Photo.created_at.desc())
 
-@router.put("/sites/{site_id}/photos/{photo_id}", summary="Aggiorna foto", tags=["Photos"])
-async def v1_update_photo(
-    site_id: UUID,
-    photo_id: UUID,
-    photo_data: PhotoUpdate,
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Aggiorna metadati e informazioni di una foto.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di modifica
-    if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per modificare foto sul sito {site_id}"
-        )
-    
-    # Simula request JSON data
-    class MockRequest:
-        def __init__(self, data: dict):
-            self._data = data
-        
-        async def json(self):
-            return self._data
-    
-    mock_request = MockRequest(photo_data.model_dump(exclude_unset=True))
-    return await update_photo_api_site__site_id__photos__photo_id__update_put(
-        site_id, photo_id, mock_request, current_user_id, user_sites, db
-    )
+    # Execute query
+    photos = await db.execute(photos_query)
+    photos = photos.scalars().all()
 
-@router.delete("/sites/{site_id}/photos/{photo_id}", summary="Elimina foto", tags=["Photos"])
-async def v1_delete_photo(
-    site_id: UUID,
-    photo_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Elimina una foto dal sito archeologico.
-    
-    ⚠️ Operazione protetta: le foto US non possono essere eliminate.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di eliminazione
-    if site_info.get("permission_level") not in ["admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per eliminare foto dal sito {site_id}"
-        )
-    
-    return await delete_photo_api_site__site_id__photos__photo_id__delete(
-        site_id, photo_id, current_user_id, user_sites, db
-    )
-
-@router.post("/sites/{site_id}/photos/bulk-update", summary="Aggiornamento bulk foto", tags=["Photos"])
-async def v1_bulk_update_photos(
-    site_id: UUID,
-    bulk_data: BulkPhotoUpdate,
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Aggiorna più foto in blocco con supporto completo per metadati archeologici.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di modifica
-    if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per modificare foto sul sito {site_id}"
-        )
-    
-    # Simula request JSON data
-    class MockRequest:
-        def __init__(self, data: dict):
-            self._data = data
-        
-        async def json(self):
-            return self._data
-    
-    mock_request = MockRequest({
-        "photo_ids": [str(pid) for pid in bulk_data.photo_ids],
-        **bulk_data.update_data.model_dump(exclude_unset=True)
-    })
-    
-    return await bulk_update_photos_api_site__site_id__photos_bulk_update_post(
-        site_id, mock_request, current_user_id, user_sites, db
-    )
-
-# ENDPOINT DI BACKWARD COMPATIBILITY CON DEPRECAZIONE
-
-@router.get("/legacy/photos/{site_id}", summary="[DEPRECATED] Foto sito legacy", tags=["Photos - Legacy"])
-async def legacy_get_site_photos(
-    site_id: UUID,
-    request: Request,
-    current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    ⚠️ DEPRECATED: Lista foto sito endpoint legacy.
-    
-    Usa /api/v1/sites/{site_id}/photos invece di questo endpoint.
-    Questo endpoint sarà rimosso il 31/12/2025.
-    """
-    logger.warning(f"Legacy photos endpoint used for site {site_id} - deprecated")
-    response = await get_site_photos_api_api_site__site_id__photos_get(
-        site_id, request, current_user_id, user_sites, db
-    )
-    add_deprecation_headers(response, f"/api/v1/sites/{site_id}/photos")
-    return response
-
-# MIGRATION HELPER
-
-@router.get("/migration/help", summary="Aiuto migrazione API foto", tags=["Photos - Migration"])
-async def migration_help():
-    """
-    Fornisce informazioni sulla migrazione dalla vecchia alla nuova API structure per le foto.
-    """
-    return {
-        "migration_guide": {
-            "old_endpoints": {
-                "/api/site/{site_id}/photos": "/api/v1/sites/{site_id}/photos",
-                "/photos/{photo_id}/stream": "/api/v1/photos/{photo_id}/stream",
-                "/photos/{photo_id}/thumbnail": "/api/v1/photos/{photo_id}/thumbnail",
-                "/photos/{photo_id}/full": "/api/v1/photos/{photo_id}/full",
-                "/api/site/{site_id}/photos/{photo_id}/update": "/api/v1/sites/{site_id}/photos/{photo_id}",
-                "/api/site/{site_id}/photos/{photo_id}": "/api/v1/sites/{site_id}/photos/{photo_id}",
-                "/api/site/{site_id}/photos/bulk-update": "/api/v1/sites/{site_id}/photos/bulk-update"
-            },
-            "changes": [
-                "Standardizzazione URL patterns",
-                "Separazione endpoints per dominio",
-                "Miglioramento filtri archeologici",
-                "Headers di deprecazione automatici",
-                "Documentazione migliorata"
-            ],
-            "deadline": "2025-12-31",
-            "action_required": "Aggiornare client applications per usare nuovi endpoints"
+    # Convert to response format
+    photos_data = []
+    for photo in photos:
+        photo_dict = {
+            "id": str(photo.id),
+            "site_id": str(photo.site_id),
+            "filename": photo.filename,
+            "original_filename": photo.original_filename,
+            "file_size": photo.file_size,
+            "mime_type": photo.mime_type,
+            
+            # Image metadata
+            "width": photo.width,
+            "height": photo.height,
+            "format": photo.format,
+            "color_space": photo.color_space,
+            "color_profile": photo.color_profile,
+            
+            # Photo metadata
+            "title": photo.title,
+            "description": photo.description,
+            "keywords": photo.get_keywords_list(),
+            "photo_type": str(photo.photo_type) if photo.photo_type else None,
+            "photographer": photo.photographer,
+            "photo_date": photo.photo_date.isoformat() if photo.photo_date else None,
+            
+            # URLs
+            "thumbnail_url": f"/photos/{photo.id}/thumbnail",
+            "full_url": f"/photos/{photo.id}/full",
+            "file_url": f"/photos/{photo.id}/full",
+            
+            # Management
+            "is_published": photo.is_published,
+            "is_validated": photo.is_validated,
+            "created_at": photo.created_at.isoformat(),
+            "updated_at": photo.updated_at.isoformat() if photo.updated_at else None,
         }
-    }
+        photos_data.append(photo_dict)
+
+    logger.info(f"Photos API v1: Returned {len(photos_data)} photos with filters: search={search}, photo_type={photo_type}")
+
+    return JSONResponse(photos_data)

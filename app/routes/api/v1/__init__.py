@@ -5,9 +5,10 @@ Struttura RESTful con domini funzionali chiari e backward compatibility.
 
 from fastapi import APIRouter
 from app.routes.api.v1.auth import router as auth_router
+# Enable sites and photos routers for v1 API
+from app.routes.api.v1.sites import router as sites_router
+from app.routes.api.v1.photos import router as photos_router
 # Temporarily comment out problematic routers to resolve import issues
-# from app.routes.api.v1.sites import router as sites_router
-# from app.routes.api.v1.photos import router as photos_router
 # from app.routes.api.v1.metadata import router as metadata_router
 # from app.routes.api.v1.deepzoom import router as deepzoom_router
 # from app.routes.api.v1.documents import router as documents_router
@@ -33,9 +34,10 @@ api_v1_router = APIRouter(
 # Includi tutti i domini funzionali
 # Include only working routers for now
 api_v1_router.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+# Enable sites and photos routers for v1 API
+api_v1_router.include_router(sites_router, tags=["Sites"])
+api_v1_router.include_router(photos_router, tags=["Photos"])
 # Temporarily comment out problematic routers
-# api_v1_router.include_router(sites_router, prefix="/sites", tags=["Sites"])
-# api_v1_router.include_router(photos_router, prefix="/photos", tags=["Photos"])
 # api_v1_router.include_router(metadata_router, prefix="/metadata", tags=["Photo Metadata"])
 # api_v1_router.include_router(deepzoom_router, prefix="/deepzoom", tags=["Deep Zoom"])
 # api_v1_router.include_router(documents_router, prefix="/documents", tags=["Documents"])
