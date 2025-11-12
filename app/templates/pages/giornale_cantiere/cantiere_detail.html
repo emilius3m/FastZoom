@@ -460,12 +460,11 @@
             </div>
         </div>
     </div>
-
-    <!-- Include the complete modal for giornale creation -->
     {% include "pages/giornale_cantiere/modal_create_giornale.html" %}
 
-
 </div>
+
+
 
 <script>
 function cantiereDetailApp() {
@@ -684,7 +683,7 @@ function cantiereDetailApp() {
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Errore nell\\'aggiornamento del giornale');
+                    throw new Error(errorData.detail || 'Errore aggiornamento del giornale');
                 }
 
                 const result = await response.json();
@@ -695,7 +694,7 @@ function cantiereDetailApp() {
                 // Ricarica pagina per mostrare le modifiche
                 setTimeout(() => location.reload(), 1500);
             } catch (error) {
-                this.errorMessage = error.message || 'Errore durante l\\'aggiornamento del giornale';
+                this.errorMessage = error.message || 'Errore durante aggiornamento del giornale';
                 console.error('Error updating giornale:', error);
             } finally {
                 this.saving = false;
@@ -900,20 +899,29 @@ function giornaliListApp() {
             this.loading = true;
             this.error = '';
             
+            console.log('🔍 DEBUG: Inizio caricamento giornali per cantiere:', '{{ cantiere.id }}', 'site:', '{{ site.id }}');
+            
             try {
                 const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/giornali`);
                 
+                console.log('🔍 DEBUG: Response status:', response.status);
+                
                 if (!response.ok) {
-                    throw new Error('Errore nel caricamento dei giornali');
+                    const errorText = await response.text();
+                    console.error('🔍 DEBUG: Error response:', errorText);
+                    throw new Error(`Errore nel caricamento dei giornali: ${response.status}`);
                 }
                 
                 const data = await response.json();
+                console.log('🔍 DEBUG: Response data:', data);
                 this.giornali = data.giornali || [];
+                console.log('🔍 DEBUG: Caricati', this.giornali.length, 'giornali');
             } catch (error) {
                 this.error = error.message || 'Errore nel caricamento dei giornali';
-                console.error('Error loading giornali:', error);
+                console.error('🔍 DEBUG: Error loading giornali:', error);
             } finally {
                 this.loading = false;
+                console.log('🔍 DEBUG: Fine caricamento giornali');
             }
         },
         
