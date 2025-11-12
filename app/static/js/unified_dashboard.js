@@ -506,7 +506,7 @@ document.addEventListener("alpine:init", () => {
                 return;
             }
             // Force navigation with full page reload
-            window.location.assign(`/giornale-cantiere/site/${siteId}`);
+            window.location.assign(`/sites/${siteId}/cantieri/`);
         },
         
         navigateToNewSite() {
@@ -872,7 +872,7 @@ document.addEventListener("alpine:init", () => {
                     break;
                 case 'giornale':
                     console.log('Navigating to giornale site:', site.id);
-                    window.location.assign(`/giornale-cantiere/site/${site.id}`);
+                    window.location.assign(`/sites/${site.id}/cantieri`);
                     break;
                 default:
                     console.log('Default navigation to site dashboard:', site.id);
