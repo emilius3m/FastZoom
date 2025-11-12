@@ -173,7 +173,7 @@ class TilesVerificationService:
             
             # Get all photos for the site
             async with async_session_maker() as db:
-                photos_query = select(Photo).where(Photo.site_id == UUID(site_id))
+                photos_query = select(Photo).where(Photo.site_id == str(UUID(site_id)))
                 photos_result = await db.execute(photos_query)
                 photos = photos_result.scalars().all()
                 

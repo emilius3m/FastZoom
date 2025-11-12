@@ -214,7 +214,7 @@ async def v1_cantiere_detail_view(
             select(Cantiere)
             .options(selectinload(Cantiere.site))
             .where(
-                and_(Cantiere.id == cantiere_id, Cantiere.is_active == True)
+                and_(Cantiere.id == str(cantiere_id), Cantiere.is_active == True)
             )
         )
         cantiere = result.scalar_one_or_none()
@@ -242,7 +242,7 @@ async def v1_cantiere_detail_view(
         # Statistiche giornali di cantiere
         giornali_count_result = await db.execute(
             select(func.count(GiornaleCantiere.id)).where(
-                GiornaleCantiere.cantiere_id == cantiere_id
+                GiornaleCantiere.cantiere_id == str(cantiere_id)
             )
         )
         giornali_count = giornali_count_result.scalar() or 0
@@ -250,7 +250,7 @@ async def v1_cantiere_detail_view(
         # Ultimo giornale
         ultimo_giornale_result = await db.execute(
             select(GiornaleCantiere)
-            .where(GiornaleCantiere.cantiere_id == cantiere_id)
+            .where(GiornaleCantiere.cantiere_id == str(cantiere_id))
             .order_by(GiornaleCantiere.data.desc())
             .limit(1)
         )
@@ -409,7 +409,7 @@ async def v1_modifica_cantiere_view(
                 selectinload(Cantiere.site)
             )
             .where(
-                and_(Cantiere.id == cantiere_id, Cantiere.is_active == True)
+                and_(Cantiere.id == str(cantiere_id), Cantiere.is_active == True)
             )
         )
         cantiere = result.scalar_one_or_none()

@@ -107,9 +107,9 @@ class GeoJSONMinIOService:
                 # Query the database for the layer
                 stmt = select(GeographicMapLayer).where(
                     and_(
-                        GeographicMapLayer.id == UUID(layer_id),
-                        GeographicMapLayer.site_id == UUID(site_id),
-                        GeographicMapLayer.map_id == UUID(map_id)
+                        GeographicMapLayer.id == str(UUID(layer_id)),
+                        GeographicMapLayer.site_id == str(UUID(site_id)),
+                        GeographicMapLayer.map_id == str(UUID(map_id))
                     )
                 )
                 result = await db_session.execute(stmt)

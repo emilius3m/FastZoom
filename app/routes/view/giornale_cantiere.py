@@ -312,11 +312,11 @@ async def giornale_cantiere_detail(
         
         # Verifica permessi di modifica
         can_edit = (
-            giornale.responsabile_id == current_user_id and not giornale.validato
+            str(giornale.responsabile_id) == str(current_user_id) and not giornale.validato
         ) or (user and user.is_superuser)
-        
+
         can_validate = (
-            giornale.responsabile_id == current_user_id and not giornale.validato
+            str(giornale.responsabile_id) == str(current_user_id) and not giornale.validato
         )
         
         can_delete = user and user.is_superuser and not giornale.validato
