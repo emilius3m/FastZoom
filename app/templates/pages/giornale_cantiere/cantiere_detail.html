@@ -364,7 +364,7 @@
                                         </div>
                                     </div>
                                     <div class="flex items-center space-x-2">
-                                        <button type="button" class="text-blue-600 hover:text-blue-800 dark:text-blue-400" @click="openViewModal(giornale)">
+                                        <button type="button" class="text-blue-600 hover:text-blue-800 dark:text-blue-400" @click="viewGiornale(giornale)">
                                             <i class="fas fa-eye"></i>
                                         </button>
                                         <button type="button" class="text-green-600 hover:text-green-800 dark:text-green-400" @click="editGiornale(giornale)">
@@ -391,150 +391,6 @@
                             </button>
                         </div>
 
-                <!-- View Giornale Modal -->
-                <div x-show="showViewModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-
-                        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-                        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-                            <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                <div class="sm:flex sm:items-start">
-                                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                                        <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
-                                            Dettagli Giornale - <span x-text="viewingGiornale?.data || ''"></span>
-                                        </h3>
-                                        <div class="mt-4 space-y-4">
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Descrizione Lavori</label>
-                                                <p class="mt-1 text-sm text-gray-900 dark:text-white" x-text="viewFormData.descrizione_lavori || 'Nessuna descrizione'"></p>
-                                            </div>
-                                            <div>
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Condizioni Meteo</label>
-                                                <p class="mt-1 text-sm text-gray-900 dark:text-white" x-text="viewFormData.condizioni_meteo || '-'"></p>
-                                            </div>
-                                            <div x-show="viewFormData.ora_inizio || viewFormData.ora_fine">
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Orari</label>
-                                                <p class="mt-1 text-sm text-gray-900 dark:text-white">
-                                                    <span x-text="viewFormData.ora_inizio || '-inizio-'"></span> - <span x-text="viewFormData.ora_fine || '-fine-'"></span>
-                                                </p>
-                                            </div>
-                                            <div x-show="viewFormData.note_generali">
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Note Generali</label>
-                                                <p class="mt-1 text-sm text-gray-900 dark:text-white" x-text="viewFormData.note_generali"></p>
-                                            </div>
-                                            <div x-show="viewFormData.problematiche">
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Problematiche</label>
-                                                <p class="mt-1 text-sm text-gray-900 dark:text-white" x-text="viewFormData.problematiche"></p>
-                                            </div>
-                                            <div x-show="viewFormData.compilatore">
-                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Compilatore</label>
-                                                <p class="mt-1 text-sm text-gray-900 dark:text-white" x-text="viewFormData.compilatore"></p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                                <button type="button" @click="closeViewModal()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
-                                    Chiudi
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Edit Giornale Modal -->
-                <div x-show="showEditModal" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-
-                        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-                        <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-                            <form @submit.prevent="saveEditedGiornale()">
-                                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                    <div class="sm:flex sm:items-start">
-                                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
-                                                Modifica Giornale - <span x-text="editingGiornale?.data || ''"></span>
-                                            </h3>
-                                            
-                                            <!-- Error message -->
-                                            <div x-show="editErrorMessage" class="mt-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-                                                <div class="flex">
-                                                    <i class="fas fa-exclamation-triangle text-red-400 mr-2"></i>
-                                                    <span class="text-red-700 dark:text-red-400 text-sm" x-text="editErrorMessage"></span>
-                                                </div>
-                                            </div>
-
-                                            <div class="mt-4 space-y-4">
-                                                <div>
-                                                    <label for="edit_data" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data *</label>
-                                                    <input type="date" id="edit_data" x-model="editFormData.data" required class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                                </div>
-                                                
-                                                <div class="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label for="edit_ora_inizio" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ora Inizio</label>
-                                                        <input type="time" id="edit_ora_inizio" x-model="editFormData.ora_inizio" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                                    </div>
-                                                    <div>
-                                                        <label for="edit_ora_fine" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ora Fine</label>
-                                                        <input type="time" id="edit_ora_fine" x-model="editFormData.ora_fine" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <label for="edit_descrizione_lavori" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Descrizione Lavori *</label>
-                                                    <textarea id="edit_descrizione_lavori" x-model="editFormData.descrizione_lavori" required rows="3" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                                                </div>
-
-                                                <div>
-                                                    <label for="edit_condizioni_meteo" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Condizioni Meteo</label>
-                                                    <select id="edit_condizioni_meteo" x-model="editFormData.condizioni_meteo" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                                        <option value="Sereno">Sereno</option>
-                                                        <option value="Nuvoloso">Nuvoloso</option>
-                                                        <option value="Pioggia">Pioggia</option>
-                                                        <option value="Neve">Neve</option>
-                                                        <option value="Vento_forte">Vento forte</option>
-                                                        <option value="Nebbia">Nebbia</option>
-                                                        <option value="Temporale">Temporale</option>
-                                                    </select>
-                                                </div>
-
-                                                <div>
-                                                    <label for="edit_note_generali" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Note Generali</label>
-                                                    <textarea id="edit_note_generali" x-model="editFormData.note_generali" rows="2" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                                                </div>
-
-                                                <div>
-                                                    <label for="edit_problematiche" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Problematiche</label>
-                                                    <textarea id="edit_problematiche" x-model="editFormData.problematiche" rows="2" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                                                </div>
-
-                                                <div>
-                                                    <label for="edit_compilatore" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Compilatore</label>
-                                                    <input type="text" id="edit_compilatore" x-model="editFormData.compilatore" class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                                    <button type="submit" :disabled="editSaving" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                                        <i class="fas fa-spinner fa-spin mr-2" x-show="editSaving"></i>
-                                        <span x-text="editSaving ? 'Salvataggio...' : 'Salva Modifiche'"></span>
-                                    </button>
-                                    <button type="button" @click="closeEditModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                                        Annulla
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
                     </div>
                 </div>
             </div>
@@ -617,6 +473,7 @@ function cantiereDetailApp() {
         // Modal state for the complete modal
         showCreateModal: false,
         editingGiornale: false,
+        editingGiornaleData: null,
         saving: false,
         errorMessage: '',
         modalMode: 'giornale', // 'giornale' or 'edit-cantiere'
@@ -788,7 +645,60 @@ function cantiereDetailApp() {
             if (this.modalMode === 'edit-cantiere') {
                 await this.saveCantiere();
             } else {
-                await this.saveGiornale();
+                if (this.editingGiornale) {
+                    await this.updateGiornale();
+                } else {
+                    await this.saveGiornale();
+                }
+            }
+        },
+        
+        async updateGiornale() {
+            if (!this.formData.data) {
+                this.errorMessage = 'La data è obbligatoria';
+                return;
+            }
+
+            this.saving = true;
+            this.errorMessage = '';
+
+            try {
+                // Prepara i dati per l'API
+                const apiData = {
+                    ...this.formData,
+                    // Solo invia i campi orario se non sono vuoti
+                    ora_inizio: this.formData.ora_inizio || null,
+                    ora_fine: this.formData.ora_fine || null,
+                    // Gestisci temperature
+                    temperatura_min: this.formData.temperatura_min || null,
+                    temperatura_max: this.formData.temperatura_max || null
+                };
+
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(apiData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Errore nell\\'aggiornamento del giornale');
+                }
+
+                const result = await response.json();
+                
+                this.showAlert('success', 'Giornale aggiornato con successo');
+                this.closeModal();
+
+                // Ricarica pagina per mostrare le modifiche
+                setTimeout(() => location.reload(), 1500);
+            } catch (error) {
+                this.errorMessage = error.message || 'Errore durante l\\'aggiornamento del giornale';
+                console.error('Error updating giornale:', error);
+            } finally {
+                this.saving = false;
             }
         },
 
@@ -977,15 +887,8 @@ function giornaliListApp() {
         error: '',
         giornali: [],
         
-        // Modal states
-        showViewModal: false,
-        showEditModal: false,
-        viewingGiornale: null,
-        editingGiornale: null,
-        viewFormData: {},
-        editFormData: {},
-        editSaving: false,
-        editErrorMessage: '',
+        // Simplified modal states (removed unused modal variables)
+        // Modal states are now handled by parent component
         
         // Init
         init() {
@@ -1017,94 +920,44 @@ function giornaliListApp() {
         
         // Edit giornale
         editGiornale(giornale) {
-            // Open modal to edit giornale
-            this.openEditModal(giornale);
-        },
-        
-        // Open view modal
-        openViewModal(giornale) {
-            this.viewingGiornale = giornale;
-            this.viewFormData = {
+            // Use the parent modal system for editing
+            this.$parent.modalMode = 'giornale';
+            this.$parent.editingGiornale = true;
+            this.$parent.editingGiornaleData = giornale;
+            this.$parent.formData = {
                 data: giornale.data,
                 ora_inizio: giornale.ora_inizio,
                 ora_fine: giornale.ora_fine,
-                descrizione_lavori: giornale.descrizione_lavori,
-                condizioni_meteo: giornale.condizioni_meteo,
+                cantiere_id: '{{ cantiere.id }}',
+                responsabile_nome: giornale.responsabile_scavo || '',
+                compilatore: giornale.compilatore || '',
+                condizioni_meteo: giornale.condizioni_meteo || '',
+                temperatura_min: giornale.temperatura_min || null,
+                temperatura_max: giornale.temperatura_max || null,
+                descrizione_lavori: giornale.descrizione_lavori || '',
                 note_generali: giornale.note_generali || '',
                 problematiche: giornale.problematiche || '',
-                compilatore: giornale.compilatore || '',
                 us_elaborate_input: giornale.us_elaborate ? giornale.us_elaborate.join(', ') : '',
-                apparecchiature_input: giornale.apparecchiature || ''
+                apparecchiature_input: giornale.apparecchiature || '',
+                operatori_ids: []
             };
-            this.showViewModal = true;
+            this.$parent.showCreateModal = true;
         },
         
-        // Open edit modal
-        openEditModal(giornale) {
-            this.editingGiornale = giornale;
-            this.editFormData = {
-                data: giornale.data,
-                ora_inizio: giornale.ora_inizio,
-                ora_fine: giornale.ora_fine,
-                descrizione_lavori: giornale.descrizione_lavori,
-                condizioni_meteo: giornale.condizioni_meteo,
-                note_generali: giornale.note_generali || '',
-                problematiche: giornale.problematiche || '',
-                compilatore: giornale.compilatore || '',
-                us_elaborate_input: giornale.us_elaborate ? giornale.us_elaborate.join(', ') : '',
-                apparecchiature_input: giornale.apparecchiature || ''
-            };
-            this.showEditModal = true;
-        },
-        
-        // Close view modal
-        closeViewModal() {
-            this.showViewModal = false;
-            this.viewingGiornale = null;
-        },
-        
-        // Close edit modal
-        closeEditModal() {
-            this.showEditModal = false;
-            this.editingGiornale = null;
-        },
-        
-        // Save edited giornale
-        async saveEditedGiornale() {
-            if (!this.editFormData.data) {
-                this.editErrorMessage = 'La data è obbligatoria';
-                return;
-            }
-
-            this.editSaving = true;
-            this.editErrorMessage = '';
-
-            try {
-                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornale.id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(this.editFormData)
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Errore nell\'aggiornamento del giornale');
-                }
-
-                const result = await response.json();
-                
-                this.closeEditModal();
-                
-                // Reload the list
-                this.loadGiornali();
-            } catch (error) {
-                this.editErrorMessage = error.message || 'Errore durante l\'aggiornamento del giornale';
-                console.error('Error updating giornale:', error);
-            } finally {
-                this.editSaving = false;
-            }
+        // View giornale - simplified alert version
+        viewGiornale(giornale) {
+            const details = `
+Data: ${giornale.data}
+${giornale.ora_inizio ? `Orario: ${giornale.ora_inizio} - ${giornale.ora_fine || 'in corso'}` : ''}
+${giornale.condizioni_meteo ? `Meteo: ${giornale.condizioni_meteo}` : ''}
+${giornale.descrizione_lavori ? `Lavori: ${giornale.descrizione_lavori}` : ''}
+${giornale.responsabile_scavo ? `Responsabile: ${giornale.responsabile_scavo}` : ''}
+${giornale.compilatore ? `Compilatore: ${giornale.compilatore}` : ''}
+${giornale.note_generali ? `Note: ${giornale.note_generali}` : ''}
+${giornale.problematiche ? `Problematiche: ${giornale.problematiche}` : ''}
+            `.trim();
+            
+            alert(details);
         },
         
         // Delete giornale
