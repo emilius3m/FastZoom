@@ -143,9 +143,13 @@ async def giornale_cantiere_site(
                 detail=f"Accesso negato al sito {site_id}"
             )
         
-        # Ottieni dettagli sito dal database
+        # Ottieni dettagli sito dal database - Handle both hyphenated and non-hyphenated UUID formats
+        site_id_str = str(site_id)
         site_result = await db.execute(
-            select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            select(ArchaeologicalSite).where(
+                (ArchaeologicalSite.id == site_id_str) |
+                (ArchaeologicalSite.id == site_id_str.replace('-', ''))
+            )
         )
         site = site_result.scalar_one_or_none()
         
@@ -180,10 +184,13 @@ async def giornale_cantiere_site(
         )
         validated_giornali = stats_validated.scalar() or 0
         
-        # Ultimo giornale
+        # Ultimo giornale - Handle UUID format inconsistencies
         last_result = await db.execute(
             select(GiornaleCantiere.data)
-            .where(GiornaleCantiere.site_id == site_id)
+            .where(
+                (GiornaleCantiere.site_id == site_id_str) |
+                (GiornaleCantiere.site_id == site_id_str.replace('-', ''))
+            )
             .order_by(GiornaleCantiere.data.desc())
             .limit(1)
         )
@@ -272,13 +279,17 @@ async def giornale_cantiere_detail(
                 detail=f"Accesso negato al sito {site_id}"
             )
         
-        # Ottieni giornale con tutte le relazioni
+        # Ottieni giornale con tutte le relazioni - Handle UUID format inconsistencies
+        site_id_str = str(site_id)
+        giornale_id_str = str(giornale_id)
         giornale_result = await db.execute(
             select(GiornaleCantiere)
             .where(
                 and_(
-                    GiornaleCantiere.id == giornale_id,
-                    GiornaleCantiere.site_id == site_id
+                    (GiornaleCantiere.id == giornale_id_str) |
+                    (GiornaleCantiere.id == giornale_id_str.replace('-', '')),
+                    (GiornaleCantiere.site_id == site_id_str) |
+                    (GiornaleCantiere.site_id == site_id_str.replace('-', ''))
                 )
             )
             .options(
@@ -485,8 +496,15 @@ async def giornale_reports(
         user_result = await db.execute(select(User).where(User.id == current_user_id))
         user = user_result.scalar_one_or_none()
         
-        # Statistiche generali per tutti i siti accessibili
-        site_ids = [UUID(site['id']) for site in user_sites]
+        # Statistiche generali per tutti i siti accessibili - Handle UUID format inconsistencies
+        site_ids = []
+        for site in user_sites:
+            try:
+                site_ids.append(UUID(site['id']))
+            except:
+                # Skip invalid UUIDs but continue processing other sites
+                logger.warning(f"Invalid UUID format for site {site.get('id')}: {site['id']}")
+                continue
         
         if site_ids:
             # Statistiche totali

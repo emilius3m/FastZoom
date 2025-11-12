@@ -68,7 +68,7 @@ async def v1_cantieri_sito_view(
         
         # Query base per cantieri
         query = select(Cantiere).where(
-            and_(Cantiere.site_id == site_id, Cantiere.is_active == True)
+            and_(Cantiere.site_id == str(site_id), Cantiere.is_active == True)
         )
         
         # Applica filtri
@@ -96,7 +96,7 @@ async def v1_cantieri_sito_view(
         total_cantieri_result = await db.execute(
             select(func.count(Cantiere.id)).where(
                 and_(
-                    Cantiere.site_id == site_id,
+                    Cantiere.site_id == str(site_id),
                     Cantiere.is_active == True
                 )
             )
@@ -110,7 +110,7 @@ async def v1_cantieri_sito_view(
             )
             .where(
                 and_(
-                    Cantiere.site_id == site_id,
+                    Cantiere.site_id == str(site_id),
                     Cantiere.is_active == True
                 )
             )

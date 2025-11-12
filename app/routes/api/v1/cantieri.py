@@ -124,7 +124,7 @@ async def v1_get_cantieri_sito_direct(
         
         # Query base
         query = select(Cantiere).where(
-            and_(Cantiere.site_id == site_id, Cantiere.is_active == True)
+            and_(Cantiere.site_id == str(site_id), Cantiere.is_active == True)
         )
         
         # Applica filtri
@@ -155,7 +155,7 @@ async def v1_get_cantieri_sito_direct(
             # Conteggio giornali per ogni cantiere
             giornali_count_result = await db.execute(
                 select(func.count(GiornaleCantiere.id)).where(
-                    GiornaleCantiere.cantiere_id == cantiere.id
+                    GiornaleCantiere.cantiere_id == str(cantiere.id)
                 )
             )
             giornali_count = giornali_count_result.scalar() or 0
@@ -211,7 +211,7 @@ async def v1_get_cantieri_sito(
         
         # Query base
         query = select(Cantiere).where(
-            and_(Cantiere.site_id == site_id, Cantiere.is_active == True)
+            and_(Cantiere.site_id == str(site_id), Cantiere.is_active == True)
         )
         
         # Applica filtri
@@ -242,7 +242,7 @@ async def v1_get_cantieri_sito(
             # Conteggio giornali per ogni cantiere
             giornali_count_result = await db.execute(
                 select(func.count(GiornaleCantiere.id)).where(
-                    GiornaleCantiere.cantiere_id == cantiere.id
+                    GiornaleCantiere.cantiere_id == str(cantiere.id)
                 )
             )
             giornali_count = giornali_count_result.scalar() or 0
@@ -251,7 +251,7 @@ async def v1_get_cantieri_sito(
             operatori_subquery = (
                 select(giornale_operatori_association.c.operatore_id)
                 .join(GiornaleCantiere, GiornaleCantiere.id == giornale_operatori_association.c.giornale_id)
-                .where(GiornaleCantiere.cantiere_id == cantiere.id)
+                .where(GiornaleCantiere.cantiere_id == str(cantiere.id))
                 .distinct()
             )
             
@@ -315,7 +315,7 @@ async def v1_create_cantiere(
         
         # Crea nuovo cantiere
         nuovo_cantiere = Cantiere(
-            site_id=site_id,
+            site_id=str(site_id),  # Convert UUID to string for SQLite compatibility
             nome=cantiere_data.get("nome"),
             codice=cantiere_data.get("codice"),
             descrizione=cantiere_data.get("descrizione"),
@@ -367,7 +367,7 @@ async def v1_get_cantiere_detail(
                 selectinload(Cantiere.giornali)
             )
             .where(
-                and_(Cantiere.id == cantiere_id, Cantiere.is_active == True)
+                and_(Cantiere.id == str(cantiere_id), Cantiere.is_active == True)
             )
         )
         cantiere = result.scalar_one_or_none()
@@ -384,7 +384,7 @@ async def v1_get_cantiere_detail(
         # Prepara statistiche aggiuntive
         giornali_count_result = await db.execute(
             select(func.count(GiornaleCantiere.id)).where(
-                GiornaleCantiere.cantiere_id == cantiere_id
+                GiornaleCantiere.cantiere_id == str(cantiere_id)
             )
         )
         giornali_count = giornali_count_result.scalar() or 0
@@ -423,7 +423,7 @@ async def v1_update_cantiere(
     try:
         # Carica cantiere esistente
         result = await db.execute(
-            select(Cantiere).where(Cantiere.id == cantiere_id)
+            select(Cantiere).where(Cantiere.id == str(cantiere_id))
         )
         cantiere = result.scalar_one_or_none()
         
@@ -502,7 +502,7 @@ async def v1_delete_cantiere(
     try:
         # Carica cantiere esistente
         result = await db.execute(
-            select(Cantiere).where(Cantiere.id == cantiere_id)
+            select(Cantiere).where(Cantiere.id == str(cantiere_id))
         )
         cantiere = result.scalar_one_or_none()
         
@@ -518,7 +518,7 @@ async def v1_delete_cantiere(
         # Verifica che non ci siano giornali associati
         giornali_count_result = await db.execute(
             select(func.count(GiornaleCantiere.id)).where(
-                GiornaleCantiere.cantiere_id == cantiere_id
+                GiornaleCantiere.cantiere_id == str(cantiere_id)
             )
         )
         giornali_count = giornali_count_result.scalar() or 0
@@ -631,7 +631,7 @@ async def v1_get_site_cantieri_stats(
         total_cantieri_result = await db.execute(
             select(func.count(Cantiere.id)).where(
                 and_(
-                    Cantiere.site_id == site_id,
+                    Cantiere.site_id == str(site_id),
                     Cantiere.is_active == True
                 )
             )
@@ -646,7 +646,7 @@ async def v1_get_site_cantieri_stats(
             )
             .where(
                 and_(
-                    Cantiere.site_id == site_id,
+                    Cantiere.site_id == str(site_id),
                     Cantiere.is_active == True
                 )
             )
@@ -667,11 +667,11 @@ async def v1_get_site_cantieri_stats(
             select(GiornaleCantiere.cantiere_id)
             .where(
                 and_(
-                    GiornaleCantiere.site_id == site_id,
+                    GiornaleCantiere.site_id == str(site_id),
                     GiornaleCantiere.cantiere_id.in_(
                         select(Cantiere.id).where(
                             and_(
-                                Cantiere.site_id == site_id,
+                                Cantiere.site_id == str(site_id),
                                 Cantiere.is_active == True
                             )
                         )
