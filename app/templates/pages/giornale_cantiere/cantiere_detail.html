@@ -20,7 +20,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8" x-data="cantiereDetailApp()">
+<div class="container mx-auto px-4 py-8" x-data="cantiereDetailApp()" @open-edit-giornale-modal.window="handleEditGiornaleEvent($event)">
 
     <!-- Breadcrumb Flowbite -->
     <nav class="flex mb-6" aria-label="Breadcrumb">
@@ -523,6 +523,16 @@ function cantiereDetailApp() {
             console.log('Cantiere detail initialized');
         },
 
+        // Handle event from giornaliListApp component
+        handleEditGiornaleEvent(event) {
+            const data = event.detail;
+            this.modalMode = data.modalMode;
+            this.editingGiornale = data.editingGiornale;
+            this.editingGiornaleData = data.editingGiornaleData;
+            this.formData = data.formData;
+            this.showCreateModal = true;
+        },
+
         // Helper methods for modal title and button text
         getModalTitle() {
             if (this.modalMode === 'edit-cantiere') {
@@ -928,28 +938,29 @@ function giornaliListApp() {
         
         // Edit giornale
         editGiornale(giornale) {
-            // Use the parent modal system for editing
-            this.$parent.modalMode = 'giornale';
-            this.$parent.editingGiornale = true;
-            this.$parent.editingGiornaleData = giornale;
-            this.$parent.formData = {
-                data: giornale.data,
-                ora_inizio: giornale.ora_inizio,
-                ora_fine: giornale.ora_fine,
-                cantiere_id: '{{ cantiere.id }}',
-                responsabile_nome: giornale.responsabile_scavo || '',
-                compilatore: giornale.compilatore || '',
-                condizioni_meteo: giornale.condizioni_meteo || '',
-                temperatura_min: giornale.temperatura_min || null,
-                temperatura_max: giornale.temperatura_max || null,
-                descrizione_lavori: giornale.descrizione_lavori || '',
-                note_generali: giornale.note_generali || '',
-                problematiche: giornale.problematiche || '',
-                us_elaborate_input: giornale.us_elaborate ? giornale.us_elaborate.join(', ') : '',
-                apparecchiature_input: giornale.apparecchiature || '',
-                operatori_ids: []
-            };
-            this.$parent.showCreateModal = true;
+            // Use $dispatch to communicate with parent component
+            this.$dispatch('open-edit-giornale-modal', {
+                modalMode: 'giornale',
+                editingGiornale: true,
+                editingGiornaleData: giornale,
+                formData: {
+                    data: giornale.data,
+                    ora_inizio: giornale.ora_inizio,
+                    ora_fine: giornale.ora_fine,
+                    cantiere_id: '{{ cantiere.id }}',
+                    responsabile_nome: giornale.responsabile_scavo || '',
+                    compilatore: giornale.compilatore || '',
+                    condizioni_meteo: giornale.condizioni_meteo || '',
+                    temperatura_min: giornale.temperatura_min || null,
+                    temperatura_max: giornale.temperatura_max || null,
+                    descrizione_lavori: giornale.descrizione_lavori || '',
+                    note_generali: giornale.note_generali || '',
+                    problematiche: giornale.problematiche || '',
+                    us_elaborate_input: giornale.us_elaborate ? giornale.us_elaborate.join(', ') : '',
+                    apparecchiature_input: giornale.apparecchiature || '',
+                    operatori_ids: []
+                }
+            });
         },
         
         // View giornale - simplified alert version
