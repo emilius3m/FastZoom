@@ -49,9 +49,22 @@ class GiornalePDFGeneratorV2:
     def _setup_custom_styles(self):
         """Configura stili personalizzati professionali"""
         
+        # Helper function to safely add or update styles
+        def add_or_update_style(name, **kwargs):
+            if name in self.styles.byName:
+                # Update existing style
+                style = self.styles[name]
+                for key, value in kwargs.items():
+                    setattr(style, key, value)
+                logger.debug(f"Updated existing style: {name}")
+            else:
+                # Add new style
+                self.styles.add(ParagraphStyle(name=name, **kwargs))
+                logger.debug(f"Added new style: {name}")
+        
         # Titolo principale
-        self.styles.add(ParagraphStyle(
-            name='MainTitle',
+        add_or_update_style(
+            'MainTitle',
             parent=self.styles['Heading1'],
             fontSize=18,
             textColor=self.COLORS['header_bg'],
@@ -59,22 +72,22 @@ class GiornalePDFGeneratorV2:
             spaceBefore=6,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
-        ))
+        )
 
         # Sottotitolo
-        self.styles.add(ParagraphStyle(
-            name='Subtitle',
+        add_or_update_style(
+            'Subtitle',
             parent=self.styles['Normal'],
             fontSize=11,
             textColor=self.COLORS['grey'],
             spaceAfter=12,
             alignment=TA_CENTER,
             fontName='Helvetica-Oblique'
-        ))
+        )
 
         # Heading sezioni
-        self.styles.add(ParagraphStyle(
-            name='SectionHeading',
+        add_or_update_style(
+            'SectionHeading',
             parent=self.styles['Heading2'],
             fontSize=12,
             textColor=self.COLORS['accent'],
@@ -85,48 +98,48 @@ class GiornalePDFGeneratorV2:
             borderWidth=2,
             borderPadding=6,
             borderRadius=3
-        ))
+        )
 
         # Sottosezione
-        self.styles.add(ParagraphStyle(
-            name='SubsectionHeading',
+        add_or_update_style(
+            'SubsectionHeading',
             parent=self.styles['Heading3'],
             fontSize=10,
             textColor=self.COLORS['header_bg'],
             spaceAfter=6,
             fontName='Helvetica-Bold'
-        ))
+        )
 
-        # Testo normale giustificato
-        self.styles.add(ParagraphStyle(
-            name='BodyText',
+        # Testo normale giustificato - UPDATE existing BodyText style instead of adding new one
+        add_or_update_style(
+            'BodyText',
             parent=self.styles['Normal'],
             fontSize=9,
             alignment=TA_JUSTIFY,
             spaceAfter=6,
             leading=11,
             textColor=self.COLORS['text']
-        ))
+        )
 
         # Etichetta/Label
-        self.styles.add(ParagraphStyle(
-            name='Label',
+        add_or_update_style(
+            'Label',
             parent=self.styles['Normal'],
             fontSize=9,
             fontName='Helvetica-Bold',
             textColor=self.COLORS['header_bg'],
             spaceAfter=3
-        ))
+        )
 
         # Numero pagina
-        self.styles.add(ParagraphStyle(
-            name='PageNum',
+        add_or_update_style(
+            'PageNum',
             parent=self.styles['Normal'],
             fontSize=8,
             textColor=self.COLORS['grey'],
             alignment=TA_CENTER,
             fontName='Helvetica-Oblique'
-        ))
+        )
 
     def generate_giornale_pdf(self,
                              giornali: List[Dict[str, Any]],
