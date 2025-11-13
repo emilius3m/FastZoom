@@ -473,6 +473,111 @@
                                     class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-600 focus:border-blue-600 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
                                     placeholder="Descrizione dettagliata del cantiere..."></textarea>
                             </div>
+
+                            <!-- Dati Contrattuali Section -->
+                            <div class="col-span-2 mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+                                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                    <i class="fas fa-file-contract mr-2"></i>Dati Contrattuali
+                                </h4>
+                                
+                                <div class="grid gap-4 grid-cols-2">
+                                    <!-- Committente -->
+                                    <div class="col-span-2 sm:col-span-1">
+                                        <label for="committente" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Committente</label>
+                                        <input
+                                            type="text"
+                                            id="committente"
+                                            x-model="modal.formData.committente"
+                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                            placeholder="Nome del committente"
+                                            maxlength="200">
+                                    </div>
+
+                                    <!-- Impresa Esecutrice -->
+                                    <div class="col-span-2 sm:col-span-1">
+                                        <label for="impresa_esecutrice" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Impresa Esecutrice</label>
+                                        <input
+                                            type="text"
+                                            id="impresa_esecutrice"
+                                            x-model="modal.formData.impresa_esecutrice"
+                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                            placeholder="Nome dell'impresa esecutrice"
+                                            maxlength="200">
+                                    </div>
+
+                                    <!-- Direttore Lavori -->
+                                    <div class="col-span-2 sm:col-span-1">
+                                        <label for="direttore_lavori" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Direttore Lavori</label>
+                                        <input
+                                            type="text"
+                                            id="direttore_lavori"
+                                            x-model="modal.formData.direttore_lavori"
+                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                            placeholder="Nome del direttore lavori"
+                                            maxlength="200">
+                                    </div>
+
+                                    <!-- Responsabile Procedimento -->
+                                    <div class="col-span-2 sm:col-span-1">
+                                        <label for="responsabile_procedimento" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Responsabile Procedimento</label>
+                                        <input
+                                            type="text"
+                                            id="responsabile_procedimento"
+                                            x-model="modal.formData.responsabile_procedimento"
+                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                            placeholder="Nome del responsabile procedimento"
+                                            maxlength="200">
+                                    </div>
+
+                                    <!-- Oggetto Appalto -->
+                                    <div class="col-span-2">
+                                        <label for="oggetto_appalto" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Oggetto Appalto</label>
+                                        <textarea
+                                            id="oggetto_appalto"
+                                            x-model="modal.formData.oggetto_appalto"
+                                            rows="3"
+                                            class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-600 focus:border-blue-600 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                            placeholder="Descrizione dell'oggetto dell'appalto"></textarea>
+                                    </div>
+
+                                    <!-- Codice CUP -->
+                                    <div class="col-span-2 sm:col-span-1">
+                                        <label for="codice_cup" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Codice CUP</label>
+                                        <input
+                                            type="text"
+                                            id="codice_cup"
+                                            x-model="modal.formData.codice_cup"
+                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                            placeholder="Codice unico progetto"
+                                            maxlength="50">
+                                    </div>
+
+                                    <!-- Codice CIG -->
+                                    <div class="col-span-2 sm:col-span-1">
+                                        <label for="codice_cig" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Codice CIG</label>
+                                        <input
+                                            type="text"
+                                            id="codice_cig"
+                                            x-model="modal.formData.codice_cig"
+                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                            placeholder="Codice identificativo gara"
+                                            maxlength="50">
+                                    </div>
+
+                                    <!-- Importo Lavori -->
+                                    <div class="col-span-2">
+                                        <label for="importo_lavori" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Importo Lavori (€)</label>
+                                        <input
+                                            type="number"
+                                            id="importo_lavori"
+                                            x-model="modal.formData.importo_lavori"
+                                            step="0.01"
+                                            min="0"
+                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                            placeholder="0.00">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Modal footer -->
