@@ -9,7 +9,7 @@ from enum import Enum as PyEnum
 from uuid import uuid4
 from typing import List
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Time, Integer, ForeignKey, Table, func
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Date, Time, Integer, ForeignKey, Table, func, Numeric
 from sqlalchemy.orm import relationship
 
 from app.database.base import Base
@@ -34,6 +34,8 @@ giornale_operatori_association = Table(
     Column('id', String(36), primary_key=True, default=lambda: str(uuid4())),
     Column('giornale_id', String(36), ForeignKey('giornali_cantiere.id', ondelete='CASCADE'), nullable=False),
     Column('operatore_id', String(36), ForeignKey('operatori_cantiere.id', ondelete='CASCADE'), nullable=False),
+    Column('ore_lavorate', Numeric(5, 2), nullable=True, comment="Ore effettivamente lavorate dall'operatore"),
+    Column('note_presenza', Text, nullable=True, comment="Note specifiche sulla presenza dell'operatore"),
     Column('created_at', DateTime, server_default=func.now())
 )
 

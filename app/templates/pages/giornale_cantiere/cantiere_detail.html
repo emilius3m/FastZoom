@@ -574,6 +574,9 @@ function cantiereDetailApp() {
         errorMessage: '',
         modalMode: 'giornale', // 'giornale' or 'edit-cantiere'
         
+        // Enhanced operator data structure
+        operatori_data: {}, // Store enhanced operator data { operatorId: { ore_lavorate, note_presenza } }
+        
         // Form data for the complete modal
         formData: {
             data: new Date().toISOString().split('T')[0],
@@ -711,6 +714,9 @@ function cantiereDetailApp() {
                     apparecchiature_input: '',
                     operatori_ids: []
                 };
+                
+                // Reset enhanced operator data
+                this.operatori_data = {};
             }
         },
 
@@ -788,7 +794,7 @@ function cantiereDetailApp() {
             this.errorMessage = '';
 
             try {
-                // Prepara i dati per l'API
+                // Prepara i dati per l'API con operatori enhanced
                 const apiData = {
                     ...this.formData,
                     // Solo invia i campi orario se non sono vuoti
@@ -796,7 +802,9 @@ function cantiereDetailApp() {
                     ora_fine: this.formData.ora_fine || null,
                     // Gestisci temperature
                     temperatura_min: this.formData.temperatura_min || null,
-                    temperatura_max: this.formData.temperatura_max || null
+                    temperatura_max: this.formData.temperatura_max || null,
+                    // Enhanced operatori structure
+                    operatori: this.getEnhancedOperatoriData()
                 };
 
                 const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}`, {
@@ -882,7 +890,7 @@ function cantiereDetailApp() {
             this.errorMessage = '';
 
             try {
-                // Prepara i dati per l'API, gestendo campi vuoti
+                // Prepara i dati per l'API con operatori enhanced, gestendo campi vuoti
                 const apiData = {
                     ...this.formData,
                     // Solo invia i campi orario se non sono vuoti
@@ -890,7 +898,9 @@ function cantiereDetailApp() {
                     ora_fine: this.formData.ora_fine || null,
                     // Gestisci temperature
                     temperatura_min: this.formData.temperatura_min || null,
-                    temperatura_max: this.formData.temperatura_max || null
+                    temperatura_max: this.formData.temperatura_max || null,
+                    // Enhanced operatori structure
+                    operatori: this.getEnhancedOperatoriData()
                 };
 
                 // Chiama API reale per salvare il giornale
@@ -1001,6 +1011,93 @@ function cantiereDetailApp() {
             }
             
             console.log('DEBUG: Fine caricamento operatori, operatori_disponibili.length:', this.operatori_disponibili.length);
+        },
+        
+        // ===== ENHANCED OPERATOR FUNCTIONS =====
+        
+        // Toggle operator selection
+        toggleOperatore(operatore) {
+            const operatoreId = operatore.id;
+            const index = this.formData.operatori_ids.indexOf(operatoreId);
+            
+            if (index === -1) {
+                // Add operator
+                this.formData.operatori_ids.push(operatoreId);
+                // Initialize enhanced data
+                if (!this.operatori_data[operatoreId]) {
+                    this.operatori_data[operatoreId] = {
+                        ore_lavorate: null,
+                        note_presenza: ''
+                    };
+                }
+            } else {
+                // Remove operator
+                this.formData.operatori_ids.splice(index, 1);
+                // Clean up enhanced data
+                delete this.operatori_data[operatoreId];
+            }
+        },
+        
+        // Check if operator is selected
+        isOperatoreSelezionato(operatoreId) {
+            return this.formData.operatori_ids.includes(operatoreId);
+        },
+        
+        // Get operator data
+        getOperatoreData(operatoreId) {
+            return this.operatori_data[operatoreId] || { ore_lavorate: null, note_presenza: '' };
+        },
+        
+        // Update operator data
+        updateOperatoreData(operatoreId, field, value) {
+            if (!this.operatori_data[operatoreId]) {
+                this.operatori_data[operatoreId] = { ore_lavorate: null, note_presenza: '' };
+            }
+            
+            if (field === 'ore_lavorate') {
+                // Convert to float and validate
+                const hours = parseFloat(value);
+                this.operatori_data[operatoreId].ore_lavorate = isNaN(hours) ? null : hours;
+            } else {
+                this.operatori_data[operatoreId][field] = value;
+            }
+        },
+        
+        // Get enhanced operatori data for API
+        getEnhancedOperatoriData() {
+            return this.formData.operatori_ids.map(operatoreId => ({
+                id: operatoreId,
+                ore_lavorate: this.operatori_data[operatoreId]?.ore_lavorate || null,
+                note_presenza: this.operatori_data[operatoreId]?.note_presenza || ''
+            }));
+        },
+        
+        // Get selected operators with their data
+        getOperatoriSelezionati() {
+            return this.operatori_disponibili.filter(operatore =>
+                this.isOperatoreSelezionato(operatore.id)
+            );
+        },
+        
+        // Get count of selected operators
+        getOperatoriSelezionatiCount() {
+            return this.formData.operatori_ids.length;
+        },
+        
+        // Load operator data for editing
+        loadOperatoriDataForEditing(giornale) {
+            if (giornale.operatori_presenti && Array.isArray(giornale.operatori_presenti)) {
+                this.formData.operatori_ids = giornale.operatori_presenti.map(op => op.id);
+                
+                // Load enhanced data
+                this.operatori_data = {};
+                giornale.operatori_presenti.forEach(op => {
+                    this.operatori_data[op.id] = {
+                        ore_lavorate: op.ore_lavorate || null,
+                        note_presenza: op.note_presenza || ''
+                    };
+                });
+            }
         }
     }
 }
@@ -1054,6 +1151,9 @@ function giornaliListApp() {
         
         // Edit giornale
         editGiornale(giornale) {
+            // Load enhanced operator data for editing
+            this.loadOperatoriDataForEditing(giornale);
+            
             // Use $dispatch to communicate with parent component
             this.$dispatch('open-edit-giornale-modal', {
                 modalMode: 'giornale',

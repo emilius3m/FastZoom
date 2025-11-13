@@ -154,6 +154,51 @@ from datetime import date, time
 from sqlalchemy import select, func, and_, or_, desc, distinct
 from sqlalchemy.orm import selectinload
 
+
+# ===== HELPER FUNCTION FOR ENHANCED OPERATOR DATA =====
+
+async def _get_enhanced_operator_data(db: AsyncSession, giornale_id: str, operatori_list: List) -> List[Dict[str, Any]]:
+    """
+    Helper function to fetch enhanced operator data including hours worked and presence notes
+    from the giornale_operatori association table.
+    
+    Args:
+        db: Database session
+        giornale_id: ID of the giornale
+        operatori_list: List of operator objects from the relationship
+    
+    Returns:
+        Enhanced operator data with hours and notes
+    """
+    enhanced_operatori = []
+    
+    for op in operatori_list:
+        # Query the association table to get enhanced data for this operator in this giornale
+        association_result = await db.execute(
+            select(giornale_operatori_association.c.ore_lavorate,
+                   giornale_operatori_association.c.note_presenza)
+            .where(
+                and_(
+                    giornale_operatori_association.c.giornale_id == str(giornale_id),
+                    giornale_operatori_association.c.operatore_id == str(op.id)
+                )
+            )
+        )
+        association_data = association_result.first()
+        
+        operator_dict = {
+            "id": str(op.id),
+            "nome": op.nome,
+            "cognome": op.cognome,
+            "ruolo": op.ruolo,
+            "qualifica": op.qualifica,
+            "ore_lavorate": float(association_data.ore_lavorate) if association_data and association_data.ore_lavorate is not None else None,
+            "note_presenza": association_data.note_presenza if association_data else None,
+        }
+        enhanced_operatori.append(operator_dict)
+    
+    return enhanced_operatori
+
 @router.get("/sites/{site_id}", summary="Lista giornali sito", tags=["Giornale di Cantiere"])
 async def v1_get_site_giornali(
     site_id: UUID,
@@ -297,15 +342,7 @@ async def v1_get_site_giornali(
                 "usr_elaborate": g.usr_elaborate.split(",") if g.usr_elaborate else [],
                 "cantiere_id": str(g.cantiere_id) if g.cantiere_id else None,
                 "cantiere": cantiere_info,
-                "operatori_presenti": [
-                    {
-                        "id": str(op.id),
-                        "nome": op.nome,
-                        "cognome": op.cognome,
-                        "ruolo": op.ruolo,
-                    }
-                    for op in (g.operatori or [])
-                ],
+                "operatori_presenti": await _get_enhanced_operator_data(db, g.id, g.operatori or []),
                 "note_generali": g.note_generali,
                 "problematiche": g.problematiche,
                 "compilatore": g.compilatore or g.responsabile_nome,
@@ -484,15 +521,7 @@ async def v1_get_cantiere_giornali(
                 "usr_elaborate": g.usr_elaborate.split(",") if g.usr_elaborate else [],
                 "cantiere_id": str(g.cantiere_id) if g.cantiere_id else None,
                 "cantiere": cantiere_info,
-                "operatori_presenti": [
-                    {
-                        "id": str(op.id),
-                        "nome": op.nome,
-                        "cognome": op.cognome,
-                        "ruolo": op.ruolo,
-                    }
-                    for op in (g.operatori or [])
-                ],
+                "operatori_presenti": await _get_enhanced_operator_data(db, g.id, g.operatori or []),
                 "note_generali": g.note_generali,
                 "problematiche": g.problematiche,
                 "compilatore": g.compilatore or g.responsabile_nome,
@@ -608,9 +637,20 @@ async def v1_create_giornale(
         await db.refresh(nuovo_giornale)
         
         # 🔥 NUOVA VALIDAZIONE: Verifica che gli operatori possano lavorare su questo sito
-        operatori_ids = giornale_data.get("operatori_ids", [])
-        if operatori_ids:
-            for op_id in operatori_ids:
+        operatori_data = giornale_data.get("operatori", [])  # Enhanced structure with hours and notes
+        if operatori_data:
+            for operatore_info in operatori_data:
+                op_id = operatore_info.get("id")
+                ore_lavorate = operatore_info.get("ore_lavorate")
+                note_presenza = operatore_info.get("note_presenza")
+                
+                # Validate hours worked
+                if ore_lavorate is not None and (not isinstance(ore_lavorate, (int, float)) or ore_lavorate < 0):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Ore lavorate non valide per operatore {op_id}: deve essere un numero positivo"
+                    )
+                
                 # Verifica che l'operatore esista e sia assegnato a questo sito
                 operatore_result = await db.execute(
                     select(OperatoreCantiere).where(
@@ -628,11 +668,13 @@ async def v1_create_giornale(
                         detail=f"L'operatore {op_id} non è assegnato al sito {site_id} e non può lavorare su questo giornale"
                     )
                 
-                # Aggiungi l'operatore al giornale
+                # Aggiungi l'operatore al giornale con enhanced data
                 await db.execute(
                     giornale_operatori_association.insert().values(
                         giornale_id=str(nuovo_giornale.id),  # Convert UUID to string
-                        operatore_id=str(UUID(op_id))  # Convert UUID to string
+                        operatore_id=str(UUID(op_id)),  # Convert UUID to string
+                        ore_lavorate=float(ore_lavorate) if ore_lavorate is not None else None,
+                        note_presenza=note_presenza
                     )
                 )
             await db.commit()
@@ -641,7 +683,7 @@ async def v1_create_giornale(
             "id": str(nuovo_giornale.id),
             "message": "Giornale creato con successo con validazione operatori-sito",
             "site_info": site_info,
-            "operatori_validati": len(operatori_ids) if operatori_ids else 0
+            "operatori_validati": len(operatori_data) if operatori_data else 0
         }
         
     except HTTPException:
@@ -708,9 +750,9 @@ async def v1_update_giornale(
                 )
         
         # 🔥 NUOVA VALIDAZIONE: Verifica che gli operatori possano lavorare su questo sito
-        if "operatori_ids" in giornale_data:
-            operatori_ids = giornale_data["operatori_ids"]
-            if operatori_ids:
+        if "operatori" in giornale_data:
+            operatori_data = giornale_data["operatori"]
+            if operatori_data:
                 # Rimuovi vecchie associazioni
                 await db.execute(
                     giornale_operatori_association.delete().where(
@@ -719,7 +761,18 @@ async def v1_update_giornale(
                 )
                 
                 # Aggiungi nuove associazioni con validazione
-                for op_id in operatori_ids:
+                for operatore_info in operatori_data:
+                    op_id = operatore_info.get("id")
+                    ore_lavorate = operatore_info.get("ore_lavorate")
+                    note_presenza = operatore_info.get("note_presenza")
+                    
+                    # Validate hours worked
+                    if ore_lavorate is not None and (not isinstance(ore_lavorate, (int, float)) or ore_lavorate < 0):
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Ore lavorate non valide per operatore {op_id}: deve essere un numero positivo"
+                        )
+                    
                     operatore_result = await db.execute(
                         select(OperatoreCantiere).where(
                             and_(
@@ -736,11 +789,13 @@ async def v1_update_giornale(
                             detail=f"L'operatore {op_id} non è assegnato al sito {site_id}"
                         )
                     
-                    # Aggiungi l'operatore al giornale
+                    # Aggiungi l'operatore al giornale con enhanced data
                     await db.execute(
                         giornale_operatori_association.insert().values(
                             giornale_id=str(giornale_id),  # Convert UUID to string
-                            operatore_id=str(UUID(op_id))  # Convert UUID to string
+                            operatore_id=str(UUID(op_id)),  # Convert UUID to string
+                            ore_lavorate=float(ore_lavorate) if ore_lavorate is not None else None,
+                            note_presenza=note_presenza
                         )
                     )
         
@@ -780,7 +835,7 @@ async def v1_update_giornale(
             "id": str(giornale.id),
             "message": "Giornale aggiornato con successo con validazione operatori-sito",
             "site_info": site_info,
-            "operatori_validati": len(operatori_ids) if "operatori_ids" in giornale_data else 0
+            "operatori_validati": len(operatori_data) if "operatori" in giornale_data else 0
         }
         
     except HTTPException:
