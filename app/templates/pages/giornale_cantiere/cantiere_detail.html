@@ -949,7 +949,7 @@ function giornaliListApp() {
                     ora_inizio: giornale.ora_inizio,
                     ora_fine: giornale.ora_fine,
                     cantiere_id: '{{ cantiere.id }}',
-                    responsabile_nome: giornale.responsabile_scavo || '',
+                    responsabile_nome: giornale.responsabile_scavo || giornale.responsabile_nome || '',
                     compilatore: giornale.compilatore || '',
                     condizioni_meteo: giornale.condizioni_meteo || '',
                     temperatura_min: giornale.temperatura_min || null,
@@ -958,8 +958,8 @@ function giornaliListApp() {
                     note_generali: giornale.note_generali || '',
                     problematiche: giornale.problematiche || '',
                     us_elaborate_input: giornale.us_elaborate ? giornale.us_elaborate.join(', ') : '',
-                    apparecchiature_input: giornale.apparecchiature || '',
-                    operatori_ids: []
+                    apparecchiature_input: giornale.attrezzatura_utilizzata ? giornale.attrezzatura_utilizzata : (giornale.apparecchiature || ''),
+                    operatori_ids: giornale.operatori_presenti ? giornale.operatori_presenti.map(op => op.id) : []
                 }
             });
         },
