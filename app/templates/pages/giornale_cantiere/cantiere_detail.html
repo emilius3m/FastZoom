@@ -624,12 +624,19 @@ function cantiereDetailApp() {
         },
 
         // Handle event from giornaliListApp component
-        handleEditGiornaleEvent(event) {
+        async handleEditGiornaleEvent(event) {
             const data = event.detail;
             this.modalMode = data.modalMode;
             this.editingGiornale = data.editingGiornale;
             this.editingGiornaleData = data.editingGiornaleData;
             this.formData = data.formData;
+            
+            // Load operators before showing the modal
+            await this.loadOperatoriDisponibili();
+            
+            // Load operator data for editing after operators are loaded
+            this.loadOperatoriDataForEditing(this.editingGiornaleData);
+            
             this.showCreateModal = true;
         },
 
@@ -1151,9 +1158,6 @@ function giornaliListApp() {
         
         // Edit giornale
         editGiornale(giornale) {
-            // Load enhanced operator data for editing
-            this.loadOperatoriDataForEditing(giornale);
-            
             // Use $dispatch to communicate with parent component
             this.$dispatch('open-edit-giornale-modal', {
                 modalMode: 'giornale',
