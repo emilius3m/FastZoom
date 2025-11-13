@@ -519,14 +519,19 @@ async def v1_create_giornale(
             site_id=str(site_id),  # Convert UUID to string for SQLite compatibility
             cantiere_id=str(UUID(cantiere_id)) if cantiere_id else None,
             data=date.fromisoformat(giornale_data.get("data")) if giornale_data.get("data") else date.today(),
-            ora_inizio=time.fromisoformat(giornale_data.get("ora_inizio", "09:00")),
-            ora_fine=time.fromisoformat(giornale_data.get("ora_fine", "18:00")),
+            ora_inizio=time.fromisoformat(giornale_data["ora_inizio"]) if giornale_data.get("ora_inizio") else None,
+            ora_fine=time.fromisoformat(giornale_data["ora_fine"]) if giornale_data.get("ora_fine") else None,
             descrizione_lavori=giornale_data.get("descrizione_lavori", ""),
-            condizioni_meteo=giornale_data.get("condizioni_meteo", "soleggiato"),
+            condizioni_meteo=giornale_data.get("condizioni_meteo"),
             note_generali=giornale_data.get("note_generali", ""),
             problematiche=giornale_data.get("problematiche", ""),
             responsabile_id=str(current_user_id),  # Convert UUID to string for SQLite compatibility
+            responsabile_nome=giornale_data.get("responsabile_nome", ""),
             compilatore=giornale_data.get("compilatore", ""),
+            temperatura_min=giornale_data.get("temperatura_min"),
+            temperatura_max=giornale_data.get("temperatura_max"),
+            us_elaborate=giornale_data.get("us_elaborate_input", ""),  # Convert input string to database field
+            attrezzatura_utilizzata=giornale_data.get("apparecchiature_input", ""),  # Convert input string to database field
             validato=False
         )
         
@@ -675,9 +680,9 @@ async def v1_update_giornale(
         if "data" in giornale_data:
             giornale.data = date.fromisoformat(giornale_data["data"])
         if "ora_inizio" in giornale_data:
-            giornale.ora_inizio = time.fromisoformat(giornale_data["ora_inizio"])
+            giornale.ora_inizio = time.fromisoformat(giornale_data["ora_inizio"]) if giornale_data["ora_inizio"] else None
         if "ora_fine" in giornale_data:
-            giornale.ora_fine = time.fromisoformat(giornale_data["ora_fine"])
+            giornale.ora_fine = time.fromisoformat(giornale_data["ora_fine"]) if giornale_data["ora_fine"] else None
         if "cantiere_id" in giornale_data:
             giornale.cantiere_id = str(UUID(giornale_data["cantiere_id"])) if giornale_data["cantiere_id"] else None
         if "descrizione_lavori" in giornale_data:
@@ -688,8 +693,18 @@ async def v1_update_giornale(
             giornale.note_generali = giornale_data["note_generali"]
         if "problematiche" in giornale_data:
             giornale.problematiche = giornale_data["problematiche"]
+        if "responsabile_nome" in giornale_data:
+            giornale.responsabile_nome = giornale_data["responsabile_nome"]
         if "compilatore" in giornale_data:
             giornale.compilatore = giornale_data["compilatore"]
+        if "temperatura_min" in giornale_data:
+            giornale.temperatura_min = giornale_data["temperatura_min"]
+        if "temperatura_max" in giornale_data:
+            giornale.temperatura_max = giornale_data["temperatura_max"]
+        if "us_elaborate_input" in giornale_data:
+            giornale.us_elaborate = giornale_data["us_elaborate_input"]  # Convert input string to database field
+        if "apparecchiature_input" in giornale_data:
+            giornale.attrezzatura_utilizzata = giornale_data["apparecchiature_input"]  # Convert input string to database field
         
         await db.commit()
         

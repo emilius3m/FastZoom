@@ -559,10 +559,11 @@ function cantiereDetailApp() {
             await this.loadOperatoriDisponibili();
         },
 
-        openEditModal() {
+        async openEditModal() {
             this.modalMode = 'edit-cantiere';
             this.showCreateModal = true;
-            this.loadCantiereData();
+            await this.loadCantiereData();
+            await this.loadOperatoriDisponibili();
         },
 
         closeModal() {
