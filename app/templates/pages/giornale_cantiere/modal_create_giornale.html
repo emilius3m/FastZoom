@@ -147,6 +147,104 @@
                                       class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
                         </div>
                     </div>
+
+                    <!-- Dati Contrattuali -->
+                    <div class="mb-6">
+                        <h4 class="text-md font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center">
+                            <i class="fas fa-file-contract mr-2 text-green-600"></i>
+                            Dati Contrattuali
+                        </h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Committente
+                                </label>
+                                <input type="text"
+                                       name="committente"
+                                       x-model="formData.committente"
+                                       placeholder="Es: Comune di Roma, Ministero dei Beni Culturali"
+                                       class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Impresa Esecutrice
+                                </label>
+                                <input type="text"
+                                       name="impresa_esecutrice"
+                                       x-model="formData.impresa_esecutrice"
+                                       placeholder="Es: S.p.A. Archeologia e Restauri, Cooperativa Scavi"
+                                       class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Direttore Lavori
+                                    </label>
+                                    <input type="text"
+                                           name="direttore_lavori"
+                                           x-model="formData.direttore_lavori"
+                                           placeholder="Es: Dott. Mario Rossi"
+                                           class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Responsabile Procedimento
+                                    </label>
+                                    <input type="text"
+                                           name="responsabile_procedimento"
+                                           x-model="formData.responsabile_procedimento"
+                                           placeholder="Es: Arch. Laura Bianchi"
+                                           class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Oggetto Appalto
+                                </label>
+                                <textarea name="oggetto_appalto"
+                                          x-model="formData.oggetto_appalto"
+                                          rows="3"
+                                          placeholder="Descrizione dettagliata dell'oggetto dell'appalto..."
+                                          class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Codice CUP
+                                    </label>
+                                    <input type="text"
+                                           name="codice_cup"
+                                           x-model="formData.codice_cup"
+                                           maxlength="50"
+                                           placeholder="Es: H71J19000000006"
+                                           class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Codice CIG
+                                    </label>
+                                    <input type="text"
+                                           name="codice_cig"
+                                           x-model="formData.codice_cig"
+                                           maxlength="50"
+                                           placeholder="Es: 1234567890"
+                                           class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Importo Lavori (€)
+                                    </label>
+                                    <input type="number"
+                                           name="importo_lavori"
+                                           x-model="formData.importo_lavori"
+                                           step="0.01"
+                                           min="0"
+                                           placeholder="Es: 50000.00"
+                                           class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- GIORNALE MODE -->

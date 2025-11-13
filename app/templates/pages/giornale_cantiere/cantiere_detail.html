@@ -321,7 +321,7 @@
                         </h3>
                         <dl class="space-y-3">
                             <div>
-                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile</dt>
+                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile Cantiere</dt>
                                 <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.responsabile_cantiere or "Non specificato" }}</dd>
                             </div>
                             <div>
@@ -342,6 +342,103 @@
                             {% endif %}
                         </dl>
                     </div>
+
+                    <!-- Dati Contrattuali -->
+                    <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-file-contract mr-2 text-green-600"></i>Dati Contrattuali
+                        </h3>
+                        <dl class="space-y-3">
+                            {% if cantiere.committente %}
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Committente</dt>
+                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.committente }}</dd>
+                            </div>
+                            {% endif %}
+                            {% if cantiere.impresa_esecutrice %}
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Impresa Esecutrice</dt>
+                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.impresa_esecutrice }}</dd>
+                            </div>
+                            {% endif %}
+                            {% if cantiere.direttore_lavori %}
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Direttore Lavori</dt>
+                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.direttore_lavori }}</dd>
+                            </div>
+                            {% endif %}
+                            {% if cantiere.responsabile_procedimento %}
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile Procedimento</dt>
+                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.responsabile_procedimento }}</dd>
+                            </div>
+                            {% endif %}
+                        </dl>
+                    </div>
+
+                    <!-- Codici e Importi -->
+                    <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6 lg:col-span-2">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-barcode mr-2 text-purple-600"></i>Codici e Importi
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {% if cantiere.codice_cup %}
+                            <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
+                                <div class="flex items-center">
+                                    <i class="fas fa-hashtag text-purple-600 dark:text-purple-400 mr-2"></i>
+                                    <div>
+                                        <dt class="text-xs font-medium text-purple-700 dark:text-purple-300">Codice CUP</dt>
+                                        <dd class="text-sm text-purple-900 dark:text-purple-100 font-mono">{{ cantiere.codice_cup }}</dd>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if cantiere.codice_cig %}
+                            <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3">
+                                <div class="flex items-center">
+                                    <i class="fas fa-fingerprint text-indigo-600 dark:text-indigo-400 mr-2"></i>
+                                    <div>
+                                        <dt class="text-xs font-medium text-indigo-700 dark:text-indigo-300">Codice CIG</dt>
+                                        <dd class="text-sm text-indigo-900 dark:text-indigo-100 font-mono">{{ cantiere.codice_cig }}</dd>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if cantiere.importo_lavori %}
+                            <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                                <div class="flex items-center">
+                                    <i class="fas fa-euro-sign text-green-600 dark:text-green-400 mr-2"></i>
+                                    <div>
+                                        <dt class="text-xs font-medium text-green-700 dark:text-green-300">Importo Lavori</dt>
+                                        <dd class="text-sm text-green-900 dark:text-green-100 font-semibold">
+                                            €{{ "{:,.2f}".format(cantiere.importo_lavori) }}
+                                        </dd>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if not cantiere.codice_cup and not cantiere.codice_cig and not cantiere.importo_lavori %}
+                            <div class="md:col-span-3 text-center py-4">
+                                <p class="text-gray-500 dark:text-gray-400">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    Nessun codice o importo specificato
+                                </p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Oggetto Appalto -->
+                    {% if cantiere.oggetto_appalto %}
+                    <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6 lg:col-span-2">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-clipboard-list mr-2 text-orange-600"></i>Oggetto Appalto
+                        </h3>
+                        <div class="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
+                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ cantiere.oggetto_appalto }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
 
                     <!-- Date e Periodo -->
                     <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6">
@@ -584,7 +681,16 @@ function cantiereDetailApp() {
                     descrizione: '',
                     area_descrizione: '',
                     tipologia_intervento: '',
-                    priorita: 3
+                    priorita: 3,
+                    // New fields
+                    committente: '',
+                    impresa_esecutrice: '',
+                    direttore_lavori: '',
+                    responsabile_procedimento: '',
+                    oggetto_appalto: '',
+                    codice_cup: '',
+                    codice_cig: '',
+                    importo_lavori: ''
                 };
             } else {
                 // Reset for giornale
@@ -629,7 +735,16 @@ function cantiereDetailApp() {
                     descrizione: cantiereData.descrizione || '',
                     area_descrizione: cantiereData.area_descrizione || '',
                     tipologia_intervento: cantiereData.tipologia_intervento || '',
-                    priorita: cantiereData.priorita || 3
+                    priorita: cantiereData.priorita || 3,
+                    // New fields
+                    committente: cantiereData.committente || '',
+                    impresa_esecutrice: cantiereData.impresa_esecutrice || '',
+                    direttore_lavori: cantiereData.direttore_lavori || '',
+                    responsabile_procedimento: cantiereData.responsabile_procedimento || '',
+                    oggetto_appalto: cantiereData.oggetto_appalto || '',
+                    codice_cup: cantiereData.codice_cup || '',
+                    codice_cig: cantiereData.codice_cig || '',
+                    importo_lavori: cantiereData.importo_lavori || ''
                 };
                 
             } catch (error) {

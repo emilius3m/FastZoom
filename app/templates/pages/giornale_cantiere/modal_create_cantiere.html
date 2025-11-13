@@ -13,7 +13,7 @@
             </div>
 
             <!-- Form -->
-            <form hx-post="/sites/{{ site.id }}/cantieri" 
+            <form hx-post="/api/v1/cantieri/sites/{{ site.id }}/cantieri"
                   hx-target="#cantieri-list"
                   hx-swap="outerHTML"
                   onsubmit="closeModal()">
@@ -98,6 +98,93 @@
                                    name="responsabile_cantiere"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                    placeholder="Nome del responsabile">
+                        </div>
+                    </div>
+
+                    <!-- Dati Contrattuali -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-sm font-medium text-gray-700 mb-3">Dati Contrattuali</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Committente <span class="text-gray-400">(opzionale)</span>
+                                </label>
+                                <input type="text"
+                                       name="committente"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                       placeholder="Es: Comune di Roma, Ministero dei Beni Culturali">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Impresa Esecutrice <span class="text-gray-400">(opzionale)</span>
+                                </label>
+                                <input type="text"
+                                       name="impresa_esecutrice"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                       placeholder="Es: S.p.A. Archeologia e Restauri, Cooperativa Scavi">
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Direttore Lavori <span class="text-gray-400">(opzionale)</span>
+                                    </label>
+                                    <input type="text"
+                                           name="direttore_lavori"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                           placeholder="Es: Dott. Mario Rossi">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Responsabile Procedimento <span class="text-gray-400">(opzionale)</span>
+                                    </label>
+                                    <input type="text"
+                                           name="responsabile_procedimento"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                           placeholder="Es: Arch. Laura Bianchi">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Oggetto Appalto <span class="text-gray-400">(opzionale)</span>
+                                </label>
+                                <textarea name="oggetto_appalto"
+                                          rows="3"
+                                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                          placeholder="Descrizione dettagliata dell'oggetto dell'appalto e delle prestazioni richieste"></textarea>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Codice CUP <span class="text-gray-400">(opzionale)</span>
+                                    </label>
+                                    <input type="text"
+                                           name="codice_cup"
+                                           maxlength="50"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                           placeholder="Es: H71J19000000006">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Codice CIG <span class="text-gray-400">(opzionale)</span>
+                                    </label>
+                                    <input type="text"
+                                           name="codice_cig"
+                                           maxlength="50"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                           placeholder="Es: 1234567890">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        Importo Lavori (€) <span class="text-gray-400">(opzionale)</span>
+                                    </label>
+                                    <input type="number"
+                                           name="importo_lavori"
+                                           step="0.01"
+                                           min="0"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                           placeholder="Es: 50000.00">
+                                </div>
+                            </div>
                         </div>
                     </div>
 

@@ -134,7 +134,15 @@ async def v1_get_cantieri_sito_direct(
                 or_(
                     Cantiere.nome.ilike(search_pattern),
                     Cantiere.codice.ilike(search_pattern),
-                    Cantiere.descrizione.ilike(search_pattern)
+                    Cantiere.descrizione.ilike(search_pattern),
+                    # Campi aggiuntivi per ricerca
+                    Cantiere.committente.ilike(search_pattern),
+                    Cantiere.impresa_esecutrice.ilike(search_pattern),
+                    Cantiere.direttore_lavori.ilike(search_pattern),
+                    Cantiere.responsabile_procedimento.ilike(search_pattern),
+                    Cantiere.oggetto_appalto.ilike(search_pattern),
+                    Cantiere.codice_cup.ilike(search_pattern),
+                    Cantiere.codice_cig.ilike(search_pattern)
                 )
             )
         if stato:
@@ -221,7 +229,15 @@ async def v1_get_cantieri_sito(
                 or_(
                     Cantiere.nome.ilike(search_pattern),
                     Cantiere.codice.ilike(search_pattern),
-                    Cantiere.descrizione.ilike(search_pattern)
+                    Cantiere.descrizione.ilike(search_pattern),
+                    # Campi aggiuntivi per ricerca
+                    Cantiere.committente.ilike(search_pattern),
+                    Cantiere.impresa_esecutrice.ilike(search_pattern),
+                    Cantiere.direttore_lavori.ilike(search_pattern),
+                    Cantiere.responsabile_procedimento.ilike(search_pattern),
+                    Cantiere.oggetto_appalto.ilike(search_pattern),
+                    Cantiere.codice_cup.ilike(search_pattern),
+                    Cantiere.codice_cig.ilike(search_pattern)
                 )
             )
         if stato:
@@ -265,20 +281,38 @@ async def v1_get_cantieri_sito(
                 "nome": cantiere.nome,
                 "codice": cantiere.codice,
                 "descrizione": cantiere.descrizione,
+                # Campi per il giornale dei lavori
+                "committente": cantiere.committente,
+                "impresa_esecutrice": cantiere.impresa_esecutrice,
+                "direttore_lavori": cantiere.direttore_lavori,
+                "responsabile_procedimento": cantiere.responsabile_procedimento,
+                "oggetto_appalto": cantiere.oggetto_appalto,
+                # Campi opzionali
+                "codice_cup": cantiere.codice_cup,
+                "codice_cig": cantiere.codice_cig,
+                "importo_lavori": float(cantiere.importo_lavori) if cantiere.importo_lavori else None,
+                # Campi temporali
                 "stato": cantiere.stato,
                 "stato_formattato": cantiere.stato_formattato,
-                "priorita": cantiere.priorita,
                 "data_inizio_prevista": cantiere.data_inizio_prevista.isoformat() if cantiere.data_inizio_prevista else None,
                 "data_fine_prevista": cantiere.data_fine_prevista.isoformat() if cantiere.data_fine_prevista else None,
                 "data_inizio_effettiva": cantiere.data_inizio_effettiva.isoformat() if cantiere.data_inizio_effettiva else None,
                 "data_fine_effettiva": cantiere.data_fine_effettiva.isoformat() if cantiere.data_fine_effettiva else None,
+                # Campi geografici
                 "area_descrizione": cantiere.area_descrizione,
+                "coordinate_lat": cantiere.coordinate_lat,
+                "coordinate_lon": cantiere.coordinate_lon,
+                "quota": cantiere.quota,
+                # Metadati
                 "responsabile_cantiere": cantiere.responsabile_cantiere,
                 "tipologia_intervento": cantiere.tipologia_intervento,
+                "priorita": cantiere.priorita,
                 "e_in_corso": cantiere.e_in_corso,
                 "durata_giorni": cantiere.durata_giorni,
+                # Statistiche
                 "giornali_count": giornali_count,
                 "operatori_count": operatori_count,
+                # Timestamp
                 "created_at": cantiere.created_at.isoformat() if cantiere.created_at else None,
                 "updated_at": cantiere.updated_at.isoformat() if cantiere.updated_at else None
             })
@@ -319,13 +353,26 @@ async def v1_create_cantiere(
             nome=cantiere_data.get("nome"),
             codice=cantiere_data.get("codice"),
             descrizione=cantiere_data.get("descrizione"),
+            # Campi per il giornale dei lavori
+            committente=cantiere_data.get("committente"),
+            impresa_esecutrice=cantiere_data.get("impresa_esecutrice"),
+            direttore_lavori=cantiere_data.get("direttore_lavori"),
+            responsabile_procedimento=cantiere_data.get("responsabile_procedimento"),
+            oggetto_appalto=cantiere_data.get("oggetto_appalto"),
+            # Campi opzionali
+            codice_cup=cantiere_data.get("codice_cup"),
+            codice_cig=cantiere_data.get("codice_cig"),
+            importo_lavori=cantiere_data.get("importo_lavori"),
+            # Campi temporali
             data_inizio_prevista=date.fromisoformat(cantiere_data.get("data_inizio_prevista")) if cantiere_data.get("data_inizio_prevista") else None,
             data_fine_prevista=date.fromisoformat(cantiere_data.get("data_fine_prevista")) if cantiere_data.get("data_fine_prevista") else None,
             stato=cantiere_data.get("stato", "pianificato"),
+            # Campi geografici
             area_descrizione=cantiere_data.get("area_descrizione"),
             coordinate_lat=cantiere_data.get("coordinate_lat"),
             coordinate_lon=cantiere_data.get("coordinate_lon"),
             quota=cantiere_data.get("quota"),
+            # Metadati
             responsabile_cantiere=cantiere_data.get("responsabile_cantiere"),
             tipologia_intervento=cantiere_data.get("tipologia_intervento"),
             priorita=cantiere_data.get("priorita", 3)
@@ -436,19 +483,43 @@ async def v1_update_cantiere(
         # Verifica accesso al sito
         verify_site_access(cantiere.site_id, user_sites)
         
-        # Aggiorna campi
+        # Aggiorna campi base
         if "nome" in cantiere_data:
             cantiere.nome = cantiere_data["nome"]
         if "codice" in cantiere_data:
             cantiere.codice = cantiere_data["codice"]
         if "descrizione" in cantiere_data:
             cantiere.descrizione = cantiere_data["descrizione"]
+        
+        # Aggiorna campi per il giornale dei lavori
+        if "committente" in cantiere_data:
+            cantiere.committente = cantiere_data["committente"]
+        if "impresa_esecutrice" in cantiere_data:
+            cantiere.impresa_esecutrice = cantiere_data["impresa_esecutrice"]
+        if "direttore_lavori" in cantiere_data:
+            cantiere.direttore_lavori = cantiere_data["direttore_lavori"]
+        if "responsabile_procedimento" in cantiere_data:
+            cantiere.responsabile_procedimento = cantiere_data["responsabile_procedimento"]
+        if "oggetto_appalto" in cantiere_data:
+            cantiere.oggetto_appalto = cantiere_data["oggetto_appalto"]
+        
+        # Aggiorna campi opzionali
+        if "codice_cup" in cantiere_data:
+            cantiere.codice_cup = cantiere_data["codice_cup"]
+        if "codice_cig" in cantiere_data:
+            cantiere.codice_cig = cantiere_data["codice_cig"]
+        if "importo_lavori" in cantiere_data:
+            cantiere.importo_lavori = cantiere_data["importo_lavori"]
+        
+        # Aggiorna campi temporali
         if "data_inizio_prevista" in cantiere_data:
             cantiere.data_inizio_prevista = date.fromisoformat(cantiere_data["data_inizio_prevista"]) if cantiere_data["data_inizio_prevista"] else None
         if "data_fine_prevista" in cantiere_data:
             cantiere.data_fine_prevista = date.fromisoformat(cantiere_data["data_fine_prevista"]) if cantiere_data["data_fine_prevista"] else None
         if "stato" in cantiere_data:
             cantiere.stato = cantiere_data["stato"]
+        
+        # Aggiorna campi geografici
         if "area_descrizione" in cantiere_data:
             cantiere.area_descrizione = cantiere_data["area_descrizione"]
         if "coordinate_lat" in cantiere_data:
@@ -457,6 +528,8 @@ async def v1_update_cantiere(
             cantiere.coordinate_lon = cantiere_data["coordinate_lon"]
         if "quota" in cantiere_data:
             cantiere.quota = cantiere_data["quota"]
+        
+        # Aggiorna metadati
         if "responsabile_cantiere" in cantiere_data:
             cantiere.responsabile_cantiere = cantiere_data["responsabile_cantiere"]
         if "tipologia_intervento" in cantiere_data:

@@ -268,7 +268,17 @@ async def v1_get_site_giornali(
                     cantiere_info = {
                         "id": str(cantiere.id),
                         "nome": cantiere.nome,
-                        "codice": cantiere.codice
+                        "codice": cantiere.codice,
+                        # Campi per il giornale dei lavori
+                        "committente": cantiere.committente,
+                        "impresa_esecutrice": cantiere.impresa_esecutrice,
+                        "direttore_lavori": cantiere.direttore_lavori,
+                        "responsabile_procedimento": cantiere.responsabile_procedimento,
+                        "oggetto_appalto": cantiere.oggetto_appalto,
+                        # Campi opzionali
+                        "codice_cup": cantiere.codice_cup,
+                        "codice_cig": cantiere.codice_cig,
+                        "importo_lavori": float(cantiere.importo_lavori) if cantiere.importo_lavori else None
                     }
             
             giornale_dict = {
@@ -421,7 +431,17 @@ async def v1_get_cantiere_giornali(
                     cantiere_info = {
                         "id": str(cantiere.id),
                         "nome": cantiere.nome,
-                        "codice": cantiere.codice
+                        "codice": cantiere.codice,
+                        # Campi per il giornale dei lavori
+                        "committente": cantiere.committente,
+                        "impresa_esecutrice": cantiere.impresa_esecutrice,
+                        "direttore_lavori": cantiere.direttore_lavori,
+                        "responsabile_procedimento": cantiere.responsabile_procedimento,
+                        "oggetto_appalto": cantiere.oggetto_appalto,
+                        # Campi opzionali
+                        "codice_cup": cantiere.codice_cup,
+                        "codice_cig": cantiere.codice_cig,
+                        "importo_lavori": float(cantiere.importo_lavori) if cantiere.importo_lavori else None
                     }
              
             giornale_dict = {

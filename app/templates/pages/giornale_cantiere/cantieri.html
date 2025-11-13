@@ -222,6 +222,8 @@
                         <th scope="col" class="px-6 py-3">Codice</th>
                         <th scope="col" class="px-6 py-3">Stato</th>
                         <th scope="col" class="px-6 py-3">Responsabile</th>
+                        <th scope="col" class="px-6 py-3">Impresa</th>
+                        <th scope="col" class="px-6 py-3">Importo</th>
                         <th scope="col" class="px-6 py-3">Data Inizio</th>
                         <th scope="col" class="px-6 py-3">Azioni</th>
                     </tr>
@@ -249,6 +251,24 @@
                             </span>
                         </td>
                         <td class="px-6 py-4">{{ cantiere_data.responsabile_cantiere or '-' }}</td>
+                        <td class="px-6 py-4">
+                            {% if cantiere_data.impresa_esecutrice %}
+                                <span class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded">
+                                    {{ cantiere_data.impresa_esecutrice[:15] }}{% if cantiere_data.impresa_esecutrice|length > 15 %}...{% endif %}
+                                </span>
+                            {% else %}
+                                <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if cantiere_data.importo_lavori %}
+                                <span class="text-sm font-semibold text-green-700 dark:text-green-300">
+                                    €{{ "{:,.0f}".format(cantiere_data.importo_lavori) }}
+                                </span>
+                            {% else %}
+                                <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
                         <td class="px-6 py-4">
                             {% if cantiere_data.data_inizio_prevista %}
                                 {{ cantiere_data.data_inizio_prevista[:10] }}
@@ -609,7 +629,16 @@
                             descrizione: '',
                             area_descrizione: '',
                             tipologia_intervento: '',
-                            priorita: 3
+                            priorita: 3,
+                            // New fields
+                            committente: '',
+                            impresa_esecutrice: '',
+                            direttore_lavori: '',
+                            responsabile_procedimento: '',
+                            oggetto_appalto: '',
+                            codice_cup: '',
+                            codice_cig: '',
+                            importo_lavori: ''
                         }
                     };
                 },

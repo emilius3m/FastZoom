@@ -78,7 +78,15 @@ async def v1_cantieri_sito_view(
                 or_(
                     Cantiere.nome.ilike(search_pattern),
                     Cantiere.codice.ilike(search_pattern),
-                    Cantiere.descrizione.ilike(search_pattern)
+                    Cantiere.descrizione.ilike(search_pattern),
+                    # Campi aggiuntivi per ricerca
+                    Cantiere.committente.ilike(search_pattern),
+                    Cantiere.impresa_esecutrice.ilike(search_pattern),
+                    Cantiere.direttore_lavori.ilike(search_pattern),
+                    Cantiere.responsabile_procedimento.ilike(search_pattern),
+                    Cantiere.oggetto_appalto.ilike(search_pattern),
+                    Cantiere.codice_cup.ilike(search_pattern),
+                    Cantiere.codice_cig.ilike(search_pattern)
                 )
             )
         if stato:
@@ -143,21 +151,37 @@ async def v1_cantieri_sito_view(
                 "nome": cantiere.nome,
                 "codice": cantiere.codice,
                 "descrizione": cantiere.descrizione,
+                # Campi per il giornale dei lavori
+                "committente": cantiere.committente,
+                "impresa_esecutrice": cantiere.impresa_esecutrice,
+                "direttore_lavori": cantiere.direttore_lavori,
+                "responsabile_procedimento": cantiere.responsabile_procedimento,
+                "oggetto_appalto": cantiere.oggetto_appalto,
+                # Campi opzionali
+                "codice_cup": cantiere.codice_cup,
+                "codice_cig": cantiere.codice_cig,
+                "importo_lavori": float(cantiere.importo_lavori) if cantiere.importo_lavori else None,
+                # Campi temporali
                 "stato": cantiere.stato,
                 "stato_formattato": cantiere.stato_formattato,
-                "priorita": cantiere.priorita,
                 "data_inizio_prevista": cantiere.data_inizio_prevista.isoformat() if hasattr(cantiere.data_inizio_prevista, 'isoformat') else None,
                 "data_fine_prevista": cantiere.data_fine_prevista.isoformat() if hasattr(cantiere.data_fine_prevista, 'isoformat') else None,
                 "data_inizio_effettiva": cantiere.data_inizio_effettiva.isoformat() if hasattr(cantiere.data_inizio_effettiva, 'isoformat') else None,
                 "data_fine_effettiva": cantiere.data_fine_effettiva.isoformat() if hasattr(cantiere.data_fine_effettiva, 'isoformat') else None,
+                # Campi geografici
                 "area_descrizione": cantiere.area_descrizione,
+                "coordinate_lat": cantiere.coordinate_lat,
+                "coordinate_lon": cantiere.coordinate_lon,
+                "quota": cantiere.quota,
+                # Metadati
                 "responsabile_cantiere": cantiere.responsabile_cantiere,
                 "tipologia_intervento": cantiere.tipologia_intervento,
+                "priorita": cantiere.priorita,
                 "e_in_corso": cantiere.e_in_corso,
                 "durata_giorni": cantiere.durata_giorni,
+                # Timestamp
                 "created_at": cantiere.created_at.isoformat() if hasattr(cantiere.created_at, 'isoformat') else None,
-                "updated_at": cantiere.updated_at.isoformat() if hasattr(cantiere.updated_at, 'isoformat') else None,
-                "quota": cantiere.quota
+                "updated_at": cantiere.updated_at.isoformat() if hasattr(cantiere.updated_at, 'isoformat') else None
             })
 
         return templates.TemplateResponse(
@@ -264,19 +288,35 @@ async def v1_cantiere_detail_view(
             "nome": cantiere.nome,
             "codice": cantiere.codice,
             "descrizione": cantiere.descrizione,
+            # Campi per il giornale dei lavori
+            "committente": cantiere.committente,
+            "impresa_esecutrice": cantiere.impresa_esecutrice,
+            "direttore_lavori": cantiere.direttore_lavori,
+            "responsabile_procedimento": cantiere.responsabile_procedimento,
+            "oggetto_appalto": cantiere.oggetto_appalto,
+            # Campi opzionali
+            "codice_cup": cantiere.codice_cup,
+            "codice_cig": cantiere.codice_cig,
+            "importo_lavori": float(cantiere.importo_lavori) if cantiere.importo_lavori else None,
+            # Campi temporali
             "stato": cantiere.stato,
             "stato_formattato": cantiere.stato_formattato,
-            "priorita": cantiere.priorita,
             "data_inizio_prevista": cantiere.data_inizio_prevista.isoformat() if hasattr(cantiere.data_inizio_prevista, 'isoformat') else None,
             "data_fine_prevista": cantiere.data_fine_prevista.isoformat() if hasattr(cantiere.data_fine_prevista, 'isoformat') else None,
             "data_inizio_effettiva": cantiere.data_inizio_effettiva.isoformat() if hasattr(cantiere.data_inizio_effettiva, 'isoformat') else None,
             "data_fine_effettiva": cantiere.data_fine_effettiva.isoformat() if hasattr(cantiere.data_fine_effettiva, 'isoformat') else None,
+            # Campi geografici
             "area_descrizione": cantiere.area_descrizione,
+            "coordinate_lat": cantiere.coordinate_lat,
+            "coordinate_lon": cantiere.coordinate_lon,
+            "quota": cantiere.quota,
+            # Metadati
             "responsabile_cantiere": cantiere.responsabile_cantiere,
             "tipologia_intervento": cantiere.tipologia_intervento,
+            "priorita": cantiere.priorita,
             "e_in_corso": cantiere.e_in_corso,
             "durata_giorni": cantiere.durata_giorni,
-            "quota": cantiere.quota,
+            # Timestamp
             "created_at": cantiere.created_at.isoformat() if hasattr(cantiere.created_at, 'isoformat') else None,
             "updated_at": cantiere.updated_at.isoformat() if hasattr(cantiere.updated_at, 'isoformat') else None,
         }

@@ -8,7 +8,7 @@ from datetime import datetime, date
 from typing import List, Optional
 from uuid import uuid4
 
-from sqlalchemy import Column, String, Text, DateTime, Date, Boolean, ForeignKey, Integer
+from sqlalchemy import Column, String, Text, DateTime, Date, Boolean, ForeignKey, Integer, Numeric
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -39,6 +39,32 @@ class Cantiere(Base):
     nome = Column(String(200), nullable=False, index=True)
     codice = Column(String(50), nullable=True, index=True)  # Codice identificativo cantiere
     descrizione = Column(Text, nullable=True)
+    
+    # Campi per il giornale dei lavori
+    # Ente o soggetto committente (es: 'PARCO ARCHEOLOGICO DI SEPINO')
+    committente = Column(String(200), nullable=True)
+    
+    # Impresa che esegue i lavori (es: 'De Maioribus srl')
+    impresa_esecutrice = Column(String(200), nullable=True)
+    
+    # Nome e qualifica del Direttore dei Lavori
+    direttore_lavori = Column(String(200), nullable=True)
+    
+    # Responsabile Unico del Procedimento (RUP)
+    responsabile_procedimento = Column(String(200), nullable=True)
+    
+    # Descrizione completa dell'oggetto dell'appalto
+    oggetto_appalto = Column(Text, nullable=True)
+    
+    # Campi opzionali
+    # Codice Unico di Progetto
+    codice_cup = Column(String(50), nullable=True)
+    
+    # Codice Identificativo Gara
+    codice_cig = Column(String(50), nullable=True)
+    
+    # Importo complessivo dei lavori
+    importo_lavori = Column(Numeric(15, 2), nullable=True)
     
     # Informazioni temporali
     data_inizio_prevista = Column(Date, nullable=True)
@@ -119,22 +145,37 @@ class Cantiere(Base):
             "nome": self.nome,
             "codice": self.codice,
             "descrizione": self.descrizione,
+            # Campi per il giornale dei lavori
+            "committente": self.committente,
+            "impresa_esecutrice": self.impresa_esecutrice,
+            "direttore_lavori": self.direttore_lavori,
+            "responsabile_procedimento": self.responsabile_procedimento,
+            "oggetto_appalto": self.oggetto_appalto,
+            # Campi opzionali
+            "codice_cup": self.codice_cup,
+            "codice_cig": self.codice_cig,
+            "importo_lavori": float(self.importo_lavori) if self.importo_lavori else None,
+            # Campi temporali
             "data_inizio_prevista": self.data_inizio_prevista.isoformat() if self.data_inizio_prevista else None,
             "data_fine_prevista": self.data_fine_prevista.isoformat() if self.data_fine_prevista else None,
             "data_inizio_effettiva": self.data_inizio_effettiva.isoformat() if self.data_inizio_effettiva else None,
             "data_fine_effettiva": self.data_fine_effettiva.isoformat() if self.data_fine_effettiva else None,
             "stato": self.stato,
             "stato_formattato": self.stato_formattato,
+            # Campi geografici
             "area_descrizione": self.area_descrizione,
             "coordinate_lat": self.coordinate_lat,
             "coordinate_lon": self.coordinate_lon,
             "quota": self.quota,
+            # Metadati
             "responsabile_cantiere": self.responsabile_cantiere,
             "tipologia_intervento": self.tipologia_intervento,
             "priorita": self.priorita,
+            # Proprietà calcolate
             "nome_completo": self.nome_completo,
             "durata_giorni": self.durata_giorni,
             "e_in_corso": self.e_in_corso,
+            # Timestamp
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "is_active": self.is_active
