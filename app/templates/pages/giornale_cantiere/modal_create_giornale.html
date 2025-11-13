@@ -1,22 +1,39 @@
 <!-- app/templates/pages/giornale_cantiere/modal_create_giornale.html -->
 <!-- Modal Creazione/Modifica Giornale di Cantiere e Modifica Cantiere -->
 <div x-show="showCreateModal" x-cloak
-     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
-     @click.self="closeModal()">
+     class="fixed inset-0 bg-black bg-opacity-75 z-50 overflow-hidden"
+     @click.self="closeModal()"
+     x-init="$watch('showCreateModal', (value) => {
+         if (value) {
+             document.body.classList.add('overflow-hidden');
+             // Also prevent scroll on mobile
+             document.body.style.position = 'fixed';
+             document.body.style.width = '100%';
+             document.body.style.top = `-${window.scrollY}px`;
+         } else {
+             document.body.classList.remove('overflow-hidden');
+             // Restore scroll position
+             const scrollY = document.body.style.top;
+             document.body.style.position = '';
+             document.body.style.width = '';
+             document.body.style.top = '';
+             window.scrollTo(0, parseInt(scrollY || '0') * -1);
+         }
+     })">
     
-    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-5xl w-full mx-4 my-8 max-h-95vh overflow-hidden">
+    <div class="bg-white dark:bg-gray-800 h-screen w-screen flex flex-col overflow-hidden">
         
-        <!-- Header Modal -->
-        <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center z-10">
+        <!-- Header Full-Screen -->
+        <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center z-10 flex-shrink-0">
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="getModalTitle()"></h3>
             <button @click="closeModal()" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
                 <i class="fas fa-times text-xl"></i>
             </button>
         </div>
         
-        <!-- Form Content -->
-        <div class="max-h-80vh overflow-y-auto">
-            <form @submit.prevent="validateAndSave()" class="p-6">
+        <!-- Form Content - Full Screen Scrollable -->
+        <div class="flex-1 overflow-y-auto modal-content-scroll">
+            <form @submit.prevent="validateAndSave()" class="p-6 pb-20">
                 
                 <!-- Alert Errori -->
                 <div x-show="errorMessage" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 mb-6">
@@ -575,8 +592,8 @@
                     </div>
                 </div>
                 
-                <!-- Actions -->
-                <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <!-- Actions - Fixed Bottom -->
+                <div class="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-end space-x-3 z-20">
                     <button type="button"
                             @click="closeModal()"
                             :disabled="saving"
@@ -598,11 +615,25 @@
 </div>
 
 <style>
-/* Stili per il modal */
+/* Stili per il full-screen modal */
 [x-cloak] { display: none !important; }
 
-.max-h-95vh { max-height: 95vh; }
-.max-h-80vh { max-height: 80vh; }
+/* Full viewport height */
+.h-screen { height: 100vh; }
+.w-screen { width: 100vw; }
+
+/* Body scroll locking styles */
+body.overflow-hidden {
+    overflow: hidden !important;
+    touch-action: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Ensure modal content scrolls properly */
+.modal-content-scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
 
 /* Styling per checkbox custom */
 input[type="checkbox"]:checked {
@@ -645,12 +676,8 @@ input[type="checkbox"]:checked {
     --tw-ring-color: rgba(234, 88, 12, 0.5);
 }
 
-/* Miglioramenti responsive */
+/* Miglioramenti responsive per full-screen */
 @media (max-width: 640px) {
-    .max-w-5xl {
-        max-width: calc(100vw - 2rem);
-    }
-    
     .grid-cols-1.md\:grid-cols-3 {
         grid-template-columns: repeat(1, minmax(0, 1fr));
     }
@@ -658,5 +685,47 @@ input[type="checkbox"]:checked {
     .grid-cols-1.md\:grid-cols-2 {
         grid-template-columns: repeat(1, minmax(0, 1fr));
     }
+    
+    /* Padding ridotto per schermi piccoli */
+    .p-6 {
+        padding: 1rem;
+    }
+    
+    /* Bottom padding extra per fixed actions */
+    .pb-20 {
+        padding-bottom: 5rem;
+    }
+}
+
+/* Stile per close button migliorato */
+.close-fullscreen {
+    position: relative;
+    z-index: 30;
+}
+
+/* Miglioramento scrollbar per full-screen */
+.overflow-y-auto {
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+.dark .overflow-y-auto {
+    scrollbar-color: #6b7280 #374151;
+}
+
+/* Animazione di entrata per full-screen modal */
+@keyframes slideIn {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.h-screen {
+    animation: slideIn 0.3s ease-out;
 }
 </style>
