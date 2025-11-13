@@ -10,6 +10,7 @@ from uuid import UUID
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from datetime import datetime
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
@@ -1540,4 +1541,642 @@ async def v1_get_all_operatori(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nel recupero degli operatori",
+        )
+
+# ===== PDF EXPORT ENDPOINTS =====
+
+@router.get("/sites/{site_id}/cantieri/{cantiere_id}/export-pdf", summary="Esporta Giornali in PDF", tags=["Giornale di Cantiere - Export"])
+async def export_giornali_pdf(
+    site_id: UUID,
+    cantiere_id: UUID,
+    data_da: Optional[date] = Query(None, description="Data inizio filtro giornali"),
+    data_a: Optional[date] = Query(None, description="Data fine filtro giornali"),
+    include_allegati: bool = Query(False, description="Includi riferimenti allegati"),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Esporta tutti i giornali di un cantiere in formato PDF conforme allo standard italiano.
+    
+    Il PDF generato segue il formato del giornale dei lavori standard con:
+    - Intestazione con OGGETTO, COMMITTENTE, IMPRESA
+    - Pagine multiple con paginazione
+    - Voci giornaliere con data, meteo, temperatura
+    - Descrizione lavori e eventi speciali
+    - Elenco operatori con ore lavorate
+    - Mezzi e attrezzature utilizzate
+    - Sezioni firme
+    
+    Args:
+        site_id: ID del sito archeologico
+        cantiere_id: ID del cantiere specifico
+        data_da: Filtra giornali da questa data (opzionale)
+        data_a: Filtra giornali fino a questa data (opzionale)
+        include_allegati: Include riferimenti agli allegati (default: False)
+        
+    Returns:
+        Response: PDF file download
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Carica tutti i giornali del cantiere con filtri opzionali
+        query = select(GiornaleCantiere).where(
+            and_(
+                GiornaleCantiere.site_id == str(site_id),
+                GiornaleCantiere.cantiere_id == str(cantiere_id)
+            )
+        )
+        
+        # Applica filtri data se specificati
+        if data_da:
+            query = query.where(GiornaleCantiere.data >= data_da)
+        if data_a:
+            query = query.where(GiornaleCantiere.data <= data_a)
+        
+        # Load relationships
+        query = query.options(
+            selectinload(GiornaleCantiere.site),
+            selectinload(GiornaleCantiere.responsabile),
+            selectinload(GiornaleCantiere.operatori),
+        )
+        
+        # Ordina per data
+        query = query.order_by(GiornaleCantiere.data, GiornaleCantiere.created_at)
+        
+        result = await db.execute(query)
+        giornali = result.scalars().all()
+        
+        if not giornali:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Nessun giornale trovato per il periodo specificato"
+            )
+        
+        # Carica informazioni del cantiere
+        from app.models.cantiere import Cantiere
+        cantiere_result = await db.execute(
+            select(Cantiere).where(
+                and_(
+                    Cantiere.id == str(cantiere_id),
+                    Cantiere.site_id == str(site_id)
+                )
+            )
+        )
+        cantiere = cantiere_result.scalar_one_or_none()
+        
+        if not cantiere:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cantiere non trovato"
+            )
+        
+        # Prepara dati per PDF
+        giornali_data = []
+        for g in giornali:
+            # Ottieni dati operatori enhanced
+            operatori_enhanced = await _get_enhanced_operator_data(db, g.id, g.operatori or [])
+            
+            giornale_dict = {
+                "data": g.data.isoformat() if g.data else None,
+                "ora_inizio": g.ora_inizio.strftime("%H:%M") if g.ora_inizio else None,
+                "ora_fine": g.ora_fine.strftime("%H:%M") if g.ora_fine else None,
+                "responsabile_scavo": g.responsabile_nome or (g.responsabile.email if g.responsabile else None),
+                "compilatore": g.compilatore or g.responsabile_nome,
+                "condizioni_meteo": g.condizioni_meteo,
+                "temperatura": g.temperatura,
+                "temperatura_min": g.temperatura_min,
+                "temperatura_max": g.temperatura_max,
+                "note_meteo": g.note_meteo,
+                "descrizione_lavori": g.descrizione_lavori,
+                "modalita_lavorazioni": g.modalita_lavorazioni,
+                "attrezzatura_utilizzata": g.attrezzatura_utilizzata,
+                "mezzi_utilizzati": g.mezzi_utilizzati,
+                "materiali_rinvenuti": g.materiali_rinvenuti,
+                "documentazione_prodotta": g.documentazione_prodotta,
+                "sopralluoghi": g.sopralluoghi,
+                "disposizioni_rup": g.disposizioni_rup,
+                "disposizioni_direttore": g.disposizioni_direttore,
+                "contestazioni": g.contestazioni,
+                "sospensioni": g.sospensioni,
+                "incidenti": g.incidenti,
+                "forniture": g.forniture,
+                "note_generali": g.note_generali,
+                "problematiche": g.problematiche,
+                "operatori_presenti": operatori_enhanced,
+                "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
+                "usm_elaborate": g.get_usm_list() if hasattr(g, "get_usm_list") else [],
+                "usr_elaborate": g.usr_elaborate.split(",") if g.usr_elaborate else [],
+                "validato": g.validato,
+                "data_validazione": g.data_validazione.isoformat() if g.data_validazione else None,
+                "created_at": g.created_at.isoformat() if g.created_at else None,
+                "updated_at": g.updated_at.isoformat() if g.updated_at else None,
+            }
+            
+            # Includi allegati se richiesto
+            if include_allegati and g.allegati_paths:
+                try:
+                    import json
+                    allegati = json.loads(g.allegati_paths)
+                    giornale_dict["allegati_paths"] = allegati
+                except:
+                    giornale_dict["allegati_paths"] = []
+            
+            giornali_data.append(giornale_dict)
+        
+        # Prepara informazioni cantiere
+        cantiere_info = {
+            "nome": cantiere.nome,
+            "codice": cantiere.codice,
+            "descrizione": cantiere.descrizione or "",
+            "oggetto_appalto": cantiere.oggetto_appalto or "",
+            "committente": cantiere.committente or "",
+            "impresa_esecutrice": cantiere.impresa_esecutrice or "",
+            "direttore_lavori": cantiere.direttore_lavori or "",
+            "responsabile_procedimento": cantiere.responsabile_procedimento or "",
+        }
+        
+        # Importa servizio PDF
+        from app.services.giornale_pdf_service import generate_giornale_pdf_quick
+        
+        # Genera PDF
+        logger.info(f"Generating PDF for cantiere {cantiere.nome} with {len(giornali_data)} giornali")
+        pdf_content = generate_giornale_pdf_quick(giornali_data, cantiere_info, site_info)
+        
+        # Prepara nome file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Giornale_{cantiere.nome.replace(' ', '_')}_{timestamp}.pdf"
+        
+        logger.info(f"PDF generated successfully: {len(pdf_content)} bytes")
+        
+        # Return PDF response
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(pdf_content))
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating giornale PDF: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nella generazione del PDF: {str(e)}"
+        )
+
+@router.get("/sites/{site_id}/giornali/{giornale_id}/export-pdf", summary="Esporta Singolo Giornale in PDF", tags=["Giornale di Cantiere - Export"])
+async def export_single_giornale_pdf(
+    site_id: UUID,
+    giornale_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Esporta un singolo giornale in formato PDF.
+    
+    Args:
+        site_id: ID del sito archeologico
+        giornale_id: ID del giornale specifico
+        
+    Returns:
+        Response: PDF file download
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Carica giornale specifico
+        result = await db.execute(
+            select(GiornaleCantiere).where(
+                and_(
+                    GiornaleCantiere.id == str(giornale_id),
+                    GiornaleCantiere.site_id == str(site_id)
+                )
+            ).options(
+                selectinload(GiornaleCantiere.site),
+                selectinload(GiornaleCantiere.responsabile),
+                selectinload(GiornaleCantiere.operatori),
+                selectinload(GiornaleCantiere.cantiere)
+            )
+        )
+        giornale = result.scalar_one_or_none()
+        
+        if not giornale:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Giornale non trovato"
+            )
+        
+        # Carica informazioni cantiere
+        cantiere = giornale.cantiere
+        
+        # Prepara dati per PDF
+        operatori_enhanced = await _get_enhanced_operator_data(db, giornale.id, giornale.operatori or [])
+        
+        giornale_dict = {
+            "data": giornale.data.isoformat() if giornale.data else None,
+            "ora_inizio": giornale.ora_inizio.strftime("%H:%M") if giornale.ora_inizio else None,
+            "ora_fine": giornale.ora_fine.strftime("%H:%M") if giornale.ora_fine else None,
+            "responsabile_scavo": giornale.responsabile_nome or (giornale.responsabile.email if giornale.responsabile else None),
+            "compilatore": giornale.compilatore or giornale.responsabile_nome,
+            "condizioni_meteo": giornale.condizioni_meteo,
+            "temperatura": giornale.temperatura,
+            "temperatura_min": giornale.temperatura_min,
+            "temperatura_max": giornale.temperatura_max,
+            "note_meteo": giornale.note_meteo,
+            "descrizione_lavori": giornale.descrizione_lavori,
+            "modalita_lavorazioni": giornale.modalita_lavorazioni,
+            "attrezzatura_utilizzata": giornale.attrezzatura_utilizzata,
+            "mezzi_utilizzati": giornale.mezzi_utilizzati,
+            "materiali_rinvenuti": giornale.materiali_rinvenuti,
+            "documentazione_prodotta": giornale.documentazione_prodotta,
+            "sopralluoghi": giornale.sopralluoghi,
+            "disposizioni_rup": giornale.disposizioni_rup,
+            "disposizioni_direttore": giornale.disposizioni_direttore,
+            "contestazioni": giornale.contestazioni,
+            "sospensioni": giornale.sospensioni,
+            "incidenti": giornale.incidenti,
+            "forniture": giornale.forniture,
+            "note_generali": giornale.note_generali,
+            "problematiche": giornale.problematiche,
+            "operatori_presenti": operatori_enhanced,
+            "us_elaborate": giornale.get_us_list() if hasattr(giornale, "get_us_list") else [],
+            "usm_elaborate": giornale.get_usm_list() if hasattr(giornale, "get_usm_list") else [],
+            "usr_elaborate": giornale.usr_elaborate.split(",") if giornale.usr_elaborate else [],
+            "validato": giornale.validato,
+            "data_validazione": giornale.data_validazione.isoformat() if giornale.data_validazione else None,
+            "created_at": giornale.created_at.isoformat() if giornale.created_at else None,
+            "updated_at": giornale.updated_at.isoformat() if giornale.updated_at else None,
+        }
+        
+        # Prepara informazioni cantiere
+        cantiere_info = {
+            "nome": cantiere.nome if cantiere else "Cantiere Sconosciuto",
+            "codice": cantiere.codice if cantiere else "",
+            "descrizione": cantiere.descrizione or "" if cantiere else "",
+            "oggetto_appalto": cantiere.oggetto_appalto or "" if cantiere else "",
+            "committente": cantiere.committente or "" if cantiere else "",
+            "impresa_esecutrice": cantiere.impresa_esecutrice or "" if cantiere else "",
+            "direttore_lavori": cantiere.direttore_lavori or "" if cantiere else "",
+            "responsabile_procedimento": cantiere.responsabile_procedimento or "" if cantiere else "",
+        }
+        
+        # Importa servizio PDF
+        from app.services.giornale_pdf_service import generate_giornale_pdf_quick
+        
+        # Genera PDF
+        logger.info(f"Generating PDF for single giornale {giornale_id}")
+        pdf_content = generate_giornale_pdf_quick([giornale_dict], cantiere_info, site_info)
+        
+        # Prepara nome file
+        data_giornale = giornale.data.strftime("%d_%m_%Y") if giornale.data else "sdata"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Giornale_{cantiere_info['nome'].replace(' ', '_')}_{data_giornale}_{timestamp}.pdf"
+        
+        logger.info(f"Single giornale PDF generated successfully: {len(pdf_content)} bytes")
+        
+        # Return PDF response
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(pdf_content))
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating single giornale PDF: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nella generazione del PDF: {str(e)}"
+        )
+
+# ===== WORD EXPORT ENDPOINTS =====
+
+@router.get("/sites/{site_id}/cantieri/{cantiere_id}/export-word", summary="Esporta Giornali in Word", tags=["Giornale di Cantiere - Export"])
+async def export_giornali_word(
+    site_id: UUID,
+    cantiere_id: UUID,
+    data_da: Optional[date] = Query(None, description="Data inizio filtro giornali"),
+    data_a: Optional[date] = Query(None, description="Data fine filtro giornali"),
+    include_allegati: bool = Query(False, description="Includi riferimenti allegati"),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Esporta tutti i giornali di un cantiere in formato Word (.docx).
+    
+    Il documento Word generato segue lo stesso formato del giornale dei lavori standard
+    con la possibilità di essere modificato e personalizzato dall'utente.
+    
+    Args:
+        site_id: ID del sito archeologico
+        cantiere_id: ID del cantiere specifico
+        data_da: Filtra giornali da questa data (opzionale)
+        data_a: Filtra giornali fino a questa data (opzionale)
+        include_allegati: Include riferimenti agli allegati (default: False)
+        
+    Returns:
+        Response: Word (.docx) file download
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Carica tutti i giornali del cantiere con filtri opzionali
+        query = select(GiornaleCantiere).where(
+            and_(
+                GiornaleCantiere.site_id == str(site_id),
+                GiornaleCantiere.cantiere_id == str(cantiere_id)
+            )
+        )
+        
+        # Applica filtri data se specificati
+        if data_da:
+            query = query.where(GiornaleCantiere.data >= data_da)
+        if data_a:
+            query = query.where(GiornaleCantiere.data <= data_a)
+        
+        # Load relationships
+        query = query.options(
+            selectinload(GiornaleCantiere.site),
+            selectinload(GiornaleCantiere.responsabile),
+            selectinload(GiornaleCantiere.operatori),
+        )
+        
+        # Ordina per data
+        query = query.order_by(GiornaleCantiere.data, GiornaleCantiere.created_at)
+        
+        result = await db.execute(query)
+        giornali = result.scalars().all()
+        
+        if not giornali:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Nessun giornale trovato per il periodo specificato"
+            )
+        
+        # Carica informazioni del cantiere
+        from app.models.cantiere import Cantiere
+        cantiere_result = await db.execute(
+            select(Cantiere).where(
+                and_(
+                    Cantiere.id == str(cantiere_id),
+                    Cantiere.site_id == str(site_id)
+                )
+            )
+        )
+        cantiere = cantiere_result.scalar_one_or_none()
+        
+        if not cantiere:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cantiere non trovato"
+            )
+        
+        # Prepara dati per Word (stessi dati del PDF)
+        giornali_data = []
+        for g in giornali:
+            # Ottieni dati operatori enhanced
+            operatori_enhanced = await _get_enhanced_operator_data(db, g.id, g.operatori or [])
+            
+            giornale_dict = {
+                "data": g.data.isoformat() if g.data else None,
+                "ora_inizio": g.ora_inizio.strftime("%H:%M") if g.ora_inizio else None,
+                "ora_fine": g.ora_fine.strftime("%H:%M") if g.ora_fine else None,
+                "responsabile_scavo": g.responsabile_nome or (g.responsabile.email if g.responsabile else None),
+                "compilatore": g.compilatore or g.responsabile_nome,
+                "condizioni_meteo": g.condizioni_meteo,
+                "temperatura": g.temperatura,
+                "temperatura_min": g.temperatura_min,
+                "temperatura_max": g.temperatura_max,
+                "note_meteo": g.note_meteo,
+                "descrizione_lavori": g.descrizione_lavori,
+                "modalita_lavorazioni": g.modalita_lavorazioni,
+                "attrezzatura_utilizzata": g.attrezzatura_utilizzata,
+                "mezzi_utilizzati": g.mezzi_utilizzati,
+                "materiali_rinvenuti": g.materiali_rinvenuti,
+                "documentazione_prodotta": g.documentazione_prodotta,
+                "sopralluoghi": g.sopralluoghi,
+                "disposizioni_rup": g.disposizioni_rup,
+                "disposizioni_direttore": g.disposizioni_direttore,
+                "contestazioni": g.contestazioni,
+                "sospensioni": g.sospensioni,
+                "incidenti": g.incidenti,
+                "forniture": g.forniture,
+                "note_generali": g.note_generali,
+                "problematiche": g.problematiche,
+                "operatori_presenti": operatori_enhanced,
+                "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
+                "usm_elaborate": g.get_usm_list() if hasattr(g, "get_usm_list") else [],
+                "usr_elaborate": g.usr_elaborate.split(",") if g.usr_elaborate else [],
+                "validato": g.validato,
+                "data_validazione": g.data_validazione.isoformat() if g.data_validazione else None,
+                "created_at": g.created_at.isoformat() if g.created_at else None,
+                "updated_at": g.updated_at.isoformat() if g.updated_at else None,
+            }
+            
+            # Includi allegati se richiesto
+            if include_allegati and g.allegati_paths:
+                try:
+                    import json
+                    allegati = json.loads(g.allegati_paths)
+                    giornale_dict["allegati_paths"] = allegati
+                except:
+                    giornale_dict["allegati_paths"] = []
+            
+            giornali_data.append(giornale_dict)
+        
+        # Prepara informazioni cantiere
+        cantiere_info = {
+            "nome": cantiere.nome,
+            "codice": cantiere.codice,
+            "descrizione": cantiere.descrizione or "",
+            "oggetto_appalto": cantiere.oggetto_appalto or "",
+            "committente": cantiere.committente or "",
+            "impresa_esecutrice": cantiere.impresa_esecutrice or "",
+            "direttore_lavori": cantiere.direttore_lavori or "",
+            "responsabile_procedimento": cantiere.responsabile_procedimento or "",
+        }
+        
+        # Importa servizio Word
+        from app.services.giornale_word_service import generate_giornale_word_quick
+        
+        # Genera Word
+        logger.info(f"Generating Word document for cantiere {cantiere.nome} with {len(giornali_data)} giornali")
+        word_content = generate_giornale_word_quick(giornali_data, cantiere_info, site_info)
+        
+        # Prepara nome file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Giornale_{cantiere.nome.replace(' ', '_')}_{timestamp}.docx"
+        
+        logger.info(f"Word document generated successfully: {len(word_content)} bytes")
+        
+        # Return Word response
+        return Response(
+            content=word_content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(word_content))
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating giornale Word document: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nella generazione del documento Word: {str(e)}"
+        )
+
+@router.get("/sites/{site_id}/giornali/{giornale_id}/export-word", summary="Esporta Singolo Giornale in Word", tags=["Giornale di Cantiere - Export"])
+async def export_single_giornale_word(
+    site_id: UUID,
+    giornale_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Esporta un singolo giornale in formato Word (.docx).
+    
+    Args:
+        site_id: ID del sito archeologico
+        giornale_id: ID del giornale specifico
+        
+    Returns:
+        Response: Word (.docx) file download
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Carica giornale specifico
+        result = await db.execute(
+            select(GiornaleCantiere).where(
+                and_(
+                    GiornaleCantiere.id == str(giornale_id),
+                    GiornaleCantiere.site_id == str(site_id)
+                )
+            ).options(
+                selectinload(GiornaleCantiere.site),
+                selectinload(GiornaleCantiere.responsabile),
+                selectinload(GiornaleCantiere.operatori),
+                selectinload(GiornaleCantiere.cantiere)
+            )
+        )
+        giornale = result.scalar_one_or_none()
+        
+        if not giornale:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Giornale non trovato"
+            )
+        
+        # Carica informazioni cantiere
+        cantiere = giornale.cantiere
+        
+        # Prepara dati per Word (stessi dati del PDF)
+        operatori_enhanced = await _get_enhanced_operator_data(db, giornale.id, giornale.operatori or [])
+        
+        giornale_dict = {
+            "data": giornale.data.isoformat() if giornale.data else None,
+            "ora_inizio": giornale.ora_inizio.strftime("%H:%M") if giornale.ora_inizio else None,
+            "ora_fine": giornale.ora_fine.strftime("%H:%M") if giornale.ora_fine else None,
+            "responsabile_scavo": giornale.responsabile_nome or (giornale.responsabile.email if giornale.responsabile else None),
+            "compilatore": giornale.compilatore or giornale.responsabile_nome,
+            "condizioni_meteo": giornale.condizioni_meteo,
+            "temperatura": giornale.temperatura,
+            "temperatura_min": giornale.temperatura_min,
+            "temperatura_max": giornale.temperatura_max,
+            "note_meteo": giornale.note_meteo,
+            "descrizione_lavori": giornale.descrizione_lavori,
+            "modalita_lavorazioni": giornale.modalita_lavorazioni,
+            "attrezzatura_utilizzata": giornale.attrezzatura_utilizzata,
+            "mezzi_utilizzati": giornale.mezzi_utilizzati,
+            "materiali_rinvenuti": giornale.materiali_rinvenuti,
+            "documentazione_prodotta": giornale.documentazione_prodotta,
+            "sopralluoghi": giornale.sopralluoghi,
+            "disposizioni_rup": giornale.disposizioni_rup,
+            "disposizioni_direttore": giornale.disposizioni_direttore,
+            "contestazioni": giornale.contestazioni,
+            "sospensioni": giornale.sospensioni,
+            "incidenti": giornale.incidenti,
+            "forniture": giornale.forniture,
+            "note_generali": giornale.note_generali,
+            "problematiche": giornale.problematiche,
+            "operatori_presenti": operatori_enhanced,
+            "us_elaborate": giornale.get_us_list() if hasattr(giornale, "get_us_list") else [],
+            "usm_elaborate": giornale.get_usm_list() if hasattr(giornale, "get_usm_list") else [],
+            "usr_elaborate": giornale.usr_elaborate.split(",") if giornale.usr_elaborate else [],
+            "validato": giornale.validato,
+            "data_validazione": giornale.data_validazione.isoformat() if giornale.data_validazione else None,
+            "created_at": giornale.created_at.isoformat() if giornale.created_at else None,
+            "updated_at": giornale.updated_at.isoformat() if giornale.updated_at else None,
+        }
+        
+        # Prepara informazioni cantiere
+        cantiere_info = {
+            "nome": cantiere.nome if cantiere else "Cantiere Sconosciuto",
+            "codice": cantiere.codice if cantiere else "",
+            "descrizione": cantiere.descrizione or "" if cantiere else "",
+            "oggetto_appalto": cantiere.oggetto_appalto or "" if cantiere else "",
+            "committente": cantiere.committente or "" if cantiere else "",
+            "impresa_esecutrice": cantiere.impresa_esecutrice or "" if cantiere else "",
+            "direttore_lavori": cantiere.direttore_lavori or "" if cantiere else "",
+            "responsabile_procedimento": cantiere.responsabile_procedimento or "" if cantiere else "",
+        }
+        
+        # Importa servizio Word
+        from app.services.giornale_word_service import generate_giornale_word_quick
+        
+        # Genera Word
+        logger.info(f"Generating Word document for single giornale {giornale_id}")
+        word_content = generate_giornale_word_quick([giornale_dict], cantiere_info, site_info)
+        
+        # Prepara nome file
+        data_giornale = giornale.data.strftime("%d_%m_%Y") if giornale.data else "sdata"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Giornale_{cantiere_info['nome'].replace(' ', '_')}_{data_giornale}_{timestamp}.docx"
+        
+        logger.info(f"Single giornale Word document generated successfully: {len(word_content)} bytes")
+        
+        # Return Word response
+        return Response(
+            content=word_content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(word_content))
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating single giornale Word document: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nella generazione del documento Word: {str(e)}"
         )

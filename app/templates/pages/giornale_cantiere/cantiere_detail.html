@@ -89,8 +89,13 @@
                             </a>
                         </li>
                         <li>
-                            <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
-                                <i class="fas fa-download mr-2"></i>Esporta Dati
+                            <a href="#" @click.prevent="exportGiornaliPDF()" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+                                <i class="fas fa-file-pdf mr-2"></i>Esporta PDF
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" @click.prevent="exportGiornaliWord()" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+                                <i class="fas fa-file-word mr-2"></i>Esporta Word
                             </a>
                         </li>
                         <li>
@@ -285,6 +290,12 @@
                                         </button>
                                         <button type="button" class="text-green-600 hover:text-green-800 dark:text-green-400" @click="editGiornale(giornale)">
                                             <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button type="button" class="text-purple-600 hover:text-purple-800 dark:text-purple-400" @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport" :title="loadingExport ? 'Generazione PDF in corso...' : 'Esporta PDF'">
+                                            <i class="fas fa-file-pdf" :class="{ 'fa-spin fa-spinner': loadingExport }"></i>
+                                        </button>
+                                        <button type="button" class="text-blue-600 hover:text-blue-800 dark:text-blue-400" @click="exportSingleGiornaleWord(giornale)" :disabled="loadingExportWord" :title="loadingExportWord ? 'Generazione Word in corso...' : 'Esporta Word'">
+                                            <i class="fas fa-file-word" :class="{ 'fa-spin fa-spinner': loadingExportWord }"></i>
                                         </button>
                                         <button type="button" class="text-red-600 hover:text-red-800 dark:text-red-400" @click="deleteGiornale(giornale)">
                                             <i class="fas fa-trash"></i>
@@ -573,6 +584,8 @@ function cantiereDetailApp() {
         saving: false,
         errorMessage: '',
         modalMode: 'giornale', // 'giornale' or 'edit-cantiere'
+        loadingExport: false,
+        loadingExportWord: false,
         
         // Enhanced operator data structure
         operatori_data: {}, // Store enhanced operator data { operatorId: { ore_lavorate, note_presenza } }
@@ -1105,6 +1118,300 @@ function cantiereDetailApp() {
                     };
                 });
             }
+        },
+        
+        // ===== PDF EXPORT FUNCTIONALITY =====
+        
+        async exportGiornaliPDF() {
+            try {
+                // Show loading indicator
+                this.showAlert('info', 'Generazione PDF in corso...');
+                
+                // Build export URL with optional filters
+                const baseUrl = `/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/export-pdf`;
+                const exportUrl = baseUrl;
+                
+                console.log('🔍 [DEBUG] Exporting giornali PDF for cantiere:', '{{ cantiere.id }}');
+                
+                // Call API to generate PDF
+                const response = await fetch(exportUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'include'
+                });
+                
+                console.log('🔍 [DEBUG] PDF export response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('🔍 [DEBUG] PDF export error response:', errorText);
+                    
+                    let errorMessage = 'Errore nella generazione del PDF';
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.detail || errorMessage;
+                    } catch (e) {
+                        // If JSON parsing fails, use the raw text
+                        errorMessage = errorText || errorMessage;
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+                
+                // Get filename from Content-Disposition header if available
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.pdf`;
+                
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (filenameMatch && filenameMatch[1]) {
+                        filename = filenameMatch[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                // Convert response to blob
+                const blob = await response.blob();
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.style.display = 'none';
+                
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
+                
+                // Clean up
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+                
+                this.showAlert('success', 'PDF generato con successo!');
+                console.log('🔍 [DEBUG] PDF download completed successfully');
+                
+            } catch (error) {
+                console.error('🔍 [DEBUG] Error exporting giornali PDF:', error);
+                this.showAlert('error', `Errore nell'esportazione PDF: ${error.message || error}`);
+            }
+        },
+        
+        // ===== WORD EXPORT FUNCTIONALITY =====
+        
+        async exportGiornaliWord() {
+            try {
+                // Show loading indicator
+                this.showAlert('info', 'Generazione documento Word in corso...');
+                
+                // Build export URL with optional filters
+                const baseUrl = `/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/export-word`;
+                const exportUrl = baseUrl;
+                
+                console.log('🔍 [DEBUG] Exporting giornali Word for cantiere:', '{{ cantiere.id }}');
+                
+                // Call API to generate Word document
+                const response = await fetch(exportUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'include'
+                });
+                
+                console.log('🔍 [DEBUG] Word export response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('🔍 [DEBUG] Word export error response:', errorText);
+                    
+                    let errorMessage = 'Errore nella generazione del documento Word';
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.detail || errorMessage;
+                    } catch (e) {
+                        // If JSON parsing fails, use the raw text
+                        errorMessage = errorText || errorMessage;
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+                
+                // Get filename from Content-Disposition header if available
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.docx`;
+                
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (filenameMatch && filenameMatch[1]) {
+                        filename = filenameMatch[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                // Convert response to blob
+                const blob = await response.blob();
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.style.display = 'none';
+                
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
+                
+                // Clean up
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+                
+                this.showAlert('success', 'Documento Word generato con successo!');
+                console.log('🔍 [DEBUG] Word document download completed successfully');
+                
+            } catch (error) {
+                console.error('🔍 [DEBUG] Error exporting giornali Word:', error);
+                this.showAlert('error', `Errore nell'esportazione Word: ${error.message || error}`);
+            }
+        },
+        
+        async exportSingleGiornaleWord(giornale) {
+            try {
+                this.loadingExportWord = true;
+                this.showAlert('info', 'Generazione Word singolo giornale in corso...');
+                
+                const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-word`;
+                
+                console.log('🔍 [DEBUG] Exporting single giornale Word:', giornale.id);
+                
+                const response = await fetch(exportUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorMessage = 'Errore nella generazione del Word del giornale';
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.detail || errorMessage;
+                    } catch (e) {
+                        errorMessage = errorText || errorMessage;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                // Get filename from Content-Disposition header
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.docx`;
+                
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (filenameMatch && filenameMatch[1]) {
+                        filename = filenameMatch[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                link.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+                
+                this.showAlert('success', 'Word del giornale generato con successo!');
+                
+            } catch (error) {
+                console.error('🔍 [DEBUG] Error exporting single giornale Word:', error);
+                this.showAlert('error', `Errore nell'esportazione del Word: ${error.message || error}`);
+            } finally {
+                this.loadingExportWord = false;
+            }
+        },
+        
+        async exportSingleGiornalePDF(giornale) {
+            try {
+                this.loadingExport = true;
+                this.showAlert('info', 'Generazione PDF singolo giornale in corso...');
+                
+                const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-pdf`;
+                
+                console.log('🔍 [DEBUG] Exporting single giornale PDF:', giornale.id);
+                
+                const response = await fetch(exportUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorMessage = 'Errore nella generazione del PDF del giornale';
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.detail || errorMessage;
+                    } catch (e) {
+                        errorMessage = errorText || errorMessage;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                // Get filename from Content-Disposition header
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.pdf`;
+                
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (filenameMatch && filenameMatch[1]) {
+                        filename = filenameMatch[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                link.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+                
+                this.showAlert('success', 'PDF del giornale generato con successo!');
+                
+            } catch (error) {
+                console.error('🔍 [DEBUG] Error exporting single giornale PDF:', error);
+                this.showAlert('error', `Errore nell'esportazione del PDF: ${error.message || error}`);
+            } finally {
+                this.loadingExport = false;
+            }
         }
     }
 }
@@ -1225,3 +1532,70 @@ ${giornale.problematiche ? `Problematiche: ${giornale.problematiche}` : ''}
 }
 </script>
 {% endblock %}
+
+        
+        async exportSingleGiornalePDF(giornale) {
+            try {
+                this.loadingExport = true;
+                this.showAlert('info', 'Generazione PDF singolo giornale in corso...');
+                
+                const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-pdf`;
+                
+                console.log('🔍 [DEBUG] Exporting single giornale PDF:', giornale.id);
+                
+                const response = await fetch(exportUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let errorMessage = 'Errore nella generazione del PDF del giornale';
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.detail || errorMessage;
+                    } catch (e) {
+                        errorMessage = errorText || errorMessage;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                // Get filename from Content-Disposition header
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.pdf`;
+                
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (filenameMatch && filenameMatch[1]) {
+                        filename = filenameMatch[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                link.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+                
+                this.showAlert('success', 'PDF del giornale generato con successo!');
+                
+            } catch (error) {
+                console.error('🔍 [DEBUG] Error exporting single giornale PDF:', error);
+                this.showAlert('error', `Errore nell'esportazione del PDF: ${error.message || error}`);
+            } finally {
+                this.loadingExport = false;
+            }
+        }
