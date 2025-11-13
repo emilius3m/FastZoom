@@ -82,6 +82,10 @@ class GiornaleWordGeneratorV2:
                 self._add_index(doc, giornali)
                 doc.add_page_break()
 
+            # Sezione stato cantiere
+            self._add_stato_cantiere_section(doc, cantiere_info)
+            doc.add_page_break()
+
             # Giornali
             for i, giornale in enumerate(giornali, 1):
                 self._add_giornale_page(doc, giornale, i, len(giornali), cantiere_info)
@@ -107,7 +111,7 @@ class GiornaleWordGeneratorV2:
             raise
 
     def _add_title_page(self, doc, cantiere_info, site_info, num_giornali):
-        """Pagina titolo professionale"""
+        """Pagina titolo professionale con informazioni complete del cantiere"""
         
         # Titolo principale
         title = doc.add_paragraph()
@@ -127,8 +131,42 @@ class GiornaleWordGeneratorV2:
 
         doc.add_paragraph()  # Spazio
 
-        # Tabella informazioni intestazione
-        header_table = doc.add_table(rows=8, cols=2)
+        # Blocco informazioni stato e priorità
+        status_table = doc.add_table(rows=2, cols=4)
+        status_table.style = 'Light Grid Accent 1'
+        
+        status_data = [
+            ("STATO CANTIERE:", cantiere_info.get('stato_formattato', 'N/D')),
+            ("PRIORITÀ:", f"{cantiere_info.get('priorita', 'N/D')}/5"),
+            ("DURATA:", f"{cantiere_info.get('durata_giorni', 'N/D')} giorni" if cantiere_info.get('durata_giorni') else "N/D"),
+            ("CODICE:", cantiere_info.get('codice', 'N/D'))
+        ]
+        
+        for i, (label, value) in enumerate(status_data):
+            row_cells = status_table.rows[0 if i < 2 else 1].cells
+            cell_idx = i if i < 2 else i - 2
+            row_cells[cell_idx].text = f"{label} {value}"
+            
+            # Formattazione celle stato
+            para = row_cells[cell_idx].paragraphs[0]
+            if para.runs:
+                run = para.runs[0]
+                run.font.size = Pt(11)
+                run.font.bold = True
+                if i == 0:  # Stato - colore speciale
+                    if cantiere_info.get('stato') == 'in_corso':
+                        run.font.color.rgb = RGBColor(34, 197, 94)  # Verde
+                    elif cantiere_info.get('stato') == 'sospeso':
+                        run.font.color.rgb = RGBColor(251, 191, 36)  # Giallo
+                    elif cantiere_info.get('stato') == 'completato':
+                        run.font.color.rgb = RGBColor(107, 114, 128)  # Grigio
+                    else:
+                        run.font.color.rgb = RGBColor(59, 130, 246)  # Blu
+
+        doc.add_paragraph()  # Spazio
+
+        # Tabella informazioni principali ampliata
+        header_table = doc.add_table(rows=10, cols=2)
         header_table.style = 'Light Grid Accent 1'
 
         header_rows = [
@@ -137,6 +175,8 @@ class GiornaleWordGeneratorV2:
             ("IMPRESA ESECUTRICE:", cantiere_info.get('impresa_esecutrice', 'N/D')),
             ("DIRETTORE DEI LAVORI:", cantiere_info.get('direttore_lavori', 'N/D')),
             ("RESPONSABILE PROCEDIMENTO:", cantiere_info.get('responsabile_procedimento', 'N/D')),
+            ("RESPONSABILE CANTIERE:", cantiere_info.get('responsabile_cantiere', 'N/D')),
+            ("TIPOLOGIA INTERVENTO:", cantiere_info.get('tipologia_intervento', 'N/D')),
             ("SITO ARCHEOLOGICO:", site_info.get('name', 'N/D')),
             ("DATA DOCUMENTO:", datetime.now().strftime('%d/%m/%Y %H:%M')),
             ("GIORNALI INCLUSI:", str(num_giornali)),
@@ -161,13 +201,41 @@ class GiornaleWordGeneratorV2:
 
         doc.add_paragraph()
         
+        # Sezione aggiuntiva - Informazioni geografiche e codici
+        geo_table = doc.add_table(rows=2, cols=3)
+        geo_table.style = 'Light Grid Accent 1'
+        
+        geo_data = [
+            ("AREA:", cantiere_info.get('area_descrizione', 'N/D')),
+            ("QUOTA:", cantiere_info.get('quota', 'N/D')),
+            ("CODICE CUP:", cantiere_info.get('codice_cup', 'N/D')),
+            ("CODICE CIG:", cantiere_info.get('codice_cig', 'N/D')),
+            ("IMPORTO LAVORI:", f"€{cantiere_info.get('importo_lavori', 'N/D'):,.2f}" if cantiere_info.get('importo_lavori') else "N/D"),
+            ("COORDINATE:", f"{cantiere_info.get('coordinate_lat', 'N/D')}, {cantiere_info.get('coordinate_lon', 'N/D')}" if cantiere_info.get('coordinate_lat') and cantiere_info.get('coordinate_lon') else "N/D")
+        ]
+        
+        for i, (label, value) in enumerate(geo_data):
+            row_cells = geo_table.rows[0 if i < 3 else 1].cells
+            cell_idx = i if i < 3 else i - 3
+            row_cells[cell_idx].text = f"{label} {value}"
+            
+            # Formattazione
+            para = row_cells[cell_idx].paragraphs[0]
+            if para.runs:
+                run = para.runs[0]
+                run.font.size = Pt(9)
+                run.font.bold = True
+
+        doc.add_paragraph()
+        
         # Nota informativa
         nota = doc.add_paragraph()
         nota.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         nota_run = nota.add_run(
             "Questo documento contiene la documentazione completa delle attività di scavo "
             "conforme agli standard ICCD del Ministero della Cultura italiano. "
-            "Tutti i dati sono tracciati e validabili."
+            "Tutti i dati sono tracciati e validabili. "
+            f"Stato attuale cantiere: {cantiere_info.get('stato_formattato', 'N/D')}."
         )
         nota_run.font.size = Pt(9)
         nota_run.font.italic = True
@@ -187,6 +255,127 @@ class GiornaleWordGeneratorV2:
         for i, g in enumerate(giornali, 1):
             data = self._format_date(g.get('data', 'N/D'))
             p = doc.add_paragraph(f"Giornale {i}: {data}", style='List Number')
+
+    def _add_stato_cantiere_section(self, doc, cantiere_info):
+        """Aggiunge sezione completa sullo stato del cantiere"""
+        
+        self._add_section_heading(doc, "STATO DEL CANTIERE E INFORMAZIONI CRITICHE")
+        
+        # Tabella stato e progressione
+        status_table = doc.add_table(rows=6, cols=2)
+        status_table.style = 'Light Grid Accent 1'
+        
+        # Dati per la tabella di stato
+        status_rows = [
+            ("STATO ATTUALE:", cantiere_info.get('stato_formattato', 'N/D')),
+            ("PRIORITÀ INTERVENTO:", f"{cantiere_info.get('priorita', 'N/D')}/5" + " - ALTA" if cantiere_info.get('priorita', 0) >= 4 else " - MEDIA" if cantiere_info.get('priorita', 0) >= 2 else " - BASSA"),
+            ("DURATA GIORNALIERA:", f"{cantiere_info.get('durata_giorni', 'N/D')} giorni" if cantiere_info.get('durata_giorni') else "In corso"),
+            ("CANTIERE IN CORSO:", "SÌ" if cantiere_info.get('e_in_corso') else "NO"),
+            ("CODICE IDENTIFICATIVO:", cantiere_info.get('codice', 'N/D')),
+            ("RESPONSABILE CANTIERE:", cantiere_info.get('responsabile_cantiere', 'N/D'))
+        ]
+        
+        for i, (label, value) in enumerate(status_rows):
+            row_cells = status_table.rows[i].cells
+            row_cells[0].text = label
+            row_cells[1].text = str(value)
+            
+            # Formattazione etichette
+            label_para = row_cells[0].paragraphs[0]
+            label_run = label_para.runs[0]
+            label_run.font.bold = True
+            label_run.font.size = Pt(10)
+            label_run.font.color.rgb = self.COLOR_ACCENT
+            
+            # Formattazione valori
+            value_para = row_cells[1].paragraphs[0]
+            if value_para.runs:
+                value_run = value_para.runs[0]
+                value_run.font.size = Pt(10)
+                # Colore speciale per stato
+                if i == 0:  # Stato
+                    if cantiere_info.get('stato') == 'in_corso':
+                        value_run.font.color.rgb = RGBColor(34, 197, 94)  # Verde
+                    elif cantiere_info.get('stato') == 'sospeso':
+                        value_run.font.color.rgb = RGBColor(251, 191, 36)  # Giallo
+                    elif cantiere_info.get('stato') == 'completato':
+                        value_run.font.color.rgb = RGBColor(107, 114, 128)  # Grigio
+
+        doc.add_paragraph()
+
+        # Tabella timeline - Programmato vs Effettivo
+        self._add_section_heading(doc, "CONFRONTO TEMPORALE: PROGRAMMAZIONE VS REALTÀ")
+        
+        timeline_table = doc.add_table(rows=3, cols=2)
+        timeline_table.style = 'Light Grid Accent 1'
+        
+        timeline_data = [
+            ("DATA INIZIO PROGRAMMATO:", self._format_date(cantiere_info.get('data_inizio_prevista')),
+             "DATA INIZIO EFFETTIVO:", self._format_date(cantiere_info.get('data_inizio_effettiva'))),
+            ("DATA FINE PROGRAMMATO:", self._format_date(cantiere_info.get('data_fine_prevista')),
+             "DATA FINE EFFETTIVO:", self._format_date(cantiere_info.get('data_fine_effettiva')))
+        ]
+        
+        for row_idx, (label1, value1, label2, value2) in enumerate(timeline_data):
+            row_cells = timeline_table.rows[row_idx].cells
+            row_cells[0].text = f"{label1} {value1}"
+            row_cells[1].text = f"{label2} {value2}"
+            
+            for cell_idx, cell in enumerate(row_cells):
+                para = cell.paragraphs[0]
+                if para.runs:
+                    run = para.runs[0]
+                    run.font.size = Pt(9)
+                    if cell_idx == 0:
+                        run.font.color.rgb = RGBColor(59, 130, 246)  # Blu per programmato
+                    else:
+                        run.font.color.rgb = RGBColor(34, 197, 94)  # Verde per effettivo
+        
+        # Riga per lo stato
+        status_row = timeline_table.add_row().cells
+        status_row[0].text = "STATO AVANZAMENTO:"
+        status_row[1].text = f"{'CANTIERE ATTIVO' if cantiere_info.get('e_in_corso') else 'CANTIERE TERMINATO'}"
+        
+        for cell in status_row:
+            para = cell.paragraphs[0]
+            if para.runs:
+                run = para.runs[0]
+                run.font.size = Pt(10)
+                run.font.bold = True
+
+        doc.add_paragraph()
+
+        # Sezione informazioni aggiuntive
+        self._add_section_heading(doc, "INFORMAZIONI TECNICHE E GEOREFERENZIAZIONE")
+        
+        info_table = doc.add_table(rows=4, cols=2)
+        info_table.style = 'Light Grid Accent 1'
+        
+        info_data = [
+            ("TIPOLOGIA INTERVENTO:", cantiere_info.get('tipologia_intervento', 'N/D')),
+            ("AREA SPECIFICA:", cantiere_info.get('area_descrizione', 'N/D')),
+            ("QUOTA ALTIMETRICA:", cantiere_info.get('quota', 'N/D')),
+            ("COORDINATE GPS:", self._format_coordinates(cantiere_info.get('coordinate_lat'), cantiere_info.get('coordinate_lon')))
+        ]
+        
+        for i, (label, value) in enumerate(info_data):
+            row_cells = info_table.rows[i].cells
+            row_cells[0].text = label
+            row_cells[1].text = value
+            
+            # Formattazione
+            label_para = row_cells[0].paragraphs[0]
+            label_run = label_para.runs[0]
+            label_run.font.bold = True
+            label_run.font.size = Pt(9)
+            label_run.font.color.rgb = self.COLOR_ACCENT
+            
+            value_para = row_cells[1].paragraphs[0]
+            if value_para.runs:
+                value_run = value_para.runs[0]
+                value_run.font.size = Pt(9)
+
+        doc.add_paragraph()
 
     def _add_giornale_page(self, doc, giornale, num, total, cantiere_info):
         """Aggiunge una pagina completa di giornale con tutte le 11 sezioni"""
@@ -497,7 +686,10 @@ class GiornaleWordGeneratorV2:
             f"Documento generato da FastZoom Archaeological System\n"
             f"Data: {datetime.now().strftime('%d/%m/%Y ore %H:%M:%S')}\n"
             f"Sito: {site_info.get('name', 'N/D')}\n"
-            f"Cantiere: {cantiere_info.get('nome', 'N/D')}"
+            f"Cantiere: {cantiere_info.get('nome_completo', cantiere_info.get('nome', 'N/D'))}\n"
+            f"Stato: {cantiere_info.get('stato_formattato', 'N/D')} | "
+            f"Durata: {cantiere_info.get('durata_giorni', 'N/D')} giorni | "
+            f"Priorità: {cantiere_info.get('priorita', 'N/D')}/5"
         )
         footer_run.font.size = Pt(8)
         footer_run.font.italic = True
@@ -527,6 +719,19 @@ class GiornaleWordGeneratorV2:
             return date_value.strftime('%d/%m/%Y')
         except:
             return str(date_value)
+
+    def _format_coordinates(self, lat, lon) -> str:
+        """Formatta coordinate GPS in formato leggibile"""
+        if not lat or not lon:
+            return 'N/D'
+        
+        try:
+            # Formatta coordinate con precisione decimale
+            lat_formatted = f"{float(lat):.6f}"
+            lon_formatted = f"{float(lon):.6f}"
+            return f"{lat_formatted}°N, {lon_formatted}°E"
+        except (ValueError, TypeError):
+            return f"{lat}, {lon}" if lat and lon else 'N/D'
 
 
 # Istanza globale
