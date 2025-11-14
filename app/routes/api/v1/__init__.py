@@ -10,7 +10,7 @@ from app.routes.api.v1.sites import router as sites_router
 from app.routes.api.v1.photos import router as photos_router  # Now includes consolidated photo endpoints
 # Temporarily comment out problematic routers to resolve import issues
 # from app.routes.api.v1.metadata import router as metadata_router
-# from app.routes.api.v1.deepzoom import router as deepzoom_router
+from app.routes.api.v1.deepzoom import router as deepzoom_router
 # from app.routes.api.v1.documents import router as documents_router
 # from app.routes.api.v1.iccd import router as iccd_router
 # from app.routes.api.v1.us import router as us_router
@@ -39,7 +39,7 @@ api_v1_router.include_router(sites_router, tags=["Sites"])
 api_v1_router.include_router(photos_router, tags=["Photos"])
 # Temporarily comment out problematic routers
 # api_v1_router.include_router(metadata_router, prefix="/metadata", tags=["Photo Metadata"])
-# api_v1_router.include_router(deepzoom_router, prefix="/deepzoom", tags=["Deep Zoom"])
+api_v1_router.include_router(deepzoom_router, prefix="/deepzoom", tags=["Deep Zoom"])
 # api_v1_router.include_router(documents_router, prefix="/documents", tags=["Documents"])
 # api_v1_router.include_router(iccd_router, prefix="/iccd", tags=["ICCD Cataloging"])
 # api_v1_router.include_router(us_router, prefix="/us", tags=["US/USM Units"])
