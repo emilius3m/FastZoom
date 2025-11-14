@@ -206,8 +206,9 @@ async def get_photo_site_access(
     # Import Photo model here to avoid circular imports
     from app.models.documentation_and_field import Photo
     
-    # Verifica esistenza foto
-    photo_query = select(Photo).where(Photo.id == photo_id)
+    # Verifica esistenza foto - FIX: Convert UUID to string for proper comparison
+    photo_id_str = str(photo_id)
+    photo_query = select(Photo).where(Photo.id == photo_id_str)
     photo = await db.execute(photo_query)
     photo = photo.scalar_one_or_none()
     

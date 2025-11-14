@@ -38,7 +38,9 @@ class PhotoServingService:
     async def get_photo_from_db(db: AsyncSession, photo_id: UUID) -> Optional[Photo]:
         """Retrieve photo record from database with error handling."""
         try:
-            photo_query = select(Photo).where(Photo.id == photo_id)
+            # Convert UUID to string since Photo.id is stored as String(36)
+            photo_id_str = str(photo_id)
+            photo_query = select(Photo).where(Photo.id == photo_id_str)
             photo = await db.execute(photo_query)
             return photo.scalar_one_or_none()
         except Exception as e:
