@@ -592,7 +592,7 @@ document.addEventListener('alpine:init', () => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
             
-            const response = await fetch(`/api/site/{{ site.id }}/photos/upload`, {
+            const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/upload`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('access_token')}`
@@ -658,7 +658,7 @@ document.addEventListener('alpine:init', () => {
                     reject(new Error('Network error during upload'));
                 });
                 
-                xhr.open('POST', `/api/site/{{ site.id }}/photos/upload`);
+                xhr.open('POST', `/api/v1/sites/{{ site.id }}/photos/upload`);
                 xhr.send(formData);
             });
         },
@@ -677,7 +677,7 @@ document.addEventListener('alpine:init', () => {
                 }
             });
             
-            const response = await fetch(`/api/site/{{ site.id }}/photos/upload`, {
+            const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/upload`, {
                 method: 'POST',
                 body: formData
             });

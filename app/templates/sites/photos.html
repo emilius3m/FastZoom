@@ -1669,7 +1669,7 @@ function photosManager() {
             try {
                 console.log('Loading photos from API...');
                 
-                const response = await fetch(`/api/site/{{ site.id }}/photos`, {
+                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -1813,7 +1813,7 @@ function photosManager() {
                 
                 // Fetch filtered photos from API
                 const queryString = params.toString();
-                const url = `/api/site/{{ site.id }}/photos${queryString ? '?' + queryString : ''}`;
+                const url = `/api/v1/sites/{{ site.id }}/photos${queryString ? '?' + queryString : ''}`;
                 
                 const response = await fetch(url, {
                     headers: {
@@ -2252,7 +2252,7 @@ function photosManager() {
                         // Use tile format from deep zoom info (PNG for transparent images, JPG for others)
                         const tileFormat = deepZoomInfo.tile_format || 'jpg';
                         const extension = tileFormat === 'png' ? 'png' : 'jpg';
-                        const url = `/api/site/${siteId}/photos/${photoId}/deepzoom/tiles/${level}/${x}_${y}.${extension}`;
+                        const url = `/api/v1/sites/${siteId}/photos/${photoId}/deepzoom/tiles/${level}/${x}_${y}.${extension}`;
                         return url;
                     }
                 };
@@ -2865,7 +2865,7 @@ function photosManager() {
                 const siteId = this.getCurrentSiteId();
                 console.log('Getting deep zoom info for:', siteId, this.currentPhoto.id);
                 
-                const response = await fetch(`/api/site/${siteId}/photos/${this.currentPhoto.id}/deepzoom/info`, {
+                const response = await fetch(`/api/v1/sites/${siteId}/photos/${this.currentPhoto.id}/deepzoom/info`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -3048,7 +3048,7 @@ function photosManager() {
             // Fetch fresh data from server for photo modal edit button
             try {
                 console.log('Fetching fresh data for photo modal edit:', this.currentPhoto.id);
-                const response = await fetch(`/api/site/{{ site.id }}/photos`, {
+                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -3214,7 +3214,7 @@ function photosManager() {
                 // Fetch fresh data from server for single photo edit
                 try {
                     console.log('Fetching fresh data for photo:', photo.id);
-                    const response = await fetch(`/api/site/{{ site.id }}/photos`, {
+                    const response = await fetch(`/api/v1/sites/{{ site.id }}/photos`, {
                         headers: {
                             'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                             'Content-Type': 'application/json'
@@ -3393,7 +3393,7 @@ function photosManager() {
             try {
                 console.log('Saving single photo edit with metadata:', metadata);
 
-                const response = await fetch(`/api/site/{{ site.id }}/photos/${this.selectedPhoto.id}/update`, {
+                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/${this.selectedPhoto.id}/update`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -3481,7 +3481,7 @@ function photosManager() {
                     }
                 });
 
-                const response = await fetch(`/api/site/{{ site.id }}/photos/bulk-update`, {
+                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/bulk-update`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -3575,7 +3575,7 @@ function photosManager() {
             this.isDeleting = true;
 
             try {
-                const response = await fetch(`/api/site/{{ site.id }}/photos/${this.photoToDelete.id}`, {
+                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/${this.photoToDelete.id}`, {
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`
@@ -3646,7 +3646,7 @@ function photosManager() {
             this.isBulkDeleting = true;
 
             try {
-                const response = await fetch(`/api/site/{{ site.id }}/photos/bulk-delete`, {
+                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/bulk-delete`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -4113,7 +4113,7 @@ function photosManager() {
                 if (photoIndex !== -1) {
                     // Refresh photo data from server to get updated fields
                     try {
-                        const response = await fetch(`/api/site/{{ site.id }}/photos`, {
+                        const response = await fetch(`/api/v1/sites/{{ site.id }}/photos`, {
                             headers: {
                                 'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                                 'Content-Type': 'application/json'
@@ -4200,7 +4200,7 @@ function photosManager() {
             try {
                 const siteId = this.getCurrentSiteId();
                 
-                const response = await fetch(`/api/site/${siteId}/photos/${photo.id}/deepzoom/status`, {
+                const response = await fetch(`/api/v1/sites/${siteId}/photos/${photo.id}/deepzoom/status`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
