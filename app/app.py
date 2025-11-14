@@ -886,80 +886,137 @@ async def health_check():
 async def on_shutdown():
     """Chiusura sistema"""
     try:
+        logger.info("🛑 Starting FastZoom application shutdown...")
+        
         # Ferma il servizio di background processing per deep zoom tiles
-        from app.services.deep_zoom_background_service import deep_zoom_background_service
-        await deep_zoom_background_service.stop_background_processor()
+        logger.info("🔄 Stopping DeepZoom background processor...")
+        try:
+            from app.services.deep_zoom_background_service import deep_zoom_background_service
+            await deep_zoom_background_service.stop_background_processor()
+            logger.info("✅ Deep zoom background processor stopped")
+        except Exception as deepzoom_error:
+            logger.error(f"❌ Error stopping DeepZoom background processor: {deepzoom_error}")
         
         # Ferma il servizio di verifica periodica tiles
-        from app.services.tiles_verification_service import tiles_verification_service
-        await tiles_verification_service.stop_periodic_verification()
+        logger.info("🔄 Stopping tiles verification service...")
+        try:
+            from app.services.tiles_verification_service import tiles_verification_service
+            await tiles_verification_service.stop_periodic_verification()
+            logger.info("✅ Tiles verification service stopped")
+        except Exception as tiles_error:
+            logger.error(f"❌ Error stopping tiles verification service: {tiles_error}")
         
         # Ferma il servizio di monitoring delle performance
-        from app.services.performance_monitoring_service import performance_monitoring_service
-        await performance_monitoring_service.stop_monitoring()
+        logger.info("🔄 Stopping performance monitoring service...")
+        try:
+            from app.services.performance_monitoring_service import performance_monitoring_service
+            await performance_monitoring_service.stop_monitoring()
+            logger.info("✅ Performance monitoring service stopped")
+        except Exception as perf_error:
+            logger.error(f"❌ Error stopping performance monitoring service: {perf_error}")
         
         # Stop queue service
         if settings.queue_enabled:
-            from app.services.request_queue_service import request_queue_service
-            await request_queue_service.stop()
-            logger.info(f"🛑 Request queue service stopped")
+            logger.info("🔄 Stopping request queue service...")
+            try:
+                from app.services.request_queue_service import request_queue_service
+                await request_queue_service.stop()
+                logger.info("✅ Request queue service stopped")
+            except Exception as queue_error:
+                logger.error(f"❌ Error stopping request queue service: {queue_error}")
         
         museum_name = getattr(settings, 'museum_name', 'Museo Archeologico')
         logger.info(f"🏺 {museum_name} - Sistema arrestato")
-        logger.info(f"🛑 Deep zoom background processor stopped")
-        logger.info(f"🛑 Tiles verification service stopped")
+        logger.info("✅ FastZoom application shutdown completed")
+        
     except Exception as e:
-        logger.error(f"❌ Errore durante shutdown: {e}")
+        logger.error(f"❌ Critical error during shutdown: {e}")
 
 @app.on_event("startup")
 async def on_startup():
     """Inizializzazione sistema archeologico"""
     try:
+        logger.info("🚀 Starting FastZoom application initialization...")
+        
         # Initialize models first to ensure proper relationship mapping
         from app.database.base import init_models
         init_models()
+        logger.info("✅ Database models initialized")
         
         await create_db_and_tables()
+        logger.info("✅ Database tables created/verified")
         
-        # Avvia il servizio di background processing per deep zoom tiles
-        from app.services.deep_zoom_background_service import deep_zoom_background_service
-        await deep_zoom_background_service.start_background_processor()
+        # Avvia il servizio di background processing per deep zoom tiles con error handling migliorato
+        logger.info("🔄 Starting DeepZoom background processor...")
+        try:
+            from app.services.deep_zoom_background_service import deep_zoom_background_service
+            
+            if not deep_zoom_background_service._running:
+                await deep_zoom_background_service.start_background_processor()
+                
+                # Verify service status
+                queue_status = await deep_zoom_background_service.get_queue_status()
+                logger.info(f"📊 DeepZoom service status: {queue_status}")
+                logger.info("✅ DeepZoom background processor started successfully")
+            else:
+                logger.info("ℹ️ DeepZoom background processor already running")
+                
+        except Exception as deepzoom_error:
+            logger.error(f"❌ Failed to start DeepZoom background processor: {deepzoom_error}")
+            logger.warning("⚠️ Application will continue but DeepZoom tiles processing may not work")
+            # Continue with application startup despite DeepZoom failure
         
         # Avvia il servizio di verifica periodica tiles
-        from app.services.tiles_verification_service import tiles_verification_service
-        await tiles_verification_service.start_periodic_verification()
+        logger.info("🔄 Starting tiles verification service...")
+        try:
+            from app.services.tiles_verification_service import tiles_verification_service
+            await tiles_verification_service.start_periodic_verification()
+            logger.info("✅ Tiles verification service started")
+        except Exception as tiles_error:
+            logger.error(f"❌ Failed to start tiles verification service: {tiles_error}")
+            logger.warning("⚠️ Application will continue but tiles verification may not work")
         
         # Avvia il servizio di monitoring delle performance
-        from app.services.performance_monitoring_service import performance_monitoring_service
-        await performance_monitoring_service.start_monitoring()
+        logger.info("🔄 Starting performance monitoring service...")
+        try:
+            from app.services.performance_monitoring_service import performance_monitoring_service
+            await performance_monitoring_service.start_monitoring()
+            logger.info("✅ Performance monitoring service started")
+        except Exception as perf_error:
+            logger.error(f"❌ Failed to start performance monitoring service: {perf_error}")
+            logger.warning("⚠️ Application will continue but performance monitoring may not work")
         
         # Initialize queue service and register handlers
         if settings.queue_enabled:
-            from app.services.request_queue_service import request_queue_service
-            logger.info("Starting queue service...")
-            await request_queue_service.start()
+            logger.info("🔄 Starting request queue service...")
+            try:
+                from app.services.request_queue_service import request_queue_service
+                await request_queue_service.start()
 
-            # CRITICAL: Wait a moment for service to fully start
-            await asyncio.sleep(0.1)
+                # CRITICAL: Wait a moment for service to fully start
+                await asyncio.sleep(0.1)
 
-            # Register queue handlers AFTER service is started
-            from app.middleware.queue_middleware import register_queue_handlers
-            register_queue_handlers()
+                # Register queue handlers AFTER service is started
+                from app.middleware.queue_middleware import register_queue_handlers
+                register_queue_handlers()
 
-            # Register photo upload handler
-            from app.routes.api.sites_photos import process_queued_upload
-            request_queue_service.register_handler('POST_/api/site/{site_id}/photos/upload', process_queued_upload)
+                # Register photo upload handler
+                from app.routes.api.sites_photos import process_queued_upload
+                request_queue_service.register_handler('POST_/api/site/{site_id}/photos/upload', process_queued_upload)
 
-            # Register bulk upload handler
-            from app.middleware.queue_middleware import bulk_upload_request_handler
-            request_queue_service.register_handler('POST_/api/site/{site_id}/photos/bulk-upload', bulk_upload_request_handler)
+                # Register bulk upload handler
+                from app.middleware.queue_middleware import bulk_upload_request_handler
+                request_queue_service.register_handler('POST_/api/site/{site_id}/photos/bulk-upload', bulk_upload_request_handler)
 
-            # Register deep zoom processing handler
-            from app.services.deep_zoom_background_service import deep_zoom_background_service
-            if hasattr(deep_zoom_background_service, 'process_queued_deep_zoom'):
-                request_queue_service.register_handler('POST_/api/site/{site_id}/photos/deep-zoom/start-background', deep_zoom_background_service.process_queued_deep_zoom)
+                # Register deep zoom processing handler
+                from app.services.deep_zoom_background_service import deep_zoom_background_service
+                if hasattr(deep_zoom_background_service, 'process_queued_deep_zoom'):
+                    request_queue_service.register_handler('POST_/api/site/{site_id}/photos/deep-zoom/start-background', deep_zoom_background_service.process_queued_deep_zoom)
 
-            logger.info(f"📋 Request queue service started with {len(request_queue_service.request_handlers)} handlers")
+                logger.info(f"✅ Request queue service started with {len(request_queue_service.request_handlers)} handlers")
+            except Exception as queue_error:
+                logger.error(f"❌ Failed to start request queue service: {queue_error}")
+                logger.warning("⚠️ Application will continue but request queue may not work")
         
         museum_name = getattr(settings, 'museum_name', 'Museo Archeologico')
         logger.info(f"🏺 {museum_name} - Sistema Archeologico avviato")
@@ -969,8 +1026,11 @@ async def on_startup():
         logger.info(f"🔍 Tiles verification service started")
         if settings.queue_enabled:
             logger.info(f"📋 Request queue system enabled")
+        logger.info("✅ FastZoom application initialization completed successfully")
+        
     except Exception as e:
-        logger.error(f"❌ Errore avvio: {e}")
+        logger.error(f"❌ Critical error during application startup: {e}")
+        logger.error("❌ Application startup failed - cannot continue")
         raise
 
 

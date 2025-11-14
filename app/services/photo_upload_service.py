@@ -17,6 +17,7 @@ from app.models import Photo
 from app.services.photo_service import photo_metadata_service
 from app.services.storage_service import storage_service
 from app.services.photo_serving_service import photo_serving_service
+from app.services.deep_zoom_background_service import deep_zoom_background_service
 from app.repositories.photo_repository import PhotoRepository
 
 
@@ -117,6 +118,11 @@ class PhotoUploadService:
             background_start_time = asyncio.get_event_loop().time()
             logger.info(f"🔍 [SERVICE DEBUG] Starting background tiles processing at {background_start_time}")
             
+            # 🔧 FIX: Ensure background processor is running
+            if not deep_zoom_background_service._running:
+                await deep_zoom_background_service.start_background_processor()
+                logger.info('🚀 Auto-started background processor for tiles generation')
+
             asyncio.create_task(
                 self._process_tiles_batch_background(photos_needing_tiles, site_id)
             )

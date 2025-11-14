@@ -1,6 +1,7 @@
 import sys
 import os
 import multiprocessing
+import asyncio
 from loguru import logger
 import uvicorn
 from app.core.config import get_settings
@@ -40,9 +41,49 @@ def get_worker_count():
     optimal_workers = min((2 * cpu_count) + 1, 8)  # Max 8 workers per evitare problemi
     return optimal_workers
 
+async def ensure_deepzoom_services():
+    """Ensure DeepZoom services are started before main application starts"""
+    try:
+        logger.info("🚀 Checking DeepZoom background services...")
+        
+        # Import the service
+        from app.services.deep_zoom_background_service import deep_zoom_background_service
+        
+        # Check if already running
+        if not deep_zoom_background_service._running:
+            logger.info("🔄 Starting DeepZoom background processor...")
+            await deep_zoom_background_service.start_background_processor()
+            
+            # Verify status
+            queue_status = await deep_zoom_background_service.get_queue_status()
+            logger.info(f"📊 DeepZoom service status: {queue_status}")
+            logger.info("✅ DeepZoom background processor started successfully")
+        else:
+            logger.info("ℹ️ DeepZoom background processor already running")
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to start DeepZoom services: {e}")
+        # Don't raise exception to prevent app startup failure
+        # Log the error but continue with application startup
+        logger.warning("⚠️ Continuing with application startup despite DeepZoom service failure")
+        return False
+
 def run_development():
     """Esegue uvicorn in modalità sviluppo con reload"""
     logger.info("Starting uvicorn in development mode with reload")
+    
+    # Pre-start DeepZoom services for development mode
+    try:
+        # Run the async function in the event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(ensure_deepzoom_services())
+        loop.close()
+    except Exception as e:
+        logger.warning(f"Could not pre-start DeepZoom services in development mode: {e}")
+    
     uvicorn.run(
         "app.app:app",
         host="127.0.0.1",
@@ -52,6 +93,18 @@ def run_development():
         access_log=True  # Explicitly enable access logging in development mode
     )
 
+async def pre_start_production_services():
+    """Pre-start services in production mode before uvicorn starts"""
+    try:
+        logger.info("🔧 Pre-starting DeepZoom services for production mode...")
+        success = await ensure_deepzoom_services()
+        if success:
+            logger.info("✅ Production services pre-start completed successfully")
+        else:
+            logger.warning("⚠️ Some production services failed to pre-start")
+    except Exception as e:
+        logger.error(f"❌ Production services pre-start failed: {e}")
+
 def run_production():
     """Esegue uvicorn in modalità produzione con multi-worker"""
     settings = get_settings()
@@ -59,6 +112,16 @@ def run_production():
     
     logger.info(f"Starting uvicorn in production mode with {worker_count} workers")
     logger.info(f"Target: Support 15-20 concurrent requests as per FASTZOOM_CONCURRENCY_ANALYSIS_REPORT.md")
+    
+    # Pre-start DeepZoom services for production mode
+    try:
+        # Run the async function in the event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(pre_start_production_services())
+        loop.close()
+    except Exception as e:
+        logger.warning(f"Could not pre-start production services: {e}")
     
     # Configurazione ottimizzata per produzione
     config = {
@@ -91,6 +154,9 @@ def run_production():
 if __name__ == "__main__":
     # Determina la modalità di esecuzione basandosi sulla variabile d'ambiente
     environment = os.getenv("FASTZOOM_ENV", "development").lower()
+    
+    logger.info(f"🚀 Starting FastZoom application in {environment} mode")
+    logger.info("📋 DeepZoom background processor will be automatically started")
     
     if environment == "production":
         run_production()
