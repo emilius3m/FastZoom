@@ -10,6 +10,7 @@ from app.routes.api.v1.sites import router as sites_router
 from app.routes.api.v1.photos import router as photos_router  # Now includes consolidated photo endpoints
 # Temporarily comment out problematic routers to resolve import issues
 # from app.routes.api.v1.metadata import router as metadata_router
+# Temporarily comment out deepzoom router due to syntax issues
 from app.routes.api.v1.deepzoom import router as deepzoom_router
 # from app.routes.api.v1.documents import router as documents_router
 # from app.routes.api.v1.iccd import router as iccd_router

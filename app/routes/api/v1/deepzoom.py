@@ -1,7 +1,7 @@
 """
 API v1 - Deep Zoom Management
 Endpoints per gestione completa deep zoom tiles e processing.
-Implementa backward compatibility con avvisi di deprecazione.
+Consolidamento di sites_deepzoom.py e deepzoom_tiles.py
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks, UploadFile
@@ -9,11 +9,12 @@ from fastapi.responses import JSONResponse, Response, RedirectResponse
 from uuid import UUID
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from loguru import logger
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import io
+import asyncio
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
@@ -46,6 +47,7 @@ class VerificationConfig(BaseModel):
 
 router = APIRouter()
 
+
 def add_deprecation_headers(response: Response, new_endpoint: str):
     """Aggiunge headers di deprecazione per backward compatibility"""
     response.headers["X-API-Deprecated"] = "true"
@@ -53,45 +55,49 @@ def add_deprecation_headers(response: Response, new_endpoint: str):
     response.headers["X-API-New-Endpoint"] = new_endpoint
     response.headers["X-API-Sunset"] = "2025-12-31"  # Data rimozione vecchi endpoint
 
+
 def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Verifica accesso al sito e restituisce informazioni sul sito"""
     site_info = next(
         (site for site in user_sites if site["id"] == str(site_id)),
         None
     )
-    
+
     if not site_info:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Sito {site_id} non trovato o access denied"
         )
-    
+
     return site_info
 
-# CONSOLIDATED ENDPOINTS FROM sites_deepzoom.py
-# These endpoints are moved from /site/{site_id}/photos/{photo_id}/deepzoom/* to /sites/{site_id}/photos/{photo_id}/*
 
-@router.get("/sites/{site_id}/photos/{photo_id}/info", summary="Ottieni informazioni deep zoom per una foto", tags=["Deep Zoom"])
+# ============================================================================
+# CONSOLIDATED ENDPOINTS FROM sites_deepzoom.py
+# ============================================================================
+
+@router.get("/sites/{site_id}/photos/{photo_id}/info", 
+            summary="Ottieni informazioni deep zoom per una foto", 
+            tags=["Deep Zoom"])
 async def get_deep_zoom_info(
-        site_id: UUID,
-        photo_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-        db: AsyncSession = Depends(get_async_session)
+    site_id: UUID,
+    photo_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni informazioni deep zoom per una foto"""
     # Verify site access
     site_info = verify_site_access(site_id, user_sites)
-    
+
     # Verify read permissions
     if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
         raise HTTPException(status_code=403, detail="Permessi richiesti")
 
     # Ottieni info deep zoom
-    deep_zoom_info = await archaeological_minio_service.get_deep_zoom_info(str(site_id), str(photo_id))
+    deep_zoom_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo_id))
 
     if not deep_zoom_info:
-        # Return a proper JSON response indicating deep zoom is not available
         return JSONResponse({
             "photo_id": str(photo_id),
             "site_id": str(site_id),
@@ -107,22 +113,24 @@ async def get_deep_zoom_info(
     return JSONResponse(deep_zoom_info)
 
 
-@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.{format}", summary="Ottieni singolo tile deep zoom", tags=["Deep Zoom"])
+@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.{format}", 
+            summary="Ottieni singolo tile deep zoom", 
+            tags=["Deep Zoom"])
 async def get_deep_zoom_tile(
-        site_id: UUID,
-        photo_id: UUID,
-        level: int,
-        x: int,
-        y: int,
-        format: str,
-        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-        db: AsyncSession = Depends(get_async_session)
+    site_id: UUID,
+    photo_id: UUID,
+    level: int,
+    x: int,
+    y: int,
+    format: str,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
-    """FIXED: Ottieni singolo tile deep zoom con supporto formato dinamico (jpg/png)"""
+    """Ottieni singolo tile deep zoom con supporto formato dinamico (jpg/png)"""
     # Verify site access
     site_info = verify_site_access(site_id, user_sites)
-    
+
     # Verify read permissions
     if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
         raise HTTPException(status_code=403, detail="Permessi richiesti")
@@ -132,7 +140,7 @@ async def get_deep_zoom_tile(
         raise HTTPException(status_code=400, detail="Formato tile non supportato")
 
     # Ottieni URL del tile
-    tile_url = await archaeological_minio_service.get_tile_url(str(site_id), str(photo_id), level, x, y)
+    tile_url = await deep_zoom_minio_service.get_tile_url(str(site_id), str(photo_id), level, x, y)
 
     if not tile_url:
         raise HTTPException(status_code=404, detail="Tile non trovato")
@@ -141,49 +149,54 @@ async def get_deep_zoom_tile(
     return RedirectResponse(url=tile_url, status_code=302)
 
 
-# FIXED: Aggiungi endpoint legacy per backward compatibility
-@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.jpg", summary="Legacy endpoint per tile JPG", tags=["Deep Zoom"])
+@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.jpg", 
+            summary="Legacy endpoint per tile JPG", 
+            tags=["Deep Zoom"])
 async def get_deep_zoom_tile_jpg(
-        site_id: UUID,
-        photo_id: UUID,
-        level: int,
-        x: int,
-        y: int,
-        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-        db: AsyncSession = Depends(get_async_session)
+    site_id: UUID,
+    photo_id: UUID,
+    level: int,
+    x: int,
+    y: int,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
-    """Legacy endpoint per tile JPG - redirect al nuovo endpoint dinamico"""
+    """Legacy endpoint per tile JPG"""
     return await get_deep_zoom_tile(site_id, photo_id, level, x, y, "jpg", current_user_id, user_sites, db)
 
 
-@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.png", summary="Legacy endpoint per tile PNG", tags=["Deep Zoom"])
+@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.png", 
+            summary="Legacy endpoint per tile PNG", 
+            tags=["Deep Zoom"])
 async def get_deep_zoom_tile_png(
-        site_id: UUID,
-        photo_id: UUID,
-        level: int,
-        x: int,
-        y: int,
-        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-        db: AsyncSession = Depends(get_async_session)
+    site_id: UUID,
+    photo_id: UUID,
+    level: int,
+    x: int,
+    y: int,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
-    """Legacy endpoint per tile PNG - redirect al nuovo endpoint dinamico"""
+    """Legacy endpoint per tile PNG"""
     return await get_deep_zoom_tile(site_id, photo_id, level, x, y, "png", current_user_id, user_sites, db)
 
 
-@router.post("/sites/{site_id}/photos/{photo_id}/process", summary="Processa foto esistente per generare deep zoom tiles", tags=["Deep Zoom"])
+@router.post("/sites/{site_id}/photos/{photo_id}/process", 
+             summary="Processa foto esistente per generare deep zoom tiles", 
+             tags=["Deep Zoom"])
 async def process_deep_zoom(
-        site_id: UUID,
-        photo_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-        db: AsyncSession = Depends(get_async_session)
+    site_id: UUID,
+    photo_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """Processa foto esistente per generare deep zoom tiles"""
     # Verify site access
     site_info = verify_site_access(site_id, user_sites)
-    
+
     # Verify write permissions
     if site_info.get("permission_level") not in ["admin", "editor"]:
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
@@ -216,7 +229,7 @@ async def process_deep_zoom(
             archaeological_metadata={
                 'inventory_number': photo.inventory_number,
                 'excavation_area': photo.excavation_area,
-                'material': photo.material,
+                'material': photo.material.value if photo.material else None,
                 'chronology_period': photo.chronology_period
             }
         )
@@ -240,18 +253,20 @@ async def process_deep_zoom(
         raise HTTPException(status_code=500, detail=f"Deep zoom processing failed: {str(e)}")
 
 
-@router.get("/sites/{site_id}/photos/{photo_id}/status", summary="Ottieni status di elaborazione deep zoom per una foto", tags=["Deep Zoom"])
+@router.get("/sites/{site_id}/photos/{photo_id}/status", 
+            summary="Ottieni status di elaborazione deep zoom per una foto", 
+            tags=["Deep Zoom"])
 async def get_deep_zoom_processing_status(
-        site_id: UUID,
-        photo_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-        db: AsyncSession = Depends(get_async_session)
+    site_id: UUID,
+    photo_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni status di elaborazione deep zoom per una foto"""
     # Verify site access
     site_info = verify_site_access(site_id, user_sites)
-    
+
     # Verify read permissions
     if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
         raise HTTPException(status_code=403, detail="Permessi richiesti")
@@ -282,20 +297,22 @@ async def get_deep_zoom_processing_status(
     })
 
 
-@router.get("/sites/{site_id}/processing-queue", summary="Controlla lo stato della coda di processamento", tags=["Deep Zoom"])
+@router.get("/sites/{site_id}/processing-queue", 
+            summary="Controlla lo stato della coda di processamento", 
+            tags=["Deep Zoom"])
 async def get_processing_queue_status(
-        site_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-        user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-        db: AsyncSession = Depends(get_async_session)
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
-    FIXED: Endpoint per controllare lo stato della coda di processamento
+    Endpoint per controllare lo stato della coda di processamento
     Utile per verificare che il background processing non blocchi gli upload
     """
     # Verify site access
     site_info = verify_site_access(site_id, user_sites)
-    
+
     # Verify read permissions
     if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
         raise HTTPException(status_code=403, detail="Permessi richiesti")
@@ -307,7 +324,7 @@ async def get_processing_queue_status(
             Photo.deepzoom_status.in_(['scheduled', 'processing'])
         )
     ).order_by(Photo.created_at.desc())
-    
+
     processing_photos = await db.execute(processing_query)
     processing_photos = processing_photos.scalars().all()
 
@@ -316,10 +333,10 @@ async def get_processing_queue_status(
         and_(
             Photo.site_id == str(site_id),
             Photo.deepzoom_status == 'completed',
-            Photo.deep_zoom_processed_at >= datetime.now() - timedelta(hours=24)
+            Photo.deepzoom_processed_at >= datetime.now() - timedelta(hours=24)
         )
-    ).order_by(Photo.deep_zoom_processed_at.desc()).limit(10)
-    
+    ).order_by(Photo.deepzoom_processed_at.desc()).limit(10)
+
     completed_photos = await db.execute(recent_completed_query)
     completed_photos = completed_photos.scalars().all()
 
@@ -351,128 +368,40 @@ async def get_processing_queue_status(
         "completed_today": len(completed_photos)
     })
 
-# EXTENDED V1 ENDPOINTS (Enhanced functionality)
 
-@router.post("/sites/{site_id}/photos/batch-process", summary="Processamento batch deep zoom", tags=["Deep Zoom"])
-async def v1_batch_process_deepzoom(
-    site_id: UUID,
-    batch_request: BatchProcessRequest,
-    background_tasks: BackgroundTasks = BackgroundTasks(),
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Processa multiple foto per deep zoom in batch.
-    
-    Supporta fino a 50 foto per richiesta con priorità personalizzabile.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di processing
-    if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per processare deep zoom in batch"
-        )
-    
-    if len(batch_request.photo_ids) > 50:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Maximum 50 photos per batch request"
-        )
-    
-    # Verifica che tutte le foto appartengano al sito
-    from sqlalchemy import select
-    
-    photo_ids_str = [str(pid) for pid in batch_request.photo_ids]
-    photos = await db.execute(
-        select(Photo).where(Photo.id.in_(batch_request.photo_ids))
-    )
-    photos = photos.scalars().all()
-    
-    if len(photos) != len(batch_request.photo_ids):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Una o più foto non trovate"
-        )
-    
-    # Verifica che tutte le foto appartengano al sito
-    for photo in photos:
-        if str(photo.site_id) != str(site_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Foto {photo.id} non appartiene al sito {site_id}"
-            )
-    
-    # Avvia processing batch using consolidated endpoints
-    results = []
-    for photo_id in batch_request.photo_ids:
-        try:
-            result = await process_deep_zoom(site_id, photo_id, current_user_id, user_sites, db)
-            results.append({
-                "photo_id": str(photo_id),
-                "status": "started",
-                "result": result
-            })
-        except Exception as e:
-            results.append({
-                "photo_id": str(photo_id),
-                "status": "error",
-                "error": str(e)
-            })
-    
-    return {
-        "batch_id": f"batch_{site_id}_{current_user_id}_{len(batch_request.photo_ids)}",
-        "site_id": str(site_id),
-        "photos_processed": len(batch_request.photo_ids),
-        "results": results,
-        "priority": batch_request.priority,
-        "force_reprocess": batch_request.force_reprocess
-    }
+# ============================================================================
+# CONSOLIDATED ENDPOINTS FROM deepzoom_tiles.py
+# ============================================================================
 
-@router.get("/sites/{site_id}/queue-status", summary="Status coda deep zoom", tags=["Deep Zoom"])
-async def v1_get_queue_status(
-    site_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Controlla lo stato della coda di processamento deep zoom.
-    
-    Include tasks pending, processing, completed e failed.
-    """
-    # Use consolidated endpoint
-    return await get_processing_queue_status(site_id, current_user_id, user_sites, db)
-
-# VERIFICATION E REPAIR ENDPOINTS
-
-@router.post("/sites/{site_id}/photos/{photo_id}/verify-repair", summary="Verifica e ripara tiles", tags=["Deep Zoom - Maintenance"])
-async def v1_verify_and_repair_tiles(
-    site_id: UUID,
+@router.post("/deepzoom/process-missing", 
+             summary="Avvia generazione manuale tiles per foto specifica", 
+             tags=["Deep Zoom - Tiles Management"])
+async def process_missing_tiles(
     photo_id: UUID,
-    auto_repair: bool = True,
+    site_id: UUID,
+    background_tasks: BackgroundTasks,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Verifica lo stato dei tiles per una foto e avvia automaticamente la generazione se mancanti.
-    
-    Utile per manutenzione e controllo integrità.
+    Avvia la generazione manuale dei tiles per una foto specifica
+
+    Args:
+        photo_id: ID della foto da processare
+        site_id: ID del sito archeologico
+        background_tasks: FastAPI BackgroundTasks per processing asincrono
+
+    Returns:
+        Stato immediato della richiesta di generazione tiles
     """
-    # Verifica accesso al sito
+    # Verify site access
     site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di manutenzione
+
+    # Verify write permissions
     if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per verifica tiles"
-        )
-    
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+
     try:
         # Verifica che la foto esista e appartenga al sito
         photo_query = select(Photo).where(
@@ -480,21 +409,163 @@ async def v1_verify_and_repair_tiles(
         )
         photo_result = await db.execute(photo_query)
         photo = photo_result.scalar_one_or_none()
-        
+
         if not photo:
             raise HTTPException(status_code=404, detail="Foto non trovata nel sito specificato")
-        
+
+        # Verifica se i tiles sono già stati generati
+        existing_tiles = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo_id))
+
+        if existing_tiles and existing_tiles.get('available', False):
+            return JSONResponse({
+                "photo_id": str(photo_id),
+                "site_id": str(site_id),
+                "status": "already_exists",
+                "message": "I tiles per questa foto sono già stati generati",
+                "tile_info": existing_tiles,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+
+        # Verifica se c'è già un processo in corso
+        task_status = await deep_zoom_background_service.get_task_status(str(photo_id))
+
+        if task_status and task_status['status'] in ['pending', 'processing', 'retrying']:
+            return JSONResponse({
+                "photo_id": str(photo_id),
+                "site_id": str(site_id),
+                "status": "already_processing",
+                "message": f"Generazione tiles già in corso (stato: {task_status['status']})",
+                "task_status": task_status,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+
+        # Carica il contenuto del file originale
+        try:
+            original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+        except Exception as e:
+            logger.error(f"Failed to load original file for photo {photo_id}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Impossibile caricare il file originale: {str(e)}"
+            )
+
+        # Prepara i metadati archeologici
+        archaeological_metadata = {
+            'inventory_number': photo.inventory_number,
+            'excavation_area': photo.excavation_area,
+            'material': photo.material.value if photo.material else None,
+            'chronology_period': photo.chronology_period,
+            'photo_type': photo.photo_type.value if photo.photo_type else None,
+            'photographer': photo.photographer,
+            'description': photo.description,
+            'keywords': photo.keywords
+        }
+
+        # Avvia il processo di generazione tiles in background
+        result = await deep_zoom_background_service.schedule_tile_processing(
+            photo_id=str(photo_id),
+            site_id=str(site_id),
+            file_path=photo.filepath,
+            original_file_content=original_file_content,
+            archaeological_metadata=archaeological_metadata
+        )
+
+        # Aggiorna lo stato nel database
+        photo.deepzoom_status = 'scheduled'
+        await db.commit()
+
+        # Log attività
+        activity = UserActivity(
+            user_id=current_user_id,
+            site_id=site_id,
+            activity_type="TILES_GENERATION",
+            activity_desc=f"Avviata generazione tiles per foto: {photo.filename}",
+            extra_data={
+                "photo_id": str(photo_id),
+                "filename": photo.filename,
+                "action": "manual_tiles_generation"
+            }
+        )
+        db.add(activity)
+        await db.commit()
+
+        logger.info(f"Manual tiles generation scheduled for photo {photo_id} by user {current_user_id}")
+
+        return JSONResponse({
+            "photo_id": str(photo_id),
+            "site_id": str(site_id),
+            "status": "scheduled",
+            "message": "Generazione tiles avviata con successo",
+            "task_info": result,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error scheduling tiles generation for photo {photo_id}: {e}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore durante l'avvio della generazione tiles: {str(e)}"
+        )
+
+
+@router.post("/deepzoom/verify-and-repair", 
+             summary="Verifica stato tiles e avvia riparazione se necessario", 
+             tags=["Deep Zoom - Tiles Management"])
+async def verify_and_repair_tiles(
+    photo_id: UUID,
+    site_id: UUID,
+    auto_repair: bool = True,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Verifica lo stato dei tiles per una foto e avvia automaticamente la generazione se mancanti
+
+    Args:
+        photo_id: ID della foto da verificare
+        site_id: ID del sito archeologico
+        auto_repair: Se True, avvia automaticamente la generazione se i tiles sono mancanti
+
+    Returns:
+        Stato completo della verifica e eventuale riparazione
+    """
+    # Verify site access
+    site_info = verify_site_access(site_id, user_sites)
+
+    # Verify read permissions
+    if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
+        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
+
+    try:
+        # Verifica che la foto esista e appartenga al sito
+        photo_query = select(Photo).where(
+            and_(Photo.id == photo_id, Photo.site_id == site_id)
+        )
+        photo_result = await db.execute(photo_query)
+        photo = photo_result.scalar_one_or_none()
+
+        if not photo:
+            raise HTTPException(status_code=404, detail="Foto non trovata nel sito specificato")
+
         # Verifica lo stato dei tiles
         tile_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo_id))
         processing_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo_id))
-        
+        task_status = await deep_zoom_background_service.get_task_status(str(photo_id))
+
         # Determina lo stato attuale
         current_status = "unknown"
         status_message = ""
         repair_needed = False
         repair_action = None
-        
-        if tile_info and tile_info.get('available', False):
+
+        if task_status and task_status['status'] in ['pending', 'processing', 'retrying']:
+            current_status = "processing"
+            status_message = f"Generazione tiles già in corso (stato: {task_status['status']})"
+        elif tile_info and tile_info.get('available', False):
             current_status = "complete"
             status_message = "Tiles già generati e disponibili"
         elif processing_status and processing_status.get('status') == 'failed':
@@ -505,7 +576,7 @@ async def v1_verify_and_repair_tiles(
             current_status = "missing"
             status_message = "Tiles non generati"
             repair_needed = True
-        
+
         # Log attività di verifica
         activity = UserActivity(
             user_id=current_user_id,
@@ -519,10 +590,9 @@ async def v1_verify_and_repair_tiles(
                 "auto_repair": auto_repair
             }
         )
-        
         db.add(activity)
         await db.commit()
-        
+
         response_data = {
             "photo_id": str(photo_id),
             "site_id": str(site_id),
@@ -530,24 +600,49 @@ async def v1_verify_and_repair_tiles(
             "status_message": status_message,
             "tile_info": tile_info,
             "processing_status": processing_status,
+            "task_status": task_status,
             "repair_needed": repair_needed,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        
+
         # Se è richiesta la riparazione automatica e i tiles sono mancanti/falliti
-        if auto_repair and repair_needed:
+        if auto_repair and repair_needed and site_info.get("permission_level") in ["admin", "editor"]:
             try:
-                # Usa la funzione di processo esistente
-                result = await process_deep_zoom(site_id, photo_id, current_user_id, user_sites, db)
-                
+                # Carica il contenuto del file originale
+                original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+
+                # Prepara i metadati archeologici
+                archaeological_metadata = {
+                    'inventory_number': photo.inventory_number,
+                    'excavation_area': photo.excavation_area,
+                    'material': photo.material.value if photo.material else None,
+                    'chronology_period': photo.chronology_period,
+                    'photo_type': photo.photo_type.value if photo.photo_type else None,
+                    'photographer': photo.photographer,
+                    'description': photo.description,
+                    'keywords': photo.keywords
+                }
+
+                # Avvia il processo di generazione tiles
+                repair_result = await deep_zoom_background_service.schedule_tile_processing(
+                    photo_id=str(photo_id),
+                    site_id=str(site_id),
+                    file_path=photo.filepath,
+                    original_file_content=original_file_content,
+                    archaeological_metadata=archaeological_metadata
+                )
+
+                # Aggiorna lo stato nel database
+                photo.deepzoom_status = 'scheduled'
+                await db.commit()
+
                 repair_action = {
                     "action": "auto_repair_scheduled",
                     "message": "Riparazione automatica avviata",
-                    "repair_result": result
+                    "repair_result": repair_result
                 }
-                
                 response_data["repair_action"] = repair_action
-                
+
                 # Log attività di riparazione
                 repair_activity = UserActivity(
                     user_id=current_user_id,
@@ -560,12 +655,11 @@ async def v1_verify_and_repair_tiles(
                         "action": "auto_repair"
                     }
                 )
-                
                 db.add(repair_activity)
                 await db.commit()
-                
+
                 logger.info(f"Auto-repair scheduled for photo {photo_id} by user {current_user_id}")
-                
+
             except Exception as repair_error:
                 logger.error(f"Failed to schedule auto-repair for photo {photo_id}: {repair_error}")
                 repair_action = {
@@ -574,9 +668,9 @@ async def v1_verify_and_repair_tiles(
                     "error": str(repair_error)
                 }
                 response_data["repair_action"] = repair_action
-        
+
         return JSONResponse(response_data)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -587,9 +681,13 @@ async def v1_verify_and_repair_tiles(
             detail=f"Errore durante la verifica dei tiles: {str(e)}"
         )
 
-@router.get("/sites/{site_id}/batch-status", summary="Status batch tiles", tags=["Deep Zoom - Maintenance"])
-async def v1_get_batch_tiles_status(
+
+@router.get("/deepzoom/batch-status", 
+            summary="Ottieni stato tiles per un batch di foto", 
+            tags=["Deep Zoom - Tiles Management"])
+async def get_batch_tiles_status(
     site_id: UUID,
+    photo_ids: Optional[List[UUID]] = None,
     limit: int = 100,
     offset: int = 0,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
@@ -597,39 +695,52 @@ async def v1_get_batch_tiles_status(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Ottieni lo stato dei tiles per un batch di foto.
-    
-    Utile per monitoring e report di sistema.
+    Ottieni lo stato dei tiles per un batch di foto
+
+    Args:
+        site_id: ID del sito archeologico
+        photo_ids: Lista specifica di ID foto (opzionale)
+        limit: Limite risultati per paginazione
+        offset: Offset per paginazione
+
+    Returns:
+        Stato dei tiles per le foto richieste
     """
-    # Verifica accesso al sito
+    # Verify site access
     site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di lettura
+
+    # Verify read permissions
     if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
         raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-    
+
     try:
         # Costruisci la query base
         photos_query = select(Photo).where(Photo.site_id == site_id)
-        
+
+        # Filtra per ID specifici se forniti
+        if photo_ids:
+            photos_query = photos_query.where(Photo.id.in_(photo_ids))
+
         # Applica paginazione
         photos_query = photos_query.offset(offset).limit(limit)
-        
+
         # Esegui la query
         photos_result = await db.execute(photos_query)
         photos = photos_result.scalars().all()
-        
+
         # Prepara i risultati
         batch_status = []
-        
         for photo in photos:
             # Ottieni informazioni sui tiles
             tile_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo.id))
             processing_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo.id))
-            
+            task_status = await deep_zoom_background_service.get_task_status(str(photo.id))
+
             # Determina lo stato complessivo
             overall_status = "unknown"
-            if tile_info and tile_info.get('available', False):
+            if task_status and task_status['status'] in ['pending', 'processing', 'retrying']:
+                overall_status = "processing"
+            elif tile_info and tile_info.get('available', False):
                 overall_status = "complete"
             elif processing_status and processing_status.get('status') == 'failed':
                 overall_status = "failed"
@@ -637,7 +748,7 @@ async def v1_get_batch_tiles_status(
                 overall_status = photo.deepzoom_status
             else:
                 overall_status = "missing"
-            
+
             photo_status = {
                 "photo_id": str(photo.id),
                 "filename": photo.filename,
@@ -646,19 +757,19 @@ async def v1_get_batch_tiles_status(
                 "has_deep_zoom": photo.has_deep_zoom,
                 "tile_count": photo.tile_count,
                 "max_zoom_level": photo.max_zoom_level,
-                "deep_zoom_processed_at": photo.deep_zoom_processed_at.isoformat() if photo.deep_zoom_processed_at else None,
+                "deepzoom_processed_at": photo.deepzoom_processed_at.isoformat() if photo.deepzoom_processed_at else None,
                 "tile_info": tile_info,
-                "processing_status": processing_status
+                "processing_status": processing_status,
+                "task_status": task_status
             }
-            
             batch_status.append(photo_status)
-        
+
         # Calcola statistiche
         status_counts = {}
         for status_item in batch_status:
             status = status_item["overall_status"]
             status_counts[status] = status_counts.get(status, 0) + 1
-        
+
         return JSONResponse({
             "site_id": str(site_id),
             "batch_status": batch_status,
@@ -677,7 +788,7 @@ async def v1_get_batch_tiles_status(
             },
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting batch tiles status for site {site_id}: {e}")
         raise HTTPException(
@@ -685,8 +796,11 @@ async def v1_get_batch_tiles_status(
             detail=f"Errore durante il recupero dello stato batch: {str(e)}"
         )
 
-@router.post("/sites/{site_id}/batch-repair", summary="Riparazione batch tiles", tags=["Deep Zoom - Maintenance"])
-async def v1_batch_repair_tiles(
+
+@router.post("/deepzoom/batch-repair", 
+             summary="Avvia riparazione batch tiles per più foto", 
+             tags=["Deep Zoom - Tiles Management"])
+async def batch_repair_tiles(
     site_id: UUID,
     photo_ids: List[UUID],
     force_repair: bool = False,
@@ -695,20 +809,23 @@ async def v1_batch_repair_tiles(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Avvia la riparazione batch dei tiles per più foto.
-    
-    Supporta force repair per rigenerare anche tiles esistenti.
+    Avvia la riparazione batch dei tiles per più foto
+
+    Args:
+        site_id: ID del sito archeologico
+        photo_ids: Lista di ID foto da riparare
+        force_repair: Se True, rigenera anche i tiles esistenti
+
+    Returns:
+        Risultati della riparazione batch
     """
-    # Verifica accesso al sito
+    # Verify site access
     site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di manutenzione
+
+    # Verify write permissions
     if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per riparazione batch tiles"
-        )
-    
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+
     try:
         # Verifica che le foto esistano e appartengano al sito
         photos_query = select(Photo).where(
@@ -716,10 +833,10 @@ async def v1_batch_repair_tiles(
         )
         photos_result = await db.execute(photos_query)
         photos = photos_result.scalars().all()
-        
+
         if not photos:
             raise HTTPException(status_code=404, detail="Nessuna foto trovata con gli ID specificati")
-        
+
         # Risultati della riparazione
         repair_results = {
             "total_requested": len(photo_ids),
@@ -729,43 +846,69 @@ async def v1_batch_repair_tiles(
             "failed": 0,
             "details": []
         }
-        
+
         for photo in photos:
             try:
                 # Verifica lo stato attuale
                 tile_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo.id))
-                
+                task_status = await deep_zoom_background_service.get_task_status(str(photo.id))
+
                 # Determina se la riparazione è necessaria
                 needs_repair = False
                 skip_reason = None
-                
-                if tile_info and tile_info.get('available', False) and not force_repair:
+
+                if task_status and task_status['status'] in ['pending', 'processing', 'retrying']:
+                    skip_reason = "Già in elaborazione"
+                elif tile_info and tile_info.get('available', False) and not force_repair:
                     skip_reason = "Tiles già disponibili"
                 else:
                     needs_repair = True
-                
+
                 photo_result = {
                     "photo_id": str(photo.id),
                     "filename": photo.filename,
                     "needs_repair": needs_repair,
                     "skip_reason": skip_reason
                 }
-                
+
                 if needs_repair:
+                    # Carica il contenuto del file originale
+                    original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+
+                    # Prepara i metadati archeologici
+                    archaeological_metadata = {
+                        'inventory_number': photo.inventory_number,
+                        'excavation_area': photo.excavation_area,
+                        'material': photo.material.value if photo.material else None,
+                        'chronology_period': photo.chronology_period,
+                        'photo_type': photo.photo_type.value if photo.photo_type else None,
+                        'photographer': photo.photographer,
+                        'description': photo.description,
+                        'keywords': photo.keywords
+                    }
+
                     # Avvia il processo di generazione tiles
-                    repair_result = await process_deep_zoom(site_id, photo.id, current_user_id, user_sites, db)
-                    
+                    repair_result = await deep_zoom_background_service.schedule_tile_processing(
+                        photo_id=str(photo.id),
+                        site_id=str(site_id),
+                        file_path=photo.filepath,
+                        original_file_content=original_file_content,
+                        archaeological_metadata=archaeological_metadata
+                    )
+
+                    # Aggiorna lo stato nel database
+                    photo.deepzoom_status = 'scheduled'
+
                     photo_result.update({
                         "repair_scheduled": True,
                         "repair_result": repair_result
                     })
-                    
                     repair_results["scheduled"] += 1
                 else:
                     repair_results["skipped"] += 1
-                
+
                 repair_results["details"].append(photo_result)
-                
+
             except Exception as photo_error:
                 logger.error(f"Failed to process photo {photo.id} in batch repair: {photo_error}")
                 repair_results["details"].append({
@@ -774,7 +917,10 @@ async def v1_batch_repair_tiles(
                     "error": str(photo_error)
                 })
                 repair_results["failed"] += 1
-        
+
+        # Commit delle modifiche al database
+        await db.commit()
+
         # Log attività batch
         activity = UserActivity(
             user_id=current_user_id,
@@ -789,18 +935,17 @@ async def v1_batch_repair_tiles(
                 "force_repair": force_repair
             }
         )
-        
         db.add(activity)
         await db.commit()
-        
+
         logger.info(f"Batch tiles repair scheduled for site {site_id} by user {current_user_id}: {repair_results['scheduled']} photos")
-        
+
         return JSONResponse({
             "site_id": str(site_id),
             "batch_repair_results": repair_results,
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -811,38 +956,29 @@ async def v1_batch_repair_tiles(
             detail=f"Errore durante la riparazione batch: {str(e)}"
         )
 
-# VERIFICATION SERVICE ENDPOINTS
 
-@router.get("/sites/{site_id}/verification/status", summary="Status servizio verifica tiles", tags=["Deep Zoom - Maintenance"])
-async def v1_get_verification_status(
-    site_id: UUID,
+# ============================================================================
+# TILES VERIFICATION SERVICE ENDPOINTS
+# ============================================================================
+
+@router.get("/deepzoom/verification/status", 
+            summary="Ottieni stato servizio di verifica periodica tiles", 
+            tags=["Deep Zoom - Verification"])
+async def get_verification_status(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    """
-    Ottieni lo stato del servizio di verifica periodica dei tiles.
-    
-    Utile per monitoring e debugging del sistema.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di lettura
-    if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-    
+    """Ottieni lo stato del servizio di verifica periodica dei tiles"""
     try:
         from app.services.tiles_verification_service import tiles_verification_service
-        
+
         verification_status = await tiles_verification_service.get_verification_status()
-        
+
         return JSONResponse({
             "verification_service_status": verification_status,
-            "site_id": str(site_id),
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
-        
+
     except Exception as e:
         logger.error(f"Error getting verification service status: {e}")
         raise HTTPException(
@@ -850,60 +986,65 @@ async def v1_get_verification_status(
             detail=f"Errore durante il recupero dello stato del servizio di verifica: {str(e)}"
         )
 
-@router.post("/sites/{site_id}/verification/trigger", summary="Avvia verifica manuale tiles", tags=["Deep Zoom - Maintenance"])
-async def v1_trigger_manual_verification(
-    site_id: UUID,
+
+@router.post("/deepzoom/verification/trigger", 
+             summary="Avvia manualmente verifica tiles per sito", 
+             tags=["Deep Zoom - Verification"])
+async def trigger_manual_verification(
+    site_id: Optional[UUID] = None,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Avvia manualmente la verifica dei tiles per il sito specificato.
-    
-    Utile per manutenzione programmata o debugging.
+    Avvia manualmente la verifica dei tiles per un sito specifico o per tutti i siti
+
+    Args:
+        site_id: ID del sito da verificare (opzionale, se None verifica tutti i siti)
+
+    Returns:
+        Risultato dell'avvio della verifica manuale
     """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di scrittura
-    if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per avviare verifica manuale"
-        )
-    
+    # If site_id is specified, verify access
+    if site_id:
+        site_info = verify_site_access(site_id, user_sites)
+        if site_info.get("permission_level") not in ["admin", "editor"]:
+            raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+
     try:
         from app.services.tiles_verification_service import tiles_verification_service
-        
+
         # Avvia la verifica manuale
         result = await tiles_verification_service.trigger_manual_verification(
-            site_id=str(site_id)
+            site_id=str(site_id) if site_id else None
         )
-        
+
         # Log attività
         activity = UserActivity(
             user_id=current_user_id,
-            site_id=site_id,
+            site_id=site_id if site_id else None,
             activity_type="MANUAL_TILES_VERIFICATION",
-            activity_desc=f"Avviata verifica manuale tiles per sito {site_id}",
+            activity_desc=f"Avviata verifica manuale tiles" + (f" per sito {site_id}" if site_id else " per tutti i siti"),
             extra_data={
-                "site_id": str(site_id),
+                "site_id": str(site_id) if site_id else None,
                 "action": "manual_verification_trigger"
             }
         )
-        
         db.add(activity)
         await db.commit()
-        
-        logger.info(f"Manual tiles verification triggered by user {current_user_id} for site {site_id}")
-        
+
+        logger.info(f"Manual tiles verification triggered by user {current_user_id}" +
+                   (f" for site {site_id}" if site_id else " for all sites"))
+
         return JSONResponse({
             "verification_result": result,
             "triggered_by": str(current_user_id),
-            "site_id": str(site_id),
+            "site_id": str(site_id) if site_id else None,
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error triggering manual verification: {e}")
         await db.rollback()
@@ -912,73 +1053,83 @@ async def v1_trigger_manual_verification(
             detail=f"Errore durante l'avvio della verifica manuale: {str(e)}"
         )
 
-@router.put("/sites/{site_id}/verification/configure", summary="Configura servizio verifica tiles", tags=["Deep Zoom - Maintenance"])
-async def v1_configure_verification_service(
-    site_id: UUID,
-    config: VerificationConfig,
+
+@router.put("/deepzoom/verification/configure", 
+            summary="Configura impostazioni servizio di verifica periodica", 
+            tags=["Deep Zoom - Verification"])
+async def configure_verification_service(
+    verification_interval_hours: Optional[int] = None,
+    batch_size: Optional[int] = None,
+    max_concurrent_verifications: Optional[int] = None,
+    auto_repair_enabled: Optional[bool] = None,
+    site_id: UUID = None,  # Required for permission check
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Configura le impostazioni del servizio di verifica periodica dei tiles.
-    
-    Richiede permessi di amministrazione.
+    Configura le impostazioni del servizio di verifica periodica dei tiles
+
+    Args:
+        verification_interval_hours: Intervallo di verifica in ore (default: 24)
+        batch_size: Dimensione del batch per elaborazione (default: 50)
+        max_concurrent_verifications: Numero massimo di verifiche concorrenti (default: 3)
+        auto_repair_enabled: Abilita riparazione automatica (default: True)
+
+    Returns:
+        Nuove configurazioni del servizio
     """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Solo gli amministratori possono configurare il servizio
-    if site_info.get("permission_level") != "admin":
-        raise HTTPException(status_code=403, detail="Permessi di amministrazione richiesti")
-    
+    # Verify site access and admin permissions
+    if site_id:
+        site_info = verify_site_access(site_id, user_sites)
+        if site_info.get("permission_level") != "admin":
+            raise HTTPException(status_code=403, detail="Permessi di amministrazione richiesti")
+
     try:
         from app.services.tiles_verification_service import tiles_verification_service
-        
+
         # Configura il servizio
         tiles_verification_service.configure_settings(
-            verification_interval_hours=config.verification_interval_hours,
-            batch_size=config.batch_size,
-            max_concurrent_verifications=config.max_concurrent_verifications,
-            auto_repair_enabled=config.auto_repair_enabled
+            verification_interval_hours=verification_interval_hours,
+            batch_size=batch_size,
+            max_concurrent_verifications=max_concurrent_verifications,
+            auto_repair_enabled=auto_repair_enabled
         )
-        
+
         # Log attività
         activity = UserActivity(
             user_id=current_user_id,
-            site_id=site_id,
+            site_id=site_id if site_id else None,
             activity_type="VERIFICATION_SERVICE_CONFIG",
             activity_desc="Configurato servizio di verifica periodica tiles",
             extra_data={
-                "verification_interval_hours": config.verification_interval_hours,
-                "batch_size": config.batch_size,
-                "max_concurrent_verifications": config.max_concurrent_verifications,
-                "auto_repair_enabled": config.auto_repair_enabled
+                "verification_interval_hours": verification_interval_hours,
+                "batch_size": batch_size,
+                "max_concurrent_verifications": max_concurrent_verifications,
+                "auto_repair_enabled": auto_repair_enabled
             }
         )
-        
         db.add(activity)
         await db.commit()
-        
+
         logger.info(f"Verification service configured by user {current_user_id}")
-        
+
         # Ottieni lo stato aggiornato
         verification_status = await tiles_verification_service.get_verification_status()
-        
+
         return JSONResponse({
             "message": "Servizio di verifica configurato con successo",
             "configured_by": str(current_user_id),
             "new_configuration": {
-                "verification_interval_hours": config.verification_interval_hours,
-                "batch_size": config.batch_size,
-                "max_concurrent_verifications": config.max_concurrent_verifications,
-                "auto_repair_enabled": config.auto_repair_enabled
+                "verification_interval_hours": verification_interval_hours,
+                "batch_size": batch_size,
+                "max_concurrent_verifications": max_concurrent_verifications,
+                "auto_repair_enabled": auto_repair_enabled
             },
             "updated_service_status": verification_status,
-            "site_id": str(site_id),
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
-        
+
     except Exception as e:
         logger.error(f"Error configuring verification service: {e}")
         await db.rollback()
@@ -987,31 +1138,28 @@ async def v1_configure_verification_service(
             detail=f"Errore durante la configurazione del servizio: {str(e)}"
         )
 
-@router.post("/sites/{site_id}/verification/start", summary="Avvia servizio verifica periodica", tags=["Deep Zoom - Maintenance"])
-async def v1_start_verification_service(
-    site_id: UUID,
+
+@router.post("/deepzoom/verification/start", 
+             summary="Avvia servizio di verifica periodica tiles", 
+             tags=["Deep Zoom - Verification"])
+async def start_verification_service(
+    site_id: UUID,  # Required for permission check
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
-    """
-    Avvia il servizio di verifica periodica dei tiles.
-    
-    Richiede permessi di amministrazione.
-    """
-    # Verifica accesso al sito
+    """Avvia il servizio di verifica periodica dei tiles"""
+    # Verify site access and admin permissions
     site_info = verify_site_access(site_id, user_sites)
-    
-    # Solo gli amministratori possono avviare il servizio
     if site_info.get("permission_level") != "admin":
         raise HTTPException(status_code=403, detail="Permessi di amministrazione richiesti")
-    
+
     try:
         from app.services.tiles_verification_service import tiles_verification_service
-        
+
         # Avvia il servizio
         await tiles_verification_service.start_periodic_verification()
-        
+
         # Log attività
         activity = UserActivity(
             user_id=current_user_id,
@@ -1020,23 +1168,21 @@ async def v1_start_verification_service(
             activity_desc="Avviato servizio di verifica periodica tiles",
             extra_data={"action": "start_verification_service"}
         )
-        
         db.add(activity)
         await db.commit()
-        
+
         logger.info(f"Verification service started by user {current_user_id}")
-        
+
         # Ottieni lo stato del servizio
         verification_status = await tiles_verification_service.get_verification_status()
-        
+
         return JSONResponse({
             "message": "Servizio di verifica periodica avviato con successo",
             "started_by": str(current_user_id),
             "service_status": verification_status,
-            "site_id": str(site_id),
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
-        
+
     except Exception as e:
         logger.error(f"Error starting verification service: {e}")
         await db.rollback()
@@ -1045,31 +1191,28 @@ async def v1_start_verification_service(
             detail=f"Errore durante l'avvio del servizio: {str(e)}"
         )
 
-@router.post("/sites/{site_id}/verification/stop", summary="Ferma servizio verifica periodica", tags=["Deep Zoom - Maintenance"])
-async def v1_stop_verification_service(
-    site_id: UUID,
+
+@router.post("/deepzoom/verification/stop", 
+             summary="Ferma servizio di verifica periodica tiles", 
+             tags=["Deep Zoom - Verification"])
+async def stop_verification_service(
+    site_id: UUID,  # Required for permission check
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
-    """
-    Ferma il servizio di verifica periodica dei tiles.
-    
-    Richiede permessi di amministrazione.
-    """
-    # Verifica accesso al sito
+    """Ferma il servizio di verifica periodica dei tiles"""
+    # Verify site access and admin permissions
     site_info = verify_site_access(site_id, user_sites)
-    
-    # Solo gli amministratori possono fermare il servizio
     if site_info.get("permission_level") != "admin":
         raise HTTPException(status_code=403, detail="Permessi di amministrazione richiesti")
-    
+
     try:
         from app.services.tiles_verification_service import tiles_verification_service
-        
+
         # Ferma il servizio
         await tiles_verification_service.stop_periodic_verification()
-        
+
         # Log attività
         activity = UserActivity(
             user_id=current_user_id,
@@ -1078,23 +1221,21 @@ async def v1_stop_verification_service(
             activity_desc="Fermato servizio di verifica periodica tiles",
             extra_data={"action": "stop_verification_service"}
         )
-        
         db.add(activity)
         await db.commit()
-        
+
         logger.info(f"Verification service stopped by user {current_user_id}")
-        
+
         # Ottieni lo stato del servizio
         verification_status = await tiles_verification_service.get_verification_status()
-        
+
         return JSONResponse({
             "message": "Servizio di verifica periodica fermato con successo",
             "stopped_by": str(current_user_id),
             "service_status": verification_status,
-            "site_id": str(site_id),
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
-        
+
     except Exception as e:
         logger.error(f"Error stopping verification service: {e}")
         await db.rollback()
@@ -1103,30 +1244,96 @@ async def v1_stop_verification_service(
             detail=f"Errore durante l'arresto del servizio: {str(e)}"
         )
 
-# ENDPOINT DI BACKWARD COMPATIBILITY CON DEPRECAZIONE
 
-@router.get("/legacy/deepzoom/status/{site_id}", summary="[DEPRECATED] Status deep zoom legacy", tags=["Deep Zoom - Legacy"])
-async def legacy_get_deepzoom_status(
+# ============================================================================
+# BATCH PROCESSING ENDPOINTS
+# ============================================================================
+
+@router.post("/sites/{site_id}/photos/batch-process", 
+             summary="Processamento batch deep zoom", 
+             tags=["Deep Zoom - Batch"])
+async def v1_batch_process_deepzoom(
     site_id: UUID,
-    request: Request,
+    batch_request: BatchProcessRequest,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    ⚠️ DEPRECATED: Status deep zoom endpoint legacy.
-    
-    Usa /api/v1/deepzoom/sites/{site_id}/queue-status invece di questo endpoint.
-    Questo endpoint sarà rimosso il 31/12/2025.
+    Processa multiple foto per deep zoom in batch.
+    Supporta fino a 50 foto per richiesta con priorità personalizzabile.
     """
-    logger.warning(f"Legacy deepzoom status endpoint used for site {site_id} - deprecated")
-    response = await get_processing_queue_status(site_id, current_user_id, user_sites, db)
-    add_deprecation_headers(response, f"/api/v1/deepzoom/sites/{site_id}/queue-status")
-    return response
+    # Verifica accesso al sito
+    site_info = verify_site_access(site_id, user_sites)
 
-# MIGRATION HELPER
+    # Verifica permessi di processing
+    if site_info.get("permission_level") not in ["admin", "editor"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permessi insufficienti per processare deep zoom in batch"
+        )
 
-@router.get("/migration/help", summary="Aiuto migrazione API deep zoom", tags=["Deep Zoom - Migration"])
+    if len(batch_request.photo_ids) > 50:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum 50 photos per batch request"
+        )
+
+    # Verifica che tutte le foto appartengano al sito
+    photos = await db.execute(
+        select(Photo).where(Photo.id.in_(batch_request.photo_ids))
+    )
+    photos = photos.scalars().all()
+
+    if len(photos) != len(batch_request.photo_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Una o più foto non trovate"
+        )
+
+    # Verifica che tutte le foto appartengano al sito
+    for photo in photos:
+        if str(photo.site_id) != str(site_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Foto {photo.id} non appartiene al sito {site_id}"
+            )
+
+    # Avvia processing batch
+    results = []
+    for photo_id in batch_request.photo_ids:
+        try:
+            result = await process_deep_zoom(site_id, photo_id, current_user_id, user_sites, db)
+            results.append({
+                "photo_id": str(photo_id),
+                "status": "started",
+                "result": result
+            })
+        except Exception as e:
+            results.append({
+                "photo_id": str(photo_id),
+                "status": "error",
+                "error": str(e)
+            })
+
+    return {
+        "batch_id": f"batch_{site_id}_{current_user_id}_{len(batch_request.photo_ids)}",
+        "site_id": str(site_id),
+        "photos_processed": len(batch_request.photo_ids),
+        "results": results,
+        "priority": batch_request.priority,
+        "force_reprocess": batch_request.force_reprocess
+    }
+
+
+# ============================================================================
+# MIGRATION HELPER ENDPOINTS
+# ============================================================================
+
+@router.get("/migration/help", 
+            summary="Aiuto migrazione API deep zoom", 
+            tags=["Deep Zoom - Migration"])
 async def migration_help():
     """
     Fornisce informazioni sulla migrazione dalla vecchia alla nuova API structure per deep zoom.
@@ -1144,345 +1351,8 @@ async def migration_help():
                 "Agregazione endpoints deep zoom",
                 "Nuovi endpoints batch processing",
                 "Miglioramento gestione background processing",
-                "Headers di deprecazione automatici"
-            ],
-            "deadline": "2025-12-31",
-            "action_required": "Aggiornare client applications per usare nuovi endpoints deep zoom"
-        }
-    }# VERIFICATION SERVICE ENDPOINTS
-
-@router.get("/sites/{site_id}/verification/status", summary="Status servizio verifica tiles", tags=["Deep Zoom - Maintenance"])
-async def v1_get_verification_status(
-    site_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Ottieni lo stato del servizio di verifica periodica dei tiles.
-    
-    Utile per monitoring e debugging del sistema.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di lettura
-    if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-    
-    try:
-        from app.services.tiles_verification_service import tiles_verification_service
-        
-        verification_status = await tiles_verification_service.get_verification_status()
-        
-        return JSONResponse({
-            "verification_service_status": verification_status,
-            "site_id": str(site_id),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting verification service status: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Errore durante il recupero dello stato del servizio di verifica: {str(e)}"
-        )
-
-@router.post("/sites/{site_id}/verification/trigger", summary="Avvia verifica manuale tiles", tags=["Deep Zoom - Maintenance"])
-async def v1_trigger_manual_verification(
-    site_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Avvia manualmente la verifica dei tiles per il sito specificato.
-    
-    Utile per manutenzione programmata o debugging.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Verifica permessi di scrittura
-    if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per avviare verifica manuale"
-        )
-    
-    try:
-        from app.services.tiles_verification_service import tiles_verification_service
-        
-        # Avvia la verifica manuale
-        result = await tiles_verification_service.trigger_manual_verification(
-            site_id=str(site_id)
-        )
-        
-        # Log attività
-        activity = UserActivity(
-            user_id=current_user_id,
-            site_id=site_id,
-            activity_type="MANUAL_TILES_VERIFICATION",
-            activity_desc=f"Avviata verifica manuale tiles per sito {site_id}",
-            extra_data={
-                "site_id": str(site_id),
-                "action": "manual_verification_trigger"
-            }
-        )
-        
-        db.add(activity)
-        await db.commit()
-        
-        logger.info(f"Manual tiles verification triggered by user {current_user_id} for site {site_id}")
-        
-        return JSONResponse({
-            "verification_result": result,
-            "triggered_by": str(current_user_id),
-            "site_id": str(site_id),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error triggering manual verification: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Errore durante l'avvio della verifica manuale: {str(e)}"
-        )
-
-@router.put("/sites/{site_id}/verification/configure", summary="Configura servizio verifica tiles", tags=["Deep Zoom - Maintenance"])
-async def v1_configure_verification_service(
-    site_id: UUID,
-    config: VerificationConfig,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Configura le impostazioni del servizio di verifica periodica dei tiles.
-    
-    Richiede permessi di amministrazione.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Solo gli amministratori possono configurare il servizio
-    if site_info.get("permission_level") != "admin":
-        raise HTTPException(status_code=403, detail="Permessi di amministrazione richiesti")
-    
-    try:
-        from app.services.tiles_verification_service import tiles_verification_service
-        
-        # Configura il servizio
-        tiles_verification_service.configure_settings(
-            verification_interval_hours=config.verification_interval_hours,
-            batch_size=config.batch_size,
-            max_concurrent_verifications=config.max_concurrent_verifications,
-            auto_repair_enabled=config.auto_repair_enabled
-        )
-        
-        # Log attività
-        activity = UserActivity(
-            user_id=current_user_id,
-            site_id=site_id,
-            activity_type="VERIFICATION_SERVICE_CONFIG",
-            activity_desc="Configurato servizio di verifica periodica tiles",
-            extra_data={
-                "verification_interval_hours": config.verification_interval_hours,
-                "batch_size": config.batch_size,
-                "max_concurrent_verifications": config.max_concurrent_verifications,
-                "auto_repair_enabled": config.auto_repair_enabled
-            }
-        )
-        
-        db.add(activity)
-        await db.commit()
-        
-        logger.info(f"Verification service configured by user {current_user_id}")
-        
-        # Ottieni lo stato aggiornato
-        verification_status = await tiles_verification_service.get_verification_status()
-        
-        return JSONResponse({
-            "message": "Servizio di verifica configurato con successo",
-            "configured_by": str(current_user_id),
-            "new_configuration": {
-                "verification_interval_hours": config.verification_interval_hours,
-                "batch_size": config.batch_size,
-                "max_concurrent_verifications": config.max_concurrent_verifications,
-                "auto_repair_enabled": config.auto_repair_enabled
-            },
-            "updated_service_status": verification_status,
-            "site_id": str(site_id),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error configuring verification service: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Errore durante la configurazione del servizio: {str(e)}"
-        )
-
-@router.post("/sites/{site_id}/verification/start", summary="Avvia servizio verifica periodica", tags=["Deep Zoom - Maintenance"])
-async def v1_start_verification_service(
-    site_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Avvia il servizio di verifica periodica dei tiles.
-    
-    Richiede permessi di amministrazione.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Solo gli amministratori possono avviare il servizio
-    if site_info.get("permission_level") != "admin":
-        raise HTTPException(status_code=403, detail="Permessi di amministrazione richiesti")
-    
-    try:
-        from app.services.tiles_verification_service import tiles_verification_service
-        
-        # Avvia il servizio
-        await tiles_verification_service.start_periodic_verification()
-        
-        # Log attività
-        activity = UserActivity(
-            user_id=current_user_id,
-            site_id=site_id,
-            activity_type="VERIFICATION_SERVICE_START",
-            activity_desc="Avviato servizio di verifica periodica tiles",
-            extra_data={"action": "start_verification_service"}
-        )
-        
-        db.add(activity)
-        await db.commit()
-        
-        logger.info(f"Verification service started by user {current_user_id}")
-        
-        # Ottieni lo stato del servizio
-        verification_status = await tiles_verification_service.get_verification_status()
-        
-        return JSONResponse({
-            "message": "Servizio di verifica periodica avviato con successo",
-            "started_by": str(current_user_id),
-            "service_status": verification_status,
-            "site_id": str(site_id),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error starting verification service: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Errore durante l'avvio del servizio: {str(e)}"
-        )
-
-@router.post("/sites/{site_id}/verification/stop", summary="Ferma servizio verifica periodica", tags=["Deep Zoom - Maintenance"])
-async def v1_stop_verification_service(
-    site_id: UUID,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Ferma il servizio di verifica periodica dei tiles.
-    
-    Richiede permessi di amministrazione.
-    """
-    # Verifica accesso al sito
-    site_info = verify_site_access(site_id, user_sites)
-    
-    # Solo gli amministratori possono fermare il servizio
-    if site_info.get("permission_level") != "admin":
-        raise HTTPException(status_code=403, detail="Permessi di amministrazione richiesti")
-    
-    try:
-        from app.services.tiles_verification_service import tiles_verification_service
-        
-        # Ferma il servizio
-        await tiles_verification_service.stop_periodic_verification()
-        
-        # Log attività
-        activity = UserActivity(
-            user_id=current_user_id,
-            site_id=site_id,
-            activity_type="VERIFICATION_SERVICE_STOP",
-            activity_desc="Fermato servizio di verifica periodica tiles",
-            extra_data={"action": "stop_verification_service"}
-        )
-        
-        db.add(activity)
-        await db.commit()
-        
-        logger.info(f"Verification service stopped by user {current_user_id}")
-        
-        # Ottieni lo stato del servizio
-        verification_status = await tiles_verification_service.get_verification_status()
-        
-        return JSONResponse({
-            "message": "Servizio di verifica periodica fermato con successo",
-            "stopped_by": str(current_user_id),
-            "service_status": verification_status,
-            "site_id": str(site_id),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error stopping verification service: {e}")
-        await db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Errore durante l'arresto del servizio: {str(e)}"
-        )
-
-# ENDPOINT DI BACKWARD COMPATIBILITY CON DEPRECAZIONE
-
-@router.get("/legacy/deepzoom/status/{site_id}", summary="[DEPRECATED] Status deep zoom legacy", tags=["Deep Zoom - Legacy"])
-async def legacy_get_deepzoom_status(
-    site_id: UUID,
-    request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    ⚠️ DEPRECATED: Status deep zoom endpoint legacy.
-    
-    Usa /api/v1/deepzoom/sites/{site_id}/queue-status invece di questo endpoint.
-    Questo endpoint sarà rimosso il 31/12/2025.
-    """
-    logger.warning(f"Legacy deepzoom status endpoint used for site {site_id} - deprecated")
-    response = await get_processing_queue_status(site_id, current_user_id, user_sites, db)
-    add_deprecation_headers(response, f"/api/v1/deepzoom/sites/{site_id}/queue-status")
-    return response
-
-# MIGRATION HELPER
-
-@router.get("/migration/help", summary="Aiuto migrazione API deep zoom", tags=["Deep Zoom - Migration"])
-async def migration_help():
-    """
-    Fornisce informazioni sulla migrazione dalla vecchia alla nuova API structure per deep zoom.
-    """
-    return {
-        "migration_guide": {
-            "old_endpoints": {
-                "/api/site/{site_id}/photos/{photo_id}/deepzoom/process": "/api/v1/deepzoom/sites/{site_id}/photos/{photo_id}/process",
-                "/api/site/{site_id}/photos/{photo_id}/deepzoom/status": "/api/v1/deepzoom/sites/{site_id}/photos/{photo_id}/status",
-                "/api/site/{site_id}/photos/{photo_id}/deepzoom/tiles/{level}/{x}_{y}.{format}": "/api/v1/deepzoom/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.{format}",
-                "/api/site/{site_id}/photos/processing-queue": "/api/v1/deepzoom/sites/{site_id}/processing-queue",
-            },
-            "changes": [
-                "Standardizzazione URL patterns",
-                "Agregazione endpoints deep zoom",
-                "Nuovi endpoints batch processing",
-                "Miglioramento gestione background processing",
-                "Headers di deprecazione automatici"
+                "Headers di deprecazione automatici",
+                "Consolidamento da sites_deepzoom.py e deepzoom_tiles.py"
             ],
             "deadline": "2025-12-31",
             "action_required": "Aggiornare client applications per usare nuovi endpoints deep zoom"

@@ -56,9 +56,6 @@ from app.routes.api.database_monitoring import router as database_monitoring_rou
 from app.routes.api.queue_monitoring import queue_monitoring_router
 # 📊 NUOVO IMPORT - Router Performance Monitoring API
 from app.routes.api.performance_monitoring import router as performance_monitoring_router
-# 🔧 NUOVO IMPORT - Router DeepZoom Tiles Management
-from app.routes.api.deepzoom_tiles import deepzoom_tiles_router
-
 from app.routes import photo_metadata
 from app.routes.api.us import us_router
 from app.routes.view.us import us_view_router
@@ -412,13 +409,6 @@ app.include_router(
     tags=["performance-monitoring"],
     prefix="/api/performance-monitoring",
     dependencies=[Depends(get_current_user_id_with_blacklist)]
-)
-
-# 🔧 INCLUSIONE ROUTER DEEPZOOM TILES - API per gestione tiles deep zoom
-app.include_router(
-    deepzoom_tiles_router,
-    tags=["deepzoom-tiles"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 
 # 🏺 INCLUSIONE ROUTER US/USM - API per Unità Stratigrafiche

@@ -2252,7 +2252,7 @@ function photosManager() {
                         // Use tile format from deep zoom info (PNG for transparent images, JPG for others)
                         const tileFormat = deepZoomInfo.tile_format || 'jpg';
                         const extension = tileFormat === 'png' ? 'png' : 'jpg';
-                        const url = `/api/v1/sites/{{ site.id }}/photos/${photoId}/deepzoom/tiles/${level}/${x}_${y}.${extension}`;
+                        const url = `/api/v1/deepzoom/sites/{{ site.id }}/photos/${photoId}/tiles/${level}/${x}_${y}.${extension}`;
                         return url;
                     }
                 };
@@ -2865,7 +2865,7 @@ function photosManager() {
                 const siteId = this.getCurrentSiteId();
                 console.log('Getting deep zoom info for:', siteId, this.currentPhoto.id);
                 
-                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/${this.currentPhoto.id}/deepzoom/info`, {
+                const response = await fetch(`/api/v1/deepzoom/sites/{{ site.id }}/photos/${this.currentPhoto.id}/info`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -4199,8 +4199,8 @@ function photosManager() {
             
             try {
                 const siteId = this.getCurrentSiteId();
-                
-                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/${photo.id}/deepzoom/status`, {
+
+                const response = await fetch(`/api/v1/deepzoom/sites/{{ site.id }}/photos/${photo.id}/status`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
