@@ -399,17 +399,280 @@
                         Descrizione Attività
                     </h4>
                     
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Descrizione Lavori <span class="text-red-500">*</span>
+                            </label>
+                            <textarea name="descrizione_lavori"
+                                      x-model="formData.descrizione_lavori"
+                                      :required="modalMode === 'giornale'"
+                                      rows="4"
+                                      placeholder="Descrizione dettagliata delle attività svolte durante la giornata..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Modalità Lavorazioni
+                            </label>
+                            <textarea name="modalita_lavorazioni"
+                                      x-model="formData.modalita_lavorazioni"
+                                      rows="4"
+                                      placeholder="Modalità e metodologie di lavorazione adottate..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Descrivi le metodologie specifiche adottate per i lavori
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Disposizioni e Ordini di Servizio -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-clipboard-list mr-2 text-red-600"></i>
+                        Disposizioni e Ordini di Servizio
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Disposizioni RUP
+                            </label>
+                            <textarea name="disposizioni_rup"
+                                      x-model="formData.disposizioni_rup"
+                                      rows="4"
+                                      placeholder="Disposizioni ricevute dal Responsabile Unico del Procedimento..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Ordini e direttive del RUP (Responsabile Unico del Procedimento)
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Disposizioni Direttore Lavori
+                            </label>
+                            <textarea name="disposizioni_direttore"
+                                      x-model="formData.disposizioni_direttore"
+                                      rows="4"
+                                      placeholder="Disposizioni ricevute dal Direttore dei Lavori/Scientifico..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Ordini e direttive del Direttore dei Lavori o Direttore Scientifico
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Eventi Particolari -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>
+                        Eventi Particolari
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Sospensioni
+                            </label>
+                            <textarea name="sospensioni"
+                                      x-model="formData.sospensioni"
+                                      rows="3"
+                                      placeholder="Motivi di sospensione e ripresa lavori..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 border-yellow-300 dark:border-yellow-600"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Eventuali sospensioni e relativi motivi
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Contestazioni
+                            </label>
+                            <textarea name="contestazioni"
+                                      x-model="formData.contestazioni"
+                                      rows="3"
+                                      placeholder="Eventuali contestazioni ricevute..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 border-yellow-300 dark:border-yellow-600"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Contestazioni o problematiche riscontrate
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Incidenti
+                            </label>
+                            <textarea name="incidenti"
+                                      x-model="formData.incidenti"
+                                      rows="3"
+                                      placeholder="Eventuali incidenti o problemi di sicurezza..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 border-red-300 dark:border-red-600"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Incidenti o problemi di sicurezza
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Note e Osservazioni Estese -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-sticky-note mr-2 text-yellow-600"></i>
+                        Note e Osservazioni
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note Generali</label>
+                            <textarea name="note_generali"
+                                      x-model="formData.note_generali"
+                                      rows="3"
+                                      placeholder="Note e osservazioni generali..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Problematiche</label>
+                            <textarea name="problematiche"
+                                      x-model="formData.problematiche"
+                                      rows="3"
+                                      placeholder="Problematiche incontrate durante i lavori..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 border-red-300 dark:border-red-600"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Sopralluoghi
+                            </label>
+                            <textarea name="sopralluoghi"
+                                      x-model="formData.sopralluoghi"
+                                      rows="3"
+                                      placeholder="Es: Sopralluogo Soprintendenza ore 10:30 - Dott.ssa Rossi..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Sopralluoghi e visite ricevute in cantiere
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Forniture
+                            </label>
+                            <textarea name="forniture"
+                                      x-model="formData.forniture"
+                                      rows="3"
+                                      placeholder="Materiali consegnati in cantiere..."
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Materiali e forniture consegnate in cantiere
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Note Meteo (campo aggiuntivo) -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-cloud mr-2 text-blue-600"></i>
+                        Note Meteo
+                    </h4>
+                    
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Descrizione Lavori <span class="text-red-500">*</span>
+                            Note Aggiuntive Condizioni Meteo
                         </label>
-                        <textarea name="descrizione_lavori"
-                                  x-model="formData.descrizione_lavori"
-                                  :required="modalMode === 'giornale'"
-                                  rows="4"
-                                  placeholder="Descrizione dettagliata delle attività svolte durante la giornata..."
+                        <textarea name="note_meteo"
+                                  x-model="formData.note_meteo"
+                                  rows="2"
+                                  placeholder="Note aggiuntive sulle condizioni meteorologiche..."
                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Osservazioni specifiche sulle condizioni meteo che potrebbero aver influenzato i lavori
+                        </p>
                     </div>
+                </div>
+                
+                <!-- Documentazione Prodotta -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                        <i class="fas fa-file-alt mr-2 text-purple-600"></i>
+                        Documentazione Prodotta
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Documentazione Grafica e Fotografica
+                            </label>
+                            <textarea name="documentazione_prodotta"
+                                      x-model="formData.documentazione_prodotta"
+                                      rows="4"
+                                      placeholder="Es: Pianta US001 1:20, Sezioni A-A' e B-B', Foto nn. 150-175"
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Documentazione grafica e fotografica prodotta durante le lavorazioni
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Materiali Rinvenuti
+                            </label>
+                            <textarea name="materiali_rinvenuti"
+                                      x-model="formData.materiali_rinvenuti"
+                                      rows="4"
+                                      placeholder="Es: Ceramica romana (frr. 15), Monete (n.3), Ossa animali"
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Materiali archeologici rinvenuti durante i lavori
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Unità Stratigrafiche Elaborate -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                US Elaborate
+                            </label>
+                            <input type="text"
+                                   name="us_elaborate"
+                                   x-model="formData.us_elaborate"
+                                   placeholder="Es: US001, US002, US003"
+                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                USM Elaborate
+                            </label>
+                            <input type="text"
+                                   name="usm_elaborate"
+                                   x-model="formData.usm_elaborate"
+                                   placeholder="Es: USM001, USM002"
+                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                USR Elaborate
+                            </label>
+                            <input type="text"
+                                   name="usr_elaborate"
+                                   x-model="formData.usr_elaborate"
+                                   placeholder="Es: USR001, USR002"
+                                   class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Inserisci i codici delle unità stratigrafiche elaborate, separati da virgole
+                    </p>
                 </div>
                 
                 <!-- Operatori Presenti -->
@@ -527,68 +790,100 @@
                     </p>
                 </div>
                 
-                <!-- Unità Stratigrafiche -->
-                <div class="mb-8">
+                <!-- Stato Validazione -->
+                <div class="mb-8" x-show="editingGiornale">
                     <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                        <i class="fas fa-layer-group mr-2 text-blue-600"></i>
-                        Unità Stratigrafiche
+                        <i class="fas fa-certificate mr-2 text-green-600"></i>
+                        Stato Validazione
                     </h4>
                     
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">US Elaborate</label>
-                        <input type="text"
-                               name="us_elaborate_input"
-                               x-model="formData.us_elaborate_input"
-                               placeholder="Es: US001, US002, US003 (separate da virgole)"
-                               class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Inserisci i codici delle unità stratigrafiche elaborate, separati da virgole
-                        </p>
+                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium"
+                                          :class="editingGiornaleData && editingGiornaleData.validato ?
+                                                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+                                                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'">
+                                        <i class="fas" :class="editingGiornaleData && editingGiornaleData.validato ?
+                                                'fa-check-circle' : 'fa-clock'"></i>
+                                        <span class="ml-2" x-text="editingGiornaleData && editingGiornaleData.validato ?
+                                                'Validato' : 'Non Validato'"></span>
+                                    </span>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                                        <span x-show="editingGiornaleData && editingGiornaleData.validato">
+                                            Validato il: <span x-text="editingGiornaleData.data_validazione ?
+                                                new Date(editingGiornaleData.data_validazione).toLocaleString('it-IT') :
+                                                'Data non disponibile'"></span>
+                                        </span>
+                                        <span x-show="!editingGiornaleData || !editingGiornaleData.validato">
+                                            Il giornale non è ancora stato validato
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <!-- Azioni Validazione -->
+                            <div class="flex space-x-2" x-show="!editingGiornaleData || !editingGiornaleData.validato">
+                                <button type="button"
+                                        @click="validateGiornale()"
+                                        :disabled="saving"
+                                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-sm flex items-center">
+                                    <i x-show="saving" class="fas fa-spinner fa-spin mr-2"></i>
+                                    <i x-show="!saving" class="fas fa-check-circle mr-2"></i>
+                                    <span x-text="saving ? 'Validazione...' : 'Valida Giornale'"></span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Note sulla Validazione -->
+                        <div class="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                            <p>
+                                <i class="fas fa-info-circle mr-1"></i>
+                                La validazione rende il giornale non più modificabile e ne attesta l'autenticità.
+                                Una volta validato, il giornale può essere esportato con firma digitale.
+                            </p>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- Note e Problematiche -->
+
+                <!-- Attrezzature e Mezzi -->
                 <div class="mb-8">
                     <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                        <i class="fas fa-sticky-note mr-2 text-yellow-600"></i>
-                        Note e Problematiche
+                        <i class="fas fa-tools mr-2 text-purple-600"></i>
+                        Attrezzature e Mezzi Utilizzati
                     </h4>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note Generali</label>
-                            <textarea name="note_generali"
-                                      x-model="formData.note_generali"
-                                      rows="4"
-                                      placeholder="Note e osservazioni generali..."
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Attrezzatura Utilizzata
+                            </label>
+                            <textarea name="attrezzatura_utilizzata"
+                                      x-model="formData.attrezzatura_utilizzata"
+                                      rows="3"
+                                      placeholder="Es: Piccone, Cazzuola, Pennellino, Metal detector (separate da virgole)"
                                       class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Attrezzatura e strumenti utilizzati durante i lavori
+                            </p>
                         </div>
                         
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Problematiche</label>
-                            <textarea name="problematiche"
-                                      x-model="formData.problematiche"
-                                      rows="4"
-                                      placeholder="Problematiche incontrate durante i lavori..."
-                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 border-red-300 dark:border-red-600"></textarea>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Mezzi Utilizzati
+                            </label>
+                            <textarea name="mezzi_utilizzati"
+                                      x-model="formData.mezzi_utilizzati"
+                                      rows="3"
+                                      placeholder="Es: Escavatore, Pala meccanica, Camion (separate da virgole)"
+                                      class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Mezzi meccanici utilizzati durante i lavori
+                            </p>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Apparecchiature -->
-                <div class="mb-8">
-                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                        <i class="fas fa-tools mr-2 text-purple-600"></i>
-                        Attrezzature e Apparecchiature
-                    </h4>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Apparecchiature Utilizzate</label>
-                        <textarea name="apparecchiature_input"
-                                  x-model="formData.apparecchiature_input"
-                                  rows="3"
-                                  placeholder="Es: Piccone, Cazzuola, Pennellino, Metal detector (separate da virgole o a capo)"
-                                  class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
                     </div>
                 </div>
                 

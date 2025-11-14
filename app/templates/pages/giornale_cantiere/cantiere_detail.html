@@ -601,10 +601,25 @@ function cantiereDetailApp() {
             condizioni_meteo: '',
             temperatura_min: null,
             temperatura_max: null,
+            note_meteo: '',
             descrizione_lavori: '',
+            modalita_lavorazioni: '',
+            disposizioni_rup: '',
+            disposizioni_direttore: '',
+            sospensioni: '',
+            contestazioni: '',
+            incidenti: '',
+            sopralluoghi: '',
             note_generali: '',
             problematiche: '',
-            us_elaborate_input: '',
+            forniture: '',
+            documentazione_prodotta: '',
+            materiali_rinvenuti: '',
+            us_elaborate: '',
+            usm_elaborate: '',
+            usr_elaborate: '',
+            attrezzatura_utilizzata: '',
+            mezzi_utilizzati: '',
             apparecchiature_input: '',
             operatori_ids: []
         },
@@ -727,10 +742,25 @@ function cantiereDetailApp() {
                     condizioni_meteo: '',
                     temperatura_min: null,
                     temperatura_max: null,
+                    note_meteo: '',
                     descrizione_lavori: '',
+                    modalita_lavorazioni: '',
+                    disposizioni_rup: '',
+                    disposizioni_direttore: '',
+                    sospensioni: '',
+                    contestazioni: '',
+                    incidenti: '',
+                    sopralluoghi: '',
                     note_generali: '',
                     problematiche: '',
-                    us_elaborate_input: '',
+                    forniture: '',
+                    documentazione_prodotta: '',
+                    materiali_rinvenuti: '',
+                    us_elaborate: '',
+                    usm_elaborate: '',
+                    usr_elaborate: '',
+                    attrezzatura_utilizzata: '',
+                    mezzi_utilizzati: '',
                     apparecchiature_input: '',
                     operatori_ids: []
                 };
@@ -1412,6 +1442,55 @@ function cantiereDetailApp() {
             } finally {
                 this.loadingExport = false;
             }
+        },
+        
+        // ===== VALIDAZIONE FUNZIONALITY =====
+        
+        async validateGiornale() {
+            if (!this.editingGiornaleData || !this.editingGiornaleData.id) {
+                this.errorMessage = 'Nessun giornale da validare';
+                return;
+            }
+
+            try {
+                this.saving = true;
+                this.errorMessage = '';
+
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}/validate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Errore durante la validazione del giornale');
+                }
+
+                const result = await response.json();
+                
+                // Update local data
+                if (this.editingGiornaleData) {
+                    this.editingGiornaleData.validato = true;
+                    this.editingGiornaleData.data_validazione = result.data_validazione;
+                }
+                
+                this.showAlert('success', 'Giornale validato con successo');
+                
+                // Update the giornale in the list if it exists
+                const giornaliApp = document.querySelector('[x-data*="giornaliListApp"]');
+                if (giornaliApp) {
+                    // Dispatch event to refresh the list
+                    this.$dispatch('giornale-validated', { giornaleId: this.editingGiornaleData.id });
+                }
+                
+            } catch (error) {
+                this.errorMessage = error.message || 'Errore durante la validazione del giornale';
+                console.error('Error validating giornale:', error);
+            } finally {
+                this.saving = false;
+            }
         }
     }
 }
@@ -1480,10 +1559,25 @@ function giornaliListApp() {
                     condizioni_meteo: giornale.condizioni_meteo || '',
                     temperatura_min: giornale.temperatura_min || null,
                     temperatura_max: giornale.temperatura_max || null,
+                    note_meteo: giornale.note_meteo || '',
                     descrizione_lavori: giornale.descrizione_lavori || '',
+                    modalita_lavorazioni: giornale.modalita_lavorazioni || '',
+                    disposizioni_rup: giornale.disposizioni_rup || '',
+                    disposizioni_direttore: giornale.disposizioni_direttore || '',
+                    sospensioni: giornale.sospensioni || '',
+                    contestazioni: giornale.contestazioni || '',
+                    incidenti: giornale.incidenti || '',
+                    sopralluoghi: giornale.sopralluoghi || '',
                     note_generali: giornale.note_generali || '',
                     problematiche: giornale.problematiche || '',
-                    us_elaborate_input: giornale.us_elaborate ? giornale.us_elaborate.join(', ') : '',
+                    forniture: giornale.forniture || '',
+                    documentazione_prodotta: giornale.documentazione_prodotta || '',
+                    materiali_rinvenuti: giornale.materiali_rinvenuti || '',
+                    us_elaborate: giornale.us_elaborate || '',
+                    usm_elaborate: giornale.usm_elaborate || '',
+                    usr_elaborate: giornale.usr_elaborate || '',
+                    attrezzatura_utilizzata: giornale.attrezzatura_utilizzata || '',
+                    mezzi_utilizzati: giornale.mezzi_utilizzati || '',
                     apparecchiature_input: giornale.attrezzatura_utilizzata ? giornale.attrezzatura_utilizzata : (giornale.apparecchiature || ''),
                     operatori_ids: giornale.operatori_presenti ? giornale.operatori_presenti.map(op => op.id) : []
                 }
