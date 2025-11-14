@@ -66,36 +66,67 @@ class PhotoUploadService:
         Returns:
             Dict con risultati upload
         """
+        # 🔍 DIAGNOSTIC: Track service-level upload timing
+        service_start_time = asyncio.get_event_loop().time()
+        logger.info(f"🔍 [SERVICE DEBUG] Starting batch upload service at {service_start_time}")
         logger.info(f"Starting batch upload: {len(files)} photos for site {site_id}")
+        logger.info(f"🔍 [SERVICE DEBUG] File details: {[{ 'name': f.filename, 'size': f.size, 'type': f.content_type } for f in files]}")
+        logger.info(f"🔍 [SERVICE DEBUG] Archaeological metadata: {archaeological_metadata}")
 
         uploaded_photos = []
         errors = []
 
         # Processa ogni foto
-        for file in files:
+        for file_index, file in enumerate(files):
             try:
+                file_start_time = asyncio.get_event_loop().time()
+                logger.info(f"🔍 [SERVICE DEBUG] Processing file {file_index + 1}/{len(files)}: {file.filename}")
+                
                 result = await self._upload_single_photo(
                     site_id, file, user_id, archaeological_metadata
                 )
+                
+                file_end_time = asyncio.get_event_loop().time()
+                file_duration = file_end_time - file_start_time
+                logger.info(f"🔍 [SERVICE DEBUG] File {file.filename} processed in {file_duration:.2f}s")
+                
                 uploaded_photos.append(result)
             except Exception as e:
-                logger.error(f"Failed to upload {file.filename}: {e}")
+                file_end_time = asyncio.get_event_loop().time()
+                logger.error(f"🔍 [SERVICE DEBUG] File {file.filename} failed after {file_end_time - file_start_time:.2f}s: {e}")
+                logger.error(f"🔍 [SERVICE DEBUG] Error details: {type(e).__name__}: {str(e)}")
                 errors.append({
                     "filename": file.filename,
                     "error": str(e)
                 })
 
-        # Prepara processamento deep zoom se necessario
+        # 🔍 DIAGNOSTIC: Track deep zoom preparation
+        deep_zoom_start_time = asyncio.get_event_loop().time()
+        logger.info(f"🔍 [SERVICE DEBUG] Starting deep zoom preparation at {deep_zoom_start_time}")
+        
         photos_needing_tiles = await self._prepare_deep_zoom_processing(
             uploaded_photos, site_id
         )
+        
+        deep_zoom_end_time = asyncio.get_event_loop().time()
+        deep_zoom_duration = deep_zoom_end_time - deep_zoom_start_time
+        logger.info(f"🔍 [SERVICE DEBUG] Deep zoom preparation completed in {deep_zoom_duration:.2f}s for {len(photos_needing_tiles)} photos")
 
         # Avvia processamento in background se necessario
         if photos_needing_tiles:
+            background_start_time = asyncio.get_event_loop().time()
+            logger.info(f"🔍 [SERVICE DEBUG] Starting background tiles processing at {background_start_time}")
+            
             asyncio.create_task(
                 self._process_tiles_batch_background(photos_needing_tiles, site_id)
             )
+            
+            logger.info(f"🔍 [SERVICE DEBUG] Background tiles task created at {asyncio.get_event_loop().time()}")
 
+        # 🔍 DIAGNOSTIC: Track service completion
+        service_end_time = asyncio.get_event_loop().time()
+        total_service_duration = service_end_time - service_start_time
+        
         response = {
             "message": f"Successfully uploaded {len(uploaded_photos)} photos",
             "uploaded_photos": [
@@ -112,6 +143,7 @@ class PhotoUploadService:
             "photos_needing_tiles": len(photos_needing_tiles)
         }
 
+        logger.info(f"🔍 [SERVICE DEBUG] Service-level upload completed in {total_service_duration:.2f}s at {service_end_time}")
         logger.info(f"Batch upload completed: {len(uploaded_photos)} success, {len(errors)} errors")
         return response
 
@@ -132,41 +164,71 @@ class PhotoUploadService:
         4. Creazione record DB
         5. Generazione thumbnail
         """
-        logger.info(f"Uploading photo: {file.filename} for site {site_id}")
+        single_photo_start_time = asyncio.get_event_loop().time()
+        logger.info(f"🔍 [SERVICE DEBUG] Starting single photo upload: {file.filename} at {single_photo_start_time}")
+        logger.info(f"🔍 [SERVICE DEBUG] File info: size={file.size}, type={file.content_type}")
 
         # 1. Validazione file
+        validation_start_time = asyncio.get_event_loop().time()
+        logger.info(f"🔍 [SERVICE DEBUG] Starting file validation at {validation_start_time}")
+        
         is_valid, validation_message = await self.metadata.validate_image_file(file)
+        
+        validation_end_time = asyncio.get_event_loop().time()
+        validation_duration = validation_end_time - validation_start_time
+        logger.info(f"🔍 [SERVICE DEBUG] File validation completed in {validation_duration:.2f}s: valid={is_valid}")
+        
         if not is_valid:
+            logger.error(f"🔍 [SERVICE DEBUG] Validation failed: {validation_message}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid file {file.filename}: {validation_message}"
             )
 
         # 2. Upload storage
+        storage_start_time = asyncio.get_event_loop().time()
+        logger.info(f"🔍 [SERVICE DEBUG] Starting storage upload at {storage_start_time}")
+        
         try:
             filename, file_path, file_size = await self.storage.save_upload_file(
                 file, str(site_id), str(user_id)
             )
-            logger.info(f"File saved to storage: {filename}")
+            storage_end_time = asyncio.get_event_loop().time()
+            storage_duration = storage_end_time - storage_start_time
+            logger.info(f"🔍 [SERVICE DEBUG] Storage upload completed in {storage_duration:.2f}s: {filename} ({file_size} bytes)")
         except Exception as e:
-            logger.error(f"Storage upload failed for {file.filename}: {e}")
+            storage_end_time = asyncio.get_event_loop().time()
+            storage_duration = storage_end_time - storage_start_time
+            logger.error(f"🔍 [SERVICE DEBUG] Storage upload failed after {storage_duration:.2f}s for {file.filename}: {e}")
+            logger.error(f"🔍 [SERVICE DEBUG] Storage error details: {type(e).__name__}: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Storage upload failed: {str(e)}"
             )
 
         # 3. Estrazione metadati
+        metadata_start_time = asyncio.get_event_loop().time()
+        logger.info(f"🔍 [SERVICE DEBUG] Starting metadata extraction at {metadata_start_time}")
+        
         await file.seek(0)  # Reset file pointer
         try:
             exif_data, metadata = await self.metadata.extract_metadata_from_file(
                 file, filename
             )
-            logger.info(f"Metadata extracted for {filename}")
+            metadata_end_time = asyncio.get_event_loop().time()
+            metadata_duration = metadata_end_time - metadata_start_time
+            logger.info(f"🔍 [SERVICE DEBUG] Metadata extracted in {metadata_duration:.2f}s for {filename}")
+            logger.info(f"🔍 [SERVICE DEBUG] Extracted metadata keys: {list(metadata.keys())}")
         except Exception as e:
-            logger.warning(f"Metadata extraction failed for {filename}: {e}")
+            metadata_end_time = asyncio.get_event_loop().time()
+            metadata_duration = metadata_end_time - metadata_start_time
+            logger.warning(f"🔍 [SERVICE DEBUG] Metadata extraction failed after {metadata_duration:.2f}s for {filename}: {e}")
             exif_data, metadata = {}, {}
 
         # 4. Creazione record DB
+        db_start_time = asyncio.get_event_loop().time()
+        logger.info(f"🔍 [SERVICE DEBUG] Starting database record creation at {db_start_time}")
+        
         try:
             photo_record = await self.metadata.create_photo_record(
                 filename=filename,
@@ -180,24 +242,42 @@ class PhotoUploadService:
             )
 
             self.db.add(photo_record)
+            
+            # 🔍 DIAGNOSTIC: Track database transaction timing
+            db_commit_start_time = asyncio.get_event_loop().time()
             await self.db.commit()
+            db_commit_end_time = asyncio.get_event_loop().time()
+            db_commit_duration = db_commit_end_time - db_commit_start_time
+            logger.info(f"🔍 [SERVICE DEBUG] Database commit completed in {db_commit_duration:.2f}s")
+            
             await self.db.refresh(photo_record)
-
-            logger.info(f"Photo record created: {photo_record.id}")
+            db_end_time = asyncio.get_event_loop().time()
+            db_total_duration = db_end_time - db_start_time
+            logger.info(f"🔍 [SERVICE DEBUG] Database operations completed in {db_total_duration:.2f}s, photo_id: {photo_record.id}")
 
         except Exception as e:
-            logger.error(f"Database record creation failed: {e}")
+            db_end_time = asyncio.get_event_loop().time()
+            db_total_duration = db_end_time - db_start_time
+            logger.error(f"🔍 [SERVICE DEBUG] Database operations failed after {db_total_duration:.2f}s: {e}")
+            logger.error(f"🔍 [SERVICE DEBUG] Database error details: {type(e).__name__}: {str(e)}")
+            
             # Cleanup storage se DB fallisce
             try:
+                cleanup_start_time = asyncio.get_event_loop().time()
                 await self.storage.delete_file(file_path)
-            except Exception:
-                pass  # Ignore cleanup errors
+                cleanup_end_time = asyncio.get_event_loop().time()
+                logger.info(f"🔍 [SERVICE DEBUG] Storage cleanup completed in {cleanup_end_time - cleanup_start_time:.2f}s")
+            except Exception as cleanup_e:
+                logger.error(f"🔍 [SERVICE DEBUG] Storage cleanup failed: {cleanup_e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Database error: {str(e)}"
             )
 
         # 5. Generazione thumbnail
+        thumbnail_start_time = asyncio.get_event_loop().time()
+        logger.info(f"🔍 [SERVICE DEBUG] Starting thumbnail generation at {thumbnail_start_time}")
+        
         await file.seek(0)  # Reset file pointer
         try:
             thumbnail_path = await self.metadata.generate_thumbnail_from_file(
@@ -207,16 +287,39 @@ class PhotoUploadService:
             if thumbnail_path:
                 photo_record.thumbnail_path = thumbnail_path
                 await self.db.commit()
-                logger.info(f"Thumbnail generated: {thumbnail_path}")
+                thumbnail_end_time = asyncio.get_event_loop().time()
+                thumbnail_duration = thumbnail_end_time - thumbnail_start_time
+                logger.info(f"🔍 [SERVICE DEBUG] Thumbnail generated in {thumbnail_duration:.2f}s: {thumbnail_path}")
             else:
-                logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+                thumbnail_end_time = asyncio.get_event_loop().time()
+                thumbnail_duration = thumbnail_end_time - thumbnail_start_time
+                logger.warning(f"🔍 [SERVICE DEBUG] Thumbnail generation failed after {thumbnail_duration:.2f}s for photo {photo_record.id}")
 
         except Exception as e:
-            logger.warning(f"Thumbnail generation error for {photo_record.id}: {e}")
+            thumbnail_end_time = asyncio.get_event_loop().time()
+            thumbnail_duration = thumbnail_end_time - thumbnail_start_time
+            logger.warning(f"🔍 [SERVICE DEBUG] Thumbnail generation error after {thumbnail_duration:.2f}s for {photo_record.id}: {e}")
+            logger.warning(f"🔍 [SERVICE DEBUG] Thumbnail error details: {type(e).__name__}: {str(e)}")
             # Non bloccare upload se thumbnail fallisce
 
         # 6. Log attività
-        await self._log_upload_activity(site_id, user_id, photo_record.id, filename, file_size)
+        activity_start_time = asyncio.get_event_loop().time()
+        logger.info(f"🔍 [SERVICE DEBUG] Starting activity logging at {activity_start_time}")
+        
+        try:
+            await self._log_upload_activity(site_id, user_id, photo_record.id, filename, file_size)
+            activity_end_time = asyncio.get_event_loop().time()
+            activity_duration = activity_end_time - activity_start_time
+            logger.info(f"🔍 [SERVICE DEBUG] Activity logging completed in {activity_duration:.2f}s")
+        except Exception as e:
+            activity_end_time = asyncio.get_event_loop().time()
+            activity_duration = activity_end_time - activity_start_time
+            logger.warning(f"🔍 [SERVICE DEBUG] Activity logging failed after {activity_duration:.2f}s: {e}")
+
+        # 🔍 DIAGNOSTIC: Track single photo completion
+        single_photo_end_time = asyncio.get_event_loop().time()
+        total_single_photo_duration = single_photo_end_time - single_photo_start_time
+        logger.info(f"🔍 [SERVICE DEBUG] Single photo upload completed in {total_single_photo_duration:.2f}s for {file.filename}")
 
         return PhotoUploadResult(
             photo_id=photo_record.id,

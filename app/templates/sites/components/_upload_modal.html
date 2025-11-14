@@ -498,6 +498,10 @@ document.addEventListener('alpine:init', () => {
         },
         
         async startUpload() {
+            // 🔍 DIAGNOSTIC: Track upload start time
+            const uploadStartTime = Date.now();
+            console.log(`🔍 [CLIENT DEBUG] Starting upload process at ${new Date().toISOString()}`);
+            
             this.isUploading = true;
             this.uploadProgress = 0;
             this.uploadedFiles = 0;
@@ -505,10 +509,20 @@ document.addEventListener('alpine:init', () => {
             
             const totalFiles = this.selectedFiles.length;
             console.log(`🚀 Starting BATCH upload of ${totalFiles} files`);
+            console.log(`🔍 [CLIENT DEBUG] File details:`, this.selectedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })));
             
             try {
+                // 🔍 DIAGNOSTIC: Track batch upload start
+                const batchStartTime = Date.now();
+                console.log(`🔍 [CLIENT DEBUG] Starting batch upload call at ${new Date().toISOString()}`);
+                
                 // NUOVO: Carica TUTTE le foto in UNA SOLA chiamata API
                 const uploadResponse = await this.uploadAllFilesInBatch();
+                
+                // 🔍 DIAGNOSTIC: Track batch upload completion
+                const batchEndTime = Date.now();
+                const batchDuration = batchEndTime - batchStartTime;
+                console.log(`🔍 [CLIENT DEBUG] Batch upload completed in ${batchDuration}ms at ${new Date().toISOString()}`);
                 
                 // Process results
                 if (uploadResponse && uploadResponse.uploaded_photos) {
@@ -525,10 +539,22 @@ document.addEventListener('alpine:init', () => {
                     
                     console.log(`✅ Batch upload successful: ${this.uploadedFiles}/${totalFiles} files`);
                 } else {
+                    console.log(`🔍 [CLIENT DEBUG] Invalid server response:`, uploadResponse);
                     throw new Error('Invalid response from server');
                 }
                 
             } catch (error) {
+                // 🔍 DIAGNOSTIC: Detailed error logging
+                const uploadEndTime = Date.now();
+                const totalUploadDuration = uploadEndTime - uploadStartTime;
+                console.log(`🔍 [CLIENT DEBUG] Upload failed after ${totalUploadDuration}ms at ${new Date().toISOString()}`);
+                console.log(`🔍 [CLIENT DEBUG] Error details:`, {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                    type: error.constructor.name
+                });
+                
                 console.error(`❌ Batch upload failed:`, error);
                 
                 // Show user-friendly error notification
@@ -536,8 +562,8 @@ document.addEventListener('alpine:init', () => {
                     ? 'Sessione scaduta. Per favore effettua nuovamente il login.'
                     : error.message.includes('413') || error.message.includes('too large')
                     ? 'I file sono troppo grandi. Prova a caricare meno foto o file più piccoli.'
-                    : error.message.includes('Network')
-                    ? 'Errore di connessione. Verifica la tua connessione internet e riprova.'
+                    : error.message.includes('Network') || error.name === 'AbortError'
+                    ? 'Errore di connessione o timeout. Verifica la tua connessione internet e riprova.'
                     : `Errore durante il caricamento: ${error.message}`;
                 
                 this.showError(errorMessage);
@@ -552,18 +578,28 @@ document.addEventListener('alpine:init', () => {
                 });
             }
             
+            // 🔍 DIAGNOSTIC: Track total upload process completion
+            const uploadEndTime = Date.now();
+            const totalUploadDuration = uploadEndTime - uploadStartTime;
+            console.log(`🔍 [CLIENT DEBUG] Total upload process completed in ${totalUploadDuration}ms at ${new Date().toISOString()}`);
+            
             this.isUploading = false;
             this.uploadComplete = true;
             console.log(`🎉 Upload completed: ${this.uploadResults.filter(r => r.success).length}/${totalFiles} successful`);
         },
         
         async uploadAllFilesInBatch() {
+            // 🔍 DIAGNOSTIC: Track FormData preparation
+            const formDataStartTime = Date.now();
+            console.log(`🔍 [CLIENT DEBUG] Preparing FormData at ${new Date().toISOString()}`);
+            
             // Create FormData with ALL files
             const formData = new FormData();
             
             // Add ALL files to the same FormData
             this.selectedFiles.forEach(fileData => {
                 formData.append('photos', fileData.file);
+                console.log(`🔍 [CLIENT DEBUG] Adding file: ${fileData.name} (${fileData.size} bytes, ${fileData.type})`);
             });
             
             // Add metadata from form component (applied to all photos)
@@ -586,13 +622,35 @@ document.addEventListener('alpine:init', () => {
                 }
             });
             
+            const formDataEndTime = Date.now();
+            const formDataDuration = formDataEndTime - formDataStartTime;
+            console.log(`🔍 [CLIENT DEBUG] FormData prepared in ${formDataDuration}ms, total size estimated: ${formData.size || 'unknown'} bytes`);
+            
             console.log(`📦 Sending batch request with ${this.selectedFiles.length} files + metadata`);
+            
+            // 🔍 DIAGNOSTIC: Track network request timing
+            const networkStartTime = Date.now();
+            console.log(`🔍 [CLIENT DEBUG] Starting network request at ${new Date().toISOString()}`);
             
             // Single API call with all files - CRITICAL: Add timeout to prevent indefinite hanging
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
+            const timeoutId = setTimeout(() => {
+                console.log(`🔍 [CLIENT DEBUG] TIMEOUT: Request aborted after 10 minutes at ${new Date().toISOString()}`);
+                controller.abort();
+            }, 600000); // Increased to 10 minutes timeout for large files
             
-            const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/upload`, {
+            // 🔍 DIAGNOSTIC: Add request details logging
+            const requestUrl = `/api/v1/sites/{{ site.id }}/photos/upload`;
+            console.log(`🔍 [CLIENT DEBUG] Request details:`, {
+                url: requestUrl,
+                method: 'POST',
+                timeout: '5 minutes',
+                filesCount: this.selectedFiles.length,
+                metadataFields: Object.keys(currentMetadata).filter(k => currentMetadata[k]),
+                hasAuth: !!localStorage.getItem('access_token')
+            });
+            
+            const response = await fetch(requestUrl, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('access_token')}`
@@ -603,11 +661,26 @@ document.addEventListener('alpine:init', () => {
             
             clearTimeout(timeoutId);
             
+            // 🔍 DIAGNOSTIC: Track network response timing
+            const networkEndTime = Date.now();
+            const networkDuration = networkEndTime - networkStartTime;
+            console.log(`🔍 [CLIENT DEBUG] Network request completed in ${networkDuration}ms at ${new Date().toISOString()}`);
+            console.log(`🔍 [CLIENT DEBUG] Response status: ${response.status} ${response.statusText}`);
+            
             if (!response.ok) {
-                throw new Error(`Upload failed: ${response.statusText}`);
+                console.log(`🔍 [CLIENT DEBUG] Response headers:`, Object.fromEntries(response.headers.entries()));
+                throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
             }
             
+            // 🔍 DIAGNOSTIC: Track response parsing
+            const parseStartTime = Date.now();
+            console.log(`🔍 [CLIENT DEBUG] Starting response parsing at ${new Date().toISOString()}`);
+            
             const responseData = await response.json();
+            
+            const parseEndTime = Date.now();
+            const parseDuration = parseEndTime - parseStartTime;
+            console.log(`🔍 [CLIENT DEBUG] Response parsed in ${parseDuration}ms`);
             console.log('📤 Batch upload response:', responseData);
             
             return responseData;

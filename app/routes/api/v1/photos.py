@@ -767,13 +767,21 @@ async def upload_photo(
             photo_record = None
             filename = None
             file_path = None
+            
+            # DEBUG: Log start of processing for this file
+            start_time = asyncio.get_event_loop().time()
+            logger.info(f"🔍 DEBUG: Starting processing for file {file.filename} at {start_time}")
 
             try:
                 # 1. Salva file su MinIO con error handling
                 try:
+                    storage_start = asyncio.get_event_loop().time()
+                    logger.info(f"🔍 DEBUG: Starting storage save for {file.filename}")
                     filename, file_path, file_size = await storage_service.save_upload_file(
                         file, str(site_id), str(current_user_id)
                     )
+                    storage_end = asyncio.get_event_loop().time()
+                    logger.info(f"🔍 DEBUG: Storage save completed for {file.filename} in {storage_end - storage_start:.2f}s")
                 except Exception as storage_error:
                     logger.error(f"Failed to save file {file.filename} to storage: {storage_error}")
                     raise HTTPException(
@@ -818,17 +826,23 @@ async def upload_photo(
 
                 # 4. Create a NEW database session for this parallel task to avoid transaction conflicts
                 from app.database.base import async_session_maker
+                db_start = asyncio.get_event_loop().time()
+                logger.info(f"🔍 DEBUG: Creating new database session for {file.filename}")
                 async with async_session_maker() as task_db:
                     try:
                         # Start transaction in the new session
+                        transaction_start = asyncio.get_event_loop().time()
+                        logger.info(f"🔍 DEBUG: Starting database transaction for {file.filename}")
                         async with task_db.begin():
                             # Add photo record to transaction
                             task_db.add(photo_record)
 
                             # Flush to get the ID without committing
+                            flush_start = asyncio.get_event_loop().time()
                             await task_db.flush()
                             await task_db.refresh(photo_record)
-                            logger.info(f"Photo record flushed with ID: {photo_record.id}")
+                            flush_end = asyncio.get_event_loop().time()
+                            logger.info(f"🔍 DEBUG: Photo record flushed with ID: {photo_record.id} in {flush_end - flush_start:.2f}s")
 
                             # 5. Genera thumbnail DOPO che il record è stato salvato con error handling
                             try:
@@ -868,10 +882,11 @@ async def upload_photo(
                                 # Don't fail the upload if activity logging fails
 
                         # Transaction commits automatically here
-                        logger.info(f"Transaction committed successfully for photo {photo_record.id}")
+                        transaction_end = asyncio.get_event_loop().time()
+                        logger.info(f"🔍 DEBUG: Transaction committed successfully for photo {photo_record.id} in {transaction_end - transaction_start:.2f}s")
 
                     except Exception as db_error:
-                        logger.error(f"Database transaction failed for photo {file.filename}: {db_error}")
+                        logger.error(f"🔍 DEBUG: Database transaction failed for photo {file.filename}: {db_error}")
                         # Clean up the uploaded file if database transaction fails
                         try:
                             await storage_service.delete_file(file_path)
@@ -935,32 +950,44 @@ async def upload_photo(
 
         # Processa tutte le foto in parallelo con error handling
         try:
-            logger.info(f"🚀 Starting photo processing of {len(photos)} photos")
+            overall_start = asyncio.get_event_loop().time()
+            logger.info(f"🔍 DEBUG: Starting overall photo processing of {len(photos)} photos at {overall_start}")
 
             # CRITICAL FIX: Sequential processing for single files to avoid session conflicts
             if len(photos) == 1:
-                logger.info("📋 Processing single file sequentially to avoid database session conflicts")
+                sequential_start = asyncio.get_event_loop().time()
+                logger.info(f"🔍 DEBUG: Processing single file sequentially to avoid database session conflicts - Starting at {sequential_start}")
                 upload_results = []
                 try:
                     result = await process_single_photo(photos[0])
                     upload_results.append(result)
+                    sequential_end = asyncio.get_event_loop().time()
+                    logger.info(f"🔍 DEBUG: Sequential processing completed in {sequential_end - sequential_start:.2f}s")
                 except Exception as e:
+                    sequential_end = asyncio.get_event_loop().time()
+                    logger.error(f"🔍 DEBUG: Sequential processing failed after {sequential_end - sequential_start:.2f}s: {e}")
                     upload_results.append(e)
             else:
                 # Use parallel processing for multiple files with CRITICAL timeout wrapper
-                logger.info(f"🚀 Starting parallel processing of {len(photos)} photos with timeout protection")
+                parallel_start = asyncio.get_event_loop().time()
+                logger.info(f"🔍 DEBUG: Starting parallel processing of {len(photos)} photos with timeout protection at {parallel_start}")
                 upload_tasks = [process_single_photo(file) for file in photos]
 
                 # CRITICAL FIX: Wrap asyncio.gather() with timeout to prevent indefinite hanging
                 try:
+                    gather_start = asyncio.get_event_loop().time()
+                    logger.info(f"🔍 DEBUG: Starting asyncio.gather with {len(upload_tasks)} tasks at {gather_start}")
                     upload_results = await asyncio.wait_for(
                         asyncio.gather(*upload_tasks, return_exceptions=True),
                         timeout=300.0  # 5 minutes timeout
                     )
+                    gather_end = asyncio.get_event_loop().time()
+                    logger.info(f"🔍 DEBUG: asyncio.gather completed in {gather_end - gather_start:.2f}s")
                     logger.info(f"✅ Parallel processing completed within timeout: {len(photos)} photos")
                 except asyncio.TimeoutError:
-                    logger.error("❌ Photo upload processing timed out after 5 minutes")
-                    raise HTTPException(status_code=408, detail="Upload processing timed out after 5 minutes")
+                    timeout_point = asyncio.get_event_loop().time()
+                    logger.error(f"🔍 DEBUG: Photo upload processing timed out after 10 minutes at {timeout_point} (started at {parallel_start})")
+                    raise HTTPException(status_code=408, detail="Upload processing timed out after 10 minutes")
 
             # Filtra risultati validi
             uploaded_photos = []
