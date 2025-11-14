@@ -588,14 +588,20 @@ document.addEventListener('alpine:init', () => {
             
             console.log(`📦 Sending batch request with ${this.selectedFiles.length} files + metadata`);
             
-            // Single API call with all files
+            // Single API call with all files - CRITICAL: Add timeout to prevent indefinite hanging
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
+            
             const response = await fetch(`/api/site/{{ site.id }}/photos/upload`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('access_token')}`
                 },
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
             
             if (!response.ok) {
                 throw new Error(`Upload failed: ${response.statusText}`);

@@ -869,9 +869,32 @@ async def upload_photo(
 
         # Processa tutte le foto in parallelo con error handling
         try:
-            logger.info(f"🚀 Starting parallel processing of {len(photos)} photos")
-            upload_tasks = [process_single_photo(file) for file in photos]
-            upload_results = await asyncio.gather(*upload_tasks, return_exceptions=True)
+            logger.info(f"🚀 Starting photo processing of {len(photos)} photos")
+            
+            # CRITICAL FIX: Sequential processing for single files to avoid session conflicts
+            if len(photos) == 1:
+                logger.info("📋 Processing single file sequentially to avoid database session conflicts")
+                upload_results = []
+                try:
+                    result = await process_single_photo(photos[0])
+                    upload_results.append(result)
+                except Exception as e:
+                    upload_results.append(e)
+            else:
+                # Use parallel processing for multiple files with CRITICAL timeout wrapper
+                logger.info(f"🚀 Starting parallel processing of {len(photos)} photos with timeout protection")
+                upload_tasks = [process_single_photo(file) for file in photos]
+                
+                # CRITICAL FIX: Wrap asyncio.gather() with timeout to prevent indefinite hanging
+                try:
+                    upload_results = await asyncio.wait_for(
+                        asyncio.gather(*upload_tasks, return_exceptions=True),
+                        timeout=300.0  # 5 minutes timeout
+                    )
+                    logger.info(f"✅ Parallel processing completed within timeout: {len(photos)} photos")
+                except asyncio.TimeoutError:
+                    logger.error("❌ Photo upload processing timed out after 5 minutes")
+                    raise HTTPException(status_code=408, detail="Upload processing timed out after 5 minutes")
             
             # Filtra risultati validi
             uploaded_photos = []
@@ -879,10 +902,14 @@ async def upload_photo(
             
             for i, result in enumerate(upload_results):
                 if isinstance(result, Exception):
-                    logger.error(f"Upload task failed for photo {photos[i].filename}: {result}")
+                    # ENHANCED ERROR HANDLING: Provide more specific error messages for database conflicts
+                    error_msg = str(result)
+                    if "database" in error_msg.lower() and ("lock" in error_msg.lower() or "conflict" in error_msg.lower()):
+                        error_msg = f"Database conflict during photo {photos[i].filename} processing: {error_msg}"
+                    logger.error(f"❌ Upload task failed for photo {photos[i].filename}: {error_msg}")
                     failed_photos.append({
                         "filename": photos[i].filename,
-                        "error": str(result)
+                        "error": error_msg
                     })
                 elif result is not None:
                     uploaded_photos.append(result)
@@ -893,7 +920,13 @@ async def upload_photo(
                         "error": "Processing failed but was handled gracefully"
                     })
             
-            logger.info(f"✅ Parallel processing completed: {len(uploaded_photos)} photos uploaded successfully, {len(failed_photos)} failed")
+            # IMPROVED LOGGING: Detailed success/failure reporting
+            success_count = len(uploaded_photos)
+            failure_count = len(failed_photos)
+            logger.info(f"📊 Upload processing summary: {success_count} photos uploaded successfully, {failure_count} failed out of {len(photos)} total")
+            
+            if failed_photos:
+                logger.warning(f"⚠️ Failed uploads: {[f['filename'] + ': ' + f['error'] for f in failed_photos[:3]]}")  # Log first 3 failures
             
             # If no photos were uploaded successfully, raise an error
             if not uploaded_photos and failed_photos:
