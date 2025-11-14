@@ -31,7 +31,7 @@ photos_router = APIRouter()
 
 @photos_router.get("/site/{site_id}/photos")
 async def get_site_photos_api(
-        site_id: UUID,
+        site_id: str,  # Changed from UUID to str to handle both formats
         # Basic filters
         search: str = None,
         photo_type: str = None,
@@ -74,6 +74,7 @@ async def get_site_photos_api(
         sort_by: str = "created_desc",
         
         site_access: tuple = Depends(get_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -87,13 +88,34 @@ async def get_site_photos_api(
     - Dimensions: width, height, file_size
     - Metadata presence: has_inventory, has_description, has_photographer
     """
-    site, permission = site_access
+    
+    # Use centralized normalization function
+    try:
+        from app.routes.api.dependencies import get_normalized_site_id
+        normalized_site_id = await get_normalized_site_id(site_id, current_user_id, db)
+    except:
+        # Fallback to manual normalization if dependency fails
+        normalized_site_id = normalize_site_id(site_id)
+        if not normalized_site_id:
+            raise HTTPException(status_code=404, detail="ID sito non valido")
+        
+        # Quick validation without full site access check for performance
+        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
+        site = await db.execute(site_query)
+        site = site.scalar_one_or_none()
+        
+        if not site:
+            raise HTTP_exception(status_code=404, detail="Sito archeologico non trovato")
+        
+        # Try basic permission check
+        from app.routes.api.dependencies import get_site_access_by_id
+        site, permission = await get_site_access_by_id(UUID(normalized_site_id), current_user_id, db)
 
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi insufficienti")
 
     # === Query 1: General photos from Photo table ===
-    photos_query = select(Photo).where(Photo.site_id == site_id)
+    photos_query = select(Photo).where(Photo.site_id == normalized_site_id)
 
     # Apply filters to Photo query
     if search:
@@ -259,7 +281,7 @@ async def get_site_photos_api(
     
     us_files_query = select(USFile).where(
         and_(
-            USFile.site_id == site_id,
+            USFile.site_id == normalized_site_id,
             USFile.file_category == 'fotografia'
         )
     )
