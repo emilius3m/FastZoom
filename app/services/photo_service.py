@@ -532,18 +532,14 @@ class PhotoMetadataService:
         if archaeological_metadata is None:
             archaeological_metadata = {}
 
-        # 🔧 CORREZIONE: Conversione UUID se necessario
+        # 🔧 CORREZIONE: Keep UUIDs as strings for SQLite compatibility
+        # The Photo model uses String(36) for UUID fields, so we must pass strings
+        # not UUID objects to avoid "type 'UUID' is not supported" error
         from uuid import UUID
-        if isinstance(site_id, str):
-            try:
-                site_id = UUID(site_id)
-            except ValueError:
-                pass
-        if isinstance(uploaded_by, str):
-            try:
-                uploaded_by = UUID(uploaded_by)
-            except ValueError:
-                pass
+        if isinstance(site_id, (UUID, object)):
+            site_id = str(site_id)
+        if isinstance(uploaded_by, (UUID, object)):
+            uploaded_by = str(uploaded_by)
 
         # Crea record foto
         photo_data = {

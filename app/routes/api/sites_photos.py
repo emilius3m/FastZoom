@@ -785,8 +785,8 @@ async def upload_photo(
                             # 6. Log attività con error handling
                             try:
                                 activity = UserActivity(
-                                    user_id=current_user_id,
-                                    site_id=site_id,
+                                    user_id=str(current_user_id),
+                                    site_id=str(site_id),
                                     activity_type="UPLOAD",
                                     activity_desc=f"Caricata foto: {file.filename}",
                                     extra_data=json.dumps({
@@ -1550,8 +1550,8 @@ async def bulk_delete_photos(
                 deleted_count += 1
 
                 activity = UserActivity(
-                    user_id=current_user_id,
-                    site_id=site_id,
+                    user_id=str(current_user_id),
+                    site_id=str(site_id),
                     activity_type="DELETE",
                     activity_desc=f"Eliminazione massiva foto {photo_filename}",
                     extra_data=json.dumps({
@@ -1601,8 +1601,8 @@ async def bulk_delete_photos(
                 deleted_count += 1
 
                 activity = UserActivity(
-                    user_id=current_user_id,
-                    site_id=site_id,
+                    user_id=str(current_user_id),
+                    site_id=str(site_id),
                     activity_type="DELETE",
                     activity_desc=f"Eliminazione massiva foto {photo_filename}",
                     extra_data=json.dumps({
