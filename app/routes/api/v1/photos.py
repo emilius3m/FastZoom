@@ -537,7 +537,7 @@ async def get_site_photos_api(
     return JSONResponse(photos_data)
 
 
-@router.post("/site/{site_id}/photos/upload")
+@router.post("/sites/{site_id}/photos/upload")
 async def upload_photo(
         site_id: UUID,
         photos: List[UploadFile] = File(...),
@@ -1132,7 +1132,7 @@ async def upload_photo(
         )
 
 
-@router.get("/site/{site_id}/photos/{photo_id}/stream")
+@router.get("/sites/{site_id}/photos/{photo_id}/stream")
 async def stream_photo_from_minio(
         site_id: UUID,
         photo_id: UUID,
@@ -1149,7 +1149,7 @@ async def stream_photo_from_minio(
     return await photo_serving_service.serve_photo_full(photo_id, db)
 
 
-@router.get("/site/{site_id}/photos/{photo_id}/thumbnail")
+@router.get("/sites/{site_id}/photos/{photo_id}/thumbnail")
 async def get_photo_thumbnail(
         site_id: UUID,
         photo_id: UUID,
@@ -1166,7 +1166,7 @@ async def get_photo_thumbnail(
     return await photo_serving_service.serve_photo_thumbnail(photo_id, db)
 
 
-@router.get("/site/{site_id}/photos/{photo_id}/full")
+@router.get("/sites/{site_id}/photos/{photo_id}/full")
 async def get_photo_full(
         site_id: UUID,
         photo_id: UUID,
@@ -1183,7 +1183,7 @@ async def get_photo_full(
     return await photo_serving_service.serve_photo_full(photo_id, db)
 
 
-@router.get("/site/{site_id}/api/photos/search")
+@router.get("/sites/{site_id}/api/photos/search")
 async def search_photos_by_metadata(
         site_id: UUID,
         material: Optional[str] = None,
@@ -1213,7 +1213,7 @@ async def search_photos_by_metadata(
     })
 
 
-@router.put("/site/{site_id}/photos/{photo_id}/update")
+@router.put("/sites/{site_id}/photos/{photo_id}/update")
 async def update_photo(
         site_id: UUID,
         photo_id: UUID,
@@ -1419,7 +1419,7 @@ async def update_photo(
     return response_data
 
 
-@router.delete("/site/{site_id}/photos/{photo_id}")
+@router.delete("/sites/{site_id}/photos/{photo_id}")
 async def delete_photo(
         site_id: UUID,
         photo_id: UUID,
@@ -1530,7 +1530,7 @@ async def delete_photo(
         )
 
 
-@router.post("/site/{site_id}/photos/bulk-delete")
+@router.post("/sites/{site_id}/photos/bulk-delete")
 async def bulk_delete_photos(
         site_id: UUID,
         delete_data: dict,
@@ -1715,7 +1715,7 @@ async def bulk_delete_photos(
         raise HTTPException(status_code=500, detail=f"Errore eliminazione in blocco: {str(e)}")
 
 
-@router.post("/site/{site_id}/photos/bulk-update")
+@router.post("/sites/{site_id}/photos/bulk-update")
 async def bulk_update_photos(
         site_id: UUID,
         update_data: dict,
@@ -2031,7 +2031,7 @@ async def log_user_activity(
         await db.rollback()
 
 
-@router.post("/site/{site_id}/photos/deep-zoom/start-background")
+@router.post("/sites/{site_id}/photos/deep-zoom/start-background")
 async def start_deep_zoom_background_processor(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
@@ -2063,7 +2063,7 @@ async def start_deep_zoom_background_processor(
         )
 
 
-@router.post("/site/{site_id}/photos/deep-zoom/stop-background")
+@router.post("/sites/{site_id}/photos/deep-zoom/stop-background")
 async def stop_deep_zoom_background_processor(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
@@ -2095,7 +2095,7 @@ async def stop_deep_zoom_background_processor(
         )
 
 
-@router.get("/site/{site_id}/photos/deep-zoom/background-status")
+@router.get("/sites/{site_id}/photos/deep-zoom/background-status")
 async def get_deep_zoom_background_status(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access)
@@ -2123,7 +2123,7 @@ async def get_deep_zoom_background_status(
         )
 
 
-@router.get("/site/{site_id}/photos/{photo_id}/deep-zoom/task-status")
+@router.get("/sites/{site_id}/photos/{photo_id}/deep-zoom/task-status")
 async def get_photo_deep_zoom_task_status(
         site_id: UUID,
         photo_id: UUID,
