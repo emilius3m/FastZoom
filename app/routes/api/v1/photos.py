@@ -17,7 +17,7 @@ from app.core.security import get_current_user_id
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 from app.models import UserActivity
 from app.models import USFile
-from app.routes.api.dependencies import get_site_access
+from app.routes.api.dependencies import get_site_access, get_photo_site_access
 from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service
 from app.services.archaeological_minio_service import archaeological_minio_service
@@ -29,6 +29,55 @@ from app.services.photo_serving_service import photo_serving_service
 
 # Export as 'router' for consistency with other API v1 modules
 router = APIRouter()
+
+
+# Consolidated photo serving endpoints - moved from photos_router.py
+@router.get("/photos/{photo_id}/thumbnail")
+async def get_photo_thumbnail_simple(
+        photo_id: UUID,
+        site_access: tuple = Depends(get_photo_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Serve thumbnail foto - CONSOLIDATED"""
+    site, permission = site_access
+    
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi richiesti")
+        
+    return await photo_serving_service.serve_photo_thumbnail(photo_id, db)
+
+
+@router.get("/photos/{photo_id}/full")
+async def get_photo_full_simple(
+        photo_id: UUID,
+        site_access: tuple = Depends(get_photo_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Serve immagine completa - CONSOLIDATED"""
+    site, permission = site_access
+    
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi richiesti")
+        
+    return await photo_serving_service.serve_photo_full(photo_id, db)
+
+
+@router.get("/photos/{photo_id}/download")
+async def download_photo_simple(
+        photo_id: UUID,
+        site_access: tuple = Depends(get_photo_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Scarica file originale foto - CONSOLIDATED"""
+    site, permission = site_access
+    
+    if not permission.can_read():
+        raise HTTPException(status_code=403, detail="Permessi richiesti")
+        
+    return await photo_serving_service.serve_photo_download(photo_id, db)
 
 
 @router.get("/sites/{site_id}/photos")
@@ -353,8 +402,8 @@ async def get_site_photos_api(
     # Add general photos
     for photo in photos:
         photo_dict = photo.to_dict()
-        photo_dict['file_url'] = f"/photos/{photo.id}/full"
-        photo_dict['thumbnail_url'] = f"/photos/{photo.id}/thumbnail"
+        photo_dict['file_url'] = f"/api/v1/photos/{photo.id}/full"
+        photo_dict['thumbnail_url'] = f"/api/v1/photos/{photo.id}/thumbnail"
         photo_dict['tags'] = photo.get_keywords_list()
         photo_dict['source_type'] = 'photo'  # Mark as general photo
         photos_data.append(photo_dict)

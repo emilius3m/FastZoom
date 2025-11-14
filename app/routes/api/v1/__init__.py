@@ -7,7 +7,7 @@ from fastapi import APIRouter
 from app.routes.api.v1.auth import router as auth_router
 # Enable sites and photos routers for v1 API
 from app.routes.api.v1.sites import router as sites_router
-from app.routes.api.v1.photos import router as photos_router
+from app.routes.api.v1.photos import router as photos_router  # Now includes consolidated photo endpoints
 # Temporarily comment out problematic routers to resolve import issues
 # from app.routes.api.v1.metadata import router as metadata_router
 # from app.routes.api.v1.deepzoom import router as deepzoom_router

@@ -1,7 +1,7 @@
 # app/services/photo_serving_service.py - Consolidated photo serving service
 """
 Consolidated service for photo serving operations.
-Eliminates duplication between photos_router and sites_photos API endpoints.
+Eliminates duplication between API v1 photos and sites_photos API endpoints.
 """
 
 from fastapi import HTTPException

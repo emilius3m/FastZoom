@@ -44,7 +44,7 @@ sites_router.include_router(iccd_hierarchy_router, prefix="/{site_id}")
 # Include refactored API sub-routers
 # DEPRECATED: dashboard_router da sites_dashboard.py non più utilizzato
 # sites_router.include_router(dashboard_router, tags=["dashboard"])
-sites_router.include_router(photos_router, tags=["photos"])
+sites_router.include_router(photos_router, tags=["photos"])  # API v1 photos router
 sites_router.include_router(storage_router, tags=["storage"])
 sites_router.include_router(deepzoom_router, tags=["deepzoom"])
 sites_router.include_router(team_router, tags=["team"])

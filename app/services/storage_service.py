@@ -58,7 +58,7 @@ class StorageService:
         Salva file uploadato su MinIO
         Returns: Tuple[filename, minio_path, file_size]
 
-        🔧 CORREZIONE CRITICA: Path compatibili con photos_router.py
+        🔧 CORREZIONE CRITICA: Path compatibili con API v1 photos.py
         """
         # Validazione file
         if not await self._validate_file(file):
@@ -72,7 +72,7 @@ class StorageService:
         unique_filename = f"{site_id}_{user_id}_{uuid4().hex[:8]}{file_extension}"
 
         # 🔧 CORREZIONE CRITICA: Path MinIO senza prefisso "sites/"
-        # Il photos_router.py controlla se il path inizia con "sites/" per decidere se usare MinIO
+        # L'API v1 photos.py controlla se il path inizia con "sites/" per decidere se usare MinIO
         minio_object_name = f"{site_id}/{unique_filename}"
 
         # Legge contenuto file una volta sola
@@ -387,8 +387,8 @@ class StorageService:
 
             file_size = len(file_content)
 
-            # 🔧 CORREZIONE: Restituisci path che photos_router.py riconoscerà come locale
-            # Il photos_router.py controlla: elif photo.file_path.startswith("storage/")
+            # 🔧 CORREZIONE: Restituisci path che API v1 photos.py riconoscerà come locale
+            # L'API v1 photos.py controlla: elif photo.file_path.startswith("storage/")
             relative_path = f"storage/site/{site_id}/{unique_filename}"
 
             logger.info(f"File saved locally: {file_path} ({file_size} bytes)")

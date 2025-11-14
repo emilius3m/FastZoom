@@ -32,8 +32,8 @@ from app.templates import templates
 # from app.routes.admin import admin_router
 # 🔧 NUOVO IMPORT - Router Sites
 from app.routes.sites_router import sites_router
-# 🔧 NUOVO IMPORT - Router Photos (senza prefisso /sites)
-from app.routes.photos_router import photos_router
+# 🔧 NUOVO IMPORT - Router Photos (senza prefisso /sites) - MOVED TO API v1
+# from app.routes.photos_router import photos_router  # REMOVED - moved to api/v1/photos.py
 # 🔧 NUOVO IMPORT - Router Form Schemas
 from app.routes.api.form_schemas import form_schemas_router
 from app.routes.api.documents import documents_router  # NUOVO
@@ -278,12 +278,12 @@ app.include_router(
     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
 )
 
-# 🖼️ INCLUSIONE ROUTER PHOTOS - Endpoints foto senza prefisso /sites
-app.include_router(
-    photos_router,
-    tags=["photos"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-)
+# 🖼️ INCLUSIONE ROUTER PHOTOS - Endpoints foto senza prefisso /sites - MOVED TO API v1
+# app.include_router(
+#     photos_router,
+#     tags=["photos"],
+#     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+# )  # REMOVED - moved to api/v1/photos.py
 
 # 📋 INCLUSIONE ROUTER FORM SCHEMAS - Endpoints per form builder
 app.include_router(
