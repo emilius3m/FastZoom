@@ -31,9 +31,10 @@ from app.routes.api.dependencies import get_site_access
 
 # Import API sub-routers
 from app.routes.api.iccd_hierarchy import iccd_hierarchy_router
-from app.routes.api.sites_photos import photos_router
+from app.routes.api.v1.photos import router as photos_router
 from app.routes.api.sites_storage import storage_router
-from app.routes.api.sites_deepzoom import deepzoom_router
+# DEPRECATED: DeepZoom v0 router - replaced by v1/deepzoom.py
+# from app.routes.api.sites_deepzoom import deepzoom_router
 from app.routes.api.sites_team import team_router, get_site_team
 
 sites_router = APIRouter(prefix="/api", tags=["sites"])
@@ -46,7 +47,8 @@ sites_router.include_router(iccd_hierarchy_router, prefix="/{site_id}")
 # sites_router.include_router(dashboard_router, tags=["dashboard"])
 sites_router.include_router(photos_router, tags=["photos"])  # API v1 photos router
 sites_router.include_router(storage_router, tags=["storage"])
-sites_router.include_router(deepzoom_router, tags=["deepzoom"])
+# DEPRECATED: DeepZoom v0 router - replaced by v1/deepzoom.py
+# sites_router.include_router(deepzoom_router, tags=["deepzoom"])
 sites_router.include_router(team_router, tags=["team"])
 
 # === UTILITIES ===
