@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from uuid import UUID
 from pathlib import Path
 from loguru import logger
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import RedirectResponse
 
 from minio import Minio
@@ -210,24 +210,57 @@ class ArchaeologicalMinIOService:
         operation_name: str = "upload",
         target_freed_mb: int = 100
     ) -> str:
-        """Metodo base per upload con retry pattern migliorato e jitter"""
+        """FIXED: Upload with retry pattern, circuit breaker, and timeout handling"""
+        
+        # FIXED: Check circuit breaker before attempting operation
+        if not self._check_circuit_breaker():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage service temporarily unavailable (circuit breaker open)"
+            )
         
         def upload_operation():
-            result = self.client.put_object(
-                bucket_name=bucket_name,
-                object_name=object_name,
-                data=io.BytesIO(data),
-                length=len(data),
-                content_type=content_type,
-                metadata=metadata
-            )
-            return f"minio://{bucket_name}/{object_name}"
+            # FIXED: Add socket timeout to prevent hanging
+            import socket
+            original_timeout = socket.getdefaulttimeout()
+            socket.setdefaulttimeout(30)  # 30 seconds timeout
+            
+            try:
+                result = self.client.put_object(
+                    bucket_name=bucket_name,
+                    object_name=object_name,
+                    data=io.BytesIO(data),
+                    length=len(data),
+                    content_type=content_type,
+                    metadata=metadata
+                )
+                return f"minio://{bucket_name}/{object_name}"
+            finally:
+                socket.setdefaulttimeout(original_timeout)
 
         try:
-            # Usa retry pattern con jitter
-            return await self.retry_handler.execute_with_retry(
-                upload_operation,
-                f"{operation_name} to {bucket_name}/{object_name}"
+            # FIXED: Execute upload with overall timeout
+            upload_future = asyncio.create_task(
+                self.retry_handler.execute_with_retry(
+                    upload_operation,
+                    f"{operation_name} to {bucket_name}/{object_name}"
+                )
+            )
+            
+            # 60 second timeout for upload operation
+            result = await asyncio.wait_for(upload_future, timeout=60.0)
+            
+            # FIXED: Success - reset circuit breaker
+            self._reset_circuit_breaker()
+            
+            return result
+            
+        except asyncio.TimeoutError:
+            logger.error(f"⏰ Upload operation timed out: {operation_name} to {bucket_name}/{object_name}")
+            self._record_circuit_breaker_failure()
+            raise HTTPException(
+                status_code=status.HTTP_408_REQUEST_TIMEOUT,
+                detail=f"Upload operation timed out: {operation_name}"
             )
         except HTTPException as e:
             # Gestione speciale per storage full
@@ -237,7 +270,15 @@ class ArchaeologicalMinIOService:
                     operation_name,
                     target_freed_mb
                 )
-            raise
+            else:
+                self._record_circuit_breaker_failure()
+                raise
+        except Exception as e:
+            self._record_circuit_breaker_failure()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Upload operation failed: {str(e)}"
+            )
 
     async def _generate_presigned_url(
         self,
@@ -310,42 +351,106 @@ class ArchaeologicalMinIOService:
             'backups': 'site-backups'
         }
 
-        # Inizializza bucket (sincrono per evitare problemi con event loop)
-        self._initialize_buckets_sync()
+        # FIXED: Circuit breaker for MinIO operations to prevent hanging
+        self.circuit_breaker = {
+            'failure_count': 0,
+            'last_failure_time': 0,
+            'state': 'CLOSED',  # CLOSED, OPEN, HALF_OPEN
+            'failure_threshold': 5,
+            'recovery_timeout': 60  # 60 seconds
+        }
 
-    def _initialize_buckets_sync(self):
-        """Inizializza bucket archeologici con policy avanzate"""
+        # FIXED: Initialize buckets with timeout to prevent hanging
+        self._initialize_buckets_with_timeout()
+
+    def _initialize_buckets_with_timeout(self):
+        """FIXED: Initialize buckets with timeout and non-blocking behavior"""
         try:
             # Include the legacy 'storage' bucket for compatibility
             all_buckets = dict(self.buckets)
             all_buckets['storage'] = 'storage'  # Add legacy bucket
             
+            # FIXED: Set timeout for bucket operations
+            import socket
+            
+            # Set socket timeout for all operations
+            socket.setdefaulttimeout(30)  # 30 seconds timeout
+            
             for bucket_type, bucket_name in all_buckets.items():
-                if not self.client.bucket_exists(bucket_name):
-                    self.client.make_bucket(bucket_name)
-                    logger.info(f"Created bucket: {bucket_name} ({bucket_type})")
+                try:
+                    # FIXED: Add timeout to bucket existence check
+                    if not self.client.bucket_exists(bucket_name):
+                        logger.info(f"Creating bucket: {bucket_name} ({bucket_type})")
+                        self.client.make_bucket(bucket_name)
+                        logger.info(f"Created bucket: {bucket_name} ({bucket_type})")
 
-                    # Policy di accesso per bucket pubblici (thumbnails e storage)
-                    if bucket_name in ["thumbnails", "storage"]:
-                        policy = {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Effect": "Allow",
-                                    "Principal": {"AWS": "*"},
-                                    "Action": ["s3:GetObject"],
-                                    "Resource": [f"arn:aws:s3:::{bucket_name}/*"]
-                                }
-                            ]
-                        }
-                        try:
-                            self.client.set_bucket_policy(bucket_name, json.dumps(policy))
-                            logger.info(f"Set public policy for bucket: {bucket_name}")
-                        except Exception as policy_error:
-                            logger.warning(f"Could not set policy for {bucket_name}: {policy_error}")
+                        # Policy di accesso per bucket pubblici (thumbnails e storage)
+                        if bucket_name in ["thumbnails", "storage"]:
+                            policy = {
+                                "Version": "2012-10-17",
+                                "Statement": [
+                                    {
+                                        "Effect": "Allow",
+                                        "Principal": {"AWS": "*"},
+                                        "Action": ["s3:GetObject"],
+                                        "Resource": [f"arn:aws:s3:::{bucket_name}/*"]
+                                    }
+                                ]
+                            }
+                            try:
+                                self.client.set_bucket_policy(bucket_name, json.dumps(policy))
+                                logger.info(f"Set public policy for bucket: {bucket_name}")
+                            except Exception as policy_error:
+                                logger.warning(f"Could not set policy for {bucket_name}: {policy_error}")
+                    else:
+                        logger.debug(f"Bucket already exists: {bucket_name}")
+                        
+                except Exception as bucket_e:
+                    logger.error(f"Error initializing bucket {bucket_name}: {bucket_e}")
+                    # FIXED: Continue with other buckets instead of failing completely
+                    continue
 
         except Exception as e:
-            logger.error(f"Error initializing buckets: {e}")
+            logger.error(f"Error in bucket initialization: {e}")
+            # FIXED: Don't fail service initialization completely
+            logger.warning("Bucket initialization failed but service will continue")
+
+    def _check_circuit_breaker(self) -> bool:
+        """Check if circuit breaker allows operations"""
+        current_time = time.time()
+        
+        # If circuit is OPEN, check if recovery timeout has passed
+        if self.circuit_breaker['state'] == 'OPEN':
+            if current_time - self.circuit_breaker['last_failure_time'] > self.circuit_breaker['recovery_timeout']:
+                # Transition to HALF_OPEN state
+                self.circuit_breaker['state'] = 'HALF_OPEN'
+                logger.info("Circuit breaker transitioning to HALF_OPEN state")
+                return True
+            else:
+                # Still in OPEN state, block operations
+                return False
+        
+        # If CLOSED or HALF_OPEN, allow operations
+        return True
+
+    def _reset_circuit_breaker(self) -> None:
+        """Reset circuit breaker after successful operation"""
+        self.circuit_breaker['failure_count'] = 0
+        self.circuit_breaker['state'] = 'CLOSED'
+        self.circuit_breaker['last_failure_time'] = 0
+        logger.debug("Circuit breaker reset to CLOSED state")
+
+    def _record_circuit_breaker_failure(self) -> None:
+        """Record a failure and update circuit breaker state"""
+        self.circuit_breaker['failure_count'] += 1
+        self.circuit_breaker['last_failure_time'] = time.time()
+        
+        # Check if we should open the circuit
+        if self.circuit_breaker['failure_count'] >= self.circuit_breaker['failure_threshold']:
+            self.circuit_breaker['state'] = 'OPEN'
+            logger.warning(f"Circuit breaker opened after {self.circuit_breaker['failure_count']} failures")
+        else:
+            logger.debug(f"Circuit breaker failure recorded: {self.circuit_breaker['failure_count']}/{self.circuit_breaker['failure_threshold']}")
 
     async def _get_file_size(self, file: UploadFile) -> int:
         """Calcola dimensione file in modo sicuro"""

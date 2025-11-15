@@ -118,10 +118,8 @@ class PhotoUploadService:
             background_start_time = asyncio.get_event_loop().time()
             logger.info(f"🔍 [SERVICE DEBUG] Starting background tiles processing at {background_start_time}")
             
-            # 🔧 FIX: Ensure background processor is running
-            if not deep_zoom_background_service._running:
-                await deep_zoom_background_service.start_background_processor()
-                logger.info('🚀 Auto-started background processor for tiles generation')
+            # 🔧 FIX: Ensure background processor is running with health check
+            await self._ensure_background_service_health()
 
             asyncio.create_task(
                 self._process_tiles_batch_background(photos_needing_tiles, site_id)
@@ -391,35 +389,6 @@ class PhotoUploadService:
 
         return photos_needing_tiles
 
-    async def _process_tiles_batch_background(
-        self,
-        photos_list: List[Dict[str, Any]],
-        site_id: UUID
-    ):
-        """
-        Processa tiles in background per multiple foto
-
-        Args:
-            photos_list: Lista foto da processare
-            site_id: ID sito
-        """
-        try:
-            logger.info(f"Starting background tiles processing for {len(photos_list)} photos")
-
-            # Import qui per evitare circular imports
-            from app.services.deep_zoom_minio_service import deep_zoom_minio_service
-
-            # Processa sequenzialmente per evitare sovraccarico
-            await deep_zoom_minio_service.process_tiles_batch_sequential(
-                photos_list=photos_list,
-                site_id=str(site_id)
-            )
-
-            logger.info(f"Background tiles processing completed for {len(photos_list)} photos")
-
-        except Exception as e:
-            logger.error(f"Background tiles processing failed: {e}")
-
     async def _log_upload_activity(
         self,
         site_id: UUID,
@@ -450,6 +419,137 @@ class PhotoUploadService:
 
         except Exception as e:
             logger.warning(f"Failed to log upload activity: {e}")
+
+    async def _ensure_background_service_health(self):
+        """
+        FIXED: Non-blocking background service health check with timeout handling
+        Prevents upload hanging by using timeout and circuit breaker pattern
+        """
+        try:
+            health_check_start = asyncio.get_event_loop().time()
+            logger.info("🔍 [SERVICE HEALTH] Starting non-blocking background service health check...")
+            
+            # FIXED: Add timeout wrapper for all service operations (max 5 seconds)
+            async def health_check_with_timeout():
+                # Check if service is marked as running
+                if not deep_zoom_background_service._running:
+                    logger.info("🔍 [SERVICE HEALTH] Service not running, starting...")
+                    await deep_zoom_background_service.start_background_processor()
+                    return "started"
+                
+                # Check if worker task is alive
+                if deep_zoom_background_service._worker_task is None:
+                    logger.warning("⚠️ [SERVICE HEALTH] Worker task is None, restarting service...")
+                    await deep_zoom_background_service.stop_background_processor()
+                    await deep_zoom_background_service.start_background_processor()
+                    return "restarted_none"
+                
+                # Check if worker task is done/failed
+                if deep_zoom_background_service._worker_task.done():
+                    if deep_zoom_background_service._worker_task.cancelled():
+                        logger.warning("⚠️ [SERVICE HEALTH] Worker task was cancelled, restarting...")
+                    elif deep_zoom_background_service._worker_task.exception():
+                        logger.error(f"❌ [SERVICE HEALTH] Worker task failed: {deep_zoom_background_service._worker_task.exception()}")
+                    else:
+                        logger.warning("⚠️ [SERVICE HEALTH] Worker task completed unexpectedly, restarting...")
+                    
+                    await deep_zoom_background_service.stop_background_processor()
+                    await deep_zoom_background_service.start_background_processor()
+                    return "restarted_done"
+                
+                # Service appears healthy
+                return "healthy"
+            
+            # FIXED: Execute health check with timeout (5 seconds max)
+            try:
+                result = await asyncio.wait_for(health_check_with_timeout(), timeout=5.0)
+                health_check_end = asyncio.get_event_loop().time()
+                health_check_duration = health_check_end - health_check_start
+                
+                if result == "healthy":
+                    logger.info(f"✅ [SERVICE HEALTH] Background service is healthy (checked in {health_check_duration:.2f}s)")
+                else:
+                    logger.info(f"🚀 [SERVICE HEALTH] Background service {result} (checked in {health_check_duration:.2f}s)")
+                
+            except asyncio.TimeoutError:
+                health_check_end = asyncio.get_event_loop().time()
+                health_check_duration = health_check_end - health_check_start
+                logger.error(f"⏰ [SERVICE HEALTH] Health check timed out after {health_check_duration:.2f}s - proceeding without blocking")
+                
+                # FIXED: Don't block upload even if health check times out
+                # Try a quick emergency restart with shorter timeout
+                try:
+                    logger.warning("🔄 [SERVICE HEALTH] Attempting quick emergency restart...")
+                    await asyncio.wait_for(deep_zoom_background_service.start_background_processor(), timeout=2.0)
+                    logger.info("🚀 [SERVICE HEALTH] Quick restart completed")
+                except asyncio.TimeoutError:
+                    logger.error("💀 [SERVICE HEALTH] Quick restart also timed out - proceeding with upload")
+                except Exception as restart_e:
+                    logger.error(f"💀 [SERVICE HEALTH] Quick restart failed: {restart_e} - proceeding with upload")
+            
+        except Exception as e:
+            health_check_end = asyncio.get_event_loop().time()
+            health_check_duration = health_check_end - health_check_start
+            logger.error(f"❌ [SERVICE HEALTH] Health check failed after {health_check_duration:.2f}s: {e}")
+            
+            # FIXED: NEVER block the upload - always continue
+            # The tile processing will be scheduled even if service check fails
+            logger.info("🔄 [SERVICE HEALTH] Proceeding with upload despite service health issues")
+
+    async def _process_tiles_batch_background(
+        self,
+        photos_list: List[Dict[str, Any]],
+        site_id: UUID
+    ):
+        """
+        Processa tiles in background per multiple foto with improved error handling
+        
+        Args:
+            photos_list: Lista foto da processare
+            site_id: ID sito
+        """
+        try:
+            logger.info(f"Starting background tiles processing for {len(photos_list)} photos")
+
+            # Import qui per evitare circular imports
+            from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+
+            # Processa sequenzialmente per evitare sovraccarico
+            await deep_zoom_minio_service.process_tiles_batch_sequential(
+                photos_list=photos_list,
+                site_id=str(site_id)
+            )
+
+            logger.info(f"Background tiles processing completed for {len(photos_list)} photos")
+
+        except Exception as e:
+            logger.error(f"Background tiles processing failed: {e}")
+            logger.error(f"Error details: {type(e).__name__}: {str(e)}")
+            
+            # Try to fallback to individual photo scheduling if batch processing fails
+            try:
+                logger.info("🔄 [FALLBACK] Attempting individual photo scheduling...")
+                for photo_info in photos_list:
+                    try:
+                        # Load file content from MinIO
+                        from app.services.archaeological_minio_service import archaeological_minio_service
+                        original_file_content = await archaeological_minio_service.get_file(photo_info['file_path'])
+                        
+                        await deep_zoom_background_service.schedule_tile_processing(
+                            photo_id=photo_info['photo_id'],
+                            site_id=str(site_id),
+                            file_path=photo_info['file_path'],
+                            original_file_content=original_file_content,
+                            archaeological_metadata=photo_info.get('archaeological_metadata', {})
+                        )
+                        
+                    except Exception as photo_e:
+                        logger.error(f"Failed to schedule individual photo {photo_info.get('photo_id')}: {photo_e}")
+                
+                logger.info("🔄 [FALLBACK] Individual photo scheduling completed")
+                
+            except Exception as fallback_e:
+                logger.error(f"💀 [FALLBACK] Fallback processing also failed: {fallback_e}")
 
 
 # Dependency injection function

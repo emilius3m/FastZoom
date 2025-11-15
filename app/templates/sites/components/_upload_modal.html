@@ -233,6 +233,125 @@
                              </template>
                          </div>
                      </div>
+
+                     <!-- WebSocket Progress for Tile Creation -->
+                     <div x-show="wsShowProgress" x-transition:enter="transition ease-out duration-300" class="mt-8">
+                         <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-6">
+                             <div class="flex items-center mb-4">
+                                 <svg class="w-6 h-6 text-blue-600 dark:text-blue-400 mr-3 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                 </svg>
+                                 <h3 class="text-lg font-medium text-blue-900 dark:text-blue-200">
+                                     Creazione Tiles in Corso
+                                 </h3>
+                             </div>
+                             
+                             <div class="space-y-4">
+                                 <!-- Overall Progress -->
+                                 <div>
+                                     <div class="flex justify-between text-sm mb-2">
+                                         <span class="text-blue-700 dark:text-blue-300">
+                                             Progresso Generale:
+                                         </span>
+                                         <span class="text-blue-700 dark:text-blue-300 font-medium">
+                                             <span x-text="wsProgressData.completedPhotos + wsProgressData.failedPhotos"></span> / <span x-text="wsProgressData.totalPhotos"></span> foto
+                                         </span>
+                                     </div>
+                                     <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                                         <div class="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                                              :style="`width: ${wsProgressData.overallProgress}%`"></div>
+                                     </div>
+                                     <div class="flex justify-between text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                         <span><span x-text="wsProgressData.completedPhotos"></span> completate</span>
+                                         <span x-show="wsProgressData.failedPhotos > 0" class="text-red-600 dark:text-red-400">
+                                             <span x-text="wsProgressData.failedPhotos"></span> fallite
+                                         </span>
+                                         <span x-text="`${wsProgressData.overallProgress}%`"></span>
+                                     </div>
+                                 </div>
+                                 
+                                 <!-- Error Display -->
+                                 <div x-show="wsError" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded p-3">
+                                     <div class="flex items-center text-red-700 dark:text-red-300">
+                                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                         </svg>
+                                         <span class="text-sm" x-text="wsError"></span>
+                                     </div>
+                                 </div>
+                                 
+                                 <!-- Currently Processing Photos -->
+                                 <div x-show="wsProgressData.processingPhotos.length > 0">
+                                     <h4 class="text-sm font-medium text-blue-700 dark:text-blue-300 mb-3">
+                                         Foto in Elaborazione:
+                                     </h4>
+                                     <div class="space-y-2 max-h-48 overflow-y-auto">
+                                         <template x-for="photo in wsProgressData.processingPhotos" :key="photo.photo_id">
+                                             <div class="bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded p-3">
+                                                 <div class="flex items-center justify-between mb-2">
+                                                     <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate"
+                                                           x-text="photo.filename || photo.photo_id"></span>
+                                                     <span class="text-xs px-2 py-1 rounded-full"
+                                                           :class="{
+                                                               'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300': photo.status === 'processing',
+                                                               'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300': photo.status === 'completed',
+                                                               'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300': photo.status === 'failed'
+                                                           }"
+                                                           x-text="photo.status"></span>
+                                                 </div>
+                                                 
+                                                 <!-- Individual Photo Progress Bar -->
+                                                 <div x-show="photo.status === 'processing' && photo.progress">
+                                                     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-1">
+                                                         <div class="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                                                              :style="`width: ${photo.progress}%`"></div>
+                                                     </div>
+                                                     <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                                                         <span>Progresso</span>
+                                                         <span x-text="`${photo.progress}%`"></span>
+                                                     </div>
+                                                 </div>
+                                                 
+                                                 <!-- Photo Details -->
+                                                 <div x-show="photo.tile_count || photo.levels" class="flex space-x-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                     <span x-show="photo.tile_count">
+                                                         Tiles: <span x-text="photo.tile_count"></span>
+                                                     </span>
+                                                     <span x-show="photo.levels">
+                                                         Livelli: <span x-text="photo.levels"></span>
+                                                     </span>
+                                                 </div>
+                                                 
+                                                 <!-- Error Message -->
+                                                 <div x-show="photo.error" class="mt-2 text-xs text-red-600 dark:text-red-400">
+                                                     Errore: <span x-text="photo.error"></span>
+                                                 </div>
+                                             </div>
+                                         </template>
+                                     </div>
+                                 </div>
+                                 
+                                 <!-- Completion Status -->
+                                 <div x-show="wsProgressData.overallProgress === 100"
+                                      class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded p-3">
+                                     <div class="flex items-center text-green-700 dark:text-green-300">
+                                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                         </svg>
+                                         <span class="text-sm font-medium">
+                                             Creazione tiles completata!
+                                         </span>
+                                     </div>
+                                     <div class="text-xs text-green-600 dark:text-green-400 mt-1">
+                                         <span x-text="wsProgressData.completedPhotos"></span> foto elaborate con successo
+                                         <span x-show="wsProgressData.failedPhotos > 0">
+                                             • <span x-text="wsProgressData.failedPhotos"></span> fallite
+                                         </span>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
                  </div>
              </div>
          </div>
@@ -341,6 +460,22 @@ document.addEventListener('alpine:init', () => {
         uploadedFiles: 0,
         uploadResults: [],
         
+        // WebSocket state
+        wsConnection: null,
+        wsReconnectAttempts: 0,
+        wsMaxReconnectAttempts: 5,
+        wsReconnectDelay: 2000,
+        wsProgressData: {
+            processingPhotos: [],
+            totalPhotos: 0,
+            completedPhotos: 0,
+            failedPhotos: 0,
+            currentProgress: 0,
+            overallProgress: 0
+        },
+        wsShowProgress: false,
+        wsError: null,
+        
         // 🔧 METODI HELPER PER COMUNICAZIONE PARENT-CHILD
         getParentComponent() {
             // Trova il parent component Alpine.js
@@ -374,6 +509,21 @@ document.addEventListener('alpine:init', () => {
             this.uploadProgress = 0;
             this.uploadedFiles = 0;
             this.uploadResults = [];
+            
+            // Reset WebSocket state
+            this.disconnectWebSocket();
+            this.wsReconnectAttempts = 0;
+            this.wsProgressData = {
+                processingPhotos: [],
+                totalPhotos: 0,
+                completedPhotos: 0,
+                failedPhotos: 0,
+                currentProgress: 0,
+                overallProgress: 0
+            };
+            this.wsShowProgress = false;
+            this.wsError = null;
+            
             this.metadata = {
                 inventory_number: '',
                 excavation_area: '',
@@ -765,7 +915,188 @@ document.addEventListener('alpine:init', () => {
             return responseData;
         },
         
-        // 🔧 FUNZIONE FINISHUPLOAD CORRETTA CON RESET STATO
+        // 🔧 WebSocket Connection Management
+        connectWebSocket() {
+            if (this.wsConnection && this.wsConnection.readyState === WebSocket.OPEN) {
+                console.log('🔌 WebSocket already connected');
+                return;
+            }
+            
+            const siteId = '{{ site.id }}';
+            const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/site/${siteId}/ws/notifications`;
+            
+            console.log(`🔌 Connecting WebSocket to: ${wsUrl}`);
+            
+            try {
+                this.wsConnection = new WebSocket(wsUrl);
+                
+                this.wsConnection.onopen = () => {
+                    console.log('✅ WebSocket connected successfully');
+                    this.wsReconnectAttempts = 0;
+                    this.wsError = null;
+                };
+                
+                this.wsConnection.onmessage = (event) => {
+                    this.handleWebSocketMessage(event);
+                };
+                
+                this.wsConnection.onclose = (event) => {
+                    console.log(`🔌 WebSocket closed: ${event.code} - ${event.reason}`);
+                    this.handleWebSocketClose(event);
+                };
+                
+                this.wsConnection.onerror = (error) => {
+                    console.error('❌ WebSocket error:', error);
+                    this.handleWebSocketError(error);
+                };
+                
+            } catch (error) {
+                console.error('❌ Failed to create WebSocket connection:', error);
+                this.handleWebSocketError(error);
+            }
+        },
+        
+        disconnectWebSocket() {
+            if (this.wsConnection) {
+                console.log('🔌 Disconnecting WebSocket');
+                this.wsConnection.close();
+                this.wsConnection = null;
+            }
+        },
+        
+        handleWebSocketMessage(event) {
+            try {
+                const message = JSON.parse(event.data);
+                console.log('📨 WebSocket message received:', message);
+                
+                if (message.type === 'tiles_progress') {
+                    this.handleTilesProgress(message);
+                } else if (message.type === 'connected') {
+                    console.log('✅ WebSocket connection confirmed:', message.message);
+                } else if (message.type === 'error') {
+                    this.handleWebSocketServerError(message);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error parsing WebSocket message:', error);
+            }
+        },
+        
+        handleTilesProgress(message) {
+            console.log('🏗️ Tiles progress update:', message);
+            
+            // Update progress data
+            if (message.total_photos) {
+                this.wsProgressData.totalPhotos = message.total_photos;
+            }
+            
+            if (message.current_photo !== undefined) {
+                this.wsProgressData.currentProgress = message.current_photo;
+            }
+            
+            // Calculate overall progress
+            if (this.wsProgressData.totalPhotos > 0) {
+                this.wsProgressData.overallProgress = Math.round(
+                    (this.wsProgressData.completedPhotos / this.wsProgressData.totalPhotos) * 100
+                );
+            }
+            
+            // Update processing photos list
+            if (message.photo_id && message.photo_filename) {
+                const existingPhoto = this.wsProgressData.processingPhotos.find(
+                    p => p.photo_id === message.photo_id
+                );
+                
+                if (!existingPhoto) {
+                    this.wsProgressData.processingPhotos.push({
+                        photo_id: message.photo_id,
+                        filename: message.photo_filename,
+                        status: message.status,
+                        progress: message.progress || 0,
+                        tile_count: message.tile_count,
+                        levels: message.levels,
+                        error: message.error
+                    });
+                } else {
+                    // Update existing photo
+                    existingPhoto.status = message.status;
+                    existingPhoto.progress = message.progress || 0;
+                    existingPhoto.tile_count = message.tile_count;
+                    existingPhoto.levels = message.levels;
+                    existingPhoto.error = message.error;
+                }
+                
+                // Update counters based on status
+                if (message.status === 'completed') {
+                    this.wsProgressData.completedPhotos++;
+                    // Remove from processing list after a delay
+                    setTimeout(() => {
+                        const index = this.wsProgressData.processingPhotos.findIndex(
+                            p => p.photo_id === message.photo_id
+                        );
+                        if (index !== -1) {
+                            this.wsProgressData.processingPhotos.splice(index, 1);
+                        }
+                    }, 2000);
+                } else if (message.status === 'failed') {
+                    this.wsProgressData.failedPhotos++;
+                }
+            }
+            
+            // Show progress UI
+            this.wsShowProgress = true;
+        },
+        
+        handleWebSocketClose(event) {
+            this.wsConnection = null;
+            
+            // Only attempt reconnection if not a normal closure and we haven't exceeded max attempts
+            if (event.code !== 1000 && this.wsReconnectAttempts < this.wsMaxReconnectAttempts) {
+                this.wsReconnectAttempts++;
+                console.log(`🔄 Attempting WebSocket reconnection ${this.wsReconnectAttempts}/${this.wsMaxReconnectAttempts}`);
+                
+                setTimeout(() => {
+                    this.connectWebSocket();
+                }, this.wsReconnectDelay * this.wsReconnectAttempts);
+            } else if (this.wsReconnectAttempts >= this.wsMaxReconnectAttempts) {
+                this.wsError = 'Failed to establish WebSocket connection after multiple attempts';
+                console.error('❌ WebSocket reconnection failed after maximum attempts');
+            }
+        },
+        
+        handleWebSocketError(error) {
+            this.wsError = 'WebSocket connection error occurred';
+            console.error('❌ WebSocket error:', error);
+        },
+        
+        handleWebSocketServerError(message) {
+            this.wsError = message.message || 'Server error occurred';
+            console.error('❌ WebSocket server error:', message);
+        },
+        
+        // Helper function to normalize site ID format
+        normalizeSiteId(siteId) {
+            if (!siteId) return siteId;
+            
+            // Remove whitespace
+            siteId = siteId.trim();
+            
+            // If it's a UUID standard with dashes, return it
+            if (siteId.includes('-')) {
+                return siteId;
+            }
+            
+            // If it's a hexadecimal hash without dashes (32 characters)
+            if (siteId.length === 32) {
+                // Convert to standard UUID format (insert dashes)
+                return `${siteId.slice(0,8)}-${siteId.slice(8,12)}-${siteId.slice(12,16)}-${siteId.slice(16,20)}-${siteId.slice(20)}`;
+            }
+            
+            // Other formats, return as is
+            return siteId;
+        },
+        
+        // 🔧 FUNZIONE FINISHUPLOAD CORRETTA CON RESET STATO E WEBSOCKET
         finishUpload() {
             // Raccogli gli ID delle foto caricate con successo
             const uploadedPhotoIds = this.uploadResults
@@ -773,6 +1104,19 @@ document.addEventListener('alpine:init', () => {
                 .map(result => result.photo_id);
             
             console.log('📸 Finishing upload for photos:', uploadedPhotoIds);
+            
+            // Connect WebSocket for progress reporting
+            if (uploadedPhotoIds.length > 0) {
+                this.connectWebSocket();
+                
+                // Initialize progress data
+                this.wsProgressData.totalPhotos = uploadedPhotoIds.length;
+                this.wsProgressData.completedPhotos = 0;
+                this.wsProgressData.failedPhotos = 0;
+                this.wsProgressData.processingPhotos = [];
+                
+                console.log('🔌 WebSocket connected for tile creation progress');
+            }
             
             // Accesso sicuro al parent component
             const parent = this.getParentComponent();
@@ -807,7 +1151,7 @@ document.addEventListener('alpine:init', () => {
                 this.resetUploadState();
             }, 100);
             
-            console.log('✅ Upload modal closed, background processing will start');
+            console.log('✅ Upload modal closed, WebSocket connected for background processing progress');
         }
     }));
 });

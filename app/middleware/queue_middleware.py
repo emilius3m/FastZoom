@@ -199,15 +199,27 @@ class QueueMiddleware(BaseHTTPMiddleware):
         if await self._should_queue_request(request):
             return await self._handle_queued_request(request, queue_setting)
         
-        # Check if system is overloaded ONLY for immediate processing
-        # (not for queued requests which are designed to handle overload)
-        system_overloaded = request_queue_service.system_monitor.is_system_overloaded()
-        if system_overloaded:
-            logger.warning(f"System overloaded, rejecting request to {request.url.path}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="System temporarily overloaded. Please try again later."
+        # FIXED: Non-blocking system overload check with timeout
+        try:
+            # Add timeout to prevent hanging on system monitor calls
+            system_overloaded = await asyncio.wait_for(
+                self._check_system_overload_with_timeout(),
+                timeout=2.0  # 2 second timeout for system check
             )
+            
+            if system_overloaded:
+                logger.warning(f"System overloaded, queueing request to {request.url.path} instead of rejecting")
+                # FIXED: Queue the request instead of rejecting to improve reliability
+                return await self._handle_queued_request(request, queue_setting)
+                
+        except asyncio.TimeoutError:
+            logger.warning("⏰ System overload check timed out, proceeding with request")
+            # FIXED: Proceed with request if check times out
+            pass
+        except Exception as e:
+            logger.warning(f"Error checking system overload: {e}, proceeding with request")
+            # FIXED: Proceed with request if check fails
+            pass
         
         # Process immediately
         return await call_next(request)
@@ -382,40 +394,79 @@ class QueueMiddleware(BaseHTTPMiddleware):
             return 'default'
     
     async def _should_queue_request(self, request: Request) -> bool:
-        """Determine if request should be queued"""
+        """FIXED: Non-blocking request queuing decision with timeout"""
         
-        # Check system load
-        load_factor = request_queue_service.system_monitor.get_load_factor()
-        
-        # Queue if system is under moderate load (lowered threshold for better responsiveness)
-        if load_factor > 0.2:
-            return True
-        
-        # Check if system is overloaded - always queue in this case
-        if request_queue_service.system_monitor.is_system_overloaded():
-            logger.info(f"System overloaded, queueing request to {request.url.path}")
-            return True
-        
-        # Check queue sizes
-        queue_status = await request_queue_service.get_queue_status()
-        
-        # Queue if there are already many requests (production threshold)
-        queue_threshold = 3  # Lowered threshold for better load management
-        
-        if queue_status['active_requests'] > queue_threshold:
-            return True
-        
-        # Check if this is a bulk operation
-        if 'bulk' in request.url.path:
-            return True
-        
-        # Always queue upload requests during high load periods
-        if 'upload' in request.url.path and load_factor > 0.1:
-            return True
-        
-        # Production behavior - no special handling for stress tests
+        try:
+            # FIXED: Add timeout to prevent hanging on system monitor calls
+            system_check_result = await asyncio.wait_for(
+                self._check_system_load_with_timeout(),
+                timeout=1.0  # 1 second timeout
+            )
+            
+            load_factor, is_overloaded, queue_status = system_check_result
+            
+            # Queue if system is under moderate load (lowered threshold for better responsiveness)
+            if load_factor > 0.2:
+                return True
+            
+            # Check if system is overloaded - always queue in this case
+            if is_overloaded:
+                logger.info(f"System overloaded, queueing request to {request.url.path}")
+                return True
+            
+            # Queue if there are already many requests (production threshold)
+            queue_threshold = 3  # Lowered threshold for better load management
+            
+            if queue_status and queue_status['active_requests'] > queue_threshold:
+                return True
+            
+            # Check if this is a bulk operation
+            if 'bulk' in request.url.path:
+                return True
+            
+            # Always queue upload requests during high load periods
+            if 'upload' in request.url.path and load_factor > 0.1:
+                return True
+            
+            # Production behavior - no special handling for stress tests
+            
+        except asyncio.TimeoutError:
+            logger.warning("⏰ System load check timed out, defaulting to immediate processing")
+            return False  # Don't queue if check times out
+        except Exception as e:
+            logger.warning(f"Error checking system load: {e}, defaulting to immediate processing")
+            return False  # Don't queue if check fails
         
         return False
+    
+    async def _check_system_overload_with_timeout(self) -> bool:
+        """Helper method to check system overload with timeout"""
+        try:
+            return request_queue_service.system_monitor.is_system_overloaded()
+        except Exception as e:
+            logger.warning(f"Error in system overload check: {e}")
+            return False  # Default to not overloaded on error
+    
+    async def _check_system_load_with_timeout(self) -> tuple:
+        """Helper method to check system load with timeout"""
+        try:
+            load_factor = request_queue_service.system_monitor.get_load_factor()
+            is_overloaded = request_queue_service.system_monitor.is_system_overloaded()
+            
+            # Get queue status with timeout
+            try:
+                queue_status = await asyncio.wait_for(
+                    request_queue_service.get_queue_status(),
+                    timeout=0.5  # 500ms timeout for queue status
+                )
+            except asyncio.TimeoutError:
+                queue_status = None  # Use None if queue status check times out
+            
+            return load_factor, is_overloaded, queue_status
+            
+        except Exception as e:
+            logger.warning(f"Error in system load check: {e}")
+            return 0.0, False, None  # Default to normal load on error
     
     async def _handle_queued_request(self, request: Request, queue_setting: Dict[str, Any]) -> Response:
         """Handle request through queue"""

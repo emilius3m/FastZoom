@@ -66,6 +66,16 @@ class DeepZoomBackgroundService:
         self._processing_lock = asyncio.Lock()
         self._task_locks = {}  # photo_id -> Lock
         self._processing_photo_ids = set()  # Track currently processing photos
+        
+        # Task timeout and cleanup settings
+        self.task_timeout_seconds = 1800  # 30 minutes max per task
+        self.stuck_task_check_interval = 300  # Check every 5 minutes
+        self.last_stuck_task_check = datetime.now()
+        
+        # Health tracking
+        self.service_start_time = datetime.now()
+        self.total_tasks_processed = 0
+        self.total_tasks_failed = 0
 
     async def start_background_processor(self):
         """Start the background processor worker"""
@@ -191,7 +201,7 @@ class DeepZoomBackgroundService:
         }
 
     async def _process_queue_worker(self):
-        """Background worker that processes the queue"""
+        """Background worker that processes the queue with stuck task detection"""
         logger.info("🔄 Background queue worker started")
         
         # Create semaphore to limit concurrent processing
@@ -199,6 +209,9 @@ class DeepZoomBackgroundService:
         
         while self._running:
             try:
+                # Check for stuck tasks periodically
+                await self._check_and_cleanup_stuck_tasks()
+                
                 # Get task from queue with timeout
                 task = await asyncio.wait_for(self.task_queue.get(), timeout=1.0)
                 
@@ -213,6 +226,101 @@ class DeepZoomBackgroundService:
             except Exception as e:
                 logger.error(f"Error in queue worker: {e}")
                 await asyncio.sleep(1)  # Prevent tight loop on errors
+
+    async def _check_and_cleanup_stuck_tasks(self):
+        """Check for and cleanup stuck tasks that have been processing too long"""
+        try:
+            current_time = datetime.now()
+            
+            # Check if it's time to run stuck task detection
+            if (current_time - self.last_stuck_task_check).total_seconds() < self.stuck_task_check_interval:
+                return
+            
+            self.last_stuck_task_check = current_time
+            logger.debug("🔍 [STUCK TASK] Running stuck task detection...")
+            
+            stuck_tasks = []
+            
+            async with self._processing_lock:
+                for photo_id, task in self.processing_tasks.items():
+                    # Check if task has been running too long
+                    if task.status == ProcessingStatus.PROCESSING and task.started_at:
+                        processing_time = (current_time - task.started_at).total_seconds()
+                        if processing_time > self.task_timeout_seconds:
+                            stuck_tasks.append((photo_id, task, processing_time))
+                            logger.warning(f"⚠️ [STUCK TASK] Photo {photo_id} stuck for {processing_time:.1f}s")
+            
+            # Cleanup stuck tasks
+            for photo_id, task, processing_time in stuck_tasks:
+                await self._cleanup_stuck_task(photo_id, task, processing_time)
+                
+            if stuck_tasks:
+                logger.info(f"🧹 [STUCK TASK] Cleaned up {len(stuck_tasks)} stuck tasks")
+            else:
+                logger.debug("🔍 [STUCK TASK] No stuck tasks found")
+                
+        except Exception as e:
+            logger.error(f"❌ [STUCK TASK] Error in stuck task detection: {e}")
+
+    async def _cleanup_stuck_task(self, photo_id: str, task: TileProcessingTask, processing_time: float):
+        """Clean up a stuck task by moving it to failed status and re-queuing if needed"""
+        try:
+            logger.warning(f"🧹 [STUCK TASK] Cleaning up stuck task for photo {photo_id} ({processing_time:.1f}s)")
+            
+            # Move task to failed status
+            task.status = ProcessingStatus.FAILED
+            task.error_message = f"Task stuck for {processing_time:.1f}s, cleaned up automatically"
+            task.completed_at = datetime.now()
+            
+            # Update database status
+            await self._update_photo_database_status(photo_id, "failed")
+            await self._update_processing_status(
+                task, "failed", 0, error=task.error_message
+            )
+            
+            # Move to failed tasks
+            self.failed_tasks[photo_id] = task
+            
+            # Remove from processing tasks
+            if photo_id in self.processing_tasks:
+                del self.processing_tasks[photo_id]
+            
+            # Remove from tracking
+            self._processing_photo_ids.discard(photo_id)
+            
+            # Clean up task lock
+            if photo_id in self._task_locks:
+                del self._task_locks[photo_id]
+            
+            # Update failure counter
+            self.total_tasks_failed += 1
+            
+            # Try to re-queue if retries remaining
+            if task.retry_count < task.max_retries:
+                logger.info(f"🔄 [STUCK TASK] Re-queuing photo {photo_id} for retry")
+                task.retry_count += 1
+                task.status = ProcessingStatus.RETRYING
+                task.started_at = None  # Reset start time
+                
+                # Re-add to queue after a delay
+                await asyncio.sleep(30)  # 30 second delay before retry
+                await self.task_queue.put(task)
+                self.processing_tasks[photo_id] = task
+                self._processing_photo_ids.add(photo_id)
+            else:
+                logger.error(f"💀 [STUCK TASK] Photo {photo_id} exceeded max retries, permanently failed")
+                # Send failure notification
+                await self._send_completion_notification(task, False)
+                
+        except Exception as e:
+            logger.error(f"❌ [STUCK TASK] Error cleaning up stuck task {photo_id}: {e}")
+            # Force cleanup even if something goes wrong
+            try:
+                self.processing_tasks.pop(photo_id, None)
+                self._processing_photo_ids.discard(photo_id)
+                self._task_locks.pop(photo_id, None)
+            except:
+                pass
 
     async def _process_single_task_with_semaphore(
         self, 
@@ -309,6 +417,9 @@ class DeepZoomBackgroundService:
                 # Rimuovi da tracking con lock
                 async with self._processing_lock:
                     self._processing_photo_ids.discard(task.photo_id)
+                
+                # Update success counter
+                self.total_tasks_processed += 1
                 
                 logger.info(f"✅ Completed tile processing for photo {task.photo_id}: {completed_tiles} tiles")
                 
@@ -859,8 +970,159 @@ class DeepZoomBackgroundService:
             "failed_tasks": len(self.failed_tasks),
             "is_running": self._running,
             "max_concurrent_tasks": self.max_concurrent_tasks,
-            "max_concurrent_uploads": self.max_concurrent_uploads
+            "max_concurrent_uploads": self.max_concurrent_uploads,
+            "service_start_time": self.service_start_time.isoformat(),
+            "total_tasks_processed": self.total_tasks_processed,
+            "total_tasks_failed": self.total_tasks_failed,
+            "last_stuck_task_check": self.last_stuck_task_check.isoformat(),
+            "task_timeout_seconds": self.task_timeout_seconds,
+            "processing_photo_ids": list(self._processing_photo_ids)
         }
+
+    async def get_health_status(self) -> Dict[str, Any]:
+        """Get detailed health status of the background service"""
+        try:
+            current_time = datetime.now()
+            uptime_seconds = (current_time - self.service_start_time).total_seconds()
+            
+            # Check worker health
+            worker_health = {
+                "is_running": self._running,
+                "worker_task_exists": self._worker_task is not None,
+                "worker_task_done": self._worker_task.done() if self._worker_task else None,
+                "worker_task_cancelled": self._worker_task.cancelled() if self._worker_task else None,
+                "worker_task_exception": str(self._worker_task.exception()) if self._worker_task and self._worker_task.done() and self._worker_task.exception() else None
+            }
+            
+            # Check for stuck tasks
+            stuck_tasks = []
+            for photo_id, task in self.processing_tasks.items():
+                if task.status == ProcessingStatus.PROCESSING and task.started_at:
+                    processing_time = (current_time - task.started_at).total_seconds()
+                    if processing_time > self.task_timeout_seconds:
+                        stuck_tasks.append({
+                            "photo_id": photo_id,
+                            "processing_time_seconds": processing_time,
+                            "started_at": task.started_at.isoformat()
+                        })
+            
+            # Calculate health metrics
+            health_metrics = {
+                "service_uptime_seconds": uptime_seconds,
+                "success_rate": (
+                    self.total_tasks_processed / (self.total_tasks_processed + self.total_tasks_failed)
+                    if (self.total_tasks_processed + self.total_tasks_failed) > 0 else 1.0
+                ),
+                "queue_health": {
+                    "is_empty": self.task_queue.qsize() == 0,
+                    "size": self.task_queue.qsize(),
+                    "max_concurrent_reached": len(self.processing_tasks) >= self.max_concurrent_tasks
+                },
+                "task_health": {
+                    "processing_count": len(self.processing_tasks),
+                    "stuck_count": len(stuck_tasks),
+                    "failed_count": len(self.failed_tasks),
+                    "completed_count": len(self.completed_tasks)
+                }
+            }
+            
+            # Determine overall health status
+            overall_status = "healthy"
+            health_issues = []
+            
+            if not self._running:
+                overall_status = "stopped"
+                health_issues.append("Service is not running")
+            elif self._worker_task is None:
+                overall_status = "unhealthy"
+                health_issues.append("Worker task is None")
+            elif self._worker_task.done():
+                overall_status = "unhealthy"
+                if self._worker_task.cancelled():
+                    health_issues.append("Worker task was cancelled")
+                elif self._worker_task.exception():
+                    health_issues.append(f"Worker task failed: {self._worker_task.exception()}")
+                else:
+                    health_issues.append("Worker task completed unexpectedly")
+            elif len(stuck_tasks) > 0:
+                overall_status = "degraded"
+                health_issues.append(f"{len(stuck_tasks)} stuck tasks detected")
+            elif self.task_queue.qsize() > 100:
+                overall_status = "degraded"
+                health_issues.append("Queue size is very large")
+            elif health_metrics["success_rate"] < 0.8 and (self.total_tasks_processed + self.total_tasks_failed) > 10:
+                overall_status = "degraded"
+                health_issues.append(f"Low success rate: {health_metrics['success_rate']:.2%}")
+            
+            return {
+                "status": overall_status,
+                "timestamp": current_time.isoformat(),
+                "uptime_seconds": uptime_seconds,
+                "worker_health": worker_health,
+                "health_metrics": health_metrics,
+                "stuck_tasks": stuck_tasks,
+                "health_issues": health_issues,
+                "queue_status": await self.get_queue_status()
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ [HEALTH] Error getting health status: {e}")
+            return {
+                "status": "error",
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e),
+                "health_issues": [f"Health check failed: {str(e)}"]
+            }
+
+    async def reset_service(self) -> Dict[str, Any]:
+        """Reset the background service - emergency recovery"""
+        try:
+            logger.warning("🔄 [RESET] Resetting background service...")
+            
+            # Stop the service
+            await self.stop_background_processor()
+            
+            # Clear queues and task tracking
+            async with self._processing_lock:
+                # Clear the queue
+                while not self.task_queue.empty():
+                    try:
+                        self.task_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                
+                # Move processing tasks to failed
+                failed_count = len(self.processing_tasks)
+                for photo_id, task in self.processing_tasks.items():
+                    task.status = ProcessingStatus.FAILED
+                    task.error_message = "Service reset - task marked as failed"
+                    task.completed_at = datetime.now()
+                    self.failed_tasks[photo_id] = task
+                
+                # Clear processing tracking
+                self.processing_tasks.clear()
+                self._processing_photo_ids.clear()
+                self._task_locks.clear()
+            
+            # Restart the service
+            await self.start_background_processor()
+            
+            logger.info(f"🔄 [RESET] Service reset completed - {failed_count} tasks moved to failed")
+            
+            return {
+                "status": "reset_completed",
+                "timestamp": datetime.now().isoformat(),
+                "failed_tasks_moved": failed_count,
+                "service_running": self._running
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ [RESET] Service reset failed: {e}")
+            return {
+                "status": "reset_failed",
+                "timestamp": datetime.now().isoformat(),
+                "error": str(e)
+            }
 
 
 # Global instance

@@ -1493,3 +1493,151 @@ async def migration_help():
             "action_required": "Aggiornare client applications per usare nuovi endpoints deep zoom"
         }
     }
+
+
+# ============================================================================
+# BACKGROUND SERVICE HEALTH MONITORING ENDPOINTS
+# ============================================================================
+
+@router.get("/background/health",
+            summary="Get background service health status",
+            tags=["Deep Zoom - Background Service"])
+async def get_background_service_health(
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Get comprehensive health status of the DeepZoom background service"""
+    try:
+        health_status = await deep_zoom_background_service.get_health_status()
+        
+        return JSONResponse({
+            "service_health": health_status,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting background service health: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting background service health: {str(e)}"
+        )
+
+
+@router.get("/background/queue",
+            summary="Get background service queue status",
+            tags=["Deep Zoom - Background Service"])
+async def get_background_queue_status(
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Get current queue status and processing statistics"""
+    try:
+        queue_status = await deep_zoom_background_service.get_queue_status()
+        
+        return JSONResponse({
+            "queue_status": queue_status,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting background queue status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting background queue status: {str(e)}"
+        )
+
+
+@router.post("/background/reset",
+             summary="Reset background service (emergency recovery)",
+             tags=["Deep Zoom - Background Service"])
+async def reset_background_service(
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Reset the background service - emergency recovery option.
+    This will stop the service, clear all queues, and restart it.
+    Only use when the service is completely stuck.
+    """
+    try:
+        # This is a dangerous operation, so we require admin permissions
+        # Check if user has admin access to at least one site
+        has_admin_access = any(
+            site.get("permission_level") == "admin"
+            for site in user_sites
+        )
+        
+        if not has_admin_access:
+            raise HTTPException(
+                status_code=403,
+                detail="Administrator permissions required to reset background service"
+            )
+        
+        # Reset the service
+        reset_result = await deep_zoom_background_service.reset_service()
+        
+        # Log activity
+        activity = UserActivity(
+            user_id=current_user_id,
+            site_id=None,  # System-wide operation
+            activity_type="BACKGROUND_SERVICE_RESET",
+            activity_desc="Background service reset performed",
+            extra_data={
+                "reset_result": reset_result,
+                "action": "emergency_service_reset"
+            }
+        )
+        db.add(activity)
+        await db.commit()
+        
+        logger.warning(f"Background service reset performed by user {current_user_id}")
+        
+        return JSONResponse({
+            "reset_result": reset_result,
+            "performed_by": str(current_user_id),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting background service: {e}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error resetting background service: {str(e)}"
+        )
+
+
+@router.get("/background/task/{photo_id}/status",
+            summary="Get processing status for specific photo",
+            tags=["Deep Zoom - Background Service"])
+async def get_photo_task_status(
+    photo_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """Get detailed processing status for a specific photo"""
+    try:
+        task_status = await deep_zoom_background_service.get_task_status(str(photo_id))
+        
+        if not task_status:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No processing task found for photo {photo_id}"
+            )
+        
+        return JSONResponse({
+            "task_status": task_status,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting task status for photo {photo_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting task status: {str(e)}"
+        )
