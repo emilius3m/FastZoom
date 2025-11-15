@@ -17,7 +17,7 @@ from app.core.security import get_current_user_id
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 from app.models import UserActivity
 from app.models import USFile
-from app.routes.api.dependencies import get_site_access, get_photo_site_access
+from app.routes.api.dependencies import get_site_access, get_photo_site_access, get_normalized_site_id
 from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service
 from app.services.archaeological_minio_service import archaeological_minio_service
@@ -1263,7 +1263,7 @@ async def update_photo(
         raise HTTPException(status_code=400, detail=f"Invalid JSON data: {str(e)}")
 
     photo_query = select(Photo).where(
-        and_(Photo.id == photo_id, Photo.site_id == site_id)
+        and_(Photo.id == str(photo_id), Photo.site_id == str(site_id))
     )
     photo = await db.execute(photo_query)
     photo = photo.scalar_one_or_none()
@@ -1462,7 +1462,7 @@ async def delete_photo(
 
     # Check if this is a US photo (which should not be deleted from here)
     us_file_query = select(USFile).where(
-        and_(USFile.id == photo_id, USFile.site_id == site_id)
+        and_(USFile.id == str(photo_id), USFile.site_id == str(site_id))
     )
     us_file = await db.execute(us_file_query)
     us_file = us_file.scalar_one_or_none()
@@ -1474,7 +1474,7 @@ async def delete_photo(
         )
 
     photo_query = select(Photo).where(
-        and_(Photo.id == photo_id, Photo.site_id == site_id)
+        and_(Photo.id == str(photo_id), Photo.site_id == str(site_id))
     )
     photo = await db.execute(photo_query)
     photo = photo.scalar_one_or_none()
@@ -1559,15 +1559,18 @@ async def delete_photo(
 
 @router.post("/sites/{site_id}/photos/bulk-delete")
 async def bulk_delete_photos(
-        site_id: UUID,
+        site_id: str,  # Changed from UUID to str to handle both formats
         delete_data: dict,
-        site_access: tuple = Depends(get_site_access),
+        normalized_site_id: str = Depends(get_normalized_site_id),
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Elimina più foto in blocco - PROTETTO contro eliminazione foto US"""
-    site, permission = site_access
-
+    # The dependency handles both normalization and site access verification
+    
+    # Get site access info for permission checking
+    site, permission = await get_site_access(UUID(normalized_site_id), current_user_id, db)
+    
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
 
@@ -1594,7 +1597,7 @@ async def bulk_delete_photos(
 
         # Check for US photos in the selection
         us_files_query = select(USFile).where(
-            and_(USFile.site_id == site_id, USFile.id.in_(photo_ids))
+            and_(USFile.site_id == normalized_site_id, USFile.id.in_(photo_ids))
         )
         us_files = await db.execute(us_files_query)
         us_files_list = us_files.scalars().all()
@@ -1609,7 +1612,7 @@ async def bulk_delete_photos(
         logger.info(f"Bulk delete: processing {len(photo_ids)} photos for site {site_id}")
 
         photos_query = select(Photo).where(and_(
-            Photo.site_id == site_id,
+            Photo.site_id == normalized_site_id,
             Photo.id.in_(photo_ids)
         ))
         photos = await db.execute(photos_query)
@@ -1787,8 +1790,8 @@ async def bulk_update_photos(
         logger.info(f"Bulk update: processing {len(photo_ids)} photos for site {site_id}")
 
         photos_query = select(Photo).where(and_(
-            Photo.site_id == site_id,
-            Photo.id.in_(photo_ids)
+            Photo.site_id == str(site_id),
+            Photo.id.in_([str(pid) for pid in photo_ids])
         ))
         photos = await db.execute(photos_query)
         photos = photos.scalars().all()
