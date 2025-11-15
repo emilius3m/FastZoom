@@ -1568,39 +1568,60 @@ async def bulk_delete_photos(
     """Elimina più foto in blocco - PROTETTO contro eliminazione foto US"""
     # The dependency handles both normalization and site access verification
     
+    # DEBUG: Log incoming request data
+    logger.info(f"🔍 BULK DELETE DEBUG - site_id: {site_id}, normalized_site_id: {normalized_site_id}")
+    logger.info(f"🔍 BULK DELETE DEBUG - delete_data: {delete_data}")
+    
     # Get site access info for permission checking
     site, permission = await get_site_access(UUID(normalized_site_id), current_user_id, db)
+    
+    logger.info(f"🔍 BULK DELETE DEBUG - Site access: {site.id if site else 'None'}, permission: {permission}")
     
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
 
     photo_ids_raw = delete_data.get("photo_ids", [])
+    logger.info(f"🔍 BULK DELETE DEBUG - photo_ids_raw: {photo_ids_raw}")
+    
     if not photo_ids_raw:
         raise HTTPException(status_code=400, detail="Nessuna foto selezionata")
 
     try:
         photo_ids = []
         for photo_id in photo_ids_raw:
+            logger.info(f"🔍 BULK DELETE DEBUG - Processing photo_id: {photo_id}, type: {type(photo_id)}")
             if isinstance(photo_id, str):
                 try:
-                    photo_ids.append(UUID(photo_id))
-                except ValueError:
-                    logger.warning(f"Invalid UUID format: {photo_id}")
+                    converted_uuid = UUID(photo_id)
+                    photo_ids.append(converted_uuid)
+                    logger.info(f"🔍 BULK DELETE DEBUG - Converted string to UUID: {photo_id} -> {converted_uuid}")
+                except ValueError as e:
+                    logger.warning(f"🔍 BULK DELETE DEBUG - Invalid UUID format: {photo_id}, error: {e}")
                     continue
             elif isinstance(photo_id, UUID):
                 photo_ids.append(photo_id)
+                logger.info(f"🔍 BULK DELETE DEBUG - Already UUID: {photo_id}")
             else:
-                logger.warning(f"Unexpected photo_id type: {type(photo_id)} - {photo_id}")
+                logger.warning(f"🔍 BULK DELETE DEBUG - Unexpected photo_id type: {type(photo_id)} - {photo_id}")
 
+        logger.info(f"🔍 BULK DELETE DEBUG - Final photo_ids list: {photo_ids}")
+        
         if not photo_ids:
             raise HTTPException(status_code=400, detail="Nessun ID foto valido")
 
         # Check for US photos in the selection
+        logger.info(f"🔍 BULK DELETE DEBUG - Checking US files for site_id: {normalized_site_id}, photo_ids: {photo_ids}")
+        
+        # Convert photo_ids to strings for database comparison (Photo.id is stored as string)
+        photo_ids_str = [str(pid) for pid in photo_ids]
+        logger.info(f"🔍 BULK DELETE DEBUG - photo_ids_str: {photo_ids_str}")
+        
         us_files_query = select(USFile).where(
-            and_(USFile.site_id == normalized_site_id, USFile.id.in_(photo_ids))
+            and_(USFile.site_id == normalized_site_id, USFile.id.in_(photo_ids_str))
         )
         us_files = await db.execute(us_files_query)
         us_files_list = us_files.scalars().all()
+        logger.info(f"🔍 BULK DELETE DEBUG - Found {len(us_files_list)} US files: {[str(f.id) for f in us_files_list]}")
 
         if us_files_list:
             us_count = len(us_files_list)
@@ -1609,16 +1630,48 @@ async def bulk_delete_photos(
                 detail=f"{us_count} foto appartengono a US/USM e non possono essere eliminate da qui"
             )
 
-        logger.info(f"Bulk delete: processing {len(photo_ids)} photos for site {site_id}")
+        logger.info(f"🔍 BULK DELETE DEBUG - Processing {len(photo_ids_str)} photos for site {site_id}")
+
+        # DEBUG: Check if photos exist in database individually
+        photo_count_check = 0
+        for photo_id in photo_ids_str:
+            individual_query = select(Photo).where(Photo.id == photo_id)
+            individual_result = await db.execute(individual_query)
+            individual_photo = individual_result.scalar_one_or_none()
+            logger.info(f"🔍 BULK DELETE DEBUG - Individual check photo {photo_id}: {'FOUND' if individual_photo else 'NOT FOUND'}")
+            if individual_photo:
+                logger.info(f"🔍 BULK DELETE DEBUG - Photo {photo_id} belongs to site: {individual_photo.site_id} (expected: {normalized_site_id})")
+                logger.info(f"🔍 BULK DELETE DEBUG - Photo {photo_id} site_id match: {individual_photo.site_id == normalized_site_id}")
+                photo_count_check += 1
+
+        logger.info(f"🔍 BULK DELETE DEBUG - Total individual photos found: {photo_count_check}")
 
         photos_query = select(Photo).where(and_(
             Photo.site_id == normalized_site_id,
-            Photo.id.in_(photo_ids)
+            Photo.id.in_(photo_ids_str)
         ))
+        
+        # DEBUG: Log the actual SQL query (without literal binds for complex queries)
+        logger.info(f"🔍 BULK DELETE DEBUG - SQL Query structure: SELECT photos WHERE site_id = '{normalized_site_id}' AND id IN {photo_ids_str}")
+        
         photos = await db.execute(photos_query)
         photos = photos.scalars().all()
+        
+        logger.info(f"🔍 BULK DELETE DEBUG - Found {len(photos)} photos matching query: {[str(p.id) for p in photos]}")
 
         if not photos:
+            # Additional debug: check all photos in the site
+            all_photos_query = select(Photo).where(Photo.site_id == normalized_site_id)
+            all_photos_result = await db.execute(all_photos_query)
+            all_photos = all_photos_result.scalars().all()
+            logger.info(f"🔍 BULK DELETE DEBUG - ALL photos in site {normalized_site_id}: {[str(p.id) for p in all_photos]}")
+            
+            # Debug: Check if any of the requested IDs exist in the database at all (regardless of site)
+            any_photos_query = select(Photo).where(Photo.id.in_(photo_ids_str))
+            any_photos_result = await db.execute(any_photos_query)
+            any_photos = any_photos_result.scalars().all()
+            logger.info(f"🔍 BULK DELETE DEBUG - Photos with requested IDs in ANY site: {[str(p.id) + ' (site: ' + p.site_id + ')' for p in any_photos]}")
+            
             raise HTTPException(status_code=404, detail="Nessuna foto trovata con gli ID specificati")
 
         deleted_count = 0
