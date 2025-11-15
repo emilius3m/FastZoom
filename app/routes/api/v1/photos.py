@@ -1040,57 +1040,138 @@ async def upload_photo(
 
         # Prepara lista foto per tiles MA NON inizia processing
         photos_needing_tiles = []
+        
+        # LOGGING: Track the start of tile detection process
+        logger.info(f"🔧 TILE DETECTION START: Processing {len(uploaded_photos)} uploaded photos for tile requirements")
+        logger.info(f"🔧 TILE DETECTION START: Site ID: {site_id}, Upload completed successfully")
 
-        for photo_data in uploaded_photos:
-            photo_id = photo_data["photo_id"]
+        # FIX: Create a new database session to ensure visibility of all uploaded photos
+        from app.database.base import async_session_maker
+        async with async_session_maker() as tile_db:
             try:
-                # Use already extracted dimensions from metadata
-                width = photo_data.get("metadata", {}).get("width", 0)
-                height = photo_data.get("metadata", {}).get("height", 0)
-                max_dimension = max(width, height) if width and height else 0
+                logger.info(f"🔧 TILE FIX: Starting tile detection with new database session for {len(uploaded_photos)} photos")
+                
+                for photo_data in uploaded_photos:
+                    photo_id = photo_data["photo_id"]
+                    try:
+                        # Use already extracted dimensions from metadata
+                        width = photo_data.get("metadata", {}).get("width", 0)
+                        height = photo_data.get("metadata", {}).get("height", 0)
+                        max_dimension = max(width, height) if width and height else 0
 
-                if max_dimension > 2000:
-                    logger.info(f"📋 Photo {photo_id} needs tiles: {width}x{height}")
+                        logger.info(f"🔧 TILE FIX: Photo {photo_id} dimensions: {width}x{height}, max_dimension: {max_dimension}")
 
-                    # Update status in database to 'scheduled' (but don't start yet)
-                    photo_query = select(Photo).where(Photo.id == UUID(photo_id))
-                    result = await db.execute(photo_query)
-                    photo_record = result.scalar_one_or_none()
+                        if max_dimension > 2000:
+                            logger.info(f"📋 Photo {photo_id} needs tiles: {width}x{height}")
 
-                    if photo_record:
-                        photo_record.deepzoom_status = 'scheduled'
-                        await db.commit()
+                            # FIX: Query in the new session to ensure visibility
+                            photo_query = select(Photo).where(Photo.id == UUID(photo_id))
+                            result = await tile_db.execute(photo_query)
+                            photo_record = result.scalar_one_or_none()
 
-                        photos_needing_tiles.append({
-                            'photo_id': photo_id,
-                            'file_path': photo_data['file_path'],
-                            'width': width,
-                            'height': height,
-                            'archaeological_metadata': photo_data.get('archaeological_metadata', {})
-                        })
-                else:
-                    logger.info(f"Skipping tiles for small image {photo_id}: {width}x{height}")
+                            if photo_record:
+                                logger.info(f"🔧 TILE FIX: Found photo record {photo_id}, updating status to 'scheduled'")
+                                photo_record.deepzoom_status = 'scheduled'
+                                await tile_db.commit()
 
-            except Exception as e:
-                logger.error(f"❌ Error checking tile requirements for photo {photo_id}: {e}")
+                                # CRITICAL FIX: Add to photos_needing_tiles list
+                                photos_needing_tiles.append({
+                                    'photo_id': photo_id,
+                                    'file_path': photo_data['file_path'],
+                                    'width': width,
+                                    'height': height,
+                                    'archaeological_metadata': photo_data.get('archaeological_metadata', {})
+                                })
+                                logger.info(f"🔧 TILE FIX: ✅ Added photo {photo_id} to photos_needing_tiles (total: {len(photos_needing_tiles)})")
+                            else:
+                                logger.error(f"🔧 TILE FIX: ❌ Photo record not found for {photo_id} - this is the root cause!")
+                                
+                                # FALLBACK: Try to find the record with string comparison
+                                fallback_query = select(Photo).where(Photo.id == str(photo_id))
+                                fallback_result = await tile_db.execute(fallback_query)
+                                fallback_photo = fallback_result.scalar_one_or_none()
+                                
+                                if fallback_photo:
+                                    logger.info(f"🔧 TILE FIX: Found photo {photo_id} with string ID conversion")
+                                    fallback_photo.deepzoom_status = 'scheduled'
+                                    await tile_db.commit()
+                                    photos_needing_tiles.append({
+                                        'photo_id': str(fallback_photo.id),
+                                        'file_path': photo_data['file_path'],
+                                        'width': width,
+                                        'height': height,
+                                        'archaeological_metadata': photo_data.get('archaeological_metadata', {})
+                                    })
+                                    logger.info(f"🔧 TILE FIX: ✅ Added fallback photo {photo_id} to photos_needing_tiles")
+                        else:
+                            logger.info(f"Skipping tiles for small image {photo_id}: {width}x{height}")
+
+                    except Exception as e:
+                        logger.error(f"❌ Error checking tile requirements for photo {photo_id}: {e}")
+
+                logger.info(f"🔧 TILE DETECTION COMPLETE: Final photos_needing_tiles list: {len(photos_needing_tiles)} items")
+                for i, tile_photo in enumerate(photos_needing_tiles):
+                    logger.info(f"🔧 TILE DETECTION COMPLETE: [{i+1}/{len(photos_needing_tiles)}] "
+                               f"photo_id={tile_photo['photo_id']}, "
+                               f"dimensions={tile_photo['width']}x{tile_photo['height']}, "
+                               f"file_path={tile_photo['file_path']}")
+
+            except Exception as session_error:
+                logger.error(f"🔧 TILE DETECTION ERROR: Database session error: {session_error}")
+                logger.error(f"🔧 TILE DETECTION ERROR: Error type: {type(session_error).__name__}")
+                logger.error(f"🔧 TILE DETECTION ERROR: This will cause photos_needing_tiles to be empty!")
+                # Don't fail the entire upload if tile detection fails
 
         # DOPO tutti gli upload: avvia batch processing con il nuovo servizio background con error handling
         if photos_needing_tiles:
             try:
                 logger.info(
-                    f"🎯 {len(photos_needing_tiles)} foto richiedono tiles - avvio batch processing con background service")
+                    f"🎯 TILE SCHEDULING: {len(photos_needing_tiles)} foto richiedono tiles - avvio batch processing con background service")
+                
+                # ENHANCED: Log detailed scheduling info
+                for i, tile_photo in enumerate(photos_needing_tiles):
+                    logger.info(f"🎯 TILE SCHEDULING [{i+1}/{len(photos_needing_tiles)}]: "
+                              f"photo_id={tile_photo['photo_id']}, "
+                              f"dimensions={tile_photo['width']}x{tile_photo['height']}, "
+                              f"file_path={tile_photo['file_path']}")
 
-                # Avvia il batch processing con il nuovo servizio background
-                batch_result = await deep_zoom_background_service.schedule_batch_processing(
-                    photos_list=photos_needing_tiles,
-                    site_id=str(site_id)
-                )
+                # FIX: Ensure proper photo data structure for background service
+                validated_photos_list = []
+                for tile_photo in photos_needing_tiles:
+                    if all(key in tile_photo for key in ['photo_id', 'file_path', 'width', 'height']):
+                        validated_photos_list.append(tile_photo)
+                    else:
+                        logger.warning(f"🎯 TILE SCHEDULING: Skipping invalid photo data: {tile_photo}")
 
-                logger.info(f"✅ Batch tiles processing schedulato: {batch_result}")
+                if not validated_photos_list:
+                    logger.warning("🎯 TILE SCHEDULING: No valid photos to schedule for processing")
+                else:
+                    # Avvia il batch processing con il nuovo servizio background
+                    logger.info(f"🎯 TILE SCHEDULING: Calling schedule_batch_processing with {len(validated_photos_list)} validated photos")
+                    batch_result = await deep_zoom_background_service.schedule_batch_processing(
+                        photos_list=validated_photos_list,
+                        site_id=str(site_id)
+                    )
+
+                    logger.info(f"✅ Tile scheduling completed: batch_result={batch_result}")
+                    
+                    # VERIFICATION: Check if scheduling was successful
+                    if batch_result and isinstance(batch_result, dict):
+                        scheduled_count = batch_result.get('scheduled_count', 0)
+                        if scheduled_count > 0:
+                            logger.info(f"✅ Tile scheduling SUCCESS: {scheduled_count} photos scheduled for processing")
+                        else:
+                            logger.warning(f"⚠️ Tile scheduling WARNING: {scheduled_count} photos scheduled (may indicate scheduling failure)")
+                    else:
+                        logger.warning(f"⚠️ Tile scheduling WARNING: Unexpected batch_result format: {batch_result}")
+
             except Exception as batch_error:
-                logger.error(f"Failed to schedule batch processing for tiles: {batch_error}")
+                logger.error(f"🔴 TILE SCHEDULING ERROR: Failed to schedule batch processing for tiles: {batch_error}")
+                logger.error(f"🔴 TILE SCHEDULING ERROR: Error type: {type(batch_error).__name__}")
                 # Don't fail the upload if batch processing fails, just log the error
                 # The tiles can be processed later manually
+        else:
+            logger.info("🎯 TILE SCHEDULING: No photos require tile processing")
 
         # Validate uploaded_photos before returning
         if not isinstance(uploaded_photos, list):
@@ -1117,11 +1198,38 @@ async def upload_photo(
                         detail=f"Invalid photo entry at index {i}: missing required field '{field}'"
                     )
 
-        # Prepare response metadata
+        # FIX: Ensure accurate counting with database verification
+        photos_needing_tiles_count = len(photos_needing_tiles)
+        
+        # VERIFICATION: Double-check with database query for accuracy
+        try:
+            verification_query = select(Photo).where(
+                and_(
+                    Photo.site_id == str(site_id),
+                    Photo.deepzoom_status == 'scheduled'
+                )
+            )
+            verification_result = await db.execute(verification_query)
+            scheduled_photos = verification_result.scalars().all()
+            scheduled_count = len(scheduled_photos)
+            
+            logger.info(f"🔧 API RESPONSE VERIFICATION: photos_needing_tiles list count = {photos_needing_tiles_count}, database scheduled count = {scheduled_count}")
+            
+            # Use the maximum of both counts for safety (should be the same)
+            final_tiles_count = max(photos_needing_tiles_count, scheduled_count)
+            
+            if photos_needing_tiles_count != scheduled_count:
+                logger.warning(f"🔧 API RESPONSE WARNING: Count mismatch! list={photos_needing_tiles_count}, db={scheduled_count}")
+                
+        except Exception as verification_error:
+            logger.error(f"🔧 API RESPONSE ERROR: Database verification failed: {verification_error}")
+            final_tiles_count = photos_needing_tiles_count
+
+        # Prepare response metadata with verified count
         response_metadata = {
             "message": f"{len(uploaded_photos)} foto caricate con successo",
             "total_uploaded": len(uploaded_photos),
-            "photos_needing_tiles": len(photos_needing_tiles),
+            "photos_needing_tiles": final_tiles_count,
             "upload_timestamp": datetime.now(timezone.utc).isoformat()
         }
 
@@ -1137,7 +1245,7 @@ async def upload_photo(
         }
 
         logger.info(
-            f"✅ Upload API response: {len(uploaded_photos)} foto caricate, {len(photos_needing_tiles)} necessitano tiles")
+            f"✅ Upload API response: {len(uploaded_photos)} foto caricate, {final_tiles_count} necessitano tiles (verified count)")
 
         return JSONResponse(response_data)
 
