@@ -76,6 +76,10 @@ class DeepZoomBackgroundService:
         self.service_start_time = datetime.now()
         self.total_tasks_processed = 0
         self.total_tasks_failed = 0
+        
+        # Batch processing context tracking
+        self._batch_context = {}  # site_id -> {"photos": [], "started_at": datetime}
+        self._photo_order = {}  # photo_id -> position in batch
 
     async def start_background_processor(self):
         """Start the background processor worker"""
@@ -170,6 +174,22 @@ class DeepZoomBackgroundService:
         site_id: str
     ) -> Dict[str, Any]:
         """Schedule multiple photos for batch processing"""
+        
+        # Initialize batch context
+        async with self._processing_lock:
+            if site_id not in self._batch_context:
+                self._batch_context[site_id] = {
+                    "photos": [],
+                    "started_at": datetime.now()
+                }
+            
+            # Add photos to batch context
+            batch_context = self._batch_context[site_id]
+            for i, photo_info in enumerate(photos_list):
+                photo_id = photo_info['photo_id']
+                if photo_id not in [p['photo_id'] for p in batch_context['photos']]:
+                    self._photo_order[photo_id] = len(batch_context['photos'])
+                    batch_context['photos'].append(photo_info)
         
         scheduled_count = 0
         for photo_info in photos_list:
@@ -354,6 +374,9 @@ class DeepZoomBackgroundService:
                 await self._update_photo_database_status(task.photo_id, "processing")
                 await self._update_processing_status(task, "processing", 0)
                 
+                # Send intermediate notification for processing start
+                await self._send_processing_notification(task, "processing", 5)
+                
                 # Generate tiles with memory-efficient processing
                 tiles_data, original_width, original_height = await self._generate_tiles_memory_efficient(
                     task.original_file_content, task.photo_id, task.site_id
@@ -363,6 +386,9 @@ class DeepZoomBackgroundService:
                 task.status = ProcessingStatus.UPLOADING
                 await self._update_processing_status(task, "uploading", 10, total_tiles, len(tiles_data))
                 
+                # Send intermediate notification for uploading stage
+                await self._send_processing_notification(task, "uploading", 10, total_tiles, len(tiles_data))
+                
                 # Upload tiles with concurrent control
                 completed_tiles = await self._upload_tiles_concurrent(
                     task, tiles_data, total_tiles
@@ -371,6 +397,9 @@ class DeepZoomBackgroundService:
                 # Create metadata
                 task.status = ProcessingStatus.COMPLETED
                 await self._update_processing_status(task, "finalizing", 90)
+                
+                # Send intermediate notification for finalizing stage
+                await self._send_processing_notification(task, "finalizing", 90, completed_tiles, len(tiles_data))
                 
                 metadata_url = await self._create_and_upload_metadata(
                     task, tiles_data, original_width, original_height
@@ -418,13 +447,32 @@ class DeepZoomBackgroundService:
                 async with self._processing_lock:
                     self._processing_photo_ids.discard(task.photo_id)
                 
+                # Clean up batch context
+                self._cleanup_batch_context(task.site_id, task.photo_id)
+                
                 # Update success counter
                 self.total_tasks_processed += 1
                 
                 logger.info(f"✅ Completed tile processing for photo {task.photo_id}: {completed_tiles} tiles")
                 
-                # Send WebSocket notification
-                await self._send_completion_notification(task, True)
+                # Get photo filename for notification
+                photo_filename = None
+                try:
+                    from app.services.archaeological_minio_service import archaeological_minio_service
+                    if hasattr(task, 'file_path') and task.file_path:
+                        # Extract filename from path
+                        photo_filename = task.file_path.split('/')[-1]
+                except Exception:
+                    pass
+                
+                # Send WebSocket notification with actual data
+                await self._send_completion_notification(
+                    task,
+                    True,
+                    tile_count=completed_tiles,
+                    levels=len(tiles_data),
+                    photo_filename=photo_filename
+                )
                 
             except Exception as e:
                 logger.error(f"❌ Failed to process tiles for photo {task.photo_id}: {e}")
@@ -468,6 +516,9 @@ class DeepZoomBackgroundService:
                     # Rimuovi da tracking con lock
                     async with self._processing_lock:
                         self._processing_photo_ids.discard(task.photo_id)
+                    
+                    # Clean up batch context
+                    self._cleanup_batch_context(task.site_id, task.photo_id)
                     
                     logger.error(f"💀 Permanently failed processing for photo {task.photo_id}")
                     
@@ -912,10 +963,54 @@ class DeepZoomBackgroundService:
         except Exception as e:
             logger.error(f"Failed to update photo database status for {photo_id}: {e}")
 
-    async def _send_completion_notification(self, task: TileProcessingTask, success: bool):
+    async def _send_processing_notification(
+        self,
+        task: TileProcessingTask,
+        stage: str,
+        progress: int = 0,
+        tile_count: int = 0,
+        levels: int = 0
+    ):
+        """Send intermediate progress notification during tile generation"""
+        try:
+            from app.routes.api.notifications_ws import notification_manager
+            
+            # Get batch context
+            current_photo = self._get_current_photo_position(task.photo_id)
+            total_photos = self._get_total_batch_size(task.site_id)
+            
+            await notification_manager.broadcast_tiles_progress(
+                site_id=task.site_id,
+                photo_id=task.photo_id,
+                status=stage,
+                progress=progress,
+                tile_count=tile_count,
+                levels=levels,
+                current_photo=current_photo,
+                total_photos=total_photos,
+                error=None
+            )
+                
+        except ImportError:
+            logger.warning("Notification manager not available")
+        except Exception as e:
+            logger.error(f"Failed to send processing notification: {e}")
+
+    async def _send_completion_notification(
+        self,
+        task: TileProcessingTask,
+        success: bool,
+        tile_count: int = 0,
+        levels: int = 0,
+        photo_filename: str = None
+    ):
         """Send WebSocket notification for task completion"""
         try:
             from app.routes.api.notifications_ws import notification_manager
+            
+            # Get batch context
+            current_photo = self._get_current_photo_position(task.photo_id)
+            total_photos = self._get_total_batch_size(task.site_id)
             
             if success:
                 await notification_manager.broadcast_tiles_progress(
@@ -923,8 +1018,11 @@ class DeepZoomBackgroundService:
                     photo_id=task.photo_id,
                     status='completed',
                     progress=100,
-                    tile_count=task.completed_at and 0,  # Will be updated by caller
-                    levels=0,  # Will be updated by caller
+                    photo_filename=photo_filename,
+                    tile_count=tile_count,
+                    levels=levels,
+                    current_photo=current_photo,
+                    total_photos=total_photos,
                     error=None
                 )
             else:
@@ -933,6 +1031,8 @@ class DeepZoomBackgroundService:
                     photo_id=task.photo_id,
                     status='failed',
                     progress=0,
+                    current_photo=current_photo,
+                    total_photos=total_photos,
                     error=task.error_message
                 )
                 
@@ -940,6 +1040,30 @@ class DeepZoomBackgroundService:
             logger.warning("Notification manager not available")
         except Exception as e:
             logger.error(f"Failed to send completion notification: {e}")
+
+    def _get_current_photo_position(self, photo_id: str) -> Optional[int]:
+        """Get the position of the current photo in the processing queue"""
+        return self._photo_order.get(photo_id, 0)
+
+    def _get_total_batch_size(self, site_id: str) -> int:
+        """Get the total number of photos being processed for a site"""
+        if site_id in self._batch_context:
+            return len(self._batch_context[site_id]["photos"])
+        return 1  # Default to 1 if no batch context
+
+    def _cleanup_batch_context(self, site_id: str, photo_id: str):
+        """Clean up batch context when a photo is completed"""
+        if site_id in self._batch_context:
+            batch = self._batch_context[site_id]
+            batch['photos'] = [p for p in batch['photos'] if p['photo_id'] != photo_id]
+            
+            # Clean up photo order tracking
+            if photo_id in self._photo_order:
+                del self._photo_order[photo_id]
+            
+            # Remove empty batch context
+            if not batch['photos']:
+                del self._batch_context[site_id]
 
     async def get_task_status(self, photo_id: str) -> Optional[Dict[str, Any]]:
         """Get status of a processing task"""
