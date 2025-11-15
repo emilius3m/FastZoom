@@ -908,6 +908,15 @@ class ArchaeologicalMinIOService:
             logger.error(f"Error getting tile URL: {e}")
             return None
 
+    async def get_tile_content(self, site_id: str, photo_id: str, level: int, x: int, y: int) -> Optional[bytes]:
+        """Ottieni contenuto diretto del tile invece di URL presigned"""
+        try:
+            from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+            return await deep_zoom_minio_service.get_tile_content(site_id, photo_id, level, x, y)
+        except Exception as e:
+            logger.error(f"Error getting tile content: {e}")
+            return None
+
     async def get_file(self, object_path: str) -> bytes:
         """Scarica file da MinIO"""
         try:

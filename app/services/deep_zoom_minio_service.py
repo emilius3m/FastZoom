@@ -772,6 +772,74 @@ class DeepZoomMinIOService:
             logger.error(f"Error generating tile URL for {object_name}: {e}")
             return None
 
+    async def get_tile_content(self, site_id: str, photo_id: str, level: int, x: int, y: int) -> Optional[bytes]:
+        """Ottieni contenuto diretto del tile invece di URL presigned"""
+        tile_coords = f"{x}_{y}"
+        
+        # Determina il formato dei tiles leggendo i metadati
+        try:
+            metadata_info = await self.get_deep_zoom_info(site_id, photo_id)
+            tile_format = metadata_info.get('tile_format', 'jpg') if metadata_info else 'jpg'
+            extension = 'png' if tile_format == 'png' else 'jpg'
+            logger.debug(f"🔍 Tile format detection: {tile_format} → .{extension} for photo {photo_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not determine tile format for {photo_id}: {e}, using JPG fallback")
+            extension = 'jpg'  # fallback
+            
+        object_name = f"{site_id}/tiles/{photo_id}/{level}/{tile_coords}.{extension}"
+
+        try:
+            # Import locale per evitare circular import
+            from app.services.archaeological_minio_service import archaeological_minio_service
+            import asyncio
+            from minio.error import S3Error
+            
+            # Prova prima il formato principale
+            try:
+                tile_data = await asyncio.to_thread(
+                    archaeological_minio_service.client.get_object,
+                    bucket_name=archaeological_minio_service.buckets['tiles'],
+                    object_name=object_name
+                )
+                
+                # Read the content
+                content = tile_data.read()
+                tile_data.close()
+                tile_data.release_conn()
+                
+                logger.debug(f"Retrieved tile content: {object_name}")
+                return content
+                
+            except S3Error:
+                logger.warning(f"Tile not found with format .{extension}, trying alternative format")
+                
+                # Prova l'altro formato se il primo non esiste
+                alternative_extension = 'png' if extension == 'jpg' else 'jpg'
+                alternative_object_name = f"{site_id}/tiles/{photo_id}/{level}/{tile_coords}.{alternative_extension}"
+                
+                try:
+                    tile_data = await asyncio.to_thread(
+                        archaeological_minio_service.client.get_object,
+                        bucket_name=archaeological_minio_service.buckets['tiles'],
+                        object_name=alternative_object_name
+                    )
+                    
+                    # Read the content
+                    content = tile_data.read()
+                    tile_data.close()
+                    tile_data.release_conn()
+                    
+                    logger.info(f"✅ Found tile with alternative format: .{alternative_extension} for photo {photo_id}")
+                    return content
+                    
+                except S3Error:
+                    logger.error(f"❌ Tile not found in both formats (.{extension} and .{alternative_extension}) for photo {photo_id}")
+                    return None
+            
+        except Exception as e:
+            logger.error(f"Error retrieving tile content for {object_name}: {e}")
+            return None
+
     async def get_deep_zoom_info(self, site_id: str, photo_id: str) -> Optional[Dict[str, Any]]:
         """Ottieni informazioni deep zoom per una foto"""
         try:

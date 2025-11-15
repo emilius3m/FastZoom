@@ -140,14 +140,22 @@ async def get_deep_zoom_tile(
     if format not in ['jpg', 'png', 'jpeg']:
         raise HTTPException(status_code=400, detail="Formato tile non supportato")
 
-    # Ottieni URL del tile
-    tile_url = await deep_zoom_minio_service.get_tile_url(str(site_id), str(photo_id), level, x, y)
+    # Ottieni contenuto del tile (servi direttamente invece di redirect)
+    tile_content = await deep_zoom_minio_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
 
-    if not tile_url:
+    if not tile_content:
         raise HTTPException(status_code=404, detail="Tile non trovato")
 
-    # Redirect al tile
-    return RedirectResponse(url=tile_url, status_code=302)
+    # Restituisci contenuto del tile direttamente (no CSP violation)
+    media_type = "image/jpeg" if format in ['jpg', 'jpeg'] else "image/png"
+    return Response(
+        content=tile_content,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "public, max-age=86400",  # Cache per 24 ore
+            "Access-Control-Allow-Origin": "*"
+        }
+    )
 
 
 @router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.jpg", 
@@ -204,30 +212,70 @@ async def get_public_deep_zoom_tile(
     """
     Public tile endpoint that uses browser session context instead of JWT headers.
     This allows OpenSeadragon to load tiles without sending authentication headers.
+    Includes fallback to try JWT authentication if session is not available.
     """
     # Validate format
     if format not in ['jpg', 'png', 'jpeg']:
         raise HTTPException(status_code=400, detail="Formato tile non supportato")
 
-    # Check if user has valid session (browser session authentication)
+    current_user_id = None
+    
+    # Try browser session authentication first
     session = request.session
-    if not session.get("user_id"):
+    if session.get("user_id"):
+        try:
+            current_user_id = UUID(session.get("user_id"))
+            logger.debug(f"Using session authentication for user {current_user_id}")
+        except (ValueError, TypeError):
+            logger.warning("Invalid user_id in session, trying fallback")
+            current_user_id = None
+    else:
+        logger.debug("No session user_id found, trying fallback authentication")
+    
+    # Fallback: Try JWT token authentication if session failed
+    if not current_user_id:
+        try:
+            # Check for Authorization header
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.replace("Bearer ", "")
+                from app.core.security import SecurityService
+                payload = await SecurityService.verify_token(token, db)
+                current_user_id = UUID(payload.get("sub"))
+                logger.debug(f"Using JWT fallback authentication for user {current_user_id}")
+        except Exception as e:
+            logger.debug(f"JWT fallback authentication failed: {e}")
+    
+    # If both methods failed, check for cookie-based JWT
+    if not current_user_id:
+        try:
+            access_token_cookie = request.cookies.get("access_token")
+            if access_token_cookie:
+                token = access_token_cookie.replace("Bearer ", "")
+                from app.core.security import SecurityService
+                payload = await SecurityService.verify_token(token, db)
+                current_user_id = UUID(payload.get("sub"))
+                logger.debug(f"Using cookie JWT authentication for user {current_user_id}")
+        except Exception as e:
+            logger.debug(f"Cookie JWT authentication failed: {e}")
+    
+    # Final check: if no authentication method worked
+    if not current_user_id:
+        logger.warning(f"No valid authentication found for tile request: {site_id}/{photo_id}/tiles/{level}/{x}_{y}.{format}")
         raise HTTPException(
             status_code=401,
-            detail="Sessione non valida. Effettua il login per accedere alle tiles."
+            detail="Autenticazione richiesta. Effettua il login per accedere alle tiles."
         )
-
-    current_user_id = UUID(session.get("user_id"))
     
     # Verify user has access to this site by checking database
-    from app.core.security import get_user_sites_by_id
+    from app.services.auth_service import AuthService
     try:
-        user_sites = await get_user_sites_by_id(current_user_id, db)
+        user_sites = await AuthService.get_user_sites_with_permissions(db, current_user_id)
         site_info = verify_site_access(site_id, user_sites)
         
-        # Verify read permissions
-        if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
-            raise HTTPException(status_code=403, detail="Permessi richiesti")
+        # Verify read permissions (allow viewers for tile access)
+        if not site_info.get("permission_level"):
+            raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
             
     except Exception as e:
         logger.error(f"Public tile access denied for user {current_user_id}, site {site_id}: {e}")
@@ -244,18 +292,26 @@ async def get_public_deep_zoom_tile(
     if not photo:
         raise HTTPException(status_code=404, detail="Foto non trovata")
 
-    # Get tile URL from MinIO
+    # Get tile content from MinIO (serve directly instead of redirect)
     try:
-        tile_url = await deep_zoom_minio_service.get_tile_url(str(site_id), str(photo_id), level, x, y)
+        tile_content = await deep_zoom_minio_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
 
-        if not tile_url:
+        if not tile_content:
             raise HTTPException(status_code=404, detail="Tile non trovato")
 
         # Log access for security monitoring
         logger.info(f"Public tile accessed: user={current_user_id}, site={site_id}, photo={photo_id}, tile={level}/{x}_{y}.{format}")
 
-        # Redirect to tile (this preserves the 302 redirect behavior)
-        return RedirectResponse(url=tile_url, status_code=302)
+        # Return tile content directly (no CSP violation)
+        media_type = "image/jpeg" if format in ['jpg', 'jpeg'] else "image/png"
+        return Response(
+            content=tile_content,
+            media_type=media_type,
+            headers={
+                "Cache-Control": "public, max-age=86400",  # Cache for 24 hours
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
         
     except Exception as e:
         logger.error(f"Error getting public tile {level}/{x}_{y}.{format} for photo {photo_id}: {e}")
