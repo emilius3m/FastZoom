@@ -2252,7 +2252,8 @@ function photosManager() {
                         // Use tile format from deep zoom info (PNG for transparent images, JPG for others)
                         const tileFormat = deepZoomInfo.tile_format || 'jpg';
                         const extension = tileFormat === 'png' ? 'png' : 'jpg';
-                        const url = `/api/v1/deepzoom/sites/{{ site.id }}/photos/${photoId}/tiles/${level}/${x}_${y}.${extension}`;
+                        // Use PUBLIC endpoint for OpenSeadragon (no auth headers required)
+                        const url = `/api/v1/deepzoom/public/sites/{{ site.id }}/photos/${photoId}/tiles/${level}/${x}_${y}.${extension}`;
                         return url;
                     }
                 };

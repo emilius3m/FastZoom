@@ -6,6 +6,7 @@ Consolidamento di sites_deepzoom.py e deepzoom_tiles.py
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks, UploadFile
 from fastapi.responses import JSONResponse, Response, RedirectResponse
+from fastapi.security import HTTPBearer
 from uuid import UUID
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -183,7 +184,85 @@ async def get_deep_zoom_tile_png(
     return await get_deep_zoom_tile(site_id, photo_id, level, x, y, "png", current_user_id, user_sites, db)
 
 
-@router.post("/sites/{site_id}/photos/{photo_id}/process", 
+# ============================================================================
+# PUBLIC TILE ENDPOINT (OPTION 1 - RECOMMENDED)
+# ============================================================================
+
+@router.get("/public/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.{format}",
+            summary="Public tile endpoint for OpenSeadragon (no auth headers required)",
+            tags=["Deep Zoom - Public"])
+async def get_public_deep_zoom_tile(
+    site_id: UUID,
+    photo_id: UUID,
+    level: int,
+    x: int,
+    y: int,
+    format: str,
+    request: Request,
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Public tile endpoint that uses browser session context instead of JWT headers.
+    This allows OpenSeadragon to load tiles without sending authentication headers.
+    """
+    # Validate format
+    if format not in ['jpg', 'png', 'jpeg']:
+        raise HTTPException(status_code=400, detail="Formato tile non supportato")
+
+    # Check if user has valid session (browser session authentication)
+    session = request.session
+    if not session.get("user_id"):
+        raise HTTPException(
+            status_code=401,
+            detail="Sessione non valida. Effettua il login per accedere alle tiles."
+        )
+
+    current_user_id = UUID(session.get("user_id"))
+    
+    # Verify user has access to this site by checking database
+    from app.core.security import get_user_sites_by_id
+    try:
+        user_sites = await get_user_sites_by_id(current_user_id, db)
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Verify read permissions
+        if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
+            raise HTTPException(status_code=403, detail="Permessi richiesti")
+            
+    except Exception as e:
+        logger.error(f"Public tile access denied for user {current_user_id}, site {site_id}: {e}")
+        raise HTTPException(status_code=403, detail="Accesso al sito negato")
+
+    # Verify photo exists and belongs to site
+    photo = await db.execute(
+        select(Photo).where(
+            and_(Photo.id == str(photo_id), Photo.site_id == str(site_id))
+        )
+    )
+    photo = photo.scalar_one_or_none()
+    
+    if not photo:
+        raise HTTPException(status_code=404, detail="Foto non trovata")
+
+    # Get tile URL from MinIO
+    try:
+        tile_url = await deep_zoom_minio_service.get_tile_url(str(site_id), str(photo_id), level, x, y)
+
+        if not tile_url:
+            raise HTTPException(status_code=404, detail="Tile non trovato")
+
+        # Log access for security monitoring
+        logger.info(f"Public tile accessed: user={current_user_id}, site={site_id}, photo={photo_id}, tile={level}/{x}_{y}.{format}")
+
+        # Redirect to tile (this preserves the 302 redirect behavior)
+        return RedirectResponse(url=tile_url, status_code=302)
+        
+    except Exception as e:
+        logger.error(f"Error getting public tile {level}/{x}_{y}.{format} for photo {photo_id}: {e}")
+        raise HTTPException(status_code=500, detail="Errore durante il caricamento del tile")
+
+
+@router.post("/sites/{site_id}/photos/{photo_id}/process",
              summary="Processa foto esistente per generare deep zoom tiles", 
              tags=["Deep Zoom"])
 async def process_deep_zoom(

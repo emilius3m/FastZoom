@@ -2,6 +2,9 @@ import asyncio
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse ,Response
+from fastapi.middleware import Middleware
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from loguru import logger
 from typing import List, Dict, Any
 from uuid import UUID
@@ -194,6 +197,16 @@ from app.middleware.performance_tracking_middleware import (
 # Queue middleware
 from app.middleware.queue_middleware import QueueMiddleware, QueueStatusMiddleware, register_queue_handlers
 
+# Add SessionMiddleware first (must be added before other middleware that might use request.session)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.secret_key if hasattr(settings, 'secret_key') else "your-secret-key-here-change-in-production",
+    session_cookie="session_id",
+    max_age=3600 * 24 * 7,  # 7 days
+    same_site="lax",
+    https_only=False
+)
+
 # Aggiungi middleware all'app
 app.add_middleware(UnifiedLoggingMiddleware)
 app.add_middleware(AuditMiddleware)
@@ -254,6 +267,19 @@ async def health_check():
     return create_health_check_endpoint(
         logging_middleware=app.state.logging_middleware
     )()
+
+@app.get("/test-session")
+async def test_session(request: Request):
+    """Test endpoint to verify SessionMiddleware is working"""
+    session = request.session
+    session["test_key"] = "test_value"
+    
+    return {
+        "session_id": session.get("session_id"),
+        "test_key": session.get("test_key"),
+        "has_session": True,
+        "session_data": dict(session)
+    }
 
 from app.routes.photo_metadata import router as photo_metadata_router
 

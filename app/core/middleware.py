@@ -35,7 +35,7 @@ class MiddlewareConfig:
     LOG_METRICS_EVERY_N_REQUESTS = 100
     
     # Rate limiting
-    RATE_LIMIT_PER_MINUTE = 60
+    RATE_LIMIT_PER_MINUTE = 1000
     RATE_LIMIT_WINDOW_SIZE = 5  # finestre da mantenere
     
     # Audit
