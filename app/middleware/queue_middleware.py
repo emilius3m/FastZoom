@@ -65,7 +65,8 @@ class QueueMiddleware(BaseHTTPMiddleware):
         # Bypass paths (not queued)
         self.bypass_paths = {
             '/health', '/login', '/logout', '/auth-test',
-            '/static/', '/docs', '/openapi.json', '/favicon.ico'
+            '/static/', '/docs', '/openapi.json', '/favicon.ico',
+            '/api/v1/deepzoom/'  # Remove rate limiting for deepzoom endpoints
         }
         
         # Initialize queue service (moved to app.py startup)

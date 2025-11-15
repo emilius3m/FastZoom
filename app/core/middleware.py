@@ -1,7 +1,6 @@
 # app/core/middleware.py - Middleware per Cross-Cutting Concerns
 
 """
-Middleware per FastAPI - Implementazione tecnica #8
 Centralizza logging, audit, performance monitoring e security headers.
 """
 
@@ -40,7 +39,7 @@ class MiddlewareConfig:
     
     # Audit
     AUDIT_METHODS = {'POST', 'PUT', 'DELETE', 'PATCH'}
-    EXCLUDE_AUDIT_PATHS = {'/health', '/metrics', '/docs', '/redoc', '/openapi.json'}
+    EXCLUDE_AUDIT_PATHS = {'/health', '/metrics', '/docs', '/redoc', '/openapi.json', '/api/v1/deepzoom/'}
     
     # Security Headers
     CSP_POLICY = (
