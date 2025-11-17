@@ -9,11 +9,14 @@ from pathlib import Path
 from loguru import logger
 from dataclasses import dataclass
 from enum import Enum
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from PIL import Image
 import math
 
 from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+from app.models import Photo
+from sqlalchemy import select
 
 
 class ProcessingStatus(Enum):
@@ -909,7 +912,13 @@ class DeepZoomBackgroundService:
         tile_count: int = None,
         levels: int = None
     ):
-        """Update photo deep zoom status in database"""
+        """
+        🔧 DATABASE CONSISTENCY FIX: Update photo deep zoom status in database
+        
+        This method now implements the same robust photo lookup logic as the upload service
+        to prevent "photo record not found" errors due to UUID/string type mismatches
+        and transaction isolation issues.
+        """
         try:
             # Avoid circular import
             from app.database.base import async_session_maker
@@ -924,23 +933,8 @@ class DeepZoomBackgroundService:
             
             async with async_session_maker() as db:
                 try:
-                    # Get photo record using STRING comparison
-                    # FIXED: Use string comparison since Photo.id is String(36), not UUID
-                    photo_query = select(Photo).where(Photo.id == photo_id_str)
-                    result = await db.execute(photo_query)
-                    photo = result.scalar_one_or_none()
-                    
-                    # FALLBACK: If not found with string, try with UUID (for backward compatibility)
-                    if photo is None:
-                        try:
-                            photo_uuid = uuid.UUID(photo_id_str)
-                            fallback_query = select(Photo).where(Photo.id == str(photo_uuid))
-                            fallback_result = await db.execute(fallback_query)
-                            photo = fallback_result.scalar_one_or_none()
-                            if photo:
-                                logger.info(f"✅ Found photo {photo_id} using fallback UUID query")
-                        except ValueError as e:
-                            logger.debug(f"Invalid UUID format for photo_id {photo_id}: {e}")
+                    # 🔧 ENHANCED: Use the same robust lookup logic as upload service
+                    photo = await self._find_photo_record_with_fallback(photo_id_str, db)
                     
                     if photo:
                         # Update status
@@ -953,16 +947,46 @@ class DeepZoomBackgroundService:
                                 photo.tile_count = tile_count
                             if levels is not None:
                                 photo.max_zoom_level = levels
-                            elif status == "failed":
-                                photo.has_deep_zoom = False
-                                photo.deep_zoom_processed_at = datetime.now()
-                            elif status == "processing":
-                                photo.deepzoom_status = "processing"
+                        elif status == "failed":
+                            photo.has_deep_zoom = False
+                            photo.deep_zoom_processed_at = datetime.now()
+                        elif status == "processing":
+                            photo.deepzoom_status = "processing"
                         
                         await db.commit()
                         logger.info(f"✅ Updated photo {photo_id} deep zoom status to: {status}")
                     else:
-                        logger.error(f"❌ Photo {photo_id} not found for status update - THIS IS THE ROOT CAUSE!")
+                        # 🔧 ENHANCED: Try with a completely fresh session as last resort
+                        logger.warning(f"🔧 Photo {photo_id} not found in main session, trying fresh session...")
+                        
+                        async with async_session_maker() as fresh_db:
+                            photo_fresh = await self._find_photo_record_with_fallback(photo_id_str, fresh_db)
+                            
+                            if photo_fresh:
+                                logger.info(f"✅ Photo {photo_id} found in fresh session, updating status")
+                                photo_fresh.deepzoom_status = status
+                                
+                                if status == "completed":
+                                    photo_fresh.has_deep_zoom = True
+                                    photo_fresh.deep_zoom_processed_at = datetime.now()
+                                    if tile_count is not None:
+                                        photo_fresh.tile_count = tile_count
+                                    if levels is not None:
+                                        photo_fresh.max_zoom_level = levels
+                                elif status == "failed":
+                                    photo_fresh.has_deep_zoom = False
+                                    photo_fresh.deep_zoom_processed_at = datetime.now()
+                                elif status == "processing":
+                                    photo_fresh.deepzoom_status = "processing"
+                                
+                                await fresh_db.commit()
+                                logger.info(f"✅ Photo {photo_id} status updated via fresh session")
+                            else:
+                                logger.error(f"❌ Photo {photo_id} not found in any session - THIS IS THE ROOT CAUSE!")
+                                # Don't raise here to avoid breaking the entire pipeline
+                                logger.error(f"❌ Deep zoom status update failed for {photo_id} - photo record not found")
+                                return
+                                
                 except Exception as e:
                     logger.error(f"Database error in status update for {photo_id}: {e}")
                     await db.rollback()
@@ -970,8 +994,75 @@ class DeepZoomBackgroundService:
                     
         except Exception as e:
             logger.error(f"Failed to update photo database status for {photo_id}: {e}")
-            # Re-raise to make sure error is propagated
-            raise
+            # 🔧 FIX: Don't re-raise to avoid breaking the entire processing pipeline
+            # The tile processing can continue even if status update fails
+            logger.error(f"⚠️ Deep zoom status update failed but continuing processing for {photo_id}")
+
+    async def _find_photo_record_with_fallback(self, photo_id: str, db: AsyncSession) -> Optional[Photo]:
+        """
+        🔧 NEW METHOD: Find photo record with multiple fallback approaches
+        
+        This method mirrors the logic from upload_service to ensure consistency
+        across the photo processing pipeline.
+        
+        Args:
+            photo_id: Photo ID as string
+            db: Database session
+            
+        Returns:
+            Photo record or None if not found
+        """
+        max_retries = 2
+        retry_delay = 0.01  # 10ms
+        
+        for attempt in range(max_retries):
+            try:
+                # 🔧 APPROACH 1: String-based query (most reliable for String(36) field)
+                photo_query = select(Photo).where(Photo.id == photo_id)
+                result = await db.execute(photo_query)
+                photo_record = result.scalar_one_or_none()
+                
+                if photo_record:
+                    logger.debug(f"🔧 DeepZoom: Photo {photo_id} found with string query (attempt {attempt + 1})")
+                    return photo_record
+                
+                # 🔧 APPROACH 2: UUID-based query (for compatibility)
+                try:
+                    photo_uuid = uuid.UUID(photo_id)
+                    uuid_query = select(Photo).where(Photo.id == str(photo_uuid))
+                    uuid_result = await db.execute(uuid_query)
+                    photo_record_uuid = uuid_result.scalar_one_or_none()
+                    
+                    if photo_record_uuid:
+                        logger.debug(f"🔧 DeepZoom: Photo {photo_id} found with UUID query (attempt {attempt + 1})")
+                        return photo_record_uuid
+                except ValueError:
+                    logger.debug(f"🔧 DeepZoom: Invalid UUID format for {photo_id}, skipping UUID query")
+                
+                # 🔧 APPROACH 3: Case-insensitive query (last resort)
+                # Using func.lower() for SQLAlchemy compatibility
+                from sqlalchemy import func
+                case_insensitive_query = select(Photo).where(func.lower(Photo.id) == photo_id.lower())
+                case_result = await db.execute(case_insensitive_query)
+                photo_record_case = case_result.scalar_one_or_none()
+                
+                if photo_record_case:
+                    logger.debug(f"🔧 DeepZoom: Photo {photo_id} found with case-insensitive query (attempt {attempt + 1})")
+                    return photo_record_case
+                
+                # If none found and this isn't the last attempt, wait and retry
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    
+            except Exception as query_error:
+                logger.warning(f"🔧 DeepZoom: Query error for photo {photo_id} (attempt {attempt + 1}): {query_error}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+        
+        logger.warning(f"🔧 DeepZoom: Photo {photo_id} not found after {max_retries} attempts with all query approaches")
+        return None
 
     async def _send_processing_notification(
         self,

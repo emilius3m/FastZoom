@@ -463,13 +463,19 @@ class PhotoUploadService:
         return uploaded_photos, failed_photos
 
     async def _identify_photos_needing_tiles(
-        self, 
-        uploaded_photos: List[Dict], 
-        site_id: UUID, 
+        self,
+        uploaded_photos: List[Dict],
+        site_id: UUID,
         db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """
         Identify which photos need deep zoom tile processing.
+        
+        🔧 DATABASE CONSISTENCY FIX: This method now handles:
+        1. UUID/string type compatibility issues
+        2. Transaction visibility timing
+        3. Retry logic for photo record lookup
+        4. Comprehensive error handling
         """
         
         photos_needing_tiles = []
@@ -479,31 +485,55 @@ class PhotoUploadService:
 
         logger.info(f"🔧 TILE DETECTION: Processing {len(uploaded_photos)} uploaded photos for tile requirements")
 
-        # Create new database session for tile detection
-        async with async_session_maker() as tile_db:
-            try:
-                for photo_data in uploaded_photos:
-                    photo_id = photo_data["photo_id"]
-                    
-                    # Use already extracted dimensions from metadata
-                    width = photo_data.get("metadata", {}).get("width", 0)
-                    height = photo_data.get("metadata", {}).get("height", 0)
-                    max_dimension = max(width, height) if width and height else 0
+        # 🔧 FIX: Use the existing database session for better transaction consistency
+        # instead of creating a new session that might not see committed records
+        try:
+            # Add a small delay to ensure all photo records are fully committed
+            await asyncio.sleep(0.05)
+            
+            for photo_data in uploaded_photos:
+                photo_id = photo_data["photo_id"]
+                
+                # Use already extracted dimensions from metadata
+                width = photo_data.get("metadata", {}).get("width", 0)
+                height = photo_data.get("metadata", {}).get("height", 0)
+                max_dimension = max(width, height) if width and height else 0
 
-                    logger.info(f"🔧 Photo {photo_id} dimensions: {width}x{height}, max_dimension: {max_dimension}")
+                logger.info(f"🔧 Photo {photo_id} dimensions: {width}x{height}, max_dimension: {max_dimension}")
 
-                    if max_dimension > self.min_dimension_for_tiles:
-                        logger.info(f"📋 Photo {photo_id} needs tiles: {width}x{height}")
+                if max_dimension > self.min_dimension_for_tiles:
+                    logger.info(f"📋 Photo {photo_id} needs tiles: {width}x{height}")
 
-                        # Query photo record to update status
-                        photo_query = select(Photo).where(Photo.id == UUID(photo_id))
-                        result = await tile_db.execute(photo_query)
-                        photo_record = result.scalar_one_or_none()
+                    # 🔧 CRITICAL FIX: Implement multi-approach photo record lookup
+                    photo_record = await self._find_photo_record_with_retry(photo_id, db)
 
-                        if photo_record:
-                            photo_record.deepzoom_status = 'scheduled'
-                            await tile_db.commit()
-
+                    if photo_record:
+                        # Update status using the same session
+                        photo_record.deepzoom_status = 'scheduled'
+                        # Don't commit here - let the outer transaction handle it
+                        
+                        photos_needing_tiles.append({
+                            'photo_id': photo_id,
+                            'file_path': photo_data['file_path'],
+                            'width': width,
+                            'height': height,
+                            'archaeological_metadata': photo_data.get('archaeological_metadata', {})
+                        })
+                        logger.info(f"🔧 Added photo {photo_id} to photos_needing_tiles")
+                    else:
+                        # 🔧 ENHANCED: Try with a fresh session as fallback
+                        logger.warning(f"🔧 Photo {photo_id} not found in main session, trying fallback session...")
+                        photo_record_fallback = await self._find_photo_record_in_fresh_session(photo_id)
+                        
+                        if photo_record_fallback:
+                            logger.info(f"🔧 Photo {photo_id} found in fallback session")
+                            photo_record_fallback.deepzoom_status = 'scheduled'
+                            
+                            async with async_session_maker() as fallback_db:
+                                fallback_db.add(photo_record_fallback)
+                                await fallback_db.commit()
+                                await fallback_db.refresh(photo_record_fallback)
+                            
                             photos_needing_tiles.append({
                                 'photo_id': photo_id,
                                 'file_path': photo_data['file_path'],
@@ -511,15 +541,122 @@ class PhotoUploadService:
                                 'height': height,
                                 'archaeological_metadata': photo_data.get('archaeological_metadata', {})
                             })
-                            logger.info(f"🔧 Added photo {photo_id} to photos_needing_tiles")
+                            logger.info(f"🔧 Added photo {photo_id} to photos_needing_tiles via fallback")
                         else:
-                            logger.error(f"🔧 Photo record not found for {photo_id}")
+                            logger.error(f"🔧 Photo record not found for {photo_id} in any session - THIS IS THE ROOT CAUSE!")
 
-            except Exception as session_error:
-                logger.error(f"🔧 Tile detection error: {session_error}")
-                # Don't fail the entire upload if tile detection fails
+        except Exception as session_error:
+            logger.error(f"🔧 Tile detection error: {session_error}")
+            # Don't fail the entire upload if tile detection fails
+            import traceback
+            logger.error(f"🔧 Tile detection traceback: {traceback.format_exc()}")
 
         return photos_needing_tiles
+
+    async def _find_photo_record_with_retry(self, photo_id: str, db: AsyncSession) -> Optional[Photo]:
+        """
+        🔧 NEW METHOD: Find photo record with multiple approaches and retry logic
+        
+        Args:
+            photo_id: Photo ID as string
+            db: Database session
+            
+        Returns:
+            Photo record or None if not found
+        """
+        max_retries = 3
+        retry_delay = 0.01  # 10ms
+        
+        for attempt in range(max_retries):
+            try:
+                # 🔧 APPROACH 1: String-based query (most reliable for String(36) field)
+                photo_query = select(Photo).where(Photo.id == photo_id)
+                result = await db.execute(photo_query)
+                photo_record = result.scalar_one_or_none()
+                
+                if photo_record:
+                    logger.debug(f"🔧 Photo {photo_id} found with string query (attempt {attempt + 1})")
+                    return photo_record
+                
+                # 🔧 APPROACH 2: UUID-based query (for compatibility)
+                try:
+                    photo_uuid = uuid.UUID(photo_id)
+                    uuid_query = select(Photo).where(Photo.id == str(photo_uuid))
+                    uuid_result = await db.execute(uuid_query)
+                    photo_record_uuid = uuid_result.scalar_one_or_none()
+                    
+                    if photo_record_uuid:
+                        logger.debug(f"🔧 Photo {photo_id} found with UUID query (attempt {attempt + 1})")
+                        return photo_record_uuid
+                except ValueError:
+                    logger.debug(f"🔧 Invalid UUID format for {photo_id}, skipping UUID query")
+                
+                # 🔧 APPROACH 3: Case-insensitive query (last resort)
+                # Using func.lower() for SQLAlchemy compatibility
+                from sqlalchemy import func
+                case_insensitive_query = select(Photo).where(func.lower(Photo.id) == photo_id.lower())
+                case_result = await db.execute(case_insensitive_query)
+                photo_record_case = case_result.scalar_one_or_none()
+                
+                if photo_record_case:
+                    logger.debug(f"🔧 Photo {photo_id} found with case-insensitive query (attempt {attempt + 1})")
+                    return photo_record_case
+                
+                # If none found and this isn't the last attempt, wait and retry
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    
+            except Exception as query_error:
+                logger.warning(f"🔧 Query error for photo {photo_id} (attempt {attempt + 1}): {query_error}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+        
+        logger.warning(f"🔧 Photo {photo_id} not found after {max_retries} attempts with all query approaches")
+        return None
+
+    async def _find_photo_record_in_fresh_session(self, photo_id: str) -> Optional[Photo]:
+        """
+        🔧 NEW METHOD: Find photo record in a completely fresh database session
+        
+        This method handles cases where the original session has isolation issues
+        and cannot see recently committed records.
+        
+        Args:
+            photo_id: Photo ID as string
+            
+        Returns:
+            Photo record or None if not found
+        """
+        try:
+            async with async_session_maker() as fresh_db:
+                # Use the same multi-approach query logic
+                photo_query = select(Photo).where(Photo.id == photo_id)
+                result = await fresh_db.execute(photo_query)
+                photo_record = result.scalar_one_or_none()
+                
+                if photo_record:
+                    logger.info(f"🔧 Photo {photo_id} found in fresh session")
+                    return photo_record
+                
+                # Try UUID-based query
+                try:
+                    photo_uuid = uuid.UUID(photo_id)
+                    uuid_query = select(Photo).where(Photo.id == str(photo_uuid))
+                    uuid_result = await fresh_db.execute(uuid_query)
+                    photo_record_uuid = uuid_result.scalar_one_or_none()
+                    
+                    if photo_record_uuid:
+                        logger.info(f"🔧 Photo {photo_id} found in fresh session with UUID query")
+                        return photo_record_uuid
+                except ValueError:
+                    pass
+                
+        except Exception as fresh_session_error:
+            logger.error(f"🔧 Fresh session error for photo {photo_id}: {fresh_session_error}")
+        
+        return None
 
     async def _schedule_tile_processing(self, photos_needing_tiles: List[Dict], site_id: UUID):
         """Schedule deep zoom processing for photos that need tiles."""

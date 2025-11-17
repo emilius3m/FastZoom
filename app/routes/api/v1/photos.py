@@ -460,8 +460,9 @@ async def bulk_delete_photos(
         bulk_service = PhotoBulkService(db)
         return await bulk_service.bulk_delete_photos(
             site_id=normalized_site_id,
-            user_id=str(current_user_id),
-            delete_request=bulk_delete_request
+            delete_request=bulk_delete_request,
+            current_user_id=current_user_id,
+            db=db
         )
 
     except HTTPException:
