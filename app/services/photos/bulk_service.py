@@ -17,7 +17,8 @@ from app.schemas.photos import BulkUpdateRequest, BulkDeleteRequest
 class PhotoBulkService:
     """Service for handling bulk photo operations (update/delete)"""
     
-    def __init__(self):
+    def __init__(self, db: AsyncSession):
+        self.db = db
         self.logger = logger.bind(service="photo_bulk_service")
     
     async def bulk_update_photos(
@@ -548,6 +549,142 @@ class PhotoBulkService:
         except Exception as e:
             self.logger.warning(f"Error during photo storage cleanup: {e}")
 
+    async def update_single_photo(
+        self,
+        site_id: str,
+        photo_id: str,
+        user_id: str,
+        update_data: dict
+    ) -> dict:
+        """
+        Update a single photo with comprehensive metadata handling
+        
+        Args:
+            site_id: Site identifier
+            photo_id: Photo identifier
+            user_id: User performing the update
+            update_data: Dictionary of fields to update
+            
+        Returns:
+            dict: Updated photo information
+        """
+        try:
+            self.logger.info(f"Updating single photo {photo_id} in site {site_id}")
+            
+            # Get photo
+            photo_query = select(Photo).where(
+                and_(Photo.id == photo_id, Photo.site_id == site_id)
+            )
+            photo_result = await self.db.execute(photo_query)
+            photo = photo_result.scalar_one_or_none()
+            
+            if not photo:
+                raise HTTPException(status_code=404, detail="Foto non trovata nel sito")
+            
+            # Define updatable fields
+            updatable_fields = {
+                'title', 'description', 'keywords', 'photo_type', 'photographer',
+                'inventory_number', 'catalog_number',
+                'excavation_area', 'stratigraphic_unit', 'grid_square', 'depth_level',
+                'find_date', 'finder', 'excavation_campaign',
+                'material', 'material_details', 'object_type', 'object_function',
+                'length_cm', 'width_cm', 'height_cm', 'diameter_cm', 'weight_grams',
+                'chronology_period', 'chronology_culture',
+                'dating_from', 'dating_to', 'dating_notes',
+                'conservation_status', 'conservation_notes', 'restoration_history',
+                'bibliography', 'comparative_references', 'external_links',
+                'copyright_holder', 'license_type', 'usage_rights',
+                'validation_notes'
+            }
+            
+            # Filter and validate data
+            filtered_data = {}
+            for field in updatable_fields:
+                if field in update_data and update_data[field] is not None:
+                    value = update_data[field]
+                    
+                    # Handle numeric fields
+                    if field in ['length_cm', 'width_cm', 'height_cm', 'diameter_cm', 'weight_grams', 'depth_level']:
+                        if value == '' or value == 'null' or value == 'None':
+                            filtered_data[field] = None
+                        else:
+                            try:
+                                filtered_data[field] = float(value) if value else None
+                            except (ValueError, TypeError):
+                                filtered_data[field] = None
+                    else:
+                        filtered_data[field] = value
+            
+            # Convert enums using the centralized system
+            filtered_data = self._convert_enum_fields(filtered_data)
+            
+            # Handle date fields
+            filtered_data = self._convert_date_fields(filtered_data)
+            
+            # Handle JSON fields
+            filtered_data = self._convert_json_fields(filtered_data)
+            
+            # Apply updates
+            updated_fields = []
+            for field, value in filtered_data.items():
+                old_value = getattr(photo, field, None)
+                if value == '' or value == 'null' or value == 'None':
+                    setattr(photo, field, None)
+                    updated_fields.append(field)
+                elif old_value != value:
+                    setattr(photo, field, value)
+                    updated_fields.append(field)
+            
+            # Update timestamp
+            photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
+            
+            # Log activity
+            activity = UserActivity(
+                user_id=user_id,
+                site_id=site_id,
+                activity_type="UPDATE",
+                activity_desc=f"Aggiornati metadati foto: {photo.filename}",
+                extra_data=json.dumps({
+                    "photo_id": photo_id,
+                    "fields_updated": updated_fields
+                })
+            )
+            self.db.add(activity)
+            
+            # Commit transaction
+            await self.db.commit()
+            await self.db.refresh(photo)
+            
+            # Broadcast WebSocket notification
+            try:
+                from app.routes.api.notifications_ws import notification_manager
+                await notification_manager.broadcast_photo_updated(
+                    site_id=site_id,
+                    photo_id=photo_id,
+                    updated_fields=updated_fields,
+                    photo_filename=photo.filename,
+                    user_id=user_id
+                )
+                self.logger.info(f"WebSocket notification sent for photo update: {photo_id}")
+            except Exception as ws_error:
+                self.logger.warning(f"Failed to send WebSocket notification for photo update: {ws_error}")
+            
+            response_data = {
+                "message": "Foto aggiornata con successo",
+                "photo_id": photo_id,
+                "updated_fields": updated_fields,
+                "photo_data": photo.to_dict()
+            }
+            
+            self.logger.info(f"Single photo {photo_id} updated successfully: {updated_fields}")
+            return response_data
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.logger.error(f"Single photo update error: {e}")
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"Errore aggiornamento foto: {str(e)}")
 
-# Create global instance
-photo_bulk_service = PhotoBulkService()
+
+# Remove global instance - services should be instantiated with db parameter
