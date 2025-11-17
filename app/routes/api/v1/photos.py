@@ -314,7 +314,7 @@ async def upload_photo(
 
     # Use modular upload service
     upload_service = PhotoUploadService()
-    return await upload_service.process_upload(
+    return await upload_service.process_photo_upload(
         site_id=site_id,
         user_id=current_user_id,
         photos=photos,
