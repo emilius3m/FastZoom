@@ -614,8 +614,9 @@ async def bulk_update_photos(
         bulk_service = PhotoBulkService(db)
         return await bulk_service.bulk_update_photos(
             site_id=str(site_id),
-            user_id=str(current_user_id),
-            bulk_request=bulk_update_request
+            update_request=bulk_update_request,
+            current_user_id=current_user_id,
+            db=db
         )
 
     except HTTPException:
