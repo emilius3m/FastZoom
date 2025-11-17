@@ -2077,8 +2077,9 @@ async def bulk_update_photos(
 
         # Use explicit transaction management instead of context manager to avoid conflicts
         try:
-            # Start transaction manually
-            #await db.begin()
+            # FIXED: Removed await db.begin() to prevent "transaction already begun" error
+            # The session is already in auto-transaction mode from get_async_session()
+            # Manual transaction management now uses explicit commit/rollback
             
             updated_count = 0
             updated_fields = []

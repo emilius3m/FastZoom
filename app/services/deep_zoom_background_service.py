@@ -918,22 +918,29 @@ class DeepZoomBackgroundService:
             from datetime import datetime
             import uuid
             
-            # Convert string photo_id to UUID if needed
-            if isinstance(photo_id, str):
-                try:
-                    photo_uuid = uuid.UUID(photo_id)
-                except ValueError as e:
-                    logger.error(f"Invalid UUID format for photo_id {photo_id}: {e}")
-                    return
-            else:
-                photo_uuid = photo_id
+            # CRITICAL FIX: Photo.id is stored as STRING, not UUID object
+            # Use the photo_id as string directly since Photo.id is String(36)
+            photo_id_str = str(photo_id)
             
             async with async_session_maker() as db:
                 try:
-                    # Get photo record
-                    photo_query = select(Photo).where(Photo.id == photo_uuid)
+                    # Get photo record using STRING comparison
+                    # FIXED: Use string comparison since Photo.id is String(36), not UUID
+                    photo_query = select(Photo).where(Photo.id == photo_id_str)
                     result = await db.execute(photo_query)
                     photo = result.scalar_one_or_none()
+                    
+                    # FALLBACK: If not found with string, try with UUID (for backward compatibility)
+                    if photo is None:
+                        try:
+                            photo_uuid = uuid.UUID(photo_id_str)
+                            fallback_query = select(Photo).where(Photo.id == str(photo_uuid))
+                            fallback_result = await db.execute(fallback_query)
+                            photo = fallback_result.scalar_one_or_none()
+                            if photo:
+                                logger.info(f"✅ Found photo {photo_id} using fallback UUID query")
+                        except ValueError as e:
+                            logger.debug(f"Invalid UUID format for photo_id {photo_id}: {e}")
                     
                     if photo:
                         # Update status
@@ -946,22 +953,25 @@ class DeepZoomBackgroundService:
                                 photo.tile_count = tile_count
                             if levels is not None:
                                 photo.max_zoom_level = levels
-                        elif status == "failed":
-                            photo.has_deep_zoom = False
-                            photo.deep_zoom_processed_at = datetime.now()
-                        elif status == "processing":
-                            photo.deepzoom_status = "processing"
+                            elif status == "failed":
+                                photo.has_deep_zoom = False
+                                photo.deep_zoom_processed_at = datetime.now()
+                            elif status == "processing":
+                                photo.deepzoom_status = "processing"
                         
                         await db.commit()
-                        logger.info(f"Updated photo {photo_id} deep zoom status to: {status}")
+                        logger.info(f"✅ Updated photo {photo_id} deep zoom status to: {status}")
                     else:
-                        logger.warning(f"Photo {photo_id} not found for status update")
+                        logger.error(f"❌ Photo {photo_id} not found for status update - THIS IS THE ROOT CAUSE!")
                 except Exception as e:
-                    logger.error(f"Database error in status update: {e}")
+                    logger.error(f"Database error in status update for {photo_id}: {e}")
                     await db.rollback()
+                    raise
                     
         except Exception as e:
             logger.error(f"Failed to update photo database status for {photo_id}: {e}")
+            # Re-raise to make sure error is propagated
+            raise
 
     async def _send_processing_notification(
         self,

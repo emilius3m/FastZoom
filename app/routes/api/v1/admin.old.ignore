@@ -1,0 +1,1685 @@
+"""
+API v1 - Administrative Functions
+Endpoints per funzioni amministrative del sistema.
+Implementa backward compatibility con avvisi di deprecazione.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
+from fastapi.responses import JSONResponse, Response
+from uuid import UUID, uuid4
+from typing import List, Dict, Any, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_, or_, update, text, func
+from sqlalchemy.orm import selectinload
+from loguru import logger
+from pydantic import BaseModel
+from datetime import datetime
+
+# Dependencies
+from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, SecurityService
+from app.database.db import get_async_session
+from app.models import User, UserSitePermission, PermissionLevel, Photo
+from app.models.user_profiles import UserProfile
+from app.models.sites import ArchaeologicalSite
+
+# Schemas
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    is_superuser: bool = False
+    is_active: bool = True
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+class UserUpdate(BaseModel):
+    email: str
+    password: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_superuser: bool = False
+    is_active: bool = True
+    is_verified: bool = False
+
+class SiteCreate(BaseModel):
+    name: str
+    code: str
+    location: Optional[str] = None
+    region: Optional[str] = None
+    province: Optional[str] = None
+    municipality: Optional[str] = None
+    description: Optional[str] = None
+    historical_period: Optional[str] = None
+    site_type: Optional[str] = "other"  # Default to SiteTypeEnum.OTHER
+    coordinates_lat: Optional[str] = None
+    coordinates_lng: Optional[str] = None
+    research_status: Optional[str] = "survey"  # Default to ResearchStatusEnum.SURVEY
+    is_active: bool = True
+    is_public: bool = True
+
+class SiteUpdate(BaseModel):
+    name: str
+    code: str
+    location: Optional[str] = None
+    region: Optional[str] = None
+    province: Optional[str] = None
+    municipality: Optional[str] = None
+    description: Optional[str] = None
+    historical_period: Optional[str] = None
+    site_type: Optional[str] = "other"  # Default to SiteTypeEnum.OTHER
+    coordinates_lat: Optional[str] = None
+    coordinates_lng: Optional[str] = None
+    research_status: Optional[str] = "survey"  # Default to ResearchStatusEnum.SURVEY
+    is_active: bool = True
+    is_public: bool = True
+
+class UserPermissionCreate(BaseModel):
+    user_id: UUID
+    site_id: UUID
+    permission_level: str
+    expires_at: Optional[str] = None
+    notes: Optional[str] = None
+
+class PermissionCreate(BaseModel):
+    user_id: UUID
+    site_id: UUID
+    permission_level: str
+    notes: Optional[str] = None
+
+class UserListItem(BaseModel):
+    id: str
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_active: bool
+    is_verified: bool
+    is_superuser: bool
+    sites_count: int = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    last_login_at: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+router = APIRouter()
+
+def normalize_site_id(site_id: str) -> Optional[str]:
+    """
+    Normalizza l'ID del sito per supportare diversi formati.
+    
+    Supporta:
+    - UUID standard con trattini: eb8d88e1-74e3-46d3-8e86-81f926c01cab
+    - Hash esadecimali senza trattini: eeedd3ceda34bf3b47d749a971b22ba
+    
+    Returns:
+        str: L'ID normalizzato o None se non valido
+    """
+    if not site_id:
+        return None
+    
+    # Rimuovi spazi bianchi
+    site_id = site_id.strip()
+    
+    # Se è un UUID standard con trattini, valida e restituiscilo
+    if '-' in site_id:
+        try:
+            # Crea un oggetto UUID per validare il formato
+            uuid_obj = UUID(site_id)
+            # Restituisci la stringa originale (già nel formato corretto)
+            return site_id
+        except (ValueError, AttributeError):
+            return None
+    
+    # Se è un hash esadecimale senza trattini
+    if len(site_id) == 32:
+        try:
+            # Verifica che sia esadecimale
+            int(site_id, 16)
+            # Converti in formato UUID standard (inserisci trattini)
+            uuid_formatted = f"{site_id[0:8]}-{site_id[8:12]}-{site_id[12:16]}-{site_id[16:20]}-{site_id[20:32]}"
+            # Valida il formato UUID risultante
+            UUID(uuid_formatted)
+            return uuid_formatted
+        except (ValueError, AttributeError):
+            return None
+    
+    # Altri formati non supportati
+    return None
+
+def add_deprecation_headers(response: Response, new_endpoint: str):
+    """Aggiunge headers di deprecazione per backward compatibility"""
+    response.headers["X-API-Deprecated"] = "true"
+    response.headers["X-API-Deprecated-Reason"] = "Endpoint ristrutturato. Usa la nuova API v1."
+    response.headers["X-API-New-Endpoint"] = new_endpoint
+    response.headers["X-API-Sunset"] = "2025-12-31"  # Data rimozione vecchi endpoint
+
+async def verify_admin_access(
+    current_user_id: UUID,
+    user_sites: List[Dict[str, Any]],
+    db: AsyncSession
+) -> bool:
+    """
+    Verifica che l'utente abbia privilegi di amministrazione.
+    
+    Per essere admin è necessario essere superuser nel sistema.
+    Gli utenti normali non possono accedere alle funzioni admin
+    anche se hanno permessi sui siti.
+    """
+    # 🔧 FIX: Check superuser status directly from database
+    # This is more reliable than checking site data which may not include superuser info
+    
+    # Query the user directly from database to get accurate superuser status
+    user_query = select(User).where(User.id == current_user_id)
+    user_result = await db.execute(user_query)
+    user = user_result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Utente non trovato"
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Utente non attivo"
+        )
+    
+    # Only superusers can access admin functions
+    if not user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accesso negato - privilegi insufficienti per funzioni admin. Richiesto superuser."
+        )
+    
+    return True
+
+# ===== GESTIONE SITI ARCHEOLOGICI =====
+
+@router.get("/sites", summary="Lista siti amministrazione", tags=["Administration"])
+@router.get("/sites/", summary="Lista siti amministrazione", tags=["Administration"])
+async def v1_admin_get_sites(
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Lista tutti i siti archeologici per amministrazione.
+    
+    Solo superutenti possono accedere.
+    """
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    # Query con conteggi utenti e foto per ogni sito
+    sites_query = (
+        select(
+            ArchaeologicalSite,
+            func.count(UserSitePermission.id).label('users_count'),
+            func.count(Photo.id).label('photos_count')
+        )
+        .outerjoin(UserSitePermission, and_(
+            UserSitePermission.site_id == ArchaeologicalSite.id,
+            UserSitePermission.is_active == True
+        ))
+        .outerjoin(Photo, Photo.site_id == UUID(ArchaeologicalSite.id))
+        .group_by(ArchaeologicalSite.id)
+        .order_by(ArchaeologicalSite.name)
+    )
+
+    sites_result = await db.execute(sites_query)
+    sites = sites_result.all()
+
+    # Converti in formato compatibile
+    sites_data = []
+    for site, users_count, photos_count in sites:
+        site_dict = {
+            "id": str(site.id),
+            "name": site.name,
+            "code": site.code,
+            "location": site.locality,
+            "region": site.region,
+            "province": site.province,
+            "municipality": site.municipality,
+            "description": site.description,
+            "historical_period": site.historical_period,
+            "site_type": site.site_type,
+            "coordinates_lat": site.coordinates_lat,
+            "coordinates_lng": site.coordinates_lng,
+            "research_status": site.research_status,
+            "is_active": site.status == "active",
+            "is_public": site.is_public,
+            "created_at": site.created_at.isoformat() if site.created_at else None,
+            "updated_at": site.updated_at.isoformat() if site.updated_at else None,
+            "users_count": users_count,
+            "photos_count": photos_count
+        }
+        sites_data.append(site_dict)
+    
+    return {
+        "sites": sites_data,
+        "count": len(sites_data),
+        "admin_user_id": str(current_user_id)
+    }
+
+@router.post("/sites", summary="Crea nuovo sito", tags=["Administration"])
+async def v1_admin_create_site(
+    site_data: SiteCreate,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Crea nuovo sito archeologico.
+    
+    Solo superutenti possono creare siti.
+    """
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        # Verifica che il codice sia unico
+        existing = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.code == site_data.code)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Codice sito '{site_data.code}' già esistente"
+            )
+        
+        site = ArchaeologicalSite(
+            id=str(uuid4()),  # Convert UUID to string for SQLite compatibility
+            name=site_data.name,
+            code=site_data.code,
+            locality=site_data.location,
+            region=site_data.region,
+            province=site_data.province,
+            municipality=site_data.municipality,
+            description=site_data.description,
+            historical_period=site_data.historical_period,
+            site_type=site_data.site_type,
+            coordinates_lat=site_data.coordinates_lat,
+            coordinates_lng=site_data.coordinates_lng,
+            research_status=site_data.research_status,
+            status="active" if site_data.is_active else "planned",
+            is_public=site_data.is_public,
+            created_by=str(current_user_id)  # Convert UUID to string for SQLite compatibility
+        )
+        
+        db.add(site)
+        await db.commit()
+        await db.refresh(site)
+        
+        return {
+            "message": "Site created successfully",
+            "site": {
+                "id": str(site.id),
+                "name": site.name,
+                "code": site.code,
+                "created_by": str(current_user_id)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get("/sites/{site_id}", summary="Dettaglio sito", tags=["Administration"])
+async def v1_admin_get_site(
+    site_id: str,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Ottieni dettagli di un sito specifico"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID sito non valido")
+    
+    # Prima prova con l'ID normalizzato
+    site = await db.execute(
+        select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
+    )
+    site = site.scalar_one_or_none()
+    
+    # Se non trovato, prova con l'ID originale e con l'hash senza trattini
+    if not site:
+        # Prova con l'ID originale
+        site = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+        )
+        site = site.scalar_one_or_none()
+    
+    if not site:
+        # Prova con l'hash senza trattini (se l'input è un UUID)
+        if '-' in site_id:
+            hash_id = site_id.replace('-', '')
+            if len(hash_id) == 32:
+                site = await db.execute(
+                    select(ArchaeologicalSite).where(ArchaeologicalSite.id == hash_id)
+                )
+                site = site.scalar_one_or_none()
+    
+    if not site:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+    
+    # Conta utenti e foto
+    users_count = await db.execute(
+        select(func.count(UserSitePermission.id))
+        .where(and_(
+            UserSitePermission.site_id == site.id,
+            UserSitePermission.is_active == True
+        ))
+    )
+    users_count = users_count.scalar() or 0
+    
+    photos_count = await db.execute(
+        select(func.count(Photo.id)).where(Photo.site_id == UUID(site.id))
+    )
+    photos_count = photos_count.scalar() or 0
+    
+    return {
+        "site": {
+            "id": str(site.id),
+            "name": site.name,
+            "code": site.code,
+            "location": site.locality,
+            "region": site.region,
+            "province": site.province,
+            "municipality": site.municipality,
+            "description": site.description,
+            "historical_period": site.historical_period,
+            "site_type": site.site_type,
+            "coordinates_lat": site.coordinates_lat,
+            "coordinates_lng": site.coordinates_lng,
+            "research_status": site.research_status,
+            "is_active": site.status == "active",
+            "is_public": site.is_public,
+            "created_at": site.created_at.isoformat() if site.created_at else None,
+            "updated_at": site.updated_at.isoformat() if site.updated_at else None,
+            "users_count": users_count,
+            "photos_count": photos_count
+        }
+    }
+
+@router.put("/sites/{site_id}", summary="Aggiorna sito", tags=["Administration"])
+async def v1_admin_update_site(
+    site_id: str,
+    site_data: SiteUpdate,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Aggiorna sito archeologico esistente"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID sito non valido")
+    
+    try:
+        site = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
+        )
+        site = site.scalar_one_or_none()
+        
+        # Se non trovato, prova con l'ID originale e con l'hash senza trattini
+        if not site:
+            # Prova con l'ID originale
+            site = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            )
+            site = site.scalar_one_or_none()
+        
+        if not site:
+            # Prova con l'hash senza trattini (se l'input è un UUID)
+            if '-' in site_id:
+                hash_id = site_id.replace('-', '')
+                if len(hash_id) == 32:
+                    site = await db.execute(
+                        select(ArchaeologicalSite).where(ArchaeologicalSite.id == hash_id)
+                    )
+                    site = site.scalar_one_or_none()
+        
+        if not site:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Verifica unicità codice (escludendo il sito corrente)
+        # Solo se il codice non è vuoto
+        if site_data.code and site_data.code.strip():
+            existing = await db.execute(
+                select(ArchaeologicalSite).where(
+                    and_(
+                        ArchaeologicalSite.code == site_data.code.strip(),
+                        ArchaeologicalSite.id != normalized_site_id
+                    )
+                )
+            )
+            if existing.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Codice sito '{site_data.code}' già esistente"
+                )
+        elif site_data.code and not site_data.code.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Il codice sito non può contenere solo spazi"
+            )
+        
+        # Aggiorna campi
+        site.name = site_data.name
+        # Only update code if it's not empty and different from current
+        if site_data.code and site_data.code.strip() and site_data.code != site.code:
+            site.code = site_data.code
+        # Don't update code if it's empty or same as current to avoid validation issues
+        elif site_data.code and site_data.code.strip() and site_data.code == site.code:
+            # Code unchanged, no update needed
+            pass
+        # If code is empty, keep the existing code (don't update)
+        
+        site.locality = site_data.location
+        site.region = site_data.region
+        site.province = site_data.province
+        site.municipality = site_data.municipality
+        site.description = site_data.description
+        site.historical_period = site_data.historical_period
+        site.site_type = site_data.site_type
+        site.coordinates_lat = site_data.coordinates_lat
+        site.coordinates_lng = site_data.coordinates_lng
+        site.research_status = site_data.research_status
+        site.status = "active" if site_data.is_active else "planned"
+        site.is_public = site_data.is_public
+        
+        await db.commit()
+        await db.refresh(site)
+        
+        return {
+            "message": "Site updated successfully",
+            "site": {
+                "id": str(site.id),
+                "name": site.name,
+                "code": site.code,
+                "updated_by": str(current_user_id)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.delete("/sites/{site_id}", summary="Elimina sito", tags=["Administration"])
+async def v1_admin_delete_site(
+    site_id: str,
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Elimina definitivamente un sito archeologico e tutti i dati correlati.
+    Operazione PERICOLOSA che richiede conferma password amministratore.
+    """
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID sito non valido")
+    
+    try:
+        # Try to get JSON body first, then fallback to query params
+        try:
+            body = await request.json()
+            admin_password = body.get("admin_password", "")
+            confirm_delete = body.get("confirm_delete", False)
+        except:
+            # Fallback to query params for backward compatibility
+            admin_password = request.query_params.get("admin_password", "")
+            confirm_delete = request.query_params.get("confirm_delete") == "true"
+        
+        # Ottieni utente corrente per verifica password
+        user = await db.execute(select(User).where(User.id == current_user_id))
+        user = user.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+        
+        # Verifica password amministratore
+        if not SecurityService.verify_password(admin_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Password amministratore non corretta"
+            )
+        
+        if not confirm_delete:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Conferma eliminazione richiesta"
+            )
+        
+        # Verifica esistenza sito
+        site = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
+        )
+        site = site.scalar_one_or_none()
+        
+        # Se non trovato, prova con l'ID originale e con l'hash senza trattini
+        if not site:
+            # Prova con l'ID originale
+            site = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            )
+            site = site.scalar_one_or_none()
+        
+        if not site:
+            # Prova con l'hash senza trattini (se l'input è un UUID)
+            if '-' in site_id:
+                hash_id = site_id.replace('-', '')
+                if len(hash_id) == 32:
+                    site = await db.execute(
+                        select(ArchaeologicalSite).where(ArchaeologicalSite.id == hash_id)
+                    )
+                    site = site.scalar_one_or_none()
+        
+        if not site:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Conta dati correlati per log
+        users_count = await db.execute(
+            select(func.count(UserSitePermission.id)).where(
+                and_(
+                    UserSitePermission.site_id == site.id,
+                    UserSitePermission.is_active == True
+                )
+            )
+        )
+        users_count = users_count.scalar() or 0
+        
+        photos_count = await db.execute(
+            select(func.count(Photo.id)).where(Photo.site_id == UUID(site.id))
+        )
+        photos_count = photos_count.scalar() or 0
+        
+        # Log operazione pericolosa
+        logger.warning(
+            f"ELIMINAZIONE PERICOLOSA: Sito '{site.name}' ({site.code}) "
+            f"da parte di {user.email}. "
+            f"Dati correlati: {users_count} utenti, {photos_count} foto"
+        )
+        
+        # Elimina sito - CASCADE gestirà eliminazione automatica
+        await db.delete(site)
+        await db.commit()
+        
+        logger.info(
+            f"Sito '{site.name}' eliminato definitivamente da {user.email}"
+        )
+        
+        return {
+            "success": True,
+            "message": f"Sito '{site.name}' eliminato definitivamente",
+            "deleted_data": {
+                "site": {
+                    "id": str(site.id),
+                    "name": site.name,
+                    "code": site.code
+                },
+                "related_data": {
+                    "users_permissions": users_count,
+                    "photos": photos_count
+                }
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/sites/{site_id}/toggle-status", summary="Toggle stato sito", tags=["Administration"])
+async def v1_admin_toggle_site_status(
+    site_id: str,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Toggle stato attivo/inattivo sito"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID sito non valido")
+    
+    try:
+        site = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
+        )
+        site = site.scalar_one_or_none()
+        
+        # Se non trovato, prova con l'ID originale e con l'hash senza trattini
+        if not site:
+            # Prova con l'ID originale
+            site = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            )
+            site = site.scalar_one_or_none()
+        
+        if not site:
+            # Prova con l'hash senza trattini (se l'input è un UUID)
+            if '-' in site_id:
+                hash_id = site_id.replace('-', '')
+                if len(hash_id) == 32:
+                    site = await db.execute(
+                        select(ArchaeologicalSite).where(ArchaeologicalSite.id == hash_id)
+                    )
+                    site = site.scalar_one_or_none()
+        
+        if not site:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Toggle stato
+        current_status = site.status
+        site.status = "planned" if current_status == "active" else "active"
+        await db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Sito {'attivato' if site.status == 'active' else 'disattivato'} con successo",
+            "is_active": site.status == "active",
+            "site_id": str(site.id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/sites/{site_id}/dangerous-delete", summary="Eliminazione pericolosa sito", tags=["Administration"])
+async def v1_admin_dangerous_delete_site(
+    site_id: str,
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Eliminazione pericolosa sito - endpoint alternativo che accetta JSON body
+    Operazione PERICOLOSA che richiede conferma password amministratore.
+    """
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID sito non valido")
+    
+    try:
+        # Try to get JSON body first, then fallback to query params
+        try:
+            body = await request.json()
+            admin_password = body.get("admin_password", "")
+            confirm_delete = body.get("confirm_delete", False)
+        except:
+            # Fallback to query params for backward compatibility
+            admin_password = request.query_params.get("admin_password", "")
+            confirm_delete = request.query_params.get("confirm_delete") == "true"
+        
+        # Ottieni utente corrente per verifica password
+        user = await db.execute(select(User).where(User.id == current_user_id))
+        user = user.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+        
+        # Verifica password amministratore
+        if not SecurityService.verify_password(admin_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Password amministratore non corretta"
+            )
+        
+        if not confirm_delete:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Conferma eliminazione richiesta"
+            )
+        
+        # Verifica esistenza sito
+        site = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
+        )
+        site = site.scalar_one_or_none()
+        
+        # Se non trovato, prova con l'ID originale e con l'hash senza trattini
+        if not site:
+            # Prova con l'ID originale
+            site = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            )
+            site = site.scalar_one_or_none()
+        
+        if not site:
+            # Prova con l'hash senza trattini (se l'input è un UUID)
+            if '-' in site_id:
+                hash_id = site_id.replace('-', '')
+                if len(hash_id) == 32:
+                    site = await db.execute(
+                        select(ArchaeologicalSite).where(ArchaeologicalSite.id == hash_id)
+                    )
+                    site = site.scalar_one_or_none()
+        
+        if not site:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Conta dati correlati per log
+        users_count = await db.execute(
+            select(func.count(UserSitePermission.id)).where(
+                and_(
+                    UserSitePermission.site_id == site.id,
+                    UserSitePermission.is_active == True
+                )
+            )
+        )
+        users_count = users_count.scalar() or 0
+        
+        photos_count = await db.execute(
+            select(func.count(Photo.id)).where(Photo.site_id == UUID(site.id))
+        )
+        photos_count = photos_count.scalar() or 0
+        
+        # Log operazione pericolosa
+        logger.warning(
+            f"ELIMINAZIONE PERICOLOSA: Sito '{site.name}' ({site.code}) "
+            f"da parte di {user.email}. "
+            f"Dati correlati: {users_count} utenti, {photos_count} foto"
+        )
+        
+        # Elimina sito - CASCADE gestirà eliminazione automatica
+        await db.delete(site)
+        await db.commit()
+        
+        logger.info(
+            f"Sito '{site.name}' eliminato definitivamente da {user.email}"
+        )
+        
+        return {
+            "success": True,
+            "message": f"Sito '{site.name}' eliminato definitivamente",
+            "deleted_data": {
+                "site": {
+                    "id": str(site.id),
+                    "name": site.name,
+                    "code": site.code
+                },
+                "related_data": {
+                    "users_permissions": users_count,
+                    "photos": photos_count
+                }
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+# ===== GESTIONE UTENTI =====
+
+@router.get("/users", summary="Lista utenti amministrazione", tags=["Administration"])
+@router.get("/users/", summary="Lista utenti amministrazione", tags=["Administration"])
+async def v1_admin_get_users(
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Lista tutti gli utenti per amministrazione.
+    
+    Solo superutenti possono accedere.
+    """
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    # Query base utenti con eager loading del profilo
+    users_query = select(User).options(selectinload(User.profile)).order_by(User.email)
+    users = await db.execute(users_query)
+    users = users.scalars().all()
+    
+    # Converti in lista serializzabile
+    users_list = []
+    for user in users:
+        # Conta i siti per ogni utente
+        sites_count_query = await db.execute(
+            select(func.count(UserSitePermission.id))
+            .where(
+                and_(
+                    UserSitePermission.user_id == user.id,
+                    UserSitePermission.is_active == True
+                )
+            )
+        )
+        sites_count = sites_count_query.scalar() or 0
+        
+        user_dict = {
+            "id": str(user.id),
+            "email": user.email,
+            "first_name": user.profile.first_name if user.profile else None,
+            "last_name": user.profile.last_name if user.profile else None,
+            "is_active": user.is_active,
+            "is_verified": user.is_verified,
+            "is_superuser": user.is_superuser,
+            "sites_count": sites_count,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+            "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None
+        }
+        users_list.append(user_dict)
+    
+    return {
+        "users": users_list,
+        "count": len(users_list),
+        "admin_user_id": str(current_user_id)
+    }
+
+@router.post("/users", summary="Crea nuovo utente", tags=["Administration"])
+async def v1_admin_create_user(
+    user_data: UserCreate,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Crea nuovo utente nel sistema.
+    
+    Solo superutenti possono creare utenti.
+    """
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        # Verifica che l'email sia unica
+        existing = await db.execute(
+            select(User).where(User.email == user_data.email)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Email '{user_data.email}' già esistente"
+            )
+        
+        hashed_password = SecurityService.get_password_hash(user_data.password)
+        
+        user = User(
+            id=str(uuid4()),  # Convert UUID to string for SQLite compatibility
+            email=user_data.email,
+            username=user_data.email.split("@")[0],
+            hashed_password=hashed_password,
+            is_active=user_data.is_active,
+            is_superuser=user_data.is_superuser,
+            is_verified=True,
+            first_name=user_data.first_name or "User",
+            last_name=user_data.last_name or "Account"
+        )
+        
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        
+        return {
+            "message": "User created successfully",
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+                "created_by": str(current_user_id)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.get("/users/{user_id}", summary="Dettaglio utente", tags=["Administration"])
+async def v1_admin_get_user(
+    user_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Ottieni dettagli di un utente specifico"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    logger.info(f"Looking up user with ID: {user_id} (type: {type(user_id)})")
+    
+    # Carica utente con relazioni
+    user_query = select(User).options(selectinload(User.profile)).where(User.id == str(user_id))
+    user_result = await db.execute(user_query)
+    user = user_result.scalar_one_or_none()
+    
+    logger.info(f"User query result: {user}")
+    
+    if not user:
+        # Try alternative lookup with UUID object directly
+        logger.info("Trying alternative lookup with UUID object")
+        user_query_alt = select(User).options(selectinload(User.profile)).where(User.id == user_id)
+        user_result_alt = await db.execute(user_query_alt)
+        user = user_result_alt.scalar_one_or_none()
+        logger.info(f"Alternative query result: {user}")
+    
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Utente non trovato: {user_id}")
+    
+    # Carica permessi utente
+    permissions_query = (
+        select(UserSitePermission, ArchaeologicalSite)
+        .join(ArchaeologicalSite, UserSitePermission.site_id == ArchaeologicalSite.id)
+        .where(UserSitePermission.user_id == user_id)
+        .order_by(ArchaeologicalSite.name)
+    )
+    permissions = await db.execute(permissions_query)
+    user_permissions = permissions.all()
+    
+    # Converti permessi in formato serializzabile
+    permissions_data = []
+    for permission, site in user_permissions:
+        permission_dict = {
+            "id": str(permission.id),
+            "site_id": str(permission.site_id),
+            "site_name": site.name,
+            "permission_level": str(permission.permission_level),  # Fix: use string value directly
+            "granted_by": str(permission.granted_by),
+            "granted_at": permission.granted_at.isoformat() if permission.granted_at else None,
+            "expires_at": permission.expires_at.isoformat() if permission.expires_at else None,
+            "is_active": permission.is_active,
+            "notes": permission.notes
+        }
+        permissions_data.append(permission_dict)
+    
+    return {
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "first_name": user.profile.first_name if user.profile else None,
+            "last_name": user.profile.last_name if user.profile else None,
+            "is_active": user.is_active,
+            "is_verified": user.is_verified,
+            "is_superuser": user.is_superuser,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+            "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+            "permissions": permissions_data
+        }
+    }
+
+@router.put("/users/{user_id}", summary="Aggiorna utente", tags=["Administration"])
+async def v1_admin_update_user(
+    user_id: UUID,
+    user_data: UserUpdate,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Aggiorna utente esistente"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        user = await db.execute(select(User).where(User.id == user_id))
+        user = user.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+        
+        # Verifica unicità email (escludendo utente corrente)
+        existing = await db.execute(
+            select(User).where(
+                and_(User.email == user_data.email, User.id != user_id)
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Email '{user_data.email}' già esistente"
+            )
+        
+        # Aggiorna campi
+        user.email = user_data.email
+        user.is_active = user_data.is_active
+        user.is_superuser = user_data.is_superuser
+        user.is_verified = user_data.is_verified
+        
+        # Aggiorna password solo se fornita
+        if user_data.password and user_data.password.strip():
+            user.hashed_password = SecurityService.get_password_hash(user_data.password)
+        
+        # Aggiorna o crea il profilo utente
+        stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+        result = await db.execute(stmt)
+        existing_profile = result.scalar_one_or_none()
+        
+        if existing_profile is None:
+            # Crea nuovo profilo
+            profile = UserProfile(
+                user_id=str(user_id),  # Convert UUID to string for SQLite compatibility
+                first_name=user_data.first_name,
+                last_name=user_data.last_name
+            )
+            db.add(profile)
+        else:
+            # Aggiorna profilo esistente
+            existing_profile.first_name = user_data.first_name
+            existing_profile.last_name = user_data.last_name
+        
+        await db.commit()
+        await db.refresh(user)
+        
+        return {
+            "message": "User updated successfully",
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+                "updated_by": str(current_user_id)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/users/{user_id}/toggle-status", summary="Toggle stato utente", tags=["Administration"])
+async def v1_admin_toggle_user_status(
+    user_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Toggle stato attivo/inattivo utente"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        user = await db.execute(select(User).where(User.id == user_id))
+        user = user.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+        
+        # Impedisce auto-disattivazione
+        if user.id == current_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Non puoi disattivare il tuo stesso account"
+            )
+        
+        # Toggle stato
+        user.is_active = not user.is_active
+        await db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Utente {'attivato' if user.is_active else 'disattivato'} con successo",
+            "is_active": user.is_active,
+            "user_id": str(user.id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.delete("/users/{user_id}", summary="Elimina utente", tags=["Administration"])
+async def v1_admin_delete_user(
+    user_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Elimina utente (soft delete)"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        user = await db.execute(select(User).where(User.id == user_id))
+        user = user.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+        
+        # Impedisce auto-eliminazione
+        if user.id == current_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Non puoi eliminare il tuo stesso account"
+            )
+        
+        # Soft delete - disattiva utente e rimuovi permessi
+        user.is_active = False
+        
+        # Disattiva tutti i permessi
+        await db.execute(
+            update(UserSitePermission)
+            .where(UserSitePermission.user_id == user_id)
+            .values(is_active=False)
+        )
+        
+        await db.commit()
+        
+        return {
+            "success": True,
+            "message": "Utente eliminato con successo",
+            "user_id": str(user.id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+# ===== GESTIONE UTENTI PER SITO =====
+
+@router.get("/sites/{site_id}/users", summary="Lista utenti per sito", tags=["Administration"])
+async def v1_admin_get_site_users(
+    site_id: str,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Lista tutti gli utenti con permessi per un sito specifico.
+    
+    Solo superutenti possono accedere.
+    """
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
+    normalized_site_id = normalize_site_id(site_id)
+    if not normalized_site_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID sito non valido")
+    
+    try:
+        # Verifica esistenza sito
+        site = await db.execute(
+            select(ArchaeologicalSite).where(ArchaeologicalSite.id == normalized_site_id)
+        )
+        site = site.scalar_one_or_none()
+        
+        # Se non trovato, prova con l'ID originale e con l'hash senza trattini
+        if not site:
+            # Prova con l'ID originale
+            site = await db.execute(
+                select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+            )
+            site = site.scalar_one_or_none()
+        
+        if not site:
+            # Prova con l'hash senza trattini (se l'input è un UUID)
+            if '-' in site_id:
+                hash_id = site_id.replace('-', '')
+                if len(hash_id) == 32:
+                    site = await db.execute(
+                        select(ArchaeologicalSite).where(ArchaeologicalSite.id == hash_id)
+                    )
+                    site = site.scalar_one_or_none()
+        
+        if not site:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Query utenti con permessi per questo sito
+        users_permissions_query = (
+            select(UserSitePermission, User, ArchaeologicalSite)
+            .join(User, UserSitePermission.user_id == User.id)
+            .join(ArchaeologicalSite, UserSitePermission.site_id == ArchaeologicalSite.id)
+            .options(selectinload(User.profile))
+            .where(UserSitePermission.site_id == normalized_site_id)
+            .order_by(User.email)
+        )
+        
+        users_permissions = await db.execute(users_permissions_query)
+        users_permissions = users_permissions.all()
+        
+        # Query tutti gli utenti disponibili per aggiungere al sito
+        all_users_query = select(User).options(selectinload(User.profile)).order_by(User.email)
+        all_users = await db.execute(all_users_query)
+        all_users = all_users.scalars().all()
+        
+        # Converti dati utenti con permessi
+        site_users = []
+        for permission, user, site_info in users_permissions:
+            user_dict = {
+                "id": str(user.id),
+                "email": user.email,
+                "first_name": user.profile.first_name if user.profile else None,
+                "last_name": user.profile.last_name if user.profile else None,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+                "permission_level": str(permission.permission_level),
+                "granted_by": str(permission.granted_by),
+                "granted_at": permission.granted_at.isoformat() if permission.granted_at else None,
+                "expires_at": permission.expires_at.isoformat() if permission.expires_at else None,
+                "is_active_permission": permission.is_active,
+                "notes": permission.notes
+            }
+            site_users.append(user_dict)
+        
+        # Converti tutti gli utenti disponibili
+        available_users = []
+        user_ids_with_permission = [user["id"] for user in site_users]
+        
+        for user in all_users:
+            if str(user.id) not in user_ids_with_permission:
+                user_dict = {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "first_name": user.profile.first_name if user.profile else None,
+                    "last_name": user.profile.last_name if user.profile else None,
+                    "is_active": user.is_active,
+                    "is_superuser": user.is_superuser
+                }
+                available_users.append(user_dict)
+        
+        return {
+            "site": {
+                "id": str(site.id),
+                "name": site.name,
+                "code": site.code,
+                "location": site.locality
+            },
+            "users": site_users,
+            "available_users": available_users,
+            "count": len(site_users),
+            "admin_user_id": str(current_user_id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+# ===== GESTIONE PERMESSI =====
+
+@router.get("/permissions", summary="Lista permessi", tags=["Administration"])
+@router.get("/permissions/", summary="Lista permessi", tags=["Administration"])
+async def v1_admin_get_permissions(
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Lista permessi utenti-siti"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    # Fix: Add eager loading for user profiles to prevent MissingGreenlet error
+    permissions = await db.execute(
+        select(UserSitePermission, User, ArchaeologicalSite)
+        .join(User, UserSitePermission.user_id == User.id)
+        .join(ArchaeologicalSite, UserSitePermission.site_id == ArchaeologicalSite.id)
+        .options(selectinload(User.profile))  # Eager load user profile
+        .order_by(User.email, ArchaeologicalSite.name)
+    )
+    permissions = permissions.all()
+    
+    permissions_data = []
+    for permission, user, site in permissions:
+        # Fix: permission_level is stored as string, not as enum with .value attribute
+        permission_level_value = permission.permission_level
+        if hasattr(permission, 'permission_level_enum'):
+            # If the model has the enum property, use it
+            permission_level_value = permission.permission_level_enum.value
+        else:
+            # Otherwise, use the string value directly
+            permission_level_value = str(permission.permission_level)
+        
+        permission_dict = {
+            "id": str(permission.id),
+            "user_id": str(permission.user_id),
+            "user_email": user.email,
+            "user_name": f"{user.profile.first_name if user.profile else ''} {user.profile.last_name if user.profile else ''}".strip(),
+            "site_id": str(permission.site_id),
+            "site_name": site.name,
+            "permission_level": permission_level_value,
+            "granted_by": str(permission.granted_by),
+            "granted_at": permission.granted_at.isoformat() if permission.granted_at else None,
+            "expires_at": permission.expires_at.isoformat() if permission.expires_at else None,
+            "is_active": permission.is_active,
+            "notes": permission.notes
+        }
+        permissions_data.append(permission_dict)
+    
+    return {
+        "permissions": permissions_data,
+        "count": len(permissions_data),
+        "admin_user_id": str(current_user_id)
+    }
+
+@router.post("/permissions", summary="Crea permesso", tags=["Administration"])
+async def v1_admin_create_permission(
+    permission_data: PermissionCreate,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Crea nuovo permesso utente-sito"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        # Verifica che non esista già
+        existing = await db.execute(
+            select(UserSitePermission).where(
+                and_(
+                    UserSitePermission.user_id == permission_data.user_id,
+                    UserSitePermission.site_id == permission_data.site_id
+                )
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Permesso già esistente per questo utente e sito"
+            )
+        
+        # Verifica esistenza utente e sito
+        user = await db.execute(select(User).where(User.id == str(permission_data.user_id)))
+        if not user.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+        
+        site = await db.execute(select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(permission_data.site_id)))
+        if not site.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Crea permesso
+        permission = UserSitePermission(
+            id=str(uuid4()),  # Convert UUID to string for SQLite compatibility
+            user_id=str(permission_data.user_id),  # Convert UUID to string for SQLite compatibility
+            site_id=str(permission_data.site_id),  # Convert UUID to string for SQLite compatibility
+            permission_level=PermissionLevel(permission_data.permission_level),
+            is_active=True,
+            granted_by=str(current_user_id),  # Convert UUID to string for SQLite compatibility
+            notes=permission_data.notes
+        )
+        
+        db.add(permission)
+        await db.commit()
+        await db.refresh(permission)
+        
+        return {
+            "message": "Permission created successfully",
+            "permission": {
+                "id": str(permission.id),
+                "user_id": str(permission.user_id),
+                "site_id": str(permission.site_id),
+                "permission_level": str(permission.permission_level),  # Fix: use string value directly
+                "granted_by": str(current_user_id)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/users/{user_id}/permissions", summary="Aggiungi permesso utente", tags=["Administration"])
+async def v1_admin_add_user_permission(
+    user_id: UUID,
+    permission_data: UserPermissionCreate,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Aggiungi permesso sito per utente"""
+    # DEBUG: Log incoming request data
+    logger.info(f"[DEBUG] v1_admin_add_user_permission called")
+    logger.info(f"[DEBUG] user_id: {user_id} (type: {type(user_id)})")
+    logger.info(f"[DEBUG] permission_data: {permission_data}")
+    logger.info(f"[DEBUG] current_user_id: {current_user_id}")
+    
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        # Verifica esistenza utente e sito
+        logger.info(f"[DEBUG] Checking if user exists with ID: {user_id}")
+        user = await db.execute(select(User).where(User.id == str(user_id)))
+        user_obj = user.scalar_one_or_none()
+        logger.info(f"[DEBUG] User found: {user_obj}")
+        
+        if not user_obj:
+            logger.error(f"[DEBUG] User not found with ID: {user_id}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+        
+        logger.info(f"[DEBUG] Checking if site exists with ID: {permission_data.site_id}")
+        site = await db.execute(select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(permission_data.site_id)))
+        site_obj = site.scalar_one_or_none()
+        logger.info(f"[DEBUG] Site found: {site_obj}")
+        
+        if not site_obj:
+            logger.error(f"[DEBUG] Site not found with ID: {permission_data.site_id}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sito non trovato")
+        
+        # Controlla se permesso già esistente
+        logger.info(f"[DEBUG] Checking if permission already exists for user_id: {user_id}, site_id: {permission_data.site_id}")
+        existing = await db.execute(
+            select(UserSitePermission).where(
+                and_(
+                    UserSitePermission.user_id == user_id,
+                    UserSitePermission.site_id == permission_data.site_id
+                )
+            )
+        )
+        existing_permission = existing.scalar_one_or_none()
+        logger.info(f"[DEBUG] Existing permission: {existing_permission}")
+        
+        if existing_permission:
+            logger.error(f"[DEBUG] Permission already exists for user_id: {user_id}, site_id: {permission_data.site_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Permesso già esistente per questo utente e sito"
+            )
+        
+        # Parsing data scadenza opzionale
+        expires_datetime = None
+        if permission_data.expires_at and permission_data.expires_at.strip():
+            try:
+                expires_datetime = datetime.fromisoformat(permission_data.expires_at)
+                logger.info(f"[DEBUG] Parsed expires_at: {expires_datetime}")
+            except ValueError as e:
+                logger.error(f"[DEBUG] Invalid date format: {e}")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato data non valido")
+        
+        # Crea permesso
+        permission_id = str(uuid4())
+        logger.info(f"[DEBUG] Creating permission with ID: {permission_id}")
+        logger.info(f"[DEBUG] Permission data: user_id={str(user_id)}, site_id={str(permission_data.site_id)}, permission_level={permission_data.permission_level}")
+        
+        permission = UserSitePermission(
+            id=permission_id,  # Convert UUID to string for SQLite compatibility
+            user_id=str(user_id),  # Convert UUID to string for SQLite compatibility
+            site_id=str(permission_data.site_id),  # Convert UUID to string for SQLite compatibility
+            permission_level=PermissionLevel(permission_data.permission_level),
+            permissions=[],  # Initialize with empty list to satisfy NOT NULL constraint
+            expires_at=expires_datetime,
+            granted_by=str(current_user_id),  # Convert UUID to string for SQLite compatibility
+            notes=permission_data.notes,
+            is_active=True
+        )
+        
+        logger.info(f"[DEBUG] Permission object created: {permission}")
+        
+        db.add(permission)
+        logger.info(f"[DEBUG] Permission added to session")
+        
+        await db.commit()
+        logger.info(f"[DEBUG] Database commit completed")
+        
+        await db.refresh(permission)
+        logger.info(f"[DEBUG] Permission refreshed: {permission}")
+        
+        # Verify the permission was actually saved
+        verify_query = await db.execute(
+            select(UserSitePermission).where(UserSitePermission.id == permission_id)
+        )
+        saved_permission = verify_query.scalar_one_or_none()
+        logger.info(f"[DEBUG] Verification query result: {saved_permission}")
+        
+        return {
+            "message": "User permission added successfully",
+            "permission": {
+                "id": str(permission.id),
+                "user_id": str(user_id),
+                "site_id": str(permission_data.site_id),
+                "permission_level": str(permission.permission_level),  # Fix: use string value directly
+                "granted_by": str(current_user_id)
+            }
+        }
+        
+    except HTTPException:
+        logger.error(f"[DEBUG] HTTPException in v1_admin_add_user_permission")
+        raise
+    except Exception as e:
+        logger.error(f"[DEBUG] Exception in v1_admin_add_user_permission: {str(e)}")
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.delete("/permissions/{permission_id}", summary="Elimina permesso", tags=["Administration"])
+async def v1_admin_delete_permission(
+    permission_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Elimina permesso"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        permission = await db.execute(
+            select(UserSitePermission).where(UserSitePermission.id == permission_id)
+        )
+        permission = permission.scalar_one_or_none()
+        
+        if not permission:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permesso non trovato")
+        
+        await db.delete(permission)
+        await db.commit()
+        
+        return {
+            "success": True,
+            "message": "Permission deleted successfully",
+            "permission_id": str(permission_id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.delete("/users/{user_id}/permissions/{permission_id}", summary="Rimuovi permesso utente", tags=["Administration"])
+async def v1_admin_remove_user_permission(
+    user_id: UUID,
+    permission_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Rimuovi permesso sito da utente"""
+    await verify_admin_access(current_user_id, user_sites, db)
+    
+    try:
+        permission = await db.execute(
+            select(UserSitePermission).where(
+                and_(
+                    UserSitePermission.id == permission_id,
+                    UserSitePermission.user_id == user_id
+                )
+            )
+        )
+        permission = permission.scalar_one_or_none()
+        
+        if not permission:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permesso non trovato")
+        
+        await db.delete(permission)
+        await db.commit()
+        
+        return {
+            "success": True,
+            "message": "User permission removed successfully",
+            "permission_id": str(permission_id),
+            "user_id": str(user_id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+# ENDPOINT DI BACKWARD COMPATIBILITY CON DEPRECAZIONE
+
+@router.get("/legacy/sites", summary="[DEPRECATED] Lista siti admin legacy", tags=["Administration - Legacy"])
+async def legacy_admin_get_sites():
+    """
+    ⚠️ DEPRECATED: Lista siti admin endpoint legacy.
+    
+    Usa /api/v1/admin/sites invece di questo endpoint.
+    Questo endpoint sarà rimosso il 31/12/2025.
+    """
+    logger.warning("Legacy admin sites endpoint used - deprecated")
+    response = JSONResponse(content={"message": "Use new endpoint"})
+    add_deprecation_headers(response, "/api/v1/admin/sites")
+    return response
+
+@router.get("/legacy/users", summary="[DEPRECATED] Lista utenti admin legacy", tags=["Administration - Legacy"])
+async def legacy_admin_get_users():
+    """
+    ⚠️ DEPRECATED: Lista utenti admin endpoint legacy.
+    
+    Usa /api/v1/admin/users invece di questo endpoint.
+    Questo endpoint sarà rimosso il 31/12/2025.
+    """
+    logger.warning("Legacy admin users endpoint used - deprecated")
+    response = JSONResponse(content={"message": "Use new endpoint"})
+    add_deprecation_headers(response, "/api/v1/admin/users")
+    return response
+
+# MIGRATION HELPER
+
+@router.get("/migration/help", summary="Aiuto migrazione API admin", tags=["Administration - Migration"])
+async def migration_help():
+    """
+    Fornisce informazioni sulla migrazione dalla vecchia alla nuova API structure per admin functions.
+    """
+    return {
+        "migration_guide": {
+            "old_endpoints": {
+                "/admin/sites/": "/api/v1/admin/sites",
+                "/admin/users/": "/api/v1/admin/users",
+                "/admin/sites/new/": "/api/v1/admin/sites",
+                "/admin/users/new/": "/api/v1/admin/users"
+            },
+            "changes": [
+                "Standardizzazione URL patterns",
+                "Agregazione endpoints admin in dominio unico",
+                "Headers di deprecazione automatici",
+                "Documentazione migliorata",
+                "Separazione chiara endpoints admin da user"
+            ],
+            "deadline": "2025-12-31",
+            "action_required": "Aggiornare client applications per usare nuovi endpoints admin"
+        }
+    }
