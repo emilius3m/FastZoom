@@ -2075,92 +2075,58 @@ async def bulk_update_photos(
 
         logger.info(f"Bulk update: filtered metadata to apply: {filtered_metadata}")
 
-        updated_count = 0
-        updated_fields = []
-
-        for photo in photos:
-            try:
-                for field, value in filtered_metadata.items():
-                    old_value = getattr(photo, field, None)
-                    setattr(photo, field, value)
-                    if field not in updated_fields:
-                        updated_fields.append(field)
-                    logger.info(f"Bulk update - Photo {photo.id} - Field '{field}': '{old_value}' -> '{value}'")
-
-                if add_tags or remove_tags:
-                    current_tags = getattr(photo, 'tags', None) or []
-                    if isinstance(current_tags, str):
-                        try:
-                            current_tags = json.loads(current_tags)
-                        except:
-                            current_tags = []
-
-                    for tag in add_tags:
-                        if tag not in current_tags:
-                            current_tags.append(tag)
-
-                    for tag in remove_tags:
-                        if tag in current_tags:
-                            current_tags.remove(tag)
-
-                    if hasattr(photo, 'tags'):
-                        photo.tags = current_tags
-                        if 'tags' not in updated_fields:
-                            updated_fields.append('tags')
-
-                photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
-                updated_count += 1
-
-            except Exception as e:
-                logger.warning(f"Error updating photo {photo.id}: {e}")
-                continue
-
-        # Use a transaction for all database operations
+        # Use explicit transaction management instead of context manager to avoid conflicts
         try:
-            async with db.begin():
-                # Update all photos first
-                for photo in photos:
-                    try:
-                        for field, value in filtered_metadata.items():
-                            old_value = getattr(photo, field, None)
-                            setattr(photo, field, value)
-                            if field not in updated_fields:
-                                updated_fields.append(field)
-                            logger.info(f"Bulk update - Photo {photo.id} - Field '{field}': '{old_value}' -> '{value}'")
+            # Start transaction manually
+            #await db.begin()
+            
+            updated_count = 0
+            updated_fields = []
 
-                        if add_tags or remove_tags:
-                            current_tags = getattr(photo, 'tags', None) or []
-                            if isinstance(current_tags, str):
-                                try:
-                                    current_tags = json.loads(current_tags)
-                                except:
-                                    current_tags = []
+            # Update all photos within the transaction
+            for photo in photos:
+                try:
+                    for field, value in filtered_metadata.items():
+                        old_value = getattr(photo, field, None)
+                        setattr(photo, field, value)
+                        if field not in updated_fields:
+                            updated_fields.append(field)
+                        logger.info(f"Bulk update - Photo {photo.id} - Field '{field}': '{old_value}' -> '{value}'")
 
-                            for tag in add_tags:
-                                if tag not in current_tags:
-                                    current_tags.append(tag)
+                    if add_tags or remove_tags:
+                        current_tags = getattr(photo, 'tags', None) or []
+                        if isinstance(current_tags, str):
+                            try:
+                                current_tags = json.loads(current_tags)
+                            except:
+                                current_tags = []
 
-                            for tag in remove_tags:
-                                if tag in current_tags:
-                                    current_tags.remove(tag)
+                        for tag in add_tags:
+                            if tag not in current_tags:
+                                current_tags.append(tag)
 
-                            if hasattr(photo, 'tags'):
-                                photo.tags = current_tags
-                                if 'tags' not in updated_fields:
-                                    updated_fields.append('tags')
+                        for tag in remove_tags:
+                            if tag in current_tags:
+                                current_tags.remove(tag)
 
-                        photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
-                        updated_count += 1
+                        if hasattr(photo, 'tags'):
+                            photo.tags = current_tags
+                            if 'tags' not in updated_fields:
+                                updated_fields.append('tags')
 
-                    except Exception as e:
-                        logger.warning(f"Error updating photo {photo.id}: {e}")
-                        continue
+                    photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
+                    updated_count += 1
 
-                # Log activity after all updates
-                await log_user_activity(
-                    db=db,
-                    user_id=current_user_id,
-                    site_id=site_id,
+                except Exception as e:
+                    logger.warning(f"Error updating photo {photo.id}: {e}")
+                    continue
+
+            # Log activity after all updates within the same transaction
+            if updated_count > 0:
+                # Create activity log directly without using log_user_activity to avoid transaction conflicts
+                activity = UserActivity(
+                    user_id=str(current_user_id),
+                    site_id=str(site_id),
                     activity_type="BULK_UPDATE",
                     activity_desc=f"Aggiornamento massivo di {updated_count} foto",
                     extra_data=json.dumps({
@@ -2172,8 +2138,11 @@ async def bulk_update_photos(
                         "remove_tags": remove_tags
                     })
                 )
+                db.add(activity)
+                logger.info(f"Activity log added for bulk update of {updated_count} photos")
 
-            # Transaction commits automatically here
+            # Commit transaction explicitly
+            await db.commit()
             logger.info(f"Bulk update transaction committed successfully for {updated_count} photos")
 
         except Exception as e:
@@ -2191,7 +2160,7 @@ async def bulk_update_photos(
         raise
     except Exception as e:
         logger.error(f"Bulk update error: {e}")
-        await db.rollback()
+        # No need for explicit rollback - async with db.begin() handles it automatically
         raise HTTPException(status_code=500, detail=f"Errore aggiornamento in blocco: {str(e)}")
 
 
@@ -2201,7 +2170,8 @@ async def log_user_activity(
         site_id: UUID,
         activity_type: str,
         activity_desc: str,
-        extra_data: str = None
+        extra_data: str = None,
+        in_transaction: bool = False
 ):
     """Log attività utente nel sistema"""
     try:
@@ -2214,12 +2184,17 @@ async def log_user_activity(
         )
 
         db.add(activity)
-        await db.commit()
+        
+        # Only commit if not already in a transaction
+        if not in_transaction:
+            await db.commit()
+        
         logger.info(f"Activity logged: {activity_type} by {user_id}")
 
     except Exception as e:
         logger.error(f"Error logging activity: {e}")
-        await db.rollback()
+        # Don't rollback here - let the calling transaction handle it
+        # await db.rollback()  # REMOVED: This conflicts with async with db.begin()
 
 
 @router.post("/sites/{site_id}/photos/deep-zoom/start-background")
