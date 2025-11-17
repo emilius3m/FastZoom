@@ -72,7 +72,7 @@ class PhotoUploadRequest(BaseModel):
     
     @validator('find_date', 'dating_from', 'dating_to')
     def validate_date_fields(cls, v):
-        """Validate date fields can be parsed as ISO dates"""
+        """Validate date fields can be parsed as ISO dates or years (for archaeological context)"""
         if v is None or v == '':
             return None
         try:
@@ -85,7 +85,15 @@ class PhotoUploadRequest(BaseModel):
                 datetime.strptime(v, '%Y-%m-%d')
                 return v
             except ValueError:
-                raise ValueError(f"Invalid date format: {v}. Use ISO format or YYYY-MM-DD")
+                try:
+                    # Try YYYY format (common for archaeological dating)
+                    year = int(v)
+                    if 1 <= year <= 9999:
+                        return v
+                    else:
+                        raise ValueError(f"Year out of range: {year}")
+                except ValueError:
+                    raise ValueError(f"Invalid date format: {v}. Use ISO format, YYYY-MM-DD, or YYYY")
     
     @validator('priority')
     def validate_priority(cls, v):
@@ -175,18 +183,28 @@ class PhotoUpdateRequest(BaseModel):
     
     @validator('find_date', 'dating_from', 'dating_to')
     def validate_date_fields(cls, v):
-        """Validate date fields"""
+        """Validate date fields - supports ISO dates, YYYY-MM-DD, or YYYY (archaeological)"""
         if v is None or v == '' or v == 'null' or v == 'None':
             return None
         try:
+            # Try ISO format first
             datetime.fromisoformat(v.replace('Z', '+00:00'))
             return v
         except ValueError:
             try:
+                # Try YYYY-MM-DD format
                 datetime.strptime(v, '%Y-%m-%d')
                 return v
             except ValueError:
-                raise ValueError(f"Invalid date format: {v}")
+                try:
+                    # Try YYYY format (common for archaeological dating)
+                    year = int(v)
+                    if 1 <= year <= 9999:
+                        return v
+                    else:
+                        raise ValueError(f"Year out of range: {year}")
+                except ValueError:
+                    raise ValueError(f"Invalid date format: {v}. Use ISO format, YYYY-MM-DD, or YYYY")
     
     @validator('keywords')
     def validate_keywords(cls, v):
