@@ -525,12 +525,13 @@ async def update_photo(
 
     try:
         # Use modular update logic from bulk service (single update mode)
-        bulk_service = PhotoBulkService(db)
+        bulk_service = PhotoBulkService()
         return await bulk_service.update_single_photo(
             site_id=str(site_id),
             photo_id=str(photo_id),
             user_id=str(current_user_id),
-            update_data=update_data
+            update_data=update_data,
+            db=db
         )
 
     except HTTPException:
@@ -555,11 +556,12 @@ async def delete_photo(
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
 
     # Use modular deletion service
-    deletion_service = PhotoDeletionService(db)
-    return await deletion_service.delete_photo(
+    deletion_service = PhotoDeletionService()
+    return await deletion_service.delete_single_photo(
         site_id=str(site_id),
-        photo_id=str(photo_id),
-        user_id=str(current_user_id)
+        photo_id=photo_id,
+        current_user_id=current_user_id,
+        db=db
     )
 
 @router.post("/sites/{site_id}/photos/bulk-delete")
@@ -581,7 +583,7 @@ async def bulk_delete_photos(
         )
 
         # Use modular bulk service
-        bulk_service = PhotoBulkService(db)
+        bulk_service = PhotoBulkService()
         return await bulk_service.bulk_delete_photos(
             site_id=normalized_site_id,
             delete_request=bulk_delete_request,
@@ -613,10 +615,10 @@ async def start_deep_zoom_background_processor(
 
     try:
         # Use modular deep zoom service
-        deepzoom_service = PhotoDeepZoomService(db)
+        deepzoom_service = PhotoDeepZoomService()
         return await deepzoom_service.start_background_processor(
             site_id=str(site_id),
-            user_id=str(current_user_id)
+            current_user_id=current_user_id
         )
 
     except Exception as e:
@@ -642,10 +644,10 @@ async def stop_deep_zoom_background_processor(
 
     try:
         # Use modular deep zoom service
-        deepzoom_service = PhotoDeepZoomService(db)
+        deepzoom_service = PhotoDeepZoomService()
         return await deepzoom_service.stop_background_processor(
             site_id=str(site_id),
-            user_id=str(current_user_id)
+            current_user_id=current_user_id
         )
 
     except Exception as e:
@@ -670,7 +672,7 @@ async def get_deep_zoom_background_status(
 
     try:
         # Use modular deep zoom service
-        deepzoom_service = PhotoDeepZoomService(db)
+        deepzoom_service = PhotoDeepZoomService()
         return await deepzoom_service.get_background_status(
             site_id=str(site_id)
         )
@@ -698,10 +700,10 @@ async def get_photo_deep_zoom_task_status(
 
     try:
         # Use modular deep zoom service
-        deepzoom_service = PhotoDeepZoomService(db)
+        deepzoom_service = PhotoDeepZoomService()
         return await deepzoom_service.get_photo_task_status(
             site_id=str(site_id),
-            photo_id=str(photo_id)
+            photo_id=photo_id
         )
 
     except Exception as e:
@@ -736,7 +738,7 @@ async def bulk_update_photos(
         )
 
         # Use modular bulk service
-        bulk_service = PhotoBulkService(db)
+        bulk_service = PhotoBulkService()
         return await bulk_service.bulk_update_photos(
             site_id=str(site_id),
             update_request=bulk_update_request,

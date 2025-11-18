@@ -545,5 +545,5 @@ class PhotoQueryService:
         return query
 
 
-# Global service instance
+# Global service instance - stateless service for dependency injection
 photo_query_service = PhotoQueryService()

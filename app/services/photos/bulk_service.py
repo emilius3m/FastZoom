@@ -17,8 +17,7 @@ from app.schemas.photos import BulkUpdateRequest, BulkDeleteRequest
 class PhotoBulkService:
     """Service for handling bulk photo operations (update/delete)"""
     
-    def __init__(self, db: AsyncSession):
-        self.db = db
+    def __init__(self):
         self.logger = logger.bind(service="photo_bulk_service")
     
     async def bulk_update_photos(
@@ -554,7 +553,8 @@ class PhotoBulkService:
         site_id: str,
         photo_id: str,
         user_id: str,
-        update_data: dict
+        update_data: dict,
+        db: AsyncSession
     ) -> dict:
         """
         Update a single photo with comprehensive metadata handling
@@ -575,7 +575,7 @@ class PhotoBulkService:
             photo_query = select(Photo).where(
                 and_(Photo.id == photo_id, Photo.site_id == site_id)
             )
-            photo_result = await self.db.execute(photo_query)
+            photo_result = await db.execute(photo_query)
             photo = photo_result.scalar_one_or_none()
             
             if not photo:
@@ -649,11 +649,11 @@ class PhotoBulkService:
                     "fields_updated": updated_fields
                 })
             )
-            self.db.add(activity)
+            db.add(activity)
             
             # Commit transaction
-            await self.db.commit()
-            await self.db.refresh(photo)
+            await db.commit()
+            await db.refresh(photo)
             
             # Broadcast WebSocket notification
             try:
@@ -683,7 +683,7 @@ class PhotoBulkService:
             raise
         except Exception as e:
             self.logger.error(f"Single photo update error: {e}")
-            await self.db.rollback()
+            await db.rollback()
             raise HTTPException(status_code=500, detail=f"Errore aggiornamento foto: {str(e)}")
 
 
