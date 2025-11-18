@@ -260,7 +260,7 @@ async def v1_login_json(
         await UserActivity.log_login(db, user.id, success=True, ip_address=request.client.host)
         
         # Ottieni siti utente
-        user_sites = await AuthService.get_user_sites(db, str(user.id))
+        user_sites = await AuthService.get_user_sites_with_permissions(db, user.id)
         
         logger.info(f"Login API riuscito per {user.email} da {request.client.host}")
         

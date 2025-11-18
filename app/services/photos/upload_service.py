@@ -40,7 +40,8 @@ class PhotoUploadService:
         user_id: UUID,
         photos: List[UploadFile],
         upload_request: PhotoUploadRequest,
-        db: AsyncSession
+        db: AsyncSession,
+        raw_metadata: Optional[Dict[str, Any]] = None
     ) -> JSONResponse:
         """
         Main entry point for photo upload processing.
@@ -144,106 +145,60 @@ class PhotoUploadService:
                 detail="Storage health check failed. Please try again later."
             )
 
-    def _prepare_archaeological_metadata(self, upload_request: PhotoUploadRequest) -> Dict[str, Any]:
+    def _prepare_archaeological_metadata(self, upload_request: PhotoUploadRequest, raw_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Convert Pydantic schema to dictionary for database operations."""
         
-        metadata = {}
+        # Use raw metadata if available to avoid Pydantic validation issues
+        if raw_metadata:
+            metadata = {}
+            
+            # Filter out None/empty values from raw metadata
+            for key, value in raw_metadata.items():
+                if value is not None and value != '':
+                    metadata[key] = value
+        else:
+            metadata = {}
+            
+            # Basic metadata from Pydantic model
+            if upload_request.title:
+                metadata['title'] = upload_request.title
+            if upload_request.description:
+                metadata['description'] = upload_request.description
+            if upload_request.photographer:
+                metadata['photographer'] = upload_request.photographer
+            if upload_request.keywords:
+                metadata['keywords'] = upload_request.keywords
+            if upload_request.photo_type:
+                metadata['photo_type'] = upload_request.photo_type
+
+        # Add remaining fields from Pydantic model if not already in metadata
+        remaining_fields = {
+            'inventory_number', 'catalog_number', 'excavation_area', 'stratigraphic_unit',
+            'grid_square', 'depth_level', 'find_date', 'finder', 'excavation_campaign',
+            'material', 'material_details', 'object_type', 'object_function',
+            'length_cm', 'width_cm', 'height_cm', 'diameter_cm', 'weight_grams',
+            'chronology_period', 'chronology_culture', 'dating_from', 'dating_to', 'dating_notes',
+            'conservation_status', 'conservation_notes', 'restoration_history',
+            'bibliography', 'comparative_references', 'external_links',
+            'copyright_holder', 'license_type', 'usage_rights'
+        }
         
-        # Basic metadata
-        if upload_request.title:
-            metadata['title'] = upload_request.title
-        if upload_request.description:
-            metadata['description'] = upload_request.description
-        if upload_request.photographer:
-            metadata['photographer'] = upload_request.photographer
-        if upload_request.keywords:
-            metadata['keywords'] = upload_request.keywords
-        if upload_request.photo_type:
-            metadata['photo_type'] = upload_request.photo_type
-
-        # Archaeological context
-        if upload_request.inventory_number:
-            metadata['inventory_number'] = upload_request.inventory_number
-        if upload_request.catalog_number:
-            metadata['catalog_number'] = upload_request.catalog_number
-        if upload_request.excavation_area:
-            metadata['excavation_area'] = upload_request.excavation_area
-        if upload_request.stratigraphic_unit:
-            metadata['stratigraphic_unit'] = upload_request.stratigraphic_unit
-        if upload_request.grid_square:
-            metadata['grid_square'] = upload_request.grid_square
-        if upload_request.depth_level is not None:
-            metadata['depth_level'] = upload_request.depth_level
-        if upload_request.find_date:
-            try:
-                metadata['find_date'] = datetime.fromisoformat(upload_request.find_date.replace('Z', '+00:00'))
-            except ValueError:
-                try:
-                    metadata['find_date'] = datetime.strptime(upload_request.find_date, '%Y-%m-%d')
-                except ValueError:
-                    logger.warning(f"Invalid find_date format: {upload_request.find_date}")
-        if upload_request.finder:
-            metadata['finder'] = upload_request.finder
-        if upload_request.excavation_campaign:
-            metadata['excavation_campaign'] = upload_request.excavation_campaign
-
-        # Material and object
-        if upload_request.material:
-            metadata['material'] = upload_request.material
-        if upload_request.material_details:
-            metadata['material_details'] = upload_request.material_details
-        if upload_request.object_type:
-            metadata['object_type'] = upload_request.object_type
-        if upload_request.object_function:
-            metadata['object_function'] = upload_request.object_function
-
-        # Dimensions
-        if upload_request.length_cm is not None:
-            metadata['length_cm'] = upload_request.length_cm
-        if upload_request.width_cm is not None:
-            metadata['width_cm'] = upload_request.width_cm
-        if upload_request.height_cm is not None:
-            metadata['height_cm'] = upload_request.height_cm
-        if upload_request.diameter_cm is not None:
-            metadata['diameter_cm'] = upload_request.diameter_cm
-        if upload_request.weight_grams is not None:
-            metadata['weight_grams'] = upload_request.weight_grams
-
-        # Chronology
-        if upload_request.chronology_period:
-            metadata['chronology_period'] = upload_request.chronology_period
-        if upload_request.chronology_culture:
-            metadata['chronology_culture'] = upload_request.chronology_culture
-        if upload_request.dating_from:
-            metadata['dating_from'] = upload_request.dating_from
-        if upload_request.dating_to:
-            metadata['dating_to'] = upload_request.dating_to
-        if upload_request.dating_notes:
-            metadata['dating_notes'] = upload_request.dating_notes
-
-        # Conservation
-        if upload_request.conservation_status:
-            metadata['conservation_status'] = upload_request.conservation_status
-        if upload_request.conservation_notes:
-            metadata['conservation_notes'] = upload_request.conservation_notes
-        if upload_request.restoration_history:
-            metadata['restoration_history'] = upload_request.restoration_history
-
-        # References
-        if upload_request.bibliography:
-            metadata['bibliography'] = upload_request.bibliography
-        if upload_request.comparative_references:
-            metadata['comparative_references'] = upload_request.comparative_references
-        if upload_request.external_links:
-            metadata['external_links'] = upload_request.external_links
-
-        # Rights
-        if upload_request.copyright_holder:
-            metadata['copyright_holder'] = upload_request.copyright_holder
-        if upload_request.license_type:
-            metadata['license_type'] = upload_request.license_type
-        if upload_request.usage_rights:
-            metadata['usage_rights'] = upload_request.usage_rights
+        for field in remaining_fields:
+            if field not in metadata:
+                value = getattr(upload_request, field, None)
+                if value is not None and value != '':
+                    # Handle date fields specially
+                    if field in ['find_date', 'dating_from', 'dating_to'] and isinstance(value, str):
+                        try:
+                            metadata[field] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        except ValueError:
+                            try:
+                                metadata[field] = datetime.strptime(value, '%Y-%m-%d')
+                            except ValueError:
+                                logger.warning(f"Invalid {field} format: {value}")
+                                metadata[field] = value
+                    else:
+                        metadata[field] = value
 
         return metadata
 

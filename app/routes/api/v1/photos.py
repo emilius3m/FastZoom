@@ -201,6 +201,7 @@ async def get_site_photos_api(
 
 @router.post("/sites/{site_id}/photos/upload")
 async def upload_photo(
+        request: Request,
         site_id: UUID,
         photos: List[UploadFile] = File(...),
         # Basic metadata
@@ -269,48 +270,170 @@ async def upload_photo(
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
 
-    # Prepare upload request using Pydantic schema
-    upload_request = PhotoUploadRequest(
-        title=title,
-        description=description,
-        photo_type=photo_type,
-        photographer=photographer,
-        keywords=keywords,
-        use_queue=use_queue,
-        priority=priority,
-        inventory_number=inventory_number,
-        catalog_number=catalog_number,
-        excavation_area=excavation_area,
-        stratigraphic_unit=stratigraphic_unit,
-        grid_square=grid_square,
-        depth_level=depth_level,
-        find_date=find_date,
-        finder=finder,
-        excavation_campaign=excavation_campaign,
-        material=material,
-        material_details=material_details,
-        object_type=object_type,
-        object_function=object_function,
-        length_cm=length_cm,
-        width_cm=width_cm,
-        height_cm=height_cm,
-        diameter_cm=diameter_cm,
-        weight_grams=weight_grams,
-        chronology_period=chronology_period,
-        chronology_culture=chronology_culture,
-        dating_from=dating_from,
-        dating_to=dating_to,
-        dating_notes=dating_notes,
-        conservation_status=conservation_status,
-        conservation_notes=conservation_notes,
-        restoration_history=restoration_history,
-        bibliography=bibliography,
-        comparative_references=comparative_references,
-        external_links=external_links,
-        copyright_holder=copyright_holder,
-        license_type=license_type,
-        usage_rights=usage_rights
-    )
+    # DEBUG: Log request details
+    logger.info(f"🔍 DEBUG - Request URL: {request.url}")
+    logger.info(f"🔍 DEBUG - Request headers: {dict(request.headers)}")
+    logger.info(f"🔍 DEBUG - Request method: {request.method}")
+    
+    # DEBUG: Log all incoming form data with types
+    logger.info(f"🔍 DEBUG - Form data received:")
+    logger.info(f"  - title: {title} (type: {type(title).__name__})")
+    logger.info(f"  - description: {description} (type: {type(description).__name__})")
+    logger.info(f"  - photo_type: {photo_type} (type: {type(photo_type).__name__})")
+    logger.info(f"  - photographer: {photographer} (type: {type(photographer).__name__})")
+    logger.info(f"  - keywords: {keywords} (type: {type(keywords).__name__})")
+    logger.info(f"  - use_queue: {use_queue} (type: {type(use_queue).__name__})")
+    logger.info(f"  - priority: {priority} (type: {type(priority).__name__})")
+    
+    logger.info(f"🔍 DEBUG - Archaeological data:")
+    logger.info(f"  - inventory_number: {inventory_number} (type: {type(inventory_number).__name__})")
+    logger.info(f"  - catalog_number: {catalog_number} (type: {type(catalog_number).__name__})")
+    logger.info(f"  - excavation_area: {excavation_area} (type: {type(excavation_area).__name__})")
+    logger.info(f"  - stratigraphic_unit: {stratigraphic_unit} (type: {type(stratigraphic_unit).__name__})")
+    logger.info(f"  - grid_square: {grid_square} (type: {type(grid_square).__name__})")
+    logger.info(f"  - depth_level: {depth_level} (type: {type(depth_level).__name__})")
+    logger.info(f"  - find_date: {find_date} (type: {type(find_date).__name__})")
+    logger.info(f"  - finder: {finder} (type: {type(finder).__name__})")
+    logger.info(f"  - excavation_campaign: {excavation_campaign} (type: {type(excavation_campaign).__name__})")
+    
+    logger.info(f"🔍 DEBUG - Material data:")
+    logger.info(f"  - material: {material} (type: {type(material).__name__})")
+    logger.info(f"  - material_details: {material_details} (type: {type(material_details).__name__})")
+    logger.info(f"  - object_type: {object_type} (type: {type(object_type).__name__})")
+    logger.info(f"  - object_function: {object_function} (type: {type(object_function).__name__})")
+    
+    logger.info(f"🔍 DEBUG - Dimension data:")
+    logger.info(f"  - length_cm: {length_cm} (type: {type(length_cm).__name__})")
+    logger.info(f"  - width_cm: {width_cm} (type: {type(width_cm).__name__})")
+    logger.info(f"  - height_cm: {height_cm} (type: {type(height_cm).__name__})")
+    logger.info(f"  - diameter_cm: {diameter_cm} (type: {type(diameter_cm).__name__})")
+    logger.info(f"  - weight_grams: {weight_grams} (type: {type(weight_grams).__name__})")
+    
+    logger.info(f"🔍 DEBUG - Chronology data:")
+    logger.info(f"  - chronology_period: {chronology_period} (type: {type(chronology_period).__name__})")
+    logger.info(f"  - chronology_culture: {chronology_culture} (type: {type(chronology_culture).__name__})")
+    logger.info(f"  - dating_from: {dating_from} (type: {type(dating_from).__name__})")
+    logger.info(f"  - dating_to: {dating_to} (type: {type(dating_to).__name__})")
+    logger.info(f"  - dating_notes: {dating_notes} (type: {type(dating_notes).__name__})")
+    
+    logger.info(f"🔍 DEBUG - Conservation data:")
+    logger.info(f"  - conservation_status: {conservation_status} (type: {type(conservation_status).__name__})")
+    logger.info(f"  - conservation_notes: {conservation_notes} (type: {type(conservation_notes).__name__})")
+    logger.info(f"  - restoration_history: {restoration_history} (type: {type(restoration_history).__name__})")
+    
+    logger.info(f"🔍 DEBUG - References data:")
+    logger.info(f"  - bibliography: {bibliography} (type: {type(bibliography).__name__})")
+    logger.info(f"  - comparative_references: {comparative_references} (type: {type(comparative_references).__name__})")
+    logger.info(f"  - external_links: {external_links} (type: {type(external_links).__name__})")
+    
+    logger.info(f"🔍 DEBUG - Rights data:")
+    logger.info(f"  - copyright_holder: {copyright_holder} (type: {type(copyright_holder).__name__})")
+    logger.info(f"  - license_type: {license_type} (type: {type(license_type).__name__})")
+    logger.info(f"  - usage_rights: {usage_rights} (type: {type(usage_rights).__name__})")
+    
+    # DEBUG: Log photos info
+    logger.info(f"🔍 DEBUG - Photos info:")
+    for i, photo in enumerate(photos):
+        logger.info(f"  - Photo {i}: {photo.filename} (size: {photo.size}, content_type: {photo.content_type})")
+    
+    # Prepare upload data as dictionary to avoid Pydantic validation issues
+    upload_data = {
+        'title': title,
+        'description': description,
+        'photo_type': photo_type,
+        'photographer': photographer,
+        'keywords': keywords,
+        'use_queue': use_queue,
+        'priority': priority,
+        'inventory_number': inventory_number,
+        'catalog_number': catalog_number,
+        'excavation_area': excavation_area,
+        'stratigraphic_unit': stratigraphic_unit,
+        'grid_square': grid_square,
+        'depth_level': depth_level,
+        'find_date': find_date,
+        'finder': finder,
+        'excavation_campaign': excavation_campaign,
+        'material': material,
+        'material_details': material_details,
+        'object_type': object_type,
+        'object_function': object_function,
+        'length_cm': length_cm,
+        'width_cm': width_cm,
+        'height_cm': height_cm,
+        'diameter_cm': diameter_cm,
+        'weight_grams': weight_grams,
+        'chronology_period': chronology_period,
+        'chronology_culture': chronology_culture,
+        'dating_from': dating_from,
+        'dating_to': dating_to,
+        'dating_notes': dating_notes,
+        'conservation_status': conservation_status,
+        'conservation_notes': conservation_notes,
+        'restoration_history': restoration_history,
+        'bibliography': bibliography,
+        'comparative_references': comparative_references,
+        'external_links': external_links,
+        'copyright_holder': copyright_holder,
+        'license_type': license_type,
+        'usage_rights': usage_rights
+    }
+    
+    # DEBUG: Log the dictionary data before Pydantic validation
+    logger.info(f"🔍 DEBUG - Upload data dictionary: {upload_data}")
+    
+    # Create PhotoUploadRequest from dictionary to allow validation
+    try:
+        upload_request = PhotoUploadRequest(**upload_data)
+        logger.info(f"✅ DEBUG - PhotoUploadRequest created successfully")
+    except Exception as validation_error:
+        logger.error(f"❌ Pydantic validation failed: {validation_error}")
+        logger.error(f"🔍 DEBUG - Validation error type: {type(validation_error).__name__}")
+        
+        # Get detailed validation errors
+        if hasattr(validation_error, 'errors'):
+            logger.error(f"🔍 DEBUG - Validation errors: {validation_error.errors()}")
+        elif hasattr(validation_error, 'json'):
+            logger.error(f"🔍 DEBUG - Validation errors JSON: {validation_error.json()}")
+        else:
+            logger.error(f"🔍 DEBUG - Validation error details: {getattr(validation_error, 'errors', 'No errors available')}")
+        
+        # Try to create PhotoUploadRequest with only the fields that are not None
+        filtered_data = {k: v for k, v in upload_data.items() if v is not None and v != ''}
+        logger.info(f"🔍 DEBUG - Trying with filtered data: {filtered_data}")
+        logger.info(f"🔍 DEBUG - Filtered data length: {len(filtered_data)} vs original: {len(upload_data)}")
+        
+        try:
+            upload_request = PhotoUploadRequest(**filtered_data)
+            logger.info(f"✅ DEBUG - PhotoUploadRequest created with filtered data")
+        except Exception as filtered_validation_error:
+            logger.error(f"❌ Filtered Pydantic validation also failed: {filtered_validation_error}")
+            logger.error(f"🔍 DEBUG - Filtered validation error type: {type(filtered_validation_error).__name__}")
+            
+            if hasattr(filtered_validation_error, 'errors'):
+                logger.error(f"🔍 DEBUG - Filtered validation errors: {filtered_validation_error.errors()}")
+            elif hasattr(filtered_validation_error, 'json'):
+                logger.error(f"🔍 DEBUG - Filtered validation errors JSON: {filtered_validation_error.json()}")
+            
+            # Create detailed error response
+            error_details = {
+                "error": str(filtered_validation_error),
+                "type": type(filtered_validation_error).__name__,
+                "validation_details": getattr(filtered_validation_error, 'errors', None),
+                "upload_data": upload_data,
+                "filtered_data": filtered_data
+            }
+            
+            logger.error(f"🔍 DEBUG - Complete error details: {error_details}")
+            
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": f"Validation error: {str(filtered_validation_error)}",
+                    "validation_errors": getattr(filtered_validation_error, 'errors', None),
+                    "debug_data": error_details
+                }
+            )
 
     # Use modular upload service
     upload_service = PhotoUploadService()
@@ -319,7 +442,8 @@ async def upload_photo(
         user_id=current_user_id,
         photos=photos,
         upload_request=upload_request,
-        db=db
+        db=db,
+        raw_metadata=upload_data  # Pass raw data as fallback
     )
 
 
@@ -660,494 +784,7 @@ async def log_user_activity(
         # await db.rollback()  # REMOVED: This conflicts with async with db.begin()
 
 
-@router.post("/sites/{site_id}/photos/deep-zoom/start-background")
-async def start_deep_zoom_background_processor(
-        site_id: UUID,
-        site_access: tuple = Depends(get_site_access),
-        current_user_id: UUID = Depends(get_current_user_id)
-):
-    """Avvia il processore background per deep zoom tiles"""
-    site, permission = site_access
-
-    if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
-
-    try:
-        await deep_zoom_background_service.start_background_processor()
-
-        logger.info(f"Deep zoom background processor started by user {current_user_id} for site {site_id}")
-
-        return {
-            "message": "Deep zoom background processor started successfully",
-            "site_id": str(site_id),
-            "started_by": str(current_user_id),
-            "started_at": datetime.now().isoformat()
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to start deep zoom background processor: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to start background processor: {str(e)}"
-        )
-
-
-@router.post("/sites/{site_id}/photos/deep-zoom/stop-background")
-async def stop_deep_zoom_background_processor(
-        site_id: UUID,
-        site_access: tuple = Depends(get_site_access),
-        current_user_id: UUID = Depends(get_current_user_id)
-):
-    """Ferma il processore background per deep zoom tiles"""
-    site, permission = site_access
-
-    if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
-
-    try:
-        await deep_zoom_background_service.stop_background_processor()
-
-        logger.info(f"Deep zoom background processor stopped by user {current_user_id} for site {site_id}")
-
-        return {
-            "message": "Deep zoom background processor stopped successfully",
-            "site_id": str(site_id),
-            "stopped_by": str(current_user_id),
-            "stopped_at": datetime.now().isoformat()
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to stop deep zoom background processor: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to stop background processor: {str(e)}"
-        )
-
-
-@router.get("/sites/{site_id}/photos/deep-zoom/background-status")
-async def get_deep_zoom_background_status(
-        site_id: UUID,
-        site_access: tuple = Depends(get_site_access)
-):
-    """Ottieni lo stato del processore background per deep zoom tiles"""
-    site, permission = site_access
-
-    if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-
-    try:
-        queue_status = await deep_zoom_background_service.get_queue_status()
-
-        return {
-            "site_id": str(site_id),
-            "background_status": queue_status,
-            "timestamp": datetime.now().isoformat()
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to get deep zoom background status: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get background status: {str(e)}"
-        )
-
-
-@router.get("/sites/{site_id}/photos/{photo_id}/deep-zoom/task-status")
-async def get_photo_deep_zoom_task_status(
-        site_id: UUID,
-        photo_id: UUID,
-        site_access: tuple = Depends(get_site_access)
-):
-    """Ottieni lo stato del task di processing per una foto specifica"""
-    site, permission = site_access
-
-    if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-
-    try:
-        task_status = await deep_zoom_background_service.get_task_status(str(photo_id))
-
-        if not task_status:
-            # Fallback to processing status from MinIO
-            processing_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo_id))
-
-            return {
-                "site_id": str(site_id),
-                "photo_id": str(photo_id),
-                "task_status": None,
-                "processing_status": processing_status,
-                "message": "Task not found in background service, checking MinIO status"
-            }
-
-        return {
-            "site_id": str(site_id),
-            "photo_id": str(photo_id),
-            "task_status": task_status,
-            "message": "Task status from background service"
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to get photo deep zoom task status: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get task status: {str(e)}"
-        )
-
-
-async def _handle_queued_upload(
-        site_id: UUID,
-        photos: List[UploadFile],
-        title: Optional[str],
-        description: Optional[str],
-        photo_type: Optional[str],
-        photographer: Optional[str],
-        keywords: Optional[str],
-        inventory_number: Optional[str],
-        catalog_number: Optional[str],
-        excavation_area: Optional[str],
-        stratigraphic_unit: Optional[str],
-        grid_square: Optional[str],
-        depth_level: Optional[float],
-        find_date: Optional[str],
-        finder: Optional[str],
-        excavation_campaign: Optional[str],
-        material: Optional[str],
-        material_details: Optional[str],
-        object_type: Optional[str],
-        object_function: Optional[str],
-        length_cm: Optional[float],
-        width_cm: Optional[float],
-        height_cm: Optional[float],
-        diameter_cm: Optional[float],
-        weight_grams: Optional[float],
-        chronology_period: Optional[str],
-        chronology_culture: Optional[str],
-        dating_from: Optional[str],
-        dating_to: Optional[str],
-        dating_notes: Optional[str],
-        conservation_status: Optional[str],
-        conservation_notes: Optional[str],
-        restoration_history: Optional[str],
-        bibliography: Optional[str],
-        comparative_references: Optional[str],
-        external_links: Optional[str],
-        copyright_holder: Optional[str],
-        license_type: Optional[str],
-        usage_rights: Optional[str],
-        site_access: tuple,
-        current_user_id: UUID,
-        db: AsyncSession,
-        priority: str = "normal"
-):
-    """Handle upload through queue system"""
-
-    from app.services.request_queue_service import request_queue_service, RequestPriority
-
-    # Map priority string to enum
-    priority_map = {
-        "critical": RequestPriority.CRITICAL,
-        "high": RequestPriority.HIGH,
-        "normal": RequestPriority.NORMAL,
-        "low": RequestPriority.LOW,
-        "bulk": RequestPriority.BULK
-    }
-
-    request_priority = priority_map.get(priority.lower(), RequestPriority.NORMAL)
-
-    # Prepare upload data for queue
-    upload_data = {
-        'site_id': str(site_id),
-        'user_id': str(current_user_id),
-        'photos_count': len(photos),
-        'metadata': {
-            'title': title,
-            'description': description,
-            'photo_type': photo_type,
-            'photographer': photographer,
-            'keywords': keywords,
-            'inventory_number': inventory_number,
-            'catalog_number': catalog_number,
-            'excavation_area': excavation_area,
-            'stratigraphic_unit': stratigraphic_unit,
-            'grid_square': grid_square,
-            'depth_level': depth_level,
-            'find_date': find_date,
-            'finder': finder,
-            'excavation_campaign': excavation_campaign,
-            'material': material,
-            'material_details': material_details,
-            'object_type': object_type,
-            'object_function': object_function,
-            'length_cm': length_cm,
-            'width_cm': width_cm,
-            'height_cm': height_cm,
-            'diameter_cm': diameter_cm,
-            'weight_grams': weight_grams,
-            'chronology_period': chronology_period,
-            'chronology_culture': chronology_culture,
-            'dating_from': dating_from,
-            'dating_to': dating_to,
-            'dating_notes': dating_notes,
-            'conservation_status': conservation_status,
-            'conservation_notes': conservation_notes,
-            'restoration_history': restoration_history,
-            'bibliography': bibliography,
-            'comparative_references': comparative_references,
-            'external_links': external_links,
-            'copyright_holder': copyright_holder,
-            'license_type': license_type,
-            'usage_rights': usage_rights
-        }
-    }
-
-    # Estimate processing time based on file count
-    estimated_duration = len(photos) * 30  # 30 seconds per photo estimate
-
-    try:
-        # Enqueue upload request
-        request_id = await request_queue_service.enqueue_request(
-            request_type="POST_/api/site/{site_id}/photos/upload",
-            payload=upload_data,
-            priority=request_priority,
-            user_id=str(current_user_id),
-            site_id=str(site_id),
-            timeout_seconds=600 + (len(photos) * 60),  # Base 10min + 1min per photo
-            max_retries=3,
-            estimated_duration=estimated_duration
-        )
-
-        # Store files temporarily for queue processing
-        temp_files = []
-        upload_paths = []
-
-        try:
-            from app.services.storage_service import storage_service
-
-            for photo in photos:
-                # Save to temporary location
-                filename, file_path, file_size = await storage_service.save_upload_file(
-                    photo, str(site_id), str(current_user_id), temp=True
-                )
-                temp_files.append({
-                    'filename': filename,
-                    'file_path': file_path,
-                    'file_size': file_size,
-                    'original_filename': photo.filename
-                })
-                upload_paths.append(file_path)
-
-            # Update request payload with file info
-            upload_data['temp_files'] = temp_files
-
-            logger.info(
-                f"Queued upload request {request_id} for {len(photos)} photos with priority {request_priority.name}")
-
-            return JSONResponse({
-                'message': f'Upload queued for processing',
-                'request_id': request_id,
-                'status': 'queued',
-                'priority': request_priority.name,
-                'photos_count': len(photos),
-                'estimated_wait': await request_queue_service._estimate_wait_time(request_priority),
-                'queue_status_url': f'/api/queue/request/{request_id}'
-            }, status_code=status.HTTP_202_ACCEPTED)
-
-        except Exception as e:
-            # Clean up temp files if queueing fails
-            logger.error(f"Failed to prepare temp files for queue: {e}")
-            try:
-                from app.services.storage_service import storage_service
-                for file_path in upload_paths:
-                    await storage_service.delete_file(file_path)
-            except Exception as cleanup_error:
-                logger.error(f"Failed to cleanup temp files: {cleanup_error}")
-            raise
-
-    except Exception as e:
-        logger.error(f"Failed to queue upload request: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to queue upload: {str(e)}"
-        )
-
-
-async def process_queued_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Process queued upload request"""
-
-    from app.services.storage_service import storage_service
-    from app.services.photo_metadata_service import photo_metadata_service
-    from app.services.deep_zoom_background_service import deep_zoom_background_service
-    from app.models import Photo
-    from sqlalchemy import select
-    import uuid
-    import aiofiles
-    from io import BytesIO
-
-    logger.info(f"Processing queued upload for site {payload['site_id']}")
-
-    try:
-        site_id = uuid.UUID(payload['site_id'])
-        user_id = uuid.UUID(payload['user_id'])
-        metadata = payload['metadata']
-        temp_files = payload.get('temp_files', [])
-
-        # Process each photo
-        uploaded_photos = []
-        photos_needing_tiles = []
-
-        for temp_file in temp_files:
-            try:
-                # Check if temp file exists before moving
-                from app.services.storage_service import storage_service
-                temp_file_exists = await storage_service.file_exists(temp_file['file_path'])
-                if not temp_file_exists:
-                    logger.error(f"Temp file not found: {temp_file['file_path']}")
-                    continue
-
-                # Move temp file to permanent location
-                permanent_path = await storage_service.move_temp_file(
-                    temp_file['file_path'],
-                    str(site_id),
-                    str(user_id)
-                )
-
-                # Extract metadata from the actual file
-                file_metadata = {}
-                try:
-                    # Create a file-like object from the permanent path for metadata extraction
-                    async with aiofiles.open(permanent_path, 'rb') as f:
-                        # Create a simple file-like object for metadata extraction
-                        content = await f.read()
-                        file_like = BytesIO(content)
-                        file_like.filename = temp_file['original_filename']
-
-                        exif_data, extracted_metadata = await photo_metadata_service.extract_metadata_from_file(
-                            file_like, temp_file['filename']
-                        )
-                        file_metadata = extracted_metadata
-                except Exception as metadata_error:
-                    logger.warning(f"Failed to extract metadata for {temp_file.get('filename')}: {metadata_error}")
-                    # Continue with empty metadata if extraction fails
-
-                # Create photo record
-                photo_record = await photo_metadata_service.create_photo_record(
-                    filename=temp_file['filename'],
-                    original_filename=temp_file['original_filename'],
-                    file_path=permanent_path,
-                    file_size=temp_file['file_size'],
-                    site_id=str(site_id),
-                    uploaded_by=str(user_id),
-                    metadata=file_metadata,
-                    archaeological_metadata=metadata
-                )
-
-                # Save to database
-                from app.database.base import async_session_maker
-                async with async_session_maker() as db:
-                    try:
-                        db.add(photo_record)
-                        await db.commit()
-                        await db.refresh(photo_record)
-                        logger.info(f"Photo record saved with ID: {photo_record.id}")
-                    except Exception as db_commit_error:
-                        logger.error(
-                            f"Database commit failed for queued photo {temp_file.get('filename')}: {db_commit_error}")
-                        # Don't try to rollback here - let the session handle it naturally
-                        raise Exception(f"Database error: Unable to save photo record: {db_commit_error}")
-
-                    # Generate thumbnail after database save
-                    try:
-                        async with aiofiles.open(permanent_path, 'rb') as f:
-                            content = await f.read()
-                            file_like = BytesIO(content)
-                            file_like.filename = temp_file['original_filename']
-
-                            thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
-                                file_like, str(photo_record.id)
-                            )
-
-                            if thumbnail_path:
-                                photo_record.thumbnail_path = thumbnail_path
-                                try:
-                                    await db.commit()
-                                    logger.info(f"Thumbnail generated and saved: {thumbnail_path}")
-                                except Exception as thumbnail_commit_error:
-                                    logger.error(f"Failed to commit thumbnail update: {thumbnail_commit_error}")
-                                    # Don't try to rollback here - let the session handle it naturally
-                            else:
-                                logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
-                    except Exception as thumbnail_error:
-                        logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
-                        # Don't fail the upload if thumbnail generation fails
-
-                uploaded_photos.append({
-                    'photo_id': str(photo_record.id),
-                    'filename': temp_file['filename'],
-                    'original_filename': temp_file['original_filename'],
-                    'file_size': temp_file['file_size'],
-                    'file_path': permanent_path,
-                    'metadata': {
-                        'width': photo_record.width,
-                        'height': photo_record.height,
-                        'photo_date': photo_record.photo_date.isoformat() if photo_record.photo_date else None,
-                        'camera_model': photo_record.camera_model
-                    },
-                    'archaeological_metadata': {
-                        'inventory_number': photo_record.inventory_number,
-                        'excavation_area': photo_record.excavation_area,
-                        'material': photo_record.material,
-                        'chronology_period': photo_record.chronology_period,
-                        'photo_type': photo_record.photo_type,
-                        'photographer': photo_record.photographer,
-                        'description': photo_record.description,
-                        'keywords': photo_record.keywords
-                    }
-                })
-
-                # Check if tiles are needed (larger files or high resolution)
-                width = photo_record.width or 0
-                height = photo_record.height or 0
-                max_dimension = max(width, height)
-                file_size_mb = temp_file['file_size'] / (1024 * 1024)
-
-                if max_dimension > 2000 or file_size_mb > 5:  # Large images need tiles
-                    photos_needing_tiles.append({
-                        'photo_id': str(photo_record.id),
-                        'file_path': permanent_path,
-                        'width': width,
-                        'height': height,
-                        'archaeological_metadata': metadata
-                    })
-
-                logger.info(
-                    f"Queued upload: Successfully processed photo {photo_record.id} ({temp_file['original_filename']})")
-
-            except Exception as e:
-                logger.error(f"Error processing queued photo {temp_file.get('filename')}: {e}")
-                continue
-
-        # Schedule tile processing if needed
-        if photos_needing_tiles:
-            try:
-                await deep_zoom_background_service.schedule_batch_processing(
-                    photos_list=photos_needing_tiles,
-                    site_id=str(site_id)
-                )
-                logger.info(f"Scheduled deep zoom processing for {len(photos_needing_tiles)} photos")
-            except Exception as tile_error:
-                logger.error(f"Failed to schedule tile processing: {tile_error}")
-                # Don't fail entire upload if tile scheduling fails
-
-        return {
-            'status': 'completed',
-            'message': f'Processed {len(uploaded_photos)} photos successfully',
-            'uploaded_photos': uploaded_photos,
-            'photos_needing_tiles': len(photos_needing_tiles),
-            'processed_at': datetime.now().isoformat()
-        }
-
-    except Exception as e:
-        logger.error(f"Error processing queued upload: {e}")
-        raise Exception(f"Upload processing failed: {str(e)}")
+# DUPLICATE ENDPOINTS REMOVED - These were conflicting with the modular service versions above
+# The modular service versions (lines 507-590) should be used instead
 
 

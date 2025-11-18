@@ -409,10 +409,10 @@ app.include_router(
 )
 
 # 🌐 INCLUSIONE ROUTER WEBSOCKET GLOBALE - Endpoint globale con token-based authentication
-app.include_router(
-    global_notifications_router,
-    tags=["websocket-global-notifications"]
-)
+#app.include_router(
+#    global_notifications_router,
+#    tags=["websocket-global-notifications"]
+#)
 
 # 🆕 INCLUSIONE ROUTER UNIFIED DASHBOARD API - API per dashboard unificata
 app.include_router(
