@@ -1743,8 +1743,11 @@ function photosManager() {
         updateStatistics() {
             this.totalPhotos = this.photos.length;
             this.totalSize = this.photos.reduce((sum, photo) => sum + ((photo && photo.file_size) || 0), 0);
-            this.lastUpload = this.photos.length > 0 ?
-                Math.max(...this.photos.filter(p => p && p.upload_date).map(p => new Date(p.upload_date).getTime())) : null;
+            
+            // Fix for "Invalid Date" issue - ensure we only process valid dates
+            const photosWithDates = this.photos.filter(p => p && p.upload_date);
+            this.lastUpload = photosWithDates.length > 0 ?
+                Math.max(...photosWithDates.map(p => new Date(p.upload_date).getTime())) : null;
         },
 
         extractAvailableTags() {
@@ -3908,6 +3911,8 @@ function photosManager() {
         formatDate(dateString, short = false) {
             if (!dateString) return 'N/A';
             const date = new Date(dateString);
+            // Check if date is valid before formatting
+            if (isNaN(date.getTime())) return 'N/A';
             return short
                 ? date.toLocaleDateString('it-IT')
                 : date.toLocaleString('it-IT');
