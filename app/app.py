@@ -51,6 +51,8 @@ from app.routes.api.iccd_records import iccd_router
 # from app.routes.api.geographic_maps import geographic_maps_router
 # 📡 NUOVO IMPORT - Router WebSocket Notifications
 from app.routes.api.notifications_ws import notifications_router
+# 🌐 NUOVO IMPORT - Router WebSocket Globale con token-based authentication
+#from app.routes.api.notifications_global_ws import global_notifications_router
 # 🆕 NUOVO IMPORT - Router Unified Dashboard API
 from app.routes.api.unified_dashboard import router as unified_dashboard_router
 # 🗄️ NUOVO IMPORT - Router Database Monitoring API
@@ -404,6 +406,12 @@ if ARCHEOLOGIA_VIEW_EXISTS:
 app.include_router(
     notifications_router,
     tags=["websocket-notifications"]
+)
+
+# 🌐 INCLUSIONE ROUTER WEBSOCKET GLOBALE - Endpoint globale con token-based authentication
+app.include_router(
+    global_notifications_router,
+    tags=["websocket-global-notifications"]
 )
 
 # 🆕 INCLUSIONE ROUTER UNIFIED DASHBOARD API - API per dashboard unificata

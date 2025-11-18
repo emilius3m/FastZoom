@@ -20,6 +20,36 @@ const PHOTOS_PER_PAGE = 24;
 const MAX_FILE_SIZE_MB = 50;
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/tiff', 'image/webp'];
 
+// Utility function to format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Utility function to format date
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('it-IT', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (error) {
+        console.error('Error formatting date:', error);
+        return dateString;
+    }
+}
+
 function photosManager() {
     return {
         // Data Properties
@@ -35,7 +65,7 @@ function photosManager() {
         isLoading: false,
         viewMode: 'grid',
         selectedPhotos: [],
-        userRole: '{{ user_role }}',
+        userRole: window.userRole || 'user',
         
         // Multi-edit state
         get isMultipleSelection() {
@@ -92,6 +122,7 @@ function photosManager() {
 
         // Bulk Delete Processing
         isBulkDeleting: false,
+        isBulkDelete: false,
 
         // Enhanced Filters
         filters: {
@@ -240,7 +271,7 @@ function photosManager() {
             try {
                 console.log('Loading photos from API...');
                 
-                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos`, {
+                const response = await fetch(`/api/v1/sites/${this.getCurrentSiteId()}/photos`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -387,7 +418,7 @@ function photosManager() {
                 
                 // Fetch filtered photos from API
                 const queryString = params.toString();
-                const url = `/api/v1/sites/{{ site.id }}/photos${queryString ? '?' + queryString : ''}`;
+                const url = `/api/v1/sites/${this.getCurrentSiteId()}/photos${queryString ? '?' + queryString : ''}`;
                 
                 const response = await fetch(url, {
                     headers: {
@@ -505,7 +536,7 @@ function photosManager() {
             if (this.filters.is_validated === true) count++;
             if (this.filters.has_deep_zoom === true) count++;
             if (this.filters.has_inventory === true) count++;
-            if (this.has_description === true) count++;
+            if (this.filters.has_description === true) count++;
             if (this.filters.has_photographer === true) count++;
             if (this.filters.upload_date_from) count++;
             if (this.filters.upload_date_to) count++;
@@ -827,7 +858,7 @@ function photosManager() {
                         const tileFormat = deepZoomInfo.tile_format || 'jpg';
                         const extension = tileFormat === 'png' ? 'png' : 'jpg';
                         // Use PUBLIC endpoint for OpenSeadragon (no auth headers required)
-                        const url = `/api/v1/deepzoom/public/sites/{{ site.id }}/photos/${photoId}/tiles/${level}/${x}_${y}.${extension}`;
+                        const url = `/api/v1/deepzoom/public/sites/${siteId}/photos/${photoId}/tiles/${level}/${x}_${y}.${extension}`;
                         return url;
                     }
                 };
@@ -1377,7 +1408,6 @@ function photosManager() {
                         break;
                     case '-':
                     case '_':
-                    case 'Q':
                         e.preventDefault();
                         this.zoomOut();
                         break;
@@ -1446,7 +1476,7 @@ function photosManager() {
                 const siteId = this.getCurrentSiteId();
                 console.log('Getting deep zoom info for:', siteId, this.currentPhoto.id);
                 
-                const response = await fetch(`/api/v1/deepzoom/sites/{{ site.id }}/photos/${this.currentPhoto.id}/info`, {
+                const response = await fetch(`/api/v1/deepzoom/sites/${this.getCurrentSiteId()}/photos/${this.currentPhoto.id}/info`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -1559,7 +1589,7 @@ function photosManager() {
         setCurrentPhoto(index) {
             console.log('setCurrentPhoto called with index:', index);
             if (index >= 0 && index < this.photos.length) {
-                const photo = this.photos.find(p => p && p.id === photo.id);
+                const photo = this.photos[index];
                 if (!photo || !photo.id) {
                     console.error('Invalid photo at index:', index, photo);
                     return;
@@ -1603,7 +1633,7 @@ function photosManager() {
                         closeButton.focus();
                     }
                 });
-            });
+            };
         },
 
         previousPhoto() {
@@ -1631,7 +1661,7 @@ function photosManager() {
             // Fetch fresh data from server for photo modal edit button
             try {
                 console.log('Fetching fresh data for photo modal edit:', this.currentPhoto.id);
-                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos`, {
+                const response = await fetch(`/api/v1/sites/${this.getCurrentSiteId()}/photos`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -1675,13 +1705,13 @@ function photosManager() {
                             }
                         } else if (metadataComponent.loadPhotoData) {
                             console.log('Loading photo data into form component');
-                            metadataComponent.loadPhotoData(photo);
+                            metadataComponent.loadPhotoData(this.currentPhoto);
                         }
                     } else {
                         console.warn('Metadata form component not found');
                         // Fallback: dispatch event to load photo data
                         if (!this.isMultipleSelection) {
-                            this.$dispatch('load-photo-data', { photo: photo });
+                            this.$dispatch('load-photo-data', { photo: this.currentPhoto });
                         }
                     }
                 } else {
@@ -1693,7 +1723,7 @@ function photosManager() {
         // Handle metadata form submission for edit
         handleEditMetadataSubmit(event) {
             console.log('handleEditMetadataSubmit called with:', event.detail);
-            const metadata = event.detail.data || event.detail.metadata);  // Support both formats
+
             const metadata = event.detail.data || event.detail.metadata;  // Support both formats
             this.savePhotoEditWithMetadata(metadata);
         },
@@ -1715,6 +1745,7 @@ function photosManager() {
                     this.showAlertMessage('Errore: nessuna foto selezionata per modifica');
                     return;
                 }
+            }
 
             const editFormContainer = this.$refs.editMetadataForm;
             if (editFormContainer) {
@@ -1802,7 +1833,7 @@ function photosManager() {
             try {
                 console.log('Saving single photo edit with metadata:', metadata);
 
-                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/${this.selectedPhoto.id}/update`, {
+                const response = await fetch(`/api/v1/sites/${this.getCurrentSiteId()}/photos/${this.selectedPhoto.id}/update`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -1890,7 +1921,7 @@ function photosManager() {
                     }
                 });
 
-                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/bulk-update`, {
+                const response = await fetch(`/api/v1/sites/${this.getCurrentSiteId()}/photos/bulk-update`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -1944,7 +1975,7 @@ function photosManager() {
                 this.closeEditModal();
 
             } catch (error) {
-                console.error('Errore durante l'aggiornamento di massa:', error);
+                console.error('Errore durante l aggiornamento di massa:', error);
                 this.showAlertMessage(`Errore durante l'aggiornamento: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
             } finally {
                 this.isSaving = false;
@@ -1985,7 +2016,7 @@ function photosManager() {
             this.isDeleting = true;
 
             try {
-                const response = await fetch(`/api/v1/sites/{{ site.id }}/photos/${this.photoToDelete.id}`, {
+                const response = await fetch(`/api/v1/sites/${this.getCurrentSiteId()}/photos/${this.photoToDelete.id}`, {
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`
@@ -2017,4 +2048,484 @@ function photosManager() {
                 }
 
                 // Remove from local data
-                this.photos = this.photos.filter(p =>
+                this.photos = this.photos.filter(p => p && p.id !== this.photoToDelete.id);
+
+                // Update filtered photos if needed
+                if (this.filteredPhotos.length > 0) {
+                    this.filteredPhotos = this.filteredPhotos.filter(p => p && p.id !== this.photoToDelete.id);
+                }
+
+                // Update paginated photos if needed
+                if (this.paginatedPhotos.length > 0) {
+                    this.paginatedPhotos = this.paginatedPhotos.filter(p => p && p.id !== this.photoToDelete.id);
+                }
+
+                // Remove from selection if selected
+                if (this.selectedPhotos.includes(this.photoToDelete.id)) {
+                    this.selectedPhotos = this.selectedPhotos.filter(id => id !== this.photoToDelete.id);
+                }
+
+                // Update statistics and pagination
+                this.updateStatistics();
+                this.updatePagination();
+                this.extractAvailableTags();
+
+                // Close modal and show success message
+                this.showDeleteModal = false;
+                this.photoToDelete = null;
+                this.showAlertMessage('Foto eliminata con successo!');
+
+                // Update current photo if it was the deleted one
+                if (this.currentPhoto && this.currentPhoto.id === this.photoToDelete?.id) {
+                    this.closePhotoModal();
+                }
+
+            } catch (error) {
+                console.error('Errore durante eliminazione:', error);
+                this.showAlertMessage(`Errore durante l eliminazione: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
+            } finally {
+                this.isDeleting = false;
+            }
+        },
+
+        // Close photo modal
+        closePhotoModal() {
+            console.log('closePhotoModal called');
+            
+            // Cleanup FAB controls before closing
+            this.cleanupFABControls();
+            
+            // Reset states
+            this.showPhotoModal = false;
+            this.currentPhoto = null;
+            this.currentPhotoIndex = 0;
+            this.imageLoaded = false;
+            this.imageError = false;
+            this.osdViewer = null;
+            this.osdLoading = false;
+            this.osdError = false;
+            this.osdErrorMessage = '';
+            this.showSidebar = false;
+            this.showMobileInfo = false;
+
+            // Clean up URL
+            const url = new URL(window.location);
+            url.searchParams.delete('photo');
+            window.history.replaceState(null, '', url.toString());
+
+            // Return focus to previously focused element
+            if (this.previouslyFocusedElement && this.previouslyFocusedElement.focus) {
+                this.previouslyFocusedElement.focus();
+                this.previouslyFocusedElement = null;
+            }
+        },
+
+        // Utility Methods
+        showAlertMessage(message) {
+            console.log('showAlertMessage called:', message);
+            this.alertMessage = message;
+            this.showAlert = true;
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                this.showAlert = false;
+            }, 5000);
+        },
+
+        // Initialize deep zoom status checking
+        async initializeDeepZoomStatus() {
+            console.log('Initializing deep zoom status checking...');
+            
+            // Check for photos that might be stuck in processing state
+            this.cleanupStuckProcessingPhotos();
+            
+            // Start periodic checking
+            this.startCleanupTimer();
+        },
+
+        // Clean up photos stuck in processing state
+        cleanupStuckProcessingPhotos() {
+            console.log('Cleaning up stuck processing photos...');
+            
+            const stuckPhotos = this.photos.filter(photo =>
+                photo && photo.deepzoom_status === 'processing' &&
+                photo.updated_at &&
+                new Date(photo.updated_at) < new Date(Date.now() - 30 * 60 * 1000) // 30 minutes ago
+            );
+            
+            if (stuckPhotos.length > 0) {
+                console.log(`Found ${stuckPhotos.length} photos stuck in processing state:`, stuckPhotos);
+                
+                // Update local state to show them as failed
+                stuckPhotos.forEach(photo => {
+                    const index = this.photos.findIndex(p => p && p.id === photo.id);
+                    if (index !== -1) {
+                        this.photos[index].deepzoom_status = 'failed';
+                        this.photos[index].deepzoom_error = 'Processing timeout - please try again';
+                    }
+                });
+                
+                this.updateStatistics();
+                this.showAlertMessage(`Rilevate ${stuckPhotos.length} foto bloccate in elaborazione. Riprova l'upload.`);
+            }
+        },
+
+        // Start cleanup timer
+        startCleanupTimer() {
+            console.log('Starting cleanup timer...');
+            
+            // Check every 5 minutes
+            setInterval(() => {
+                this.cleanupStuckProcessingPhotos();
+            }, 5 * 60 * 1000);
+        },
+
+        // WebSocket for real-time notifications
+        ws: null,
+        wsConnected: false,
+        wsReconnectAttempts: 0,
+        wsMaxReconnectAttempts: 5,
+        wsReconnectDelay: 5000,
+        wsReconnectTimer: null,
+        wsAuthFailed: false,
+        photosBeingProcessed: new Set(),
+        
+        // FIXED: Add cleanup timer reference
+        cleanupTimer: null,
+        
+        connectWebSocket() {
+            const siteId = this.getCurrentSiteId();
+            if (!siteId) {
+                console.error('❌ Cannot connect WebSocket: site ID not available');
+                return;
+            }
+
+            // Don't attempt to reconnect if authentication previously failed
+            if (this.wsAuthFailed) {
+                console.warn('⚠️ WebSocket authentication previously failed, not reconnecting');
+                return;
+            }
+
+            // Check if we've exceeded max reconnection attempts
+            if (this.wsReconnectAttempts >= this.wsMaxReconnectAttempts) {
+                console.error('❌ Max WebSocket reconnection attempts exceeded');
+                this.showAlertMessage('Impossibile connettersi alle notifiche in tempo reale');
+                return;
+            }
+
+            // Close existing connection if any
+            this.disconnectWebSocket();
+
+            // Determine WebSocket URL (ws or wss based on protocol)
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/site/${siteId}/ws/notifications`;
+
+            console.log(`🔌 Connecting WebSocket (attempt ${this.wsReconnectAttempts + 1}/${this.wsMaxReconnectAttempts}):`, wsUrl);
+
+            try {
+                this.ws = new WebSocket(wsUrl);
+
+                this.ws.onopen = () => {
+                    console.log('✅ WebSocket connected, sending auth token...');
+                    this.wsReconnectAttempts = 0; // Reset reconnection attempts on successful connection
+
+                    // For cookie-based authentication, we don't need to send token manually
+                    // The WebSocket will inherit cookies from the browser automatically
+                    console.log('📤 WebSocket connected - authentication via cookies');
+                };
+
+                // Set up authentication response handler
+                let authConfirmed = false;
+                this.ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'connected') {
+                            authConfirmed = true;
+                            this.wsConnected = true;
+                            console.log('✅ WebSocket authenticated and ready');
+                            // Switch to normal message handling
+                            this.ws.onmessage = (event) => {
+                                try {
+                                    const notification = JSON.parse(event.data);
+                                    this.handleWebSocketNotification(notification);
+                                } catch (e) {
+                                    console.error('Error parsing WebSocket message:', e);
+                                }
+                            };
+                        } else if (data.type === 'error') {
+                            console.error('❌ WebSocket authentication failed:', data.message);
+                            this.wsAuthFailed = true; // Mark auth as failed to prevent reconnection
+                            this.ws.close();
+                            this.showAlertMessage(`Errore autenticazione WebSocket: ${data.message}`);
+                            return;
+                        } else if (!authConfirmed) {
+                            // If we get a message before auth confirmation, treat it as an error
+                            console.error('❌ Received message before authentication:', data);
+                            this.ws.close();
+                            return;
+                        } else {
+                            // Handle normal messages after auth
+                            this.handleWebSocketNotification(data);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing WebSocket auth response:', e);
+                        this.ws.close();
+                        return;
+                    }
+                };
+                
+                this.ws.onerror = (error) => {
+                    console.error('❌ WebSocket error:', error);
+                    this.wsConnected = false;
+                    this.wsReconnectAttempts++;
+                };
+
+                this.ws.onclose = (event) => {
+                    console.log(`🔌 WebSocket closed (code: ${event.code}, reason: ${event.reason})`);
+                    this.wsConnected = false;
+
+                    // Don't reconnect if authentication failed or connection was closed intentionally
+                    if (this.wsAuthFailed || event.code === 1000) {
+                        console.log('🔌 WebSocket closed intentionally or auth failed, not reconnecting');
+                        return;
+                    }
+
+                    // Implement exponential backoff for reconnection
+                    const delay = Math.min(this.wsReconnectDelay * Math.pow(2, this.wsReconnectAttempts - 1), 30000); // Max 30 seconds
+
+                    console.log(`🔄 Scheduling WebSocket reconnection in ${delay}ms (attempt ${this.wsReconnectAttempts})`);
+
+                    this.wsReconnectTimer = setTimeout(() => {
+                        if (!this.wsConnected && !this.wsAuthFailed) {
+                            this.connectWebSocket();
+                        }
+                    }, delay);
+                };
+                
+            } catch (error) {
+                console.error('Failed to create WebSocket:', error);
+            }
+        },
+
+        // Handle WebSocket messages
+        handleWebSocketMessage(data) {
+            console.log('Handling WebSocket message:', data);
+            
+            switch (data.type) {
+                case 'photo_uploaded':
+                    this.handlePhotoUploadedNotification(data);
+                    break;
+                case 'photo_updated':
+                    this.handlePhotoUpdatedNotification(data);
+                    break;
+                case 'photo_deleted':
+                    this.handlePhotoDeletedNotification(data);
+                    break;
+                case 'deepzoom_status_changed':
+                    this.handleDeepZoomStatusNotification(data);
+                    break;
+                default:
+                    console.log('Unknown WebSocket message type:', data.type);
+            }
+        },
+
+        // Handle photo upload notifications
+        handlePhotoUploadedNotification(data) {
+            console.log('Photo uploaded notification:', data);
+            
+            if (data.photo && data.photo.id) {
+                // Add new photo to the list
+                this.photos.unshift(data.photo);
+                
+                // Update filtered photos if no filters are active
+                if (this.getActiveFiltersCount() === 0) {
+                    this.filteredPhotos = this.photos;
+                    this.updatePagination();
+                }
+                
+                // Update statistics
+                this.updateStatistics();
+                this.extractAvailableTags();
+                
+                // Show success message
+                this.showAlertMessage(`Nuova foto "${data.photo.filename}" caricata con successo!`);
+            }
+        },
+
+        // Handle photo update notifications
+        handlePhotoUpdatedNotification(data) {
+            console.log('Photo updated notification:', data);
+            
+            if (data.photo && data.photo.id) {
+                // Update existing photo in the list
+                const index = this.photos.findIndex(p => p && p.id === data.photo.id);
+                if (index !== -1) {
+                    this.photos[index] = { ...this.photos[index], ...data.photo };
+                    
+                    // Update current photo if it's the one being edited
+                    if (this.currentPhoto && this.currentPhoto.id === data.photo.id) {
+                        this.currentPhoto = { ...this.currentPhoto, ...data.photo };
+                    }
+                    
+                    // Update filtered photos if needed
+                    const filteredIndex = this.filteredPhotos.findIndex(p => p && p.id === data.photo.id);
+                    if (filteredIndex !== -1) {
+                        this.filteredPhotos[filteredIndex] = { ...this.filteredPhotos[filteredIndex], ...data.photo };
+                    }
+                }
+                
+                // Update statistics and tags
+                this.updateStatistics();
+                this.extractAvailableTags();
+                
+                // Show success message
+                this.showAlertMessage(`Foto "${data.photo.filename}" aggiornata con successo!`);
+            }
+        },
+
+        // Handle photo deletion notifications
+        handlePhotoDeletedNotification(data) {
+            console.log('Photo deleted notification:', data);
+            
+            if (data.photo_id) {
+                // Remove photo from all arrays
+                this.photos = this.photos.filter(p => p && p.id !== data.photo_id);
+                this.filteredPhotos = this.filteredPhotos.filter(p => p && p.id !== data.photo_id);
+                this.paginatedPhotos = this.paginatedPhotos.filter(p => p && p.id !== data.photo_id);
+                
+                // Remove from selection
+                this.selectedPhotos = this.selectedPhotos.filter(id => id !== data.photo_id);
+                
+                // Update statistics and pagination
+                this.updateStatistics();
+                this.updatePagination();
+                this.extractAvailableTags();
+                
+                // Show success message
+                this.showAlertMessage('Foto eliminata con successo!');
+                
+                // Close modal if the deleted photo was being viewed
+                if (this.currentPhoto && this.currentPhoto.id === data.photo_id) {
+                    this.closePhotoModal();
+                }
+            }
+        },
+
+        // Handle DeepZoom status change notifications
+        handleDeepZoomStatusNotification(data) {
+            console.log('DeepZoom status notification:', data);
+            
+            if (data.photo_id && data.status) {
+                // Update photo's DeepZoom status
+                const index = this.photos.findIndex(p => p && p.id === data.photo_id);
+                if (index !== -1) {
+                    this.photos[index].deepzoom_status = data.status;
+                    this.photos[index].deepzoom_error = data.error || null;
+                    
+                    // Show appropriate message based on status
+                    switch (data.status) {
+                        case 'completed':
+                            this.showAlertMessage('DeepZoom tiles generati con successo!');
+                            break;
+                        case 'failed':
+                            this.showAlertMessage(`Errore generazione DeepZoom: ${data.error || 'Errore sconosciuto'}`);
+                            break;
+                        case 'processing':
+                            // Don't show message for processing status
+                            break;
+                    }
+                }
+            }
+        },
+
+        // Start WebSocket heartbeat to maintain connection
+        startWebSocketHeartbeat() {
+            // Clear any existing heartbeat
+            if (this.wsHeartbeatInterval) {
+                clearInterval(this.wsHeartbeatInterval);
+            }
+            
+            // Send ping every 30 seconds
+            this.wsHeartbeatInterval = setInterval(() => {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    try {
+                        this.ws.send(JSON.stringify({ action: 'ping' }));
+                        console.log('💓 WebSocket ping sent');
+                    } catch (error) {
+                        console.error('❌ Error sending WebSocket ping:', error);
+                    }
+                } else {
+                    console.log('⚠️ WebSocket not available for ping, clearing heartbeat');
+                    clearInterval(this.wsHeartbeatInterval);
+                    this.wsHeartbeatInterval = null;
+                }
+            }, 30000);
+        },
+        
+        disconnectWebSocket() {
+            // Clear any pending reconnection timer
+            if (this.wsReconnectTimer) {
+                clearTimeout(this.wsReconnectTimer);
+                this.wsReconnectTimer = null;
+            }
+
+            // FIXED: Clear cleanup timer
+            if (this.cleanupTimer) {
+                clearInterval(this.cleanupTimer);
+                this.cleanupTimer = null;
+                console.log('🧹 Cleanup timer cleared');
+            }
+
+            if (this.ws) {
+                console.log('🔌 Disconnecting WebSocket');
+                this.ws.close(1000, 'Client disconnect'); // Send normal closure code
+                this.ws = null;
+                this.wsConnected = false;
+            }
+
+            // Reset connection state
+            this.wsAuthFailed = false;
+            this.wsReconnectAttempts = 0;
+        },
+
+        // Fallback share method for browsers that don't support Web Share API
+        fallbackShare(url) {
+            console.log('Using fallback share method');
+            
+            // Create a temporary input to copy the URL
+            const input = document.createElement('input');
+            input.value = url;
+            document.body.appendChild(input);
+            input.select();
+            
+            try {
+                document.execCommand('copy');
+                this.showAlertMessage('Link copiato negli appunti!');
+            } catch (error) {
+                console.error('Failed to copy URL:', error);
+                this.showAlertMessage('Impossibile copiare il link. Copialo manualmente: ' + url);
+            } finally {
+                document.body.removeChild(input);
+            }
+        }
+
+    };
+}
+
+// Initialize the photos manager when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('Initializing Photos Manager...');
+    
+    // Wait for Alpine.js to be available
+    if (typeof Alpine !== 'undefined') {
+        Alpine.data('photosManager', photosManager);
+        console.log('Photos Manager initialized successfully');
+    } else {
+        console.error('Alpine.js not available for Photos Manager initialization');
+    }
+});
+
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { photosManager };
+}
