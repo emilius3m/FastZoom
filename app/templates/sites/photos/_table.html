@@ -1,0 +1,366 @@
+<!-- _table.html - Componente Tabella Risultati per Foto Archeologiche -->
+<!-- Componente modulare per la visualizzazione di foto in grid/list view -->
+
+<!-- View Mode Toggle
+<div class="flex justify-between items-center mb-6">
+    <div class="text-sm text-gray-600">
+        <span x-text="filteredPhotos.length"></span> di <span x-text="totalPhotos"></span> foto
+    </div>
+
+    <div class="flex rounded-md shadow-sm" role="group">
+        <button @click="viewMode = 'grid'"
+                :class="viewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                class="px-4 py-2 text-sm font-medium border border-gray-200 rounded-l-lg focus:z-10 focus:ring-2 focus:ring-blue-500 transition-colors">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+            </svg>
+        </button>
+        <button @click="viewMode = 'list'"
+                :class="viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                class="px-4 py-2 text-sm font-medium border-t border-b border-r border-gray-200 rounded-r-lg focus:z-10 focus:ring-2 focus:ring-blue-500 transition-colors">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+            </svg>
+        </button>
+    </div>
+</div> -->
+
+<!-- Photos Grid View -->
+<div x-show="viewMode === 'grid'" class="mb-8">
+    <!-- Loading State -->
+    <div x-show="isLoading" class="flex justify-center items-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="!isLoading && filteredPhotos.length === 0" class="text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">Nessuna foto trovata</h3>
+        <p class="mt-1 text-sm text-gray-500">
+            <span x-show="hasActiveFilters()">Prova a modificare i filtri di ricerca.</span>
+            <span x-show="!hasActiveFilters()">Inizia caricando la prima foto.</span>
+        </p>
+    </div>
+
+    <!-- Grid Layout -->
+    <div x-show="!isLoading && filteredPhotos.length > 0"
+         class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <template x-for="photo in paginatedPhotos" :key="photo.id">
+            <div class="flex flex-col h-full bg-white rounded-lg shadow overflow-hidden group hover:shadow-lg transition-shadow duration-200">
+                <!-- Photo Thumbnail -->
+                <div class="w-full h-48 bg-gray-200 relative overflow-hidden">
+                    <img :src="photo.thumbnail_url || photo.file_url"
+                          :alt="photo.filename"
+                          class="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-200"
+                          @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))"
+                          loading="lazy">
+
+                    <!-- US Photo Badge (top-left) -->
+                    <div x-show="photo.source_type === 'us_file'"
+                         class="absolute top-2 left-2 z-10">
+                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-purple-600 text-white shadow-lg">
+                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                            </svg>
+                            US
+                        </span>
+                    </div>
+
+                    <!-- Deep Zoom Status Indicators -->
+                    <div class="absolute top-2 right-2 flex space-x-1">
+                        <!-- Tiles Available Indicator -->
+                        <div x-show="photo.has_deep_zoom && photo.deepzoom_status === 'completed'"
+                             class="bg-green-500 rounded-full p-1.5 shadow-lg"
+                             title="Deep zoom tiles disponibili">
+                            <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                        
+                        <!-- Processing Indicator -->
+                        <div x-show="photo.deepzoom_status === 'processing' || photo.deepzoom_status === 'scheduled'"
+                             class="bg-blue-500 rounded-full p-1.5 shadow-lg animate-pulse"
+                             title="Elaborazione tiles in corso">
+                            <svg class="w-3 h-3 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                        </div>
+                        
+                        <!-- Failed Indicator -->
+                        <div x-show="photo.deepzoom_status === 'failed'"
+                             class="bg-red-500 rounded-full p-1.5 shadow-lg"
+                             title="Elaborazione tiles fallita">
+                            <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Overlay Actions -->
+                    <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                        <div class="flex space-x-2">
+                            <button @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))"
+                                    class="p-2 bg-white rounded-full text-gray-700 hover:text-blue-600 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                            </button>
+                            {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
+                            <button @click="editPhoto(photo)"
+                                    class="p-2 bg-white rounded-full text-gray-700 hover:text-green-600 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Selection Checkbox (disabled for US photos) -->
+                    {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
+                    <div class="absolute top-2 left-2">
+                        <input type="checkbox"
+                               :value="photo.id"
+                               x-model="selectedPhotos"
+                               :disabled="photo.source_type === 'us_file'"
+                               :class="photo.source_type === 'us_file' ? 'opacity-50 cursor-not-allowed' : ''"
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Photo Info -->
+                <div class="p-3 flex flex-col justify-end flex-grow">
+                    <div class="flex items-center gap-2 mb-1">
+                        <h3 class="text-sm font-medium text-gray-900 break-words flex-1" x-text="photo.original_filename"></h3>
+                        <!-- US Badge in title area -->
+                        <span x-show="photo.source_type === 'us_file'"
+                              class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"
+                              title="Foto caricata da US/USM">
+                            US
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <span x-text="formatFileSize(photo.file_size)"></span>
+                        • <span x-text="formatDate(photo.upload_date, true)"></span>
+                    </p>
+
+                    <!-- Tags -->
+                    <div x-show="photo.tags && photo.tags.length > 0" class="mt-2">
+                        <div class="flex flex-wrap gap-1">
+                            <template x-for="tag in (photo.tags || []).slice(0, 2)" :key="tag">
+                                <span class="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full" x-text="tag"></span>
+                            </template>
+                            <span x-show="(photo.tags || []).length > 2" class="inline-block px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">
+                                +<span x-text="(photo.tags || []).length - 2"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+
+<!-- Photos List View -->
+<div x-show="viewMode === 'list'" class="mb-8">
+    <!-- Loading State -->
+    <div x-show="isLoading" class="flex justify-center items-center h-64">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+
+    <!-- Empty State -->
+    <div x-show="!isLoading && filteredPhotos.length === 0" class="text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">Nessuna foto trovata</h3>
+        <p class="mt-1 text-sm text-gray-500">
+            <span x-show="hasActiveFilters()">Prova a modificare i filtri di ricerca.</span>
+            <span x-show="!hasActiveFilters()">Inizia caricando la prima foto.</span>
+        </p>
+    </div>
+
+    <!-- List Layout -->
+    <div x-show="!isLoading && filteredPhotos.length > 0" class="bg-white shadow overflow-hidden sm:rounded-md">
+        <ul class="divide-y divide-gray-200">
+            <template x-for="photo in paginatedPhotos" :key="photo.id">
+                <li class="hover:bg-gray-50 transition-colors duration-150">
+                    <div class="px-4 py-4 sm:px-6 flex items-center">
+                        <!-- Selection Checkbox -->
+                        {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
+                        <div class="flex-shrink-0 mr-4">
+                            <input type="checkbox"
+                                   :value="photo.id"
+                                   x-model="selectedPhotos"
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        </div>
+                        {% endif %}
+
+                        <!-- Thumbnail -->
+                        <div class="flex-shrink-0 mr-4 relative">
+                            <img :src="photo.thumbnail_url || photo.file_url"
+                                 :alt="photo.filename"
+                                 class="h-16 w-16 object-cover rounded-lg cursor-pointer"
+                                 @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))">
+                            
+                            <!-- Deep Zoom Status Indicators (List View) -->
+                            <div class="absolute -top-1 -right-1 flex space-x-1">
+                                <!-- Tiles Available Indicator -->
+                                <div x-show="photo.has_deep_zoom && photo.deepzoom_status === 'completed'"
+                                     class="bg-green-500 rounded-full p-1 shadow-lg"
+                                     title="Deep zoom tiles disponibili">
+                                    <svg class="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                    </svg>
+                                </div>
+                                
+                                <!-- Processing Indicator -->
+                                <div x-show="photo.deepzoom_status === 'processing' || photo.deepzoom_status === 'scheduled'"
+                                     class="bg-blue-500 rounded-full p-1 shadow-lg animate-pulse"
+                                     title="Elaborazione tiles in corso">
+                                    <svg class="w-2 h-2 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                </div>
+                                
+                                <!-- Failed Indicator -->
+                                <div x-show="photo.deepzoom_status === 'failed'"
+                                     class="bg-red-500 rounded-full p-1 shadow-lg"
+                                     title="Elaborazione tiles fallita">
+                                    <svg class="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Photo Details -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="text-sm font-medium text-gray-900 break-words cursor-pointer hover:text-blue-600 transition-colors"
+                                        @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))"
+                                        x-text="photo.original_filename"></h3>
+
+                                    <div class="mt-1 flex items-center text-sm text-gray-500">
+                                        <span x-text="formatFileSize(photo.file_size)"></span>
+                                        <span class="mx-2">•</span>
+                                        <span x-text="`${photo.width || 'N/A'} × ${photo.height || 'N/A'} px`"></span>
+                                        <span class="mx-2">•</span>
+                                        <span x-text="formatDate(photo.upload_date)"></span>
+                                    </div>
+
+                                    <!-- Description -->
+                                    <p x-show="photo.description"
+                                       class="mt-1 text-sm text-gray-600 line-clamp-2"
+                                       x-text="photo.description"></p>
+
+                                    <!-- Tags -->
+                                    <div x-show="photo.tags && photo.tags.length > 0" class="mt-2">
+                                        <div class="flex flex-wrap gap-1">
+                                            <template x-for="tag in photo.tags || []" :key="tag">
+                                                <span class="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full" x-text="tag"></span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="flex-shrink-0 ml-4">
+                                    <div class="flex space-x-2">
+                                        <button @click="openPhotoModal(photos.findIndex(p => p && p.id === photo.id))"
+                                                class="text-gray-400 hover:text-blue-600 transition-colors">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                            </svg>
+                                        </button>
+                                        {% if user_role in ['admin', 'regional_admin', 'superadmin' ,'curator'] %}
+                                        <button @click="editPhoto(photo)"
+                                                class="text-gray-400 hover:text-green-600 transition-colors">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                            </svg>
+                                        </button>
+                                        <!-- Delete button (disabled for US photos) -->
+                                        <button @click="photo.source_type === 'us_file' ? null : confirmDeletePhoto(photo)"
+                                                :disabled="photo.source_type === 'us_file'"
+                                                :class="photo.source_type === 'us_file' ? 'opacity-30 cursor-not-allowed' : 'hover:text-red-600'"
+                                                :title="photo.source_type === 'us_file' ? 'Foto US: eliminabile solo dalla pagina US' : 'Elimina foto'"
+                                                class="text-gray-400 transition-colors">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            </template>
+        </ul>
+    </div>
+</div>
+
+<!-- Pagination -->
+<div x-show="filteredPhotos.length > itemsPerPage" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-lg shadow">
+    <div class="flex-1 flex justify-between sm:hidden">
+        <button @click="previousPage()"
+                :disabled="currentPage <= 1"
+                :class="currentPage <= 1 ? 'cursor-not-allowed text-gray-400' : 'text-gray-700 hover:text-gray-500'"
+                class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white">
+            Precedente
+        </button>
+        <button @click="nextPage()"
+                :disabled="currentPage >= totalPages"
+                :class="currentPage >= totalPages ? 'cursor-not-allowed text-gray-400' : 'text-gray-700 hover:text-gray-500'"
+                class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white">
+            Successiva
+        </button>
+    </div>
+
+    <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+        <div>
+            <p class="text-sm text-gray-700">
+                Mostra da <span class="font-medium" x-text="startItem"></span> a
+                <span class="font-medium" x-text="endItem"></span> di
+                <span class="font-medium" x-text="filteredPhotos.length"></span> risultati
+            </p>
+        </div>
+        <div>
+            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <button @click="previousPage()"
+                        :disabled="currentPage <= 1"
+                        :class="currentPage <= 1 ? 'cursor-not-allowed text-gray-300' : 'text-gray-500 hover:bg-gray-50'"
+                        class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium">
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+
+                <template x-for="page in visiblePages" :key="page">
+                    <button @click="goToPage(page)"
+                            :class="page === currentPage ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'"
+                            class="relative inline-flex items-center px-4 py-2 border text-sm font-medium"
+                            x-text="page"></button>
+                </template>
+
+                <button @click="nextPage()"
+                        :disabled="currentPage >= totalPages"
+                        :class="currentPage >= totalPages ? 'cursor-not-allowed text-gray-300' : 'text-gray-500 hover:bg-gray-50'"
+                        class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium">
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+            </nav>
+        </div>
+    </div>
+</div>

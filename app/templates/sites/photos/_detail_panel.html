@@ -1,0 +1,379 @@
+<!-- _detail_panel.html - Pannello Dettaglio Foto Riutilizzabile -->
+<!-- Componente per visualizzare i dettagli completi di una foto archeologica -->
+<!-- Estratto dal template photos.html per modularizzazione -->
+
+<!-- Sidebar (Desktop) - Pannello Dettaglio Foto -->
+<div class="hidden lg:block fixed top-20 bottom-24 right-0 w-80 bg-black bg-opacity-90 backdrop-blur-sm border-l border-gray-700 overflow-y-auto z-50"
+     x-show="currentPhoto && showSidebar"
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="transform translate-x-full opacity-0"
+     x-transition:enter-end="transform translate-x-0 opacity-100"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="transform translate-x-0 opacity-100"
+     x-transition:leave-end="transform translate-x-full opacity-0"
+     @mouseleave="showSidebar = false">
+
+    <!-- Close Button -->
+    <div class="sticky top-0 bg-black bg-opacity-75 p-2 flex justify-end border-b border-gray-700">
+        <button @click="showSidebar = false"
+                class="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-gray-700">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+
+    <div class="p-6 space-y-6 text-white">
+        <!-- Photo Information -->
+        <div class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Informazioni Foto
+            </h4>
+
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-400">Nome file:</span>
+                    <span class="font-medium truncate ml-2" x-text="currentPhoto?.original_filename"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400">Dimensioni:</span>
+                    <span x-text="`${currentPhoto?.width || 'N/A'} × ${currentPhoto?.height || 'N/A'} px`"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400">Dimensione file:</span>
+                    <span x-text="formatFileSize(currentPhoto?.file_size)"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-400">Data upload:</span>
+                    <span x-text="formatDate(currentPhoto?.upload_date)"></span>
+                </div>
+                <div class="flex justify-between" x-show="currentPhoto?.photo_date">
+                    <span class="text-gray-400">Data scatto:</span>
+                    <span x-text="formatDate(currentPhoto?.photo_date)"></span>
+                </div>
+                <div class="flex justify-between" x-show="currentPhoto?.photographer">
+                    <span class="text-gray-400">Fotografo:</span>
+                    <span x-text="currentPhoto?.photographer"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Archaeological Data -->
+        <div x-show="currentPhoto?.inventory_number || currentPhoto?.excavation_area || currentPhoto?.material"
+             class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+                </svg>
+                Dati Archeologici
+            </h4>
+
+            <div class="space-y-2 text-sm">
+                <div x-show="currentPhoto?.inventory_number" class="flex justify-between">
+                    <span class="text-gray-400">N. Inventario:</span>
+                    <span x-text="currentPhoto?.inventory_number || 'N/A'"></span>
+                </div>
+                <div x-show="currentPhoto?.excavation_area" class="flex justify-between">
+                    <span class="text-gray-400">Area di scavo:</span>
+                    <span x-text="currentPhoto?.excavation_area || 'N/A'"></span>
+                </div>
+                <div x-show="currentPhoto?.stratigraphic_unit" class="flex justify-between">
+                    <span class="text-gray-400">U.S.:</span>
+                    <span x-text="currentPhoto?.stratigraphic_unit || 'N/A'"></span>
+                </div>
+                <div x-show="currentPhoto?.material" class="flex justify-between">
+                    <span class="text-gray-400">Materiale:</span>
+                    <span x-text="currentPhoto?.material || 'N/A'"></span>
+                </div>
+                <div x-show="currentPhoto?.object_type" class="flex justify-between">
+                    <span class="text-gray-400">Tipo oggetto:</span>
+                    <span x-text="currentPhoto?.object_type || 'N/A'"></span>
+                </div>
+                <div x-show="currentPhoto?.chronology_period" class="flex justify-between">
+                    <span class="text-gray-400">Periodo:</span>
+                    <span x-text="currentPhoto?.chronology_period || 'N/A'"></span>
+                </div>
+                <div x-show="currentPhoto?.find_date" class="flex justify-between">
+                    <span class="text-gray-400">Data rinvenimento:</span>
+                    <span x-text="formatDate(currentPhoto?.find_date)"></span>
+                </div>
+                <div x-show="currentPhoto?.conservation_status" class="flex justify-between">
+                    <span class="text-gray-400">Conservazione:</span>
+                    <span class="capitalize" x-text="currentPhoto?.conservation_status || 'N/A'"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Photo Type -->
+        <div x-show="currentPhoto?.photo_type" class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Tipo Foto
+            </h4>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-900 text-blue-200" x-text="currentPhoto?.photo_type || 'N/A'"></span>
+        </div>
+
+        <!-- Description -->
+        <div x-show="currentPhoto?.description" class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Descrizione
+            </h4>
+            <p class="text-gray-300 text-sm leading-relaxed" x-text="currentPhoto?.description || 'Nessuna descrizione'"></p>
+        </div>
+
+        <!-- Tags -->
+        <div x-show="currentPhoto?.tags && currentPhoto.tags.length > 0" class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                </svg>
+                Tag
+            </h4>
+            <div class="flex flex-wrap gap-2">
+                <template x-for="tag in currentPhoto?.tags || []" :key="tag">
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-900 text-blue-200" x-text="tag"></span>
+                </template>
+            </div>
+        </div>
+
+        <!-- Status Information -->
+        <div class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Stato
+            </h4>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-400">Pubblicata:</span>
+                    <span class="text-sm font-medium" 
+                          :class="currentPhoto?.is_published ? 'text-green-400' : 'text-gray-500'"
+                          x-text="currentPhoto?.is_published ? 'Sì' : 'No'"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-400">Validata:</span>
+                    <span class="text-sm font-medium" 
+                          :class="currentPhoto?.is_validated ? 'text-green-400' : 'text-gray-500'"
+                          x-text="currentPhoto?.is_validated ? 'Sì' : 'No'"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-400">Deep Zoom:</span>
+                    <span class="text-sm font-medium" 
+                          :class="currentPhoto?.has_deep_zoom ? 'text-green-400' : 'text-gray-500'"
+                          x-text="currentPhoto?.has_deep_zoom ? 'Disponibile' : 'Non disponibile'"></span>
+                </div>
+                <div x-show="currentPhoto?.source_type" class="flex items-center justify-between">
+                    <span class="text-sm text-gray-400">Origine:</span>
+                    <span class="text-sm font-medium capitalize" 
+                          x-text="currentPhoto?.source_type === 'us_file' ? 'File US' : 'Upload diretto'"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Details -->
+        <div x-show="currentPhoto?.exif_data" class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Dettagli Tecnici
+            </h4>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between" x-show="currentPhoto?.exif_data?.camera">
+                    <span class="text-gray-400">Camera:</span>
+                    <span x-text="currentPhoto?.exif_data?.camera"></span>
+                </div>
+                <div class="flex justify-between" x-show="currentPhoto?.exif_data?.lens">
+                    <span class="text-gray-400">Obiettivo:</span>
+                    <span x-text="currentPhoto?.exif_data?.lens"></span>
+                </div>
+                <div class="flex justify-between" x-show="currentPhoto?.exif_data?.focal_length">
+                    <span class="text-gray-400">Focale:</span>
+                    <span x-text="currentPhoto?.exif_data?.focal_length"></span>
+                </div>
+                <div class="flex justify-between" x-show="currentPhoto?.exif_data?.aperture">
+                    <span class="text-gray-400">Apertura:</span>
+                    <span x-text="currentPhoto?.exif_data?.aperture"></span>
+                </div>
+                <div class="flex justify-between" x-show="currentPhoto?.exif_data?.iso">
+                    <span class="text-gray-400">ISO:</span>
+                    <span x-text="currentPhoto?.exif_data?.iso"></span>
+                </div>
+                <div class="flex justify-between" x-show="currentPhoto?.exif_data?.shutter_speed">
+                    <span class="text-gray-400">Tempo:</span>
+                    <span x-text="currentPhoto?.exif_data?.shutter_speed"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions (if user has permissions) -->
+        {% if user_role in ['admin', 'regional_admin', 'superadmin', 'curator'] %}
+        <div class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+            <h4 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                Azioni
+            </h4>
+            <div class="space-y-2">
+                <button @click="openEditModal()"
+                        x-show="currentPhoto && (userRole === 'admin' || userRole === 'curator')"
+                        class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                    Modifica Metadati
+                </button>
+                
+                <button @click="confirmDeletePhoto(currentPhoto)"
+                        x-show="currentPhoto && currentPhoto.source_type !== 'us_file'"
+                        class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    Elimina Foto
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Mobile Info Panel -->
+<div class="lg:hidden fixed bottom-0 left-0 right-0 z-40"
+     x-show="showMobileInfo"
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="transform translate-y-full"
+     x-transition:enter-end="transform translate-y-0"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="transform translate-y-0"
+     x-transition:leave-end="transform translate-y-full"
+     style="height: 60vh;">
+
+    <div class="bg-black bg-opacity-95 text-white p-4 h-full overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+            <h4 class="text-lg font-semibold">Informazioni</h4>
+            <button @click="showMobileInfo = false"
+                    class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-700 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div x-show="currentPhoto" class="space-y-4">
+            <!-- Basic Info -->
+            <div class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+                <h5 class="font-medium text-gray-300 mb-3">Dettagli Base</h5>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Nome file:</span>
+                        <span class="truncate ml-2" x-text="currentPhoto?.original_filename || 'N/A'"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Dimensioni:</span>
+                        <span x-text="`${currentPhoto?.width || 'N/A'} × ${currentPhoto?.height || 'N/A'} px`"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Data upload:</span>
+                        <span x-text="formatDate(currentPhoto?.upload_date)"></span>
+                    </div>
+                    <div class="flex justify-between" x-show="currentPhoto?.photographer">
+                        <span class="text-gray-400">Fotografo:</span>
+                        <span x-text="currentPhoto?.photographer"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Archaeological Info -->
+            <div x-show="currentPhoto?.inventory_number || currentPhoto?.excavation_area" 
+                 class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+                <h5 class="font-medium text-gray-300 mb-3">Dati Archeologici</h5>
+                <div class="space-y-2 text-sm">
+                    <div x-show="currentPhoto?.inventory_number" class="flex justify-between">
+                        <span class="text-gray-400">N. Inventario:</span>
+                        <span x-text="currentPhoto?.inventory_number"></span>
+                    </div>
+                    <div x-show="currentPhoto?.excavation_area" class="flex justify-between">
+                        <span class="text-gray-400">Area di scavo:</span>
+                        <span x-text="currentPhoto?.excavation_area"></span>
+                    </div>
+                    <div x-show="currentPhoto?.stratigraphic_unit" class="flex justify-between">
+                        <span class="text-gray-400">U.S.:</span>
+                        <span x-text="currentPhoto?.stratigraphic_unit"></span>
+                    </div>
+                    <div x-show="currentPhoto?.material" class="flex justify-between">
+                        <span class="text-gray-400">Materiale:</span>
+                        <span x-text="currentPhoto?.material"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div x-show="currentPhoto?.description" class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+                <h5 class="font-medium text-gray-300 mb-3">Descrizione</h5>
+                <p class="text-gray-300 text-sm leading-relaxed" x-text="currentPhoto?.description"></p>
+            </div>
+
+            <!-- Tags -->
+            <div x-show="currentPhoto?.tags && currentPhoto.tags.length > 0" class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+                <h5 class="font-medium text-gray-300 mb-3">Tag</h5>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="tag in currentPhoto?.tags || []" :key="tag">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-900 text-blue-200" x-text="tag"></span>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+                <h5 class="font-medium text-gray-300 mb-3">Stato</h5>
+                <div class="space-y-2 text-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Pubblicata:</span>
+                        <span class="text-sm" 
+                              :class="currentPhoto?.is_published ? 'text-green-400' : 'text-gray-500'"
+                              x-text="currentPhoto?.is_published ? 'Sì' : 'No'"></span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400">Deep Zoom:</span>
+                        <span class="text-sm" 
+                              :class="currentPhoto?.has_deep_zoom ? 'text-green-400' : 'text-gray-500'"
+                              x-text="currentPhoto?.has_deep_zoom ? 'Disponibile' : 'Non disponibile'"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Actions -->
+            {% if user_role in ['admin', 'regional_admin', 'superadmin', 'curator'] %}
+            <div x-show="currentPhoto" class="bg-gray-800 bg-opacity-75 rounded-lg p-4">
+                <h5 class="font-medium text-gray-300 mb-3">Azioni</h5>
+                <div class="space-y-2">
+                    <button @click="openEditModal()"
+                            x-show="currentPhoto && (userRole === 'admin' || userRole === 'curator')"
+                            class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors">
+                        Modifica Metadati
+                    </button>
+                    
+                    <button @click="confirmDeletePhoto(currentPhoto)"
+                            x-show="currentPhoto && currentPhoto.source_type !== 'us_file'"
+                            class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
+                        Elimina Foto
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

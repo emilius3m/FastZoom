@@ -1,0 +1,368 @@
+<!-- _filters.html - Componente Filtri Ricerca per Foto Archeologiche -->
+<!-- Sezione: Enhanced Filters Panel -->
+<div class="bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
+    <!-- Quick Filters Bar -->
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Search -->
+            <div>
+                <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    Ricerca Rapida
+                </label>
+                <input type="text"
+                       id="search"
+                       x-model="filters.search"
+                       @input="applyFilters()"
+                       placeholder="Nome, inventario, descrizione..."
+                       class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+            </div>
+
+            <!-- Material -->
+            <div>
+                <label for="material" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Materiale</label>
+                <select x-model="filters.material"
+                        @change="applyFilters()"
+                        id="material"
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+                    <option value="">Tutti i materiali</option>
+                    <option value="ceramic">Ceramica</option>
+                    <option value="bronze">Bronzo</option>
+                    <option value="iron">Ferro</option>
+                    <option value="stone">Pietra</option>
+                    <option value="marble">Marmo</option>
+                    <option value="glass">Vetro</option>
+                    <option value="bone">Osso</option>
+                    <option value="wood">Legno</option>
+                    <option value="gold">Oro</option>
+                    <option value="silver">Argento</option>
+                    <option value="terracotta">Terracotta</option>
+                    <option value="mosaic">Mosaico</option>
+                    <option value="other">Altro</option>
+                </select>
+            </div>
+
+            <!-- Photo Type -->
+            <div>
+                <label for="photoType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo Foto</label>
+                <select x-model="filters.photo_type"
+                        @change="applyFilters()"
+                        id="photoType"
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+                    <option value="">Tutti i tipi</option>
+                    <option value="general_view">Vista Generale</option>
+                    <option value="detail">Dettaglio</option>
+                    <option value="section">Sezione</option>
+                    <option value="before_restoration">Pre-Restauro</option>
+                    <option value="after_restoration">Post-Restauro</option>
+                    <option value="excavation_progress">Avanzamento Scavo</option>
+                    <option value="stratigraphy">Stratigrafia</option>
+                    <option value="find_context">Contesto Rinvenimento</option>
+                    <option value="laboratory">Laboratorio</option>
+                    <option value="archive">Archivio</option>
+                </select>
+            </div>
+
+            <!-- Sort By -->
+            <div>
+                <label for="sortBy" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ordinamento</label>
+                <select x-model="filters.sortBy"
+                        @change="applyFilters()"
+                        id="sortBy"
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+                    <option value="created_desc">Data upload ↓</option>
+                    <option value="created_asc">Data upload ↑</option>
+                    <option value="filename_asc">Nome file A→Z</option>
+                    <option value="filename_desc">Nome file Z→A</option>
+                    <option value="size_desc">Dimensione ↓</option>
+                    <option value="size_asc">Dimensione ↑</option>
+                    <option value="photo_date_desc">Data foto ↓</option>
+                    <option value="find_date_desc">Data rinvenimento ↓</option>
+                    <option value="inventory_asc">N. Inventario ↑</option>
+                    <option value="material_asc">Materiale ↑</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Advanced Filters Toggle -->
+        <div class="mt-4 flex items-center justify-between">
+            <button @click="showAdvancedFilters = !showAdvancedFilters"
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                </svg>
+                <span x-text="showAdvancedFilters ? 'Nascondi filtri avanzati' : 'Mostra filtri avanzati'"></span>
+                <svg class="w-4 h-4 ml-2 transition-transform" :class="showAdvancedFilters ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+
+            <!-- Active Filters Count -->
+            <div x-show="getActiveFiltersCount() > 0" class="flex items-center space-x-2">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                    </svg>
+                    <span x-text="getActiveFiltersCount()"></span> filtri attivi
+                </span>
+                <button @click="clearAllFilters()" class="text-sm text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 font-medium">
+                    Cancella tutti
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Advanced Filters Panel -->
+    <div x-show="showAdvancedFilters"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 -translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-2"
+         class="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Archaeological Context Section -->
+            <div class="space-y-4">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+                    </svg>
+                    Contesto Archeologico
+                </h3>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Area di Scavo</label>
+                    <input type="text" x-model="filters.excavation_area" @input="applyFilters()"
+                           placeholder="es: Area A, Settore 3..."
+                           class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unità Stratigrafica</label>
+                    <input type="text" x-model="filters.stratigraphic_unit" @input="applyFilters()"
+                           placeholder="es: US 101, US 205..."
+                           class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Periodo Cronologico</label>
+                    <input type="text" x-model="filters.chronology_period" @input="applyFilters()"
+                           placeholder="es: Romano Imperiale, Neolitico..."
+                           class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo Oggetto</label>
+                    <input type="text" x-model="filters.object_type" @input="applyFilters()"
+                           placeholder="es: Anfora, Moneta, Fibula..."
+                           class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stato di Conservazione</label>
+                    <select x-model="filters.conservation_status" @change="applyFilters()"
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        <option value="">Tutti gli stati</option>
+                        <option value="excellent">Eccellente</option>
+                        <option value="good">Buono</option>
+                        <option value="fair">Discreto</option>
+                        <option value="poor">Cattivo</option>
+                        <option value="fragmentary">Frammentario</option>
+                        <option value="restored">Restaurato</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Status and Technical Section -->
+            <div class="space-y-4">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Stato e Qualità
+                </h3>
+
+                <!-- Status Checkboxes -->
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="filters.is_published" @change="applyFilters()"
+                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Solo foto pubblicate</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="filters.is_validated" @change="applyFilters()"
+                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Solo foto validate</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="filters.has_deep_zoom" @change="applyFilters()"
+                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Con Deep Zoom disponibile</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="filters.has_inventory" @change="applyFilters()"
+                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Con numero inventario</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="filters.has_description" @change="applyFilters()"
+                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Con descrizione</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="filters.has_photographer" @change="applyFilters()"
+                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4">
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Con fotografo indicato</span>
+                    </label>
+                </div>
+
+                <!-- Image Dimensions -->
+                <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dimensioni Immagine (px)</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Largh. Min</label>
+                            <input type="number" x-model="filters.min_width" @input="applyFilters()"
+                                   placeholder="0"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Largh. Max</label>
+                            <input type="number" x-model="filters.max_width" @input="applyFilters()"
+                                   placeholder="∞"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Altez. Min</label>
+                            <input type="number" x-model="filters.min_height" @input="applyFilters()"
+                                   placeholder="0"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Altez. Max</label>
+                            <input type="number" x-model="filters.max_height" @input="applyFilters()"
+                                   placeholder="∞"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Size -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dimensione File (MB)</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Min</label>
+                            <input type="number" step="0.1" x-model="filters.min_file_size_mb" @input="applyFilters()"
+                                   placeholder="0"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Max</label>
+                            <input type="number" step="0.1" x-model="filters.max_file_size_mb" @input="applyFilters()"
+                                   placeholder="∞"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date Ranges Section -->
+            <div class="space-y-4">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    Periodi Temporali
+                </h3>
+
+                <!-- Upload Date Range -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Upload</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Da</label>
+                            <input type="date" x-model="filters.upload_date_from" @input="applyFilters()"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">A</label>
+                            <input type="date" x-model="filters.upload_date_to" @input="applyFilters()"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Photo Date Range -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Scatto</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Da</label>
+                            <input type="date" x-model="filters.photo_date_from" @input="applyFilters()"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">A</label>
+                            <input type="date" x-model="filters.photo_date_to" @input="applyFilters()"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Find Date Range -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Rinvenimento</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">Da</label>
+                            <input type="date" x-model="filters.find_date_from" @input="applyFilters()"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 dark:text-gray-400 mb-1">A</label>
+                            <input type="date" x-model="filters.find_date_to" @input="applyFilters()"
+                                   class="block w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Date Presets -->
+                <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Scorciatoie Upload</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button @click="setDatePreset('today')" class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-200 transition-colors">
+                            Oggi
+                        </button>
+                        <button @click="setDatePreset('week')" class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-200 transition-colors">
+                            Ultima settimana
+                        </button>
+                        <button @click="setDatePreset('month')" class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-200 transition-colors">
+                            Ultimo mese
+                        </button>
+                        <button @click="setDatePreset('year')" class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-700 dark:text-gray-200 transition-colors">
+                            Ultimo anno
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Filters Tags -->
+        <div x-show="getActiveFiltersCount() > 0" class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div class="flex flex-wrap gap-2">
+                <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Filtri attivi:</span>
+                <template x-for="(filter, key) in getActiveFiltersList()" :key="key">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                        <span x-text="filter.label + ': ' + filter.value"></span>
+                        <button @click="clearFilter(key)" class="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300">×</button>
+                    </span>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>

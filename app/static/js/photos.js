@@ -2132,6 +2132,32 @@ function photosManager() {
             }, 5000);
         },
 
+        // Open Upload Modal - Metodo corretto per inizializzare il componente upload
+        openUploadModal() {
+            console.log('openUploadModal called - initializing upload component');
+            
+            // Try to get the upload component from the DOM
+            const uploadElement = document.querySelector('[x-data*=\"photoUploadComponent\"]');
+            
+            if (uploadElement) {
+                // Get the Alpine.js component data
+                const uploadComponent = Alpine.$data(uploadElement);
+                
+                if (uploadComponent && uploadComponent.openModal) {
+                    console.log('Found upload component, calling openModal()');
+                    uploadComponent.openModal();
+                } else {
+                    console.error('Upload component not found or has no openModal method');
+                    // Fallback: show simple alert
+                    this.showAlertMessage('Upload component non disponibile');
+                }
+            } else {
+                console.warn('Upload component element not found in DOM');
+                // Fallback: show simple alert
+                this.showAlertMessage('Upload component non disponibile');
+            }
+        },
+
         // Initialize deep zoom status checking
         async initializeDeepZoomStatus() {
             console.log('Initializing deep zoom status checking...');
@@ -2529,3 +2555,227 @@ document.addEventListener('DOMContentLoaded', () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { photosManager };
 }
+
+// FAB Controls CSS Styles - Aggiunti dal file di riferimento photos.ori.html
+const fabStyles = `
+/* Flowbite-style Controls for OpenSeadragon */
+.osd-fab-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.osd-fab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    width: 44px;
+    height: 44px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    border: 1px solid;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    white-space: nowrap;
+}
+
+/* Flowbite button variants */
+.osd-fab-primary {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+    color: #ffffff;
+}
+
+.osd-fab-primary:hover {
+    background-color: #2563eb;
+    border-color: #2563eb;
+}
+
+.osd-fab-secondary {
+    background-color: #6b7280;
+    border-color: #6b7280;
+    color: #ffffff;
+}
+
+.osd-fab-secondary:hover {
+    background-color: #4b5563;
+    border-color: #4b5563;
+}
+
+.osd-fab-accent {
+    background-color: #8b5cf6;
+    border-color: #8b5cf6;
+    color: #ffffff;
+}
+
+.osd-fab-accent:hover {
+    background-color: #7c3aed;
+    border-color: #7c3aed;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .osd-fab-primary {
+        background-color: #60a5fa;
+        border-color: #60a5fa;
+    }
+    
+    .osd-fab-primary:hover {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+    }
+    
+    .osd-fab-secondary {
+        background-color: #9ca3af;
+        border-color: #9ca3af;
+    }
+    
+    .osd-fab-secondary:hover {
+        background-color: #6b7280;
+        border-color: #6b7280;
+    }
+}
+
+/* Active state */
+.osd-fab:active {
+    transform: scale(0.98);
+}
+
+/* SVG Icons */
+.osd-fab svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+    flex-shrink: 0;
+}
+
+/* Tooltip */
+.osd-fab-tooltip {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-right: 12px;
+    background: rgba(17, 24, 39, 0.9);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 0.375rem;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.15s ease-in-out;
+    pointer-events: none;
+    z-index: 1001;
+    border: 1px solid rgba(75, 85, 99, 0.3);
+}
+
+.osd-fab-tooltip::after {
+    content: '';
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 4px solid transparent;
+    border-left-color: rgba(17, 24, 39, 0.9);
+}
+
+.osd-fab:hover .osd-fab-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Focus states for accessibility */
+.osd-fab:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .osd-fab-container {
+        bottom: 16px;
+        right: 16px;
+        gap: 6px;
+    }
+    
+    .osd-fab {
+        padding: 8px 12px;
+        font-size: 13px;
+        min-height: 40px;
+    }
+    
+    .osd-fab svg {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .osd-fab-tooltip {
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+    
+    /* Hide text on mobile, show only icons */
+    .osd-fab:not(:only-child) {
+        padding: 8px;
+        width: 40px;
+    }
+    
+    .osd-fab:not(:only-child) .osd-fab-tooltip {
+        display: block;
+    }
+}
+
+/* Animation for entrance */
+@keyframes fabEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.osd-fab {
+    animation: fabEntrance 0.3s ease-out;
+}
+
+.osd-fab:nth-child(2) { animation-delay: 0.05s; }
+.osd-fab:nth-child(3) { animation-delay: 0.1s; }
+.osd-fab:nth-child(4) { animation-delay: 0.15s; }
+.osd-fab:nth-child(5) { animation-delay: 0.2s; }
+.osd-fab:nth-child(6) {animation-delay: 0.25s; }
+
+/* Hide default OpenSeadragon controls */
+.osd-container .navigator,
+.osd-container .zoom-in,
+.osd-container .zoom-out,
+.osd-container .home,
+.osd-container .full-page,
+.osd-container .rotate-left,
+.osd-container .rotate-right {
+    display: none !important;
+}
+`;
+
+// Add FAB styles to the page
+const fabStylesheet = document.createElement('style');
+fabStylesheet.textContent = fabStyles;
+fabStylesheet.setAttribute('id', 'osd-fab-styles');
+document.head.appendChild(fabStylesheet);
+
+console.log('✅ FAB controls CSS styles loaded successfully');

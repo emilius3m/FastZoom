@@ -1,0 +1,448 @@
+<!-- _notifications.html - Componente Sistema Notifiche per Gestione Foto -->
+<!-- Componente modulare per la visualizzazione di notifiche e feedback utente -->
+
+<!-- Toast Notifications Container -->
+<div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none">
+    <!-- Toast notifications vengono inserite qui dinamicamente -->
+</div>
+
+<!-- Alert Banner (per messaggi importanti) -->
+<div x-show="showAlert" 
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="opacity-0 transform translate-y-2"
+     x-transition:enter-end="opacity-100 transform translate-y-0"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="opacity-100 transform translate-y-0"
+     x-transition:leave-end="opacity-0 transform translate-y-2"
+     class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
+    
+    <div class="max-w-lg mx-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-4"
+         :class="alertClasses[alertType] || 'border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-800 dark:text-blue-200'">
+        
+        <div class="flex items-start">
+            <!-- Alert Icon -->
+            <div class="flex-shrink-0 mr-3">
+                <div class="alert-icon-container">
+                    <!-- Success Icon -->
+                    <svg x-show="alertType === 'success'" class="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 0l-2 2a1 1 0 001.414 1.414l2-2a1 1 0 001.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    
+                    <!-- Error Icon -->
+                    <svg x-show="alertType === 'error'" class="w-5 h-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414-1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414 1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                    </svg>
+                    
+                    <!-- Warning Icon -->
+                    <svg x-show="alertType === 'warning'" class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    
+                    <!-- Info Icon -->
+                    <svg x-show="alertType === 'info'" class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2h3a1 1 0 100-2H9z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Alert Content -->
+            <div class="flex-1">
+                <h3 class="text-sm font-medium" x-text="alertTitle"></h3>
+                <div class="mt-1 text-sm" x-html="alertMessage"></div>
+                
+                <!-- Additional Details (optional) -->
+                <div x-show="alertDetails" class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                    <button @click="showAlertDetails = !showAlertDetails" 
+                            class="text-blue-600 dark:text-blue-400 hover:text-blue-500 font-medium">
+                        <span x-show="!showAlertDetails">Mostra dettagli</span>
+                        <span x-show="showAlertDetails">Nascondi dettagli</span>
+                    </button>
+                    <div x-show="showAlertDetails" class="mt-2 p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                        <pre class="text-xs whitespace-pre-wrap" x-text="alertDetails"></pre>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons (optional) -->
+                <div x-show="alertActions && alertActions.length > 0" class="mt-3 flex space-x-2">
+                    <template x-for="action in alertActions" :key="action.id">
+                        <button @click="handleAlertAction(action.id)"
+                                :class="action.class || 'bg-blue-600 text-white px-3 py-1 rounded text-sm'"
+                                x-text="action.text"></button>
+                    </template>
+                </div>
+            </div>
+            
+            <!-- Close Button -->
+            <div class="flex-shrink-0 ml-4">
+                <button @click="showAlert = false; resetAlert()"
+                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Notification Container -->
+<div id="progress-container" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 space-y-2">
+    <!-- Progress notifications vengono inserite qui dinamicamente -->
+</div>
+
+<!-- Status Indicator (per stati persistenti) -->
+<div x-show="statusIndicators && Object.keys(statusIndicators).length > 0"
+     class="fixed top-20 right-4 z-40 space-y-2">
+    <template x-for="(status, key) in statusIndicators" :key="key">
+        <div x-show="status.visible"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform translate-x-2"
+             x-transition:enter-end="opacity-100 transform translate-x-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform translate-x-0"
+             x-transition:leave-end="opacity-0 transform translate-x-2"
+             class="pointer-events-auto">
+            
+            <!-- Status Badge -->
+            <div class="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium"
+                 :class="status.type === 'success' ? 'bg-green-100 text-green-800' :
+                         status.type === 'error' ? 'bg-red-100 text-red-800' :
+                         status.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                         status.type === 'info' ? 'bg-blue-100 text-blue-800' :
+                         'bg-gray-100 text-gray-800'">
+                
+                <!-- Status Icon -->
+                <div class="w-4 h-4 mr-2">
+                    <!-- Success -->
+                    <svg x-show="status.type === 'success'" class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 0l-2 2a1 1 0 001.414 1.414l2-2a1 1 0 001.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    
+                    <!-- Error -->
+                    <svg x-show="status.type === 'error'" class="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414-1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414 1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                    </svg>
+                    
+                    <!-- Warning -->
+                    <svg x-show="status.type === 'warning'" class="w-4 h-4 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    
+                    <!-- Info -->
+                    <svg x-show="status.type === 'info'" class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2h3a1 1 0 100-2H9z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+                
+                <!-- Status Text -->
+                <span x-text="status.message"></span>
+                
+                <!-- Progress Bar (if applicable) -->
+                <div x-show="status.progress !== undefined" class="ml-3 w-24 bg-gray-200 rounded-full h-2">
+                    <div class="h-2 bg-current-color rounded-full transition-all duration-300"
+                         :style="`width: ${status.progress}%`"></div>
+                </div>
+                
+                <!-- Close Button -->
+                <button @click="removeStatus(key)"
+                        class="ml-2 text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </template>
+</div>
+
+<!-- JavaScript per il sistema notifiche -->
+<script>
+// Sistema notifiche riutilizzabile per la gestione di foto
+window.photoNotificationSystem = {
+    // Stato interno
+    toasts: [],
+    statusIndicators: {},
+    alerts: [],
+    
+    // Inizializzazione
+    init() {
+        this.setupEventListeners();
+        this.cleanupExpiredNotifications();
+        console.log('Photo notification system initialized');
+    },
+    
+    // Mostra un toast notification
+    showToast(message, options = {}) {
+        const toastId = this.generateId();
+        const toast = {
+            id: toastId,
+            message: message,
+            type: options.type || 'info', // success, error, warning, info
+            duration: options.duration || 5000,
+            title: options.title || null,
+            persistent: options.persistent || false,
+            action: options.action || null,
+            progress: options.progress || null,
+            details: options.details || null,
+            timestamp: new Date()
+        };
+        
+        this.toasts.push(toast);
+        this.renderToast(toast);
+        
+        // Auto-remove se non persistente
+        if (!toast.persistent) {
+            setTimeout(() => {
+                this.removeToast(toastId);
+            }, toast.duration);
+        }
+        
+        return toastId;
+    },
+    
+    // Mostra un alert banner
+    showAlert(message, type = 'info', options = {}) {
+        const alertId = this.generateId();
+        
+        this.alerts = [{
+            id: alertId,
+            message: message,
+            type: type,
+            title: options.title || null,
+            details: options.details || null,
+            actions: options.actions || [],
+            timestamp: new Date()
+        }];
+        
+        // Aggiorna stato Alpine.js
+        this.updateAlpineState();
+        
+        return alertId;
+    },
+    
+    // Mostra uno status indicator
+    showStatus(id, message, type = 'info', options = {}) {
+        this.statusIndicators[id] = {
+            message: message,
+            type: type,
+            visible: true,
+            progress: options.progress || undefined,
+            timeout: options.timeout || null,
+            timestamp: new Date()
+        };
+        
+        // Aggiorna stato Alpine.js
+        this.updateAlpineState();
+        
+        // Auto-remove se impostato timeout
+        if (options.timeout) {
+            setTimeout(() => {
+n                this.removeStatus(id);
+            }, options.timeout);
+        }
+        
+        return this.statusIndicators[id];
+    },
+    
+    // Aggiorna uno status esistente
+    updateStatus(id, updates) {
+        if (this.statusIndicators[id]) {
+            Object.assign(this.statusIndicators[id], updates, {
+                timestamp: new Date()
+            });
+            this.updateAlpineState();
+        }
+    },
+    
+    // Rimuove un toast
+    removeToast(toastId) {
+        const index = this.toasts.findIndex(t => t.id === toastId);
+        if (index !== -1) {
+            const toast = this.toasts[index];
+            // Animazione di uscita
+            const toastElement = document.getElementById(`toast-${toastId}`);
+            if (toastElement) {
+                toastElement.classList.add('toast-exit');
+                setTimeout(() => {
+                    this.toasts.splice(index, 1);
+                    this.updateAlpineState();
+                }, 300);
+            } else {
+                this.toasts.splice(index, 1);
+                this.updateAlpineState();
+            }
+        }
+    },
+    
+    // Rimuove uno status
+    removeStatus(statusId) {
+        if (this.statusIndicators[statusId]) {
+            this.statusIndicators[statusId].visible = false;
+            delete this.statusIndicators[statusId];
+            this.updateAlpineState();
+        }
+    },
+    
+    // Rimuove tutti i toast
+    clearToasts() {
+        this.toasts.forEach(toast => {
+            const toastElement = document.getElementById(`toast-${toast.id}`);
+            if (toastElement) {
+                toastElement.classList.add('toast-exit');
+            }
+        });
+        
+        setTimeout(() => {
+            this.toasts = [];
+            this.updateAlpineState();
+        }, 300);
+    },
+    
+    // Rimuove tutti gli alert
+    clearAlerts() {
+        this.alerts = [];
+        this.updateAlpineState();
+    },
+    
+    // Pulisci notifiche scadute
+    cleanupExpiredNotifications() {
+        setInterval(() => {
+            const now = new Date();
+            
+            // Rimuovi toast scaduti
+            this.toasts = this.toasts.filter(toast => {
+                const age = now - toast.timestamp;
+                const maxAge = toast.persistent ? 30000 : 10000; // 30s per persistent, 10s per normali
+                
+                if (age > maxAge) {
+                    const toastElement = document.getElementById(`toast-${toast.id}`);
+                    if (toastElement) {
+                        toastElement.classList.add('toast-exit');
+                        setTimeout(() => {
+                            toastElement.remove();
+                        }, 300);
+                    }
+                    return false;
+                }
+                return true;
+            });
+            
+            this.updateAlpineState();
+        }, 5000); // Controlla ogni 5 secondi
+    },
+    
+    // Renderizza un toast nel DOM
+    renderToast(toast) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        
+        const toastElement = document.createElement('div');
+        toastElement.id = `toast-${toast.id}`;
+        toastElement.className = 'toast-notification pointer-events-auto';
+        toastElement.setAttribute('role', 'alert');
+        toastElement.setAttribute('aria-live', 'polite');
+        
+        // Colori base per tipo
+        const bgColors = {
+            success: 'bg-green-500',
+            error: 'bg-red-500',
+            warning: 'bg-yellow-500',
+            info: 'bg-blue-500'
+        };
+        
+        const bgColor = bgColors[toast.type] || bgColors.info;
+        
+        toastElement.innerHTML = `
+            <div class="flex items-start max-w-md p-4 rounded-lg shadow-lg ${bgColor} text-white">
+                <!-- Icon -->
+                <div class="flex-shrink-0 mr-3">
+                    <div class="toast-icon">
+                        ${this.getToastIcon(toast.type)}
+                    </div>
+                </div>
+                
+                <!-- Content -->
+                <div class="flex-1 min-w-0">
+                    ${toast.title ? `<h4 class="text-sm font-semibold mb-1">${toast.title}</h4>` : ''}
+                    <p class="text-sm">${toast.message}</p>
+                    
+                    <!-- Progress Bar -->
+                    ${toast.progress !== null ? `
+                        <div class="mt-2 w-full bg-white bg-opacity-30 rounded-full h-1.5">
+                            <div class="h-1.5 bg-white rounded-full transition-all duration-300" 
+                                 style="width: ${toast.progress}%"></div>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- Action Button -->
+                    ${toast.action ? `
+                        <button onclick="window.photoNotificationSystem.handleToastAction('${toast.id}', '${toast.action}')"
+                                class="mt-2 text-xs bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded text-white">
+                            ${toast.action.text}
+                        </button>
+                    ` : ''}
+                </div>
+                
+                <!-- Close Button -->
+                <div class="flex-shrink-0 ml-4">
+                    <button onclick="window.photoNotificationSystem.removeToast('${toast.id}')"
+                            class="text-white hover:text-gray-200 transition-colors"
+                            aria-label="Chiudi notifica">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(toastElement);
+        
+        // Animazione di entrata
+        setTimeout(() => {
+            toastElement.classList.add('toast-enter');
+        }, 10);
+    },
+    
+    // Ottiene l'icona per il tipo di toast
+    getToastIcon(type) {
+        const icons = {
+            success: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 0l-2 2a1 1 0 001.414 1.414l2-2a1 1 0 001.414 0z" clip-rule="evenodd"/></svg>',
+            error: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414-1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414 1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>',
+            warning: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>',
+            info: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2h3a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>'
+        };
+        return icons[type] || icons.info;
+    },
+    
+    // Gestisce azione toast
+    handleToastAction(toastId, actionId) {
+        // Aggiungi qui la logica per gestire azioni custom
+        console.log('Toast action clicked:', { toastId, actionId });
+        
+        // Rimuovi il toast dopo l'azione
+        setTimeout(() => {
+            this.removeToast(toastId);
+        }, 500);
+    },
+    
+    // Genera ID univoco
+    generateId() {
+        return 'toast-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+    },
+    
+    // Aggiorna stato Alpine.js
+    updateAlpineState() {
+        // Sincronizza con Alpine store se disponibile
+        if (window.Alpine && window.Alpine.store) {
+            try {
+                window.Alpine.store('notifications', {
+                    toasts: this.toasts,
+                    statusIndicators: this.statusIndicators,
+n                    alerts: this.alerts,\n                    showAlert: this.alerts.length > 0,
+n                    showAlertMessage: this.alerts.length > 0 ? this.alerts[0].message : '',
+n                    alertType: this.alerts.length > 0 ? this.alerts[0].type : 'info',\n                    alertTitle: this.alerts.length > 0 ? this.alerts[0].title : '',\n                    alertMessage: this.alerts.length > 0 ? this.alerts[0].message : '',\n                    alertDetails: this.alerts.length > 0 ? this.alerts[0].details : null,\n                    alertActions: this.alerts.length > 0 ? this.alerts[0].actions : []\n                });\n            } catch (error) {\n                console.error('Error updating Alpine store:', error);\n            }\n        }\n    },
+    
+    // Setup event listeners
+    setupEventListeners() {
+n        // Global event listeners per notifiche esterne\n        document.addEventListener('photo:upload-start', (e) => {\n            this.showToast('Upload iniziato...', {\n                type: 'info',\n                title: 'Upload Photos',\n                progress: 0\n            });\n        });\n        \n        document.addEventListener('photo:upload-progress', (e) => {\n            const toastId = this.findToastByType('info', 'Upload Photos');\n            if (toastId) {\n                this.updateToastProgress(toastId, e.detail.progress);\n            }\n        });\n        \n        document.addEventListener('photo:upload-success', (e) => {\n            this.showToast(`Upload completato! ${e.detail.fileCount || 0} file caricati con successo`, {\n                type: 'success',\n                title: 'Upload Completato',\n                duration: 3000\n            });\n        });\n        \n        document.addEventListener('photo:upload-error', (e) => {\n            this.showToast(`Errore durante upload: ${e.detail.message}`, {\n                type: 'error',\n                title: 'Upload Fallito',\n                duration: 5000,\n                details: e.detail.stack\n            });\n        });\n        \n        document.addEventListener('photo:delete-success', (e) => {\n            this.showToast(`Foto eliminata con successo`, {\n                type: 'success',\n                duration: 2000\n            });\n        });\n        \n        document.addEventListener('photo:delete-error', (e) => {\n            this.showToast(`Errore eliminazione foto: ${e.detail.message}`, {\n                type: 'error',\n                duration: 4000\n            });\n        });\n        \n        // WebSocket notifications\n        document.addEventListener('ws:tile-completed', (e) => {\n            this.showToast(`Deep Zoom completato: ${e.detail.fileName}`, {\n                type: 'success',\n                title: 'Deep Zoom'\n            });\n        });\n        \n        document.addEventListener('ws:tile-failed', (e) => {\n            this.showToast(`Errore Deep Zoom: ${e.detail.fileName}`, {\n                type: 'error',\n                title: 'Deep Zoom'\n            });\n        });\n        \n        document.addEventListener('ws:upload-completed', (e) => {\n            this.showToast(`Upload massa completato: ${e.detail.totalCount} foto processate`, {\n                type: 'success',\n                title: 'Upload Massa'\n            });\n        });\n    },\n    \n    // Trova toast per tipo e titolo\n    findToastByType(type, title) {\n        return this.toasts.find(toast => \n            toast.type === type && \n            (title ? toast.title === title : true)\n        );\n    },\n    \n    // Aggiorna progress di un toast esistente\n    updateToastProgress(toastId, progress) {\n        const toast = this.toasts.find(t => t.id === toastId);\n        if (toast) {\n            toast.progress = Math.min(100, Math.max(0, progress));\n            \n            const progressElement = document.querySelector(`#toast-${toastId} .toast-progress-bar`);\n            if (progressElement) {\n                progressElement.style.width = `${toast.progress}%`;\n            }\n        }\n    },\n    \n    // Mostra notifica per operazione in corso\n    showProgressNotification(id, message, current, total) {\n        const progress = total > 0 ? (current / total) * 100 : 0;\n        return this.showStatus(id, message, 'info', { progress });\n    },\n    \n    // Mostra notifica di successo\n    showSuccess(id, message, duration = 3000) {\n        return this.showStatus(id, message, 'success', { \n            timeout: duration \n        });\n    },\n    \n    // Mostra notifica di errore\n    showError(id, message, duration = 5000) {\n        return this.showStatus(id, message, 'error', { \n            timeout: duration \n        });\n    }\n};\n\n// Inizializza il sistema notifiche quando il DOM è pronto\ndocument.addEventListener('DOMContentLoaded', () => {\n    window.photoNotificationSystem.init();\n});\n</script>\n\n<!-- Stili per il sistema notifiche -->\n<style>\n/* Toast Notifications */\n.toast-notification {\n    animation: toastSlideIn 0.3s ease-out;\n    margin-bottom: 8px;\n    min-width: 300px;\n}\n\n.toast-notification.toast-enter {\n    animation: toastSlideIn 0.3s ease-out;\n}\n\n.toast-notification.toast-exit {\n    animation: toastSlideOut 0.3s ease-in;\n    opacity: 0;\n    transform: translateX(100%);\n}\n\n/* Toast Icon Styles */\n.toast-icon {\n    width: 1.25rem;\n    height: 1.25rem;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    flex-shrink: 0;\n}\n\n/* Status Indicators */\n.status-indicator {\n    animation: statusFadeIn 0.3s ease-out;\n}\n\n@keyframes statusFadeIn {\n    from {\n        opacity: 0;\n        transform: translateX(20px);\n    }\n    to {\n        opacity: 1;\n        transform: translateX(0);\n    }\n}\n\n@keyframes toastSlideIn {\n    from {\n        opacity: 0;\n        transform: translateX(100%);\n    }\n    to {\n        opacity: 1;\n        transform: 0;\n    }\n}\n\n@keyframes toastSlideOut {\n    from {\n        opacity: 1;\n        transform: 0;\n    }\n    to {\n        opacity: 0;\n        transform: translateX(100%);\n    }\n\n/* Progress Bar */\n.toast-progress-bar {\n    height: 100%;\n    transition: width 0.3s ease-out;\n}\n\n/* Dark mode styles */\ndark .toast-notification {\n    /* Colori specifici per dark mode */\n}\n\n/* Responsive */\n@media (max-width: 640px) {\n    .toast-notification {\n        max-width: 90vw;\n        margin-left: auto;\n        margin-right: auto;\n    }\n    \n    .status-indicator {\n        margin-left: auto;\n        margin-right: auto;\n    }\n}\n\n/* Focus e Accessibilità */\n.toast-notification:focus {\n    outline: 2px solid rgba(255, 255, 255, 0.5);\n    outline-offset: 2px;\n}\n\n/* Z-index per layering corretto */\n#toast-container {\n    z-index: 9999;\n}\n\n#progress-container {\n    z-index: 9998;\n}\n</style>
