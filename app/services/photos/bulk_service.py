@@ -375,7 +375,7 @@ class PhotoBulkService:
         updated_count = 0
         updated_fields = []
         
-        try:
+        async with db.begin():  # Auto-commit on success, auto-rollback on exception
             # Update all photos within the transaction
             for photo in photos:
                 try:
@@ -420,14 +420,7 @@ class PhotoBulkService:
                 db.add(activity)
                 self.logger.info(f"Activity log added for bulk update of {updated_count} photos")
             
-            # Commit transaction explicitly
-            await db.commit()
-            self.logger.info(f"Bulk update transaction committed successfully for {updated_count} photos")
-            
-        except Exception as e:
-            self.logger.error(f"Bulk update transaction error: {e}")
-            await db.rollback()
-            raise HTTPException(status_code=500, detail=f"Errore aggiornamento in blocco: {str(e)}")
+            self.logger.info(f"Bulk update transaction completed successfully for {updated_count} photos")
         
         return {
             'updated_count': updated_count,

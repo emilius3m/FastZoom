@@ -103,7 +103,7 @@ class PhotoUploadService:
 
         # Process photos (parallel or sequential based on count)
         upload_results = await self._process_photos_parallel_or_sequential(
-            photos, site_id, user_id, archaeological_metadata
+            photos, site_id, user_id, archaeological_metadata, db
         )
 
         # Filter and validate results
@@ -207,7 +207,8 @@ class PhotoUploadService:
         photos: List[UploadFile],
         site_id: UUID,
         user_id: UUID,
-        archaeological_metadata: Dict[str, Any]
+        archaeological_metadata: Dict[str, Any],
+        db: AsyncSession
     ) -> List:
         """
         Process photos using parallel or sequential approach based on file count.
@@ -215,14 +216,14 @@ class PhotoUploadService:
         
         if len(photos) == 1:
             logger.info("Processing single photo sequentially to avoid database session conflicts")
-            result = await self._process_single_photo(photos[0], site_id, user_id, archaeological_metadata)
+            result = await self._process_single_photo(photos[0], site_id, user_id, archaeological_metadata, db)
             return [result]
         else:
             # Use parallel processing with timeout protection
             logger.info(f"Processing {len(photos)} photos in parallel with timeout protection")
             
             upload_tasks = [
-                self._process_single_photo(photo, site_id, user_id, archaeological_metadata)
+                self._process_single_photo(photo, site_id, user_id, archaeological_metadata, db)
                 for photo in photos
             ]
 
@@ -235,7 +236,7 @@ class PhotoUploadService:
                 return upload_results
             except asyncio.TimeoutError:
                 raise HTTPException(
-                    status_code=408, 
+                    status_code=408,
                     detail="Upload processing timed out after 5 minutes"
                 )
 
@@ -244,10 +245,12 @@ class PhotoUploadService:
         file: UploadFile,
         site_id: UUID,
         user_id: UUID,
-        archaeological_metadata: Dict[str, Any]
+        archaeological_metadata: Dict[str, Any],
+        task_db: AsyncSession
     ) -> Optional[Dict[str, Any]]:
         """
         Process a single photo with complete error handling and transaction management.
+        Uses the passed database session with async context manager pattern.
         """
         
         photo_record = None
@@ -255,18 +258,18 @@ class PhotoUploadService:
         file_path = None
         
         try:
-            # 1. Save file to storage
+            # 1. Save file to storage (outside transaction)
             filename, file_path, file_size = await storage_service.save_upload_file(
                 file, str(site_id), str(user_id)
             )
 
-            # 2. Extract metadata from uploaded file
+            # 2. Extract metadata from uploaded file (outside transaction)
             await file.seek(0)  # Reset file pointer
             exif_data, metadata = await photo_metadata_service.extract_metadata_from_file(
                 file, filename
             )
 
-            # 3. Create photo record in database
+            # 3. Create photo record object (not saved yet)
             photo_record = await photo_metadata_service.create_photo_record(
                 filename=filename,
                 original_filename=file.filename,
@@ -278,57 +281,43 @@ class PhotoUploadService:
                 archaeological_metadata=archaeological_metadata
             )
 
-            # 4. Handle database transaction and thumbnail generation
-            async with async_session_maker() as task_db:
+            # 4. Handle all database operations in a single transaction using the passed session
+            async with task_db.begin():
+                # Add photo record to transaction
+                task_db.add(photo_record)
+                await task_db.flush()
+                await task_db.refresh(photo_record)
+
+                # 5. Generate thumbnail
                 try:
-                    async with task_db.begin():
-                        # Add photo record to transaction
-                        task_db.add(photo_record)
-                        await task_db.flush()
-                        await task_db.refresh(photo_record)
-
-                        # 5. Generate thumbnail
-                        try:
-                            await file.seek(0)  # Reset file pointer for thumbnail
-                            thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
-                                file, str(photo_record.id)
-                            )
-
-                            if thumbnail_path:
-                                photo_record.thumbnail_path = thumbnail_path
-                                logger.info(f"Thumbnail generated: {thumbnail_path}")
-                            else:
-                                logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
-                        except Exception as thumbnail_error:
-                            logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
-                            # Don't fail the entire upload if thumbnail generation fails
-
-                        # 6. Log activity
-                        activity = UserActivity(
-                            user_id=str(user_id),
-                            site_id=str(site_id),
-                            activity_type="UPLOAD",
-                            activity_desc=f"Caricata foto: {file.filename}",
-                            extra_data=json.dumps({
-                                "photo_id": str(photo_record.id),
-                                "filename": filename,
-                                "file_size": file_size
-                            })
-                        )
-                        task_db.add(activity)
-                        logger.info(f"Activity log added for photo {photo_record.id}")
-
-                except Exception as db_error:
-                    logger.error(f"Database transaction failed for photo {file.filename}: {db_error}")
-                    # Clean up uploaded file if database transaction fails
-                    try:
-                        await storage_service.delete_file(file_path)
-                    except Exception as cleanup_error:
-                        logger.error(f"Failed to cleanup file after DB transaction failure: {cleanup_error}")
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Database error: Unable to save photo record"
+                    await file.seek(0)  # Reset file pointer for thumbnail
+                    thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
+                        file, str(photo_record.id)
                     )
+
+                    if thumbnail_path:
+                        photo_record.thumbnail_path = thumbnail_path
+                        logger.info(f"Thumbnail generated: {thumbnail_path}")
+                    else:
+                        logger.warning(f"Thumbnail generation failed for photo {photo_record.id}")
+                except Exception as thumbnail_error:
+                    logger.error(f"Thumbnail generation error for photo {photo_record.id}: {thumbnail_error}")
+                    # Don't fail the entire upload if thumbnail generation fails
+
+                # 6. Log activity
+                activity = UserActivity(
+                    user_id=str(user_id),
+                    site_id=str(site_id),
+                    activity_type="UPLOAD",
+                    activity_desc=f"Caricata foto: {file.filename}",
+                    extra_data=json.dumps({
+                        "photo_id": str(photo_record.id),
+                        "filename": filename,
+                        "file_size": file_size
+                    })
+                )
+                task_db.add(activity)
+                logger.info(f"Activity log added for photo {photo_record.id}")
 
             logger.info(f"Photo {photo_record.id} uploaded successfully by user {user_id}")
 

@@ -14,6 +14,31 @@ response = requests.post(
 tokens = response.json()
 access_token = tokens["access_token"]
 
+# FastAPI Photo Services - Code Style
+
+## Database Sessions
+- NEVER use self.db in service classes
+- ALWAYS pass AsyncSession as method parameter
+- USE async with db.begin() for transactions
+
+## Error Handling
+- REMOVE redundant except HTTPException: raise blocks
+- USE Pydantic validators for input validation
+- LOG errors with structured logging: logger.error("msg", exc_info=True)
+
+## Performance
+- USE eager loading (selectinload) for relationships
+- AVOID N+1 queries
+- IMPLEMENT retry logic with tenacity library
+
+## Type Hints
+- ALWAYS use complete type hints with Optional, List, Dict
+- IMPORT from typing for Python < 3.9 compatibility
+
+## Testing
+- RUN pytest before committing
+- CHECK type hints with mypy
+- VERIFY transaction rollback behavior
 
 
 # Guida alla Normalizzazione degli ID dei Siti
