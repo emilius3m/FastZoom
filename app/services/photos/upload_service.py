@@ -176,6 +176,23 @@ class PhotoUploadService:
             for key, value in raw_metadata.items():
                 if value is not None and value != '':
                     metadata[key] = value
+            
+            # ✅ CRITICAL FIX: Ensure archaeological fields are included from raw_metadata
+            # Map frontend form field names to database field names
+            field_mapping = {
+                'excavation_area': 'excavation_area',  # Already matches
+                'stratigraphic_unit': 'stratigraphic_unit',  # Already matches
+                'photo_date': 'photo_date',  # Already matches
+                # Add other mappings as needed
+            }
+            
+            # Apply field mapping and ensure all fields are included
+            for frontend_field, db_field in field_mapping.items():
+                if frontend_field in raw_metadata and raw_metadata[frontend_field]:
+                    metadata[db_field] = raw_metadata[frontend_field]
+            
+            logger.debug(f"📋 Raw metadata processed: {list(metadata.keys())}")
+            
         else:
             metadata = {}
             
@@ -190,7 +207,7 @@ class PhotoUploadService:
                 metadata['keywords'] = upload_request.keywords
             if upload_request.photo_type:
                 metadata['photo_type'] = upload_request.photo_type
-
+        
         # Add remaining fields from Pydantic model if not already in metadata
         remaining_fields = {
             'inventory_number', 'catalog_number', 'excavation_area', 'stratigraphic_unit',
@@ -299,50 +316,83 @@ class PhotoUploadService:
                     file, filename
                 )
 
-                # 3. Create photo record object (not saved yet)
-                photo_record = await photo_metadata_service.create_photo_record(
-                    filename=filename,
-                    original_filename=file.filename,
-                    file_path=file_path,
-                    file_size=file_size,
-                    site_id=str(site_id),
-                    uploaded_by=str(user_id),
-                    metadata=metadata,
-                    archaeological_metadata=archaeological_metadata
-                )
+                # ✅ CRITICAL FIX: Create photo record with better error handling
+                try:
+                    photo_record = await photo_metadata_service.create_photo_record(
+                        filename=filename,
+                        original_filename=file.filename,
+                        file_path=file_path,
+                        file_size=file_size,
+                        site_id=str(site_id),
+                        uploaded_by=str(user_id),
+                        metadata=metadata,
+                        archaeological_metadata=archaeological_metadata
+                    )
+                    logger.debug(f"✅ Photo record created successfully: {photo_record.id if photo_record else 'unknown'}")
+                except Exception as create_error:
+                    logger.error(
+                        "❌ PHOTO RECORD CREATION FAILED",
+                        error=str(create_error),
+                        error_type=type(create_error).__name__,
+                        filename=filename,
+                        site_id=str(site_id),
+                        user_id=str(user_id),
+                        metadata_keys=list(metadata.keys()) if metadata else [],
+                        arch_metadata_keys=list(archaeological_metadata.keys()) if archaeological_metadata else [],
+                        exc_info=True
+                    )
+                    raise
 
                 # ✅ FIX: Gestione transazione compatibile con SQLite
                 try:
-                    # Verifica se c'è già una transazione attiva
-                    if task_db.in_transaction():
-                        logger.debug("Using existing transaction")
-                        # Usa la transazione esistente
+                    # ✅ CRITICAL FIX: Use dedicated transaction for photo creation
+                    # This ensures proper isolation and commit handling
+                    async with task_db.begin():
                         task_db.add(photo_record)
                         await task_db.flush()
-                        # ✅ CRITICAL FIX: Non usare refresh dentro transazione con SQLite
-                        # Usa expire_on_commit=False o accedi ai dati prima del commit
                         photo_id = photo_record.id
-                        logger.debug(f"✅ Photo flushed in existing transaction: {photo_id}")
-                    else:
-                        # Crea nuova transazione solo se necessario
-                        logger.debug("Creating new transaction")
-                        async with task_db.begin():
-                            task_db.add(photo_record)
-                            await task_db.flush()
-                            photo_id = photo_record.id
-                            logger.debug(f"✅ Photo flushed in new transaction: {photo_id}")
+                        logger.debug(f"✅ Photo flushed in dedicated transaction: {photo_id}")
+                        
+                        # ✅ FIX: Commit immediately after flush to ensure record is saved
+                        await task_db.commit()
+                        logger.debug(f"✅ Photo committed to database: {photo_id}")
                     
-                    # ✅ FIX: Non fare refresh qui - SQLite non lo supporta bene
-                    # I dati sono già accessibili dopo flush()
+                    # ✅ FIX: After commit, refresh to get the generated ID
+                    await task_db.refresh(photo_record)
+                    photo_id = photo_record.id
+                    logger.debug(f"✅ Photo refreshed with ID: {photo_id}")
                     
                 except Exception as db_error:
+                    # ✅ FIX: Logging corretto con messaggio errore visibile
+                    import traceback
+                    error_traceback = traceback.format_exc()
+                    
+                    # Log con messaggio errore incluso nella stringa
                     logger.error(
-                        "Database operation failed",
+                        f"❌ DATABASE OPERATION FAILED: {type(db_error).__name__}: {str(db_error)}"
+                    )
+                    logger.error(
+                        f"Photo ID: {photo_record.id if photo_record else 'unknown'}, "
+                        f"Metadata keys: {list(archaeological_metadata.keys()) if archaeological_metadata else []}"
+                    )
+                    logger.error(f"❌ FULL TRACEBACK:\n{error_traceback}")
+                    
+                    # Log strutturato aggiuntivo per debugging
+                    logger.bind(
                         error=str(db_error),
                         error_type=type(db_error).__name__,
                         photo_id=photo_record.id if photo_record else "unknown",
-                        exc_info=True  # ✅ CRITICAL: Aggiunto stack trace
-                    )
+                        metadata_keys=list(archaeological_metadata.keys()) if archaeological_metadata else []
+                    ).error("Database operation exception details")
+                    
+                    # Log metadata that was being processed
+                    if archaeological_metadata:
+                        logger.error(
+                            "❌ METADATA BEING PROCESSED",
+                            metadata=archaeological_metadata,
+                            metadata_type=type(archaeological_metadata).__name__
+                        )
+                    
                     raise
                 
                 # 5. Generate thumbnail (outside main transaction)
@@ -459,27 +509,20 @@ class PhotoUploadService:
                 raise he
                 
             except Exception as photo_error:
-                # ✅ CRITICAL FIX: Log completo con stack trace
+                # ✅ FIX: Logging migliorato per debug
                 import traceback
                 error_details = traceback.format_exc()
                 
+                # Log l'errore completo nella stringa del messaggio
                 logger.error(
-                    "Unexpected error processing photo",
-                    error=str(photo_error),
-                    error_type=type(photo_error).__name__,
-                    filename=file.filename if file else "Unknown",
-                    site_id=str(site_id),
-                    user_id=str(user_id),
-                    file_path=file_path if file_path else "Unknown",
-                    file_size=file_size if 'file_size' in locals() else "Unknown",
-                    exc_info=True  # ✅ QUESTO È CRITICO - mostra stack trace completo
+                    f"❌ UNEXPECTED ERROR: {type(photo_error).__name__}: {str(photo_error)}"
                 )
-                
-                # Log separato per traceback completo
                 logger.error(
-                    "Full traceback for debugging",
-                    traceback=error_details
+                    f"Context - File: {file.filename if file else 'Unknown'}, "
+                    f"Path: {file_path if file_path else 'Unknown'}, "
+                    f"Size: {file_size if 'file_size' in locals() else 'Unknown'}"
                 )
+                logger.error(f"❌ FULL TRACEBACK:\n{error_details}")
                 
                 # Rollback esplicito per SQLite
                 if task_db.in_transaction():

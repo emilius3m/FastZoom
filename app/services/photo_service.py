@@ -574,7 +574,7 @@ class PhotoMetadataService:
             "conservation_status": self._convert_to_enum(ConservationStatus, archaeological_metadata.get('conservation_status')),
             "photo_type": self._convert_to_enum(PhotoType, archaeological_metadata.get('photo_type')),
             "description": archaeological_metadata.get('description'),
-            "keywords": archaeological_metadata.get('keywords'),
+            "keywords": self._convert_keywords_to_string(archaeological_metadata.get('keywords')),
 
             # 🔧 FIX: Exif completo removed - exif_data field doesn't exist in Photo model
             # The exif_data is stored internally but not passed to the Photo model
@@ -674,6 +674,37 @@ class PhotoMetadataService:
                 return None
         except Exception as e:
             logger.error(f"Error converting value '{value}' to {enum_class.__name__}: {e}")
+            return None
+
+    def _convert_keywords_to_string(self, keywords) -> Optional[str]:
+        """
+        Converte keywords da list a string per il database SQLite
+        
+        Args:
+            keywords: Keywords che possono essere lista, string, o None
+            
+        Returns:
+            Stringa con keywords separati da virgola o None
+        """
+        if keywords is None:
+            return None
+        
+        if isinstance(keywords, str):
+            # Return None for empty or whitespace-only strings
+            return keywords.strip() if keywords.strip() else None
+        
+        if isinstance(keywords, list):
+            # Filtra valori None o vuoti e converte a stringhe
+            valid_keywords = [str(k).strip() for k in keywords if k and str(k).strip()]
+            if not valid_keywords:
+                return None
+            return ", ".join(valid_keywords)
+        
+        # Se è un altro tipo, converti a stringa
+        try:
+            keyword_str = str(keywords)
+            return keyword_str if keyword_str.strip() else None
+        except Exception:
             return None
 
     def _guess_mime_type(self, filename: str) -> str:
