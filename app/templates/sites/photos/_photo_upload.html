@@ -519,8 +519,9 @@ function photoUploadComponent() {
                     formData.append('tags', JSON.stringify(this.metadata.tags));
                 }
                 
-                // Site ID
-                formData.append('site_id', this.config.siteId);
+                // ✅ CRITICAL FIX: Remove site_id from FormData
+                // Site ID should come from URL path parameter, not form field
+                // formData.append('site_id', this.config.siteId); // REMOVED - causes backend conflicts
                 
                 // ✅ FIX 3: Log FormData per debugging
                 console.log('📤 Sending FormData with entries:');
@@ -582,24 +583,41 @@ function photoUploadComponent() {
                     detail.progress = 100;
                 });
                 
-                // ✅ FIX 6: Mostra risultati dettagliati
-                if (result.successful && result.successful.length > 0) {
+                // ✅ CRITICAL FIX 2: Enhanced response validation and handling
+                console.log('🔍 Validating upload response structure:', result);
+                
+                // Handle both new format and backward compatibility
+                const successful = result.successful || result.uploaded_photos || [];
+                const failed = result.failed || result.failed_photos || [];
+                const total = successful.length + failed.length;
+                
+                if (successful && successful.length > 0) {
+                    console.log('✅ Successful uploads:', successful);
                     this.showToast(
-                        `✅ ${result.successful.length} foto caricate con successo!`,
+                        `✅ ${successful.length} foto caricate con successo!`,
                         'success'
                     );
                 }
                 
-                if (result.failed && result.failed.length > 0) {
-                    console.warn('⚠️ Some files failed:', result.failed);
+                if (failed && failed.length > 0) {
+                    console.warn('⚠️ Failed uploads:', failed);
                     this.showToast(
-                        `⚠️ ${result.failed.length} foto non caricate. Controlla la console.`,
+                        `⚠️ ${failed.length} foto non caricate. Controlla la console.`,
                         'warning'
                     );
                 }
                 
-                // Call success callback
-                this.handleUploadSuccess(result);
+                // Create normalized result for callback
+                const normalizedResult = {
+                    successful: successful,
+                    failed: failed,
+                    total_uploaded: successful.length,
+                    total_failed: failed.length,
+                    message: result.message || `${successful.length}/${total} foto caricate`
+                };
+                
+                console.log('📋 Normalized result for callback:', normalizedResult);
+                this.handleUploadSuccess(normalizedResult);
                 
                 // Close modal after delay
                 setTimeout(() => {
@@ -609,14 +627,28 @@ function photoUploadComponent() {
             } catch (error) {
                 console.error('❌ Upload error:', error);
                 
-                // ✅ FIX 7: Error handling specifico
+                // ✅ CRITICAL FIX 4: Enhanced error handling with detailed categorization
+                let errorMessage = 'Errore upload sconosciuto';
+                
                 if (error.name === 'AbortError') {
-                    this.showToast('⏱️ Upload timeout - file troppo grandi o connessione lenta', 'error');
+                    errorMessage = '⏱️ Upload timeout - file troppo grandi o connessione lenta';
                 } else if (error.message.includes('Failed to fetch')) {
-                    this.showToast('🔌 Errore di connessione - verifica la rete', 'error');
+                    errorMessage = '🔌 Errore di connessione - verifica la rete';
+                } else if (error.message.includes('422')) {
+                    errorMessage = '📋 Errore validazione - controlla i dati inseriti';
+                } else if (error.message.includes('403')) {
+                    errorMessage = '🔒 Permessi insufficienti per caricare foto';
+                } else if (error.message.includes('401')) {
+                    errorMessage = '🔑 Autenticazione richiesta';
+                } else if (error.message.includes('413')) {
+                    errorMessage = '📁 File troppo grande';
+                } else if (error.message.includes('503')) {
+                    errorMessage = '🔧 Servizio temporaneamente non disponibile';
                 } else {
-                    this.showToast(`❌ Errore upload: ${error.message}`, 'error');
+                    errorMessage = `❌ Errore upload: ${error.message}`;
                 }
+                
+                this.showToast(errorMessage, 'error');
                 
                 // Mark all as failed
                 this.uploadDetails.forEach(detail => {
@@ -689,7 +721,8 @@ function photoUploadComponent() {
                         formData.append('tags', JSON.stringify(this.metadata.tags));
                     }
                     
-                    formData.append('site_id', this.config.siteId);
+                    // ✅ CRITICAL FIX: Remove site_id from FormData in batch upload too
+                    // formData.append('site_id', this.config.siteId); // REMOVED - causes backend conflicts
                     
                     // Upload batch
                     try {
@@ -786,29 +819,45 @@ function photoUploadComponent() {
             }
         },
 
+        // ✅ CRITICAL FIX 3: Enhanced success handler with robust response processing
         handleUploadSuccess(result) {
-            let message = 'Upload completato!';
+            console.log('🎉 Upload success handler called with:', result);
             
-            if (result.successful && result.failed) {
-                // Batch upload result format
-                const total = result.successful.length + result.failed.length;
-                message = `Upload completato: ${result.successful.length}/${total} file caricati con successo`;
+            let message = 'Upload completato!';
+            const successful = result.successful || result.uploaded_photos || [];
+            const failed = result.failed || result.failed_photos || [];
+            
+            if (successful.length > 0 || failed.length > 0) {
+                // Standardized result format
+                const total = successful.length + failed.length;
+                message = `Upload completato: ${successful.length}/${total} file caricati con successo`;
                 
-                if (result.failed.length > 0) {
-                    console.warn('Files that failed to upload:', result.failed);
+                if (failed.length > 0) {
+                    console.warn('Files that failed to upload:', failed);
+                    message += ` (${failed.length} falliti)`;
                 }
                 
                 // Call the success callback with successful uploads
                 if (window[this.config.successCallback] && typeof window[this.config.successCallback] === 'function') {
-                    window[this.config.successCallback](result.successful);
+                    try {
+                        window[this.config.successCallback](successful);
+                    } catch (callbackError) {
+                        console.error('❌ Success callback error:', callbackError);
+                        // Don't fail the entire upload for callback error
+                    }
                 }
             } else {
-                // Single upload result format (backward compatibility)
-                message = `Upload completato con successo! ${this.files.length} file caricati`;
+                // Backward compatibility for old response formats
+                const uploadedCount = result.total_uploaded || result.uploaded_file_ids?.length || this.files.length || 0;
+                message = `Upload completato con successo! ${uploadedCount} file caricati`;
                 
                 // Call the success callback function if it exists
                 if (window[this.config.successCallback] && typeof window[this.config.successCallback] === 'function') {
-                    window[this.config.successCallback](result.uploaded_file_ids || []);
+                    try {
+                        window[this.config.successCallback](result.uploaded_file_ids || successful);
+                    } catch (callbackError) {
+                        console.error('❌ Success callback error:', callbackError);
+                    }
                 }
             }
             

@@ -33,6 +33,7 @@ class PhotoUploadService:
         self.parallel_processing_threshold = 3  # Files count to trigger parallel vs sequential
         self.max_file_size_mb = 50  # Maximum file size limit
         self.min_dimension_for_tiles = 2000  # Minimum dimension for deep zoom tiles
+        self.debug_mode = False  # Riabilita validazione storage
 
     async def process_photo_upload(
         self,
@@ -105,19 +106,25 @@ class PhotoUploadService:
             logger.info("Starting direct upload processing")
             
             # Pre-upload validation and storage checks
+            logger.debug("Step 1: Validating storage and preparing for upload")
             await self._validate_and_prepare_storage(photos)
+            logger.debug("Step 1 completed: Storage validation passed")
 
             # Prepare archaeological metadata from Pydantic schema
+            logger.debug("Step 2: Preparing archaeological metadata")
             archaeological_metadata = self._prepare_archaeological_metadata(upload_request, raw_metadata)
+            logger.debug("Step 2 completed: Archaeological metadata prepared")
 
             logger.debug("Processing photos",
                         photo_count=len(photos),
                         metadata_keys=list(archaeological_metadata.keys()))
 
             # Process photos (parallel or sequential based on count)
+            logger.debug("Step 3: Starting photo processing")
             upload_results = await self._process_photos_parallel_or_sequential(
                 photos, site_id, user_id, archaeological_metadata, db
             )
+            logger.debug("Step 3 completed: Photo processing finished")
 
             # Filter and validate results
             uploaded_photos, failed_photos = self._filter_upload_results(photos, upload_results)
@@ -140,10 +147,28 @@ class PhotoUploadService:
 
     async def _validate_and_prepare_storage(self, photos: List[UploadFile]):
         """Validate files and ensure storage is ready."""
+        if self.debug_mode:
+            logger.warning("🚨 DEBUG MODE: Skipping storage validation to identify hang point")
+            return  # Skip storage validation in debug mode
+            
+        logger.debug("🔍 STORAGE VALIDATION: Starting storage health check")
         
-        # Check storage health and capacity
+        # Check storage health and capacity with timeout
         try:
-            await storage_management_service.ensure_buckets_exist()
+            logger.debug("🔍 STORAGE VALIDATION: Checking buckets exist")
+            # Add timeout to prevent hanging
+            import asyncio
+            await asyncio.wait_for(
+                storage_management_service.ensure_buckets_exist(),
+                timeout=30.0  # 30 seconds timeout
+            )
+            logger.debug("🔍 STORAGE VALIDATION: Buckets check completed")
+        except asyncio.TimeoutError:
+            logger.error("Storage service timeout - buckets check took too long")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage service is temporarily unavailable. Please try again later."
+            )
         except Exception as storage_error:
             logger.error(f"Storage service initialization failed: {storage_error}")
             raise HTTPException(
@@ -153,17 +178,38 @@ class PhotoUploadService:
 
         # Check storage capacity
         try:
-            storage_usage = await storage_management_service.get_storage_usage()
+            logger.debug("🔍 STORAGE VALIDATION: Getting storage usage")
+            import asyncio
+            storage_usage = await asyncio.wait_for(
+                storage_management_service.get_storage_usage(),
+                timeout=15.0  # 15 seconds timeout
+            )
+            logger.debug(f"🔍 STORAGE VALIDATION: Storage usage retrieved: {storage_usage}")
+            
             if storage_usage.get('total_size_gb', 0) > 8:  # >80% of 10GB
                 logger.warning(f"Storage usage critical ({storage_usage.get('total_size_gb', 0)}GB)")
-                cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=1000)
+                logger.debug("🔍 STORAGE VALIDATION: Starting emergency cleanup")
+                cleanup_result = await asyncio.wait_for(
+                    storage_management_service.emergency_cleanup(target_freed_mb=1000),
+                    timeout=60.0  # 60 seconds timeout for cleanup
+                )
                 logger.info(f"Pre-upload cleanup: {cleanup_result}")
+            else:
+                logger.debug("🔍 STORAGE VALIDATION: Storage usage is acceptable")
+        except asyncio.TimeoutError:
+            logger.error("Storage service timeout - storage usage check took too long")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage service is temporarily unavailable. Please try again later."
+            )
         except Exception as storage_health_error:
             logger.error(f"Storage health check failed: {storage_health_error}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Storage health check failed. Please try again later."
             )
+        
+        logger.debug("🔍 STORAGE VALIDATION: All storage validation steps completed")
 
     def _prepare_archaeological_metadata(self, upload_request: PhotoUploadRequest, raw_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Convert Pydantic schema to dictionary for database operations."""
@@ -248,34 +294,40 @@ class PhotoUploadService:
         db: AsyncSession
     ) -> List:
         """
-        Process photos using parallel or sequential approach based on file count.
+        Process photos ALWAYS sequentially for SQLite compatibility.
+        
+        SQLite is single-writer - parallel processing causes database locks.
         """
         
-        if len(photos) == 1:
-            logger.debug("Processing single photo sequentially")
-            result = await self._process_single_photo(photos[0], site_id, user_id, archaeological_metadata, db)
-            return [result]
-        else:
-            # Use parallel processing with timeout protection
-            logger.debug("Processing photos in parallel", photo_count=len(photos))
+        logger.info(f"🔄 Processing {len(photos)} photos sequentially (SQLite mode)")
+        results = []
+        
+        for i, photo in enumerate(photos, 1):
+            logger.debug(f"📸 Processing photo {i}/{len(photos)}: {photo.filename}")
             
-            upload_tasks = [
-                self._process_single_photo(photo, site_id, user_id, archaeological_metadata, db)
-                for photo in photos
-            ]
-
             try:
-                upload_results = await asyncio.wait_for(
-                    asyncio.gather(*upload_tasks, return_exceptions=True),
-                    timeout=300.0  # 5 minutes timeout
+                result = await self._process_single_photo(
+                    photo,
+                    site_id,
+                    user_id,
+                    archaeological_metadata,
+                    db
                 )
-                logger.info("Parallel processing completed", photo_count=len(photos))
-                return upload_results
-            except asyncio.TimeoutError:
-                raise HTTPException(
-                    status_code=408,
-                    detail="Upload processing timed out after 5 minutes"
-                )
+                results.append(result)
+                logger.info(f"✅ Photo {i}/{len(photos)} completed: {photo.filename}")
+                
+                # CRITICAL: Small delay between photos for SQLite write lock release
+                if i < len(photos):
+                    await asyncio.sleep(0.15)  # 150ms delay
+                    
+            except Exception as e:
+                logger.error(f"❌ Failed to process {photo.filename}: {str(e)}")
+                results.append(e)
+                # Continue processing remaining photos
+                continue
+        
+        logger.info(f"✨ Batch complete: {len([r for r in results if not isinstance(r, Exception)])}/{len(photos)} succeeded")
+        return results
 
     async def _process_single_photo(
         self,
@@ -345,22 +397,13 @@ class PhotoUploadService:
 
                 # ✅ FIX: Gestione transazione compatibile con SQLite
                 try:
-                    # ✅ CRITICAL FIX: Use dedicated transaction for photo creation
-                    # This ensures proper isolation and commit handling
-                    async with task_db.begin():
-                        task_db.add(photo_record)
-                        await task_db.flush()
-                        photo_id = photo_record.id
-                        logger.debug(f"✅ Photo flushed in dedicated transaction: {photo_id}")
-                        
-                        # ✅ FIX: Commit immediately after flush to ensure record is saved
-                        await task_db.commit()
-                        logger.debug(f"✅ Photo committed to database: {photo_id}")
-                    
-                    # ✅ FIX: After commit, refresh to get the generated ID
-                    await task_db.refresh(photo_record)
+                    # ✅ CRITICAL FIX: Add photo record without nested commits
+                    task_db.add(photo_record)
+                    await task_db.flush()  # Flush senza commit per transazione outer
                     photo_id = photo_record.id
-                    logger.debug(f"✅ Photo refreshed with ID: {photo_id}")
+                    # ✅ NO commit in nested transaction - gestito dal chiamante
+                    await task_db.refresh(photo_record)
+                    logger.debug(f"✅ Photo record flushed: {photo_id}")
                     
                 except Exception as db_error:
                     # ✅ FIX: Logging corretto con messaggio errore visibile
@@ -404,18 +447,7 @@ class PhotoUploadService:
                     
                     if thumbnail_path:
                         photo_record.thumbnail_path = thumbnail_path
-                        # ✅ FIX: Update separato per thumbnail
-                        try:
-                            await task_db.commit()
-                            logger.debug(f"✅ Thumbnail path updated: {thumbnail_path}")
-                        except Exception as commit_error:
-                            logger.error(
-                                "Thumbnail commit failed",
-                                photo_id=str(photo_record.id),
-                                error=str(commit_error),
-                                exc_info=True
-                            )
-                            # Non fallire per thumbnail
+                        logger.debug(f"✅ Thumbnail path updated: {thumbnail_path}")
                     else:
                         logger.warning(f"Thumbnail generation failed for {photo_record.id}")
                         
@@ -442,8 +474,9 @@ class PhotoUploadService:
                         })
                     )
                     task_db.add(activity)
-                    await task_db.commit()  # ✅ Commit esplicito per activity
-                    logger.debug(f"✅ Activity logged for photo {photo_record.id}")
+                    # ✅ NO commit in nested transaction - gestito dal chiamante
+                    await task_db.flush()  # Flush per generare ID activity
+                    logger.debug(f"✅ Activity flushed for photo {photo_record.id}")
                     
                 except Exception as activity_error:
                     logger.error(

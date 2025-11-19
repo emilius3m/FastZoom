@@ -1,6 +1,8 @@
 # app/database/session.py
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from app.core.config import settings
 from app.services.database_pool_monitor import initialize_pool_monitor
 import logging
@@ -13,6 +15,17 @@ logger.info(f"Database pool configuration - Size: {settings.db_pool_size}, Max O
 
 # Base dichiarativa per modelli, se non già altrove
 Base = declarative_base()
+
+# SQLite WAL mode configuration for better concurrent access
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_conn, connection_record):
+    """Enable WAL mode for concurrent SQLite access"""
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")      # Enable WAL mode for concurrent access
+    cursor.execute("PRAGMA synchronous=NORMAL")     # Better performance with WAL
+    cursor.execute("PRAGMA busy_timeout=5000")     # 5 second lock timeout
+    cursor.close()
+    logger.info("SQLite WAL mode enabled with optimized settings")
 
 # Crea engine asincrono con connection pool ottimizzato per stress test
 engine = create_async_engine(
@@ -29,7 +42,7 @@ engine = create_async_engine(
     pool_reset_on_return='commit',   # Resetta stato connessione al ritorno
     connect_args={
         "check_same_thread": False,  # SQLite: permette multi-threading
-        "timeout": 60,                # SQLite: timeout operazioni
+        "timeout": 30,                # SQLite: timeout operazioni increased to 30 seconds
         # Removed isolation_level=None to prevent AttributeError
         # SQLite will use default autocommit behavior
     },

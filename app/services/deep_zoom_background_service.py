@@ -926,6 +926,7 @@ class DeepZoomBackgroundService:
             from sqlalchemy import select
             from datetime import datetime
             import uuid
+            from uuid import UUID
             
             # CRITICAL FIX: Photo.id is stored as STRING, not UUID object
             # Use the photo_id as string directly since Photo.id is String(36)
@@ -1028,7 +1029,7 @@ class DeepZoomBackgroundService:
                 
                 # 🔧 APPROACH 2: UUID-based query (for compatibility)
                 try:
-                    photo_uuid = uuid.UUID(photo_id)
+                    photo_uuid = UUID(photo_id)
                     uuid_query = select(Photo).where(Photo.id == str(photo_uuid))
                     uuid_result = await db.execute(uuid_query)
                     photo_record_uuid = uuid_result.scalar_one_or_none()
