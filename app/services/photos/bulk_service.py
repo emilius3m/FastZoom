@@ -372,55 +372,72 @@ class PhotoBulkService:
         site_id: str
     ) -> Dict[str, Any]:
         """Execute the actual bulk update operation"""
+        import time
+        start_time = time.time()
         updated_count = 0
         updated_fields = []
         
-        async with db.begin():  # Auto-commit on success, auto-rollback on exception
-            # Update all photos within the transaction
-            for photo in photos:
-                try:
-                    # Apply metadata updates
-                    for field, value in filtered_metadata.items():
-                        old_value = getattr(photo, field, None)
-                        setattr(photo, field, value)
-                        if field not in updated_fields:
-                            updated_fields.append(field)
-                        self.logger.debug(
-                            f"Bulk update - Photo {photo.id} - Field '{field}': '{old_value}' -> '{value}'"
-                        )
-                    
-                    # Handle tag updates
-                    if add_tags or remove_tags:
-                        updated_fields.extend(self._update_photo_tags(photo, add_tags, remove_tags))
-                    
-                    # Update timestamp
-                    photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
-                    updated_count += 1
-                    
-                except Exception as e:
-                    self.logger.warning(f"Error updating photo {photo.id}: {e}")
-                    continue
+        with logger.contextualize(
+            operation="bulk_update",
+            site_id=site_id,
+            user_id=str(current_user_id),
+            photo_count=len(photos)
+        ):
+            logger.info("Starting bulk update operation")
             
-            # Log activity after all updates within the same transaction
-            if updated_count > 0:
-                activity = UserActivity(
-                    user_id=str(current_user_id),
-                    site_id=str(site_id),
-                    activity_type="BULK_UPDATE",
-                    activity_desc=f"Aggiornamento massivo di {updated_count} foto",
-                    extra_data=json.dumps({
-                        "photo_count": updated_count,
-                        "photo_ids": [str(p.id) for p in photos[:updated_count]],
-                        "updated_fields": updated_fields,
-                        "metadata_fields": list(filtered_metadata.keys()),
-                        "add_tags": add_tags,
-                        "remove_tags": remove_tags
-                    })
-                )
-                db.add(activity)
-                self.logger.info(f"Activity log added for bulk update of {updated_count} photos")
+            async with db.begin():  # Auto-commit on success, auto-rollback on exception
+                # Update all photos within the transaction
+                for photo in photos:
+                    try:
+                        # Apply metadata updates
+                        for field, value in filtered_metadata.items():
+                            old_value = getattr(photo, field, None)
+                            setattr(photo, field, value)
+                            if field not in updated_fields:
+                                updated_fields.append(field)
+                            logger.debug("Field updated",
+                                        photo_id=str(photo.id),
+                                        field=field,
+                                        old_value=old_value,
+                                        new_value=value)
+                        
+                        # Handle tag updates
+                        if add_tags or remove_tags:
+                            tag_fields = self._update_photo_tags(photo, add_tags, remove_tags)
+                            updated_fields.extend(tag_fields)
+                        
+                        # Update timestamp
+                        photo.updated = datetime.now(timezone.utc).replace(tzinfo=None)
+                        updated_count += 1
+                        
+                    except Exception as e:
+                        logger.warning("Error updating photo", photo_id=str(photo.id), error=str(e))
+                        continue
+                
+                # Log activity after all updates within the same transaction
+                if updated_count > 0:
+                    activity = UserActivity(
+                        user_id=str(current_user_id),
+                        site_id=str(site_id),
+                        activity_type="BULK_UPDATE",
+                        activity_desc=f"Aggiornamento massivo di {updated_count} foto",
+                        extra_data=json.dumps({
+                            "photo_count": updated_count,
+                            "photo_ids": [str(p.id) for p in photos[:updated_count]],
+                            "updated_fields": updated_fields,
+                            "metadata_fields": list(filtered_metadata.keys()),
+                            "add_tags": add_tags,
+                            "remove_tags": remove_tags
+                        })
+                    )
+                    db.add(activity)
+                    logger.debug("Activity log added", updated_count=updated_count)
             
-            self.logger.info(f"Bulk update transaction completed successfully for {updated_count} photos")
+            duration = time.time() - start_time
+            logger.info("Bulk update completed",
+                       updated_count=updated_count,
+                       updated_fields=len(updated_fields),
+                       duration=duration)
         
         return {
             'updated_count': updated_count,

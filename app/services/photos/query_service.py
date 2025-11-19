@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
+from sqlalchemy.orm import selectinload
 from loguru import logger
 
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus
@@ -118,12 +119,16 @@ class PhotoQueryService:
     ) -> List[Dict]:
         """Query US photos from USFile table with applied filters."""
         
-        # Build base query for US files
+        # Build base query for US files with eager loading
         us_files_query = select(USFile).where(
             and_(
                 USFile.site_id == normalized_site_id,
                 USFile.file_category == 'fotografia'
             )
+        ).options(
+            # Eager load US and USM associations to avoid N+1 queries
+            selectinload(USFile.us_associations),
+            selectinload(USFile.usm_associations)
         )
         
         # Apply search filter to USFile query (basic search only)
@@ -142,8 +147,8 @@ class PhotoQueryService:
         us_files = await db.execute(us_files_query)
         us_files = us_files.scalars().all()
         
-        # Get US/USM associations for these files
-        us_associations_map = await self._get_us_associations(us_files, db)
+        # Get US/USM associations for these files (now uses pre-loaded data)
+        us_associations_map = self._get_us_associations(us_files)
         
         # Convert to unified dictionary format
         us_photos_data = []
@@ -269,72 +274,41 @@ class PhotoQueryService:
         
         return us_photos_data
 
-    async def _get_us_associations(
-        self, 
-        us_files: List[USFile], 
-        db: AsyncSession
+    def _get_us_associations(
+        self,
+        us_files: List[USFile]
     ) -> Dict[str, List[str]]:
-        """Get US/USM associations for the given US files."""
+        """
+        Get US/USM associations for the given US files using pre-loaded data.
         
-        us_file_ids = [uf.id for uf in us_files]
+        This method now uses the eagerly loaded relationships from USFile objects
+        instead of making separate database queries, which eliminates the N+1 problem.
+        """
         us_associations_map = {}  # {file_id: [list of US codes]}
 
-        if not us_file_ids:
-            return us_associations_map
-
         try:
-            # Query US associations
-            us_assoc_query = select(us_files_association.c.file_id, us_files_association.c.us_id).where(
-                us_files_association.c.file_id.in_(us_file_ids)
-            )
-            us_assoc_results = await db.execute(us_assoc_query)
-            us_assoc_list = us_assoc_results.fetchall()
-
-            # Get US codes for these associations
-            if us_assoc_list:
-                us_ids = [row.us_id for row in us_assoc_list]
-                us_query = select(UnitaStratigrafica.id, UnitaStratigrafica.us_code).where(
-                    UnitaStratigrafica.id.in_(us_ids)
-                )
-                us_results = await db.execute(us_query)
-                us_codes_map = {row.id: row.us_code for row in us_results.fetchall()}
-
-                # Build associations map
-                for assoc in us_assoc_list:
-                    file_id = assoc.file_id
-                    us_code = us_codes_map.get(assoc.us_id)
-                    if us_code:
-                        if file_id not in us_associations_map:
-                            us_associations_map[file_id] = []
-                        us_associations_map[file_id].append(f"US {us_code}")
-
-            # Query USM associations
-            usm_assoc_query = select(usm_files_association.c.file_id, usm_files_association.c.usm_id).where(
-                usm_files_association.c.file_id.in_(us_file_ids)
-            )
-            usm_assoc_results = await db.execute(usm_assoc_query)
-            usm_assoc_list = usm_assoc_results.fetchall()
-
-            # Get USM codes for these associations
-            if usm_assoc_list:
-                usm_ids = [row.usm_id for row in usm_assoc_list]
-                usm_query = select(UnitaStratigraficaMuraria.id, UnitaStratigraficaMuraria.usm_code).where(
-                    UnitaStratigraficaMuraria.id.in_(usm_ids)
-                )
-                usm_results = await db.execute(usm_query)
-                usm_codes_map = {row.id: row.usm_code for row in usm_results.fetchall()}
-
-                # Build associations map
-                for assoc in usm_assoc_list:
-                    file_id = assoc.file_id
-                    usm_code = usm_codes_map.get(assoc.usm_id)
-                    if usm_code:
-                        if file_id not in us_associations_map:
-                            us_associations_map[file_id] = []
-                        us_associations_map[file_id].append(f"USM {usm_code}")
+            for us_file in us_files:
+                file_id = str(us_file.id)
+                associations = []
+                
+                # Get US associations from pre-loaded data
+                if hasattr(us_file, 'us_associations') and us_file.us_associations:
+                    for us in us_file.us_associations:
+                        if us.us_code:
+                            associations.append(f"US {us.us_code}")
+                
+                # Get USM associations from pre-loaded data
+                if hasattr(us_file, 'usm_associations') and us_file.usm_associations:
+                    for usm in us_file.usm_associations:
+                        if usm.usm_code:
+                            associations.append(f"USM {usm.usm_code}")
+                
+                # Only add to map if there are associations
+                if associations:
+                    us_associations_map[file_id] = associations
 
         except Exception as e:
-            logger.error(f"Error getting US associations: {e}")
+            logger.error(f"Error getting US associations from pre-loaded data: {e}")
             # Don't fail the entire query if associations fail
 
         return us_associations_map

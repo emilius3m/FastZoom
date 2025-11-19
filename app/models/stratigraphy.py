@@ -131,6 +131,23 @@ class USFile(Base, SiteMixin, UserMixin):
     uploaded_by_user = relationship("User", foreign_keys=[uploaded_by])
     validated_by_user = relationship("User", foreign_keys=[validated_by])
     
+    # Relazioni con US/USM per eager loading
+    us_associations = relationship(
+        "UnitaStratigrafica",
+        secondary=us_files_association,
+        back_populates="files",
+        lazy="selectin",
+        order_by=us_files_association.c.ordine
+    )
+    
+    usm_associations = relationship(
+        "UnitaStratigraficaMuraria",
+        secondary=usm_files_association,
+        back_populates="files",
+        lazy="selectin",
+        order_by=usm_files_association.c.ordine
+    )
+    
     def to_dict(self):
         """Conversione dict per API"""
         return {
@@ -265,7 +282,7 @@ class UnitaStratigrafica(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     files = relationship(
         "USFile",
         secondary=us_files_association,
-        backref="unita_stratigrafiche",
+        back_populates="us_associations",
         order_by=us_files_association.c.ordine
     )
     
@@ -465,7 +482,7 @@ class UnitaStratigraficaMuraria(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     files = relationship(
         "USFile",
         secondary=usm_files_association,
-        backref="unita_stratigrafiche_murarie",
+        back_populates="usm_associations",
         order_by=usm_files_association.c.ordine
     )
     

@@ -154,80 +154,97 @@ class PhotoDeletionService:
         thumbnail_path: str
     ) -> Dict[str, Any]:
         """Clean up photo storage (MinIO and local files)"""
+        import time
+        start_time = time.time()
+        
         cleanup_result = {
             "photo_file_deleted": False,
             "thumbnail_deleted": False,
             "errors": []
         }
         
-        try:
-            # Delete main photo file
-            if photo_path:
-                if '/' in photo_path:
-                    # MinIO file
-                    try:
-                        success = await archaeological_minio_service.remove_file(photo_path)
-                        cleanup_result["photo_file_deleted"] = success
-                        if success:
-                            self.logger.info(f"File deleted from MinIO: {photo_path}")
-                        else:
-                            self.logger.warning(f"Could not delete MinIO file: {photo_path}")
-                    except Exception as e:
-                        error_msg = f"Error deleting MinIO file {photo_path}: {e}"
-                        cleanup_result["errors"].append(error_msg)
-                        self.logger.warning(error_msg)
-                
-                elif photo_path.startswith("storage/") or photo_path.startswith("app/static/uploads/"):
-                    # Local file
-                    try:
-                        from pathlib import Path
-                        file_path = Path(photo_path)
-                        if file_path.exists():
-                            file_path.unlink()
-                            cleanup_result["photo_file_deleted"] = True
-                            self.logger.info(f"Local file deleted: {file_path}")
-                    except Exception as e:
-                        error_msg = f"Error deleting local file {photo_path}: {e}"
-                        cleanup_result["errors"].append(error_msg)
-                        self.logger.warning(error_msg)
+        with logger.contextualize(
+            operation="cleanup_photo_storage",
+            photo_path=photo_path,
+            thumbnail_path=thumbnail_path
+        ):
+            logger.info("Starting storage cleanup")
             
-            # Delete thumbnail
-            if thumbnail_path:
-                if thumbnail_path.startswith("thumbnails/"):
-                    # MinIO thumbnail
-                    try:
-                        success = await archaeological_minio_service.remove_object_from_bucket(
-                            archaeological_minio_service.buckets["thumbnails"],
-                            thumbnail_path
-                        )
-                        cleanup_result["thumbnail_deleted"] = success
-                        if success:
-                            self.logger.info(f"Thumbnail deleted from MinIO: {thumbnail_path}")
-                        else:
-                            self.logger.warning(f"Could not delete MinIO thumbnail: {thumbnail_path}")
-                    except Exception as e:
-                        error_msg = f"Error deleting MinIO thumbnail {thumbnail_path}: {e}"
-                        cleanup_result["errors"].append(error_msg)
-                        self.logger.warning(error_msg)
+            try:
+                # Delete main photo file
+                if photo_path:
+                    if '/' in photo_path:
+                        # MinIO file
+                        try:
+                            success = await archaeological_minio_service.remove_file(photo_path)
+                            cleanup_result["photo_file_deleted"] = success
+                            if success:
+                                logger.info("MinIO file deleted successfully")
+                            else:
+                                logger.warning("Could not delete MinIO file")
+                        except Exception as e:
+                            error_msg = f"Error deleting MinIO file: {e}"
+                            cleanup_result["errors"].append(error_msg)
+                            logger.error("MinIO file deletion error", error=str(e))
+                    
+                    elif photo_path.startswith("storage/") or photo_path.startswith("app/static/uploads/"):
+                        # Local file
+                        try:
+                            from pathlib import Path
+                            file_path = Path(photo_path)
+                            if file_path.exists():
+                                file_path.unlink()
+                                cleanup_result["photo_file_deleted"] = True
+                                logger.info("Local file deleted successfully")
+                        except Exception as e:
+                            error_msg = f"Error deleting local file: {e}"
+                            cleanup_result["errors"].append(error_msg)
+                            logger.error("Local file deletion error", error=str(e))
                 
-                elif thumbnail_path.startswith("storage/thumbnails/"):
-                    # Local thumbnail
-                    try:
-                        from pathlib import Path
-                        thumbnail_file_path = Path(thumbnail_path)
-                        if thumbnail_file_path.exists():
-                            thumbnail_file_path.unlink()
-                            cleanup_result["thumbnail_deleted"] = True
-                            self.logger.info(f"Local thumbnail deleted: {thumbnail_file_path}")
-                    except Exception as e:
-                        error_msg = f"Error deleting local thumbnail {thumbnail_path}: {e}"
-                        cleanup_result["errors"].append(error_msg)
-                        self.logger.warning(error_msg)
+                # Delete thumbnail
+                if thumbnail_path:
+                    if thumbnail_path.startswith("thumbnails/"):
+                        # MinIO thumbnail
+                        try:
+                            success = await archaeological_minio_service.remove_object_from_bucket(
+                                archaeological_minio_service.buckets["thumbnails"],
+                                thumbnail_path
+                            )
+                            cleanup_result["thumbnail_deleted"] = success
+                            if success:
+                                logger.info("MinIO thumbnail deleted successfully")
+                            else:
+                                logger.warning("Could not delete MinIO thumbnail")
+                        except Exception as e:
+                            error_msg = f"Error deleting MinIO thumbnail: {e}"
+                            cleanup_result["errors"].append(error_msg)
+                            logger.error("MinIO thumbnail deletion error", error=str(e))
+                    
+                    elif thumbnail_path.startswith("storage/thumbnails/"):
+                        # Local thumbnail
+                        try:
+                            from pathlib import Path
+                            thumbnail_file_path = Path(thumbnail_path)
+                            if thumbnail_file_path.exists():
+                                thumbnail_file_path.unlink()
+                                cleanup_result["thumbnail_deleted"] = True
+                                logger.info("Local thumbnail deleted successfully")
+                        except Exception as e:
+                            error_msg = f"Error deleting local thumbnail: {e}"
+                            cleanup_result["errors"].append(error_msg)
+                            logger.error("Local thumbnail deletion error", error=str(e))
+                
+            except Exception as e:
+                error_msg = f"General error during storage cleanup: {e}"
+                cleanup_result["errors"].append(error_msg)
+                logger.error("Storage cleanup error", error=str(e))
             
-        except Exception as e:
-            error_msg = f"General error during storage cleanup: {e}"
-            cleanup_result["errors"].append(error_msg)
-            self.logger.warning(error_msg)
+            duration = time.time() - start_time
+            logger.info("Storage cleanup completed",
+                       photo_file_deleted=cleanup_result["photo_file_deleted"],
+                       thumbnail_deleted=cleanup_result["thumbnail_deleted"],
+                       errors_count=len(cleanup_result["errors"]),
+                       duration=duration)
         
         return cleanup_result
     

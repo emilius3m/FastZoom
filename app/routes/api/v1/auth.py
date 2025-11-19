@@ -221,8 +221,11 @@ async def v1_login_json(
     ```
     """
     try:
+        logger.info(f"🐛 [DEBUG] Starting JSON login for: {credentials.username}")
+        
         # Autentica utente
         user = await AuthService.authenticate_user(db, credentials.username, credentials.password)
+        logger.info(f"🐛 [DEBUG] User authenticated: {user is not None}")
         
         if not user:
             # Skip logging failed login attempts without user_id to avoid NOT NULL constraint
@@ -253,14 +256,21 @@ async def v1_login_json(
         refresh_token = SecurityService.create_refresh_token(token_data)
         
         # Aggiorna ultimo login
-        user.last_login_at = datetime.utcnow()
-        await db.commit()
+        await user.update_last_login(db)
         
-        # Log login riuscito
-        await UserActivity.log_login(db, user.id, success=True, ip_address=request.client.host)
+        # Log login riuscito (user.update_last_login already committed the db)
+        await UserActivity.log_activity(
+            db=db,
+            user_id=user.id,
+            activity_type="user_login_success",
+            description="Login riuscito",
+            ip_address=request.client.host
+        )
         
         # Ottieni siti utente
+        logger.info(f"🐛 [DEBUG] Getting user sites for: {user.id}")
         user_sites = await AuthService.get_user_sites_with_permissions(db, user.id)
+        logger.info(f"🐛 [DEBUG] User sites retrieved: {len(user_sites) if user_sites else 0}")
         
         logger.info(f"Login API riuscito per {user.email} da {request.client.host}")
         
@@ -284,7 +294,10 @@ async def v1_login_json(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Errore login JSON: {str(e)}")
+        logger.error(f"🐛 [DEBUG] Errore login JSON: {str(e)}")
+        logger.error(f"🐛 [DEBUG] Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"🐛 [DEBUG] Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore durante il login: {str(e)}"

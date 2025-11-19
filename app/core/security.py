@@ -239,7 +239,7 @@ class SecurityService:
             if not token_jti:
                 return False
 
-            from app.models.users import TokenBlacklist
+            from app.models import TokenBlacklist
             await TokenBlacklist.blacklist_token(db, token_jti, user_id, reason)
             return True
 
@@ -471,7 +471,8 @@ async def current_active_user(
     """
     Dependency: ottiene l'utente corrente attivo dal database
     """
-    user = await db.get(User, user_id)
+    result = await db.execute(select(User).where(User.id == str(user_id)))
+    user = result.scalar_one_or_none()
     
     if not user:
         raise HTTPException(
