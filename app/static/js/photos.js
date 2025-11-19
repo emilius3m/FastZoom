@@ -1650,6 +1650,34 @@ function photosManager() {
             }
         },
 
+        // Edit Methods
+        async editPhoto(photo) {
+            console.log('editPhoto called with photo:', photo);
+
+            if (photo === null) {
+                // Multi-edit mode
+                if (this.selectedPhotos.length === 0) {
+                    this.showAlertMessage('Nessuna foto selezionata per la modifica di massa');
+                    return;
+                }
+                this.selectedPhoto = null; // Clear single photo selection
+                this.isMultipleSelection = true;
+            } else {
+                // Single photo edit mode
+                if (!photo || !photo.id) {
+                    console.error('Invalid photo object passed to editPhoto:', photo);
+                    this.showAlertMessage('Errore: foto non valida per modifica');
+                    return;
+                }
+                this.selectedPhoto = photo;
+                this.currentPhoto = photo; // Set currentPhoto for edit modal
+                this.isMultipleSelection = false;
+            }
+
+            // Open the edit modal
+            await this.openEditModal();
+        },
+
         async openEditModal() {
             console.log('openEditModal called');
             if (!this.currentPhoto || !this.currentPhoto.id) {
@@ -2619,6 +2647,36 @@ function photosManager() {
             } finally {
                 document.body.removeChild(input);
             }
+        },
+
+        // Function to refresh photos after upload (called by upload component)
+        async refreshPhotos(uploadedFileIds = []) {
+            console.log('refreshPhotos called with uploaded file IDs:', uploadedFileIds);
+            
+            try {
+                // Reload photos from server
+                await this.loadPhotos();
+                
+                // Update filtered photos to show all photos
+                this.filteredPhotos = this.photos;
+                
+                // Update statistics and pagination
+                this.updateStatistics();
+                this.extractAvailableTags();
+                this.updatePagination();
+                
+                // Show success message
+                const message = uploadedFileIds.length > 0
+                    ? `${uploadedFileIds.length} nuove foto caricate con successo!`
+                    : 'Foto caricate con successo!';
+                this.showAlertMessage(message);
+                
+                console.log('Photos refreshed successfully after upload');
+                
+            } catch (error) {
+                console.error('Error refreshing photos after upload:', error);
+                this.showAlertMessage('Errore nell\'aggiornamento della lista foto. Ricarica la pagina.');
+            }
         }
 
     };
@@ -2632,10 +2690,41 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof Alpine !== 'undefined') {
         Alpine.data('photosManager', photosManager);
         console.log('Photos Manager initialized successfully');
+        
+        // Make refreshPhotos function globally available for upload component
+        // Wait a bit for the instance to be created
+        setTimeout(() => {
+            if (window.photosManagerInstance) {
+                // Bind refreshPhotos to instance and make it globally available
+                window.refreshPhotos = (uploadedFileIds) => {
+                    window.photosManagerInstance.refreshPhotos(uploadedFileIds);
+                };
+                console.log('refreshPhotos function made globally available');
+            }
+        }, 500);
     } else {
         console.error('Alpine.js not available for Photos Manager initialization');
     }
 });
+
+// Make editPhoto and confirmDeletePhoto globally accessible for HTML templates
+window.editPhoto = function(photo) {
+    if (window.photosManagerInstance) {
+        return window.photosManagerInstance.editPhoto(photo);
+    } else {
+        console.error('photosManagerInstance not available');
+        return false;
+    }
+};
+
+window.confirmDeletePhoto = function(photo) {
+    if (window.photosManagerInstance) {
+        return window.photosManagerInstance.confirmDeletePhoto(photo);
+    } else {
+        console.error('photosManagerInstance not available');
+        return false;
+    }
+};
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {

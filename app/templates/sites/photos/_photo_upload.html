@@ -489,7 +489,7 @@ function photoUploadComponent() {
             
             // Add files
             this.files.forEach((fileObj, index) => {
-                formData.append(`files[${index}]`, fileObj.file);
+                formData.append(`photos`, fileObj.file);
             });
             
             // Add metadata

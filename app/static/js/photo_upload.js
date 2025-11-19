@@ -371,7 +371,7 @@ class PhotoUpload {
 
             // Aggiungi file
             this.state.files.forEach((fileObj, index) => {
-                formData.append(`files[${index}]`, fileObj.file);
+                formData.append(`photos`, fileObj.file);
             });
 
             // Aggiungi metadati
