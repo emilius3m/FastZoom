@@ -1982,6 +1982,92 @@ function photosManager() {
             }
         },
         
+        // Bulk Delete Methods
+        confirmBulkDelete() {
+            if (!this.selectedPhotos || this.selectedPhotos.length === 0) {
+                this.showAlertMessage('Nessuna foto selezionata per l\'eliminazione.');
+                return;
+            }
+            
+            // Show confirmation dialog with count
+            const confirmMessage = `Sei sicuro di voler eliminare ${this.selectedPhotos.length} foto? Questa azione è irreversibile.`;
+            
+            if (confirm(confirmMessage)) {
+                this.executeBulkDelete();
+            }
+        },
+        
+        async executeBulkDelete() {
+            if (!this.selectedPhotos || this.selectedPhotos.length === 0) {
+                return;
+            }
+            
+            this.isBulkDeleting = true;
+            
+            try {
+                console.log(`Starting bulk delete for ${this.selectedPhotos.length} photos`);
+                
+                const response = await fetch(`/api/v1/sites/${this.getCurrentSiteId()}/photos/bulk-delete`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        photo_ids: this.selectedPhotos,
+                        confirm: true
+                    })
+                });
+                
+                // Handle authentication errors
+                if (response.status === 401) {
+                    console.error('Authentication error (401): Token expired or invalid');
+                    this.showAlertMessage('Sessione scaduta. Effettua nuovamente il login.');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Errore di autenticazione: sessione scaduta');
+                }
+                
+                if (response.status === 403) {
+                    console.error('Authorization error (403): Insufficient permissions');
+                    this.showAlertMessage('Non hai i permessi per eliminare queste foto.');
+                    throw new Error('Errore di autorizzazione: permessi insufficienti');
+                }
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error:', response.status, errorText);
+                    this.showAlertMessage(`Errore durante l'eliminazione di massa: ${response.status} ${response.statusText}`);
+                    throw new Error(`Errore durante l'eliminazione: ${response.status} ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                console.log('Bulk delete result:', result);
+                
+                // Refresh data to reflect changes
+                await this.loadPhotos();
+                this.updateStatistics();
+                this.extractAvailableTags();
+                
+                // Update filtered photos
+                this.filteredPhotos = this.photos;
+                this.updatePagination();
+                
+                // Show success message
+                this.showAlertMessage(`${this.selectedPhotos.length} foto eliminate con successo!`);
+                
+                // Clear selection
+                this.selectedPhotos = [];
+                
+            } catch (error) {
+                console.error('Errore durante l\'eliminazione di massa:', error);
+                this.showAlertMessage(`Errore durante l'eliminazione: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
+            } finally {
+                this.isBulkDeleting = false;
+            }
+        },
+        
         // Legacy savePhotoEdit method for backward compatibility
         async savePhotoEdit() {
             console.warn('savePhotoEdit: This method is deprecated, use savePhotoEditWithMetadata instead');
