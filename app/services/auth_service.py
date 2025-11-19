@@ -2,6 +2,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 from loguru import logger
 
@@ -34,26 +35,36 @@ class AuthService:
         Returns:
             Utente se autenticazione riuscita, None altrimenti
         """
-        # Trova utente per email
-        query = select(User).where(
-            and_(
-                User.email == email,
-                User.is_active == True
+        try:
+            # Trova utente per email con eager loading delle relazioni
+            query = select(User).options(
+                selectinload(User.site_permissions),
+                selectinload(User.profile)
+            ).where(
+                and_(
+                    User.email == email,
+                    User.is_active == True
+                )
             )
-        )
-        
-        result = await db.execute(query)
-        user = result.scalar_one_or_none()
-        
-        if not user:
+            
+            result = await db.execute(query)
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                logger.warning(f"Authentication failed: user not found or inactive - {email}")
+                return None
+            
+            # Verifica password
+            if not SecurityService.verify_password(password, user.hashed_password):
+                logger.warning(f"Authentication failed: invalid password - {email}")
+                return None
+            
+            logger.info(f"User authenticated successfully: {user.id} - {user.email}")
+            return user
+            
+        except Exception as e:
+            logger.error(f"Authentication error for {email}: {str(e)}", exc_info=True)
             return None
-        
-        # Verifica password
-        if not SecurityService.verify_password(password, user.hashed_password):
-            return None
-
-        print(user.id, user.email, user.is_active)
-        return user
 
     @staticmethod
     async def get_user_sites_with_permissions(
@@ -64,8 +75,6 @@ class AuthService:
         Ottiene siti accessibili dall'utente con dettagli permessi
         Se è superuser, ha accesso a TUTTI i siti attivi
         
-        🔧 ENHANCED: Improved error handling and comprehensive debugging
-        
         Args:
             db: Sessione database
             user_id: ID utente
@@ -74,66 +83,37 @@ class AuthService:
             Lista dizionari con info siti e permessi
         """
         try:
-            # 🔍 DEBUG: Enhanced logging for troubleshooting
-            logger.info(f"🐛 [DEBUG] get_user_sites_with_permissions - START")
-            logger.info(f"🐛 [DEBUG] Input user_id: {user_id} (type: {type(user_id)})")
-            
-            # 🔍 DEBUG: Validate input user_id
             if not user_id:
-                logger.error(f"🐛 [DEBUG] Invalid user_id provided: {user_id}")
+                logger.error(f"Invalid user_id provided: {user_id}")
                 return []
             
-            # 🔧 FIX: Ensure we're in proper async context
-            if not hasattr(db, 'execute'):
-                logger.error(f"🐛 [DEBUG] Invalid database session provided: {db}")
-                return []
-            
-            # Prima verifica se è superuser
-            logger.info(f"🐛 [DEBUG] Checking if user {user_id} is superuser...")
-            
-            # 🔧 UUID FORMAT FIX: Handle both dashed and non-dashed UUID formats
+            # Convert user_id to string for database queries
             user_id_str = str(user_id)
-            user_id_no_dashes = user_id_str.replace('-', '')
             
-            logger.info(f"🐛 [DEBUG] UUID formats to try:")
-            logger.info(f"🐛 [DEBUG]  - With dashes: {user_id_str}")
-            logger.info(f"🐛 [DEBUG]  - Without dashes: {user_id_no_dashes}")
-            
-            # Try with dashes first, then without dashes
-            user_query = select(User).where(
-                (User.id == user_id_str) | (User.id == user_id_no_dashes)
+            # Load user with eager loading to prevent greenlet errors
+            user_query = select(User).options(
+                selectinload(User.site_permissions)
+            ).where(
+                (User.id == user_id_str) | (User.id == user_id_str.replace('-', ''))
             )
             user_result = await db.execute(user_query)
             user = user_result.scalar_one_or_none()
             
-            logger.info(f"🐛 [DEBUG] User found: {user is not None}")
-            if user:
-                logger.info(f"🐛 [DEBUG] User details - email: {user.email}, is_active: {user.is_active}, is_superuser: {user.is_superuser}")
-            else:
-                logger.error(f"🐛 [DEBUG] User {user_id} not found in database!")
+            if not user:
+                logger.warning(f"User {user_id} not found in database")
                 return []
             
-            if user and user.is_superuser:
-                logger.info(f"🐛 [DEBUG] Superuser detected, getting all active sites")
-                # SUPERADMIN: accesso a tutti i siti attivi
+            # Superuser gets access to all active sites
+            if user.is_superuser:
+                logger.info(f"Superuser {user.email} accessing all active sites")
                 return await AuthService.get_all_sites_for_superuser(db)
             
-            # 🔍 DEBUG: Enhanced logging for normal user permissions
-            logger.info(f"🐛 [DEBUG] Normal user detected, checking explicit permissions...")
-            logger.info(f"🐛 [DEBUG] User is_active: {user.is_active}")
-            
+            # Check if user is active
             if not user.is_active:
-                logger.warning(f"🐛 [DEBUG] User {user_id} is not active, no site access")
+                logger.warning(f"User {user.email} is not active, no site access")
                 return []
             
-            # 🔍 DEBUG: Enhanced query construction with validation
-            logger.info(f"🐛 [DEBUG] Building site permissions query...")
-            logger.info(f"🐛 [DEBUG] Query filters:")
-            logger.info(f"🐛 [DEBUG]  - user_id: {user_id}")
-            logger.info(f"🐛 [DEBUG]  - permission_active: True")
-            logger.info(f"🐛 [DEBUG]  - site_status: {SiteStatusEnum.ACTIVE.value} (type: {type(SiteStatusEnum.ACTIVE.value)})")
-            
-            # UTENTE NORMALE: solo siti con permessi espliciti
+            # Normal user: only sites with explicit permissions
             query = select(
                 ArchaeologicalSite.id,
                 ArchaeologicalSite.name,
@@ -147,59 +127,34 @@ class AuthService:
                 ArchaeologicalSite.id == UserSitePermission.site_id
             ).where(
                 and_(
-                    (UserSitePermission.user_id == user_id_str) | (UserSitePermission.user_id == user_id_no_dashes),  # 🔧 FIX: Handle both UUID formats
+                    (UserSitePermission.user_id == user_id_str) | (UserSitePermission.user_id == user_id_str.replace('-', '')),
                     UserSitePermission.is_active == True,
                     ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value
                 )
             ).order_by(ArchaeologicalSite.name)
             
-            logger.info(f"🐛 [DEBUG] Executing site permissions query...")
             result = await db.execute(query)
             sites_data = []
             
-            logger.info(f"🐛 [DEBUG] Processing query results...")
-            row_count = 0
             for row in result:
-                row_count += 1
-                logger.info(f"🐛 [DEBUG] Site {row_count}: {row.name} (ID: {row.id}, permission: {row.permission_level})")
-                
-                # 🔍 DEBUG: Validate site data before adding
                 if row.id and row.name:
                     sites_data.append({
-                        "id": str(row.id),  # 🔧 FIX: Ensure consistent UUID string format
+                        "id": str(row.id),
                         "name": str(row.name),
                         "code": str(row.code) if row.code else "",
                         "location": str(row.municipality) if row.municipality else "",
                         "permission_level": str(row.permission_level) if row.permission_level else "read"
                     })
-                else:
-                    logger.warning(f"🐛 [DEBUG] Skipping invalid site row: {row}")
-            
-            logger.info(f"🐛 [DEBUG] Query processing complete. Processed {row_count} rows, returning {len(sites_data)} valid sites")
             
             if not sites_data:
-                logger.warning(f"🐛 [DEBUG] No accessible sites found for user {user_id}")
-                logger.warning(f"🐛 [DEBUG] This could mean:")
-                logger.warning(f"🐛 [DEBUG]  - User has no explicit permissions")
-                logger.warning(f"🐛 [DEBUG]  - All accessible sites are inactive")
-                logger.warning(f"🐛 [DEBUG]  - Permission records are inactive")
+                logger.info(f"No accessible sites found for user {user.email}")
             else:
-                logger.info(f"🐛 [DEBUG] Successfully found {len(sites_data)} accessible sites for user {user_id}")
-                for site in sites_data:
-                    logger.info(f"🐛 [DEBUG]  - {site['name']} (ID: {site['id']}, permission: {site['permission_level']})")
+                logger.info(f"Found {len(sites_data)} accessible sites for user {user.email}")
             
             return sites_data
             
         except Exception as e:
-            # 🔍 DEBUG: Enhanced error logging
-            logger.error(f"🐛 [DEBUG] get_user_sites_with_permissions - ERROR: {str(e)}")
-            logger.error(f"🐛 [DEBUG] Error type: {type(e).__name__}")
-            logger.error(f"🐛 [DEBUG] User ID: {user_id} (type: {type(user_id)})")
-            import traceback
-            logger.error(f"🐛 [DEBUG] Full traceback: {traceback.format_exc()}")
-            
-            # Return empty list on error to prevent system crashes
-            logger.error(f"🐛 [DEBUG] Returning empty sites list due to error")
+            logger.error(f"Error getting user sites for {user_id}: {str(e)}", exc_info=True)
             return []
 
     # NUOVO METODO - MANCAVA QUESTO
@@ -261,18 +216,16 @@ class AuthService:
         """
         # Ottieni siti utente con permessi (gestisce automaticamente superuser)
         sites_data = await AuthService.get_user_sites_with_permissions(db, user.id)
-        print(sites_data)
+        
+        logger.info(f"Login response for user {user.email}: {len(sites_data)} sites found")
         
         if not sites_data:
             # Verifica se è superuser - in questo caso consentiamo l'accesso anche senza siti
-            user_query = select(User).where(User.id == user.id)
-            user_result = await db.execute(user_query)
-            db_user = user_result.scalar_one_or_none()
-
-            if db_user and db_user.is_superuser:
-                print("Superuser accessing system without sites - allowing access for configuration")
+            if user.is_superuser:
+                logger.info("Superuser accessing system without sites - allowing access for configuration")
                 # Per superuser senza siti, consentiamo l'accesso con lista vuota
             else:
+                logger.warning(f"User {user.email} has no site access, denying login")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Utente non ha accesso a nessun sito archeologico"
@@ -320,7 +273,10 @@ class AuthService:
             
             # Verifica che l'utente sia ancora attivo
             user_id_str = payload.get("sub")
-            user_query = select(User).where(
+            user_query = select(User).options(
+                selectinload(User.site_permissions),
+                selectinload(User.profile)
+            ).where(
                 and_(User.id == user_id_str, User.is_active == True)
             )
             
