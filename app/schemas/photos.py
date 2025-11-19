@@ -73,7 +73,7 @@ class PhotoUploadRequest(BaseModel):
     @validator('find_date', 'dating_from', 'dating_to')
     def validate_date_fields(cls, v):
         """Validate date fields can be parsed as ISO dates or years (for archaeological context)"""
-        if v is None or v == '':
+        if v is None or v == '' or v == 'null' or v == 'None':
             return None
         try:
             # Try ISO format first
@@ -86,36 +86,95 @@ class PhotoUploadRequest(BaseModel):
                 return v
             except ValueError:
                 try:
-                    # Try YYYY format (common for archaeological dating)
+                    # Try YYYY format or negative years (common for archaeological dating)
                     year = int(v)
-                    if 1 <= year <= 9999:
+                    if -9999 <= year <= 9999:
                         return v
                     else:
                         raise ValueError(f"Year out of range: {year}")
                 except ValueError:
-                    raise ValueError(f"Invalid date format: {v}. Use ISO format, YYYY-MM-DD, or YYYY")
+                    raise ValueError(f"Invalid date format: {v}. Use ISO format, YYYY-MM-DD, YYYY, or negative years for BCE")
     
     @validator('priority')
     def validate_priority(cls, v):
         """Validate priority field"""
+        if v is None or v == '' or v == 'null' or v == 'None':
+            return 'normal'
         allowed_priorities = ['critical', 'high', 'normal', 'low', 'bulk']
         if v.lower() not in allowed_priorities:
             raise ValueError(f"Priority must be one of: {allowed_priorities}")
         return v.lower()
     
+    @validator('*', pre=True)
+    def convert_empty_strings_to_none(cls, v):
+        """Convert empty strings and null-like values to None"""
+        if v is None:
+            return None
+        if isinstance(v, str):
+            if v.strip() == '' or v.lower() in ['null', 'none', 'undefined']:
+                return None
+        return v
+    
     class Config:
-        schema_extra = {
+        extra = "ignore"  # Allow backward compatibility with additional fields
+        
+        json_schema_extra = {  # Updated for Pydantic V2 compatibility
             "example": {
-                "title": "Decorated pottery fragment",
-                "description": "Fine example of decorated ceramic from context B3",
+                "title": "Decorated pottery fragment from Sector A",
+                "description": "Fine example of decorated ceramic with geometric patterns, recovered from context B3 during systematic excavation",
                 "photo_type": "detail",
-                "photographer": "Dr. Smith",
+                "photographer": "Dr. Maria Rossi",
+                "keywords": "pottery, decoration, ceramic, bronze age",
+                
+                # Archaeological context
                 "inventory_number": "INV-2023-001",
+                "catalog_number": "CAT-2023-A-042",
                 "excavation_area": "Sector A",
                 "stratigraphic_unit": "US 1234",
+                "grid_square": "A3-B4",
+                "depth_level": 2.5,
+                "find_date": "2023-05-15",
+                "finder": "Prof. John Smith",
+                "excavation_campaign": "Spring Campaign 2023",
+                
+                # Material and object information
                 "material": "ceramic",
+                "material_details": "Fine paste, fired at high temperature",
+                "object_type": "vessel fragment",
+                "object_function": "storage container",
+                
+                # Physical dimensions
+                "length_cm": 8.5,
+                "width_cm": 6.2,
+                "height_cm": 1.1,
+                "diameter_cm": None,
+                "weight_grams": 45.7,
+                
+                # Chronology and dating
                 "chronology_period": "Late Bronze Age",
-                "conservation_status": "good"
+                "chronology_culture": "Terramare culture",
+                "dating_from": "-1200",
+                "dating_to": "-1100",
+                "dating_notes": "Based on stratigraphic context and typology (Late Bronze Age, approx. 1200-1100 BCE)",
+                
+                # Conservation information
+                "conservation_status": "good",
+                "conservation_notes": "Minor surface abrasion, stable condition",
+                "restoration_history": "No restoration performed",
+                
+                # References and documentation
+                "bibliography": "Rossi, M. (2023). Archaeological Survey of Sector A. Journal of Excavation Studies, 45(2), 123-145.",
+                "comparative_references": "Similar specimens found at nearby sites",
+                "external_links": "https://example.com/catalog/12345",
+                
+                # Rights and licensing
+                "copyright_holder": "Archaeological Institute",
+                "license_type": "CC BY-SA 4.0",
+                "usage_rights": "Educational and research purposes",
+                
+                # Queue control
+                "use_queue": True,
+                "priority": "normal"
             }
         }
 

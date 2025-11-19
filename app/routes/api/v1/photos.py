@@ -204,236 +204,98 @@ async def upload_photo(
         request: Request,
         site_id: UUID,
         photos: List[UploadFile] = File(...),
-        # Basic metadata
-        title: Optional[str] = Form(None),
-        description: Optional[str] = Form(None),
-        photo_type: Optional[str] = Form(None),
-        photographer: Optional[str] = Form(None),
-        keywords: Optional[str] = Form(None),
-        # Queue control
-        use_queue: Optional[bool] = Form(False),
-        priority: Optional[str] = Form("normal"),
-
-        # Archaeological metadata
-        inventory_number: Optional[str] = Form(None),
-        catalog_number: Optional[str] = Form(None),
-        excavation_area: Optional[str] = Form(None),
-        stratigraphic_unit: Optional[str] = Form(None),
-        grid_square: Optional[str] = Form(None),
-        depth_level: Optional[float] = Form(None),
-        find_date: Optional[str] = Form(None),
-        finder: Optional[str] = Form(None),
-        excavation_campaign: Optional[str] = Form(None),
-
-        # Material and object
-        material: Optional[str] = Form(None),
-        material_details: Optional[str] = Form(None),
-        object_type: Optional[str] = Form(None),
-        object_function: Optional[str] = Form(None),
-
-        # Dimensions
-        length_cm: Optional[float] = Form(None),
-        width_cm: Optional[float] = Form(None),
-        height_cm: Optional[float] = Form(None),
-        diameter_cm: Optional[float] = Form(None),
-        weight_grams: Optional[float] = Form(None),
-
-        # Chronology
-        chronology_period: Optional[str] = Form(None),
-        chronology_culture: Optional[str] = Form(None),
-        dating_from: Optional[str] = Form(None),
-        dating_to: Optional[str] = Form(None),
-        dating_notes: Optional[str] = Form(None),
-
-        # Conservation
-        conservation_status: Optional[str] = Form(None),
-        conservation_notes: Optional[str] = Form(None),
-        restoration_history: Optional[str] = Form(None),
-
-        # References
-        bibliography: Optional[str] = Form(None),
-        comparative_references: Optional[str] = Form(None),
-        external_links: Optional[str] = Form(None),
-
-        # Rights
-        copyright_holder: Optional[str] = Form(None),
-        license_type: Optional[str] = Form(None),
-        usage_rights: Optional[str] = Form(None),
-
+        metadata: str = Form(..., description="JSON string containing photo metadata"),
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Upload foto al sito archeologico - MODULAR SERVICE VERSION"""
+    """
+    Upload foto al sito archeologico con metadata JSON - REFACTORED VERSION
+    
+    Args:
+        request: FastAPI Request object
+        site_id: UUID del sito archeologico
+        photos: Lista di file foto da caricare
+        metadata: JSON string containing comprehensive photo metadata
+        
+    Returns:
+        JSONResponse con risultati del caricamento
+        
+    Example usage:
+        ```
+        const formData = new FormData();
+        formData.append('photos', fileInput.files[0]);
+        formData.append('metadata', JSON.stringify({
+            title: 'Photo title',
+            description: 'Photo description',
+            photo_type: 'detail',
+            photographer: 'John Doe',
+            inventory_number: 'INV-2023-001',
+            material: 'ceramic',
+            chronology_period: 'Bronze Age',
+            use_queue: false,
+            priority: 'normal'
+        }));
+        
+        const response = await fetch('/api/v1/sites/site-id/photos/upload', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Authorization': 'Bearer ' + token
+            }
+        });
+        ```
+    """
     site, permission = site_access
 
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
 
-    # DEBUG: Log request details
-    logger.info(f"🔍 DEBUG - Request URL: {request.url}")
-    logger.info(f"🔍 DEBUG - Request headers: {dict(request.headers)}")
-    logger.info(f"🔍 DEBUG - Request method: {request.method}")
-    
-    # DEBUG: Log all incoming form data with types
-    logger.info(f"🔍 DEBUG - Form data received:")
-    logger.info(f"  - title: {title} (type: {type(title).__name__})")
-    logger.info(f"  - description: {description} (type: {type(description).__name__})")
-    logger.info(f"  - photo_type: {photo_type} (type: {type(photo_type).__name__})")
-    logger.info(f"  - photographer: {photographer} (type: {type(photographer).__name__})")
-    logger.info(f"  - keywords: {keywords} (type: {type(keywords).__name__})")
-    logger.info(f"  - use_queue: {use_queue} (type: {type(use_queue).__name__})")
-    logger.info(f"  - priority: {priority} (type: {type(priority).__name__})")
-    
-    logger.info(f"🔍 DEBUG - Archaeological data:")
-    logger.info(f"  - inventory_number: {inventory_number} (type: {type(inventory_number).__name__})")
-    logger.info(f"  - catalog_number: {catalog_number} (type: {type(catalog_number).__name__})")
-    logger.info(f"  - excavation_area: {excavation_area} (type: {type(excavation_area).__name__})")
-    logger.info(f"  - stratigraphic_unit: {stratigraphic_unit} (type: {type(stratigraphic_unit).__name__})")
-    logger.info(f"  - grid_square: {grid_square} (type: {type(grid_square).__name__})")
-    logger.info(f"  - depth_level: {depth_level} (type: {type(depth_level).__name__})")
-    logger.info(f"  - find_date: {find_date} (type: {type(find_date).__name__})")
-    logger.info(f"  - finder: {finder} (type: {type(finder).__name__})")
-    logger.info(f"  - excavation_campaign: {excavation_campaign} (type: {type(excavation_campaign).__name__})")
-    
-    logger.info(f"🔍 DEBUG - Material data:")
-    logger.info(f"  - material: {material} (type: {type(material).__name__})")
-    logger.info(f"  - material_details: {material_details} (type: {type(material_details).__name__})")
-    logger.info(f"  - object_type: {object_type} (type: {type(object_type).__name__})")
-    logger.info(f"  - object_function: {object_function} (type: {type(object_function).__name__})")
-    
-    logger.info(f"🔍 DEBUG - Dimension data:")
-    logger.info(f"  - length_cm: {length_cm} (type: {type(length_cm).__name__})")
-    logger.info(f"  - width_cm: {width_cm} (type: {type(width_cm).__name__})")
-    logger.info(f"  - height_cm: {height_cm} (type: {type(height_cm).__name__})")
-    logger.info(f"  - diameter_cm: {diameter_cm} (type: {type(diameter_cm).__name__})")
-    logger.info(f"  - weight_grams: {weight_grams} (type: {type(weight_grams).__name__})")
-    
-    logger.info(f"🔍 DEBUG - Chronology data:")
-    logger.info(f"  - chronology_period: {chronology_period} (type: {type(chronology_period).__name__})")
-    logger.info(f"  - chronology_culture: {chronology_culture} (type: {type(chronology_culture).__name__})")
-    logger.info(f"  - dating_from: {dating_from} (type: {type(dating_from).__name__})")
-    logger.info(f"  - dating_to: {dating_to} (type: {type(dating_to).__name__})")
-    logger.info(f"  - dating_notes: {dating_notes} (type: {type(dating_notes).__name__})")
-    
-    logger.info(f"🔍 DEBUG - Conservation data:")
-    logger.info(f"  - conservation_status: {conservation_status} (type: {type(conservation_status).__name__})")
-    logger.info(f"  - conservation_notes: {conservation_notes} (type: {type(conservation_notes).__name__})")
-    logger.info(f"  - restoration_history: {restoration_history} (type: {type(restoration_history).__name__})")
-    
-    logger.info(f"🔍 DEBUG - References data:")
-    logger.info(f"  - bibliography: {bibliography} (type: {type(bibliography).__name__})")
-    logger.info(f"  - comparative_references: {comparative_references} (type: {type(comparative_references).__name__})")
-    logger.info(f"  - external_links: {external_links} (type: {type(external_links).__name__})")
-    
-    logger.info(f"🔍 DEBUG - Rights data:")
-    logger.info(f"  - copyright_holder: {copyright_holder} (type: {type(copyright_holder).__name__})")
-    logger.info(f"  - license_type: {license_type} (type: {type(license_type).__name__})")
-    logger.info(f"  - usage_rights: {usage_rights} (type: {type(usage_rights).__name__})")
-    
-    # DEBUG: Log photos info
-    logger.info(f"🔍 DEBUG - Photos info:")
-    for i, photo in enumerate(photos):
-        logger.info(f"  - Photo {i}: {photo.filename} (size: {photo.size}, content_type: {photo.content_type})")
-    
-    # Prepare upload data as dictionary to avoid Pydantic validation issues
-    upload_data = {
-        'title': title,
-        'description': description,
-        'photo_type': photo_type,
-        'photographer': photographer,
-        'keywords': keywords,
-        'use_queue': use_queue,
-        'priority': priority,
-        'inventory_number': inventory_number,
-        'catalog_number': catalog_number,
-        'excavation_area': excavation_area,
-        'stratigraphic_unit': stratigraphic_unit,
-        'grid_square': grid_square,
-        'depth_level': depth_level,
-        'find_date': find_date,
-        'finder': finder,
-        'excavation_campaign': excavation_campaign,
-        'material': material,
-        'material_details': material_details,
-        'object_type': object_type,
-        'object_function': object_function,
-        'length_cm': length_cm,
-        'width_cm': width_cm,
-        'height_cm': height_cm,
-        'diameter_cm': diameter_cm,
-        'weight_grams': weight_grams,
-        'chronology_period': chronology_period,
-        'chronology_culture': chronology_culture,
-        'dating_from': dating_from,
-        'dating_to': dating_to,
-        'dating_notes': dating_notes,
-        'conservation_status': conservation_status,
-        'conservation_notes': conservation_notes,
-        'restoration_history': restoration_history,
-        'bibliography': bibliography,
-        'comparative_references': comparative_references,
-        'external_links': external_links,
-        'copyright_holder': copyright_holder,
-        'license_type': license_type,
-        'usage_rights': usage_rights
-    }
-    
-    # DEBUG: Log the dictionary data before Pydantic validation
-    logger.info(f"🔍 DEBUG - Upload data dictionary: {upload_data}")
-    
-    # Create PhotoUploadRequest from dictionary to allow validation
+    # Parse and validate JSON metadata
     try:
-        upload_request = PhotoUploadRequest(**upload_data)
-        logger.info(f"✅ DEBUG - PhotoUploadRequest created successfully")
-    except Exception as validation_error:
-        logger.error(f"❌ Pydantic validation failed: {validation_error}")
-        logger.error(f"🔍 DEBUG - Validation error type: {type(validation_error).__name__}")
-        
-        # Get detailed validation errors
-        if hasattr(validation_error, 'errors'):
-            logger.error(f"🔍 DEBUG - Validation errors: {validation_error.errors()}")
-        elif hasattr(validation_error, 'json'):
-            logger.error(f"🔍 DEBUG - Validation errors JSON: {validation_error.json()}")
-        else:
-            logger.error(f"🔍 DEBUG - Validation error details: {getattr(validation_error, 'errors', 'No errors available')}")
-        
-        # Try to create PhotoUploadRequest with only the fields that are not None
-        filtered_data = {k: v for k, v in upload_data.items() if v is not None and v != ''}
-        logger.info(f"🔍 DEBUG - Trying with filtered data: {filtered_data}")
-        logger.info(f"🔍 DEBUG - Filtered data length: {len(filtered_data)} vs original: {len(upload_data)}")
-        
-        try:
-            upload_request = PhotoUploadRequest(**filtered_data)
-            logger.info(f"✅ DEBUG - PhotoUploadRequest created with filtered data")
-        except Exception as filtered_validation_error:
-            logger.error(f"❌ Filtered Pydantic validation also failed: {filtered_validation_error}")
-            logger.error(f"🔍 DEBUG - Filtered validation error type: {type(filtered_validation_error).__name__}")
-            
-            if hasattr(filtered_validation_error, 'errors'):
-                logger.error(f"🔍 DEBUG - Filtered validation errors: {filtered_validation_error.errors()}")
-            elif hasattr(filtered_validation_error, 'json'):
-                logger.error(f"🔍 DEBUG - Filtered validation errors JSON: {filtered_validation_error.json()}")
-            
-            # Create detailed error response
-            error_details = {
-                "error": str(filtered_validation_error),
-                "type": type(filtered_validation_error).__name__,
-                "validation_details": getattr(filtered_validation_error, 'errors', None),
-                "upload_data": upload_data,
-                "filtered_data": filtered_data
+        metadata_dict = json.loads(metadata)
+        logger.info(f"JSON metadata parsed successfully", keys=list(metadata_dict.keys()))
+    except json.JSONDecodeError as json_error:
+        logger.error(f"Invalid JSON metadata provided: {json_error}")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Invalid JSON metadata format",
+                "error": str(json_error),
+                "field": "metadata"
             }
-            
-            logger.error(f"🔍 DEBUG - Complete error details: {error_details}")
-            
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "message": f"Validation error: {str(filtered_validation_error)}",
-                    "validation_errors": getattr(filtered_validation_error, 'errors', None),
-                    "debug_data": error_details
-                }
-            )
+        )
+
+    # Validate with Pydantic schema
+    try:
+        upload_request = PhotoUploadRequest(**metadata_dict)
+        logger.info("PhotoUploadRequest validated successfully",
+                   title=upload_request.title,
+                   photo_type=upload_request.photo_type)
+    except Exception as validation_error:
+        logger.error(f"Pydantic validation failed: {validation_error}")
+        
+        # Extract detailed validation errors and make them JSON serializable
+        validation_errors = None
+        if hasattr(validation_error, 'errors'):
+            try:
+                validation_errors = validation_error.errors()
+                # Ensure all values in validation errors are JSON serializable
+                if validation_errors:
+                    validation_errors = json.loads(json.dumps(validation_errors, default=str))
+            except Exception as json_error:
+                logger.warning(f"Failed to serialize validation errors: {json_error}")
+                validation_errors = [{"msg": str(validation_error), "type": "validation_error"}]
+        
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Metadata validation failed",
+                "validation_errors": validation_errors,
+                "error_type": type(validation_error).__name__,
+                "received_metadata": metadata_dict
+            }
+        )
 
     # Use modular upload service
     upload_service = PhotoUploadService()
@@ -442,8 +304,7 @@ async def upload_photo(
         user_id=current_user_id,
         photos=photos,
         upload_request=upload_request,
-        db=db,
-        raw_metadata=upload_data  # Pass raw data as fallback
+        db=db
     )
 
 

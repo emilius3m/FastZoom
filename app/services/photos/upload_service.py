@@ -40,8 +40,7 @@ class PhotoUploadService:
         user_id: UUID,
         photos: List[UploadFile],
         upload_request: PhotoUploadRequest,
-        db: AsyncSession,
-        raw_metadata: Optional[Dict[str, Any]] = None
+        db: AsyncSession
     ) -> JSONResponse:
         """
         Main entry point for photo upload processing.
@@ -106,7 +105,7 @@ class PhotoUploadService:
             # Pre-upload validation and storage checks
             await self._validate_and_prepare_storage(photos)
 
-            # Prepare archaeological metadata from Pydantic schema
+            # Prepare archaeological metadata from validated PhotoUploadRequest
             archaeological_metadata = self._prepare_archaeological_metadata(upload_request)
 
             logger.debug("Processing photos",
@@ -164,34 +163,14 @@ class PhotoUploadService:
                 detail="Storage health check failed. Please try again later."
             )
 
-    def _prepare_archaeological_metadata(self, upload_request: PhotoUploadRequest, raw_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Convert Pydantic schema to dictionary for database operations."""
+    def _prepare_archaeological_metadata(self, upload_request: PhotoUploadRequest) -> Dict[str, Any]:
+        """Convert validated PhotoUploadRequest to dictionary for database operations."""
         
-        # Use raw metadata if available to avoid Pydantic validation issues
-        if raw_metadata:
-            metadata = {}
-            
-            # Filter out None/empty values from raw metadata
-            for key, value in raw_metadata.items():
-                if value is not None and value != '':
-                    metadata[key] = value
-        else:
-            metadata = {}
-            
-            # Basic metadata from Pydantic model
-            if upload_request.title:
-                metadata['title'] = upload_request.title
-            if upload_request.description:
-                metadata['description'] = upload_request.description
-            if upload_request.photographer:
-                metadata['photographer'] = upload_request.photographer
-            if upload_request.keywords:
-                metadata['keywords'] = upload_request.keywords
-            if upload_request.photo_type:
-                metadata['photo_type'] = upload_request.photo_type
-
-        # Add remaining fields from Pydantic model if not already in metadata
-        remaining_fields = {
+        metadata = {}
+        
+        # Extract all fields from the validated Pydantic model
+        field_names = [
+            'title', 'description', 'photo_type', 'photographer', 'keywords',
             'inventory_number', 'catalog_number', 'excavation_area', 'stratigraphic_unit',
             'grid_square', 'depth_level', 'find_date', 'finder', 'excavation_campaign',
             'material', 'material_details', 'object_type', 'object_function',
@@ -200,24 +179,24 @@ class PhotoUploadService:
             'conservation_status', 'conservation_notes', 'restoration_history',
             'bibliography', 'comparative_references', 'external_links',
             'copyright_holder', 'license_type', 'usage_rights'
-        }
+        ]
         
-        for field in remaining_fields:
-            if field not in metadata:
-                value = getattr(upload_request, field, None)
-                if value is not None and value != '':
-                    # Handle date fields specially
-                    if field in ['find_date', 'dating_from', 'dating_to'] and isinstance(value, str):
+        for field in field_names:
+            value = getattr(upload_request, field, None)
+            if value is not None and value != '':
+                # Handle date fields specially
+                if field in ['find_date', 'dating_from', 'dating_to'] and isinstance(value, str):
+                    try:
+                        metadata[field] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    except ValueError:
                         try:
-                            metadata[field] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                            metadata[field] = datetime.strptime(value, '%Y-%m-%d')
                         except ValueError:
-                            try:
-                                metadata[field] = datetime.strptime(value, '%Y-%m-%d')
-                            except ValueError:
-                                logger.warning(f"Invalid {field} format: {value}")
-                                metadata[field] = value
-                    else:
-                        metadata[field] = value
+                            # For archaeological dates (like years BCE), keep as string
+                            metadata[field] = value
+                            logger.debug(f"Archaeological date format for {field}: {value}")
+                else:
+                    metadata[field] = value
 
         return metadata
 
