@@ -586,17 +586,53 @@ class PhotoMetadataService:
 
         # 🔧 FIX: Remove problematic fields that don't exist in Photo model
         # This prevents "invalid keyword argument" errors
-        problematic_fields = ['dpi', 'exif_data']  # Fields that might be in metadata but not in Photo model
+        problematic_fields = ['dpi', 'exif_data', 'color_profile']  # Fields that might be in metadata but not in Photo model
         for field in problematic_fields:
             if field in metadata:
                 logger.debug(f"Excluding '{field}' field from Photo model (not supported)")
-                # Field is already excluded since we don't add it to photo_data
+                # Remove from metadata to prevent passing to Photo constructor
+                del metadata[field]
+
+        # 🔧 FIX: Also check for any other fields that might cause issues
+        # Get valid Photo model fields by checking the model's __table__.columns
+        valid_photo_fields = {col.name for col in Photo.__table__.columns}
+        
+        # Filter photo_data to only include valid fields
+        filtered_photo_data = {}
+        for key, value in photo_data.items():
+            if key in valid_photo_fields:
+                filtered_photo_data[key] = value
+            else:
+                logger.debug(f"Excluding '{key}' field from Photo model (not in model)")
 
         # Rimuovi campi None per evitare errori
-        photo_data = {k: v for k, v in photo_data.items() if v is not None}
+        filtered_photo_data = {k: v for k, v in filtered_photo_data.items() if v is not None}
 
-        photo = Photo(**photo_data)
-        return photo
+        try:
+            photo = Photo(**filtered_photo_data)
+            logger.debug(f"Photo record created successfully with {len(filtered_photo_data)} fields")
+            return photo
+        except Exception as e:
+            logger.error(f"Error creating Photo record: {e}")
+            logger.error(f"Photo data fields: {list(filtered_photo_data.keys())}")
+            # Try with minimal fields as fallback
+            try:
+                minimal_data = {
+                    "filename": filename,
+                    "original_filename": original_filename,
+                    "filepath": file_path,
+                    "file_size": file_size,
+                    "site_id": site_id,
+                    "uploaded_by": uploaded_by,
+                    "created_by": uploaded_by,
+                    "mime_type": self._guess_mime_type(filename),
+                }
+                photo = Photo(**minimal_data)
+                logger.warning(f"Photo record created with minimal fields due to error")
+                return photo
+            except Exception as fallback_error:
+                logger.error(f"Even minimal Photo creation failed: {fallback_error}")
+                raise PhotoServiceError(f"Failed to create Photo record: {fallback_error}")
 
     def _convert_to_enum(self, enum_class, value):
         """

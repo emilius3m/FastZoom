@@ -40,7 +40,8 @@ class PhotoUploadService:
         user_id: UUID,
         photos: List[UploadFile],
         upload_request: PhotoUploadRequest,
-        db: AsyncSession
+        db: AsyncSession,
+        raw_metadata: Optional[Dict[str, Any]] = None
     ) -> JSONResponse:
         """
         Main entry point for photo upload processing.
@@ -57,7 +58,7 @@ class PhotoUploadService:
 
         # Process upload directly with storage and processing coordination
         return await self._process_direct_upload(
-            site_id, user_id, photos, upload_request, db
+            site_id, user_id, photos, upload_request, db, raw_metadata
         )
 
     async def _should_use_queue(self, explicit_request: bool) -> bool:
@@ -86,7 +87,8 @@ class PhotoUploadService:
         user_id: UUID,
         photos: List[UploadFile],
         upload_request: PhotoUploadRequest,
-        db: AsyncSession
+        db: AsyncSession,
+        raw_metadata: Optional[Dict[str, Any]] = None
     ) -> JSONResponse:
         """
         Process photos upload directly without queueing.
@@ -105,8 +107,8 @@ class PhotoUploadService:
             # Pre-upload validation and storage checks
             await self._validate_and_prepare_storage(photos)
 
-            # Prepare archaeological metadata from validated PhotoUploadRequest
-            archaeological_metadata = self._prepare_archaeological_metadata(upload_request)
+            # Prepare archaeological metadata from Pydantic schema
+            archaeological_metadata = self._prepare_archaeological_metadata(upload_request, raw_metadata)
 
             logger.debug("Processing photos",
                         photo_count=len(photos),
@@ -163,14 +165,34 @@ class PhotoUploadService:
                 detail="Storage health check failed. Please try again later."
             )
 
-    def _prepare_archaeological_metadata(self, upload_request: PhotoUploadRequest) -> Dict[str, Any]:
-        """Convert validated PhotoUploadRequest to dictionary for database operations."""
+    def _prepare_archaeological_metadata(self, upload_request: PhotoUploadRequest, raw_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Convert Pydantic schema to dictionary for database operations."""
         
-        metadata = {}
-        
-        # Extract all fields from the validated Pydantic model
-        field_names = [
-            'title', 'description', 'photo_type', 'photographer', 'keywords',
+        # Use raw metadata if available to avoid Pydantic validation issues
+        if raw_metadata:
+            metadata = {}
+            
+            # Filter out None/empty values from raw metadata
+            for key, value in raw_metadata.items():
+                if value is not None and value != '':
+                    metadata[key] = value
+        else:
+            metadata = {}
+            
+            # Basic metadata from Pydantic model
+            if upload_request.title:
+                metadata['title'] = upload_request.title
+            if upload_request.description:
+                metadata['description'] = upload_request.description
+            if upload_request.photographer:
+                metadata['photographer'] = upload_request.photographer
+            if upload_request.keywords:
+                metadata['keywords'] = upload_request.keywords
+            if upload_request.photo_type:
+                metadata['photo_type'] = upload_request.photo_type
+
+        # Add remaining fields from Pydantic model if not already in metadata
+        remaining_fields = {
             'inventory_number', 'catalog_number', 'excavation_area', 'stratigraphic_unit',
             'grid_square', 'depth_level', 'find_date', 'finder', 'excavation_campaign',
             'material', 'material_details', 'object_type', 'object_function',
@@ -179,24 +201,24 @@ class PhotoUploadService:
             'conservation_status', 'conservation_notes', 'restoration_history',
             'bibliography', 'comparative_references', 'external_links',
             'copyright_holder', 'license_type', 'usage_rights'
-        ]
+        }
         
-        for field in field_names:
-            value = getattr(upload_request, field, None)
-            if value is not None and value != '':
-                # Handle date fields specially
-                if field in ['find_date', 'dating_from', 'dating_to'] and isinstance(value, str):
-                    try:
-                        metadata[field] = datetime.fromisoformat(value.replace('Z', '+00:00'))
-                    except ValueError:
+        for field in remaining_fields:
+            if field not in metadata:
+                value = getattr(upload_request, field, None)
+                if value is not None and value != '':
+                    # Handle date fields specially
+                    if field in ['find_date', 'dating_from', 'dating_to'] and isinstance(value, str):
                         try:
-                            metadata[field] = datetime.strptime(value, '%Y-%m-%d')
+                            metadata[field] = datetime.fromisoformat(value.replace('Z', '+00:00'))
                         except ValueError:
-                            # For archaeological dates (like years BCE), keep as string
-                            metadata[field] = value
-                            logger.debug(f"Archaeological date format for {field}: {value}")
-                else:
-                    metadata[field] = value
+                            try:
+                                metadata[field] = datetime.strptime(value, '%Y-%m-%d')
+                            except ValueError:
+                                logger.warning(f"Invalid {field} format: {value}")
+                                metadata[field] = value
+                    else:
+                        metadata[field] = value
 
         return metadata
 
@@ -289,30 +311,75 @@ class PhotoUploadService:
                     archaeological_metadata=archaeological_metadata
                 )
 
-                # 4. Handle all database operations in a single transaction using the passed session
-                async with task_db.begin():
-                    # Add photo record to transaction
-                    task_db.add(photo_record)
-                    await task_db.flush()
-                    await task_db.refresh(photo_record)
-
-                    # 5. Generate thumbnail
-                    try:
-                        await file.seek(0)  # Reset file pointer for thumbnail
-                        thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
-                            file, str(photo_record.id)
-                        )
-
-                        if thumbnail_path:
-                            photo_record.thumbnail_path = thumbnail_path
-                            logger.debug("Thumbnail generated", thumbnail_path=thumbnail_path)
-                        else:
-                            logger.warning("Thumbnail generation failed", photo_id=str(photo_record.id))
-                    except Exception as thumbnail_error:
-                        logger.error("Thumbnail generation error", photo_id=str(photo_record.id), error=str(thumbnail_error))
-                        # Don't fail the entire upload if thumbnail generation fails
-
-                    # 6. Log activity
+                # ✅ FIX: Gestione transazione compatibile con SQLite
+                try:
+                    # Verifica se c'è già una transazione attiva
+                    if task_db.in_transaction():
+                        logger.debug("Using existing transaction")
+                        # Usa la transazione esistente
+                        task_db.add(photo_record)
+                        await task_db.flush()
+                        # ✅ CRITICAL FIX: Non usare refresh dentro transazione con SQLite
+                        # Usa expire_on_commit=False o accedi ai dati prima del commit
+                        photo_id = photo_record.id
+                        logger.debug(f"✅ Photo flushed in existing transaction: {photo_id}")
+                    else:
+                        # Crea nuova transazione solo se necessario
+                        logger.debug("Creating new transaction")
+                        async with task_db.begin():
+                            task_db.add(photo_record)
+                            await task_db.flush()
+                            photo_id = photo_record.id
+                            logger.debug(f"✅ Photo flushed in new transaction: {photo_id}")
+                    
+                    # ✅ FIX: Non fare refresh qui - SQLite non lo supporta bene
+                    # I dati sono già accessibili dopo flush()
+                    
+                except Exception as db_error:
+                    logger.error(
+                        "Database operation failed",
+                        error=str(db_error),
+                        error_type=type(db_error).__name__,
+                        photo_id=photo_record.id if photo_record else "unknown",
+                        exc_info=True  # ✅ CRITICAL: Aggiunto stack trace
+                    )
+                    raise
+                
+                # 5. Generate thumbnail (outside main transaction)
+                try:
+                    await file.seek(0)
+                    thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
+                        file, str(photo_record.id)
+                    )
+                    
+                    if thumbnail_path:
+                        photo_record.thumbnail_path = thumbnail_path
+                        # ✅ FIX: Update separato per thumbnail
+                        try:
+                            await task_db.commit()
+                            logger.debug(f"✅ Thumbnail path updated: {thumbnail_path}")
+                        except Exception as commit_error:
+                            logger.error(
+                                "Thumbnail commit failed",
+                                photo_id=str(photo_record.id),
+                                error=str(commit_error),
+                                exc_info=True
+                            )
+                            # Non fallire per thumbnail
+                    else:
+                        logger.warning(f"Thumbnail generation failed for {photo_record.id}")
+                        
+                except Exception as thumbnail_error:
+                    logger.error(
+                        "Thumbnail generation error",
+                        photo_id=str(photo_record.id),
+                        error=str(thumbnail_error),
+                        exc_info=True  # ✅ Stack trace
+                    )
+                    # Don't fail upload for thumbnail
+                
+                # 6. Log activity in separate transaction
+                try:
                     activity = UserActivity(
                         user_id=str(user_id),
                         site_id=str(site_id),
@@ -325,14 +392,28 @@ class PhotoUploadService:
                         })
                     )
                     task_db.add(activity)
-                    logger.debug("Activity log added", photo_id=str(photo_record.id))
-
+                    await task_db.commit()  # ✅ Commit esplicito per activity
+                    logger.debug(f"✅ Activity logged for photo {photo_record.id}")
+                    
+                except Exception as activity_error:
+                    logger.error(
+                        "Activity logging failed",
+                        photo_id=str(photo_record.id),
+                        error=str(activity_error),
+                        exc_info=True
+                    )
+                    # Non fallire upload per activity log
+                
                 duration = time.time() - start_time
-                logger.info("Photo processed successfully",
-                           photo_id=str(photo_record.id),
-                           duration=duration,
-                           file_size=file_size)
-
+                logger.info(
+                    "Photo processed successfully",
+                    photo_id=str(photo_record.id),
+                    duration=duration,
+                    file_size=file_size
+                )
+                
+                # ✅ FIX: Accedi a tutti i dati necessari PRIMA di uscire dal metodo
+                # per evitare lazy loading issues con SQLite
                 return {
                     "photo_id": str(photo_record.id),
                     "filename": filename,
@@ -355,9 +436,16 @@ class PhotoUploadService:
                         'keywords': photo_record.keywords
                     }
                 }
-
+                
             except HTTPException as he:
                 # Re-raise HTTP exceptions as-is
+                logger.error(
+                    "HTTP exception during photo processing",
+                    status_code=he.status_code,
+                    detail=he.detail,
+                    exc_info=True
+                )
+                
                 if he.status_code == 507:  # Storage full
                     logger.error("Storage full during upload")
                     try:
@@ -369,16 +457,56 @@ class PhotoUploadService:
                     except Exception as cleanup_error:
                         logger.error("Cleanup attempt failed", error=str(cleanup_error))
                 raise he
-
+                
             except Exception as photo_error:
-                logger.error("Unexpected error processing photo", error=str(photo_error))
+                # ✅ CRITICAL FIX: Log completo con stack trace
+                import traceback
+                error_details = traceback.format_exc()
+                
+                logger.error(
+                    "Unexpected error processing photo",
+                    error=str(photo_error),
+                    error_type=type(photo_error).__name__,
+                    filename=file.filename if file else "Unknown",
+                    site_id=str(site_id),
+                    user_id=str(user_id),
+                    file_path=file_path if file_path else "Unknown",
+                    file_size=file_size if 'file_size' in locals() else "Unknown",
+                    exc_info=True  # ✅ QUESTO È CRITICO - mostra stack trace completo
+                )
+                
+                # Log separato per traceback completo
+                logger.error(
+                    "Full traceback for debugging",
+                    traceback=error_details
+                )
+                
+                # Rollback esplicito per SQLite
+                if task_db.in_transaction():
+                    try:
+                        await task_db.rollback()
+                        logger.debug("Transaction rolled back")
+                    except Exception as rollback_error:
+                        logger.error(
+                            "Rollback failed",
+                            error=str(rollback_error),
+                            exc_info=True
+                        )
+                
                 # Clean up file if it exists
                 if file_path:
                     try:
                         await storage_service.delete_file(file_path)
+                        logger.info(f"✅ Cleaned up file: {file_path}")
                     except Exception as cleanup_error:
-                        logger.error("Failed to cleanup file after error", error=str(cleanup_error))
-                # Return None for this photo but don't fail the entire batch
+                        logger.error(
+                            "File cleanup failed",
+                            file_path=file_path,
+                            error=str(cleanup_error),
+                            exc_info=True
+                        )
+                
+                # Return None to indicate failure but don't crash entire batch
                 return None
 
     def _filter_upload_results(
@@ -800,7 +928,7 @@ class PhotoUploadService:
                     'estimated_wait': await request_queue_service._estimate_wait_time(request_priority),
                     'queue_status_url': f'/api/queue/request/{request_id}'
                 }, status_code=status.HTTP_202_ACCEPTED)
-
+        
             except Exception as e:
                 # Clean up temp files if queueing fails
                 logger.error(f"Failed to prepare temp files for queue: {e}")
@@ -810,7 +938,7 @@ class PhotoUploadService:
                 except Exception as cleanup_error:
                     logger.error(f"Failed to cleanup temp files: {cleanup_error}")
                 raise
-
+        
         except Exception as e:
             logger.error(f"Failed to queue upload request: {e}")
             raise HTTPException(

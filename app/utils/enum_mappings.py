@@ -97,7 +97,29 @@ class EnumConverter:
         'pubblicazione': 'publication',
         'per pubblicazione': 'publication',
         'editoriale': 'publication',
-        'divulgazione': 'publication'
+        'divulgazione': 'publication',
+        
+        # 🔧 FIX: Add English fallback mappings for common shorthand values
+        'general': 'general_view',           # Common shorthand for general_view
+        'generale': 'general_view',          # Italian fallback
+        'vista': 'general_view',             # Single word fallback
+        'panoramic': 'general_view',         # English typo fallback
+        
+        'detail shot': 'detail',             # English fallback
+        'close-up': 'detail',                # English fallback
+        'macro shot': 'detail',              # English fallback
+        
+        'stratigraphic': 'stratigraphy',     # English fallback
+        'strat': 'stratigraphy',             # Abbreviation fallback
+        
+        'excavation': 'excavation_progress', # English fallback
+        'progress': 'excavation_progress',   # English fallback
+        
+        'context': 'find_context',           # English fallback
+        'find': 'find_context',              # English fallback
+        
+        'lab': 'laboratory',                 # Abbreviation fallback
+        'analysis': 'laboratory',            # English fallback
     }
     
     # ===== MATERIAL TYPE MAPPINGS =====
@@ -210,7 +232,34 @@ class EnumConverter:
         
         'altro': 'other',
         'materiale non identificato': 'other',
-        'sconosciuto': 'other'
+        'sconosciuto': 'other',
+        
+        # 🔧 FIX: Add English fallback mappings for common shorthand values
+        'pottery': 'ceramic',              # English fallback
+        'ceramic': 'ceramic',              # Direct English match
+        'pot': 'ceramic',                  # English fallback
+        
+        'metal': 'metal_composite',        # English fallback
+        'bronze': 'bronze',                # Direct English match
+        'iron': 'iron',                    # Direct English match
+        'steel': 'iron',                   # English fallback
+        
+        'stone': 'stone',                  # Direct English match
+        'rock': 'stone',                   # English fallback
+        'marble': 'marble',                # Direct English match
+        
+        'glass': 'glass',                  # Direct English match
+        'wood': 'wood',                    # Direct English match
+        'bone': 'bone',                    # Direct English match
+        
+        'gold': 'gold',                    # Direct English match
+        'silver': 'silver',                # Direct English match
+        'lead': 'lead',                    # Direct English match
+        'copper': 'copper',                # Direct English match
+        
+        'unknown': 'other',                # English fallback
+        'misc': 'other',                   # English fallback
+        'various': 'other',                # English fallback
     }
     
     # ===== CONSERVATION STATUS MAPPINGS =====
@@ -258,7 +307,52 @@ class EnumConverter:
         
         'incompleto': 'incomplete',
         'parziale': 'incomplete',
-        'frammentario': 'fragmentary'
+        'frammentario': 'fragmentary',
+        
+        # 🔧 FIX: Add English fallback mappings for common shorthand values
+        'excellent': 'excellent',           # Direct English match
+        'perfect': 'excellent',            # English fallback
+        'mint': 'excellent',               # English fallback
+        'pristine': 'excellent',           # English fallback
+        
+        'good': 'good',                    # Direct English match
+        'fine': 'good',                    # English fallback
+        'well preserved': 'good',          # English fallback
+        
+        'fair': 'fair',                    # Direct English match
+        'average': 'fair',                 # English fallback
+        'moderate': 'fair',                # English fallback
+        'ok': 'fair',                      # English fallback
+        
+        'poor': 'poor',                    # Direct English match
+        'bad': 'poor',                     # English fallback
+        'damaged': 'poor',                 # English fallback
+        'worn': 'poor',                    # English fallback
+        
+        'very poor': 'very_poor',          # English fallback
+        'terrible': 'very_poor',           # English fallback
+        'critical': 'very_poor',           # English fallback
+        
+        'fragmentary': 'fragmentary',      # Direct English match
+        'fragmented': 'fragmentary',       # English fallback
+        'incomplete': 'incomplete',        # Direct English match
+        'partial': 'incomplete',           # English fallback
+        
+        'restored': 'restored',            # Direct English match
+        'repaired': 'restored',            # English fallback
+        'conserved': 'restored',           # English fallback
+        
+        'reconstructed': 'reconstructed',  # Direct English match
+        'rebuilt': 'reconstructed',        # English fallback
+        'reconstructed': 'reconstructed',  # Direct English match
+        
+        'lost': 'lost',                    # Direct English match
+        'missing': 'missing',              # Direct English match
+        'absent': 'missing',               # English fallback
+        
+        'damaged': 'damaged',              # Direct English match
+        'broken': 'damaged',               # English fallback
+        'injured': 'damaged',              # English fallback
     }
     
     # ===== DOCUMENT TYPE MAPPINGS =====

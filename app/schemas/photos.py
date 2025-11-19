@@ -18,7 +18,7 @@ class PhotoUploadRequest(BaseModel):
     description: Optional[str] = Field(None, description="Photo description")
     photo_type: Optional[str] = Field(None, description="Photo type (general, detail, context, etc.)")
     photographer: Optional[str] = Field(None, description="Photographer name")
-    keywords: Optional[str] = Field(None, description="Comma-separated keywords")
+    keywords: Optional[Union[str, List[str]]] = Field(None, description="Keywords (string or comma-separated)")
     
     # Archaeological context
     inventory_number: Optional[str] = Field(None, description="Museum inventory number")
@@ -59,7 +59,7 @@ class PhotoUploadRequest(BaseModel):
     # References and documentation
     bibliography: Optional[str] = Field(None, description="Bibliographic references")
     comparative_references: Optional[str] = Field(None, description="Comparative examples")
-    external_links: Optional[str] = Field(None, description="External reference links")
+    external_links: Optional[Union[str, List[str]]] = Field(None, description="External reference links")
     
     # Rights and licensing
     copyright_holder: Optional[str] = Field(None, description="Copyright holder")
@@ -87,13 +87,42 @@ class PhotoUploadRequest(BaseModel):
             except ValueError:
                 try:
                     # Try YYYY format or negative years (common for archaeological dating)
+                    # Handle BCE formats like "3000 BCE"
+                    if isinstance(v, str) and v.upper().endswith(' BCE'):
+                        try:
+                            year = int(v.replace(' BCE', '').replace(' bce', '').strip())
+                            if -9999 <= year <= 9999:
+                                return v
+                            else:
+                                raise ValueError(f"Year out of range: {year}")
+                        except ValueError:
+                            pass
+                    
                     year = int(v)
                     if -9999 <= year <= 9999:
                         return v
                     else:
                         raise ValueError(f"Year out of range: {year}")
                 except ValueError:
-                    raise ValueError(f"Invalid date format: {v}. Use ISO format, YYYY-MM-DD, YYYY, or negative years for BCE")
+                    raise ValueError(f"Invalid date format: {v}. Use ISO format, YYYY-MM-DD, YYYY, or BCE years")
+    
+    @validator('keywords')
+    def validate_keywords(cls, v):
+        """Normalize keywords to string format"""
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return ', '.join(str(k).strip() for k in v if str(k).strip())
+        return str(v)
+    
+    @validator('external_links')
+    def validate_external_links(cls, v):
+        """Normalize external links to JSON string"""
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return str(v)  # Will be JSON encoded later
+        return str(v)
     
     @validator('priority')
     def validate_priority(cls, v):
