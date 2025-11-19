@@ -832,16 +832,21 @@ class PhotoUploadService:
                         detail=f"Invalid photo entry at index {i}: missing required field '{field}'"
                     )
 
+        # ✅ FIX: Response format compatible with frontend expectations
+        # Frontend expects 'successful' and 'failed' arrays for batch upload handling
         response_data = {
-            "uploaded_photos": uploaded_photos,
+            "successful": uploaded_photos,
+            "failed": failed_photos,
             "message": f"{len(uploaded_photos)} foto caricate con successo",
             "total_uploaded": len(uploaded_photos),
             "photos_needing_tiles": len(photos_needing_tiles),
             "upload_timestamp": datetime.now(timezone.utc).isoformat()
         }
 
+        # Maintain backward compatibility with existing frontend code
+        response_data["uploaded_photos"] = uploaded_photos  # For backward compatibility
         if failed_photos:
-            response_data["failed_photos"] = failed_photos
+            response_data["failed_photos"] = failed_photos  # For backward compatibility
             response_data["total_failed"] = len(failed_photos)
 
         logger.info(f"✅ Upload API response: {len(uploaded_photos)} foto caricate, {len(photos_needing_tiles)} necessitano tiles")

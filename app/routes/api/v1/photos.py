@@ -200,78 +200,81 @@ async def get_site_photos_api(
 
 
 @router.post("/sites/{site_id}/photos/upload")
-async def upload_photo(
-        request: Request,
-        site_id: UUID,
-        photos: List[UploadFile] = File(...),
-        metadata: str = Form(..., description="JSON string containing photo metadata"),
-        site_access: tuple = Depends(get_site_access),
-        current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+async def upload_photos(
+    site_id: UUID,
+    photos: List[UploadFile] = File(...),  # ✅ Lista di file
+    inventory_number: Optional[str] = Form(None),
+    excavation_area: Optional[str] = Form(None),
+    stratigraphic_unit: Optional[str] = Form(None),
+    material: Optional[str] = Form(None),
+    photo_type: Optional[str] = Form(None),
+    photo_date: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),  # JSON string
+    site_access: tuple = Depends(get_site_access),
+    current_user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Upload foto al sito archeologico con metadata JSON - REFACTORED VERSION
+    Upload foto al sito archeologico con metadati come campi separati - FIXED VERSION
     
     Args:
-        request: FastAPI Request object
         site_id: UUID del sito archeologico
         photos: Lista di file foto da caricare
-        metadata: JSON string containing comprehensive photo metadata
+        inventory_number: Numero di inventario
+        excavation_area: Area di scavo
+        stratigraphic_unit: Unità stratigrafica
+        material: Materiale
+        photo_type: Tipo foto
+        photo_date: Data scatto
+        description: Descrizione
+        tags: Tags come JSON string
         
     Returns:
         JSONResponse con risultati del caricamento
-        
-    Example usage:
-        ```
-        const formData = new FormData();
-        formData.append('photos', fileInput.files[0]);
-        formData.append('metadata', JSON.stringify({
-            title: 'Photo title',
-            description: 'Photo description',
-            photo_type: 'detail',
-            photographer: 'John Doe',
-            inventory_number: 'INV-2023-001',
-            material: 'ceramic',
-            chronology_period: 'Bronze Age',
-            use_queue: false,
-            priority: 'normal'
-        }));
-        
-        const response = await fetch('/api/v1/sites/site-id/photos/upload', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
-        });
-        ```
     """
     site, permission = site_access
 
     if not permission.can_write():
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
 
-    # Parse and validate JSON metadata
-    try:
-        metadata_dict = json.loads(metadata)
-        logger.info(f"JSON metadata parsed successfully", keys=list(metadata_dict.keys()))
-    except json.JSONDecodeError as json_error:
-        logger.error(f"Invalid JSON metadata provided: {json_error}")
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message": "Invalid JSON metadata format",
-                "error": str(json_error),
-                "field": "metadata"
-            }
-        )
+    logger.info(f"📥 Received {len(photos)} files for upload")
+    
+    # Parse tags se presente
+    tags_list = []
+    if tags:
+        try:
+            tags_list = json.loads(tags)
+        except:
+            tags_list = []
+    
+    # Costruisci metadata dict dai campi del form
+    metadata_dict = {
+        'title': f"Upload {len(photos)} photos",
+        'description': description or '',
+        'photographer': '',
+        'photo_type': photo_type,
+        'inventory_number': inventory_number,
+        'excavation_area': excavation_area,
+        'stratigraphic_unit': stratigraphic_unit,
+        'material': material,
+        'photo_date': photo_date,
+        'keywords': tags_list,
+        'use_queue': False,
+        'priority': 'normal'
+    }
+    
+    # Remove None values to avoid validation issues
+    metadata_dict = {k: v for k, v in metadata_dict.items() if v is not None and v != ''}
+    
+    logger.info(f"📋 Metadata prepared: {list(metadata_dict.keys())}")
 
     # Validate with Pydantic schema
     try:
         upload_request = PhotoUploadRequest(**metadata_dict)
         logger.info("PhotoUploadRequest validated successfully",
-                   title=upload_request.title,
-                   photo_type=upload_request.photo_type)
+                   photo_type=upload_request.photo_type,
+                   inventory_number=upload_request.inventory_number)
     except Exception as validation_error:
         logger.error(f"Pydantic validation failed: {validation_error}")
         
@@ -297,14 +300,15 @@ async def upload_photo(
             }
         )
 
-    # Use modular upload service
+    # Use modular upload service with raw metadata for better compatibility
     upload_service = PhotoUploadService()
     return await upload_service.process_photo_upload(
         site_id=site_id,
         user_id=current_user_id,
         photos=photos,
         upload_request=upload_request,
-        db=db
+        db=db,
+        raw_metadata=metadata_dict  # Pass raw metadata for better field handling
     )
 
 

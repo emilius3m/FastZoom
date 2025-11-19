@@ -240,16 +240,18 @@
 
         <!-- Action Buttons -->
         <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <button @click="closeModal()" 
-                    x-show="!isUploading" 
+            <button @click="closeModal()"
+                    x-show="!isUploading"
                     class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                 Annulla
             </button>
-            <button @click="uploadFiles()" 
-                    x-show="!isUploading && files.length > 0" 
+            <!-- Opzione 2: Upload batch (raccomandato per >5 file) -->
+            <button @click="uploadFilesInBatches()"
+                    x-show="!isUploading && files.length > 0"
                     :disabled="files.length === 0"
                     class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
-                Carica Foto
+                <span x-show="files.length <= 5">Carica Foto</span>
+                <span x-show="files.length > 5">Carica <span x-text="files.length"></span> Foto (in batch)</span>
             </button>
         </div>
     </div>
@@ -475,7 +477,7 @@ function photoUploadComponent() {
                 this.showToast('Nessun file da caricare', 'error');
                 return;
             }
-
+            
             this.isUploading = true;
             this.uploadProgress = 0;
             this.uploadDetails = this.files.map((file, index) => ({
@@ -484,35 +486,94 @@ function photoUploadComponent() {
                 progress: 0,
                 status: 'pending'
             }));
-
-            const formData = new FormData();
             
-            // Add files
-            this.files.forEach((fileObj, index) => {
-                formData.append(`photos`, fileObj.file);
-            });
-            
-            // Add metadata
-            formData.append('metadata', JSON.stringify({
-                ...this.metadata,
-                site_id: this.config.siteId,
-                upload_timestamp: new Date().toISOString()
-            }));
-
             try {
+                const formData = new FormData();
+                
+                // ✅ FIX 1: Append files con nome corretto per array
+                // FastAPI si aspetta 'photos' come UploadFile list
+                this.files.forEach((fileObj, index) => {
+                    // Aggiungi ogni file con lo stesso nome - FastAPI li gestirà come lista
+                    formData.append('photos', fileObj.file, fileObj.file.name);
+                    
+                    // Log per debugging
+                    console.log(`📎 Appending file ${index + 1}/${this.files.length}:`, {
+                        name: fileObj.file.name,
+                        size: fileObj.file.size,
+                        type: fileObj.file.type
+                    });
+                });
+                
+                // ✅ FIX 2: Metadata come campi separati invece di JSON string
+                // Questo rende più facile il parsing lato server
+                formData.append('inventory_number', this.metadata.inventory_number || '');
+                formData.append('excavation_area', this.metadata.excavation_area || '');
+                formData.append('stratigraphic_unit', this.metadata.stratigraphic_unit || '');
+                formData.append('material', this.metadata.material || '');
+                formData.append('photo_type', this.metadata.photo_type || '');
+                formData.append('photo_date', this.metadata.photo_date || '');
+                formData.append('description', this.metadata.description || '');
+                
+                // Tags come array JSON
+                if (this.metadata.tags && this.metadata.tags.length > 0) {
+                    formData.append('tags', JSON.stringify(this.metadata.tags));
+                }
+                
+                // Site ID
+                formData.append('site_id', this.config.siteId);
+                
+                // ✅ FIX 3: Log FormData per debugging
+                console.log('📤 Sending FormData with entries:');
+                for (let [key, value] of formData.entries()) {
+                    if (value instanceof File) {
+                        console.log(`  ${key}: [File] ${value.name} (${this.formatFileSize(value.size)})`);
+                    } else {
+                        console.log(`  ${key}: ${value}`);
+                    }
+                }
+                
+                // ✅ FIX 4: Fetch con timeout e progress tracking
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
+                
+                console.log(`🚀 Uploading ${this.files.length} files to ${this.config.uploadUrl}...`);
+                
                 const response = await fetch(this.config.uploadUrl, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        // ⚠️ NON impostare Content-Type per FormData!
+                        // Il browser lo fa automaticamente con boundary
                     },
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
-
+                
+                clearTimeout(timeoutId);
+                
+                // ✅ FIX 5: Gestione dettagliata degli errori HTTP
                 if (!response.ok) {
-                    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text();
+                    let errorDetail;
+                    
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        errorDetail = errorJson.detail || errorJson.message || errorText;
+                    } catch {
+                        errorDetail = errorText;
+                    }
+                    
+                    console.error('❌ Upload failed:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        detail: errorDetail
+                    });
+                    
+                    throw new Error(`Upload failed (${response.status}): ${errorDetail}`);
                 }
-
+                
                 const result = await response.json();
+                console.log('✅ Upload successful:', result);
                 
                 // Update progress to complete
                 this.uploadProgress = 100;
@@ -520,33 +581,238 @@ function photoUploadComponent() {
                     detail.status = 'completed';
                     detail.progress = 100;
                 });
-
+                
+                // ✅ FIX 6: Mostra risultati dettagliati
+                if (result.successful && result.successful.length > 0) {
+                    this.showToast(
+                        `✅ ${result.successful.length} foto caricate con successo!`,
+                        'success'
+                    );
+                }
+                
+                if (result.failed && result.failed.length > 0) {
+                    console.warn('⚠️ Some files failed:', result.failed);
+                    this.showToast(
+                        `⚠️ ${result.failed.length} foto non caricate. Controlla la console.`,
+                        'warning'
+                    );
+                }
+                
                 // Call success callback
                 this.handleUploadSuccess(result);
-
-            } catch (error) {
-                console.error('Upload error:', error);
-                this.uploadDetails.forEach(detail => {
-                    detail.status = 'error';
-                });
-                this.handleUploadError(error);
-            } finally {
-                this.isUploading = false;
                 
-                // Close modal after delay on success
+                // Close modal after delay
                 setTimeout(() => {
                     this.closeModal();
                 }, 2000);
+                
+            } catch (error) {
+                console.error('❌ Upload error:', error);
+                
+                // ✅ FIX 7: Error handling specifico
+                if (error.name === 'AbortError') {
+                    this.showToast('⏱️ Upload timeout - file troppo grandi o connessione lenta', 'error');
+                } else if (error.message.includes('Failed to fetch')) {
+                    this.showToast('🔌 Errore di connessione - verifica la rete', 'error');
+                } else {
+                    this.showToast(`❌ Errore upload: ${error.message}`, 'error');
+                }
+                
+                // Mark all as failed
+                this.uploadDetails.forEach(detail => {
+                    detail.status = 'error';
+                });
+                
+                this.handleUploadError(error);
+                
+            } finally {
+                this.isUploading = false;
+            }
+        },
+
+        /**
+         * Upload files in batches to prevent timeout and provide better UX
+         */
+        async uploadFilesInBatches() {
+            if (this.files.length === 0) {
+                this.showToast('Nessun file da caricare', 'error');
+                return;
+            }
+            
+            this.isUploading = true;
+            this.uploadProgress = 0;
+            this.uploadDetails = this.files.map((file, index) => ({
+                index,
+                fileName: file.name,
+                progress: 0,
+                status: 'pending'
+            }));
+            
+            const BATCH_SIZE = 5; // Upload 5 files alla volta
+            const batches = [];
+            
+            // Dividi files in batch
+            for (let i = 0; i < this.files.length; i += BATCH_SIZE) {
+                batches.push(this.files.slice(i, i + BATCH_SIZE));
+            }
+            
+            console.log(`📦 Uploading ${this.files.length} files in ${batches.length} batches`);
+            
+            const allResults = {
+                successful: [],
+                failed: []
+            };
+            
+            try {
+                // Upload ogni batch sequenzialmente
+                for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+                    const batch = batches[batchIndex];
+                    console.log(`📤 Uploading batch ${batchIndex + 1}/${batches.length} (${batch.length} files)`);
+                    
+                    const formData = new FormData();
+                    
+                    // Append files del batch corrente
+                    batch.forEach((fileObj) => {
+                        formData.append('photos', fileObj.file, fileObj.file.name);
+                    });
+                    
+                    // Metadata (stessi per tutti)
+                    formData.append('inventory_number', this.metadata.inventory_number || '');
+                    formData.append('excavation_area', this.metadata.excavation_area || '');
+                    formData.append('stratigraphic_unit', this.metadata.stratigraphic_unit || '');
+                    formData.append('material', this.metadata.material || '');
+                    formData.append('photo_type', this.metadata.photo_type || '');
+                    formData.append('photo_date', this.metadata.photo_date || '');
+                    formData.append('description', this.metadata.description || '');
+                    
+                    if (this.metadata.tags && this.metadata.tags.length > 0) {
+                        formData.append('tags', JSON.stringify(this.metadata.tags));
+                    }
+                    
+                    formData.append('site_id', this.config.siteId);
+                    
+                    // Upload batch
+                    try {
+                        const response = await fetch(this.config.uploadUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                            },
+                            body: formData
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`Batch ${batchIndex + 1} failed: ${response.statusText}`);
+                        }
+                        
+                        const result = await response.json();
+                        
+                        // Accumula risultati
+                        if (result.successful) {
+                            allResults.successful.push(...result.successful);
+                        }
+                        if (result.failed) {
+                            allResults.failed.push(...result.failed);
+                        }
+                        
+                        // Update progress
+                        const completedFiles = (batchIndex + 1) * BATCH_SIZE;
+                        this.uploadProgress = Math.min(100, (completedFiles / this.files.length) * 100);
+                        
+                        // Update details per files nel batch
+                        batch.forEach((fileObj) => {
+                            const detail = this.uploadDetails.find(d => d.fileName === fileObj.name);
+                            if (detail) {
+                                detail.status = 'completed';
+                                detail.progress = 100;
+                            }
+                        });
+                        
+                        console.log(`✅ Batch ${batchIndex + 1} completed`);
+                        
+                    } catch (batchError) {
+                        console.error(`❌ Batch ${batchIndex + 1} error:`, batchError);
+                        
+                        // Mark batch files as failed
+                        batch.forEach((fileObj) => {
+                            const detail = this.uploadDetails.find(d => d.fileName === fileObj.name);
+                            if (detail) {
+                                detail.status = 'error';
+                            }
+                            allResults.failed.push({
+                                filename: fileObj.name,
+                                error: batchError.message
+                            });
+                        });
+                    }
+                    
+                    // Small delay between batches
+                    if (batchIndex < batches.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                }
+                
+                // Final summary
+                this.uploadProgress = 100;
+                
+                if (allResults.successful.length > 0) {
+                    this.showToast(
+                        `✅ ${allResults.successful.length}/${this.files.length} foto caricate!`,
+                        'success'
+                    );
+                }
+                
+                if (allResults.failed.length > 0) {
+                    this.showToast(
+                        `⚠️ ${allResults.failed.length} foto non caricate`,
+                        'warning'
+                    );
+                    console.error('Failed files:', allResults.failed);
+                }
+                
+                this.handleUploadSuccess(allResults);
+                
+                setTimeout(() => {
+                    this.closeModal();
+                }, 2000);
+                
+            } catch (error) {
+                console.error('❌ Upload error:', error);
+                this.showToast(`❌ Errore upload: ${error.message}`, 'error');
+                this.handleUploadError(error);
+                
+            } finally {
+                this.isUploading = false;
             }
         },
 
         handleUploadSuccess(result) {
-            this.showToast(`Upload completato con successo! ${this.files.length} file caricati`, 'success');
+            let message = 'Upload completato!';
             
-            // Call the success callback function if it exists
-            if (window[this.config.successCallback] && typeof window[this.config.successCallback] === 'function') {
-                window[this.config.successCallback](result.uploaded_file_ids || []);
+            if (result.successful && result.failed) {
+                // Batch upload result format
+                const total = result.successful.length + result.failed.length;
+                message = `Upload completato: ${result.successful.length}/${total} file caricati con successo`;
+                
+                if (result.failed.length > 0) {
+                    console.warn('Files that failed to upload:', result.failed);
+                }
+                
+                // Call the success callback with successful uploads
+                if (window[this.config.successCallback] && typeof window[this.config.successCallback] === 'function') {
+                    window[this.config.successCallback](result.successful);
+                }
+            } else {
+                // Single upload result format (backward compatibility)
+                message = `Upload completato con successo! ${this.files.length} file caricati`;
+                
+                // Call the success callback function if it exists
+                if (window[this.config.successCallback] && typeof window[this.config.successCallback] === 'function') {
+                    window[this.config.successCallback](result.uploaded_file_ids || []);
+                }
             }
+            
+            this.showToast(message, 'success');
         },
 
         handleUploadError(error) {
