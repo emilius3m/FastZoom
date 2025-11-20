@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 from datetime import datetime, timedelta
 
 from app.database.session import get_async_session
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, get_current_user_sites_with_blacklist
 from app.models import Photo, UserSitePermission, Document
 from app.models import UserActivity, User
 from app.models.sites import ArchaeologicalSite
@@ -36,14 +36,15 @@ async def dashboard_view(
     request: Request,
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """Visualizza dashboard del sito archeologico"""
 
     # Verifica esistenza sito
     site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
-    site = await db.execute(site_query)
-    site = site.scalar_one_or_none()
+    site_result = await db.execute(site_query)
+    site = site_result.scalar_one_or_none()
 
     if not site:
         raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
@@ -59,8 +60,8 @@ async def dashboard_view(
             UserSitePermission.is_active == True
         )
     )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
+    permission_result = await db.execute(permission_query)
+    permission = permission_result.scalar_one_or_none()
 
     if not permission:
         raise HTTPException(
@@ -74,9 +75,9 @@ async def dashboard_view(
     team_members = await get_team_members(db, site_id)
     recent_activities = await get_recent_activities(db, site_id)
 
-    # Prepara context per il template
+    # Prepara context per il template con user_sites corretti
     context = await get_base_template_context(
-        request, current_user_id, [], db, site, permission, "dashboard"
+        request, current_user_id, user_sites, db, site, permission, "dashboard"
     )
     context.update({
         "stats": stats,

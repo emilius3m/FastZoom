@@ -690,6 +690,12 @@ async def dashboard_view(
             "csrf_token": csrf_token,
             "use_unified": use_unified
         }
+        
+        # Debug logging for site selector
+        logger.info(f"🐛 DEBUG Dashboard: sites_count={len(user_sites)}, sites={user_sites}")
+        if user_sites:
+            for site in user_sites:
+                logger.info(f"🐛 DEBUG Dashboard: Site - ID: {site.get('id')}, Name: {site.get('name')}, Permission: {site.get('permission_level')}")
 
         # Add unified-specific context
         if use_unified:
@@ -849,6 +855,46 @@ async def auth_test(request: Request, db: AsyncSession = Depends(get_async_sessi
             "auth_status": "failed",
             "success": False,
             "cookie_found": access_token_cookie is not None
+        }
+
+@app.get("/debug-sites")
+async def debug_sites(
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Debug endpoint per verificare perché il site selector non appare"""
+    try:
+        # Ottieni informazioni utente
+        from app.services.auth_service import AuthService
+        user_result = await db.execute(select(User).where(User.id == current_user_id))
+        user = user_result.scalar_one_or_none()
+        
+        # Debug sites from dependency vs direct service call
+        sites_direct = await AuthService.get_user_sites_with_permissions(db, current_user_id)
+        
+        return {
+            "user_id": str(current_user_id),
+            "user_email": user.email if user else "Unknown",
+            "is_superuser": user.is_superuser if user else False,
+            "sites_from_dependency": {
+                "count": len(user_sites),
+                "sites": user_sites
+            },
+            "sites_from_direct_call": {
+                "count": len(sites_direct),
+                "sites": sites_direct
+            },
+            "should_show_dropdown": len(user_sites) > 1,
+            "dropdown_condition": "sites_count > 1"
+        }
+        
+    except Exception as e:
+        logger.error(f"Debug sites error: {str(e)}")
+        return {
+            "error": str(e),
+            "success": False
         }
 
 @app.get("/site-selection")

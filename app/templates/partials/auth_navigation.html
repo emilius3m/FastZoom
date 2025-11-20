@@ -19,8 +19,8 @@
     
     <!-- Right side: Site selector + Notifications + User menu -->
     <div class="flex items-center lg:order-2">
-      <!-- Site selector (solo se multi-sito) -->
-      {% if sites_count is defined and sites_count > 1 %}
+      <!-- Site selector (sempre visibile se c'è almeno un sito) -->
+      {% if sites_count is defined and sites_count > 0 %}
       <div class="me-4 hidden sm:block">
         <button type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700" data-dropdown-toggle="site-selector-dropdown">
           <i class="fas fa-map-marker-alt me-2 text-blue-600"></i>
@@ -73,7 +73,7 @@
 </nav>
 
 <!-- Site selector dropdown -->
-{% if sites_count is defined and sites_count > 1 %}
+{% if sites_count is defined and sites_count > 0 %}
 <div id="site-selector-dropdown" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-80 dark:bg-gray-700 dark:divide-gray-600">
     <div class="px-4 py-3 text-sm text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-600">
       <div class="font-semibold">I Tuoi Siti ({{ sites_count }})</div>
@@ -104,6 +104,54 @@
       {% endfor %}
     </ul>
 </div>
+
+<script>
+// Debug script per site selector dropdown
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DEBUG: Site selector dropdown initialization');
+    
+    // Check if dropdown elements exist
+    const dropdownButton = document.querySelector('[data-dropdown-toggle="site-selector-dropdown"]');
+    const dropdownMenu = document.getElementById('site-selector-dropdown');
+    
+    console.log('DEBUG: Dropdown button found:', !!dropdownButton);
+    console.log('DEBUG: Dropdown menu found:', !!dropdownMenu);
+    
+    if (dropdownButton && dropdownMenu) {
+        console.log('DEBUG: Both dropdown elements found, adding click handler');
+        
+        // Add manual click handler as fallback
+        dropdownButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('DEBUG: Dropdown button clicked');
+            
+            // Toggle dropdown visibility
+            if (dropdownMenu.classList.contains('hidden')) {
+                dropdownMenu.classList.remove('hidden');
+                dropdownMenu.classList.add('block');
+                console.log('DEBUG: Dropdown shown');
+            } else {
+                dropdownMenu.classList.add('hidden');
+                dropdownMenu.classList.remove('block');
+                console.log('DEBUG: Dropdown hidden');
+            }
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!dropdownButton.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                dropdownMenu.classList.add('hidden');
+                dropdownMenu.classList.remove('block');
+                console.log('DEBUG: Dropdown closed (outside click)');
+            }
+        });
+    } else {
+        console.error('DEBUG: Dropdown elements not found');
+        console.log('DEBUG: sites_count variable:', '{{ sites_count }}');
+        console.log('DEBUG: sites variable:', {{ sites|tojson }});
+    }
+});
+</script>
 {% endif %}
 
 <!-- Notifications dropdown -->

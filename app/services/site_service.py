@@ -42,7 +42,9 @@ class SiteService:
         )
         
         if active_only:
-            query = query.where(ArchaeologicalSite.is_active == True)
+            # Fix: Use status field instead of is_active to match ArchaeologicalSite model
+            from app.models.sites import SiteStatusEnum
+            query = query.where(ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value)
             
         result = await db.execute(query)
         return result.scalars().all()

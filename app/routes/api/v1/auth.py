@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 # Dependencies - Use blacklist versions for consistency with API routes
-from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
+from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist, get_current_user_token_with_blacklist
 from app.database.session import get_async_session
 from app.core.config import get_settings
 from app.core.security import current_active_user
@@ -725,6 +725,7 @@ async def v1_me(
 
 @router.post("/users/{user_id}/update", summary="Aggiorna profilo utente", tags=["Authentication"])
 async def v1_update_user(
+    request: Request,
     user_id: str,
     first_name: str = Form(None),
     last_name: str = Form(None),
@@ -736,7 +737,7 @@ async def v1_update_user(
     phone: str = Form(None),
     company: str = Form(None),
     db: AsyncSession = Depends(get_async_session),
-    current_user: User = Depends(current_active_user)
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
 ):
     """API endpoint to update user profile information"""
     try:
@@ -749,12 +750,48 @@ async def v1_update_user(
                 detail="Invalid user ID format"
             )
 
+        # DEBUG: Log authorization check details
+        logger.info(f"🔍 [AUTH_DEBUG] Profile update attempt:")
+        logger.info(f"🔍 [AUTH_DEBUG] Target user_id from URL: {target_user_id} (type: {type(target_user_id)})")
+        logger.info(f"🔍 [AUTH_DEBUG] Current user_id from token: {current_user_id} (type: {type(current_user_id)})")
+        
+        # DEBUG: Check token extraction
+        try:
+            from app.core.security import _extract_token_from_request
+            token = _extract_token_from_request(request)
+            logger.info(f"🔍 [AUTH_DEBUG] Token extracted successfully: {token[:50]}...")
+        except Exception as e:
+            logger.error(f"🔍 [AUTH_DEBUG] Token extraction failed: {e}")
+
+        # Get current user from database to check superuser status
+        result = await db.execute(select(User).where(User.id == str(current_user_id)))
+        current_user = result.scalar_one_or_none()
+        
+        if not current_user:
+            logger.error(f"🔍 [AUTH_DEBUG] User not found in database: {current_user_id}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+        
+        logger.info(f"🔍 [AUTH_DEBUG] Current user from DB: {current_user.id} (type: {type(current_user.id)})")
+        logger.info(f"🔍 [AUTH_DEBUG] Current user is_superuser: {current_user.is_superuser}")
+        
+        # Convert both to UUID for proper comparison
+        current_user_uuid = UUID(str(current_user.id))
+        logger.info(f"🔍 [AUTH_DEBUG] Current user UUID: {current_user_uuid} (type: {type(current_user_uuid)})")
+        logger.info(f"🔍 [AUTH_DEBUG] Target user UUID: {target_user_id} (type: {type(target_user_id)})")
+        logger.info(f"🔍 [AUTH_DEBUG] IDs match: {target_user_id == current_user_uuid}")
+
         # Check permissions: allow self-update or superuser
-        if target_user_id != current_user.id and not current_user.is_superuser:
+        if target_user_id != current_user_uuid and not current_user.is_superuser:
+            logger.error(f"🔍 [AUTH_DEBUG] Authorization FAILED: {target_user_id} != {current_user_uuid} and not superuser")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to update this user profile"
             )
+        
+        logger.info(f"🔍 [AUTH_DEBUG] Authorization PASSED")
 
         # Sanitize input data using nh3
         sanitized_data = {}
