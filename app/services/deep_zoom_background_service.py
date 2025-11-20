@@ -257,7 +257,9 @@ class DeepZoomBackgroundService:
             batch_context = self._batch_context[effective_site_id]
             for i, photo_info in enumerate(photos_list):
                 photo_id = photo_info['photo_id']
-                if photo_id not in [p['photo_id'] for p in batch_context['photos']]:
+                # Check for existing photos using both 'photo_id' and 'id' keys for compatibility
+                existing_photos = [p.get('photo_id', p.get('id')) for p in batch_context['photos']]
+                if photo_id not in existing_photos:
                     self._photo_order[photo_id] = len(batch_context['photos'])
                     batch_context['photos'].append(photo_info)
         
@@ -273,7 +275,7 @@ class DeepZoomBackgroundService:
                     site_id=effective_site_id,  # Use normalized site_id
                     file_path=photo_info['file_path'],
                     original_file_content=original_file_content,
-                    archaeological_metadata=photo_info.get('archaeological_metadata', {})
+                    archaeological_metadata=photo_info.get('archaeological_metadata', photo_info.get('metadata', {}))
                 )
                 scheduled_count += 1
                 
@@ -330,7 +332,9 @@ class DeepZoomBackgroundService:
             batch_context = self._batch_context[effective_site_id]
             for i, photo_snapshot in enumerate(photo_snapshots):
                 photo_id = photo_snapshot['id']
-                if photo_id not in [p['id'] for p in batch_context['photos']]:
+                # Check for existing photos using both 'photo_id' and 'id' keys for compatibility
+                existing_photos = [p.get('photo_id', p.get('id')) for p in batch_context['photos']]
+                if photo_id not in existing_photos:
                     self._photo_order[photo_id] = len(batch_context['photos'])
                     batch_context['photos'].append(photo_snapshot)
         
@@ -348,12 +352,16 @@ class DeepZoomBackgroundService:
                 from app.services.archaeological_minio_service import archaeological_minio_service
                 original_file_content = await archaeological_minio_service.get_file(photo_snapshot['file_path'])
                 
-                # Extract archaeological metadata from snapshot
-                archaeological_metadata = photo_snapshot.get('archaeological_metadata', {})
+                # Extract archaeological metadata from snapshot (check both possible keys)
+                archaeological_metadata = photo_snapshot.get('archaeological_metadata', photo_snapshot.get('metadata', {}))
                 
                 # Add additional metadata from snapshot if available
-                if 'metadata' in photo_snapshot:
+                if 'metadata' in photo_snapshot and 'archaeological_metadata' in photo_snapshot:
+                    # If both exist, merge them
                     archaeological_metadata.update(photo_snapshot['metadata'])
+                elif 'metadata' in photo_snapshot:
+                    # If only metadata exists, use it
+                    archaeological_metadata = photo_snapshot['metadata']
                 
                 # Schedule tile processing using snapshot data
                 await self.schedule_tile_processing_with_snapshot(
@@ -451,7 +459,7 @@ class DeepZoomBackgroundService:
                 site_id=effective_site_id,  # Use normalized site_id
                 file_path=photo_snapshot['file_path'],
                 original_file_content=original_file_content,
-                archaeological_metadata=archaeological_metadata or photo_snapshot.get('archaeological_metadata', {})
+                archaeological_metadata=archaeological_metadata or photo_snapshot.get('archaeological_metadata', photo_snapshot.get('metadata', {}))
             )
             
             # 🔧 SNAPSHOT-BASED: Store snapshot data in task for later use
@@ -769,7 +777,7 @@ class DeepZoomBackgroundService:
                 
             except Exception as e:
                 # FIX: task is a dataclass object, not a dict - access attributes directly
-                photoid = task.photoid if hasattr(task, 'photoid') else 'unknown'
+                photoid = task.photo_id if hasattr(task, 'photo_id') else 'unknown'
                 logger.error(f"❌ Failed to process tiles for photo {photoid}: {e}")
                 import traceback
                 logger.error(f"❌ Error traceback:\n{traceback.format_exc()}")
@@ -1488,7 +1496,8 @@ class DeepZoomBackgroundService:
         """Clean up batch context when a photo is completed"""
         if site_id in self._batch_context:
             batch = self._batch_context[site_id]
-            batch['photos'] = [p for p in batch['photos'] if p['photo_id'] != photo_id]
+            # Handle both 'photo_id' and 'id' keys for compatibility
+            batch['photos'] = [p for p in batch['photos'] if p.get('photo_id', p.get('id')) != photo_id]
             
             # Clean up photo order tracking
             if photo_id in self._photo_order:

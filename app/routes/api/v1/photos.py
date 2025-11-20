@@ -302,14 +302,20 @@ async def upload_photos(
 
     # Use modular upload service with raw metadata for better compatibility
     upload_service = PhotoUploadService()
-    return await upload_service.process_photo_upload(
+    result = await upload_service.process_photo_upload(
         site_id=site_id,
         user_id=current_user_id,
         photos=photos,
         upload_request=upload_request,
         db=db,
-        raw_metadata=metadata_dict  # Pass raw metadata for better field handling
+        raw_metadata=metadata_dict
     )
+
+    # 🔧 FIX: Commit esplicito per rendere i dati visibili ad altre sessioni
+    await db.commit()
+    logger.info("✅ Database changes committed - data now visible to all sessions")
+
+    return result
 
 
 @router.get("/sites/{site_id}/photos/{photo_id}/stream")
@@ -327,13 +333,6 @@ async def stream_photo_from_minio(
 
     # Use consolidated photo serving service for consistent behavior
     return await photo_serving_service.serve_photo_full(photo_id, db)
-
-
-# REMOVED: Duplicate endpoints get_photo_thumbnail and get_photo_full
-# These are now handled by the consolidated _simple versions above:
-# - get_photo_thumbnail_simple at line 36
-# - get_photo_full_simple at line 52
-# - get_photo_download_simple at line 68
 
 
 @router.get("/sites/{site_id}/api/photos/search")
