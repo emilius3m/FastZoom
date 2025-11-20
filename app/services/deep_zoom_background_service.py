@@ -707,16 +707,16 @@ class DeepZoomBackgroundService:
                 task.completed_at = datetime.now()
                 task.status = ProcessingStatus.COMPLETED
                 
-                # Update database with completion (only for legacy path)
-                if not use_snapshot:
-                    await self._update_photo_database_status(
-                        task.photo_id,
-                        "completed",
-                        tile_count=completed_tiles,
-                        levels=len(tiles_data)
-                    )
-                else:
-                    logger.debug(f"🔧 SNAPSHOT-BASED: Skipping database update for 'completed' status")
+                # Update database with completion (CRITICAL: Always update for completion status)
+                # Even in snapshot mode, we need to update the database with completion status
+                # so that the UI shows the correct deepzoom_status
+                await self._update_photo_database_status(
+                    task.photo_id,
+                    "completed",
+                    tile_count=completed_tiles,
+                    levels=len(tiles_data),
+                    use_snapshot=use_snapshot
+                )
                 
                 # Update final status
                 final_status = {
@@ -808,11 +808,14 @@ class DeepZoomBackgroundService:
                     task.status = ProcessingStatus.FAILED
                     task.completed_at = datetime.now()
                     
-                    # Update database with failed status (only for legacy path)
-                    if not use_snapshot:
-                        await self._update_photo_database_status(task.photo_id, "failed")
-                    else:
-                        logger.debug(f"🔧 SNAPSHOT-BASED: Skipping database update for 'failed' status")
+                    # Update database with failed status (CRITICAL: Always update for failed status)
+                    # Even in snapshot mode, we need to update the database with failed status
+                    # so that the UI shows the correct deepzoom_status
+                    await self._update_photo_database_status(
+                        task.photo_id,
+                        "failed",
+                        use_snapshot=use_snapshot
+                    )
                     await self._update_processing_status(
                         task, "failed", 0, error=f"Failed after {task.max_retries} retries: {str(e)}"
                     )
@@ -1240,7 +1243,8 @@ class DeepZoomBackgroundService:
         photo_id: str,
         status: str,
         tile_count: int = None,
-        levels: int = None
+        levels: int = None,
+        use_snapshot: bool = False
     ):
         """
         🔧 SNAPSHOT-BASED FIX: Skip database updates entirely for snapshot-based processing.
@@ -1258,10 +1262,16 @@ class DeepZoomBackgroundService:
             elif photo_id in self.failed_tasks:
                 task = self.failed_tasks[photo_id]
             
-            if task and hasattr(task, 'snapshot_data') and task.snapshot_data:
-                logger.info(f"🔧 SNAPSHOT-BASED: Skipping ALL database updates for photo {photo_id} (status: {status})")
+            if task and hasattr(task, 'snapshot_data') and task.snapshot_data and status != "completed":
+                logger.info(f"🔧 SNAPSHOT-BASED: Skipping database update for photo {photo_id} (status: {status})")
                 logger.info(f"🔧 SNAPSHOT-BASED: Status '{status}' is tracked in MinIO metadata and processing state")
                 return
+            
+            # CRITICAL FIX: Always allow completion and failed status updates, even in snapshot mode
+            # This ensures the UI shows the correct deepzoom_status after tile generation
+            if task and hasattr(task, 'snapshot_data') and task.snapshot_data and status in ["completed", "failed"]:
+                logger.info(f"🔧 SNAPSHOT-BASED: UPDATING database for photo {photo_id} with {status} status")
+                logger.info(f"🔧 SNAPSHOT-BASED: {status.capitalize()} status update is required for UI consistency")
             
             # Only do database updates for non-snapshot processing (legacy path)
             logger.info(f"🔧 DATABASE: Updating photo {photo_id} status to {status}")
