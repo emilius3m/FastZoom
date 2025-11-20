@@ -682,8 +682,8 @@ async def get_recent_photos(db: AsyncSession, site_id: UUID, limit: int = 6) -> 
             {
                 "id": str(photo.id),
                 "filename": photo.filename,
-                "thumbnail_url": f"/photos/{photo.id}/thumbnail",
-                "full_url": f"/photos/{photo.id}/full",
+                "thumbnail_url": f"/api/v1/photos/{photo.id}/thumbnail",
+                "full_url": f"/api/v1/photos/{photo.id}/full",
                 "photo_type": photo.photo_type if photo.photo_type else None,
                 "created_at": photo.created_at.isoformat(),
                 "category": getattr(photo, 'category', None)
