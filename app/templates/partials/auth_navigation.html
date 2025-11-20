@@ -23,9 +23,9 @@
       {% if sites_count is defined and sites_count > 0 %}
       <div class="me-8 hidden sm:block">
         <button type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700" data-dropdown-toggle="site-selector-dropdown">
-          <i class="fas fa-map-marker-alt me-2 text-blue-600"></i>
+          <i class="mr-3 fas fa-map-marker-alt me-2 text-blue-600"></i>
           <span id="current-site-name">{{ current_site_name or sites[0].name if sites else 'Seleziona Sito' }}</span>
-          <svg class="w-2.5 h-2.5 ms-2.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+          <svg class="ml-3 w-2.5 h-2.5 ms-2.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4"/>
           </svg>
         </button>
@@ -41,7 +41,7 @@
       </button>
       
       <!-- Theme Toggle (Navigation) -->
-      <button id="theme-toggle-nav" type="button" class="p-2 mr-3 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600">
+      <button id="theme-toggle-nav" type="button" class="p-2 mr-3 ml-3 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600">
           <span class="sr-only">Cambia tema</span>
           <!-- Sun icon (light mode) -->
           <svg id="theme-toggle-nav-light-icon" class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
@@ -83,7 +83,7 @@
       <li>
         <a href="/view/{{ site.id }}/dashboard/" class="flex items-center px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-600 border-b border-gray-100 dark:border-gray-600 last:border-b-0">
           <i class="fas fa-map-marker-alt me-3 text-blue-600 flex-shrink-0"></i>
-          <div class="flex-1 min-w-0">
+          <div class="ml-3 flex-1 min-w-0">
             <div class="font-medium text-gray-900 dark:text-white truncate">{{ site.name }}</div>
             <div class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ site.location }}</div>
             <span class="inline-block px-2 py-1 text-xs font-medium rounded-full mt-1
