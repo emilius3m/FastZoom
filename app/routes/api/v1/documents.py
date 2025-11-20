@@ -5,12 +5,16 @@ Implementa backward compatibility con avvisi di deprecazione.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
-from fastapi.responses import JSONResponse, Response
-from uuid import UUID
+from fastapi.responses import JSONResponse, Response, StreamingResponse
+from uuid import UUID, uuid4
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_, or_, func
 from loguru import logger
 from pydantic import BaseModel
+from pathlib import Path
+from datetime import datetime
+import json
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
@@ -20,6 +24,8 @@ from app.database.db import get_async_session
 from app.services.archaeological_minio_service import archaeological_minio_service
 from app.models.sites import ArchaeologicalSite
 from app.models import UserSitePermission
+from app.models import UserActivity
+from app.models.documents import Document
 
 # Schemas
 class DocumentUpdate(BaseModel):
@@ -78,27 +84,69 @@ async def v1_get_site_documents(
     # Verifica accesso al sito
     site_info = verify_site_access(site_id, user_sites)
     
-    # Simula request con query params
-    class MockRequest:
-        def __init__(self, query_params: dict):
-            self.query_params = query_params
-    
-    mock_request = MockRequest({
-        "category": category,
-        "search": search,
-        "limit": limit,
-        "offset": offset
-    })
-    
-    result = await get_documents_api_site__site_id__documents_get(
-        site_id, mock_request, current_user_id, user_sites, db
-    )
-    
-    # Aggiungi informazioni sito
-    if isinstance(result, dict):
-        result["site_info"] = site_info
-    
-    return result
+    # Direct implementation with filters
+    try:
+        # Base query
+        query = select(Document).where(
+            and_(
+                Document.site_id == str(site_id),
+                Document.is_deleted == False
+            )
+        )
+
+        # Apply filters
+        if category:
+            query = query.where(Document.category == category)
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.where(
+                or_(
+                    Document.title.ilike(search_term),
+                    Document.description.ilike(search_term),
+                    Document.author.ilike(search_term),
+                    Document.tags.ilike(search_term)
+                )
+            )
+
+        query = query.order_by(Document.uploaded_at.desc())
+        
+        # Apply pagination
+        query = query.offset(offset).limit(limit)
+        
+        result = await db.execute(query)
+        documents = result.scalars().all()
+
+        # Format results
+        documents_list = []
+        for doc in documents:
+            documents_list.append({
+                "id": str(doc.id),
+                "title": doc.title,
+                "description": doc.description,
+                "category": doc.category,
+                "doc_type": doc.doc_type,
+                "filename": doc.filename,
+                "file_size": doc.filesize,
+                "mime_type": doc.mimetype,
+                "tags": doc.tags.split(",") if doc.tags else [],
+                "doc_date": doc.doc_date.isoformat() if doc.doc_date else None,
+                "author": doc.author,
+                "is_public": doc.is_public,
+                "uploaded_at": doc.uploaded_at.isoformat(),
+                "uploaded_by": str(doc.uploaded_by),
+                "version": doc.version
+            })
+
+        return JSONResponse({
+            "documents": documents_list,
+            "total": len(documents_list),
+            "site_info": site_info
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel recupero documenti: {str(e)}")
 
 @router.post("/sites/{site_id}/documents", summary="Upload documento", tags=["Documents"])
 async def v1_upload_document(
@@ -169,7 +217,7 @@ async def v1_upload_document(
         content_type = file.content_type or 'application/octet-stream'
         
         # Generate unique document ID
-        temp_document_id = str(uuid.uuid4())
+        temp_document_id = str(uuid4())
         
         logger.info(f"Uploading document: {file.filename}, size: {len(content)}, type: {content_type}")
         
@@ -276,9 +324,47 @@ async def v1_get_document(
     # Verifica accesso al sito
     site_info = verify_site_access(site_id, user_sites)
     
-    return await get_document_api_site__site_id__documents__document_id__get(
-        site_id, document_id, current_user_id, user_sites, db
-    )
+    # Direct implementation instead of backward compatibility
+    try:
+        # Get document
+        query = select(Document).where(
+            and_(
+                Document.id == document_id,
+                Document.site_id == str(site_id),
+                Document.is_deleted == False
+            )
+        )
+
+        result = await db.execute(query)
+        doc = result.scalar_one_or_none()
+
+        if not doc:
+            raise HTTPException(status_code=404, detail="Documento non trovato")
+
+        return JSONResponse({
+            "id": str(doc.id),
+            "title": doc.title,
+            "description": doc.description,
+            "category": doc.category,
+            "doc_type": doc.doc_type,
+            "filename": doc.filename,
+            "file_size": doc.filesize,
+            "mime_type": doc.mimetype,
+            "tags": doc.tags.split(",") if doc.tags else [],
+            "doc_date": doc.doc_date.isoformat() if doc.doc_date else None,
+            "author": doc.author,
+            "is_public": doc.is_public,
+            "uploaded_at": doc.uploaded_at.isoformat(),
+            "uploaded_by": str(doc.uploaded_by),
+            "version": doc.version,
+            "site_info": site_info
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching document {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel recupero documento: {str(e)}")
 
 @router.put("/sites/{site_id}/documents/{document_id}", summary="Aggiorna documento", tags=["Documents"])
 async def v1_update_document(
@@ -318,9 +404,106 @@ async def v1_update_document(
     form_data = document_data.model_dump(exclude_unset=True)
     mock_request = MockRequest(form_data, file)
     
-    return await update_document_api_site__site_id__documents__document_id__put(
-        site_id, document_id, mock_request, current_user_id, user_sites, db
-    )
+    # Direct implementation instead of backward compatibility
+    try:
+        # Get document
+        query = select(Document).where(
+            and_(
+                Document.id == document_id,
+                Document.site_id == str(site_id),
+                Document.is_deleted == False
+            )
+        )
+
+        result = await db.execute(query)
+        doc = result.scalar_one_or_none()
+
+        if not doc:
+            raise HTTPException(status_code=404, detail="Documento non trovato")
+
+        # Update document fields
+        update_data = document_data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            if hasattr(doc, field):
+                setattr(doc, field, value)
+
+        # Handle file update if provided
+        if file:
+            # Validate file
+            file_size = await archaeological_minio_service._get_file_size(file)
+            if file_size > 52428800:  # 50MB
+                raise HTTPException(status_code=400, detail="File troppo grande (max 50MB)")
+
+            # Read file content
+            content = await file.read()
+            
+            # Determine content type and extension
+            file_extension = Path(file.filename).suffix
+            content_type = file.content_type or 'application/octet-stream'
+            
+            # Generate unique document ID
+            temp_document_id = str(uuid4())
+            
+            # Upload to MinIO
+            object_name = f"{site_id}/{temp_document_id}{file_extension}"
+            
+            minio_path = await archaeological_minio_service._upload_with_retry(
+                bucket_name=archaeological_minio_service.buckets['documents'],
+                object_name=object_name,
+                data=content,
+                content_type=content_type,
+                metadata=archaeological_minio_service._merge_metadata(
+                    archaeological_minio_service._create_base_metadata(str(site_id), content_type),
+                    {
+                        'title': doc.title,
+                        'description': doc.description,
+                        'category': doc.category,
+                        'doc_type': doc.doc_type,
+                        'filename': file.filename,
+                        'tags': doc.tags,
+                        'author': doc.author,
+                        'uploaded_by': str(current_user_id)
+                    }
+                ),
+                operation_name="document update",
+                target_freed_mb=200
+            )
+
+            # Update document file info
+            doc.filename = file.filename
+            doc.filepath = minio_path
+            doc.filesize = len(content)
+            doc.mimetype = content_type
+
+        await db.commit()
+        await db.refresh(doc)
+
+        # Log activity
+        await log_document_activity(
+            db=db,
+            user_id=current_user_id,
+            site_id=site_id,
+            activity_type="UPDATE",
+            activity_desc=f"Aggiornato documento: {doc.title}",
+            extra_data={"document_id": str(document_id)}
+        )
+
+        return JSONResponse({
+            "message": "Documento aggiornato con successo",
+            "document_id": str(doc.id),
+            "document": {
+                "id": str(doc.id),
+                "title": doc.title,
+                "filename": doc.filename,
+                "updated_at": doc.uploaded_at.isoformat()
+            }
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating document {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nell'aggiornamento: {str(e)}")
 
 @router.delete("/sites/{site_id}/documents/{document_id}", summary="Elimina documento", tags=["Documents"])
 async def v1_delete_document(
@@ -407,8 +590,8 @@ async def log_document_activity(
     """Log attività documento"""
     try:
         activity = UserActivity(
-            user_id=user_id,
-            site_id=site_id,
+            user_id=str(user_id),
+            site_id=str(site_id),
             activity_type=activity_type,
             activity_desc=activity_desc,
             extra_data=json.dumps(extra_data) if extra_data else None
@@ -494,11 +677,53 @@ async def legacy_get_site_documents(
     Questo endpoint sarà rimosso il 31/12/2025.
     """
     logger.warning(f"Legacy documents endpoint used for site {site_id} - deprecated")
-    response = await get_documents_api_site__site_id__documents_get(
-        site_id, request, current_user_id, user_sites, db
-    )
-    add_deprecation_headers(response, f"/api/v1/documents/sites/{site_id}/documents")
-    return response
+    # Direct implementation for legacy endpoint
+    try:
+        # Base query
+        query = select(Document).where(
+            and_(
+                Document.site_id == str(site_id),
+                Document.is_deleted == False
+            )
+        )
+
+        query = query.order_by(Document.uploaded_at.desc())
+        
+        result = await db.execute(query)
+        documents = result.scalars().all()
+
+        # Format results
+        documents_list = []
+        for doc in documents:
+            documents_list.append({
+                "id": str(doc.id),
+                "title": doc.title,
+                "description": doc.description,
+                "category": doc.category,
+                "doc_type": doc.doc_type,
+                "filename": doc.filename,
+                "file_size": doc.filesize,
+                "mime_type": doc.mimetype,
+                "tags": doc.tags.split(",") if doc.tags else [],
+                "doc_date": doc.doc_date.isoformat() if doc.doc_date else None,
+                "author": doc.author,
+                "is_public": doc.is_public,
+                "uploaded_at": doc.uploaded_at.isoformat(),
+                "uploaded_by": str(doc.uploaded_by),
+                "version": doc.version
+            })
+
+        response = JSONResponse({
+            "documents": documents_list,
+            "total": len(documents_list)
+        })
+        
+        add_deprecation_headers(response, f"/api/v1/sites/{site_id}/documents")
+        return response
+
+    except Exception as e:
+        logger.error(f"Error fetching documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel recupero documenti: {str(e)}")
 
 # NUOVI ENDPOINTS V1 - Funzionalità aggiuntive dalla vecchia implementazione
 

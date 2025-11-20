@@ -41,7 +41,7 @@ api_v1_router.include_router(photos_router, tags=["Photos"])
 # Temporarily comment out problematic routers
 # api_v1_router.include_router(metadata_router, prefix="/metadata", tags=["Photo Metadata"])
 api_v1_router.include_router(deepzoom_router, prefix="/deepzoom", tags=["Deep Zoom"])
-api_v1_router.include_router(documents_router, prefix="/documents", tags=["Documents"])
+api_v1_router.include_router(documents_router, tags=["Documents"])
 # api_v1_router.include_router(iccd_router, prefix="/iccd", tags=["ICCD Cataloging"])
 # api_v1_router.include_router(us_router, prefix="/us", tags=["US/USM Units"])
 api_v1_router.include_router(geographic_router, prefix="/geographic", tags=["Geographic Maps"])
