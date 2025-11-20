@@ -546,8 +546,11 @@ class DeepZoomBackgroundService:
             task.error_message = f"Task stuck for {processing_time:.1f}s, cleaned up automatically"
             task.completed_at = datetime.now()
             
-            # Update database status
-            await self._update_photo_database_status(photo_id, "failed")
+            # Update database status (only for legacy path)
+            if hasattr(task, 'snapshot_data') and task.snapshot_data:
+                logger.debug(f"🔧 SNAPSHOT-BASED: Skipping database update for stuck task {photo_id}")
+            else:
+                await self._update_photo_database_status(photo_id, "failed")
             await self._update_processing_status(
                 task, "failed", 0, error=task.error_message
             )
@@ -650,9 +653,14 @@ class DeepZoomBackgroundService:
             try:
                 logger.info(f"🔄 Processing tiles for photo {task.photo_id} (attempt {task.retry_count + 1}) - {'SNAPSHOT' if use_snapshot else 'DATABASE'}")
                 
-                # 🔧 SNAPSHOT-BASED: Update status in database only for progress tracking
-                # Don't query database for photo info - use snapshot data instead
-                await self._update_photo_database_status(task.photo_id, "processing")
+                # 🔧 SNAPSHOT-BASED: Skip database update for processing status
+                # Status is tracked via MinIO metadata for snapshot-based processing
+                if use_snapshot:
+                    logger.debug(f"🔧 SNAPSHOT-BASED: Skipping database update for 'processing' status")
+                else:
+                    # Legacy path: Update database for processing status
+                    await self._update_photo_database_status(task.photo_id, "processing")
+                
                 await self._update_processing_status(task, "processing", 0)
                 
                 # Send intermediate notification for processing start
@@ -691,13 +699,16 @@ class DeepZoomBackgroundService:
                 task.completed_at = datetime.now()
                 task.status = ProcessingStatus.COMPLETED
                 
-                # Update database with completion
-                await self._update_photo_database_status(
-                    task.photo_id,
-                    "completed",
-                    tile_count=completed_tiles,
-                    levels=len(tiles_data)
-                )
+                # Update database with completion (only for legacy path)
+                if not use_snapshot:
+                    await self._update_photo_database_status(
+                        task.photo_id,
+                        "completed",
+                        tile_count=completed_tiles,
+                        levels=len(tiles_data)
+                    )
+                else:
+                    logger.debug(f"🔧 SNAPSHOT-BASED: Skipping database update for 'completed' status")
                 
                 # Update final status
                 final_status = {
@@ -757,7 +768,12 @@ class DeepZoomBackgroundService:
                 )
                 
             except Exception as e:
-                logger.error(f"❌ Failed to process tiles for photo {task.photo_id}: {e}")
+                # FIX: task is a dataclass object, not a dict - access attributes directly
+                photoid = task.photoid if hasattr(task, 'photoid') else 'unknown'
+                logger.error(f"❌ Failed to process tiles for photo {photoid}: {e}")
+                import traceback
+                logger.error(f"❌ Error traceback:\n{traceback.format_exc()}")
+
                 task.error_message = str(e)
                 
                 # Check if we should retry
@@ -784,8 +800,11 @@ class DeepZoomBackgroundService:
                     task.status = ProcessingStatus.FAILED
                     task.completed_at = datetime.now()
                     
-                    # Update database with failed status
-                    await self._update_photo_database_status(task.photo_id, "failed")
+                    # Update database with failed status (only for legacy path)
+                    if not use_snapshot:
+                        await self._update_photo_database_status(task.photo_id, "failed")
+                    else:
+                        logger.debug(f"🔧 SNAPSHOT-BASED: Skipping database update for 'failed' status")
                     await self._update_processing_status(
                         task, "failed", 0, error=f"Failed after {task.max_retries} retries: {str(e)}"
                     )
@@ -1216,23 +1235,30 @@ class DeepZoomBackgroundService:
         levels: int = None
     ):
         """
-        🔧 SNAPSHOT-BASED FIX: Update photo deep zoom status in database only for final status updates.
+        🔧 SNAPSHOT-BASED FIX: Skip database updates entirely for snapshot-based processing.
         
-        This method is now used ONLY for final status updates (completed/failed) to eliminate
-        race conditions during initial processing. The snapshot data provides all necessary
-        information for tile generation without needing database queries.
-        
-        Uses enhanced retry logic with WAL checkpoints for SQLite transaction isolation issues.
+        Status is tracked via MinIO metadata and can be synced later. This completely eliminates
+        SQLite WAL snapshot isolation issues for background tasks.
         """
         try:
-            # 🔧 SNAPSHOT-BASED: Only update final statuses, skip intermediate "processing" updates
-            # This eliminates race conditions during initial tile generation
-            if status == "processing":
-                logger.debug(f"🔧 SNAPSHOT-BASED: Skipping database update for 'processing' status of {photo_id}")
+            # Check if this task is using snapshot data
+            task = None
+            if photo_id in self.processing_tasks:
+                task = self.processing_tasks[photo_id]
+            elif photo_id in self.completed_tasks:
+                task = self.completed_tasks[photo_id]
+            elif photo_id in self.failed_tasks:
+                task = self.failed_tasks[photo_id]
+            
+            if task and hasattr(task, 'snapshot_data') and task.snapshot_data:
+                logger.info(f"🔧 SNAPSHOT-BASED: Skipping ALL database updates for photo {photo_id} (status: {status})")
+                logger.info(f"🔧 SNAPSHOT-BASED: Status '{status}' is tracked in MinIO metadata and processing state")
                 return
             
-            logger.info(f"🔧 SNAPSHOT-BASED: Updating final status '{status}' for photo {photo_id}")
+            # Only do database updates for non-snapshot processing (legacy path)
+            logger.info(f"🔧 DATABASE: Updating photo {photo_id} status to {status}")
             
+            # Only do database updates for non-snapshot processing (legacy path)
             # Avoid circular import
             # Import from centralized database engine
             from app.database.engine import AsyncSessionLocal as async_session_maker
@@ -1247,11 +1273,11 @@ class DeepZoomBackgroundService:
             async with async_session_maker() as db:
                 try:
                     # 🔧 ENHANCED: Use the same robust lookup logic as upload service
-                    # But only for final status updates to avoid race conditions
+                    # But only for legacy path (non-snapshot) processing
                     photo = await self._find_photo_record_with_fallback(photo_id_str, db)
                     
                     if photo:
-                        # Update final status
+                        # Update status
                         photo.deepzoom_status = status
                         
                         if status == "completed":
@@ -1266,7 +1292,7 @@ class DeepZoomBackgroundService:
                             photo.deep_zoom_processed_at = datetime.now()
                         
                         await db.commit()
-                        logger.info(f"✅ Updated photo {photo_id} final deep zoom status to: {status}")
+                        logger.info(f"✅ Updated photo {photo_id} deep zoom status to: {status} (legacy path)")
                     else:
                         # 🔧 ENHANCED: Try with a completely fresh session as last resort
                         logger.warning(f"🔧 Photo {photo_id} not found in main session, trying fresh session...")
@@ -1275,7 +1301,7 @@ class DeepZoomBackgroundService:
                             photo_fresh = await self._find_photo_record_with_fallback(photo_id_str, fresh_db)
                             
                             if photo_fresh:
-                                logger.info(f"✅ Photo {photo_id} found in fresh session, updating final status")
+                                logger.info(f"✅ Photo {photo_id} found in fresh session, updating status")
                                 photo_fresh.deepzoom_status = status
                                 
                                 if status == "completed":
@@ -1290,35 +1316,23 @@ class DeepZoomBackgroundService:
                                     photo_fresh.deep_zoom_processed_at = datetime.now()
                                 
                                 await fresh_db.commit()
-                                logger.info(f"✅ Photo {photo_id} final status updated via fresh session")
+                                logger.info(f"✅ Photo {photo_id} status updated via fresh session (legacy path)")
                             else:
-                                logger.error(f"❌ Photo {photo_id} not found in any session for final status update")
-                                # 🔧 SNAPSHOT-BASED: Don't fail the entire processing for status update issues
-                                logger.error(f"⚠️ Final status update failed for {photo_id} but tiles were processed successfully")
+                                logger.error(f"❌ Photo {photo_id} not found in any session for status update")
+                                # Don't fail the entire processing for status update issues
+                                logger.error(f"⚠️ Status update failed for {photo_id} but tiles were processed successfully")
                                 return
                                 
                 except Exception as e:
-                    logger.error(f"Database error in final status update for {photo_id}: {e}")
+                    logger.error(f"Database error in status update for {photo_id}: {e}")
                     await db.rollback()
                     raise
                     
         except Exception as e:
-            logger.error(f"Failed to update final photo database status for {photo_id}: {e}")
-            # 🔧 SNAPSHOT-BASED: Don't re-raise to avoid breaking the entire processing pipeline
+            logger.error(f"Failed to update photo database status for {photo_id}: {e}")
+            # Don't re-raise to avoid breaking the entire processing pipeline
             # The tile processing is already complete, status update failure shouldn't break it
-            logger.error(f"⚠️ Final status update failed but tile processing was successful for {photo_id}")
-            
-            # Log snapshot information if available
-            task = None
-            if photo_id in self.processing_tasks:
-                task = self.processing_tasks[photo_id]
-            elif photo_id in self.completed_tasks:
-                task = self.completed_tasks[photo_id]
-            elif photo_id in self.failed_tasks:
-                task = self.failed_tasks[photo_id]
-            
-            if task and hasattr(task, 'snapshot_data') and task.snapshot_data:
-                logger.info(f"🔧 SNAPSHOT-BASED: Tiles processed successfully using snapshot data for {photo_id}")
+            logger.error(f"⚠️ Status update failed but tile processing was successful for {photo_id}")
 
     async def _find_photo_record_with_fallback(
         self,
@@ -1327,16 +1341,16 @@ class DeepZoomBackgroundService:
         max_retries: int = 5
     ) -> Optional[Photo]:
         """
-        🔧 SNAPSHOT-BASED FIX: Find photo record with retry logic for FINAL STATUS UPDATES ONLY.
+        🔧 SNAPSHOT-BASED FIX: Find photo record with retry logic for LEGACY PATH ONLY.
         
-        This method is now used ONLY for final status updates (completed/failed) to eliminate
+        This method is now used ONLY for legacy path processing (non-snapshot) to eliminate
         race conditions during initial processing. The complex retry logic with WAL checkpoints
-        is preserved but only used when absolutely necessary for final status updates.
+        is preserved but only used when absolutely necessary for legacy status updates.
         
         SQLite WAL FIX: Adds delay between retries to allow checkpoint.
         """
 
-        logger.debug(f"🔧 SNAPSHOT-BASED: Looking up photo {photo_id} for final status update")
+        logger.debug(f"🔧 LEGACY PATH: Looking up photo {photo_id} for database status update")
 
         for attempt in range(max_retries):
             try:
@@ -1355,7 +1369,7 @@ class DeepZoomBackgroundService:
                     photo_obj = result.scalar_one_or_none()
 
                     if photo_obj:
-                        logger.debug(f"🔧 SNAPSHOT-BASED: Photo {photo_id} found with UUID (attempt {attempt + 1})")
+                        logger.debug(f"🔧 LEGACY PATH: Photo {photo_id} found with UUID (attempt {attempt + 1})")
                         return photo_obj
                 except ValueError:
                     pass
@@ -1367,19 +1381,19 @@ class DeepZoomBackgroundService:
                 photo_obj = result.scalar_one_or_none()
 
                 if photo_obj:
-                    logger.debug(f"🔧 SNAPSHOT-BASED: Photo {photo_id} found with string (attempt {attempt + 1})")
+                    logger.debug(f"🔧 LEGACY PATH: Photo {photo_id} found with string (attempt {attempt + 1})")
                     return photo_obj
 
-                # Force WAL checkpoint on retry (only for final status updates)
+                # Force WAL checkpoint on retry (only for legacy path updates)
                 if attempt > 0:
                     await db.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))
-                    logger.debug(f"🔧 SNAPSHOT-BASED: Forced WAL checkpoint for final status update (attempt {attempt + 1})")
+                    logger.debug(f"🔧 LEGACY PATH: Forced WAL checkpoint for database status update (attempt {attempt + 1})")
 
             except Exception as e:
-                logger.warning(f"🔧 SNAPSHOT-BASED: Error finding photo {photo_id} for final status (attempt {attempt + 1}): {e}")
+                logger.warning(f"🔧 LEGACY PATH: Error finding photo {photo_id} for database status (attempt {attempt + 1}): {e}")
                 continue
 
-        logger.error(f"🔧 SNAPSHOT-BASED: Photo {photo_id} not found after {max_retries} attempts for final status update")
+        logger.error(f"🔧 LEGACY PATH: Photo {photo_id} not found after {max_retries} attempts for database status update")
         return None
 
     async def _send_processing_notification(
