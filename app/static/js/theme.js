@@ -23,36 +23,39 @@ class ThemeManager {
     }
 
     setupEventListeners() {
-        // Get theme toggle elements
+        // Get all theme toggle elements
         this.themeToggleBtn = document.getElementById('theme-toggle');
-        this.themeToggleMobileBtn = document.getElementById('theme-toggle-mobile');
+        this.themeToggleNavBtn = document.getElementById('theme-toggle-nav');
+        this.themeToggleSidebarBtn = document.getElementById('theme-toggle-sidebar');
+        
+        // Get all icon elements
         this.lightIcon = document.getElementById('theme-toggle-light-icon');
         this.darkIcon = document.getElementById('theme-toggle-dark-icon');
-        this.mobileLightIcon = document.getElementById('theme-toggle-mobile-light-icon');
-        this.mobileDarkIcon = document.getElementById('theme-toggle-mobile-dark-icon');
+        this.navLightIcon = document.getElementById('theme-toggle-nav-light-icon');
+        this.navDarkIcon = document.getElementById('theme-toggle-nav-dark-icon');
+        this.sidebarLightIcon = document.getElementById('theme-toggle-sidebar-light-icon');
+        this.sidebarDarkIcon = document.getElementById('theme-toggle-sidebar-dark-icon');
 
         // Check if any theme toggle elements exist
-        if (!this.themeToggleBtn && !this.themeToggleMobileBtn) {
+        if (!this.themeToggleBtn && !this.themeToggleNavBtn && !this.themeToggleSidebarBtn) {
             console.warn('No theme toggle elements found in DOM');
-            return;
-        }
-
-        if ((!this.lightIcon || !this.darkIcon) && (!this.mobileLightIcon || !this.mobileDarkIcon)) {
-            console.warn('No theme toggle icons found in DOM');
             return;
         }
 
         // Apply initial theme
         this.applyTheme(this.currentTheme);
 
-        // Add click event listener to desktop button if it exists
+        // Add click event listener to all theme toggle buttons
         if (this.themeToggleBtn) {
             this.themeToggleBtn.addEventListener('click', () => this.toggleTheme());
         }
+        
+        if (this.themeToggleNavBtn) {
+            this.themeToggleNavBtn.addEventListener('click', () => this.toggleTheme());
+        }
 
-        // Add click event listener to mobile button if it exists
-        if (this.themeToggleMobileBtn) {
-            this.themeToggleMobileBtn.addEventListener('click', () => this.toggleTheme());
+        if (this.themeToggleSidebarBtn) {
+            this.themeToggleSidebarBtn.addEventListener('click', () => this.toggleTheme());
         }
 
         // Listen for system theme changes
@@ -86,32 +89,54 @@ class ThemeManager {
     }
 
     showLightIcon() {
+        // Main theme toggle icons
         if (this.lightIcon) {
             this.lightIcon.classList.remove('hidden');
         }
         if (this.darkIcon) {
             this.darkIcon.classList.add('hidden');
         }
-        if (this.mobileLightIcon) {
-            this.mobileLightIcon.classList.remove('hidden');
+        
+        // Navigation theme toggle icons
+        if (this.navLightIcon) {
+            this.navLightIcon.classList.remove('hidden');
         }
-        if (this.mobileDarkIcon) {
-            this.mobileDarkIcon.classList.add('hidden');
+        if (this.navDarkIcon) {
+            this.navDarkIcon.classList.add('hidden');
+        }
+        
+        // Sidebar theme toggle icons
+        if (this.sidebarLightIcon) {
+            this.sidebarLightIcon.classList.remove('hidden');
+        }
+        if (this.sidebarDarkIcon) {
+            this.sidebarDarkIcon.classList.add('hidden');
         }
     }
 
     showDarkIcon() {
+        // Main theme toggle icons
         if (this.lightIcon) {
             this.lightIcon.classList.add('hidden');
         }
         if (this.darkIcon) {
             this.darkIcon.classList.remove('hidden');
         }
-        if (this.mobileLightIcon) {
-            this.mobileLightIcon.classList.add('hidden');
+        
+        // Navigation theme toggle icons
+        if (this.navLightIcon) {
+            this.navLightIcon.classList.add('hidden');
         }
-        if (this.mobileDarkIcon) {
-            this.mobileDarkIcon.classList.remove('hidden');
+        if (this.navDarkIcon) {
+            this.navDarkIcon.classList.remove('hidden');
+        }
+        
+        // Sidebar theme toggle icons
+        if (this.sidebarLightIcon) {
+            this.sidebarLightIcon.classList.add('hidden');
+        }
+        if (this.sidebarDarkIcon) {
+            this.sidebarDarkIcon.classList.remove('hidden');
         }
     }
 
