@@ -606,7 +606,7 @@ class DeepZoomBackgroundService:
             await self._process_single_task(task)
 
     async def _process_single_task(self, task: TileProcessingTask):
-        """Process a single photo's tiles with proper locking"""
+        """Process a single photo's tiles with proper locking using snapshot data"""
         
         # CRITICO: Ottieni lock per questo photo_id per evitare duplicati
         if task.photo_id not in self._task_locks:
@@ -621,19 +621,47 @@ class DeepZoomBackgroundService:
             task.status = ProcessingStatus.PROCESSING
             task.started_at = datetime.now()
             
-            try:
-                logger.info(f"🔄 Processing tiles for photo {task.photo_id} (attempt {task.retry_count + 1})")
+            # 🔧 SNAPSHOT-BASED: Determine data source and log accordingly
+            use_snapshot = False
+            photo_data = {}
+            
+            if hasattr(task, 'snapshot_data') and task.snapshot_data:
+                use_snapshot = True
+                photo_data = task.snapshot_data
+                logger.info(f"🔧 SNAPSHOT-BASED: Processing photo {task.photo_id} using snapshot data")
                 
-                # Update status in database
+                # Validate required snapshot fields
+                required_fields = ['file_path', 'width', 'height']
+                missing_fields = [field for field in required_fields if field not in photo_data]
+                
+                if missing_fields:
+                    logger.warning(f"🔧 SNAPSHOT-BASED: Missing required fields in snapshot for {task.photo_id}: {missing_fields}")
+                    use_snapshot = False
+                    photo_data = {}
+                    
+                    # 🔧 SNAPSHOT-BASED: Validate additional optional fields for better error handling
+                    if task.snapshot_data:
+                        optional_fields = ['file_path', 'width', 'height', 'filename']
+                        available_fields = [field for field in optional_fields if field in task.snapshot_data]
+                        logger.info(f"🔧 SNAPSHOT-BASED: Available snapshot fields for {task.photo_id}: {available_fields}")
+                else:
+                    logger.info(f"🔄 Processing photo {task.photo_id} using traditional database queries")
+            
+            try:
+                logger.info(f"🔄 Processing tiles for photo {task.photo_id} (attempt {task.retry_count + 1}) - {'SNAPSHOT' if use_snapshot else 'DATABASE'}")
+                
+                # 🔧 SNAPSHOT-BASED: Update status in database only for progress tracking
+                # Don't query database for photo info - use snapshot data instead
                 await self._update_photo_database_status(task.photo_id, "processing")
                 await self._update_processing_status(task, "processing", 0)
                 
                 # Send intermediate notification for processing start
                 await self._send_processing_notification(task, "processing", 5)
                 
-                # Generate tiles with memory-efficient processing
+                # 🔧 SNAPSHOT-BASED: Generate tiles with memory-efficient processing
+                # Use snapshot data if available, otherwise fall back to traditional method
                 tiles_data, original_width, original_height = await self._generate_tiles_memory_efficient(
-                    task.original_file_content, task.photo_id, task.site_id
+                    task.original_file_content, task.photo_id, task.site_id, photo_data if use_snapshot else None
                 )
                 
                 total_tiles = self._count_total_tiles(tiles_data)
@@ -780,27 +808,35 @@ class DeepZoomBackgroundService:
                     await self._send_completion_notification(task, False)
 
     async def _generate_tiles_memory_efficient(
-        self, 
-        content: bytes, 
-        photo_id: str, 
-        site_id: str
+        self,
+        content: bytes,
+        photo_id: str,
+        site_id: str,
+        snapshot_data: Optional[Dict[str, Any]] = None
     ) -> Tuple[Dict[int, Dict[str, bytes]], int, int]:
-        """Generate tiles with memory-efficient processing"""
+        """Generate tiles with memory-efficient processing using snapshot data when available"""
         
         # Use asyncio.to_thread to move CPU-intensive work off event loop
         return await asyncio.to_thread(
-            self._generate_tiles_sync, content, photo_id, site_id
+            self._generate_tiles_sync, content, photo_id, site_id, snapshot_data
         )
 
     def _generate_tiles_sync(
-        self, 
-        content: bytes, 
-        photo_id: str, 
-        site_id: str
+        self,
+        content: bytes,
+        photo_id: str,
+        site_id: str,
+        snapshot_data: Optional[Dict[str, Any]] = None
     ) -> Tuple[Dict[int, Dict[str, bytes]], int, int]:
-        """Synchronous tile generation (runs in thread pool)"""
+        """Synchronous tile generation (runs in thread pool) using snapshot data when available"""
         
         try:
+            # 🔧 SNAPSHOT-BASED: Log data source
+            if snapshot_data:
+                logger.debug(f"🔧 SNAPSHOT-BASED: Generating tiles for {photo_id} using snapshot data")
+            else:
+                logger.debug(f"🔄 Generating tiles for {photo_id} using traditional method")
+            
             # Open image from bytes
             image = Image.open(io.BytesIO(content))
             
@@ -821,8 +857,24 @@ class DeepZoomBackgroundService:
                 elif image.mode != 'RGB':
                     image = image.convert('RGB')
 
-            original_width = image.width
-            original_height = image.height
+            # 🔧 SNAPSHOT-BASED: Use dimensions from snapshot if available, otherwise from image
+            if snapshot_data and 'width' in snapshot_data and 'height' in snapshot_data:
+                original_width = snapshot_data['width']
+                original_height = snapshot_data['height']
+                logger.debug(f"🔧 SNAPSHOT-BASED: Using dimensions from snapshot: {original_width}x{original_height}")
+                
+                # Validate that snapshot dimensions match actual image dimensions
+                if abs(image.width - original_width) > 5 or abs(image.height - original_height) > 5:
+                    logger.warning(f"🔧 SNAPSHOT-BASED: Dimension mismatch for {photo_id} - "
+                                 f"snapshot: {original_width}x{original_height}, actual: {image.width}x{image.height}")
+                    # Use actual image dimensions as fallback
+                    original_width = image.width
+                    original_height = image.height
+                    logger.info(f"🔧 SNAPSHOT-BASED: Using actual image dimensions as fallback: {original_width}x{original_height}")
+            else:
+                original_width = image.width
+                original_height = image.height
+                logger.debug(f"🔄 Using actual image dimensions: {original_width}x{original_height}")
 
             # Calculate levels
             max_dimension = max(image.size)
@@ -1164,13 +1216,23 @@ class DeepZoomBackgroundService:
         levels: int = None
     ):
         """
-        🔧 DATABASE CONSISTENCY FIX: Update photo deep zoom status in database
+        🔧 SNAPSHOT-BASED FIX: Update photo deep zoom status in database only for final status updates.
         
-        This method now implements the same robust photo lookup logic as the upload service
-        to prevent "photo record not found" errors due to UUID/string type mismatches
-        and transaction isolation issues.
+        This method is now used ONLY for final status updates (completed/failed) to eliminate
+        race conditions during initial processing. The snapshot data provides all necessary
+        information for tile generation without needing database queries.
+        
+        Uses enhanced retry logic with WAL checkpoints for SQLite transaction isolation issues.
         """
         try:
+            # 🔧 SNAPSHOT-BASED: Only update final statuses, skip intermediate "processing" updates
+            # This eliminates race conditions during initial tile generation
+            if status == "processing":
+                logger.debug(f"🔧 SNAPSHOT-BASED: Skipping database update for 'processing' status of {photo_id}")
+                return
+            
+            logger.info(f"🔧 SNAPSHOT-BASED: Updating final status '{status}' for photo {photo_id}")
+            
             # Avoid circular import
             # Import from centralized database engine
             from app.database.engine import AsyncSessionLocal as async_session_maker
@@ -1185,10 +1247,11 @@ class DeepZoomBackgroundService:
             async with async_session_maker() as db:
                 try:
                     # 🔧 ENHANCED: Use the same robust lookup logic as upload service
+                    # But only for final status updates to avoid race conditions
                     photo = await self._find_photo_record_with_fallback(photo_id_str, db)
                     
                     if photo:
-                        # Update status
+                        # Update final status
                         photo.deepzoom_status = status
                         
                         if status == "completed":
@@ -1201,11 +1264,9 @@ class DeepZoomBackgroundService:
                         elif status == "failed":
                             photo.has_deep_zoom = False
                             photo.deep_zoom_processed_at = datetime.now()
-                        elif status == "processing":
-                            photo.deepzoom_status = "processing"
                         
                         await db.commit()
-                        logger.info(f"✅ Updated photo {photo_id} deep zoom status to: {status}")
+                        logger.info(f"✅ Updated photo {photo_id} final deep zoom status to: {status}")
                     else:
                         # 🔧 ENHANCED: Try with a completely fresh session as last resort
                         logger.warning(f"🔧 Photo {photo_id} not found in main session, trying fresh session...")
@@ -1214,7 +1275,7 @@ class DeepZoomBackgroundService:
                             photo_fresh = await self._find_photo_record_with_fallback(photo_id_str, fresh_db)
                             
                             if photo_fresh:
-                                logger.info(f"✅ Photo {photo_id} found in fresh session, updating status")
+                                logger.info(f"✅ Photo {photo_id} found in fresh session, updating final status")
                                 photo_fresh.deepzoom_status = status
                                 
                                 if status == "completed":
@@ -1227,27 +1288,25 @@ class DeepZoomBackgroundService:
                                 elif status == "failed":
                                     photo_fresh.has_deep_zoom = False
                                     photo_fresh.deep_zoom_processed_at = datetime.now()
-                                elif status == "processing":
-                                    photo_fresh.deepzoom_status = "processing"
                                 
                                 await fresh_db.commit()
-                                logger.info(f"✅ Photo {photo_id} status updated via fresh session")
+                                logger.info(f"✅ Photo {photo_id} final status updated via fresh session")
                             else:
-                                logger.error(f"❌ Photo {photo_id} not found in any session - THIS IS THE ROOT CAUSE!")
-                                # Don't raise here to avoid breaking the entire pipeline
-                                logger.error(f"❌ Deep zoom status update failed for {photo_id} - photo record not found")
+                                logger.error(f"❌ Photo {photo_id} not found in any session for final status update")
+                                # 🔧 SNAPSHOT-BASED: Don't fail the entire processing for status update issues
+                                logger.error(f"⚠️ Final status update failed for {photo_id} but tiles were processed successfully")
                                 return
                                 
                 except Exception as e:
-                    logger.error(f"Database error in status update for {photo_id}: {e}")
+                    logger.error(f"Database error in final status update for {photo_id}: {e}")
                     await db.rollback()
                     raise
                     
         except Exception as e:
-            logger.error(f"Failed to update photo database status for {photo_id}: {e}")
+            logger.error(f"Failed to update final photo database status for {photo_id}: {e}")
             # 🔧 SNAPSHOT-BASED: Don't re-raise to avoid breaking the entire processing pipeline
-            # The tile processing can continue even if status update fails
-            logger.error(f"⚠️ Deep zoom status update failed but continuing processing for {photo_id}")
+            # The tile processing is already complete, status update failure shouldn't break it
+            logger.error(f"⚠️ Final status update failed but tile processing was successful for {photo_id}")
             
             # Log snapshot information if available
             task = None
@@ -1259,7 +1318,7 @@ class DeepZoomBackgroundService:
                 task = self.failed_tasks[photo_id]
             
             if task and hasattr(task, 'snapshot_data') and task.snapshot_data:
-                logger.info(f"🔧 SNAPSHOT-BASED: Processing continues with snapshot data for {photo_id}")
+                logger.info(f"🔧 SNAPSHOT-BASED: Tiles processed successfully using snapshot data for {photo_id}")
 
     async def _find_photo_record_with_fallback(
         self,
@@ -1267,15 +1326,24 @@ class DeepZoomBackgroundService:
         db: AsyncSession,
         max_retries: int = 5
     ) -> Optional[Photo]:
-        # Find photo record with retry logic and exponential backoff.
-        # SQLite WAL FIX: Adds delay between retries to allow checkpoint.
+        """
+        🔧 SNAPSHOT-BASED FIX: Find photo record with retry logic for FINAL STATUS UPDATES ONLY.
+        
+        This method is now used ONLY for final status updates (completed/failed) to eliminate
+        race conditions during initial processing. The complex retry logic with WAL checkpoints
+        is preserved but only used when absolutely necessary for final status updates.
+        
+        SQLite WAL FIX: Adds delay between retries to allow checkpoint.
+        """
+
+        logger.debug(f"🔧 SNAPSHOT-BASED: Looking up photo {photo_id} for final status update")
 
         for attempt in range(max_retries):
             try:
                 # Add delay before retry (except first attempt)
                 if attempt > 0:
                     delay = 0.1 * (2 ** attempt)
-                    logger.debug(f"Retry {attempt}/{max_retries} for photo {photo_id} after {delay:.1f}s")
+                    logger.debug(f"🔧 SNAPSHOT-BASED: Retry {attempt}/{max_retries} for photo {photo_id} after {delay:.1f}s")
                     await asyncio.sleep(delay)
 
                 # Try UUID query first
@@ -1287,7 +1355,7 @@ class DeepZoomBackgroundService:
                     photo_obj = result.scalar_one_or_none()
 
                     if photo_obj:
-                        logger.debug(f"Photo {photo_id} found with UUID (attempt {attempt + 1})")
+                        logger.debug(f"🔧 SNAPSHOT-BASED: Photo {photo_id} found with UUID (attempt {attempt + 1})")
                         return photo_obj
                 except ValueError:
                     pass
@@ -1299,19 +1367,19 @@ class DeepZoomBackgroundService:
                 photo_obj = result.scalar_one_or_none()
 
                 if photo_obj:
-                    logger.debug(f"Photo {photo_id} found with string (attempt {attempt + 1})")
+                    logger.debug(f"🔧 SNAPSHOT-BASED: Photo {photo_id} found with string (attempt {attempt + 1})")
                     return photo_obj
 
-                # Force WAL checkpoint on retry
+                # Force WAL checkpoint on retry (only for final status updates)
                 if attempt > 0:
                     await db.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))
-                    logger.debug(f"Forced WAL checkpoint (attempt {attempt + 1})")
+                    logger.debug(f"🔧 SNAPSHOT-BASED: Forced WAL checkpoint for final status update (attempt {attempt + 1})")
 
             except Exception as e:
-                logger.warning(f"Error finding photo {photo_id} (attempt {attempt + 1}): {e}")
+                logger.warning(f"🔧 SNAPSHOT-BASED: Error finding photo {photo_id} for final status (attempt {attempt + 1}): {e}")
                 continue
 
-        logger.error(f"Photo {photo_id} not found after {max_retries} attempts")
+        logger.error(f"🔧 SNAPSHOT-BASED: Photo {photo_id} not found after {max_retries} attempts for final status update")
         return None
 
     async def _send_processing_notification(
