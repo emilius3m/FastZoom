@@ -25,6 +25,14 @@ from app.models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere, Co
 from app.templates import templates
 from app.core.csrf_settings import _csrf_tokens_optional
 
+# Import helper functions unificati
+from app.services.view_helpers import (
+    get_current_user_with_profile,
+    verify_site_access,
+    normalize_site_id,
+    get_base_template_context
+)
+
 # Router per le view HTML
 router = APIRouter(prefix="/giornale-cantiere", tags=["giornale-cantiere-pages"])
 
@@ -89,8 +97,7 @@ async def giornale_cantiere_detail(
             )
         
         # Ottieni informazioni utente corrente
-        user_result = await db.execute(select(User).where(User.id == current_user_id))
-        user = user_result.scalar_one_or_none()
+        user = await get_current_user_with_profile(current_user_id, db)
         
         # Verifica permessi di modifica
         can_edit = (
@@ -106,15 +113,13 @@ async def giornale_cantiere_detail(
         # CSRF token
         csrf_token, signed_token, csrf_instance = _csrf_tokens_optional()
         
-        context = {
-            "request": request,
+        # Prepara context base
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, giornale.site, current_page="giornale_cantiere"
+        )
+        context.update({
             "title": f"Giornale {giornale.data.strftime('%d/%m/%Y')} - {giornale.site.name} | Sistema Archeologico",
-            "current_page": "giornale_cantiere",
-            "user": user,
-            "current_user": user,  # Add current_user for profile modal
-            "site": giornale.site,
             "site_info": site_info,
-            "sites": user_sites,
             "giornale": giornale,
             "permissions": {
                 "can_edit": can_edit,
@@ -122,7 +127,7 @@ async def giornale_cantiere_detail(
                 "can_delete": can_delete
             },
             "csrf_token": csrf_token
-        }
+        })
         
         response = templates.TemplateResponse("pages/giornale_cantiere/detail.html", context)
         
@@ -153,8 +158,7 @@ async def operatori_management(
     """
     try:
         # Ottieni informazioni utente
-        user_result = await db.execute(select(User).where(User.id == current_user_id))
-        user = user_result.scalar_one_or_none()
+        user = await get_current_user_with_profile(current_user_id, db)
         
         # Se l'utente ha accesso a un solo sito, reindirizza direttamente alla pagina operatori del sito
         if len(user_sites) == 1:
@@ -201,8 +205,7 @@ async def site_operatori_view(
             )
         
         # Ottieni informazioni utente
-        user_result = await db.execute(select(User).where(User.id == current_user_id))
-        user = user_result.scalar_one_or_none()
+        user = await get_current_user_with_profile(current_user_id, db)
         
         # Ottieni profilo utente
         user_profile_result = await db.execute(
@@ -214,8 +217,10 @@ async def site_operatori_view(
         csrf_token, signed_token, csrf_instance = _csrf_tokens_optional()
         
         # Prepare context for template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, current_page="giornale-operatori"
+        )
+        context.update({
             "title": f"Gestione Operatori - {site_info['name']} | Sistema Archeologico",
             "message": f"Operatori del sito: {site_info['name']}",
             
@@ -227,22 +232,12 @@ async def site_operatori_view(
             "site_code": site_info.get("code", ""),
             "site_location": site_info.get("location", ""),
             
-            # User context
-            "user_email": user.email if user else None,
-            "user_type": "superuser" if user and user.is_superuser else "user",
-            "current_user": user,  # Already included but ensuring consistency
             "user_profile": user_profile,
             "csrf_token": csrf_token,
             
-            # Navigation context
-            "current_page": "giornale-operatori",
-            "current_site_name": site_info["name"],
-            "sites": user_sites,
-            "sites_count": len(user_sites),
-            
             # Flag to indicate this is site-specific operator view
             "is_site_specific": True
-        }
+        })
         
         logger.info(f"Site operatori view rendered: user_id={current_user_id}, site_id={site_id}, site_name={site_info['name']}")
         response = templates.TemplateResponse("pages/giornale_cantiere/operatori.html", context)
@@ -275,8 +270,7 @@ async def giornale_reports(
     """
     try:
         # Ottieni informazioni utente
-        user_result = await db.execute(select(User).where(User.id == current_user_id))
-        user = user_result.scalar_one_or_none()
+        user = await get_current_user_with_profile(current_user_id, db)
         
         # Statistiche generali per tutti i siti accessibili - Handle UUID format inconsistencies
         site_ids = []
@@ -334,13 +328,12 @@ async def giornale_reports(
         # CSRF token
         csrf_token, signed_token, csrf_instance = _csrf_tokens_optional()
         
-        context = {
-            "request": request,
+        # Prepara context base
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, current_page="giornale_cantiere"
+        )
+        context.update({
             "title": "Report Giornali di Cantiere | Sistema Archeologico",
-            "current_page": "giornale_cantiere",
-            "user": user,
-            "current_user": user,  # Add current_user for profile modal
-            "sites": user_sites,
             "stats": {
                 "total_giornali": total_giornali,
                 "validated_giornali": validated_giornali,
@@ -349,7 +342,7 @@ async def giornale_reports(
             },
             "meteo_stats": meteo_stats,
             "csrf_token": csrf_token
-        }
+        })
         
         response = templates.TemplateResponse("pages/giornale_cantiere/reports.html", context)
         

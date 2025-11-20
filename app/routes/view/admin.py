@@ -25,6 +25,13 @@ from app.database.db import get_async_session
 from app.templates import templates
 from app.models import User
 
+# Import helper functions unificati
+from app.services.view_helpers import (
+    get_current_user_with_profile,
+    normalize_site_id,
+    require_superuser
+)
+
 # Router initialization
 admin_view_router = APIRouter(tags=["Admin - Views"], prefix="/admin")
 
@@ -33,151 +40,7 @@ admin_view_router = APIRouter(tags=["Admin - Views"], prefix="/admin")
 # HELPER FUNCTIONS
 # ============================================================================
 
-def normalize_site_id(site_id: str) -> Optional[str]:
-    """
-    Normalizza l'ID del sito per supportare diversi formati.
-    
-    Supporta:
-    - UUID standard con trattini: eb8d88e1-74e3-46d3-8e86-81f926c01cab
-    - Hash esadecimali senza trattini: eeedd3ceda34bf3b47d749a971b22ba
-    
-    Returns:
-        str: L'ID normalizzato o None se non valido
-    """
-    if not site_id:
-        return None
-    
-    # Rimuovi spazi bianchi
-    site_id = site_id.strip()
-    
-    # Se è un UUID standard con trattini, valida e restituiscilo
-    if '-' in site_id:
-        try:
-            # Crea un oggetto UUID per validare il formato
-            uuid_obj = UUID(site_id)
-            # Restituisci la stringa originale (già nel formato corretto)
-            return site_id
-        except (ValueError, AttributeError):
-            return None
-    
-    # Se è un hash esadecimale senza trattini
-    if len(site_id) == 32:
-        try:
-            # Verifica che sia esadecimale
-            int(site_id, 16)
-            # Converti in formato UUID standard (inserisci trattini)
-            uuid_formatted = f"{site_id[0:8]}-{site_id[8:12]}-{site_id[12:16]}-{site_id[16:20]}-{site_id[20:32]}"
-            # Valida il formato UUID risultante
-            UUID(uuid_formatted)
-            return uuid_formatted
-        except (ValueError, AttributeError):
-            return None
-    
-    # Altri formati non supportati
-    return None
-
-async def get_admin_template_context(
-    request: Request,
-    current_user_id: UUID,
-    user_sites: List[Dict[str, Any]],
-    db: AsyncSession
-) -> dict:
-    """
-    Crea il context base per tutti i template admin.
-    Contiene informazioni utente e configurazione menu.
-    """
-
-    # 🔧 FIX: Handle both UUID formats for consistency
-    user_id_str = str(current_user_id)
-    user_id_no_dashes = user_id_str.replace('-', '')
-    
-    # Ottieni informazioni utente completa con entrambi i formati UUID
-    # Carica anche il profilo per evitare AttributeError
-    from sqlalchemy.orm import selectinload
-    user_query = select(User).options(selectinload(User.profile)).where(
-        (User.id == user_id_str) | (User.id == user_id_no_dashes)
-    )
-    user_result = await db.execute(user_query)
-    user = user_result.scalar_one_or_none()
-
-    if not user:
-        logger.warning(f"User {current_user_id} not found in database (tried both UUID formats)")
-
-    # Sito virtuale per il pannello amministrazione (per il menu laterale)
-    admin_site = {
-        "id": "admin",
-        "name": "Pannello Amministrazione",
-        "location": "Sistema",
-        "permission_level": "admin",
-        "is_active": True
-    }
-
-    # Context da passare ai template
-    context = {
-        "request": request,
-        "sites": user_sites or [],
-        "sites_count": len(user_sites) if user_sites else 0,
-        "user_email": user.email if user else "Unknown",
-        "user_name": user.full_name if user and hasattr(user, 'full_name') else user.email if user else "Admin",
-        "user_type": "superuser" if user and user.is_superuser else "user",
-        "is_superuser": user.is_superuser if user else False,
-        "current_site_name": user_sites[0]["name"] if user_sites else "Amministrazione",
-        "current_page": request.url.path.split("/")[-1] or "admin",
-        "site": admin_site,  # Per attivare il menu laterale
-        "first_site": user_sites[0] if user_sites else admin_site,
-    }
-
-    return context
-
-
-async def require_superuser(
-    request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-) -> tuple:
-    """
-    Middleware per verificare che l'utente sia superuser.
-    Ritorna una tupla (user, context) per le route.
-    """
-
-    # 🔧 FIX: Handle both UUID formats and ensure fresh data
-    user_id_str = str(current_user_id)
-    user_id_no_dashes = user_id_str.replace('-', '')
-    
-    logger.info(f"🐛 [DEBUG] require_superuser - Checking user {current_user_id}")
-    logger.info(f"🐛 [DEBUG] UUID formats to try: {user_id_str} (with dashes), {user_id_no_dashes} (without dashes)")
-    
-    # Try with both UUID formats to ensure we find the user
-    # Carica anche il profilo per evitare AttributeError
-    from sqlalchemy.orm import selectinload
-    user_query = select(User).options(selectinload(User.profile)).where(
-        (User.id == user_id_str) | (User.id == user_id_no_dashes)
-    )
-    user_result = await db.execute(user_query)
-    user = user_result.scalar_one_or_none()
-    
-    logger.info(f"🐛 [DEBUG] User found in require_superuser: {user is not None}")
-    if user:
-        logger.info(f"🐛 [DEBUG] User details in require_superuser - email: {user.email}, is_active: {user.is_active}, is_superuser: {user.is_superuser}")
-    else:
-        logger.error(f"🐛 [DEBUG] User {current_user_id} not found in require_superuser!")
-
-    if not user or not user.is_superuser:
-        logger.warning(
-            f"Access denied for user {current_user_id}: "
-            f"is_superuser={user.is_superuser if user else False}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accesso negato: solo i superadmin possono accedere a questa sezione"
-        )
-
-    context = await get_admin_template_context(request, current_user_id, user_sites, db)
-
-    logger.debug(f"Superuser {user.email} accessing admin area")
-
-    return user, context
+# Le funzioni helper sono state spostate in app/services/view_helpers.py
 
 
 # ============================================================================

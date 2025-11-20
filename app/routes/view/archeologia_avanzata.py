@@ -23,12 +23,13 @@ from app.core.security import get_current_user_id_with_blacklist, get_current_us
 from app.models.sites import ArchaeologicalSite
 from app.models import User
 
-# Helper function to get current user with context
-async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
-    """Recupera informazioni utente corrente"""
-    user_query = select(User).where(User.id == current_user_id)
-    user = await db.execute(user_query)
-    return user.scalar_one_or_none()
+# Import helper functions unificati
+from app.services.view_helpers import (
+    get_current_user_with_profile,
+    verify_site_access,
+    get_site_with_verification,
+    get_base_template_context
+)
 
 # Import modelli archeologia avanzata
 from app.models.archeologia_avanzata import (
@@ -44,37 +45,7 @@ router = APIRouter(prefix="/archeologia", tags=["archeologia-pages"])
 
 
 # ===== HELPER FUNCTIONS =====
-
-async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> bool:
-    """Verifica accesso utente al sito"""
-    return any(site['id'] == str(site_id) for site in user_sites)
-
-
-async def get_site_with_verification(
-    site_id: UUID, 
-    db: AsyncSession, 
-    user_sites: List[Dict[str, Any]]
-) -> ArchaeologicalSite:
-    """Ottieni sito con verifica accesso"""
-    if not await verify_site_access(site_id, user_sites):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Accesso negato al sito {site_id}"
-        )
-    
-    # Carica sito dal database
-    result = await db.execute(
-        select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
-    )
-    site = result.scalar_one_or_none()
-    
-    if not site:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato"
-        )
-    
-    return site
+# Le funzioni helper sono state spostate in app/services/view_helpers.py
 
 
 # ===== DASHBOARD ARCHEOLOGIA =====
@@ -100,16 +71,16 @@ async def archeologia_dashboard(
                 accessible_sites.append(site)
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
-        # Prepara context
-        context = {
-            "request": request,
+        # Prepara context base
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, current_page="archeologia"
+        )
+        context.update({
             "title": "Archeologia Avanzata - FastZoom",
             "sites": accessible_sites,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/dashboard.html", context)
         
@@ -144,17 +115,16 @@ async def us_list(
         total_us = us_count.scalar()
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, site, current_page="us"
+        )
+        context.update({
             "title": f"Unità Stratigrafiche - {site.name}",
-            "site": site,
             "total_us": total_us,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/us_list.html", context)
         
@@ -204,17 +174,16 @@ async def us_detail(
             )
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, us.site, current_page="us"
+        )
+        context.update({
             "title": f"{us.numero_us} - {us.site.name}",
             "us": us,
-            "site": us.site,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/us_detail.html", context)
         
@@ -280,22 +249,21 @@ async def tombe_list(
         con_corredo = con_corredo_count.scalar()
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, site, current_page="tombe"
+        )
+        context.update({
             "title": f"Tombe - {site.name}",
-            "site": site,
             "stats": {
                 "total": total_tombe,
                 "inumazioni": inumazioni,
                 "incinerazioni": incinerazioni,
                 "con_corredo": con_corredo
             },
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/tombe_list.html", context)
         
@@ -351,18 +319,17 @@ async def tomba_detail(
         reperti_corredo = reperti_result.scalars().all()
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, tomba.site, current_page="tombe"
+        )
+        context.update({
             "title": f"{tomba.numero_tomba} - {tomba.site.name}",
             "tomba": tomba,
-            "site": tomba.site,
             "reperti_corredo": reperti_corredo,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/tomba_detail.html", context)
         
@@ -468,13 +435,14 @@ async def reperti_list(
                 filter_info = {"type": "us", "object": us}
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, site, current_page="reperti"
+        )
+        context.update({
             "title": f"Reperti - {site.name}",
-            "site": site,
             "stats": {
                 "total": total_reperti,
                 "ceramica": ceramica,
@@ -485,9 +453,7 @@ async def reperti_list(
             },
             "casse_disponibili": casse_disponibili,
             "filter_info": filter_info,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/reperti_list.html", context)
         
@@ -537,17 +503,16 @@ async def reperto_detail(
             )
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, reperto.site, current_page="reperti"
+        )
+        context.update({
             "title": f"{reperto.numero_inventario} - {reperto.site.name}",
             "reperto": reperto,
-            "site": reperto.site,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/reperto_detail.html", context)
         
@@ -624,13 +589,14 @@ async def campioni_list(
         laboratori = [row[0] for row in laboratori_result.fetchall() if row[0]]
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, site, current_page="campioni"
+        )
+        context.update({
             "title": f"Campioni Scientifici - {site.name}",
-            "site": site,
             "stats": {
                 "total": total_campioni,
                 "carbonio_14": carbonio_14,
@@ -639,9 +605,7 @@ async def campioni_list(
                 "in_attesa": total_campioni - analizzati
             },
             "laboratori": laboratori,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/campioni_list.html", context)
         
@@ -691,17 +655,16 @@ async def campione_detail(
             )
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, campione.site, current_page="campioni"
+        )
+        context.update({
             "title": f"{campione.numero_campione} - {campione.site.name}",
             "campione": campione,
-            "site": campione.site,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/campione_detail.html", context)
         
@@ -731,16 +694,15 @@ async def matrix_harris(
         site = await get_site_with_verification(site_id, db, user_sites)
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, site, current_page="matrix_harris"
+        )
+        context.update({
             "title": f"Matrix Harris - {site.name}",
-            "site": site,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/matrix_harris.html", context)
         
@@ -802,13 +764,14 @@ async def reports_archeologia(
         periodi_stats = dict(periodi_result.fetchall())
         
         # Get current user information
-        current_user = await get_current_user_with_context(current_user_id, db)
+        current_user = await get_current_user_with_profile(current_user_id, db)
         
         # Context per template
-        context = {
-            "request": request,
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, site, current_page="reports"
+        )
+        context.update({
             "title": f"Report Archeologici - {site.name}",
-            "site": site,
             "stats": {
                 "us_total": us_count.scalar(),
                 "tombe_total": tombe_count.scalar(),
@@ -816,9 +779,7 @@ async def reports_archeologia(
                 "campioni_total": campioni_count.scalar()
             },
             "periodi_stats": periodi_stats,
-            "current_user_id": current_user_id,
-            "current_user": current_user  # Add current_user for profile modal
-        }
+        })
         
         return templates.TemplateResponse("pages/archeologia/reports.html.old", context)
         

@@ -21,6 +21,13 @@ from app.models.giornale_cantiere import GiornaleCantiere
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 
+# Import helper functions unificati
+from app.services.view_helpers import (
+    verify_site_access,
+    normalize_site_id,
+    get_base_template_context
+)
+
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
@@ -184,32 +191,32 @@ async def v1_cantieri_sito_view(
                 "updated_at": cantiere.updated_at.isoformat() if hasattr(cantiere.updated_at, 'isoformat') else None
             })
 
+        # Prepara context base
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, current_page="cantieri"
+        )
+        context.update({
+            "site_id": str(site_id),
+            "site": site_info,  # Template expects 'site', not 'site_info'
+            "site_info": site_info,
+            "cantieri": cantieri_data,  # Pass serialized data
+            "total_cantieri": total_cantieri,
+            "stati": stati,
+            "stati_options": stati_options,
+            "priorita_options": priorita_options,
+            "current_search": search,
+            "current_stato": stato,
+            # Add stats dict for template compatibility
+            "stats": {
+                "total": total_cantieri,
+                "in_corso": stati.get("in_corso", 0),
+                "pianificati": stati.get("pianificato", 0),
+                "completati": stati.get("completato", 0)
+            },
+        })
+        
         return templates.TemplateResponse(
-            "pages/giornale_cantiere/cantieri.html",
-            {
-                "request": request,
-                "site_id": str(site_id),
-                "site": site_info,  # Template expects 'site', not 'site_info'
-                "site_info": site_info,
-                "cantieri": cantieri_data,  # Pass serialized data
-                "total_cantieri": total_cantieri,
-                "stati": stati,
-                "stati_options": stati_options,
-                "priorita_options": priorita_options,
-                "current_search": search,
-                "current_stato": stato,
-                # Add stats dict for template compatibility
-                "stats": {
-                    "total": total_cantieri,
-                    "in_corso": stati.get("in_corso", 0),
-                    "pianificati": stati.get("pianificato", 0),
-                    "completati": stati.get("completato", 0)
-                },
-                # Add site selector variables for multi-site functionality
-                "sites": user_sites,
-                "sites_count": len(user_sites),
-                "current_site_name": site_info.get("name", "")
-            }
+            "pages/giornale_cantiere/cantieri.html", context
         )
         
     except HTTPException:
@@ -337,21 +344,21 @@ async def v1_cantiere_detail_view(
                 "condizioni_meteo": ultimo_giornale.condizioni_meteo if hasattr(ultimo_giornale, 'condizioni_meteo') else None,
             }
         
+        # Prepara context base
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, current_page="cantieri"
+        )
+        context.update({
+            "cantiere": cantiere_data,  # Usa dati serializzati
+            "site": site_data,           # Usa dati serializzati
+            "site_info": site_info,
+            "giornali_count": giornali_count,
+            "ultimo_giornale": ultimo_giornale_data,  # Usa dati serializzati
+            "operatori_count": operatori_count,
+        })
+        
         return templates.TemplateResponse(
-            "pages/giornale_cantiere/cantiere_detail.html",
-            {
-                "request": request,
-                "cantiere": cantiere_data,  # Usa dati serializzati
-                "site": site_data,           # Usa dati serializzati
-                "site_info": site_info,
-                "giornali_count": giornali_count,
-                "ultimo_giornale": ultimo_giornale_data,  # Usa dati serializzati
-                "operatori_count": operatori_count,
-                # Add site selector variables for multi-site functionality
-                "sites": user_sites,
-                "sites_count": len(user_sites),
-                "current_site_name": site_info.get("name", "")
-            }
+            "pages/giornale_cantiere/cantiere_detail.html", context
         )
 
     except HTTPException:
@@ -405,20 +412,20 @@ async def v1_nuovo_cantiere_view(
             {"value": "altro", "label": "Altro"}
         ]
         
+        # Prepara context base
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, current_page="cantieri"
+        )
+        context.update({
+            "site_id": str(site_id),
+            "site_info": site_info,
+            "stati_options": stati_options,
+            "priorita_options": priorita_options,
+            "tipologie_intervento": tipologie_intervento,
+        })
+        
         return templates.TemplateResponse(
-            "pages/giornale_cantiere/nuovo_cantiere.html",
-            {
-                "request": request,
-                "site_id": str(site_id),
-                "site_info": site_info,
-                "stati_options": stati_options,
-                "priorita_options": priorita_options,
-                "tipologie_intervento": tipologie_intervento,
-                # Add site selector variables for multi-site functionality
-                "sites": user_sites,
-                "sites_count": len(user_sites),
-                "current_site_name": site_info.get("name", "")
-            }
+            "pages/giornale_cantiere/nuovo_cantiere.html", context
         )
         
     except HTTPException:
@@ -490,20 +497,20 @@ async def v1_modifica_cantiere_view(
             {"value": "altro", "label": "Altro"}
         ]
         
+        # Prepara context base
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, current_page="cantieri"
+        )
+        context.update({
+            "cantiere": cantiere,
+            "site_info": site_info,
+            "stati_options": stati_options,
+            "priorita_options": priorita_options,
+            "tipologie_intervento": tipologie_intervento,
+        })
+        
         return templates.TemplateResponse(
-            "pages/giornale_cantiere/modifica_cantiere.html",
-            {
-                "request": request,
-                "cantiere": cantiere,
-                "site_info": site_info,
-                "stati_options": stati_options,
-                "priorita_options": priorita_options,
-                "tipologie_intervento": tipologie_intervento,
-                # Add site selector variables for multi-site functionality
-                "sites": user_sites,
-                "sites_count": len(user_sites),
-                "current_site_name": site_info.get("name", "")
-            }
+            "pages/giornale_cantiere/modifica_cantiere.html", context
         )
         
     except HTTPException:
