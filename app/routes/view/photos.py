@@ -1,6 +1,7 @@
 # app/routes/view/photos.py - Photos view route
 
 import asyncio
+import logging
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,11 +17,13 @@ from app.models import UserSitePermission
 from app.models import User
 from app.templates import templates
 
+logger = logging.getLogger(__name__)
+
 photos_view_router = APIRouter(prefix="/view", tags=["photos"])
 
 async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
     """Recupera informazioni utente corrente"""
-    user_query = select(User).where(User.id == current_user_id)
+    user_query = select(User).where(User.id == str(current_user_id))  # Convert UUID to string like geographic_map.py
     user = await db.execute(user_query)
     return user.scalar_one_or_none()
 
@@ -67,7 +70,11 @@ async def site_photos(
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
 
+
+    
     current_user = await get_current_user_with_context(current_user_id, db)
+    
+
 
     # Query foto con paginazione e categorie
     photos_query = select(Photo).where(Photo.site_id == str(site_id))
@@ -98,6 +105,7 @@ async def site_photos(
         "site": site,
         "user_permission": permission,
         "current_user": current_user,
+        "user": current_user,  # Add user for profile modal compatibility
         "can_read": permission.can_read(),
         "can_write": permission.can_write(),
         "can_admin": permission.can_admin(),

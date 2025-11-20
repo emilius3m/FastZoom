@@ -1,4 +1,5 @@
 # app/routes/view/geographic_map.py - Route per mappa geografica
+import logging
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +14,16 @@ from app.models import UserSitePermission
 from app.models import User
 from app.templates import templates
 
+logger = logging.getLogger(__name__)
+
 geographic_map_router = APIRouter(prefix="/view", tags=["geographic-map"])
+
+
+async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
+    """Recupera informazioni utente corrente"""
+    user_query = select(User).where(User.id == str(current_user_id))  # Convert UUID to string like geographic_map.py
+    user = await db.execute(user_query)
+    return user.scalar_one_or_none()
 
 @geographic_map_router.get("/{site_id}/geographic-map", response_class=HTMLResponse)
 async def geographic_map_view(
@@ -29,14 +39,11 @@ async def geographic_map_view(
     site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
     site = await db.execute(site_query)
     site = site.scalar_one_or_none()
-    
+    current_user = await get_current_user_with_context(current_user_id, db)
     if not site:
         raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
     
-    # Get current user information
-    user_query = select(User).where(User.id == str(current_user_id))
-    user = await db.execute(user_query)
-    user = user.scalar_one_or_none()
+
     
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
@@ -63,8 +70,8 @@ async def geographic_map_view(
         "can_read": can_read,
         "can_write": can_write,
         "user_id": str(current_user_id),
-        "user": user,
-        "current_user": user,  # Add current_user for profile modal
+        "user": current_user,
+        "current_user": current_user,  # Add current_user for profile modal
         "sites": user_sites,
         "sites_count": len(user_sites),
         "current_site_name": site.name if site else None
