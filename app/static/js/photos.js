@@ -2387,7 +2387,7 @@ function photosManager() {
                             this.ws.onmessage = (event) => {
                                 try {
                                     const notification = JSON.parse(event.data);
-                                    this.handleWebSocketNotification(notification);
+                                    this.handleWebSocketMessage(notification);
                                 } catch (e) {
                                     console.error('Error parsing WebSocket message:', e);
                                 }
@@ -2405,7 +2405,7 @@ function photosManager() {
                             return;
                         } else {
                             // Handle normal messages after auth
-                            this.handleWebSocketNotification(data);
+                            this.handleWebSocketMessage(data);
                         }
                     } catch (e) {
                         console.error('Error parsing WebSocket auth response:', e);
