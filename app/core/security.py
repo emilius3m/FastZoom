@@ -10,6 +10,7 @@ from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from loguru import logger
 
 from app.core.config import get_settings

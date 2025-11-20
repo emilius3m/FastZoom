@@ -43,7 +43,7 @@
 
                 <!-- Edit Form (hidden initially) -->
                 <div id="profile-edit" class="hidden">
-                    <form method="post" action="/auth/post_update_user/{{ (current_user or user).id }}">
+                    <form method="post" action="/api/v1/auth/users/{{ (current_user or user).id }}/update">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <div class="space-y-4">
                             <div>

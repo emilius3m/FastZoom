@@ -28,7 +28,7 @@ from app.database.db import create_db_and_tables, get_async_session
 from app.exception import http_exception_handler
 
 from fastapi_csrf_protect import CsrfProtect
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Form
 from app.core.csrf_settings import CsrfSettings, _csrf_tokens_optional
 from app.templates import templates
 # VECCHIO ADMIN ROUTER - Migrato in API v1
@@ -914,6 +914,67 @@ async def health_check():
         "multi_site_enabled": getattr(settings, 'site_selection_enabled', True)
     }
 
+
+
+# BACKWARD COMPATIBILITY ROUTE FOR LEGACY AUTH ENDPOINT
+@app.post("/auth/post_update_user/{user_id}", include_in_schema=False)
+async def legacy_update_user(
+    user_id: str,
+    request: Request,
+    first_name: str = Form(None),
+    last_name: str = Form(None),
+    gender: str = Form(None),
+    dob: str = Form(None),
+    city: str = Form(None),
+    country: str = Form(None),
+    address: str = Form(None),
+    phone: str = Form(None),
+    company: str = Form(None),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Legacy endpoint for backward compatibility.
+    Redirects to the new API v1 endpoint.
+    """
+    logger.warning(f"Legacy auth endpoint used: /auth/post_update_user/{user_id} - redirecting to API v1")
+    
+    # Get current user from token
+    try:
+        access_token_cookie = request.cookies.get("access_token")
+        if not access_token_cookie:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        token = access_token_cookie.replace("Bearer ", "")
+        payload = await SecurityService.verify_token(token, db)
+        current_user_id = UUID(payload.get("sub"))
+        
+        # Get current user object
+        result = await db.execute(select(User).where(User.id == current_user_id))
+        current_user = result.scalar_one_or_none()
+        
+        if not current_user:
+            raise HTTPException(status_code=401, detail="User not found")
+            
+    except Exception as e:
+        logger.error(f"Error authenticating user for legacy endpoint: {e}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
+    
+    # Import the v1 update function and call it
+    from app.routes.api.v1.auth import v1_update_user
+    return await v1_update_user(
+        user_id=user_id,
+        first_name=first_name,
+        last_name=last_name,
+        gender=gender,
+        dob=dob,
+        city=city,
+        country=country,
+        address=address,
+        phone=phone,
+        company=company,
+        db=db,
+        current_user=current_user
+    )
 
 
 @app.on_event("shutdown")
