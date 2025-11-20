@@ -21,7 +21,7 @@
     <div class="flex items-center lg:order-2">
       <!-- Site selector (sempre visibile se c'è almeno un sito) -->
       {% if sites_count is defined and sites_count > 0 %}
-      <div class="me-4 hidden sm:block">
+      <div class="me-8 hidden sm:block">
         <button type="button" class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 dark:bg-gray-800 dark:text-white dark:border-gray-600 dark:hover:bg-gray-700" data-dropdown-toggle="site-selector-dropdown">
           <i class="fas fa-map-marker-alt me-2 text-blue-600"></i>
           <span id="current-site-name">{{ current_site_name or sites[0].name if sites else 'Seleziona Sito' }}</span>
@@ -41,7 +41,7 @@
       </button>
       
       <!-- Theme Toggle (Navigation) -->
-      <button id="theme-toggle-nav" type="button" class="p-2 mr-1 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600">
+      <button id="theme-toggle-nav" type="button" class="p-2 mr-3 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600">
           <span class="sr-only">Cambia tema</span>
           <!-- Sun icon (light mode) -->
           <svg id="theme-toggle-nav-light-icon" class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
@@ -54,7 +54,7 @@
       </button>
 
       <!-- Notifications -->
-      <button type="button" data-dropdown-toggle="notification-dropdown" class="p-2 mr-1 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600">
+      <button type="button" data-dropdown-toggle="notification-dropdown" class="p-2 mr-3 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600">
           <span class="sr-only">Visualizza notifiche</span>
           <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 14 20"><path d="M12.133 10.632v-1.8A5.406 5.406 0 0 0 7.979 3.57.946.946 0 0 0 8 3.464V1.1a1 1 0 0 0-2 0v2.364a.946.946 0 0 0 .021.106 5.406 5.406 0 0 0-4.154 5.262v1.8C1.867 13.018 0 13.614 0 14.807 0 15.4 0 16 .538 16h12.924C14 16 14 15.4 14 14.807c0-1.193-1.867-1.789-1.867-4.175ZM3.823 17a3.453 3.453 0 0 0 6.354 0H3.823Z"/></svg>
       </button>
