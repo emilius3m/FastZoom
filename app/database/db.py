@@ -5,7 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import bcrypt
 
-from app.database.base import async_session_maker, Base, engine
+# Import from the centralized database engine
+from app.database.engine import engine, AsyncSessionLocal as async_session_maker
+from app.database.base import Base
 from app.models import User
 
 def get_password_hash(password: str) -> str:

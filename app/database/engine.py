@@ -13,6 +13,8 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 # Optional import for pool monitor to avoid circular imports
 try:
     from app.services.database_pool_monitor import initialize_pool_monitor
@@ -20,8 +22,6 @@ try:
 except ImportError:
     POOL_MONITOR_AVAILABLE = False
     logger.warning("Database pool monitor not available due to circular import")
-
-logger = logging.getLogger(__name__)
 
 # Log database configuration for debugging
 logger.info(f"Database URL: {settings.database_url}")

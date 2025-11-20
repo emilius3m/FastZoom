@@ -1141,7 +1141,8 @@ class DeepZoomMinIOService:
             import uuid
             
             # Use proper async session handling
-            from app.database.base import async_session_maker
+            # Import from centralized database engine
+            from app.database.engine import AsyncSessionLocal as async_session_maker
             
             # Convert string photo_id to UUID if needed
             if isinstance(photo_id, str):

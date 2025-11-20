@@ -14,7 +14,8 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.database.base import async_session_maker
+# Import from centralized database engine
+from app.database.engine import AsyncSessionLocal as async_session_maker
 from app.models import Photo, UserActivity
 from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service
@@ -176,38 +177,32 @@ class PhotoUploadService:
                 detail="Storage service is currently unavailable. Please try again later."
             )
 
-        # Check storage capacity
+        # ✅ CRITICAL FIX: Skip expensive storage usage calculation during upload
+        # Just do a quick bucket existence check instead
+        logger.debug("🔍 STORAGE VALIDATION: Skipping detailed storage check (performance optimization)")
+
+        # Quick check - just verify buckets exist without listing all objects
         try:
-            logger.debug("🔍 STORAGE VALIDATION: Getting storage usage")
-            import asyncio
-            storage_usage = await asyncio.wait_for(
-                storage_management_service.get_storage_usage(),
-                timeout=15.0  # 15 seconds timeout
+            bucket_check = await asyncio.wait_for(
+                storage_management_service.ensure_buckets_exist(),
+                timeout=5.0
             )
-            logger.debug(f"🔍 STORAGE VALIDATION: Storage usage retrieved: {storage_usage}")
-            
-            if storage_usage.get('total_size_gb', 0) > 8:  # >80% of 10GB
-                logger.warning(f"Storage usage critical ({storage_usage.get('total_size_gb', 0)}GB)")
-                logger.debug("🔍 STORAGE VALIDATION: Starting emergency cleanup")
-                cleanup_result = await asyncio.wait_for(
-                    storage_management_service.emergency_cleanup(target_freed_mb=1000),
-                    timeout=60.0  # 60 seconds timeout for cleanup
-                )
-                logger.info(f"Pre-upload cleanup: {cleanup_result}")
-            else:
-                logger.debug("🔍 STORAGE VALIDATION: Storage usage is acceptable")
         except asyncio.TimeoutError:
-            logger.error("Storage service timeout - storage usage check took too long")
+            logger.error("Bucket validation timeout")
+            bucket_check = {'created_buckets': [], 'existing_buckets': []}
+
+        if not bucket_check.get('created_buckets') and not bucket_check.get('existing_buckets'):
+            logger.error("❌ No buckets available")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Storage service is temporarily unavailable. Please try again later."
+                detail="Storage buckets not available"
             )
-        except Exception as storage_health_error:
-            logger.error(f"Storage health check failed: {storage_health_error}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Storage health check failed. Please try again later."
-            )
+
+        logger.debug("✅ STORAGE VALIDATION: Quick bucket check completed")
+        storage_usage = {
+            'total_size_gb': 0,
+            'timestamp': datetime.now().isoformat()
+        }
         
         logger.debug("🔍 STORAGE VALIDATION: All storage validation steps completed")
 

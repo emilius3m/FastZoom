@@ -3,6 +3,7 @@
 import asyncio
 import json
 import io
+import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
@@ -10,6 +11,50 @@ from loguru import logger
 from dataclasses import dataclass
 from enum import Enum
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# UUID normalization function (local copy to avoid circular imports)
+def normalize_site_id(site_id: str) -> Optional[str]:
+    """
+    Normalizza l'ID del sito per supportare diversi formati.
+    
+    Supporta:
+    - UUID standard con trattini: eb8d88e1-74e3-46d3-8e86-81f926c01cab
+    - Hash esadecimali senza trattini: eeedd3ceda34bf3b47d749a971b22ba
+    
+    Returns:
+        str: L'ID normalizzato o None se non valido
+    """
+    if not site_id:
+        return None
+    
+    # Rimuovi spazi bianchi
+    site_id = site_id.strip()
+    
+    # Se è un UUID standard con trattini, valida e restituiscilo
+    if '-' in site_id:
+        try:
+            # Crea un oggetto UUID per validare il formato e normalizzare a lowercase
+            uuid_obj = uuid.UUID(site_id)
+            # Restituisci la stringa normalizzata in lowercase
+            return str(uuid_obj)
+        except (ValueError, AttributeError):
+            return None
+    
+    # Se è un hash esadecimale senza trattini
+    if len(site_id) == 32:
+        try:
+            # Verifica che sia esadecimale
+            int(site_id, 16)
+            # Converti in formato UUID standard (inserisci trattini)
+            uuid_formatted = f"{site_id[0:8]}-{site_id[8:12]}-{site_id[12:16]}-{site_id[16:20]}-{site_id[20:32]}"
+            # Valida il formato UUID risultante
+            uuid.UUID(uuid_formatted)
+            return uuid_formatted
+        except (ValueError, AttributeError):
+            return None
+    
+    # Altri formati non supportati
+    return None
 
 from PIL import Image
 import math
@@ -118,6 +163,15 @@ class DeepZoomBackgroundService:
     ) -> Dict[str, Any]:
         """Schedule a photo for tile processing with deduplication"""
         
+        # 🔧 UUID NORMALIZATION: Normalize site_id for consistent handling
+        normalized_site_id = normalize_site_id(site_id)
+        if not normalized_site_id:
+            logger.warning(f"Invalid site_id format: {site_id}")
+            # Continue with original site_id but log warning to avoid breaking pipeline
+        
+        # Use normalized site_id if available, otherwise use original
+        effective_site_id = normalized_site_id if normalized_site_id else site_id
+        
         # CRITICO: Acquisisci lock per deduplicazione atomica
         async with self._processing_lock:
             # Verifica se il task è già in coda o in elaborazione
@@ -127,7 +181,7 @@ class DeepZoomBackgroundService:
                     logger.info(f"🔄 Task already scheduled/processing for photo {photo_id}")
                     return {
                         'photo_id': photo_id,
-                        'site_id': site_id,
+                        'site_id': effective_site_id,
                         'status': 'already_scheduled',
                         'message': f'Task already {existing_task.status.value}',
                         'scheduled_at': datetime.now().isoformat()
@@ -141,16 +195,16 @@ class DeepZoomBackgroundService:
                     logger.info(f"✅ Task already completed recently for photo {photo_id}")
                     return {
                         'photo_id': photo_id,
-                        'site_id': site_id,
+                        'site_id': effective_site_id,
                         'status': 'already_completed',
                         'message': 'Task completed recently',
                         'completed_at': completed_task.completed_at.isoformat()
                     }
             
-            # Crea nuovo task
+            # Crea nuovo task with normalized site_id
             task = TileProcessingTask(
                 photo_id=photo_id,
-                site_id=site_id,
+                site_id=effective_site_id,  # Use normalized site_id
                 file_path=file_path,
                 original_file_content=original_file_content,
                 archaeological_metadata=archaeological_metadata
@@ -165,7 +219,7 @@ class DeepZoomBackgroundService:
             
             return {
                 'photo_id': photo_id,
-                'site_id': site_id,
+                'site_id': effective_site_id,
                 'status': 'scheduled',
                 'message': 'Tile processing scheduled in background',
                 'scheduled_at': datetime.now().isoformat()
@@ -178,16 +232,25 @@ class DeepZoomBackgroundService:
     ) -> Dict[str, Any]:
         """Schedule multiple photos for batch processing"""
         
-        # Initialize batch context
+        # 🔧 UUID NORMALIZATION: Normalize site_id for batch processing
+        normalized_site_id = normalize_site_id(site_id)
+        if not normalized_site_id:
+            logger.warning(f"Invalid site_id format in batch processing: {site_id}")
+            # Continue with original site_id but log warning
+        
+        # Use normalized site_id if available, otherwise use original
+        effective_site_id = normalized_site_id if normalized_site_id else site_id
+        
+        # Initialize batch context with normalized site_id
         async with self._processing_lock:
-            if site_id not in self._batch_context:
-                self._batch_context[site_id] = {
+            if effective_site_id not in self._batch_context:
+                self._batch_context[effective_site_id] = {
                     "photos": [],
                     "started_at": datetime.now()
                 }
             
             # Add photos to batch context
-            batch_context = self._batch_context[site_id]
+            batch_context = self._batch_context[effective_site_id]
             for i, photo_info in enumerate(photos_list):
                 photo_id = photo_info['photo_id']
                 if photo_id not in [p['photo_id'] for p in batch_context['photos']]:
@@ -203,7 +266,7 @@ class DeepZoomBackgroundService:
                 
                 await self.schedule_tile_processing(
                     photo_id=photo_info['photo_id'],
-                    site_id=site_id,
+                    site_id=effective_site_id,  # Use normalized site_id
                     file_path=photo_info['file_path'],
                     original_file_content=original_file_content,
                     archaeological_metadata=photo_info.get('archaeological_metadata', {})
@@ -216,7 +279,7 @@ class DeepZoomBackgroundService:
         logger.info(f"📋 Scheduled {scheduled_count} photos for batch processing")
         
         return {
-            'site_id': site_id,
+            'site_id': effective_site_id,
             'scheduled_count': scheduled_count,
             'total_photos': len(photos_list),
             'status': 'scheduled',
@@ -921,12 +984,11 @@ class DeepZoomBackgroundService:
         """
         try:
             # Avoid circular import
-            from app.database.base import async_session_maker
+            # Import from centralized database engine
+            from app.database.engine import AsyncSessionLocal as async_session_maker
             from app.models import Photo
             from sqlalchemy import select
             from datetime import datetime
-            import uuid
-            from uuid import UUID
             
             # CRITICAL FIX: Photo.id is stored as STRING, not UUID object
             # Use the photo_id as string directly since Photo.id is String(36)
@@ -1029,7 +1091,7 @@ class DeepZoomBackgroundService:
                 
                 # 🔧 APPROACH 2: UUID-based query (for compatibility)
                 try:
-                    photo_uuid = UUID(photo_id)
+                    photo_uuid = uuid.UUID(photo_id)
                     uuid_query = select(Photo).where(Photo.id == str(photo_uuid))
                     uuid_result = await db.execute(uuid_query)
                     photo_record_uuid = uuid_result.scalar_one_or_none()

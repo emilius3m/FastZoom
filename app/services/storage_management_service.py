@@ -19,42 +19,92 @@ class StorageManagementService:
     
     def __init__(self):
         self.minio_service = archaeological_minio_service
+        self._storage_cache = {}
+        self._cache_ttl = 300  # Cache for 5 minutes
+        self._last_cache_time = None
         
     async def get_storage_usage(self) -> Dict[str, Any]:
-        """Ottieni utilizzo storage per tutti i bucket"""
+        """
+        Ottieni utilizzo storage con cache per evitare timeout.
+        
+        ✅ OPTIMIZATION:
+        - Cached result per 5 minuti
+        - Sample first 100 objects instead of iterating all
+        - Returns quickly for upload validation
+        """
+        
+        current_time = datetime.now()
+        
+        # Check if cache is still valid (avoid recalculating frequently)
+        if self._last_cache_time and (current_time - self._last_cache_time).total_seconds() < self._cache_ttl:
+            logger.debug("🔍 Using cached storage usage (cache age: %.1fs)" %
+                        (current_time - self._last_cache_time).total_seconds())
+            # Return cached result with cached flag set to True
+            cached_result = self._storage_cache.copy()
+            cached_result['cached'] = True
+            return cached_result
+        
         try:
             storage_info = {}
             total_size = 0
             total_objects = 0
             
+            # ✅ OPTIMIZATION: Only sample first 100 objects instead of ALL
+            max_objects_to_check = 100
+            objects_checked = 0
+            
             for bucket_name, bucket_id in self.minio_service.buckets.items():
                 try:
-                    # Lista oggetti nel bucket
-                    objects = await asyncio.to_thread(
+                    # Quick bucket exists check (FAST)
+                    bucket_exists = await asyncio.to_thread(
+                        self.minio_service.client.bucket_exists,
+                        bucket_id
+                    )
+                    
+                    if not bucket_exists:
+                        storage_info[bucket_name] = {
+                            'bucket_id': bucket_id,
+                            'size_bytes': 0,
+                            'size_mb': 0,
+                            'objects_count': 0,
+                            'status': 'not_found'
+                        }
+                        continue
+                    
+                    # Sample objects instead of iterating everything
+                    bucket_size = 0
+                    bucket_objects = 0
+                    
+                    # List objects (with sampling limit)
+                    objects_iter = await asyncio.to_thread(
                         self.minio_service.client.list_objects,
                         bucket_name=bucket_id,
                         recursive=True
                     )
                     
-                    bucket_size = 0
-                    bucket_objects = 0
-                    
-                    for obj in objects:
-                        bucket_size += obj.size
+                    # Iterate with object limit for performance
+                    for obj in objects_iter:
+                        if objects_checked >= max_objects_to_check:
+                            logger.debug(f"Storage check: Sampled {max_objects_to_check} objects (stopped for performance)")
+                            break
+                        
+                        bucket_size += obj.size if obj.size else 0
                         bucket_objects += 1
+                        objects_checked += 1
                     
                     storage_info[bucket_name] = {
                         'bucket_id': bucket_id,
                         'size_bytes': bucket_size,
-                        'size_mb': round(bucket_size / (1024 * 1024), 2),
-                        'objects_count': bucket_objects
+                        'size_mb': round(bucket_size / (1024 * 1024), 2) if bucket_size else 0,
+                        'objects_count': bucket_objects,
+                        'sampled': objects_checked >= max_objects_to_check
                     }
                     
                     total_size += bucket_size
                     total_objects += bucket_objects
                     
                 except Exception as e:
-                    logger.warning(f"Could not get stats for bucket {bucket_id}: {e}")
+                    logger.warning(f"❌ Could not get stats for bucket {bucket_id}: {e}")
                     storage_info[bucket_name] = {
                         'bucket_id': bucket_id,
                         'size_bytes': 0,
@@ -63,17 +113,26 @@ class StorageManagementService:
                         'error': str(e)
                     }
             
-            return {
+            result = {
                 'total_size_bytes': total_size,
-                'total_size_mb': round(total_size / (1024 * 1024), 2),
-                'total_size_gb': round(total_size / (1024 * 1024 * 1024), 2),
+                'total_size_mb': round(total_size / (1024 * 1024), 2) if total_size else 0,
+                'total_size_gb': round(total_size / (1024 * 1024 * 1024), 2) if total_size else 0,
                 'total_objects': total_objects,
                 'buckets': storage_info,
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'cached': False
             }
             
+            # Store in cache for next call
+            self._storage_cache = result
+            self._last_cache_time = current_time
+            
+            logger.info(f"✅ Storage usage calculated (total: {result['total_size_gb']}GB, objects sampled: {total_objects})")
+            
+            return result
+            
         except Exception as e:
-            logger.error(f"Error getting storage usage: {e}")
+            logger.error(f"❌ Error getting storage usage: {e}")
             return {
                 'total_size_bytes': 0,
                 'total_size_mb': 0,

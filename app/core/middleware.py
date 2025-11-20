@@ -16,8 +16,8 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from loguru import logger
 
-# Import per audit
-from app.database.base import async_session_maker
+# Import per audit from centralized engine
+from app.database.engine import AsyncSessionLocal as async_session_maker
 from app.models import UserActivity
 from sqlalchemy.ext.asyncio import AsyncSession
 

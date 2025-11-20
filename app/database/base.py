@@ -6,7 +6,7 @@ from datetime import datetime
 import sqlalchemy
 import uuid
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import DateTime, Column, Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -78,28 +78,20 @@ class SoftDeleteMixin:
     deleted_by = Column(String(36), nullable=True)
 
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+# Import configuration for database connection
+from app.core.config import settings
 
+# Import the centralized database engine and session factory
+# This eliminates duplicate engines and ensures consistent WAL mode configuration
+from app.database.engine import engine, AsyncSessionLocal, async_session_maker
 
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=True,  # Enable SQL logging for debugging
-    future=True,
-    # Connection Pool Configuration - Ottimizzato per 15-20 richieste concorrenti
-    pool_size=20,           # 20 connessioni permanenti
-    max_overflow=30,        # 30 connessioni aggiuntive sotto carico
-    pool_timeout=30,        # 30 secondi timeout
-    pool_recycle=3600,      # 1 ora riciclo connessioni
-    pool_pre_ping=True,     # Verifica connessioni prima dell'uso
-)
-
-# DEBUG: Log engine creation
+# DEBUG: Log centralized engine usage
 from loguru import logger
-logger.info(f"[DEBUG] Database engine created with URL: {DATABASE_URL}")
-logger.info(f"[DEBUG] Engine pool configuration: pool_size=20, max_overflow=30")
+logger.info(f"[DEBUG] Using centralized engine for model initialization: {settings.database_url}")
+logger.info(f"[DEBUG] Centralized async session maker available for model initialization")
 
-async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
-logger.info(f"[DEBUG] Async session maker created")
+# Note: The main application now uses the centralized engine from app.database.engine
+# This ensures all database connections use the same WAL mode configuration
 
 
 def init_models():

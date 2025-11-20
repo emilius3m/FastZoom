@@ -82,7 +82,8 @@ async def process_queued_bulk_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
                 )
 
                 # Save to database
-                from app.database.base import async_session_maker
+                # Import from centralized database engine
+                from app.database.engine import AsyncSessionLocal as async_session_maker
                 async with async_session_maker() as db:
                     db.add(photo_record)
                     await db.commit()
@@ -172,7 +173,8 @@ async def process_queued_bulk_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         # Log bulk upload activity
         try:
-            from app.database.base import async_session_maker
+            # Import from centralized database engine
+            from app.database.engine import AsyncSessionLocal as async_session_maker
             async with async_session_maker() as db:
                 activity = UserActivity(
                     user_id=user_id,

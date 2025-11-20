@@ -14,11 +14,11 @@ class Settings(BaseSettings):
 
     
     # Database Connection Pool Configuration
-    # CRITICO: Ottimizzato per supportare 50+ richieste concorrenti (stress test)
-    db_pool_size: int = 30           # Aumentato a 30 connessioni permanenti nel pool
-    db_max_overflow: int = 70        # Aumentato a 70 connessioni aggiuntive (totale: 100)
-    db_pool_timeout: int = 60        # Aumentato a 60 secondi timeout per operazioni lunghe
-    db_pool_recycle: int = 1800     # Ridotto a 30 minuti per evitare stale connections
+    # OTTIMIZZATO PER SQLITE: Ridotto per prevenire deadlocks (SQLite è file-based, non server-based)
+    db_pool_size: int = 5            # Ridotto a 5 connessioni permanenti (SQLite non necesita pooling elevato)
+    db_max_overflow: int = 10        # Ridotto a 10 connessioni aggiuntive (totale: 15)
+    db_pool_timeout: int = 30        # Ridotto a 30 secondi timeout
+    db_pool_recycle: int = 3600     # Aumentato a 1 ora (3600 secondi) - SQLite gestisce bene le connessioni lunghe
     db_pool_pre_ping: bool = True    # Mantenuto: Verifica salute connessioni prima dell'uso
     db_pool_reset_on_return: str = "commit"  # Resetta stato connessione al ritorno
 

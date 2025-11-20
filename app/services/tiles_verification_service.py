@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from uuid import UUID
 
-from app.database.base import async_session_maker
+# Import from centralized database engine
+from app.database.engine import AsyncSessionLocal as async_session_maker
 from app.models import Photo
 from app.services.deep_zoom_background_service import deep_zoom_background_service
 from app.services.deep_zoom_minio_service import deep_zoom_minio_service
