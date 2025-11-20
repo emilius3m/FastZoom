@@ -16,11 +16,15 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from loguru import logger
+
+# Import security functions
+from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
+from app.database.session import get_async_session
 
 # Import modelli del sistema
 from app.models import User, UserSitePermission, Photo, Document, UserActivity
@@ -28,6 +32,7 @@ from app.models.sites import ArchaeologicalSite
 from app.models.user_profiles import UserProfile
 from app.models.giornale_cantiere import GiornaleCantiere
 from app.models.archeologia_avanzata import UnitaStratigraficaCompleta
+from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
 from app.models.archaeological_records import SchedaTomba, InventarioReperto, CampioneScientifico
 from app.models.form_schemas import FormSchema
 
@@ -426,10 +431,10 @@ async def get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any]
 # ============================================================================
 
 async def require_superuser(
-    request,
-    current_user_id: UUID,
-    user_sites: List[Dict[str, Any]],
-    db: AsyncSession
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ) -> Tuple[User, Dict[str, Any]]:
     """
     Verifica che l'utente sia superuser e ritorna context.
