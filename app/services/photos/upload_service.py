@@ -830,7 +830,12 @@ class PhotoUploadService:
         return None
 
     async def _schedule_tile_processing(self, photos_needing_tiles: List[Dict], site_id: UUID):
-        """Schedule deep zoom processing for photos that need tiles."""
+        """
+        Schedule deep zoom processing for photos that need tiles.
+        
+        🔧 SNAPSHOT-BASED SOLUTION: Creates complete photo snapshots to eliminate race conditions.
+        All necessary data is passed to the background service to avoid database queries.
+        """
         
         with logger.contextualize(
             operation="schedule_tile_processing",
@@ -842,36 +847,110 @@ class PhotoUploadService:
                 return
 
             try:
-                logger.info("Starting tile scheduling", photo_count=len(photos_needing_tiles))
+                logger.info("Starting tile scheduling with snapshot-based approach", photo_count=len(photos_needing_tiles))
 
-                # Validate photos data structure
-                validated_photos_list = []
+                # 🔧 SNAPSHOT CREATION: Create complete photo snapshots with all necessary data
+                photo_snapshots = []
                 for tile_photo in photos_needing_tiles:
-                    if all(key in tile_photo for key in ['photo_id', 'file_path', 'width', 'height']):
-                        validated_photos_list.append(tile_photo)
-                    else:
-                        logger.warning("Skipping invalid photo data", photo_data=tile_photo)
+                    try:
+                        # Validate basic structure
+                        if not all(key in tile_photo for key in ['photo_id', 'file_path', 'width', 'height']):
+                            logger.warning("Skipping invalid photo data", photo_data=tile_photo)
+                            continue
+                        
+                        # Create comprehensive snapshot with all data needed for tile processing
+                        photo_snapshot = {
+                            # Core identification
+                            'id': tile_photo['photo_id'],
+                            'site_id': str(site_id),
+                            
+                            # File information
+                            'file_path': tile_photo['file_path'],
+                            'width': tile_photo['width'],
+                            'height': tile_photo['height'],
+                            'filename': tile_photo.get('filename', f"photo_{tile_photo['photo_id']}"),
+                            'file_size': tile_photo.get('file_size', 0),
+                            
+                            # Metadata from photo processing
+                            'created_at': tile_photo.get('created_at', datetime.now(timezone.utc).isoformat()),
+                            'photo_date': tile_photo.get('photo_date'),
+                            'camera_model': tile_photo.get('camera_model'),
+                            
+                            # Archaeological metadata
+                            'archaeological_metadata': tile_photo.get('archaeological_metadata', {}),
+                            
+                            # Additional metadata that might be needed
+                            'metadata': tile_photo.get('metadata', {}),
+                            
+                            # Processing flags
+                            'needs_tiles': True,
+                            'min_dimension_for_tiles': self.min_dimension_for_tiles
+                        }
+                        
+                        # Add any additional metadata fields that might be present
+                        if 'inventory_number' in tile_photo:
+                            photo_snapshot['inventory_number'] = tile_photo['inventory_number']
+                        if 'excavation_area' in tile_photo:
+                            photo_snapshot['excavation_area'] = tile_photo['excavation_area']
+                        if 'stratigraphic_unit' in tile_photo:
+                            photo_snapshot['stratigraphic_unit'] = tile_photo['stratigraphic_unit']
+                        if 'material' in tile_photo:
+                            photo_snapshot['material'] = tile_photo['material']
+                        if 'chronology_period' in tile_photo:
+                            photo_snapshot['chronology_period'] = tile_photo['chronology_period']
+                        if 'photo_type' in tile_photo:
+                            photo_snapshot['photo_type'] = tile_photo['photo_type']
+                        if 'photographer' in tile_photo:
+                            photo_snapshot['photographer'] = tile_photo['photographer']
+                        if 'description' in tile_photo:
+                            photo_snapshot['description'] = tile_photo['description']
+                        if 'keywords' in tile_photo:
+                            photo_snapshot['keywords'] = tile_photo['keywords']
+                        
+                        photo_snapshots.append(photo_snapshot)
+                        logger.debug(f"Created snapshot for photo {tile_photo['photo_id']}",
+                                   snapshot_keys=list(photo_snapshot.keys()))
+                        
+                    except Exception as snapshot_error:
+                        logger.error(f"Failed to create snapshot for photo {tile_photo.get('photo_id', 'unknown')}: {snapshot_error}")
+                        # Continue with other photos even if one snapshot fails
+                        continue
 
-                if validated_photos_list:
-                    # Schedule batch processing with background service
-                    batch_result = await deep_zoom_background_service.schedule_batch_processing(
-                        photos_list=validated_photos_list,
+                if photo_snapshots:
+                    logger.info(f"Created {len(photo_snapshots)} complete photo snapshots for tile processing")
+                    
+                    # 🔧 SNAPSHOT-BASED CALL: Pass complete snapshots to background service
+                    batch_result = await deep_zoom_background_service.schedule_batch_processing_with_snapshots(
+                        photo_snapshots=photo_snapshots,
                         site_id=str(site_id)
                     )
 
-                    logger.debug("Tile scheduling completed", result=batch_result)
+                    logger.debug("Tile scheduling with snapshots completed", result=batch_result)
                     
                     # Verify scheduling success
                     if batch_result and isinstance(batch_result, dict):
                         scheduled_count = batch_result.get('scheduled_count', 0)
                         if scheduled_count > 0:
-                            logger.info("Tile scheduling successful", scheduled_count=scheduled_count)
+                            logger.info("Snapshot-based tile scheduling successful",
+                                       scheduled_count=scheduled_count,
+                                       total_snapshots=len(photo_snapshots))
                         else:
-                            logger.warning("Tile scheduling warning", scheduled_count=scheduled_count)
+                            logger.warning("Snapshot-based tile scheduling warning",
+                                         scheduled_count=scheduled_count,
+                                         total_snapshots=len(photo_snapshots))
+                    else:
+                        logger.error("Unexpected result from snapshot-based tile scheduling", result=batch_result)
+                else:
+                    logger.warning("No valid photo snapshots created for tile processing")
 
             except Exception as batch_error:
-                logger.error("Tile scheduling error", error=str(batch_error))
+                logger.error("Snapshot-based tile scheduling error",
+                           error=str(batch_error),
+                           error_type=type(batch_error).__name__,
+                           photos_count=len(photos_needing_tiles))
                 # Don't fail the upload if tile scheduling fails
+                import traceback
+                logger.error(f"Tile scheduling traceback: {traceback.format_exc()}")
 
     def _prepare_upload_response(
         self, 

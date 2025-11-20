@@ -11,6 +11,8 @@ from loguru import logger
 from dataclasses import dataclass
 from enum import Enum
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from uuid import UUID
 
 # UUID normalization function (local copy to avoid circular imports)
 def normalize_site_id(site_id: str) -> Optional[str]:
@@ -88,6 +90,8 @@ class TileProcessingTask:
     created_at: datetime = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    # 🔧 SNAPSHOT-BASED: Add snapshot data field to eliminate database queries
+    snapshot_data: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         if self.created_at is None:
@@ -285,6 +289,190 @@ class DeepZoomBackgroundService:
             'status': 'scheduled',
             'message': f'{scheduled_count} photos scheduled for background processing'
         }
+
+    async def schedule_batch_processing_with_snapshots(
+        self,
+        photo_snapshots: List[Dict[str, Any]],
+        site_id: str
+    ) -> Dict[str, Any]:
+        """
+        🔧 SNAPSHOT-BASED SOLUTION: Schedule multiple photos for batch processing using complete snapshots.
+        
+        This method eliminates race conditions by using complete photo snapshots instead of
+        querying the database for photo records that may not be visible due to SQLite WAL delays.
+        
+        Args:
+            photo_snapshots: List of complete photo snapshots with all necessary data
+            site_id: Site ID for batch processing
+            
+        Returns:
+            Dict with scheduling results
+        """
+        
+        # 🔧 UUID NORMALIZATION: Normalize site_id for batch processing
+        normalized_site_id = normalize_site_id(site_id)
+        if not normalized_site_id:
+            logger.warning(f"Invalid site_id format in snapshot batch processing: {site_id}")
+            # Continue with original site_id but log warning
+        
+        # Use normalized site_id if available, otherwise use original
+        effective_site_id = normalized_site_id if normalized_site_id else site_id
+        
+        # Initialize batch context with normalized site_id
+        async with self._processing_lock:
+            if effective_site_id not in self._batch_context:
+                self._batch_context[effective_site_id] = {
+                    "photos": [],
+                    "started_at": datetime.now()
+                }
+            
+            # Add photo snapshots to batch context
+            batch_context = self._batch_context[effective_site_id]
+            for i, photo_snapshot in enumerate(photo_snapshots):
+                photo_id = photo_snapshot['id']
+                if photo_id not in [p['id'] for p in batch_context['photos']]:
+                    self._photo_order[photo_id] = len(batch_context['photos'])
+                    batch_context['photos'].append(photo_snapshot)
+        
+        scheduled_count = 0
+        logger.info(f"🔧 SNAPSHOT-BASED: Processing {len(photo_snapshots)} photo snapshots for site {effective_site_id}")
+        
+        for photo_snapshot in photo_snapshots:
+            try:
+                photo_id = photo_snapshot['id']
+                
+                # 🔧 SNAPSHOT-BASED: Use snapshot data directly instead of querying database
+                logger.debug(f"🔧 SNAPSHOT-BASED: Processing snapshot for photo {photo_id}")
+                
+                # Load file content from MinIO using snapshot file_path
+                from app.services.archaeological_minio_service import archaeological_minio_service
+                original_file_content = await archaeological_minio_service.get_file(photo_snapshot['file_path'])
+                
+                # Extract archaeological metadata from snapshot
+                archaeological_metadata = photo_snapshot.get('archaeological_metadata', {})
+                
+                # Add additional metadata from snapshot if available
+                if 'metadata' in photo_snapshot:
+                    archaeological_metadata.update(photo_snapshot['metadata'])
+                
+                # Schedule tile processing using snapshot data
+                await self.schedule_tile_processing_with_snapshot(
+                    photo_snapshot=photo_snapshot,
+                    original_file_content=original_file_content,
+                    archaeological_metadata=archaeological_metadata
+                )
+                scheduled_count += 1
+                
+                logger.debug(f"🔧 SNAPSHOT-BASED: Successfully scheduled photo {photo_id} from snapshot")
+                
+            except Exception as e:
+                logger.error(f"🔧 SNAPSHOT-BASED: Failed to schedule processing for photo {photo_snapshot.get('id', 'unknown')}: {e}")
+                import traceback
+                logger.error(f"🔧 SNAPSHOT-BASED: Error traceback: {traceback.format_exc()}")
+        
+        logger.info(f"🔧 SNAPSHOT-BASED: Scheduled {scheduled_count} photos from snapshots for batch processing")
+        
+        return {
+            'site_id': effective_site_id,
+            'scheduled_count': scheduled_count,
+            'total_photos': len(photo_snapshots),
+            'status': 'scheduled',
+            'message': f'{scheduled_count} photos scheduled from snapshots for background processing',
+            'processing_method': 'snapshot-based'
+        }
+
+    async def schedule_tile_processing_with_snapshot(
+        self,
+        photo_snapshot: Dict[str, Any],
+        original_file_content: bytes,
+        archaeological_metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        🔧 SNAPSHOT-BASED SOLUTION: Schedule a photo for tile processing using complete snapshot.
+        
+        This method eliminates race conditions by using complete photo snapshot instead of
+        querying the database for photo records that may not be visible due to SQLite WAL delays.
+        
+        Args:
+            photo_snapshot: Complete photo snapshot with all necessary data
+            original_file_content: Raw file content from MinIO
+            archaeological_metadata: Archaeological metadata from snapshot
+            
+        Returns:
+            Dict with scheduling results
+        """
+        
+        photo_id = photo_snapshot['id']
+        site_id = photo_snapshot['site_id']
+        
+        # 🔧 UUID NORMALIZATION: Normalize site_id for consistent handling
+        normalized_site_id = normalize_site_id(site_id)
+        if not normalized_site_id:
+            logger.warning(f"Invalid site_id format in snapshot processing: {site_id}")
+            # Continue with original site_id but log warning
+        
+        # Use normalized site_id if available, otherwise use original
+        effective_site_id = normalized_site_id if normalized_site_id else site_id
+        
+        # CRITICO: Acquisisci lock per deduplicazione atomica
+        async with self._processing_lock:
+            # Verifica se il task è già in coda o in elaborazione
+            if photo_id in self.processing_tasks:
+                existing_task = self.processing_tasks[photo_id]
+                if existing_task.status in [ProcessingStatus.PENDING, ProcessingStatus.PROCESSING, ProcessingStatus.RETRYING]:
+                    logger.info(f"🔧 SNAPSHOT-BASED: Task already scheduled/processing for photo {photo_id}")
+                    return {
+                        'photo_id': photo_id,
+                        'site_id': effective_site_id,
+                        'status': 'already_scheduled',
+                        'message': f'Task already {existing_task.status.value}',
+                        'scheduled_at': datetime.now().isoformat(),
+                        'processing_method': 'snapshot-based'
+                    }
+            
+            # Verifica se il task è stato completato di recente (evita duplicati)
+            if photo_id in self.completed_tasks:
+                completed_task = self.completed_tasks[photo_id]
+                # Considera completato solo se meno di 1 ora fa
+                if completed_task.completed_at and (datetime.now() - completed_task.completed_at).total_seconds() < 3600:
+                    logger.info(f"🔧 SNAPSHOT-BASED: Task already completed recently for photo {photo_id}")
+                    return {
+                        'photo_id': photo_id,
+                        'site_id': effective_site_id,
+                        'status': 'already_completed',
+                        'message': 'Task completed recently',
+                        'completed_at': completed_task.completed_at.isoformat(),
+                        'processing_method': 'snapshot-based'
+                    }
+            
+            # 🔧 SNAPSHOT-BASED: Crea nuovo task con dati completi dal snapshot
+            task = TileProcessingTask(
+                photo_id=photo_id,
+                site_id=effective_site_id,  # Use normalized site_id
+                file_path=photo_snapshot['file_path'],
+                original_file_content=original_file_content,
+                archaeological_metadata=archaeological_metadata or photo_snapshot.get('archaeological_metadata', {})
+            )
+            
+            # 🔧 SNAPSHOT-BASED: Store snapshot data in task for later use
+            # This eliminates the need for database queries during processing
+            task.snapshot_data = photo_snapshot
+            
+            # Aggiungi a coda e tracking
+            await self.task_queue.put(task)
+            self.processing_tasks[photo_id] = task
+            self._processing_photo_ids.add(photo_id)
+            
+            logger.info(f"🔧 SNAPSHOT-BASED: Scheduled tile processing for photo {photo_id} from snapshot")
+            
+            return {
+                'photo_id': photo_id,
+                'site_id': effective_site_id,
+                'status': 'scheduled',
+                'message': 'Tile processing scheduled from snapshot in background',
+                'scheduled_at': datetime.now().isoformat(),
+                'processing_method': 'snapshot-based'
+            }
 
     async def _process_queue_worker(self):
         """Background worker that processes the queue with stuck task detection"""
@@ -1057,74 +1245,73 @@ class DeepZoomBackgroundService:
                     
         except Exception as e:
             logger.error(f"Failed to update photo database status for {photo_id}: {e}")
-            # 🔧 FIX: Don't re-raise to avoid breaking the entire processing pipeline
+            # 🔧 SNAPSHOT-BASED: Don't re-raise to avoid breaking the entire processing pipeline
             # The tile processing can continue even if status update fails
             logger.error(f"⚠️ Deep zoom status update failed but continuing processing for {photo_id}")
-
-    async def _find_photo_record_with_fallback(self, photo_id: str, db: AsyncSession) -> Optional[Photo]:
-        """
-        🔧 NEW METHOD: Find photo record with multiple fallback approaches
-        
-        This method mirrors the logic from upload_service to ensure consistency
-        across the photo processing pipeline.
-        
-        Args:
-            photo_id: Photo ID as string
-            db: Database session
             
-        Returns:
-            Photo record or None if not found
-        """
-        max_retries = 2
-        retry_delay = 0.01  # 10ms
-        
+            # Log snapshot information if available
+            task = None
+            if photo_id in self.processing_tasks:
+                task = self.processing_tasks[photo_id]
+            elif photo_id in self.completed_tasks:
+                task = self.completed_tasks[photo_id]
+            elif photo_id in self.failed_tasks:
+                task = self.failed_tasks[photo_id]
+            
+            if task and hasattr(task, 'snapshot_data') and task.snapshot_data:
+                logger.info(f"🔧 SNAPSHOT-BASED: Processing continues with snapshot data for {photo_id}")
+
+    async def _find_photo_record_with_fallback(
+        self,
+        photo_id: str,
+        db: AsyncSession,
+        max_retries: int = 5
+    ) -> Optional[Photo]:
+        # Find photo record with retry logic and exponential backoff.
+        # SQLite WAL FIX: Adds delay between retries to allow checkpoint.
+
         for attempt in range(max_retries):
             try:
-                # 🔧 APPROACH 1: String-based query (most reliable for String(36) field)
-                photo_query = select(Photo).where(Photo.id == photo_id)
-                result = await db.execute(photo_query)
-                photo_record = result.scalar_one_or_none()
-                
-                if photo_record:
-                    logger.debug(f"🔧 DeepZoom: Photo {photo_id} found with string query (attempt {attempt + 1})")
-                    return photo_record
-                
-                # 🔧 APPROACH 2: UUID-based query (for compatibility)
+                # Add delay before retry (except first attempt)
+                if attempt > 0:
+                    delay = 0.1 * (2 ** attempt)
+                    logger.debug(f"Retry {attempt}/{max_retries} for photo {photo_id} after {delay:.1f}s")
+                    await asyncio.sleep(delay)
+
+                # Try UUID query first
                 try:
-                    photo_uuid = uuid.UUID(photo_id)
-                    uuid_query = select(Photo).where(Photo.id == str(photo_uuid))
-                    uuid_result = await db.execute(uuid_query)
-                    photo_record_uuid = uuid_result.scalar_one_or_none()
-                    
-                    if photo_record_uuid:
-                        logger.debug(f"🔧 DeepZoom: Photo {photo_id} found with UUID query (attempt {attempt + 1})")
-                        return photo_record_uuid
+                    photo_uuid = UUID(photo_id)
+                    result = await db.execute(
+                        select(Photo).where(Photo.id == photo_uuid)
+                    )
+                    photo_obj = result.scalar_one_or_none()
+
+                    if photo_obj:
+                        logger.debug(f"Photo {photo_id} found with UUID (attempt {attempt + 1})")
+                        return photo_obj
                 except ValueError:
-                    logger.debug(f"🔧 DeepZoom: Invalid UUID format for {photo_id}, skipping UUID query")
-                
-                # 🔧 APPROACH 3: Case-insensitive query (last resort)
-                # Using func.lower() for SQLAlchemy compatibility
-                from sqlalchemy import func
-                case_insensitive_query = select(Photo).where(func.lower(Photo.id) == photo_id.lower())
-                case_result = await db.execute(case_insensitive_query)
-                photo_record_case = case_result.scalar_one_or_none()
-                
-                if photo_record_case:
-                    logger.debug(f"🔧 DeepZoom: Photo {photo_id} found with case-insensitive query (attempt {attempt + 1})")
-                    return photo_record_case
-                
-                # If none found and this isn't the last attempt, wait and retry
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                    
-            except Exception as query_error:
-                logger.warning(f"🔧 DeepZoom: Query error for photo {photo_id} (attempt {attempt + 1}): {query_error}")
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2
-        
-        logger.warning(f"🔧 DeepZoom: Photo {photo_id} not found after {max_retries} attempts with all query approaches")
+                    pass
+
+                # Try string query
+                result = await db.execute(
+                    select(Photo).where(Photo.id == photo_id)
+                )
+                photo_obj = result.scalar_one_or_none()
+
+                if photo_obj:
+                    logger.debug(f"Photo {photo_id} found with string (attempt {attempt + 1})")
+                    return photo_obj
+
+                # Force WAL checkpoint on retry
+                if attempt > 0:
+                    await db.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))
+                    logger.debug(f"Forced WAL checkpoint (attempt {attempt + 1})")
+
+            except Exception as e:
+                logger.warning(f"Error finding photo {photo_id} (attempt {attempt + 1}): {e}")
+                continue
+
+        logger.error(f"Photo {photo_id} not found after {max_retries} attempts")
         return None
 
     async def _send_processing_notification(
