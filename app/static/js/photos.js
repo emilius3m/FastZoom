@@ -2450,7 +2450,7 @@ function photosManager() {
         // Handle WebSocket messages
         handleWebSocketMessage(data) {
             console.log('Handling WebSocket message:', data);
-            
+
             switch (data.type) {
                 case 'photo_uploaded':
                     this.handlePhotoUploadedNotification(data);
@@ -2463,6 +2463,9 @@ function photosManager() {
                     break;
                 case 'deepzoom_status_changed':
                     this.handleDeepZoomStatusNotification(data);
+                    break;
+                case 'tiles_progress':
+                    this.handleTilesProgressNotification(data);
                     break;
                 default:
                     console.log('Unknown WebSocket message type:', data.type);
@@ -2554,14 +2557,14 @@ function photosManager() {
         // Handle DeepZoom status change notifications
         handleDeepZoomStatusNotification(data) {
             console.log('DeepZoom status notification:', data);
-            
+
             if (data.photo_id && data.status) {
                 // Update photo's DeepZoom status
                 const index = this.photos.findIndex(p => p && p.id === data.photo_id);
                 if (index !== -1) {
                     this.photos[index].deepzoom_status = data.status;
                     this.photos[index].deepzoom_error = data.error || null;
-                    
+
                     // Show appropriate message based on status
                     switch (data.status) {
                         case 'completed':
@@ -2572,6 +2575,87 @@ function photosManager() {
                             break;
                         case 'processing':
                             // Don't show message for processing status
+                            break;
+                    }
+                }
+            }
+        },
+
+        // Handle tiles progress notifications
+        handleTilesProgressNotification(data) {
+            console.log('Tiles progress notification:', data);
+
+            if (data.photo_id && data.status) {
+                // Update photo's DeepZoom status and progress
+                const index = this.photos.findIndex(p => p && p.id === data.photo_id);
+                if (index !== -1) {
+                    this.photos[index].deepzoom_status = data.status;
+                    this.photos[index].deepzoom_progress = data.progress || 0;
+                    this.photos[index].deepzoom_error = data.error || null;
+                    
+                    // IMPORTANT: Update has_deep_zoom when status is completed
+                    if (data.status === 'completed') {
+                        this.photos[index].has_deep_zoom = true;
+                    }
+
+                    // Update current photo if it's the one being processed
+                    if (this.currentPhoto && this.currentPhoto.id === data.photo_id) {
+                        this.currentPhoto.deepzoom_status = data.status;
+                        this.currentPhoto.deepzoom_progress = data.progress || 0;
+                        this.currentPhoto.deepzoom_error = data.error || null;
+                        
+                        // IMPORTANT: Update has_deep_zoom for current photo too
+                        if (data.status === 'completed') {
+                            this.currentPhoto.has_deep_zoom = true;
+                        }
+                    }
+
+                    // Update filtered photos if needed
+                    const filteredIndex = this.filteredPhotos.findIndex(p => p && p.id === data.photo_id);
+                    if (filteredIndex !== -1) {
+                        this.filteredPhotos[filteredIndex].deepzoom_status = data.status;
+                        this.filteredPhotos[filteredIndex].deepzoom_progress = data.progress || 0;
+                        this.filteredPhotos[filteredIndex].deepzoom_error = data.error || null;
+                        
+                        // IMPORTANT: Update has_deep_zoom in filtered photos too
+                        if (data.status === 'completed') {
+                            this.filteredPhotos[filteredIndex].has_deep_zoom = true;
+                        }
+                    }
+
+                    // Update paginated photos if needed
+                    const paginatedIndex = this.paginatedPhotos.findIndex(p => p && p.id === data.photo_id);
+                    if (paginatedIndex !== -1) {
+                        this.paginatedPhotos[paginatedIndex].deepzoom_status = data.status;
+                        this.paginatedPhotos[paginatedIndex].deepzoom_progress = data.progress || 0;
+                        this.paginatedPhotos[paginatedIndex].deepzoom_error = data.error || null;
+                        
+                        // IMPORTANT: Update has_deep_zoom in paginated photos too
+                        if (data.status === 'completed') {
+                            this.paginatedPhotos[paginatedIndex].has_deep_zoom = true;
+                        }
+                    }
+
+                    // Manage photosBeingProcessed set
+                    if (data.status === 'processing' || data.status === 'uploading' || data.status === 'finalizing') {
+                        this.photosBeingProcessed.add(data.photo_id);
+                    } else if (data.status === 'completed' || data.status === 'failed') {
+                        this.photosBeingProcessed.delete(data.photo_id);
+                    }
+
+                    // Show appropriate message based on status
+                    switch (data.status) {
+                        case 'completed':
+                            this.showAlertMessage('DeepZoom tiles generati con successo!');
+                            break;
+                        case 'failed':
+                            this.showAlertMessage(`Errore generazione DeepZoom: ${data.error || 'Errore sconosciuto'}`);
+                            break;
+                        case 'processing':
+                        case 'uploading':
+                        case 'finalizing':
+                            // Show progress message for intermediate statuses
+                            console.log(`Tiles generation progress: ${data.status} (${data.progress}%)`);
                             break;
                     }
                 }
