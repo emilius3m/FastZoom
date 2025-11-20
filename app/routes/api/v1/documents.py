@@ -16,15 +16,10 @@ from pydantic import BaseModel
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.database.db import get_async_session
 
-# Import existing document functions for backward compatibility
-from app.routes.api.documents import (
-    upload_document_api_site__site_id__documents_post,
-    get_documents_api_site__site_id__documents_get,
-    get_document_api_site__site_id__documents__document_id__get,
-    update_document_api_site__site_id__documents__document_id__put,
-    delete_document_api_site__site_id__documents__document_id__delete,
-    download_document_api_site__site_id__documents__document_id__download_get
-)
+# Import services for direct implementation
+from app.services.archaeological_minio_service import archaeological_minio_service
+from app.models.sites import ArchaeologicalSite
+from app.models import UserSitePermission
 
 # Schemas
 class DocumentUpdate(BaseModel):
@@ -159,10 +154,113 @@ async def v1_upload_document(
         "is_public": is_public
     }
     
-    mock_request = MockRequest(form_data, file)
-    return await upload_document_api_site__site_id__documents_post(
-        site_id, mock_request, current_user_id, user_sites, db
-    )
+    # Direct implementation instead of backward compatibility
+    try:
+        # Validate file
+        file_size = await archaeological_minio_service._get_file_size(file)
+        if file_size > 52428800:  # 50MB
+            raise HTTPException(status_code=400, detail="File troppo grande (max 50MB)")
+
+        # Read file content
+        content = await file.read()
+        
+        # Determine content type and extension
+        file_extension = Path(file.filename).suffix
+        content_type = file.content_type or 'application/octet-stream'
+        
+        # Generate unique document ID
+        temp_document_id = str(uuid.uuid4())
+        
+        logger.info(f"Uploading document: {file.filename}, size: {len(content)}, type: {content_type}")
+        
+        # Prepare metadata for MinIO
+        document_metadata = {
+            'title': title,
+            'description': description or '',
+            'category': category,
+            'doc_type': doc_type or content_type,
+            'filename': file.filename,
+            'tags': tags or '',
+            'author': author or '',
+            'doc_date': doc_date or '',
+            'uploaded_by': str(current_user_id)
+        }
+        
+        # Upload to MinIO
+        object_name = f"{site_id}/{temp_document_id}{file_extension}"
+        logger.info(f"MinIO object_name: {object_name}")
+        
+        minio_path = await archaeological_minio_service._upload_with_retry(
+            bucket_name=archaeological_minio_service.buckets['documents'],
+            object_name=object_name,
+            data=content,
+            content_type=content_type,
+            metadata=archaeological_minio_service._merge_metadata(
+                archaeological_minio_service._create_base_metadata(str(site_id), content_type),
+                document_metadata
+            ),
+            operation_name="document upload",
+            target_freed_mb=200
+        )
+
+        # Create database record
+        new_document = Document(
+            site_id=str(site_id),
+            title=title,
+            description=description,
+            category=category,
+            doc_type=doc_type or content_type,
+            filename=file.filename,
+            filepath=minio_path,
+            filesize=len(content),
+            mimetype=content_type,
+            tags=tags,
+            doc_date=datetime.fromisoformat(doc_date) if doc_date else None,
+            author=author,
+            is_public=is_public,
+            uploaded_by=str(current_user_id),
+            created_by=str(current_user_id)
+        )
+
+        db.add(new_document)
+        await db.commit()
+        await db.refresh(new_document)
+
+        # Log activity
+        await log_document_activity(
+            db=db,
+            user_id=current_user_id,
+            site_id=site_id,
+            activity_type="UPLOAD",
+            activity_desc=f"Caricato documento: {title}",
+            extra_data={
+                "document_id": str(new_document.id),
+                "filename": file.filename,
+                "category": category,
+                "minio_path": minio_path
+            }
+        )
+
+        logger.info(f"Document uploaded to MinIO: {minio_path}")
+
+        return JSONResponse({
+            "message": "Documento caricato con successo",
+            "document_id": str(new_document.id),
+            "document": {
+                "id": str(new_document.id),
+                "title": new_document.title,
+                "filename": new_document.filename,
+                "uploaded_at": new_document.uploaded_at.isoformat()
+            }
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        logger.error(f"Error uploading document: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Errore nel caricamento: {str(e)}")
 
 @router.get("/sites/{site_id}/documents/{document_id}", summary="Dettagli documento", tags=["Documents"])
 async def v1_get_document(
@@ -247,9 +345,82 @@ async def v1_delete_document(
             detail=f"Permessi insufficienti per eliminare documenti dal sito {site_id}"
         )
     
-    return await delete_document_api_site__site_id__documents__document_id__delete(
-        site_id, document_id, current_user_id, user_sites, db
-    )
+    # Direct implementation
+    try:
+        # Verify site access
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Get document
+        query = select(Document).where(
+            and_(
+                Document.id == document_id,
+                Document.site_id == str(site_id),
+                Document.is_deleted == False
+            )
+        )
+
+        result = await db.execute(query)
+        doc = result.scalar_one_or_none()
+
+        if not doc:
+            raise HTTPException(status_code=404, detail="Documento non trovato")
+
+        doc_title = doc.title
+
+        # Soft delete
+        doc.is_deleted = True
+        doc.deleted_at = datetime.utcnow()
+        doc.deleted_by = current_user_id
+
+        await db.commit()
+
+        # Log activity
+        await log_document_activity(
+            db=db,
+            user_id=current_user_id,
+            site_id=site_id,
+            activity_type="DELETE",
+            activity_desc=f"Eliminato documento: {doc_title}",
+            extra_data={"document_id": str(document_id)}
+        )
+
+        return JSONResponse({
+            "message": "Documento eliminato con successo",
+            "document_id": str(document_id)
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting document {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nell'eliminazione: {str(e)}")
+
+# Funzione helper per logging attività documento
+async def log_document_activity(
+    db: AsyncSession,
+    user_id: UUID,
+    site_id: UUID,
+    activity_type: str,
+    activity_desc: str,
+    extra_data: dict = None
+):
+    """Log attività documento"""
+    try:
+        activity = UserActivity(
+            user_id=user_id,
+            site_id=site_id,
+            activity_type=activity_type,
+            activity_desc=activity_desc,
+            extra_data=json.dumps(extra_data) if extra_data else None
+        )
+
+        db.add(activity)
+        await db.commit()
+        logger.info(f"Document activity logged: {activity_type} by {user_id}")
+
+    except Exception as e:
+        logger.error(f"Error logging document activity: {e}")
+        await db.rollback()
 
 @router.get("/sites/{site_id}/documents/{document_id}/download", summary="Download documento", tags=["Documents"])
 async def v1_download_document(
@@ -265,9 +436,46 @@ async def v1_download_document(
     # Verifica accesso al sito
     site_info = verify_site_access(site_id, user_sites)
     
-    return await download_document_api_site__site_id__documents__document_id__download_get(
-        site_id, document_id, current_user_id, user_sites, db
-    )
+    # Direct implementation
+    try:
+        # Verify site access
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Get document
+        query = select(Document).where(
+            and_(
+                Document.id == document_id,
+                Document.site_id == str(site_id),
+                Document.is_deleted == False
+            )
+        )
+
+        result = await db.execute(query)
+        doc = result.scalar_one_or_none()
+
+        if not doc:
+            raise HTTPException(status_code=404, detail="Documento non trovato")
+
+        # Download file from MinIO
+        try:
+            file_data = await archaeological_minio_service.get_file(doc.filepath)
+
+            return StreamingResponse(
+                iter([file_data]),
+                media_type=doc.mimetype or "application/octet-stream",
+                headers={
+                    "Content-Disposition": f"attachment; filename={doc.filename}"
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error downloading from MinIO: {e}")
+            raise HTTPException(status_code=404, detail="File non trovato su storage")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading document {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel download: {str(e)}")
 
 # ENDPOINT DI BACKWARD COMPATIBILITY CON DEPRECAZIONE
 
@@ -292,6 +500,77 @@ async def legacy_get_site_documents(
     add_deprecation_headers(response, f"/api/v1/documents/sites/{site_id}/documents")
     return response
 
+# NUOVI ENDPOINTS V1 - Funzionalità aggiuntive dalla vecchia implementazione
+
+@router.get("/sites/{site_id}/documents/count", summary="Conteggio documenti sito", tags=["Documents"])
+async def v1_get_documents_count(
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get documents count for a specific site.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Conteggio documenti per il sito
+        from app.models import Document
+        documents_count = await db.execute(
+            select(func.count(Document.id)).where(
+                and_(
+                    Document.site_id == str(site_id),
+                    Document.is_deleted == False
+                )
+            )
+        )
+        count = documents_count.scalar() or 0
+        
+        return JSONResponse({
+            "count": count,
+            "site_id": str(site_id)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting documents count for site {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel conteggio documenti: {str(e)}")
+
+@router.get("/unified/documents/count", summary="Conteggio documenti", tags=["Documents"])
+async def v1_get_unified_documents_count(
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Get total documents count for the current user across all accessible sites.
+    """
+    try:
+        # Get all sites user has access to
+        accessible_site_ids = [site["id"] for site in user_sites]
+        
+        if not accessible_site_ids:
+            return JSONResponse({"count": 0})
+        
+        # Count documents across all accessible sites
+        from app.models import Document
+        documents_count = await db.execute(
+            select(func.count(Document.id)).where(
+                and_(
+                    Document.site_id.in_(accessible_site_ids),
+                    Document.is_deleted == False
+                )
+            )
+        )
+        count = documents_count.scalar() or 0
+        
+        return JSONResponse({"count": count})
+        
+    except Exception as e:
+        logger.error(f"Error getting unified documents count: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel conteggio documenti: {str(e)}")
+
 # MIGRATION HELPER
 
 @router.get("/migration/help", summary="Aiuto migrazione API documenti", tags=["Documents - Migration"])
@@ -306,12 +585,17 @@ async def migration_help():
                 "/api/site/{site_id}/documents/{document_id}": "/api/v1/documents/sites/{site_id}/documents/{document_id}",
                 "/api/site/{site_id}/documents/{document_id}/download": "/api/v1/documents/sites/{site_id}/documents/{document_id}/download"
             },
+            "new_endpoints": {
+                "/api/v1/sites/{site_id}/documents/count": "Conteggio documenti sito",
+                "/api/v1/unified/documents/count": "Conteggio documenti unificato"
+            },
             "changes": [
                 "Standardizzazione URL patterns",
                 "Separazione endpoints documenti da altri domini",
                 "Miglioramento filtri e ricerca",
                 "Headers di deprecazione automatici",
-                "Documentazione migliorata"
+                "Documentazione migliorata",
+                "Aggiunta endpoint di conteggio documenti"
             ],
             "deadline": "2025-12-31",
             "action_required": "Aggiornare client applications per usare nuovi endpoints documenti"
