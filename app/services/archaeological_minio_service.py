@@ -1025,10 +1025,13 @@ class ArchaeologicalMinIOService:
     async def get_file(self, object_path: str) -> bytes:
         """Scarica file da MinIO"""
         try:
+            logger.info(f"Attempting to download file from MinIO: {object_path}")
             bucket, object_name = self._parse_minio_path(object_path)
+            logger.info(f"Parsed MinIO path - Bucket: {bucket}, Object: {object_name}")
 
             def _download_file():
                 # get_object returns HTTPResponse object, need to read content
+                logger.info(f"Calling get_object on bucket {bucket} for object {object_name}")
                 response = self.client.get_object(
                     bucket_name=bucket,
                     object_name=object_name
@@ -1036,6 +1039,7 @@ class ArchaeologicalMinIOService:
                 try:
                     # Read content from HTTPResponse object
                     content = response.read()
+                    logger.info(f"Successfully read {len(content)} bytes from MinIO")
                     return content
                 finally:
                     response.close()
@@ -1046,6 +1050,9 @@ class ArchaeologicalMinIOService:
 
         except Exception as e:
             logger.error(f"Error downloading file {object_path}: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=404, detail=f"File non trovato: {object_path}")
 
     async def remove_file(self, object_path: str) -> bool:

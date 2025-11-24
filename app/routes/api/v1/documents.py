@@ -641,7 +641,12 @@ async def v1_download_document(
 
         # Download file from MinIO
         try:
+            logger.info(f"Attempting to download document: {doc.filepath}")
             file_data = await archaeological_minio_service.get_file(doc.filepath)
+            
+            if not file_data:
+                logger.error(f"File data is empty for document: {doc.filepath}")
+                raise HTTPException(status_code=404, detail="File vuoto su storage")
 
             return StreamingResponse(
                 iter([file_data]),
@@ -650,9 +655,15 @@ async def v1_download_document(
                     "Content-Disposition": f"attachment; filename={doc.filename}"
                 }
             )
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 404)
+            raise
         except Exception as e:
             logger.error(f"Error downloading from MinIO: {e}")
-            raise HTTPException(status_code=404, detail="File non trovato su storage")
+            logger.error(f"Document filepath: {doc.filepath}")
+            logger.error(f"Document ID: {document_id}")
+            logger.error(f"Site ID: {site_id}")
+            raise HTTPException(status_code=500, detail=f"Errore nel download del file: {str(e)}")
 
     except HTTPException:
         raise
