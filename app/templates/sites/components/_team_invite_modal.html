@@ -336,7 +336,7 @@ document.addEventListener('alpine:init', () => {
         
         async loadAvailableUsers() {
             try {
-                const response = await fetch('/api/users/available-for-site/{{ site.id }}');
+                const response = await fetch('/api/v1/teams/sites/{{ site.id }}/available-users');
                 if (response.ok) {
                     this.availableUsers = await response.json();
                 }
@@ -381,7 +381,7 @@ document.addEventListener('alpine:init', () => {
                     ...this.inviteData
                 };
                 
-                const response = await fetch(`/sites/{{ site.id }}/team/invite`, {
+                const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -390,7 +390,7 @@ document.addEventListener('alpine:init', () => {
                 });
                 
                 if (response.ok) {
-                    this.$parent.showInviteModal = false;
+                    window.teamManager.showInviteModal = false;
                     // Refresh team list
                     location.reload();
                 } else {

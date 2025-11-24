@@ -463,6 +463,62 @@ async def v1_get_team_member(
         logger.error(f"Error fetching team member {user_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nel recupero dettagli: {str(e)}")
 
+@router.get("/sites/{site_id}/available-users", summary="Utenti disponibili per invito", tags=["Team Management"])
+async def v1_get_available_users_for_invite(
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Recupera utenti disponibili per l'invito al team.
+    """
+    site_info = verify_site_access(site_id, user_sites)
+    
+    # Verifica permessi di admin
+    if site_info.get("permission_level") not in ["admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo gli amministratori possono invitare membri"
+        )
+    
+    try:
+        # Recupera utenti non ancora membri del team
+        existing_members_query = select(UserSitePermission.user_id).where(
+            UserSitePermission.site_id == str(site_id)
+        )
+        existing_members_result = await db.execute(existing_members_query)
+        existing_member_ids = [row[0] for row in existing_members_result.fetchall()]
+        
+        # Recupera tutti gli utenti del sistema
+        all_users_query = select(User).where(
+            and_(
+                User.id != current_user_id,  # Escludi se stesso
+                ~User.id.in_(existing_member_ids)  # Escludi già membri
+            )
+        ).order_by(User.email)
+        
+        all_users_result = await db.execute(all_users_query)
+        all_users = all_users_result.scalars().all()
+        
+        # Formatta risultati
+        available_users = []
+        for user in all_users:
+            available_users.append({
+                "id": str(user.id),
+                "name": user.full_name or user.email,
+                "email": user.email
+            })
+        
+        return JSONResponse({
+            "available_users": available_users,
+            "total": len(available_users)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching available users for site {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel recupero utenti: {str(e)}")
+
 # MIGRATION HELPER
 
 @router.get("/migration/help", summary="Aiuto migrazione API teams", tags=["Team Management - Migration"])

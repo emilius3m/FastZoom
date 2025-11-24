@@ -9,25 +9,25 @@
 <div class=" mx-auto p-6" x-data="teamManager">
     
     <!-- Header -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div class="px-6 py-4 border-b border-gray-200">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Gestione Team</h1>
-                    <p class="mt-1 text-sm text-gray-600">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gestione Team</h1>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         Gestione membri e permessi per il sito {{ site.name }} ({{ site.code }})
                     </p>
                 </div>
                 <div class="flex items-center space-x-3 mt-4 sm:mt-0">
-                    <button @click="showInviteModal = true" 
-                            class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <button @click="showInviteModal = true"
+                            class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
                         Invita Utente
                     </button>
-                    <button @click="exportTeamData" 
-                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <button @click="exportTeamData"
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
@@ -41,7 +41,7 @@
     <!-- Team Overview Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <!-- Total Members -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,14 +49,14 @@
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-medium text-gray-900">Totale Membri</h3>
-                    <p class="text-2xl font-semibold text-blue-600" x-text="stats.totalMembers"></p>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Totale Membri</h3>
+                    <p class="text-2xl font-semibold text-blue-600 dark:text-blue-400" x-text="stats.totalMembers"></p>
                 </div>
             </div>
         </div>
 
         <!-- Active Members -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,14 +64,14 @@
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-medium text-gray-900">Membri Attivi</h3>
-                    <p class="text-2xl font-semibold text-green-600" x-text="stats.activeMembers"></p>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Membri Attivi</h3>
+                    <p class="text-2xl font-semibold text-green-600 dark:text-green-400" x-text="stats.activeMembers"></p>
                 </div>
             </div>
         </div>
 
         <!-- Administrators -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -79,14 +79,14 @@
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-medium text-gray-900">Amministratori</h3>
-                    <p class="text-2xl font-semibold text-red-600" x-text="stats.administrators"></p>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Amministratori</h3>
+                    <p class="text-2xl font-semibold text-red-600 dark:text-red-400" x-text="stats.administrators"></p>
                 </div>
             </div>
         </div>
 
         <!-- Pending Invites -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -94,15 +94,15 @@
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-medium text-gray-900">Inviti Pendenti</h3>
-                    <p class="text-2xl font-semibold text-yellow-600" x-text="stats.pendingInvites"></p>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Inviti Pendenti</h3>
+                    <p class="text-2xl font-semibold text-yellow-600 dark:text-yellow-400" x-text="stats.pendingInvites"></p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Roles Information Panel -->
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-6 mb-6">
         <div class="flex items-start">
             <div class="flex-shrink-0">
                 <svg class="h-6 w-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
@@ -110,8 +110,8 @@
             </svg>
         </div>
         <div class="ml-3">
-            <h4 class="text-lg font-medium text-blue-800 mb-2">Ruoli e Permessi del Sito Archeologico</h4>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-700">
+            <h4 class="text-lg font-medium text-blue-800 dark:text-blue-200 mb-2">Ruoli e Permessi del Sito Archeologico</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-700 dark:text-blue-300">
                 <div>
                     <strong class="font-semibold">Admin (Direttore di Scavo)</strong>
                     <ul class="mt-1 list-disc list-inside space-y-1">
@@ -145,25 +145,25 @@
     </div>
 
     <!-- Search and Filters -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="md:col-span-2">
-                    <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Cerca Membri</label>
-                    <input type="text" 
+                    <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cerca Membri</label>
+                    <input type="text"
                            id="search"
                            x-model="searchTerm"
                            @input="filterMembers"
-                           class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                           class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                            placeholder="Cerca per nome, email, specializzazione...">
                 </div>
                 
                 <div>
-                    <label for="roleFilter" class="block text-sm font-medium text-gray-700 mb-2">Ruolo</label>
-                    <select id="roleFilter" 
+                    <label for="roleFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ruolo</label>
+                    <select id="roleFilter"
                             x-model="roleFilter"
                             @change="filterMembers"
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
                         <option value="">Tutti i ruoli</option>
                         <option value="admin">Amministratori</option>
                         <option value="write">Scrittori</option>
@@ -172,11 +172,11 @@
                 </div>
                 
                 <div>
-                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-2">Stato</label>
-                    <select id="statusFilter" 
+                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stato</label>
+                    <select id="statusFilter"
                             x-model="statusFilter"
                             @change="filterMembers"
-                            class="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
                         <option value="">Tutti gli stati</option>
                         <option value="active">Attivo</option>
                         <option value="inactive">Inattivo</option>
@@ -189,13 +189,13 @@
     </div>
 
     <!-- Team Members List -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <div class="px-6 py-4 border-b border-gray-200">
             <div class="flex justify-between items-center">
-                <h2 class="text-lg font-semibold text-gray-900">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                     Membri del Team (<span x-text="filteredMembers.length"></span>)
                 </h2>
-                <div class="text-sm text-gray-500">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
                     Ultimo aggiornamento: <span x-text="formatDate(new Date())"></span>
                 </div>
             </div>
@@ -203,10 +203,10 @@
         
         <div class="overflow-x-auto">
             <table class="w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+                <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th @click="setSortBy('name')" 
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                        <th @click="setSortBy('name')"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                             <div class="flex items-center space-x-1">
                                 <span>Utente</span>
                                 <svg x-show="sortBy === 'name'" class="w-4 h-4" :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,17 +214,17 @@
                                 </svg>
                             </div>
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Ruolo Archeologico
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Permessi
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Stato
                         </th>
-                        <th @click="setSortBy('granted_at')" 
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">
+                        <th @click="setSortBy('granted_at')"
+                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
                             <div class="flex items-center space-x-1">
                                 <span>Accesso Dal</span>
                                 <svg x-show="sortBy === 'granted_at'" class="w-4 h-4" :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,15 +232,15 @@
                                 </svg>
                             </div>
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Attività
                         </th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Azioni
                         </th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     <!-- Empty State -->
                     <tr x-show="filteredMembers.length === 0">
                         <td colspan="7" class="px-6 py-12 text-center">
@@ -248,8 +248,8 @@
                                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                                 </svg>
-                                <h3 class="mt-2 text-sm font-medium text-gray-900">Nessun membro trovato</h3>
-                                <p class="mt-1 text-sm text-gray-500">
+                                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Nessun membro trovato</h3>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                     <span x-show="hasActiveFilters()">Prova a modificare i filtri di ricerca.</span>
                                     <span x-show="!hasActiveFilters()">Inizia invitando il primo membro del team.</span>
                                 </p>
@@ -268,7 +268,7 @@
 
                     <!-- Member Rows -->
                     <template x-for="member in filteredMembers" :key="member.id">
-                        <tr class="hover:bg-gray-50" :class="{'opacity-50': !member.is_active}">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700" :class="{'opacity-50': !member.is_active}">
                             <!-- User Info -->
                             <td class="px-6 py-4">
                                 <div class="flex items-center">
@@ -279,11 +279,11 @@
                                         </div>
                                     </div>
                                     <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900" 
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white"
                                              x-text="getUserDisplayName(member)"></div>
-                                        <div class="text-sm text-gray-500" x-text="member.email"></div>
-                                        <div x-show="member.specialization" 
-                                             class="text-xs text-gray-400" 
+                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="member.email"></div>
+                                        <div x-show="member.specialization"
+                                             class="text-xs text-gray-400 dark:text-gray-500"
                                              x-text="'Specializzazione: ' + member.specialization"></div>
                                     </div>
                                 </div>
@@ -291,9 +291,9 @@
 
                             <!-- Archaeological Role -->
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900" x-text="member.archaeological_role || 'Non specificato'"></div>
-                                <div x-show="member.institution" 
-                                     class="text-xs text-gray-500" 
+                                <div class="text-sm text-gray-900 dark:text-gray-200" x-text="member.archaeological_role || 'Non specificato'"></div>
+                                <div x-show="member.institution"
+                                     class="text-xs text-gray-500 dark:text-gray-400"
                                      x-text="member.institution"></div>
                             </td>
 
@@ -303,7 +303,7 @@
                                       class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                                       x-text="getPermissionDisplayName(member.permission_level)">
                                 </span>
-                                <div x-show="member.expires_at" class="text-xs text-gray-500 mt-1">
+                                <div x-show="member.expires_at" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     Scade: <span x-text="formatDate(member.expires_at)"></span>
                                 </div>
                             </td>
@@ -340,19 +340,19 @@
                             </td>
 
                             <!-- Access Date -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 <div x-text="formatDate(member.granted_at)"></div>
-                                <div class="text-xs text-gray-400">
+                                <div class="text-xs text-gray-400 dark:text-gray-500">
                                     da <span x-text="member.granted_by_name || 'Sistema'"></span>
                                 </div>
                             </td>
 
                             <!-- Activity -->
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">
+                                <div class="text-sm text-gray-900 dark:text-gray-200">
                                     <span x-text="member.photos_uploaded || 0"></span> foto
                                 </div>
-                                <div class="text-xs text-gray-500">
+                                <div class="text-xs text-gray-500 dark:text-gray-400">
                                     Ultimo accesso: <span x-text="member.last_login_at ? formatDate(member.last_login_at) : 'Mai'"></span>
                                 </div>
                             </td>
@@ -537,8 +537,15 @@ document.addEventListener('alpine:init', () => {
             if (!confirm(`Vuoi ${action} ${this.getUserDisplayName(member)}?`)) return;
             
             try {
-                const response = await fetch(`/sites/{{ site.id }}/team/${member.user_id}/toggle-status`, {
-                    method: 'POST'
+                const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members/${member.user_id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        permission_level: member.permission_level,
+                        is_active: !member.is_active
+                    })
                 });
                 
                 if (response.ok) {
@@ -553,27 +560,34 @@ document.addEventListener('alpine:init', () => {
             }
         },
         
-		// Nel team.html, aggiorna la chiamata API
+		// Nel team.html, aggiorna la chiamata API v1
 		async refreshTeam() {
-		try {
-			const response = await fetch(`/sites/{{ site.id }}/api/team`);
-			if (response.ok) {
-				const data = await response.json();
-				this.members = data.team_members || [];
-				this.filteredMembers = [...this.members];
-				this.calculateStats();
+			try {
+				const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members`);
+				if (response.ok) {
+					const data = await response.json();
+					this.members = data.members || [];
+					this.filteredMembers = [...this.members];
+					this.calculateStats();
+				}
+			} catch (error) {
+				console.error('Error loading team:', error);
 			}
-		} catch (error) {
-			console.error('Error loading team:', error);
-			}
-		}
+		},
 
 		
 		
         async resendInvitation(member) {
             try {
-                const response = await fetch(`/sites/{{ site.id }}/team/${member.user_id}/resend-invitation`, {
-                    method: 'POST'
+                const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members/${member.user_id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        permission_level: member.permission_level,
+                        notes: 'Invito reinviato'
+                    })
                 });
                 
                 if (response.ok) {
@@ -595,8 +609,8 @@ document.addEventListener('alpine:init', () => {
             if (confirmation !== 'RIMUOVI') return;
             
             try {
-                const response = await fetch(`/sites/{{ site.id }}/team/${member.user_id}/remove`, {
-                    method: 'POST'
+                const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members/${member.user_id}`, {
+                    method: 'DELETE'
                 });
                 
                 if (response.ok) {
