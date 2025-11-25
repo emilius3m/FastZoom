@@ -15,7 +15,7 @@ from sqlalchemy import select, func
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.database.db import get_async_session
-from app.models import Photo, Site, User, UserSitePermission
+from app.models import Photo, Site, User, UserSitePermission, UserActivity, get_activity_display_name
 
 # Import existing unified dashboard functions for backward compatibility
 # Note: unified_dashboard.py doesn't exist yet, so we'll implement these directly
@@ -143,44 +143,95 @@ async def v1_get_recent_activities(
     """
     Ottieni attività recenti del sistema.
     
-    Include upload foto, modifiche documenti, ecc.
+    Include upload foto, modifiche documenti, azioni US/USM, export, ecc.
+    Ora utilizza la tabella UserActivity per tracking completo.
     """
     if not user_sites:
         return {"activities": [], "count": 0}
     
-    # In una implementazione reale, questo queryerebbe una tabella di attività
-    # Per ora, simula attività recenti basate sui dati disponibili
-    site_ids = [UUID(site["site_id"]) for site in user_sites]
-    
-    # Ottieni foto recenti
-    recent_photos_result = await db.execute(
-        select(Photo).where(
-            Photo.site_id.in_(site_ids)
-        ).order_by(Photo.created_at.desc()).limit(limit)
-    )
-    recent_photos = recent_photos_result.scalars().all()
-    
-    activities = []
-    for photo in recent_photos:
-        activity = {
-            "id": f"photo_{photo.id}",
-            "type": "photo_upload",
-            "title": f"Upload foto: {photo.title or 'Untitled'}",
-            "site_id": str(photo.site_id),
-            "user_id": str(photo.created_by) if hasattr(photo, 'created_by') else str(current_user_id),
-            "timestamp": photo.created_at,
-            "metadata": {
-                "file_size": getattr(photo, 'file_size', None),
-                "photo_type": getattr(photo, 'photo_type', None)
+    try:
+        # Import User model (UserActivity already imported at top level)
+        from app.models import User
+        from sqlalchemy.orm import selectinload
+        
+        # Estrai gli ID dei siti accessibili dall'utente
+        site_ids = [site["site_id"] for site in user_sites]
+        
+        # Query per attività recenti usando UserActivity
+        activities_query = (
+            select(UserActivity, User)
+            .outerjoin(User, UserActivity.user_id == User.id)
+            .options(selectinload(User.profile))
+            .where(UserActivity.site_id.in_(site_ids))
+            .order_by(UserActivity.activity_date.desc())
+            .limit(limit)
+        )
+        
+        activities_result = await db.execute(activities_query)
+        activities_data = activities_result.all()
+        
+        activities = []
+        for activity, user in activities_data:
+            # Mappa activity type a display name
+            activity_type = activity.activity_type
+            activity_desc = activity.activity_desc or ""
+            
+            # Ottieni informazioni sul sito
+            site_info = next((site for site in user_sites if site["site_id"] == activity.site_id), None)
+            site_name = site_info["site_name"] if site_info else "Sito sconosciuto"
+            
+            # Costruisci l'attività nel formato expected dal frontend
+            activity_dict = {
+                "id": str(activity.id),
+                "type": activity_type,
+                "title": activity_desc or get_activity_display_name(activity_type),
+                "description": activity_desc,
+                "timestamp": activity.activity_date,
+                "site": {
+                    "id": str(activity.site_id),
+                    "name": site_name
+                } if activity.site_id else None,
+                "user": {
+                    "id": str(activity.user_id),
+                    "email": user.email if user else "Sistema",
+                    "name": user.full_name if user and hasattr(user, 'full_name') else user.email if user else "Sistema"
+                } if user else {
+                    "id": str(activity.user_id),
+                    "email": "Sistema",
+                    "name": "Sistema"
+                },
+                "metadata": activity.get_extra_data() or {}
             }
+            
+            # Aggiungi campi specifici in base al tipo di attività
+            if activity.photo_id:
+                activity_dict["photo_id"] = str(activity.photo_id)
+            if activity.us_id:
+                activity_dict["us_id"] = str(activity.us_id)
+            if activity.usm_id:
+                activity_dict["usm_id"] = str(activity.usm_id)
+            if activity.tomba_id:
+                activity_dict["tomba_id"] = str(activity.tomba_id)
+            if activity.reperto_id:
+                activity_dict["reperto_id"] = str(activity.reperto_id)
+            
+            activities.append(activity_dict)
+        
+        return {
+            "activities": activities,
+            "count": len(activities),
+            "user_id": str(current_user_id)
         }
-        activities.append(activity)
-    
-    return {
-        "activities": activities,
-        "count": len(activities),
-        "user_id": str(current_user_id)
-    }
+        
+    except Exception as e:
+        logger.error(f"Error retrieving recent activities: {str(e)}")
+        # Fallback a comportamento precedente in caso di errore
+        return {
+            "activities": [],
+            "count": 0,
+            "user_id": str(current_user_id),
+            "error": "Impossibile caricare attività recenti"
+        }
 
 @router.get("/dashboard/system/status", summary="Status sistema", tags=["Unified Dashboard"])
 async def v1_get_system_status(
