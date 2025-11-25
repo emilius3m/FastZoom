@@ -85,65 +85,178 @@ class TilesVerificationService:
         
         logger.info("🛑 Tiles verification service stopped")
     
+    @logger.catch(
+        reraise=True,
+        message="Periodic verification worker failed",
+        level="ERROR"
+    )
     async def _periodic_verification_worker(self):
         """Background worker that runs periodic verification"""
-        logger.info("🔄 Periodic verification worker started")
-        
-        while self._running:
+        with logger.contextualize(
+            operation="periodic_verification_worker",
+            service_type="tiles_verification"
+        ):
             try:
-                # Run verification for all sites
-                await self._verify_all_sites()
+                logger.info(
+                    "🔄 Periodic verification worker started",
+                    extra={
+                        "verification_interval_hours": self.verification_interval.total_seconds() / 3600,
+                        "service_running": self._running
+                    }
+                )
                 
-                # Sleep until next verification
-                await asyncio.sleep(self.verification_interval.total_seconds())
-                
-            except asyncio.CancelledError:
-                logger.info("Periodic verification worker cancelled")
-                break
+                while self._running:
+                    try:
+                        logger.debug(
+                            "Starting verification cycle",
+                            extra={
+                                "cycle_start": datetime.now(timezone.utc).isoformat(),
+                                "verification_interval_hours": self.verification_interval.total_seconds() / 3600
+                            }
+                        )
+                        
+                        # Run verification for all sites
+                        await self._verify_all_sites()
+                        
+                        logger.debug(
+                            "Verification cycle completed, sleeping until next cycle",
+                            extra={
+                                "sleep_duration_seconds": self.verification_interval.total_seconds(),
+                                "service_running": self._running
+                            }
+                        )
+                        
+                        # Sleep until next verification
+                        await asyncio.sleep(self.verification_interval.total_seconds())
+                        
+                    except asyncio.CancelledError:
+                        logger.info(
+                            "Periodic verification worker cancelled",
+                            extra={
+                                "cancelled_gracefully": True,
+                                "service_running": False
+                            }
+                        )
+                        break
+                    except Exception as e:
+                        logger.error(
+                            "Error in periodic verification worker cycle",
+                            extra={
+                                "error": str(e),
+                                "error_type": type(e).__name__,
+                                "retry_sleep_seconds": 300
+                            },
+                            exc_info=True
+                        )
+                        # Sleep for a shorter interval on error
+                        await asyncio.sleep(300)  # 5 minutes
+                        
             except Exception as e:
-                logger.error(f"Error in periodic verification worker: {e}")
-                # Sleep for a shorter interval on error
-                await asyncio.sleep(300)  # 5 minutes
+                logger.error(
+                    "Critical error in periodic verification worker",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "worker_stopped": True
+                    },
+                    exc_info=True
+                )
+                raise
     
+    @logger.catch(
+        reraise=True,
+        message="Failed to verify all sites",
+        level="ERROR"
+    )
     async def _verify_all_sites(self):
         """Verify tiles for all sites"""
-        try:
-            async with async_session_maker() as db:
-                # Get all unique site IDs from photos
-                site_ids_query = select(Photo.site_id).distinct()
-                site_ids_result = await db.execute(site_ids_query)
-                site_ids = [row[0] for row in site_ids_result.fetchall()]
-                
-                logger.info(f"Starting verification for {len(site_ids)} sites")
-                
-                # Create semaphore to limit concurrent verifications
-                semaphore = asyncio.Semaphore(self.max_concurrent_verifications)
-                
-                # Run verification for each site concurrently
-                verification_tasks = []
-                for site_id in site_ids:
-                    task = self._verify_site_with_semaphore(semaphore, str(site_id))
-                    verification_tasks.append(task)
-                
-                # Wait for all verifications to complete
-                results = await asyncio.gather(*verification_tasks, return_exceptions=True)
-                
-                # Process results
-                successful_verifications = 0
-                failed_verifications = 0
-                
-                for i, result in enumerate(results):
-                    if isinstance(result, Exception):
-                        logger.error(f"Verification failed for site {site_ids[i]}: {result}")
-                        failed_verifications += 1
-                    else:
-                        logger.info(f"Verification completed for site {site_ids[i]}: {result}")
-                        successful_verifications += 1
-                
-                logger.info(f"Site verification completed: {successful_verifications} successful, {failed_verifications} failed")
-                
-        except Exception as e:
-            logger.error(f"Error verifying all sites: {e}")
+        with logger.contextualize(
+            operation="verify_all_sites",
+            service_type="tiles_verification"
+        ):
+            try:
+                async with async_session_maker() as db:
+                    # Get all unique site IDs from photos
+                    site_ids_query = select(Photo.site_id).distinct()
+                    site_ids_result = await db.execute(site_ids_query)
+                    site_ids = [row[0] for row in site_ids_result.fetchall()]
+                    
+                    logger.info(
+                        "Starting verification for all sites",
+                        extra={
+                            "total_sites": len(site_ids),
+                            "max_concurrent_verifications": self.max_concurrent_verifications,
+                            "batch_size": self.batch_size,
+                            "auto_repair_enabled": self.auto_repair_enabled
+                        }
+                    )
+                    
+                    # Create semaphore to limit concurrent verifications
+                    semaphore = asyncio.Semaphore(self.max_concurrent_verifications)
+                    
+                    # Run verification for each site concurrently
+                    verification_tasks = []
+                    for site_id in site_ids:
+                        task = self._verify_site_with_semaphore(semaphore, str(site_id))
+                        verification_tasks.append(task)
+                    
+                    logger.debug(
+                        "Started concurrent verification tasks",
+                        extra={
+                            "total_tasks": len(verification_tasks),
+                            "max_concurrent": self.max_concurrent_verifications
+                        }
+                    )
+                    
+                    # Wait for all verifications to complete
+                    results = await asyncio.gather(*verification_tasks, return_exceptions=True)
+                    
+                    # Process results
+                    successful_verifications = 0
+                    failed_verifications = 0
+                    
+                    for i, result in enumerate(results):
+                        if isinstance(result, Exception):
+                            logger.error(
+                                "Verification failed for site",
+                                extra={
+                                    "site_id": str(site_ids[i]),
+                                    "error": str(result),
+                                    "error_type": type(result).__name__
+                                }
+                            )
+                            failed_verifications += 1
+                        else:
+                            logger.info(
+                                "Verification completed for site",
+                                extra={
+                                    "site_id": str(site_ids[i]),
+                                    "result": result,
+                                    "verification_successful": True
+                                }
+                            )
+                            successful_verifications += 1
+                    
+                    logger.info(
+                        "All sites verification completed",
+                        extra={
+                            "total_sites": len(site_ids),
+                            "successful_verifications": successful_verifications,
+                            "failed_verifications": failed_verifications,
+                            "success_rate": (successful_verifications / len(site_ids) * 100) if site_ids else 0
+                        }
+                    )
+                    
+            except Exception as e:
+                logger.error(
+                    "Error verifying all sites",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
+                raise
     
     async def _verify_site_with_semaphore(self, semaphore: asyncio.Semaphore, site_id: str):
         """Verify site with semaphore control"""

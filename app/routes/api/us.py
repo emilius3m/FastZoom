@@ -7,9 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc
 from sqlalchemy.orm import selectinload
 from pydantic import ValidationError
-import logging
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 from app.database.db import get_async_session
 from app.core.security import (

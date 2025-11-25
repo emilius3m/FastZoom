@@ -48,6 +48,11 @@ class PhotoUploadService:
         self.metadata = metadata_service
         self.photo_repo = photo_repo
 
+    @logger.catch(
+        reraise=True,
+        message="Batch photo upload failed for site {site_id}",
+        level="ERROR"
+    )
     async def upload_photos(
         self,
         site_id: UUID,
@@ -67,89 +72,186 @@ class PhotoUploadService:
         Returns:
             Dict con risultati upload
         """
-        # 🔍 DIAGNOSTIC: Track service-level upload timing
-        service_start_time = asyncio.get_event_loop().time()
-        logger.info(f"🔍 [SERVICE DEBUG] Starting batch upload service at {service_start_time}")
-        logger.info(f"Starting batch upload: {len(files)} photos for site {site_id}")
-        logger.info(f"🔍 [SERVICE DEBUG] File details: {[{ 'name': f.filename, 'size': f.size, 'type': f.content_type } for f in files]}")
-        logger.info(f"🔍 [SERVICE DEBUG] Archaeological metadata: {archaeological_metadata}")
-
-        uploaded_photos = []
-        errors = []
-
-        # Processa ogni foto
-        for file_index, file in enumerate(files):
-            try:
-                file_start_time = asyncio.get_event_loop().time()
-                logger.info(f"🔍 [SERVICE DEBUG] Processing file {file_index + 1}/{len(files)}: {file.filename}")
-                
-                result = await self._upload_single_photo(
-                    site_id, file, user_id, archaeological_metadata
-                )
-                
-                file_end_time = asyncio.get_event_loop().time()
-                file_duration = file_end_time - file_start_time
-                logger.info(f"🔍 [SERVICE DEBUG] File {file.filename} processed in {file_duration:.2f}s")
-                
-                uploaded_photos.append(result)
-            except Exception as e:
-                file_end_time = asyncio.get_event_loop().time()
-                logger.error(f"🔍 [SERVICE DEBUG] File {file.filename} failed after {file_end_time - file_start_time:.2f}s: {e}")
-                logger.error(f"🔍 [SERVICE DEBUG] Error details: {type(e).__name__}: {str(e)}")
-                errors.append({
-                    "filename": file.filename,
-                    "error": str(e)
-                })
-
-        # 🔍 DIAGNOSTIC: Track deep zoom preparation
-        deep_zoom_start_time = asyncio.get_event_loop().time()
-        logger.info(f"🔍 [SERVICE DEBUG] Starting deep zoom preparation at {deep_zoom_start_time}")
-        
-        photos_needing_tiles = await self._prepare_deep_zoom_processing(
-            uploaded_photos, site_id
-        )
-        
-        deep_zoom_end_time = asyncio.get_event_loop().time()
-        deep_zoom_duration = deep_zoom_end_time - deep_zoom_start_time
-        logger.info(f"🔍 [SERVICE DEBUG] Deep zoom preparation completed in {deep_zoom_duration:.2f}s for {len(photos_needing_tiles)} photos")
-
-        # Avvia processamento in background se necessario
-        if photos_needing_tiles:
-            background_start_time = asyncio.get_event_loop().time()
-            logger.info(f"🔍 [SERVICE DEBUG] Starting background tiles processing at {background_start_time}")
+        with logger.contextualize(
+            operation="upload_photos_batch",
+            site_id=str(site_id),
+            user_id=str(user_id),
+            total_files=len(files),
+            has_metadata=archaeological_metadata is not None
+        ):
+            # 🔍 DIAGNOSTIC: Track service-level upload timing
+            service_start_time = asyncio.get_event_loop().time()
             
-            # 🔧 FIX: Ensure background processor is running with health check
-            await self._ensure_background_service_health()
+            logger.info(
+                "Starting batch upload service",
+                extra={
+                    "site_id": str(site_id),
+                    "user_id": str(user_id),
+                    "total_files": len(files),
+                    "file_details": [
+                        {
+                            "name": f.filename,
+                            "size": f.size,
+                            "type": f.content_type
+                        } for f in files
+                    ],
+                    "has_metadata": archaeological_metadata is not None
+                }
+            )
 
-            asyncio.create_task(
-                self._process_tiles_batch_background(photos_needing_tiles, site_id)
+            uploaded_photos = []
+            errors = []
+
+            # Processa ogni foto
+            for file_index, file in enumerate(files):
+                with logger.contextualize(
+                    file_index=file_index + 1,
+                    total_files=len(files),
+                    filename=file.filename,
+                    file_size=file.size
+                ):
+                    try:
+                        file_start_time = asyncio.get_event_loop().time()
+                        
+                        logger.debug(
+                            "Processing file",
+                            extra={
+                                "file_index": file_index + 1,
+                                "filename": file.filename,
+                                "file_size": file.size,
+                                "content_type": file.content_type
+                            }
+                        )
+                        
+                        result = await self._upload_single_photo(
+                            site_id, file, user_id, archaeological_metadata
+                        )
+                        
+                        file_end_time = asyncio.get_event_loop().time()
+                        file_duration = file_end_time - file_start_time
+                        
+                        logger.info(
+                            "File processed successfully",
+                            extra={
+                                "filename": file.filename,
+                                "file_index": file_index + 1,
+                                "duration_seconds": f"{file_duration:.2f}",
+                                "photo_id": str(result.photo_id),
+                                "file_size": result.file_size
+                            }
+                        )
+                        
+                        uploaded_photos.append(result)
+                        
+                    except Exception as e:
+                        file_end_time = asyncio.get_event_loop().time()
+                        file_duration = file_end_time - file_start_time
+                        
+                        logger.error(
+                            "File processing failed",
+                            extra={
+                                "filename": file.filename,
+                                "file_index": file_index + 1,
+                                "duration_seconds": f"{file_duration:.2f}",
+                                "error": str(e),
+                                "error_type": type(e).__name__
+                            }
+                        )
+                        
+                        errors.append({
+                            "filename": file.filename,
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        })
+
+            # 🔍 DIAGNOSTIC: Track deep zoom preparation
+            deep_zoom_start_time = asyncio.get_event_loop().time()
+            
+            logger.debug(
+                "Starting deep zoom preparation",
+                extra={
+                    "uploaded_photos_count": len(uploaded_photos),
+                    "site_id": str(site_id)
+                }
             )
             
-            logger.info(f"🔍 [SERVICE DEBUG] Background tiles task created at {asyncio.get_event_loop().time()}")
-
-        # 🔍 DIAGNOSTIC: Track service completion
-        service_end_time = asyncio.get_event_loop().time()
-        total_service_duration = service_end_time - service_start_time
-        
-        response = {
-            "message": f"Successfully uploaded {len(uploaded_photos)} photos",
-            "uploaded_photos": [
-                {
-                    "photo_id": str(result.photo_id),
-                    "filename": result.filename,
-                    "file_size": result.file_size,
-                    "metadata": result.metadata
+            photos_needing_tiles = await self._prepare_deep_zoom_processing(
+                uploaded_photos, site_id
+            )
+            
+            deep_zoom_end_time = asyncio.get_event_loop().time()
+            deep_zoom_duration = deep_zoom_end_time - deep_zoom_start_time
+            
+            logger.info(
+                "Deep zoom preparation completed",
+                extra={
+                    "photos_needing_tiles": len(photos_needing_tiles),
+                    "duration_seconds": f"{deep_zoom_duration:.2f}",
+                    "site_id": str(site_id)
                 }
-                for result in uploaded_photos
-            ],
-            "total_uploaded": len(uploaded_photos),
-            "errors": errors,
-            "photos_needing_tiles": len(photos_needing_tiles)
-        }
+            )
 
-        logger.info(f"🔍 [SERVICE DEBUG] Service-level upload completed in {total_service_duration:.2f}s at {service_end_time}")
-        logger.info(f"Batch upload completed: {len(uploaded_photos)} success, {len(errors)} errors")
-        return response
+            # Avvia processamento in background se necessario
+            if photos_needing_tiles:
+                background_start_time = asyncio.get_event_loop().time()
+                
+                logger.info(
+                    "Starting background tiles processing",
+                    extra={
+                        "photos_count": len(photos_needing_tiles),
+                        "site_id": str(site_id)
+                    }
+                )
+                
+                # 🔧 FIX: Ensure background processor is running with health check
+                await self._ensure_background_service_health()
+
+                asyncio.create_task(
+                    self._process_tiles_batch_background(photos_needing_tiles, site_id)
+                )
+                
+                logger.debug(
+                    "Background tiles task created",
+                    extra={
+                        "task_created_at": asyncio.get_event_loop().time(),
+                        "photos_count": len(photos_needing_tiles)
+                    }
+                )
+
+            # 🔍 DIAGNOSTIC: Track service completion
+            service_end_time = asyncio.get_event_loop().time()
+            total_service_duration = service_end_time - service_start_time
+            
+            response = {
+                "message": f"Successfully uploaded {len(uploaded_photos)} photos",
+                "uploaded_photos": [
+                    {
+                        "photo_id": str(result.photo_id),
+                        "filename": result.filename,
+                        "file_size": result.file_size,
+                        "metadata": result.metadata
+                    }
+                    for result in uploaded_photos
+                ],
+                "total_uploaded": len(uploaded_photos),
+                "errors": errors,
+                "photos_needing_tiles": len(photos_needing_tiles)
+            }
+
+            logger.success(
+                "Batch upload service completed",
+                extra={
+                    "site_id": str(site_id),
+                    "user_id": str(user_id),
+                    "total_uploaded": len(uploaded_photos),
+                    "total_errors": len(errors),
+                    "photos_needing_tiles": len(photos_needing_tiles),
+                    "total_duration_seconds": f"{total_service_duration:.2f}",
+                    "success_rate": f"{(len(uploaded_photos)/len(files))*100:.1f}%" if files else "0%"
+                }
+            )
+            
+            return response
 
     async def _upload_single_photo(
         self,

@@ -18,6 +18,11 @@ settings = get_settings()
 class AuthService:
     """Servizio per autenticazione archeologica multi-sito"""
     
+    @logger.catch(
+        reraise=True,
+        message="User authentication failed for email {email}",
+        level="ERROR"
+    )
     @staticmethod
     async def authenticate_user(
         db: AsyncSession,
@@ -35,37 +40,79 @@ class AuthService:
         Returns:
             Utente se autenticazione riuscita, None altrimenti
         """
-        try:
-            # Trova utente per email con eager loading delle relazioni
-            query = select(User).options(
-                selectinload(User.site_permissions),
-                selectinload(User.profile)
-            ).where(
-                and_(
-                    User.email == email,
-                    User.is_active == True
+        with logger.contextualize(
+            operation="authenticate_user",
+            email=email,
+            has_password=bool(password)
+        ):
+            try:
+                # Trova utente per email con eager loading delle relazioni
+                query = select(User).options(
+                    selectinload(User.site_permissions),
+                    selectinload(User.profile)
+                ).where(
+                    and_(
+                        User.email == email,
+                        User.is_active == True
+                    )
                 )
-            )
-            
-            result = await db.execute(query)
-            user = result.scalar_one_or_none()
-            
-            if not user:
-                logger.warning(f"Authentication failed: user not found or inactive - {email}")
+                
+                result = await db.execute(query)
+                user = result.scalar_one_or_none()
+                
+                if not user:
+                    logger.warning(
+                        "Authentication failed: user not found or inactive",
+                        extra={
+                            "email": email,
+                            "reason": "user_not_found_or_inactive",
+                            "user_active": False
+                        }
+                    )
+                    return None
+                
+                # Verifica password
+                if not SecurityService.verify_password(password, user.hashed_password):
+                    logger.warning(
+                        "Authentication failed: invalid password",
+                        extra={
+                            "email": email,
+                            "reason": "invalid_password",
+                            "user_id": str(user.id) if user else None,
+                            "user_active": user.is_active if user else None
+                        }
+                    )
+                    return None
+                
+                logger.success(
+                    "User authenticated successfully",
+                    extra={
+                        "user_id": str(user.id),
+                        "email": user.email,
+                        "is_active": user.is_active,
+                        "has_profile": bool(user.profile),
+                        "site_permissions_count": len(user.site_permissions) if user.site_permissions else 0
+                    }
+                )
+                return user
+                
+            except Exception as e:
+                logger.error(
+                    "Authentication error",
+                    extra={
+                        "email": email,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
                 return None
-            
-            # Verifica password
-            if not SecurityService.verify_password(password, user.hashed_password):
-                logger.warning(f"Authentication failed: invalid password - {email}")
-                return None
-            
-            logger.info(f"User authenticated successfully: {user.id} - {user.email}")
-            return user
-            
-        except Exception as e:
-            logger.error(f"Authentication error for {email}: {str(e)}", exc_info=True)
-            return None
 
+    @logger.catch(
+        reraise=True,
+        message="Failed to get user sites with permissions for user {user_id}",
+        level="ERROR"
+    )
     @staticmethod
     async def get_user_sites_with_permissions(
         db: AsyncSession,
@@ -82,80 +129,172 @@ class AuthService:
         Returns:
             Lista dizionari con info siti e permessi
         """
-        try:
-            if not user_id:
-                logger.error(f"Invalid user_id provided: {user_id}")
-                return []
-            
-            # Convert user_id to string for database queries
-            user_id_str = str(user_id)
-            
-            # Load user with eager loading to prevent greenlet errors
-            user_query = select(User).options(
-                selectinload(User.site_permissions)
-            ).where(User.id == user_id_str)
-            user_result = await db.execute(user_query)
-            user = user_result.scalar_one_or_none()
-            
-            if not user:
-                logger.warning(f"User {user_id} not found in database")
-                return []
-            
-            # Superuser gets access to all active sites
-            if user.is_superuser:
-                logger.info(f"Superuser {user.email} accessing all active sites")
-                return await AuthService.get_all_sites_for_superuser(db)
-            
-            # Check if user is active
-            if not user.is_active:
-                logger.warning(f"User {user.email} is not active, no site access")
-                return []
-            
-            # Normal user: only sites with explicit permissions
-            query = select(
-                ArchaeologicalSite.id,
-                ArchaeologicalSite.name,
-                ArchaeologicalSite.code,
-                ArchaeologicalSite.municipality,
-                UserSitePermission.permission_level
-            ).select_from(
-                ArchaeologicalSite
-            ).join(
-                UserSitePermission,
-                ArchaeologicalSite.id == UserSitePermission.site_id
-            ).where(
-                and_(
-                    UserSitePermission.user_id == user_id_str,
-                    UserSitePermission.is_active == True,
-                    ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value
+        with logger.contextualize(
+            operation="get_user_sites_with_permissions",
+            user_id=str(user_id),
+            user_id_type=type(user_id).__name__
+        ):
+            try:
+                if not user_id:
+                    logger.error(
+                        "Invalid user_id provided",
+                        extra={
+                            "user_id": user_id,
+                            "user_id_type": type(user_id).__name__ if user_id else None,
+                            "reason": "empty_user_id"
+                        }
+                    )
+                    return []
+                
+                # Convert user_id to string for database queries
+                user_id_str = str(user_id)
+                
+                logger.debug(
+                    "Loading user with permissions",
+                    extra={
+                        "user_id_str": user_id_str,
+                        "loading_permissions": True
+                    }
                 )
-            ).order_by(ArchaeologicalSite.name)
-            
-            result = await db.execute(query)
-            sites_data = []
-            
-            for row in result:
-                if row.id and row.name:
-                    sites_data.append({
-                        "site_id": str(row.id),
-                        "site_name": str(row.name),
-                        "code": str(row.code) if row.code else "",
-                        "location": str(row.municipality) if row.municipality else "",
-                        "permission_level": str(row.permission_level) if row.permission_level else "read"
-                    })
-            
-            if not sites_data:
-                logger.info(f"No accessible sites found for user {user.email}")
-            else:
-                logger.info(f"Found {len(sites_data)} accessible sites for user {user.email}")
-            
-            return sites_data
-            
-        except Exception as e:
-            logger.error(f"Error getting user sites for {user_id}: {str(e)}", exc_info=True)
-            return []
+                
+                # Load user with eager loading to prevent greenlet errors
+                user_query = select(User).options(
+                    selectinload(User.site_permissions)
+                ).where(User.id == user_id_str)
+                user_result = await db.execute(user_query)
+                user = user_result.scalar_one_or_none()
+                
+                if not user:
+                    logger.warning(
+                        "User not found in database",
+                        extra={
+                            "user_id": str(user_id),
+                            "user_id_str": user_id_str,
+                            "reason": "user_not_found"
+                        }
+                    )
+                    return []
+                
+                # Superuser gets access to all active sites
+                if user.is_superuser:
+                    logger.info(
+                        "Superuser accessing all active sites",
+                        extra={
+                            "user_email": user.email,
+                            "user_id": str(user.id),
+                            "is_superuser": True,
+                            "access_level": "all_sites"
+                        }
+                    )
+                    return await AuthService.get_all_sites_for_superuser(db)
+                
+                # Check if user is active
+                if not user.is_active:
+                    logger.warning(
+                        "User is not active, denying site access",
+                        extra={
+                            "user_email": user.email,
+                            "user_id": str(user.id),
+                            "is_active": False,
+                            "reason": "user_inactive"
+                        }
+                    )
+                    return []
+                
+                logger.debug(
+                    "Querying user site permissions",
+                    extra={
+                        "user_email": user.email,
+                        "user_id": str(user.id),
+                        "is_active": True,
+                        "is_superuser": False
+                    }
+                )
+                
+                # Normal user: only sites with explicit permissions
+                query = select(
+                    ArchaeologicalSite.id,
+                    ArchaeologicalSite.name,
+                    ArchaeologicalSite.code,
+                    ArchaeologicalSite.municipality,
+                    UserSitePermission.permission_level
+                ).select_from(
+                    ArchaeologicalSite
+                ).join(
+                    UserSitePermission,
+                    ArchaeologicalSite.id == UserSitePermission.site_id
+                ).where(
+                    and_(
+                        UserSitePermission.user_id == user_id_str,
+                        UserSitePermission.is_active == True,
+                        ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value
+                    )
+                ).order_by(ArchaeologicalSite.name)
+                
+                result = await db.execute(query)
+                sites_data = []
+                
+                for row in result:
+                    if row.id and row.name:
+                        site_data = {
+                            "site_id": str(row.id),
+                            "site_name": str(row.name),
+                            "code": str(row.code) if row.code else "",
+                            "location": str(row.municipality) if row.municipality else "",
+                            "permission_level": str(row.permission_level) if row.permission_level else "read"
+                        }
+                        sites_data.append(site_data)
+                        
+                        logger.debug(
+                            "Site permission found",
+                            extra={
+                                "site_id": site_data["site_id"],
+                                "site_name": site_data["site_name"],
+                                "permission_level": site_data["permission_level"],
+                                "user_email": user.email
+                            }
+                        )
+                
+                if not sites_data:
+                    logger.info(
+                        "No accessible sites found for user",
+                        extra={
+                            "user_email": user.email,
+                            "user_id": str(user.id),
+                            "sites_count": 0,
+                            "reason": "no_permissions"
+                        }
+                    )
+                else:
+                    logger.success(
+                        "Found accessible sites for user",
+                        extra={
+                            "user_email": user.email,
+                            "user_id": str(user.id),
+                            "sites_count": len(sites_data),
+                            "permission_levels": list(set(site["permission_level"] for site in sites_data))
+                        }
+                    )
+                
+                return sites_data
+                
+            except Exception as e:
+                logger.error(
+                    "Error getting user sites",
+                    extra={
+                        "user_id": str(user_id),
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
+                return []
 
-    # NUOVO METODO - MANCAVA QUESTO
+    @logger.catch(
+        reraise=True,
+        message="Failed to get all sites for superuser",
+        level="ERROR"
+    )
     @staticmethod
     async def get_all_sites_for_superuser(db: AsyncSession) -> List[Dict[str, Any]]:
         """
@@ -168,35 +307,78 @@ class AuthService:
         Returns:
             Lista di tutti i siti attivi con permesso REGIONAL_ADMIN
         """
-        try:
-            query = select(
-                ArchaeologicalSite.id,
-                ArchaeologicalSite.name,
-                ArchaeologicalSite.code,
-                ArchaeologicalSite.municipality,
-            ).where(
-                ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value  # 🔥 FIX: Use .value to get string value
-            ).order_by(ArchaeologicalSite.name)
-            
-            result = await db.execute(query)
-            sites_data = []
-            
-            for row in result:
-                sites_data.append({
-                    "site_id": str(row.id),
-                    "site_name": row.name,
-                    "code": row.code,
-                    "location": row.municipality or "",
-                    "permission_level": "regional_admin"  # Massimo livello per superadmin
-                })
-            
-            return sites_data
-        except Exception as e:
-            logger.error(f"Error in get_all_sites_for_superuser: {str(e)}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            return []
+        with logger.contextualize(
+            operation="get_all_sites_for_superuser",
+            access_level="regional_admin"
+        ):
+            try:
+                logger.debug(
+                    "Querying all active sites for superuser",
+                    extra={
+                        "status_filter": SiteStatusEnum.ACTIVE.value,
+                        "permission_level": "regional_admin"
+                    }
+                )
+                
+                query = select(
+                    ArchaeologicalSite.id,
+                    ArchaeologicalSite.name,
+                    ArchaeologicalSite.code,
+                    ArchaeologicalSite.municipality,
+                ).where(
+                    ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value
+                ).order_by(ArchaeologicalSite.name)
+                
+                result = await db.execute(query)
+                sites_data = []
+                
+                for row in result:
+                    site_data = {
+                        "site_id": str(row.id),
+                        "site_name": row.name,
+                        "code": row.code,
+                        "location": row.municipality or "",
+                        "permission_level": "regional_admin"  # Massimo livello per superadmin
+                    }
+                    sites_data.append(site_data)
+                    
+                    logger.debug(
+                        "Superuser site access granted",
+                        extra={
+                            "site_id": site_data["site_id"],
+                            "site_name": site_data["site_name"],
+                            "permission_level": site_data["permission_level"]
+                        }
+                    )
+                
+                logger.success(
+                    "Retrieved all active sites for superuser",
+                    extra={
+                        "sites_count": len(sites_data),
+                        "permission_level": "regional_admin",
+                        "status_filter": SiteStatusEnum.ACTIVE.value
+                    }
+                )
+                
+                return sites_data
+                
+            except Exception as e:
+                logger.error(
+                    "Error retrieving all sites for superuser",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "permission_level": "regional_admin"
+                    },
+                    exc_info=True
+                )
+                return []
 
+    @logger.catch(
+        reraise=True,
+        message="Failed to create login response for user {user.email}",
+        level="ERROR"
+    )
     @staticmethod
     async def create_login_response(
         db: AsyncSession,
@@ -212,45 +394,137 @@ class AuthService:
         Returns:
             Dizionario con token e informazioni redirect
         """
-        # Ottieni siti utente con permessi (gestisce automaticamente superuser)
-        sites_data = await AuthService.get_user_sites_with_permissions(db, user.id)
-        
-        logger.info(f"Login response for user {user.email}: {len(sites_data)} sites found")
-        
-        if not sites_data:
-            # Verifica se è superuser - in questo caso consentiamo l'accesso anche senza siti
-            if user.is_superuser:
-                logger.info("Superuser accessing system without sites - allowing access for configuration")
-                # Per superuser senza siti, consentiamo l'accesso con lista vuota
-            else:
-                logger.warning(f"User {user.email} has no site access, denying login")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Utente non ha accesso a nessun sito archeologico"
+        with logger.contextualize(
+            operation="create_login_response",
+            user_id=str(user.id),
+            user_email=user.email,
+            is_superuser=user.is_superuser
+        ):
+            try:
+                logger.info(
+                    "Creating login response",
+                    extra={
+                        "user_email": user.email,
+                        "user_id": str(user.id),
+                        "is_superuser": user.is_superuser,
+                        "is_active": user.is_active
+                    }
                 )
-        
-        # Crea token JWT multi-sito
-        access_token = SecurityService.create_site_aware_token(
-            user_id=user.id,
-            sites_data=sites_data
-        )
-        
-        # Determina redirect intelligente
-        redirect_url = await SiteService.smart_redirect_after_login(
-            [{"id": site["site_id"], "name": site["site_name"]} for site in sites_data]
-        )
-        
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user_id": str(user.id),
-            "user_email": user.email,
-            "sites_count": len(sites_data),
-            "sites": sites_data,
-            "redirect_url": redirect_url,
-            "multi_site_enabled": len(sites_data) > 1
-        }
+                
+                # Ottieni siti utente con permessi (gestisce automaticamente superuser)
+                sites_data = await AuthService.get_user_sites_with_permissions(db, user.id)
+                
+                logger.info(
+                    "User sites retrieved for login response",
+                    extra={
+                        "user_email": user.email,
+                        "sites_count": len(sites_data),
+                        "has_sites": len(sites_data) > 0
+                    }
+                )
+                
+                if not sites_data:
+                    # Verifica se è superuser - in questo caso consentiamo l'accesso anche senza siti
+                    if user.is_superuser:
+                        logger.info(
+                            "Superuser accessing system without sites - allowing access for configuration",
+                            extra={
+                                "user_email": user.email,
+                                "access_reason": "superuser_configuration_access",
+                                "sites_count": 0
+                            }
+                        )
+                        # Per superuser senza siti, consentiamo l'accesso con lista vuota
+                    else:
+                        logger.warning(
+                            "User has no site access, denying login",
+                            extra={
+                                "user_email": user.email,
+                                "user_id": str(user.id),
+                                "is_superuser": False,
+                                "sites_count": 0,
+                                "reason": "no_site_permissions"
+                            }
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Utente non ha accesso a nessun sito archeologico"
+                        )
+                
+                logger.debug(
+                    "Creating site-aware JWT token",
+                    extra={
+                        "user_email": user.email,
+                        "sites_count": len(sites_data),
+                        "multi_site": len(sites_data) > 1
+                    }
+                )
+                
+                # Crea token JWT multi-sito
+                access_token = SecurityService.create_site_aware_token(
+                    user_id=user.id,
+                    sites_data=sites_data
+                )
+                
+                logger.debug(
+                    "Determining smart redirect after login",
+                    extra={
+                        "user_email": user.email,
+                        "sites_for_redirect": [{"id": site["site_id"], "name": site["site_name"]} for site in sites_data]
+                    }
+                )
+                
+                # Determina redirect intelligente
+                redirect_url = await SiteService.smart_redirect_after_login(
+                    [{"id": site["site_id"], "name": site["site_name"]} for site in sites_data]
+                )
+                
+                login_response = {
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                    "user_id": str(user.id),
+                    "user_email": user.email,
+                    "sites_count": len(sites_data),
+                    "sites": sites_data,
+                    "redirect_url": redirect_url,
+                    "multi_site_enabled": len(sites_data) > 1
+                }
+                
+                logger.success(
+                    "Login response created successfully",
+                    extra={
+                        "user_email": user.email,
+                        "user_id": str(user.id),
+                        "sites_count": len(sites_data),
+                        "multi_site_enabled": login_response["multi_site_enabled"],
+                        "redirect_url": redirect_url,
+                        "token_created": True
+                    }
+                )
+                
+                return login_response
+                
+            except HTTPException:
+                # Re-raise HTTP exceptions without modification
+                raise
+            except Exception as e:
+                logger.error(
+                    "Error creating login response",
+                    extra={
+                        "user_email": user.email,
+                        "user_id": str(user.id),
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
+                raise
 
+    @logger.catch(
+        reraise=True,
+        message="Failed to validate and refresh token",
+        level="ERROR"
+    )
     @staticmethod
     async def validate_and_refresh_token(
         db: AsyncSession,
@@ -266,33 +540,102 @@ class AuthService:
         Returns:
             Payload token validato o nuovo token se refresh
         """
-        try:
-            payload = SecurityService.verify_token(token)
-            
-            # Verifica che l'utente sia ancora attivo
-            user_id_str = payload.get("sub")
-            user_query = select(User).options(
-                selectinload(User.site_permissions),
-                selectinload(User.profile)
-            ).where(
-                and_(User.id == user_id_str, User.is_active == True)
-            )
-            
-            result = await db.execute(user_query)
-            user = result.scalar_one_or_none()
-            
-            if not user:
+        with logger.contextualize(
+            operation="validate_and_refresh_token",
+            has_token=bool(token),
+            token_length=len(token) if token else 0
+        ):
+            try:
+                logger.debug(
+                    "Validating JWT token",
+                    extra={
+                        "token_length": len(token) if token else 0,
+                        "has_token": bool(token)
+                    }
+                )
+                
+                payload = SecurityService.verify_token(token)
+                
+                user_id_str = payload.get("sub")
+                
+                logger.debug(
+                    "Token verified, checking user status",
+                    extra={
+                        "user_id_str": user_id_str,
+                        "token_subject": user_id_str,
+                        "token_valid": True
+                    }
+                )
+                
+                # Verifica che l'utente sia ancora attivo
+                user_query = select(User).options(
+                    selectinload(User.site_permissions),
+                    selectinload(User.profile)
+                ).where(
+                    and_(User.id == user_id_str, User.is_active == True)
+                )
+                
+                result = await db.execute(user_query)
+                user = result.scalar_one_or_none()
+                
+                if not user:
+                    logger.warning(
+                        "Token validation failed - user not found or inactive",
+                        extra={
+                            "user_id_str": user_id_str,
+                            "user_found": False,
+                            "reason": "user_not_found_or_inactive"
+                        }
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Utente non più attivo"
+                    )
+                
+                logger.success(
+                    "Token validated successfully",
+                    extra={
+                        "user_id_str": user_id_str,
+                        "user_email": user.email,
+                        "user_active": user.is_active,
+                        "has_profile": bool(user.profile),
+                        "site_permissions_count": len(user.site_permissions) if user.site_permissions else 0
+                    }
+                )
+                
+                return payload
+                
+            except HTTPException as e:
+                logger.warning(
+                    "HTTP exception during token validation",
+                    extra={
+                        "status_code": e.status_code,
+                        "detail": e.detail,
+                        "exception_type": type(e).__name__
+                    }
+                )
+                # Token scaduto o non valido
+                raise e
+            except Exception as e:
+                logger.error(
+                    "Unexpected error during token validation",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "token_length": len(token) if token else 0
+                    },
+                    exc_info=True
+                )
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Utente non più attivo"
+                    detail="Token validation failed"
                 )
-            
-            return payload
-            
-        except HTTPException as e:
-            # Token scaduto o non valido
-            raise e
 
+    @logger.catch(
+        reraise=True,
+        message="Failed to prepare login redirect template data for {user_email}",
+        level="ERROR"
+    )
     @staticmethod
     def get_login_redirect_template_data(
         sites_data: List[Dict[str, Any]],
@@ -308,16 +651,63 @@ class AuthService:
         Returns:
             Dizionario dati per template
         """
-        return {
-            "user_email": user_email,
-            "sites_count": len(sites_data),
-            "sites": sites_data,
-            "single_site": len(sites_data) == 1,
-            "multiple_sites": len(sites_data) > 1,
-            "site_selection_enabled": settings.site_selection_enabled,
-            "museum_name": settings.museum_name
-        }
+        with logger.contextualize(
+            operation="get_login_redirect_template_data",
+            user_email=user_email,
+            sites_count=len(sites_data)
+        ):
+            try:
+                logger.debug(
+                    "Preparing login redirect template data",
+                    extra={
+                        "user_email": user_email,
+                        "sites_count": len(sites_data),
+                        "site_selection_enabled": settings.site_selection_enabled,
+                        "museum_name": settings.museum_name
+                    }
+                )
+                
+                template_data = {
+                    "user_email": user_email,
+                    "sites_count": len(sites_data),
+                    "sites": sites_data,
+                    "single_site": len(sites_data) == 1,
+                    "multiple_sites": len(sites_data) > 1,
+                    "site_selection_enabled": settings.site_selection_enabled,
+                    "museum_name": settings.museum_name
+                }
+                
+                logger.info(
+                    "Login redirect template data prepared",
+                    extra={
+                        "user_email": user_email,
+                        "sites_count": len(sites_data),
+                        "single_site": template_data["single_site"],
+                        "multiple_sites": template_data["multiple_sites"],
+                        "site_selection_enabled": template_data["site_selection_enabled"]
+                    }
+                )
+                
+                return template_data
+                
+            except Exception as e:
+                logger.error(
+                    "Error preparing login redirect template data",
+                    extra={
+                        "user_email": user_email,
+                        "sites_count": len(sites_data),
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
+                raise
 
+    @logger.catch(
+        reraise=True,
+        message="Failed to get user sites (legacy method) for user_id {user_id}",
+        level="ERROR"
+    )
     @staticmethod
     async def get_user_sites(db: AsyncSession, user_id: str) -> List[Dict[str, Any]]:
         """
@@ -330,5 +720,44 @@ class AuthService:
         Returns:
             Lista dizionari con info siti
         """
-        # Since user_id is already a string, we can use it directly
-        return await AuthService.get_user_sites_with_permissions(db, UUID(user_id))
+        with logger.contextualize(
+            operation="get_user_sites_legacy",
+            user_id=user_id,
+            method_type="legacy_compatibility"
+        ):
+            try:
+                logger.debug(
+                    "Legacy method called - delegating to get_user_sites_with_permissions",
+                    extra={
+                        "user_id": user_id,
+                        "user_id_type": type(user_id).__name__,
+                        "legacy_method": True
+                    }
+                )
+                
+                # Since user_id is already a string, we can use it directly
+                sites_data = await AuthService.get_user_sites_with_permissions(db, UUID(user_id))
+                
+                logger.info(
+                    "Legacy method completed successfully",
+                    extra={
+                        "user_id": user_id,
+                        "sites_count": len(sites_data),
+                        "delegated_to": "get_user_sites_with_permissions"
+                    }
+                )
+                
+                return sites_data
+                
+            except Exception as e:
+                logger.error(
+                    "Error in legacy get_user_sites method",
+                    extra={
+                        "user_id": user_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "legacy_method": True
+                    },
+                    exc_info=True
+                )
+                raise

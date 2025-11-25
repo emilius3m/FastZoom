@@ -868,216 +868,814 @@ class DeepZoomBackgroundService:
         site_id: str,
         snapshot_data: Optional[Dict[str, Any]] = None
     ) -> Tuple[Dict[int, Dict[str, bytes]], int, int]:
-        """Synchronous tile generation (runs in thread pool) using snapshot data when available"""
+        """Synchronous tile generation (runs in thread pool) using snapshot data when available with detailed debugging"""
+        import time
+        generation_start_time = time.time()
         
-        try:
-            # 🔧 SNAPSHOT-BASED: Log data source
-            if snapshot_data:
-                logger.debug(f"🔧 SNAPSHOT-BASED: Generating tiles for {photo_id} using snapshot data")
-            else:
-                logger.debug(f"🔄 Generating tiles for {photo_id} using traditional method")
-            
-            # 🔧 VALIDATION: Validate content before processing
-            if not content:
-                raise ValueError("Image content is empty")
-            
-            if len(content) < 100:  # Most valid images are larger than 100 bytes
-                raise ValueError(f"Image content too small: {len(content)} bytes")
-            
-            # 🔧 VALIDATION: Log content details for debugging
-            content_preview = content[:50] if len(content) >= 50 else content
-            logger.debug(f"🔧 IMAGE VALIDATION: Content size: {len(content)} bytes, preview: {content_preview}")
-            
-            # 🔧 VALIDATION: Check common image format signatures
-            if len(content) >= 4:
-                # JPEG: FF D8 FF
-                if content[0:2] == b'\xFF\xD8' and content[2] == 0xFF:
-                    logger.debug(f"🔧 IMAGE VALIDATION: JPEG signature detected for {photo_id}")
-                # PNG: 89 50 4E 47
-                elif content[0:4] == b'\x89PNG':
-                    logger.debug(f"🔧 IMAGE VALIDATION: PNG signature detected for {photo_id}")
-                # WEBP: 52 49 46 46 ... 57 45 42 50
-                elif content[0:4] == b'RIFF' and len(content) >= 12 and content[8:12] == b'WEBP':
-                    logger.debug(f"🔧 IMAGE VALIDATION: WEBP signature detected for {photo_id}")
-                else:
-                    logger.warning(f"🔧 IMAGE VALIDATION: Unknown image format for {photo_id}, first 8 bytes: {content[:8]}")
-            else:
-                logger.warning(f"🔧 IMAGE VALIDATION: Content too small to determine format for {photo_id}")
-            
-            # 🔧 VALIDATION: Try to open image with better error handling
+        with logger.contextualize(
+            operation="generate_tiles_sync",
+            photo_id=photo_id,
+            site_id=site_id,
+            tile_size=self.tile_size,
+            format=self.format,
+            service="deep_zoom_background_service"
+        ):
             try:
-                # Create BytesIO object and reset position
-                image_buffer = io.BytesIO(content)
-                image_buffer.seek(0)
+                # 🔧 SNAPSHOT-BASED: Log data source
+                use_snapshot = bool(snapshot_data)
+                logger.info(
+                    "🔧 TILE GENERATION STARTED",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "use_snapshot": use_snapshot,
+                        "content_size_bytes": len(content),
+                        "tile_size": self.tile_size,
+                        "generation_start_time": datetime.now().isoformat(),
+                        "data_source": "snapshot" if use_snapshot else "traditional"
+                    }
+                )
                 
-                # Open image with explicit format validation
-                image = Image.open(image_buffer)
+                # 🔧 VALIDATION: Validate content before processing
+                validation_start_time = time.time()
+                if not content:
+                    logger.error(
+                        "❌ IMAGE CONTENT VALIDATION FAILED",
+                        extra={
+                            "photo_id": photo_id,
+                            "site_id": site_id,
+                            "error": "empty_content",
+                            "content_size": 0,
+                            "validation_time_ms": round((time.time() - validation_start_time) * 1000, 2)
+                        }
+                    )
+                    raise ValueError("Image content is empty")
                 
-                # Verify image can be loaded
-                image.verify()  # Verify without loading pixel data
+                if len(content) < 100:  # Most valid images are larger than 100 bytes
+                    logger.error(
+                        "❌ IMAGE CONTENT VALIDATION FAILED",
+                        extra={
+                            "photo_id": photo_id,
+                            "site_id": site_id,
+                            "error": "content_too_small",
+                            "content_size": len(content),
+                            "validation_time_ms": round((time.time() - validation_start_time) * 1000, 2)
+                        }
+                    )
+                    raise ValueError(f"Image content too small: {len(content)} bytes")
                 
-                # Reopen after verify (verify() closes the file)
-                image_buffer.seek(0)
-                image = Image.open(image_buffer)
+                # 🔧 VALIDATION: Log content details for debugging
+                content_preview = content[:50] if len(content) >= 50 else content
+                logger.debug(
+                    "🔧 IMAGE CONTENT ANALYSIS",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "content_size": len(content),
+                        "content_preview": content_preview.hex() if isinstance(content_preview, bytes) else str(content_preview),
+                        "validation_time_ms": round((time.time() - validation_start_time) * 1000, 2)
+                    }
+                )
                 
-                logger.info(f"🔧 IMAGE VALIDATION: Successfully validated and loaded image for {photo_id}, size: {image.size}, mode: {image.mode}")
+                # 🔧 VALIDATION: Check common image format signatures
+                format_detection_start_time = time.time()
+                detected_format = "unknown"
+                if len(content) >= 4:
+                    # JPEG: FF D8 FF
+                    if content[0:2] == b'\xFF\xD8' and content[2] == 0xFF:
+                        detected_format = "jpeg"
+                        logger.debug(
+                            "🔧 IMAGE FORMAT DETECTED: JPEG",
+                            extra={
+                                "photo_id": photo_id,
+                                "site_id": site_id,
+                                "detected_format": "jpeg",
+                                "signature": content[0:4].hex(),
+                                "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
+                            }
+                        )
+                    # PNG: 89 50 4E 47
+                    elif content[0:4] == b'\x89PNG':
+                        detected_format = "png"
+                        logger.debug(
+                            "🔧 IMAGE FORMAT DETECTED: PNG",
+                            extra={
+                                "photo_id": photo_id,
+                                "site_id": site_id,
+                                "detected_format": "png",
+                                "signature": content[0:8].hex(),
+                                "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
+                            }
+                        )
+                    # WEBP: 52 49 46 46 ... 57 45 42 50
+                    elif content[0:4] == b'RIFF' and len(content) >= 12 and content[8:12] == b'WEBP':
+                        detected_format = "webp"
+                        logger.debug(
+                            "🔧 IMAGE FORMAT DETECTED: WEBP",
+                            extra={
+                                "photo_id": photo_id,
+                                "site_id": site_id,
+                                "detected_format": "webp",
+                                "signature": content[0:12].hex(),
+                                "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
+                            }
+                        )
+                    else:
+                        logger.warning(
+                            "⚠️ UNKNOWN IMAGE FORMAT",
+                            extra={
+                                "photo_id": photo_id,
+                                "site_id": site_id,
+                                "detected_format": "unknown",
+                                "first_8_bytes": content[:8].hex(),
+                                "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
+                            }
+                        )
+                else:
+                    logger.warning(
+                        "⚠️ CONTENT TOO SMALL FOR FORMAT DETECTION",
+                        extra={
+                            "photo_id": photo_id,
+                            "site_id": site_id,
+                            "content_size": len(content),
+                            "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
+                        }
+                    )
                 
-            except Exception as img_error:
-                logger.error(f"🔧 IMAGE VALIDATION: Failed to validate image for {photo_id}: {img_error}")
-                logger.error(f"🔧 IMAGE VALIDATION: Content info - Size: {len(content)}, First 100 bytes: {content[:100]}")
-                raise ValueError(f"Invalid image content: {str(img_error)}")
-            
-            # Determine format based on image
-            original_format = image.format.lower() if image.format else 'jpg'
-            original_has_transparency = image.mode in ('RGBA', 'LA') or 'transparency' in image.info
-            
-            if original_format == 'png' or original_has_transparency:
-                self.format = 'png'
-                if image.mode != 'RGBA':
-                    image = image.convert('RGBA')
-            else:
-                self.format = 'jpg'
-                if image.mode == 'RGBA':
-                    background = Image.new('RGB', image.size, (255, 255, 255))
-                    background.paste(image, mask=image.split()[-1])
-                    image = background
-                elif image.mode != 'RGB':
-                    image = image.convert('RGB')
+                # 🔧 VALIDATION: Try to open image with better error handling
+                image_loading_start_time = time.time()
+                try:
+                    # Create BytesIO object and reset position
+                    image_buffer = io.BytesIO(content)
+                    image_buffer.seek(0)
+                    
+                    # Open image with explicit format validation
+                    image = Image.open(image_buffer)
+                    
+                    # Verify image can be loaded
+                    image.verify()  # Verify without loading pixel data
+                    
+                    # Reopen after verify (verify() closes the file)
+                    image_buffer.seek(0)
+                    image = Image.open(image_buffer)
+                    
+                    image_loading_time = time.time() - image_loading_start_time
+                    
+                    logger.success(
+                        "✅ IMAGE VALIDATION SUCCESSFUL",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "image_size": f"{image.width}x{image.height}",
+                        "image_mode": image.mode,
+                        "image_format": image.format,
+                        "detected_format": detected_format,
+                        "image_loading_time_ms": round(image_loading_time * 1000, 2),
+                        "total_validation_time_ms": round((time.time() - validation_start_time) * 1000, 2)
+                    }
+                )
+                
+                except Exception as img_error:
+                    image_loading_time = time.time() - image_loading_start_time
+                    
+                    logger.error(
+                        "❌ IMAGE VALIDATION FAILED",
+                        extra={
+                            "photo_id": photo_id,
+                            "site_id": site_id,
+                            "error": str(img_error),
+                            "error_type": type(img_error).__name__,
+                            "content_size": len(content),
+                            "detected_format": detected_format,
+                            "image_loading_time_ms": round(image_loading_time * 1000, 2),
+                            "total_validation_time_ms": round((time.time() - validation_start_time) * 1000, 2),
+                            "content_preview": content[:100].hex()
+                        }
+                    )
+                    
+                    import traceback
+                    logger.error(
+                        "📋 IMAGE VALIDATION ERROR TRACEBACK",
+                        extra={
+                            "photo_id": photo_id,
+                            "site_id": site_id,
+                            "traceback": traceback.format_exc(),
+                            "error_details": {
+                                "error": str(img_error),
+                                "error_type": type(img_error).__name__,
+                                "module": type(img_error).__module__ if hasattr(type(img_error), '__module__') else 'unknown'
+                            }
+                        }
+                    )
+                    
+                    raise ValueError(f"Invalid image content: {str(img_error)}")
+                
+                # Determine format based on image
+                format_determination_start_time = time.time()
+                original_format = image.format.lower() if image.format else 'jpg'
+                original_has_transparency = image.mode in ('RGBA', 'LA') or 'transparency' in image.info
+                
+                if original_format == 'png' or original_has_transparency:
+                    self.format = 'png'
+                    format_reason = "png_format_or_transparency"
+                    if image.mode != 'RGBA':
+                        image = image.convert('RGBA')
+                        conversion_performed = "RGB_to_RGBA"
+                    else:
+                        conversion_performed = "none"
+                else:
+                    self.format = 'jpg'
+                    format_reason = "jpg_format_no_transparency"
+                    if image.mode == 'RGBA':
+                        background = Image.new('RGB', image.size, (255, 255, 255))
+                        background.paste(image, mask=image.split()[-1])
+                        image = background
+                        conversion_performed = "RGBA_to_RGB"
+                    elif image.mode != 'RGB':
+                        image = image.convert('RGB')
+                        conversion_performed = f"{image.mode}_to_RGB"
+                    else:
+                        conversion_performed = "none"
+                
+                format_determination_time = time.time() - format_determination_start_time
+                
+                logger.info(
+                    "🎨 TILE FORMAT DETERMINED",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "original_image_format": original_format,
+                        "original_image_mode": image.mode,
+                        "has_transparency": original_has_transparency,
+                        "selected_tile_format": self.format,
+                        "format_reason": format_reason,
+                        "conversion_performed": conversion_performed,
+                        "final_image_mode": image.mode,
+                        "format_determination_time_ms": round(format_determination_time * 1000, 2)
+                    }
+                )
 
-            # 🔧 SNAPSHOT-BASED: Use dimensions from snapshot if available, otherwise from image
-            if snapshot_data and 'width' in snapshot_data and 'height' in snapshot_data:
-                original_width = snapshot_data['width']
-                original_height = snapshot_data['height']
-                logger.debug(f"🔧 SNAPSHOT-BASED: Using dimensions from snapshot: {original_width}x{original_height}")
-                
-                # Validate that snapshot dimensions match actual image dimensions
-                if abs(image.width - original_width) > 5 or abs(image.height - original_height) > 5:
-                    logger.warning(f"🔧 SNAPSHOT-BASED: Dimension mismatch for {photo_id} - "
-                                 f"snapshot: {original_width}x{original_height}, actual: {image.width}x{image.height}")
-                    # Use actual image dimensions as fallback
+                # 🔧 SNAPSHOT-BASED: Use dimensions from snapshot if available, otherwise from image
+                dimension_resolution_start_time = time.time()
+                if snapshot_data and 'width' in snapshot_data and 'height' in snapshot_data:
+                    original_width = snapshot_data['width']
+                    original_height = snapshot_data['height']
+                    dimension_source = "snapshot"
+                    
+                    logger.debug(
+                        "🔧 DIMENSIONS FROM SNAPSHOT",
+                        extra={
+                            "photo_id": photo_id,
+                            "site_id": site_id,
+                            "snapshot_width": original_width,
+                            "snapshot_height": original_height,
+                            "dimension_source": "snapshot"
+                        }
+                    )
+                    
+                    # Validate that snapshot dimensions match actual image dimensions
+                    if abs(image.width - original_width) > 5 or abs(image.height - original_height) > 5:
+                        logger.warning(
+                            "⚠️ DIMENSION MISMATCH DETECTED",
+                            extra={
+                                "photo_id": photo_id,
+                                "site_id": site_id,
+                                "snapshot_width": original_width,
+                                "snapshot_height": original_height,
+                                "actual_width": image.width,
+                                "actual_height": image.height,
+                                "width_diff": abs(image.width - original_width),
+                                "height_diff": abs(image.height - original_height),
+                                "dimension_source": "fallback_to_actual"
+                            }
+                        )
+                        # Use actual image dimensions as fallback
+                        original_width = image.width
+                        original_height = image.height
+                        dimension_source = "actual_image_fallback"
+                        
+                        logger.info(
+                            "🔄 USING ACTUAL IMAGE DIMENSIONS",
+                            extra={
+                                "photo_id": photo_id,
+                                "site_id": site_id,
+                                "final_width": original_width,
+                                "final_height": original_height,
+                                "dimension_source": dimension_source
+                            }
+                        )
+                    else:
+                        logger.info(
+                            "✅ SNAPSHOT DIMENSIONS VALIDATED",
+                            extra={
+                                "photo_id": photo_id,
+                                "site_id": site_id,
+                                "final_width": original_width,
+                                "final_height": original_height,
+                                "dimension_source": dimension_source
+                            }
+                        )
+                else:
                     original_width = image.width
                     original_height = image.height
-                    logger.info(f"🔧 SNAPSHOT-BASED: Using actual image dimensions as fallback: {original_width}x{original_height}")
-            else:
-                original_width = image.width
-                original_height = image.height
-                logger.debug(f"🔄 Using actual image dimensions: {original_width}x{original_height}")
+                    dimension_source = "actual_image"
+                    
+                    logger.debug(
+                        "🔄 USING ACTUAL IMAGE DIMENSIONS",
+                        extra={
+                            "photo_id": photo_id,
+                            "site_id": site_id,
+                            "final_width": original_width,
+                            "final_height": original_height,
+                            "dimension_source": dimension_source
+                        }
+                    )
+                
+                dimension_resolution_time = time.time() - dimension_resolution_start_time
 
-            # Calculate levels
-            max_dimension = max(image.size)
-            levels = math.ceil(math.log2(max_dimension)) + 1
+                # Calculate levels
+                level_calculation_start_time = time.time()
+                max_dimension = max(image.size)
+                levels = math.ceil(math.log2(max_dimension)) + 1
+                level_calculation_time = time.time() - level_calculation_start_time
+                
+                logger.info(
+                    "📐 TILE PYRAMID CALCULATED",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "image_width": image.width,
+                        "image_height": image.height,
+                        "max_dimension": max_dimension,
+                        "calculated_levels": levels,
+                        "tile_size": self.tile_size,
+                        "level_calculation_time_ms": round(level_calculation_time * 1000, 2),
+                        "dimension_resolution_time_ms": round(dimension_resolution_time * 1000, 2)
+                    }
+                )
 
-            tiles_data = {}
+                tiles_data = {}
+                total_tiles_generated = 0
+                tile_generation_start_time = time.time()
 
-            # Generate tiles for each level
-            for level in range(levels):
-                level_tiles = {}
+                # Generate tiles for each level
+                for level in range(levels):
+                    level_start_time = time.time()
+                    level_tiles = {}
 
-                # Calculate dimensions for this level
-                scale = 2 ** (levels - 1 - level)
-                level_width = max(1, image.width // scale)
-                level_height = max(1, image.height // scale)
+                    # Calculate dimensions for this level
+                    scale = 2 ** (levels - 1 - level)
+                    level_width = max(1, image.width // scale)
+                    level_height = max(1, image.height // scale)
 
-                # Create resized image for this level
-                level_image = image.resize((level_width, level_height), Image.Resampling.LANCZOS)
+                    logger.debug(
+                        f"🔍 PROCESSING LEVEL {level}",
+                        extra={
+                            "photo_id": photo_id,
+                            "site_id": site_id,
+                            "level": level,
+                            "scale_factor": scale,
+                            "level_width": level_width,
+                            "level_height": level_height,
+                            "tiles_in_level_x": math.ceil(level_width / self.tile_size),
+                            "tiles_in_level_y": math.ceil(level_height / self.tile_size)
+                        }
+                    )
 
-                # Generate tiles for this level
-                for y in range(0, level_height, self.tile_size):
-                    for x in range(0, level_width, self.tile_size):
-                        # Extract tile
-                        tile_box = (x, y, min(x + self.tile_size, level_width), min(y + self.tile_size, level_height))
-                        tile = level_image.crop(tile_box)
+                    # Create resized image for this level
+                    resize_start_time = time.time()
+                    level_image = image.resize((level_width, level_height), Image.Resampling.LANCZOS)
+                    resize_time = time.time() - resize_start_time
 
-                        # Pad tile if needed
-                        if tile.size[0] < self.tile_size or tile.size[1] < self.tile_size:
-                            if original_has_transparency:
-                                padded_tile = Image.new('RGBA', (self.tile_size, self.tile_size), (255, 255, 255, 0))
-                                padded_tile.paste(tile, (0, 0), tile if tile.mode == 'RGBA' else None)
+                    # Generate tiles for this level
+                    tiles_in_level = 0
+                    for y in range(0, level_height, self.tile_size):
+                        for x in range(0, level_width, self.tile_size):
+                            tile_start_time = time.time()
+                            
+                            # Extract tile
+                            tile_box = (x, y, min(x + self.tile_size, level_width), min(y + self.tile_size, level_height))
+                            tile = level_image.crop(tile_box)
+
+                            # Pad tile if needed
+                            padding_performed = False
+                            if tile.size[0] < self.tile_size or tile.size[1] < self.tile_size:
+                                padding_performed = True
+                                if original_has_transparency:
+                                    padded_tile = Image.new('RGBA', (self.tile_size, self.tile_size), (255, 255, 255, 0))
+                                    padded_tile.paste(tile, (0, 0), tile if tile.mode == 'RGBA' else None)
+                                else:
+                                    padded_tile = Image.new('RGB', (self.tile_size, self.tile_size), (255, 255, 255))
+                                    padded_tile.paste(tile, (0, 0))
+                                tile = padded_tile
+
+                            # Convert to bytes
+                            encoding_start_time = time.time()
+                            tile_buffer = io.BytesIO()
+                            if self.format == 'png':
+                                tile.save(tile_buffer, format='PNG', optimize=True)
                             else:
-                                padded_tile = Image.new('RGB', (self.tile_size, self.tile_size), (255, 255, 255))
-                                padded_tile.paste(tile, (0, 0))
-                            tile = padded_tile
+                                tile.save(tile_buffer, format='JPEG', quality=85, optimize=True)
+                            tile_data = tile_buffer.getvalue()
+                            encoding_time = time.time() - encoding_start_time
 
-                        # Convert to bytes
-                        tile_buffer = io.BytesIO()
-                        if self.format == 'png':
-                            tile.save(tile_buffer, format='PNG', optimize=True)
-                        else:
-                            tile.save(tile_buffer, format='JPEG', quality=85, optimize=True)
-                        tile_data = tile_buffer.getvalue()
+                            # Validate tile data
+                            if tile_data is None or len(tile_data) == 0:
+                                logger.error(
+                                    "❌ TILE GENERATION FAILED",
+                                    extra={
+                                        "photo_id": photo_id,
+                                        "site_id": site_id,
+                                        "level": level,
+                                        "tile_coords": f"{x//self.tile_size}_{y//self.tile_size}",
+                                        "tile_box": tile_box,
+                                        "tile_size_before_padding": f"{tile_box[2]-tile_box[0]}x{tile_box[3]-tile_box[1]}",
+                                        "padding_performed": padding_performed,
+                                        "encoding_time_ms": round(encoding_time * 1000, 2),
+                                        "tile_data_size": 0,
+                                        "error": "empty_tile_data"
+                                    }
+                                )
+                                continue
 
-                        # Validate tile data
-                        if tile_data is None or len(tile_data) == 0:
-                            logger.error(f"Failed to generate tile data for level {level}, coords {x//self.tile_size}_{y//self.tile_size}")
-                            continue
+                            # Store with coordinates
+                            tile_coords = f"{x//self.tile_size}_{y//self.tile_size}"
+                            level_tiles[tile_coords] = tile_data
+                            tiles_in_level += 1
+                            total_tiles_generated += 1
+                            
+                            tile_total_time = time.time() - tile_start_time
+                            
+                            # Log every 100th tile to avoid spam
+                            if total_tiles_generated % 100 == 0:
+                                logger.debug(
+                                    f"🔹 TILE GENERATED #{total_tiles_generated}",
+                                    extra={
+                                        "photo_id": photo_id,
+                                        "site_id": site_id,
+                                        "level": level,
+                                        "tile_coords": tile_coords,
+                                        "tile_data_size_bytes": len(tile_data),
+                                        "padding_performed": padding_performed,
+                                        "encoding_time_ms": round(encoding_time * 1000, 2),
+                                        "total_tile_time_ms": round(tile_total_time * 1000, 2),
+                                        "tiles_generated_so_far": total_tiles_generated
+                                    }
+                                )
 
-                        # Store with coordinates
-                        tile_coords = f"{x//self.tile_size}_{y//self.tile_size}"
-                        level_tiles[tile_coords] = tile_data
+                    level_time = time.time() - level_start_time
+                    logger.debug(
+                        f"✅ LEVEL {level} COMPLETED",
+                        extra={
+                            "photo_id": photo_id,
+                            "site_id": site_id,
+                            "level": level,
+                            "tiles_in_level": tiles_in_level,
+                            "level_time_ms": round(level_time * 1000, 2),
+                            "resize_time_ms": round(resize_time * 1000, 2),
+                            "total_tiles_so_far": total_tiles_generated
+                        }
+                    )
+                    
+                    tiles_data[level] = level_tiles
 
-                tiles_data[level] = level_tiles
-                logger.debug(f"Generated {len(level_tiles)} tiles for level {level}")
+                total_generation_time = time.time() - tile_generation_start_time
+                total_operation_time = time.time() - generation_start_time
+                
+                logger.success(
+                    "✅ TILE GENERATION COMPLETED",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "total_levels": levels,
+                        "total_tiles_generated": total_tiles_generated,
+                        "original_width": original_width,
+                        "original_height": original_height,
+                        "tile_format": self.format,
+                        "tile_size": self.tile_size,
+                        "generation_performance": {
+                            "total_generation_time_ms": round(total_generation_time * 1000, 2),
+                            "total_operation_time_ms": round(total_operation_time * 1000, 2),
+                            "average_tile_time_ms": round(total_generation_time / total_tiles_generated * 1000, 2) if total_tiles_generated > 0 else 0,
+                            "tiles_per_second": round(total_tiles_generated / total_generation_time, 2) if total_generation_time > 0 else 0
+                        },
+                        "timing_breakdown": {
+                            "validation_time_ms": round((time.time() - validation_start_time) * 1000, 2),
+                            "format_determination_time_ms": round(format_determination_time * 1000, 2),
+                            "dimension_resolution_time_ms": round(dimension_resolution_time * 1000, 2),
+                            "level_calculation_time_ms": round(level_calculation_time * 1000, 2)
+                        },
+                        "data_source": "snapshot" if use_snapshot else "traditional"
+                    }
+                )
 
-            return tiles_data, original_width, original_height
+                return tiles_data, original_width, original_height
 
-        except Exception as e:
-            logger.error(f"Tile generation failed: {e}")
-            raise Exception(f"Tile generation failed: {str(e)}")
+            except Exception as e:
+                total_operation_time = time.time() - generation_start_time
+                
+                logger.error(
+                    "❌ TILE GENERATION FAILED",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "total_operation_time_ms": round(total_operation_time * 1000, 2),
+                        "content_size": len(content),
+                        "failure_point": "tile_generation"
+                    }
+                )
+                
+                import traceback
+                logger.error(
+                    "📋 TILE GENERATION ERROR TRACEBACK",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "traceback": traceback.format_exc(),
+                        "error_details": {
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                            "module": type(e).__module__ if hasattr(type(e), '__module__') else 'unknown'
+                        }
+                    }
+                )
+                
+                raise Exception(f"Tile generation failed: {str(e)}")
 
     async def _upload_tiles_concurrent(
-        self, 
-        task: TileProcessingTask, 
-        tiles_data: Dict[int, Dict[str, bytes]], 
+        self,
+        task: TileProcessingTask,
+        tiles_data: Dict[int, Dict[str, bytes]],
         total_tiles: int
     ) -> int:
-        """Upload tiles with concurrent control"""
+        """Upload tiles with concurrent control and comprehensive performance metrics"""
+        import time
+        upload_start_time = time.time()
         
-        # Create semaphore for upload control
-        upload_semaphore = asyncio.Semaphore(self.max_concurrent_uploads)
-        
-        # Create upload tasks
-        upload_tasks = []
-        for level, tiles_level in tiles_data.items():
-            for tile_coords, tile_data in tiles_level.items():
-                upload_task = self._upload_single_tile_with_semaphore(
-                    task, level, tile_coords, tile_data, upload_semaphore
+        with logger.contextualize(
+            operation="upload_tiles_concurrent",
+            photo_id=task.photo_id,
+            site_id=task.site_id,
+            total_tiles=total_tiles,
+            levels_count=len(tiles_data),
+            max_concurrent_uploads=self.max_concurrent_uploads,
+            service="deep_zoom_background_service"
+        ):
+            try:
+                logger.info(
+                    "🚀 CONCURRENT TILE UPLOAD STARTED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "total_tiles": total_tiles,
+                        "levels_count": len(tiles_data),
+                        "max_concurrent_uploads": self.max_concurrent_uploads,
+                        "upload_start_time": datetime.now().isoformat()
+                    }
                 )
-                upload_tasks.append(upload_task)
-        
-        # Process uploads in batches to avoid overwhelming the system
-        batch_size = 20
-        completed_tiles = 0
-        successful_uploads = []
-        failed_uploads = []
-        
-        for i in range(0, len(upload_tasks), batch_size):
-            batch = upload_tasks[i:i + batch_size]
-            batch_results = await asyncio.gather(*batch, return_exceptions=True)
+                
+                # Create semaphore for upload control
+                upload_semaphore = asyncio.Semaphore(self.max_concurrent_uploads)
+                
+                # Create upload tasks with detailed tracking
+                task_creation_start_time = time.time()
+                upload_tasks = []
+                tile_details_by_level = {}
+                
+                for level, tiles_level in tiles_data.items():
+                    level_tile_count = len(tiles_level)
+                    tile_details_by_level[level] = level_tile_count
+                    
+                    logger.debug(
+                        f"🔍 CREATING UPLOAD TASKS FOR LEVEL {level}",
+                        extra={
+                            "photo_id": task.photo_id,
+                            "site_id": task.site_id,
+                            "level": level,
+                            "tiles_in_level": level_tile_count,
+                            "total_tiles_so_far": len(upload_tasks)
+                        }
+                    )
+                    
+                    for tile_coords, tile_data in tiles_level.items():
+                        upload_task = self._upload_single_tile_with_semaphore(
+                            task, level, tile_coords, tile_data, upload_semaphore
+                        )
+                        upload_tasks.append(upload_task)
+                
+                task_creation_time = time.time() - task_creation_start_time
+                
+                logger.info(
+                    "📋 UPLOAD TASKS CREATED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "total_upload_tasks": len(upload_tasks),
+                        "task_creation_time_ms": round(task_creation_time * 1000, 2),
+                        "tiles_by_level": tile_details_by_level,
+                        "average_tiles_per_level": round(total_tiles / len(tiles_data), 2) if tiles_data else 0
+                    }
+                )
+                
+                # Process uploads in batches to avoid overwhelming the system
+                batch_size = 20
+                completed_tiles = 0
+                successful_uploads = []
+                failed_uploads = []
+                batch_processing_times = []
+                error_types = {}
+                
+                total_batches = (len(upload_tasks) + batch_size - 1) // batch_size
+                
+                for batch_num, i in enumerate(range(0, len(upload_tasks), batch_size), 1):
+                    batch_start_time = time.time()
+                    batch = upload_tasks[i:i + batch_size]
+                    
+                    logger.info(
+                        f"🔄 PROCESSING BATCH {batch_num}/{total_batches}",
+                        extra={
+                            "photo_id": task.photo_id,
+                            "site_id": task.site_id,
+                            "batch_number": batch_num,
+                            "total_batches": total_batches,
+                            "batch_size": len(batch),
+                            "batch_start_index": i,
+                            "batch_end_index": min(i + batch_size, len(upload_tasks)),
+                            "completed_tiles_before_batch": completed_tiles
+                        }
+                    )
+                    
+                    batch_results = await asyncio.gather(*batch, return_exceptions=True)
+                    batch_processing_time = time.time() - batch_start_time
+                    batch_processing_times.append(batch_processing_time)
+                    
+                    # Process batch results with detailed error tracking
+                    batch_successful = 0
+                    batch_failed = 0
+                    
+                    for result_idx, result in enumerate(batch_results):
+                        if isinstance(result, Exception):
+                            failed_uploads.append(result)
+                            batch_failed += 1
+                            
+                            # Track error types for analysis
+                            error_type = type(result).__name__
+                            error_types[error_type] = error_types.get(error_type, 0) + 1
+                            
+                            logger.warning(
+                                f"❌ TILE UPLOAD FAILED IN BATCH {batch_num}",
+                                extra={
+                                    "photo_id": task.photo_id,
+                                    "site_id": task.site_id,
+                                    "batch_number": batch_num,
+                                    "result_index": result_idx,
+                                    "error_type": error_type,
+                                    "error_message": str(result)[:200],  # Truncate long errors
+                                    "total_failed_so_far": len(failed_uploads)
+                                }
+                            )
+                        elif result is not None:
+                            successful_uploads.append(result)
+                            completed_tiles += 1
+                            batch_successful += 1
+                        else:
+                            # None result - treat as failure
+                            failed_uploads.append(Exception("Upload returned None"))
+                            batch_failed += 1
+                            error_types["NoneResult"] = error_types.get("NoneResult", 0) + 1
+                    
+                    # Update progress
+                    progress = 10 + int((completed_tiles / total_tiles) * 80)  # 10-90%
+                    await self._update_processing_status(
+                        task, "uploading", progress, total_tiles, len(tiles_data), completed_tiles
+                    )
+                    
+                    # Calculate batch performance metrics
+                    batch_throughput = len(batch) / batch_processing_time if batch_processing_time > 0 else 0
+                    overall_progress = (completed_tiles / total_tiles) * 100 if total_tiles > 0 else 0
+                    
+                    logger.info(
+                        f"✅ BATCH {batch_num} COMPLETED",
+                        extra={
+                            "photo_id": task.photo_id,
+                            "site_id": task.site_id,
+                            "batch_number": batch_num,
+                            "batch_successful": batch_successful,
+                            "batch_failed": batch_failed,
+                            "batch_processing_time_ms": round(batch_processing_time * 1000, 2),
+                            "batch_throughput_tiles_per_sec": round(batch_throughput, 2),
+                            "completed_tiles": completed_tiles,
+                            "total_tiles": total_tiles,
+                            "overall_progress_percent": round(overall_progress, 2),
+                            "progress_update": progress,
+                            "successful_uploads": len(successful_uploads),
+                            "failed_uploads": len(failed_uploads)
+                        }
+                    )
+                    
+                    # Small delay between batches to prevent overwhelming
+                    if i + batch_size < len(upload_tasks):
+                        await asyncio.sleep(0.1)
+                
+                # Calculate final performance metrics
+                total_upload_time = time.time() - upload_start_time
+                average_batch_time = sum(batch_processing_times) / len(batch_processing_times) if batch_processing_times else 0
+                success_rate = (completed_tiles / total_tiles) * 100 if total_tiles > 0 else 0
+                overall_throughput = completed_tiles / total_upload_time if total_upload_time > 0 else 0
+                
+                # Log comprehensive upload summary
+                logger.success(
+                    "🎉 CONCURRENT TILE UPLOAD COMPLETED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "final_results": {
+                            "completed_tiles": completed_tiles,
+                            "total_tiles": total_tiles,
+                            "successful_uploads": len(successful_uploads),
+                            "failed_uploads": len(failed_uploads),
+                            "success_rate_percent": round(success_rate, 2)
+                        },
+                        "performance_metrics": {
+                            "total_upload_time_ms": round(total_upload_time * 1000, 2),
+                            "average_batch_time_ms": round(average_batch_time * 1000, 2),
+                            "overall_throughput_tiles_per_sec": round(overall_throughput, 2),
+                            "task_creation_time_ms": round(task_creation_time * 1000, 2),
+                            "total_batches_processed": len(batch_processing_times),
+                            "batch_size_used": batch_size
+                        },
+                        "error_analysis": {
+                            "error_types": error_types,
+                            "error_count": len(failed_uploads),
+                            "error_rate_percent": round((len(failed_uploads) / total_tiles) * 100, 2) if total_tiles > 0 else 0
+                        },
+                        "levels_processed": tile_details_by_level
+                    }
+                )
+                
+                # Log warnings for any issues
+                if failed_uploads:
+                    logger.warning(
+                        "⚠️ TILE UPLOAD ISSUES DETECTED",
+                        extra={
+                            "photo_id": task.photo_id,
+                            "site_id": task.site_id,
+                            "failed_upload_count": len(failed_uploads),
+                            "success_rate_percent": round(success_rate, 2),
+                            "error_breakdown": error_types,
+                            "recommendation": "Check MinIO connectivity and storage capacity" if len(failed_uploads) > total_tiles * 0.1 else "Monitor for patterns"
+                        }
+                    )
+                
+                # Performance warnings
+                if overall_throughput < 5:  # Less than 5 tiles per second
+                    logger.warning(
+                        "⚠️ SLOW UPLOAD PERFORMANCE DETECTED",
+                        extra={
+                            "photo_id": task.photo_id,
+                            "site_id": task.site_id,
+                            "throughput_tiles_per_sec": round(overall_throughput, 2),
+                            "recommended_action": "Consider increasing concurrent uploads or checking network bandwidth"
+                        }
+                    )
+                
+                return completed_tiles
             
-            # Process batch results
-            for result in batch_results:
-                if isinstance(result, Exception):
-                    failed_uploads.append(result)
-                elif result is not None:
-                    successful_uploads.append(result)
-                    completed_tiles += 1
-            
-            # Update progress
-            progress = 10 + int((completed_tiles / total_tiles) * 80)  # 10-90%
-            await self._update_processing_status(
-                task, "uploading", progress, total_tiles, len(tiles_data), completed_tiles
-            )
-            
-            logger.info(f"Uploaded {completed_tiles}/{total_tiles} tiles for photo {task.photo_id}")
-            
-            # Small delay between batches to prevent overwhelming
-            if i + batch_size < len(upload_tasks):
-                await asyncio.sleep(0.1)
-        
-        if failed_uploads:
-            logger.warning(f"Some tile uploads failed for photo {task.photo_id}: {len(failed_uploads)} errors")
-        
-        return completed_tiles
+            except Exception as e:
+                total_upload_time = time.time() - upload_start_time
+                
+                logger.error(
+                    "❌ CONCURRENT TILE UPLOAD FAILED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "total_upload_time_ms": round(total_upload_time * 1000, 2),
+                        "tiles_data_levels": len(tiles_data),
+                        "total_tiles_expected": total_tiles,
+                        "failure_point": "concurrent_upload_coordinator"
+                    }
+                )
+                
+                import traceback
+                logger.error(
+                    "📋 CONCURRENT UPLOAD ERROR TRACEBACK",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "traceback": traceback.format_exc(),
+                        "error_details": {
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                            "module": type(e).__module__ if hasattr(type(e), '__module__') else 'unknown'
+                        }
+                    }
+                )
+                
+                raise Exception(f"Concurrent tile upload failed: {str(e)}")
 
     async def _upload_single_tile_with_semaphore(
         self,
@@ -1098,60 +1696,169 @@ class DeepZoomBackgroundService:
         tile_coords: str,
         tile_data: bytes
     ) -> Optional[str]:
-        """Upload single tile to MinIO"""
-        try:
-            # Validate tile data
-            if tile_data is None or len(tile_data) == 0:
-                return None
-            
-            # Determine extension
-            extension = 'png' if self.format == 'png' else 'jpg'
-            object_name = f"{task.site_id}/tiles/{task.photo_id}/{level}/{tile_coords}.{extension}"
-            
-            # Prepare metadata
-            tile_metadata = {
-                'photo_id': task.photo_id,
-                'site_id': task.site_id,
-                'level': level,
-                'tile_coords': tile_coords,
-                'tile_size': self.tile_size,
-                'format': self.format
-            }
-            
-            if task.archaeological_metadata:
-                tile_metadata.update({
-                    'inventory_number': task.archaeological_metadata.get('inventory_number'),
-                    'excavation_area': task.archaeological_metadata.get('excavation_area'),
-                    'material': task.archaeological_metadata.get('material')
-                })
-            
-            # Upload to MinIO
-            from app.services.archaeological_minio_service import archaeological_minio_service
-            
-            result = await asyncio.to_thread(
-                archaeological_minio_service._client.put_object,
-                bucket_name=archaeological_minio_service.buckets['tiles'],
-                object_name=object_name,
-                data=io.BytesIO(tile_data),
-                length=len(tile_data),
-                content_type='image/png' if self.format == 'png' else 'image/jpeg',
-                metadata={
-                    'x-amz-meta-photo-id': str(tile_metadata.get('photo_id', '')),
-                    'x-amz-meta-site-id': str(tile_metadata.get('site_id', '')),
-                    'x-amz-meta-level': str(tile_metadata.get('level', '')),
-                    'x-amz-meta-tile-coords': str(tile_metadata.get('tile_coords', '')),
-                    'x-amz-meta-tile-size': str(tile_metadata.get('tile_size', '')),
-                    'x-amz-meta-inventory-number': str(tile_metadata.get('inventory_number', '')),
-                    'x-amz-meta-excavation-area': str(tile_metadata.get('excavation_area', '')),
-                    'x-amz-meta-material': str(tile_metadata.get('material', ''))
+        """Upload single tile to MinIO with detailed debugging"""
+        import time
+        upload_start_time = time.time()
+        
+        with logger.contextualize(
+            operation="upload_single_tile",
+            photo_id=task.photo_id,
+            site_id=task.site_id,
+            level=level,
+            tile_coords=tile_coords,
+            tile_size=self.tile_size,
+            format=self.format,
+            service="deep_zoom_background_service"
+        ):
+            try:
+                # Validate tile data
+                if tile_data is None or len(tile_data) == 0:
+                    logger.error(
+                        "❌ TILE DATA VALIDATION FAILED",
+                        extra={
+                            "photo_id": task.photo_id,
+                            "site_id": task.site_id,
+                            "level": level,
+                            "tile_coords": tile_coords,
+                            "tile_data_is_none": tile_data is None,
+                            "tile_data_length": len(tile_data) if tile_data else 0,
+                            "validation_error": "empty_or_null_tile_data"
+                        }
+                    )
+                    return None
+                
+                # Determine extension
+                extension = 'png' if self.format == 'png' else 'jpg'
+                object_name = f"{task.site_id}/tiles/{task.photo_id}/{level}/{tile_coords}.{extension}"
+                
+                logger.debug(
+                    "🔍 TILE UPLOAD STARTED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "level": level,
+                        "tile_coords": tile_coords,
+                        "tile_size": self.tile_size,
+                        "format": self.format,
+                        "extension": extension,
+                        "object_name": object_name,
+                        "tile_data_size_bytes": len(tile_data),
+                        "upload_start_time": datetime.now().isoformat()
+                    }
+                )
+                
+                # Prepare metadata
+                tile_metadata = {
+                    'photo_id': task.photo_id,
+                    'site_id': task.site_id,
+                    'level': level,
+                    'tile_coords': tile_coords,
+                    'tile_size': self.tile_size,
+                    'format': self.format
                 }
-            )
+                
+                if task.archaeological_metadata:
+                    tile_metadata.update({
+                        'inventory_number': task.archaeological_metadata.get('inventory_number'),
+                        'excavation_area': task.archaeological_metadata.get('excavation_area'),
+                        'material': task.archaeological_metadata.get('material')
+                    })
+                
+                # Upload to MinIO with timing
+                minio_upload_start_time = time.time()
+                from app.services.archaeological_minio_service import archaeological_minio_service
+                
+                logger.info(
+                    "📤 MINIO UPLOAD INITIATED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "level": level,
+                        "tile_coords": tile_coords,
+                        "bucket_name": archaeological_minio_service.buckets['tiles'],
+                        "object_name": object_name,
+                        "content_type": 'image/png' if self.format == 'png' else 'image/jpeg',
+                        "tile_metadata": tile_metadata,
+                        "tile_data_size_bytes": len(tile_data)
+                    }
+                )
+                
+                result = await asyncio.to_thread(
+                    archaeological_minio_service._client.put_object,
+                    bucket_name=archaeological_minio_service.buckets['tiles'],
+                    object_name=object_name,
+                    data=io.BytesIO(tile_data),
+                    length=len(tile_data),
+                    content_type='image/png' if self.format == 'png' else 'image/jpeg',
+                    metadata={
+                        'x-amz-meta-photo-id': str(tile_metadata.get('photo_id', '')),
+                        'x-amz-meta-site-id': str(tile_metadata.get('site_id', '')),
+                        'x-amz-meta-level': str(tile_metadata.get('level', '')),
+                        'x-amz-meta-tile-coords': str(tile_metadata.get('tile_coords', '')),
+                        'x-amz-meta-tile-size': str(tile_metadata.get('tile_size', '')),
+                        'x-amz-meta-inventory-number': str(tile_metadata.get('inventory_number', '')),
+                        'x-amz-meta-excavation-area': str(tile_metadata.get('excavation_area', '')),
+                        'x-amz-meta-material': str(tile_metadata.get('material', ''))
+                    }
+                )
+                
+                minio_upload_time = time.time() - minio_upload_start_time
+                total_upload_time = time.time() - upload_start_time
+                
+                logger.success(
+                    "✅ TILE UPLOAD COMPLETED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "level": level,
+                        "tile_coords": tile_coords,
+                        "object_name": object_name,
+                        "minio_upload_time_ms": round(minio_upload_time * 1000, 2),
+                        "total_upload_time_ms": round(total_upload_time * 1000, 2),
+                        "tile_data_size_bytes": len(tile_data),
+                        "upload_speed_kb_per_sec": round((len(tile_data) / 1024) / minio_upload_time, 2) if minio_upload_time > 0 else 0,
+                        "bucket_name": archaeological_minio_service.buckets['tiles']
+                    }
+                )
+                
+                return object_name
             
-            return object_name
-            
-        except Exception as e:
-            logger.error(f"Tile upload error for {task.photo_id}: {e}")
-            return None
+            except Exception as e:
+                total_upload_time = time.time() - upload_start_time
+                
+                logger.error(
+                    "❌ TILE UPLOAD FAILED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "level": level,
+                        "tile_coords": tile_coords,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "total_upload_time_ms": round(total_upload_time * 1000, 2),
+                        "tile_data_size_bytes": len(tile_data) if tile_data else 0,
+                        "failure_point": "minio_upload"
+                    }
+                )
+                
+                import traceback
+                logger.error(
+                    "📋 TILE UPLOAD ERROR TRACEBACK",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "level": level,
+                        "tile_coords": tile_coords,
+                        "traceback": traceback.format_exc(),
+                        "error_details": {
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                            "module": type(e).__module__ if hasattr(type(e), '__module__') else 'unknown'
+                        }
+                    }
+                )
+                
+                return None
 
     async def _create_and_upload_metadata(
         self,
@@ -1160,62 +1867,293 @@ class DeepZoomBackgroundService:
         width: int,
         height: int
     ) -> str:
-        """Create and upload metadata.json for tiles"""
+        """Create and upload metadata.json for tiles with comprehensive debugging"""
+        import time
+        metadata_start_time = time.time()
         
-        metadata = {
-            "photo_id": task.photo_id,
-            "site_id": task.site_id,
-            "width": width,
-            "height": height,
-            "levels": len(tiles_data),
-            "tile_size": self.tile_size,
-            "overlap": self.overlap,
-            "format": self.format,
-            "tile_format": self.format,
-            "total_tiles": self._count_total_tiles(tiles_data),
-            "created": datetime.now().isoformat(),
-            "archaeological_metadata": task.archaeological_metadata or {}
-        }
-        
-        # Add level information
-        level_info = {}
-        for level, tiles_level in tiles_data.items():
-            level_info[level] = {
-                "tile_count": len(tiles_level),
-                "tiles": list(tiles_level.keys())
-            }
-        metadata["level_info"] = level_info
-        
-        # Upload metadata
-        metadata_json = json.dumps(metadata, indent=2, ensure_ascii=False)
-        metadata_bytes = metadata_json.encode('utf-8')
-        
-        metadata_object_name = f"{task.site_id}/tiles/{task.photo_id}/metadata.json"
-        
-        try:
-            from app.services.archaeological_minio_service import archaeological_minio_service
-            
-            result = await asyncio.to_thread(
-                archaeological_minio_service._client.put_object,
-                bucket_name=archaeological_minio_service.buckets['tiles'],
-                object_name=metadata_object_name,
-                data=io.BytesIO(metadata_bytes),
-                length=len(metadata_bytes),
-                content_type='application/json',
-                metadata={
-                    'x-amz-meta-photo-id': task.photo_id,
-                    'x-amz-meta-site-id': task.site_id,
-                    'x-amz-meta-document-type': 'deep_zoom_metadata',
-                    'x-amz-meta-created': datetime.now().isoformat()
+        with logger.contextualize(
+            operation="create_and_upload_metadata",
+            photo_id=task.photo_id,
+            site_id=task.site_id,
+            width=width,
+            height=height,
+            levels=len(tiles_data),
+            service="deep_zoom_background_service"
+        ):
+            try:
+                logger.info(
+                    "🔧 METADATA CREATION STARTED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "image_width": width,
+                        "image_height": height,
+                        "levels_count": len(tiles_data),
+                        "tile_size": self.tile_size,
+                        "tile_format": self.format,
+                        "metadata_creation_start_time": datetime.now().isoformat()
+                    }
+                )
+                
+                # Calculate comprehensive statistics
+                total_tiles = self._count_total_tiles(tiles_data)
+                level_statistics = {}
+                tiles_by_level = {}
+                
+                level_analysis_start_time = time.time()
+                for level, tiles_level in tiles_data.items():
+                    tile_count = len(tiles_level)
+                    tiles_list = list(tiles_level.keys())
+                    
+                    level_statistics[level] = {
+                        "tile_count": tile_count,
+                        "tiles": tiles_list
+                    }
+                    
+                    # Calculate tile coordinates range for debugging
+                    if tiles_list:
+                        x_coords = [int(tile.split('_')[0]) for tile in tiles_list]
+                        y_coords = [int(tile.split('_')[1]) for tile in tiles_list]
+                        tiles_by_level[level] = {
+                            "tile_count": tile_count,
+                            "x_range": [min(x_coords), max(x_coords)],
+                            "y_range": [min(y_coords), max(y_coords)],
+                            "tiles_sample": tiles_list[:5]  # First 5 tiles as sample
+                        }
+                    else:
+                        tiles_by_level[level] = {
+                            "tile_count": 0,
+                            "x_range": [0, 0],
+                            "y_range": [0, 0],
+                            "tiles_sample": []
+                        }
+                
+                level_analysis_time = time.time() - level_analysis_start_time
+                
+                logger.debug(
+                    "📊 TILE LEVEL ANALYSIS COMPLETED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "total_tiles": total_tiles,
+                        "level_analysis_time_ms": round(level_analysis_time * 1000, 2),
+                        "tiles_by_level": tiles_by_level,
+                        "average_tiles_per_level": round(total_tiles / len(tiles_data), 2) if tiles_data else 0
+                    }
+                )
+                
+                # Create comprehensive metadata
+                metadata_creation_start_time = time.time()
+                metadata = {
+                    "photo_id": task.photo_id,
+                    "site_id": task.site_id,
+                    "width": width,
+                    "height": height,
+                    "levels": len(tiles_data),
+                    "tile_size": self.tile_size,
+                    "overlap": self.overlap,
+                    "format": self.format,
+                    "tile_format": self.format,
+                    "total_tiles": total_tiles,
+                    "created": datetime.now().isoformat(),
+                    "archaeological_metadata": task.archaeological_metadata or {},
+                    "processing_info": {
+                        "service_version": "deep_zoom_background_service_v2",
+                        "tile_size_pixels": self.tile_size,
+                        "overlap_pixels": self.overlap,
+                        "max_level": len(tiles_data) - 1 if tiles_data else 0,
+                        "min_level": 0
+                    },
+                    "level_info": level_statistics,
+                    "performance_metrics": {
+                        "total_tiles_generated": total_tiles,
+                        "levels_processed": len(tiles_data),
+                        "average_tiles_per_level": round(total_tiles / len(tiles_data), 2) if tiles_data else 0
+                    }
                 }
-            )
+                
+                metadata_creation_time = time.time() - metadata_creation_start_time
+                
+                logger.debug(
+                    "📋 METADATA STRUCTURE CREATED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "metadata_creation_time_ms": round(metadata_creation_time * 1000, 2),
+                        "metadata_keys": list(metadata.keys()),
+                        "metadata_size_estimate": len(str(metadata)),
+                        "archaeological_metadata_keys": list((task.archaeological_metadata or {}).keys()),
+                        "level_info_keys": list(level_statistics.keys())
+                    }
+                )
+                
+                # Serialize metadata
+                serialization_start_time = time.time()
+                metadata_json = json.dumps(metadata, indent=2, ensure_ascii=False)
+                metadata_bytes = metadata_json.encode('utf-8')
+                serialization_time = time.time() - serialization_start_time
+                
+                logger.debug(
+                    "📄 METADATA SERIALIZATION COMPLETED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "serialization_time_ms": round(serialization_time * 1000, 2),
+                        "metadata_json_size_bytes": len(metadata_bytes),
+                        "metadata_json_size_kb": round(len(metadata_bytes) / 1024, 2),
+                        "metadata_object_count": len(metadata),
+                        "level_info_count": len(level_statistics)
+                    }
+                )
+                
+                # Prepare object name and upload details
+                metadata_object_name = f"{task.site_id}/tiles/{task.photo_id}/metadata.json"
+                
+                logger.info(
+                    "📤 METADATA UPLOAD INITIATED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "metadata_object_name": metadata_object_name,
+                        "metadata_size_bytes": len(metadata_bytes),
+                        "content_type": "application/json",
+                        "upload_start_time": datetime.now().isoformat()
+                    }
+                )
+                
+                # Prepare comprehensive metadata for MinIO
+                minio_metadata = {
+                    'x-amz-meta-photo-id': str(task.photo_id),
+                    'x-amz-meta-site-id': str(task.site_id),
+                    'x-amz-meta-document-type': 'deep_zoom_metadata',
+                    'x-amz-meta-created': datetime.now().isoformat(),
+                    'x-amz-meta-width': str(width),
+                    'x-amz-meta-height': str(height),
+                    'x-amz-meta-levels': str(len(tiles_data)),
+                    'x-amz-meta-tile-count': str(total_tiles),
+                    'x-amz-meta-tile-format': str(self.format),
+                    'x-amz-meta-tile-size': str(self.tile_size)
+                }
+                
+                # Add archaeological metadata if available
+                if task.archaeological_metadata:
+                    for key, value in task.archaeological_metadata.items():
+                        if value is not None:
+                            minio_metadata[f'x-amz-meta-arch-{key.lower().replace("_", "-")}'] = str(value)
+                
+                # Upload to MinIO with timing
+                upload_start_time = time.time()
+                from app.services.archaeological_minio_service import archaeological_minio_service
+                
+                logger.info(
+                    "🗄️ MINIO METADATA UPLOAD STARTED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "bucket_name": archaeological_minio_service.buckets['tiles'],
+                        "object_name": metadata_object_name,
+                        "content_type": "application/json",
+                        "metadata_size_bytes": len(metadata_bytes),
+                        "minio_metadata_keys": list(minio_metadata.keys()),
+                        "upload_start_time": datetime.now().isoformat()
+                    }
+                )
+                
+                result = await asyncio.to_thread(
+                    archaeological_minio_service._client.put_object,
+                    bucket_name=archaeological_minio_service.buckets['tiles'],
+                    object_name=metadata_object_name,
+                    data=io.BytesIO(metadata_bytes),
+                    length=len(metadata_bytes),
+                    content_type='application/json',
+                    metadata=minio_metadata
+                )
+                
+                upload_time = time.time() - upload_start_time
+                total_metadata_time = time.time() - metadata_start_time
+                
+                # Calculate upload performance metrics
+                upload_speed_kb_per_sec = round((len(metadata_bytes) / 1024) / upload_time, 2) if upload_time > 0 else 0
+                
+                logger.success(
+                    "✅ METADATA UPLOAD COMPLETED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "metadata_object_name": metadata_object_name,
+                        "minio_result": str(result),
+                        "performance_metrics": {
+                            "total_metadata_time_ms": round(total_metadata_time * 1000, 2),
+                            "level_analysis_time_ms": round(level_analysis_time * 1000, 2),
+                            "metadata_creation_time_ms": round(metadata_creation_time * 1000, 2),
+                            "serialization_time_ms": round(serialization_time * 1000, 2),
+                            "upload_time_ms": round(upload_time * 1000, 2),
+                            "upload_speed_kb_per_sec": upload_speed_kb_per_sec
+                        },
+                        "metadata_details": {
+                            "size_bytes": len(metadata_bytes),
+                            "size_kb": round(len(metadata_bytes) / 1024, 2),
+                            "total_tiles": total_tiles,
+                            "levels": len(tiles_data),
+                            "tile_format": self.format,
+                            "image_dimensions": f"{width}x{height}"
+                        },
+                        "minio_details": {
+                            "bucket": archaeological_minio_service.buckets['tiles'],
+                            "object_url": f"minio://{archaeological_minio_service.buckets['tiles']}/{metadata_object_name}",
+                            "metadata_count": len(minio_metadata)
+                        }
+                    }
+                )
+                
+                final_url = f"minio://{archaeological_minio_service.buckets['tiles']}/{metadata_object_name}"
+                
+                logger.info(
+                    "🎉 METADATA PROCESSING COMPLETED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "final_metadata_url": final_url,
+                        "total_processing_time_ms": round(total_metadata_time * 1000, 2),
+                        "processing_success": True
+                    }
+                )
+                
+                return final_url
             
-            logger.info(f"Deep zoom metadata uploaded: {metadata_object_name}")
-            return f"minio://{archaeological_minio_service.buckets['tiles']}/{metadata_object_name}"
-            
-        except Exception as e:
-            logger.error(f"Metadata upload failed: {e}")
-            raise Exception(f"Metadata upload failed: {str(e)}")
+            except Exception as e:
+                total_metadata_time = time.time() - metadata_start_time
+                
+                logger.error(
+                    "❌ METADATA CREATION/UPLOAD FAILED",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "total_metadata_time_ms": round(total_metadata_time * 1000, 2),
+                        "failure_point": "metadata_processing",
+                        "tiles_data_levels": len(tiles_data),
+                        "image_dimensions": f"{width}x{height}"
+                    }
+                )
+                
+                import traceback
+                logger.error(
+                    "📋 METADATA ERROR TRACEBACK",
+                    extra={
+                        "photo_id": task.photo_id,
+                        "site_id": task.site_id,
+                        "traceback": traceback.format_exc(),
+                        "error_details": {
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                            "module": type(e).__module__ if hasattr(type(e), '__module__') else 'unknown'
+                        }
+                    }
+                )
+                
+                raise Exception(f"Metadata creation/upload failed: {str(e)}")
 
     def _count_total_tiles(self, tiles_data: Dict[int, Dict[str, bytes]]) -> int:
         """Count total tiles in all levels"""

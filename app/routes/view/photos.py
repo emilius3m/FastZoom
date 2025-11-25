@@ -1,7 +1,7 @@
 # app/routes/view/photos.py - Photos view route
 
 import asyncio
-import logging
+from loguru import logger
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,6 @@ from app.models import UserSitePermission
 from app.models import User
 from app.templates import templates
 
-logger = logging.getLogger(__name__)
 
 photos_view_router = APIRouter(prefix="/view", tags=["photos"])
 

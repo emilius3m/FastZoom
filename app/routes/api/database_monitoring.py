@@ -3,9 +3,7 @@ from typing import Dict, Any
 from app.database.session import get_async_session
 from app.services.database_pool_monitor import get_pool_monitor
 from app.core.security import get_current_user_id
-import logging
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 router = APIRouter(prefix="/api/database", tags=["database_monitoring"])
 

@@ -1,5 +1,5 @@
 # app/routes/view/geographic_map.py - Route per mappa geografica
-import logging
+from loguru import logger
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,6 @@ from app.models import UserSitePermission
 from app.models import User
 from app.templates import templates
 
-logger = logging.getLogger(__name__)
 
 geographic_map_router = APIRouter(prefix="/view", tags=["geographic-map"])
 

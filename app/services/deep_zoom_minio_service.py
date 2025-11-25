@@ -25,6 +25,11 @@ class DeepZoomMinIOService:
         self.overlap = 0      # Tile overlap for seamless viewing
         self.format = 'jpg'   # Tile format
 
+    @logger.catch(
+        reraise=True,
+        message="Failed to create processing status for {photo_id}",
+        level="ERROR"
+    )
     async def create_processing_status(
         self,
         photo_id: str,
@@ -37,36 +42,63 @@ class DeepZoomMinIOService:
         Returns:
             Dict con informazioni di stato
         """
-        try:
-            # Crea status metadata iniziale
-            status = {
-                "photo_id": photo_id,
-                "site_id": site_id,
-                "status": "processing",
-                "progress": 0,
-                "total_tiles": 0,
-                "completed_tiles": 0,
-                "levels": 0,
-                "tile_size": self.tile_size,
-                "started": datetime.now().isoformat(),
-                "archaeological_metadata": archaeological_metadata or {}
-            }
-            
-            # Upload status iniziale tramite storage service
-            object_name = f"{site_id}/tiles/{photo_id}/processing_status.json"
-            await self.storage.upload_json(
-                bucket=self.storage.buckets['tiles'],
-                object_name=object_name,
-                data=status
-            )
-            
-            logger.info(f"Deep zoom processing status created for photo {photo_id}")
-            return status
-            
-        except Exception as e:
-            logger.error(f"Failed to create processing status for {photo_id}: {e}")
-            raise
+        with logger.contextualize(
+            operation="create_processing_status",
+            photo_id=photo_id,
+            site_id=site_id,
+            has_metadata=archaeological_metadata is not None
+        ):
+            try:
+                # Crea status metadata iniziale
+                status = {
+                    "photo_id": photo_id,
+                    "site_id": site_id,
+                    "status": "processing",
+                    "progress": 0,
+                    "total_tiles": 0,
+                    "completed_tiles": 0,
+                    "levels": 0,
+                    "tile_size": self.tile_size,
+                    "started": datetime.now().isoformat(),
+                    "archaeological_metadata": archaeological_metadata or {}
+                }
+                
+                # Upload status iniziale tramite storage service
+                object_name = f"{site_id}/tiles/{photo_id}/processing_status.json"
+                await self.storage.upload_json(
+                    bucket=self.storage.buckets['tiles'],
+                    object_name=object_name,
+                    data=status
+                )
+                
+                logger.success(
+                    "Deep zoom processing status created",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "object_name": object_name,
+                        "tile_size": self.tile_size
+                    }
+                )
+                return status
+                
+            except Exception as e:
+                logger.error(
+                    "Failed to create processing status",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
+                )
+                raise
 
+    @logger.catch(
+        reraise=True,
+        message="Failed to schedule background tiles generation for {photo_id}",
+        level="ERROR"
+    )
     def schedule_tiles_generation_background(
         self,
         background_tasks: BackgroundTasks,
@@ -88,26 +120,47 @@ class DeepZoomMinIOService:
         Returns:
             Dict con informazioni di scheduling
         """
-        
-        # Aggiungi task in background
-        background_tasks.add_task(
-            self._process_tiles_background,
-            photo_id,
-            original_file_content,
-            site_id,
-            archaeological_metadata
-        )
-        
-        logger.info(f"Deep zoom tiles generation scheduled in background for photo {photo_id}")
-        
-        return {
-            'photo_id': photo_id,
-            'site_id': site_id,
-            'status': 'scheduled',
-            'message': 'Deep zoom tiles generation scheduled in background',
-            'scheduled_at': datetime.now().isoformat()
-        }
+        with logger.contextualize(
+            operation="schedule_tiles_generation_background",
+            photo_id=photo_id,
+            site_id=site_id,
+            file_size=len(original_file_content),
+            has_metadata=archaeological_metadata is not None
+        ):
+            # Aggiungi task in background
+            background_tasks.add_task(
+                self._process_tiles_background,
+                photo_id,
+                original_file_content,
+                site_id,
+                archaeological_metadata
+            )
+            
+            scheduled_at = datetime.now().isoformat()
+            logger.info(
+                "Deep zoom tiles generation scheduled in background",
+                extra={
+                    "photo_id": photo_id,
+                    "site_id": site_id,
+                    "file_size": len(original_file_content),
+                    "scheduled_at": scheduled_at,
+                    "tile_size": self.tile_size
+                }
+            )
+            
+            return {
+                'photo_id': photo_id,
+                'site_id': site_id,
+                'status': 'scheduled',
+                'message': 'Deep zoom tiles generation scheduled in background',
+                'scheduled_at': scheduled_at
+            }
 
+    @logger.catch(
+        reraise=True,
+        message="Failed to schedule async tiles generation for {photo_id}",
+        level="ERROR"
+    )
     async def schedule_tiles_generation_async(
         self,
         photo_id: str,
@@ -128,27 +181,48 @@ class DeepZoomMinIOService:
         Returns:
             Dict con informazioni di scheduling
         """
-        
-        # FIXED: Usa asyncio.create_task per esecuzione veramente asincrona
-        asyncio.create_task(
-            self._process_tiles_background(
-                photo_id,
-                original_file_content,
-                site_id,
-                archaeological_metadata
+        with logger.contextualize(
+            operation="schedule_tiles_generation_async",
+            photo_id=photo_id,
+            site_id=site_id,
+            file_size=len(original_file_content),
+            has_metadata=archaeological_metadata is not None
+        ):
+            # FIXED: Usa asyncio.create_task per esecuzione veramente asincrona
+            asyncio.create_task(
+                self._process_tiles_background(
+                    photo_id,
+                    original_file_content,
+                    site_id,
+                    archaeological_metadata
+                )
             )
-        )
-        
-        logger.info(f"✅ Deep zoom tiles generation scheduled asynchronously for photo {photo_id}")
-        
-        return {
-            'photo_id': photo_id,
-            'site_id': site_id,
-            'status': 'scheduled',
-            'message': 'Deep zoom tiles generation scheduled asynchronously',
-            'scheduled_at': datetime.now().isoformat()
-        }
+            
+            scheduled_at = datetime.now().isoformat()
+            logger.success(
+                "Deep zoom tiles generation scheduled asynchronously",
+                extra={
+                    "photo_id": photo_id,
+                    "site_id": site_id,
+                    "file_size": len(original_file_content),
+                    "scheduled_at": scheduled_at,
+                    "tile_size": self.tile_size
+                }
+            )
+            
+            return {
+                'photo_id': photo_id,
+                'site_id': site_id,
+                'status': 'scheduled',
+                'message': 'Deep zoom tiles generation scheduled asynchronously',
+                'scheduled_at': scheduled_at
+            }
 
+    @logger.catch(
+        reraise=True,
+        message="Batch tiles processing failed for site {site_id}",
+        level="ERROR"
+    )
     async def process_tiles_batch_sequential(
         self,
         photos_list: List[Dict[str, Any]],
@@ -163,107 +237,162 @@ class DeepZoomMinIOService:
             photos_list: Lista di dict con photo_id, file_path, archaeological_metadata
             site_id: ID del sito archeologico
         """
-        total_photos = len(photos_list)
-        logger.info(f"🚀 BATCH PROCESSING STARTED: {total_photos} foto da processare sequenzialmente")
-        
-        # Import notification manager
-        try:
-            from app.routes.api.notifications_ws import notification_manager
-            has_websocket = True
-        except ImportError:
-            logger.warning("Notification manager not available")
-            has_websocket = False
-        
-        completed_count = 0
-        failed_count = 0
-        
-        for idx, photo_info in enumerate(photos_list, 1):
-            photo_id = photo_info['photo_id']
-            file_path = photo_info['file_path']
-            archaeological_metadata = photo_info.get('archaeological_metadata', {})
-            width = photo_info.get('width', 0)
-            height = photo_info.get('height', 0)
+        with logger.contextualize(
+            operation="process_tiles_batch_sequential",
+            site_id=site_id,
+            total_photos=len(photos_list)
+        ):
+            total_photos = len(photos_list)
             
-            # Estrai filename dall'ultimo segmento del file_path
-            filename = file_path.split('/')[-1] if '/' in file_path else file_path
+            logger.info(
+                "Batch processing started",
+                extra={
+                    "site_id": site_id,
+                    "total_photos": total_photos,
+                    "processing_mode": "sequential"
+                }
+            )
             
+            # Import notification manager
             try:
-                logger.info(f"🔄 [{idx}/{total_photos}] Processing tiles for photo {photo_id} ({width}x{height})")
+                from app.routes.api.notifications_ws import notification_manager
+                has_websocket = True
+                logger.debug("WebSocket notifications enabled")
+            except ImportError:
+                has_websocket = False
+                logger.warning("WebSocket notifications not available")
+            
+            completed_count = 0
+            failed_count = 0
+            
+            for idx, photo_info in enumerate(photos_list, 1):
+                photo_id = photo_info['photo_id']
+                file_path = photo_info['file_path']
+                archaeological_metadata = photo_info.get('archaeological_metadata', {})
+                width = photo_info.get('width', 0)
+                height = photo_info.get('height', 0)
                 
-                # Invia notifica inizio processing
-                if has_websocket:
-                    await notification_manager.broadcast_tiles_progress(
-                        site_id=site_id,
-                        photo_id=photo_id,
-                        status='processing',
-                        progress=0,
-                        photo_filename=filename,
-                        current_photo=idx,
-                        total_photos=total_photos
-                    )
+                # Estrai filename dall'ultimo segmento del file_path
+                filename = file_path.split('/')[-1] if '/' in file_path else file_path
                 
-                # Carica file da MinIO usando storage service
-                original_file_content = await self.storage.get_file(
-                    bucket=self.storage.buckets['photos'],
-                    object_name=file_path.split('/')[-1]  # Estrai filename dal path
-                )
-                
-                # Processa tiles per questa foto
-                await self._process_tiles_background(
-                    photo_id,
-                    original_file_content,
-                    site_id,
-                    archaeological_metadata
-                )
-                
-                completed_count += 1
-                logger.info(f"✅ [{idx}/{total_photos}] Tiles completati per photo {photo_id} - Progresso: {completed_count}/{total_photos}")
-                
-                # Ottieni info finali sui tiles
-                tile_info = await self.get_deep_zoom_info(site_id, photo_id)
-                tile_count = tile_info.get('total_tiles', 0) if tile_info else 0
-                levels = tile_info.get('levels', 0) if tile_info else 0
-                
-                # Invia notifica completamento
-                if has_websocket:
-                    await notification_manager.broadcast_tiles_progress(
-                        site_id=site_id,
-                        photo_id=photo_id,
-                        status='completed',
-                        progress=100,
-                        photo_filename=filename,
-                        tile_count=tile_count,
-                        levels=levels,
-                        current_photo=idx,
-                        total_photos=total_photos
-                    )
-                
-            except Exception as e:
-                failed_count += 1
-                logger.error(f"❌ [{idx}/{total_photos}] Tiles falliti per photo {photo_id}: {e}")
-                
-                # Update database with failed status
-                await self._update_photo_database_status(photo_id, "failed")
-                await self._update_processing_status(
-                    photo_id, site_id, "failed", 0, error=str(e)
-                )
-                
-                # Invia notifica errore
-                if has_websocket:
-                    await notification_manager.broadcast_tiles_progress(
-                        site_id=site_id,
-                        photo_id=photo_id,
-                        status='failed',
-                        progress=0,
-                        photo_filename=filename,
-                        current_photo=idx,
-                        total_photos=total_photos,
-                        error=str(e)
-                    )
-        
-        logger.info(
-            f"🎉 BATCH PROCESSING COMPLETED: {completed_count} successi, {failed_count} fallimenti su {total_photos} foto totali"
-        )
+                with logger.contextualize(
+                    photo_id=photo_id,
+                    filename=filename,
+                    batch_position=f"{idx}/{total_photos}",
+                    dimensions=f"{width}x{height}"
+                ):
+                    try:
+                        logger.info(
+                            "Processing tiles for photo",
+                            extra={
+                                "photo_id": photo_id,
+                                "filename": filename,
+                                "width": width,
+                                "height": height,
+                                "batch_progress": f"{idx}/{total_photos}"
+                            }
+                        )
+                        
+                        # Invia notifica inizio processing
+                        if has_websocket:
+                            await notification_manager.broadcast_tiles_progress(
+                                site_id=site_id,
+                                photo_id=photo_id,
+                                status='processing',
+                                progress=0,
+                                photo_filename=filename,
+                                current_photo=idx,
+                                total_photos=total_photos
+                            )
+                        
+                        # Carica file da MinIO usando storage service
+                        original_file_content = await self.storage.get_file(
+                            bucket=self.storage.buckets['photos'],
+                            object_name=file_path.split('/')[-1]  # Estrai filename dal path
+                        )
+                        
+                        # Processa tiles per questa foto
+                        await self._process_tiles_background(
+                            photo_id,
+                            original_file_content,
+                            site_id,
+                            archaeological_metadata
+                        )
+                        
+                        completed_count += 1
+                        logger.success(
+                            "Tiles processing completed for photo",
+                            extra={
+                                "photo_id": photo_id,
+                                "completed_count": completed_count,
+                                "total_photos": total_photos,
+                                "success_rate": f"{(completed_count/idx)*100:.1f}%"
+                            }
+                        )
+                        
+                        # Ottieni info finali sui tiles
+                        tile_info = await self.get_deep_zoom_info(site_id, photo_id)
+                        tile_count = tile_info.get('total_tiles', 0) if tile_info else 0
+                        levels = tile_info.get('levels', 0) if tile_info else 0
+                        
+                        # Invia notifica completamento
+                        if has_websocket:
+                            await notification_manager.broadcast_tiles_progress(
+                                site_id=site_id,
+                                photo_id=photo_id,
+                                status='completed',
+                                progress=100,
+                                photo_filename=filename,
+                                tile_count=tile_count,
+                                levels=levels,
+                                current_photo=idx,
+                                total_photos=total_photos
+                            )
+                        
+                    except Exception as e:
+                        failed_count += 1
+                        logger.error(
+                            "Tiles processing failed for photo",
+                            extra={
+                                "photo_id": photo_id,
+                                "filename": filename,
+                                "error": str(e),
+                                "error_type": type(e).__name__,
+                                "failed_count": failed_count,
+                                "batch_progress": f"{idx}/{total_photos}"
+                            }
+                        )
+                        
+                        # Update database with failed status
+                        await self._update_photo_database_status(photo_id, "failed")
+                        await self._update_processing_status(
+                            photo_id, site_id, "failed", 0, error=str(e)
+                        )
+                        
+                        # Invia notifica errore
+                        if has_websocket:
+                            await notification_manager.broadcast_tiles_progress(
+                                site_id=site_id,
+                                photo_id=photo_id,
+                                status='failed',
+                                progress=0,
+                                photo_filename=filename,
+                                current_photo=idx,
+                                total_photos=total_photos,
+                                error=str(e)
+                            )
+            
+            logger.info(
+                "Batch processing completed",
+                extra={
+                    "site_id": site_id,
+                    "completed_count": completed_count,
+                    "failed_count": failed_count,
+                    "total_photos": total_photos,
+                    "success_rate": f"{(completed_count/total_photos)*100:.1f}%",
+                    "processing_mode": "sequential"
+                }
+            )
 
     async def _schedule_and_process_tiles(
         self,
@@ -302,6 +431,11 @@ class DeepZoomMinIOService:
                 photo_id, site_id, "failed", 0, error=f"File loading failed: {str(e)}"
             )
 
+    @logger.catch(
+        reraise=True,
+        message="Background tiles processing failed for photo {photo_id}",
+        level="ERROR"
+    )
     async def _process_tiles_background(
         self,
         photo_id: str,
@@ -312,135 +446,210 @@ class DeepZoomMinIOService:
         """
         Processa tiles in background senza bloccare l'upload principale
         """
-        try:
-            logger.info(f"🚀 Starting background tiles generation for photo {photo_id} (site: {site_id})")
-            
-            # 1. Update database status to "processing"
-            await self._update_photo_database_status(photo_id, "processing")
-            
-            # 2. Aggiorna status a "processing"
-            await self._update_processing_status(photo_id, site_id, "processing", 0)
-            
-            # 2. Genera tiles in memoria
-            tiles_data, original_width, original_height = await self._generate_tiles_from_bytes(
-                original_file_content, photo_id, site_id
-            )
-            
-            total_tiles = self._count_total_tiles(tiles_data)
-            await self._update_processing_status(photo_id, site_id, "uploading", 10, total_tiles, len(tiles_data))
-            
-            # 3. Upload tiles con progress tracking
-            completed_tiles = 0
-            upload_tasks = []
-            
-            for level, tiles_level in tiles_data.items():
-                for tile_coords, tile_data in tiles_level.items():
-                    # Usa estensione dinamica basata sul formato
-                    extension = 'png' if self.format == 'png' else 'jpg'
-                    object_name = f"{site_id}/tiles/{photo_id}/{level}/{tile_coords}.{extension}"
-
-                    # Metadati archeologici
-                    tile_metadata = {
-                        'photo_id': photo_id,
-                        'site_id': site_id,
-                        'level': level,
-                        'tile_coords': tile_coords,
-                        'tile_size': self.tile_size,
-                        'format': self.format
-                    }
-
-                    if archaeological_metadata:
-                        tile_metadata.update({
-                            'inventory_number': archaeological_metadata.get('inventory_number'),
-                            'excavation_area': archaeological_metadata.get('excavation_area'),
-                            'material': archaeological_metadata.get('material')
-                        })
-
-                    task = self._upload_single_tile_with_metadata(
-                        object_name, tile_data, tile_metadata
-                    )
-                    upload_tasks.append(task)
-            
-            # Upload tiles con progress tracking ogni 10 tiles
-            batch_size = 10
-            successful_uploads = []
-            failed_uploads = []
-            
-            for i in range(0, len(upload_tasks), batch_size):
-                batch = upload_tasks[i:i + batch_size]
-                batch_results = await asyncio.gather(*batch, return_exceptions=True)
-                
-                # Processa risultati batch
-                for result in batch_results:
-                    if result is not None and not isinstance(result, Exception):
-                        successful_uploads.append(result)
-                    else:
-                        failed_uploads.append(result)
-                
-                completed_tiles += len(batch)
-                progress = 10 + int((completed_tiles / total_tiles) * 80)  # 10-90%
-                
-                await self._update_processing_status(
-                    photo_id, site_id, "uploading", progress, total_tiles, len(tiles_data), completed_tiles
-                )
-                
-                logger.info(f"Uploaded {completed_tiles}/{total_tiles} tiles for photo {photo_id}")
-            
-            if failed_uploads:
-                logger.warning(f"Some tile uploads failed for photo {photo_id}: {len(failed_uploads)} errors")
-
-            # 4. Crea metadata finale
-            await self._update_processing_status(photo_id, site_id, "finalizing", 90)
-            
-            metadata_url = await self._create_and_upload_metadata(
-                photo_id, site_id, tiles_data, archaeological_metadata, original_width, original_height
-            )
-            
-            # 5. Completa con successo
-            final_status = {
-                "photo_id": photo_id,
-                "site_id": site_id,
-                "status": "completed",
-                "progress": 100,
-                "total_tiles": total_tiles,
-                "completed_tiles": len(successful_uploads),
-                "failed_tiles": len(failed_uploads),
-                "levels": len(tiles_data),
-                "tile_size": self.tile_size,
-                "tile_format": self.format,
-                "width": original_width,
-                "height": original_height,
-                "metadata_url": metadata_url,
-                "started": datetime.now().isoformat(),
-                "completed": datetime.now().isoformat(),
-                "archaeological_metadata": archaeological_metadata or {}
-            }
-            
-            await self._update_processing_status_full(photo_id, site_id, final_status)
-            
-            # Update database with completion status
-            await self._update_photo_database_status(
-                photo_id,
-                "completed",
-                tile_count=len(successful_uploads),
-                levels=len(tiles_data)
-            )
-            
-            logger.info(f"🎉 Background tiles generation completed for photo {photo_id}: {len(successful_uploads)} tiles uploaded in {len(tiles_data)} levels")
-
-        except Exception as e:
-            logger.error(f"❌ Background tiles generation failed for photo {photo_id}: {e}")
-            
-            # Update database with failed status
-            await self._update_photo_database_status(photo_id, "failed")
-            
-            # Aggiorna status a "failed"
+        with logger.contextualize(
+            operation="_process_tiles_background",
+            photo_id=photo_id,
+            site_id=site_id,
+            file_size=len(original_file_content),
+            has_metadata=archaeological_metadata is not None
+        ):
             try:
-                await self._update_processing_status(
-                    photo_id, site_id, "failed", 0, error=str(e)
+                logger.info(
+                    "Starting background tiles generation",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "file_size": len(original_file_content),
+                        "tile_size": self.tile_size
+                    }
                 )
-            except Exception as status_error:
-                logger.error(f"Failed to update error status for photo {photo_id}: {status_error}")
+                
+                # 1. Update database status to "processing"
+                await self._update_photo_database_status(photo_id, "processing")
+                
+                # 2. Aggiorna status a "processing"
+                await self._update_processing_status(photo_id, site_id, "processing", 0)
+                
+                # 2. Genera tiles in memoria
+                tiles_data, original_width, original_height = await self._generate_tiles_from_bytes(
+                    original_file_content, photo_id, site_id
+                )
+                
+                total_tiles = self._count_total_tiles(tiles_data)
+                levels_count = len(tiles_data)
+                
+                logger.info(
+                    "Tiles generated in memory",
+                    extra={
+                        "photo_id": photo_id,
+                        "total_tiles": total_tiles,
+                        "levels": levels_count,
+                        "dimensions": f"{original_width}x{original_height}",
+                        "format": self.format
+                    }
+                )
+                
+                await self._update_processing_status(photo_id, site_id, "uploading", 10, total_tiles, levels_count)
+                
+                # 3. Upload tiles con progress tracking
+                completed_tiles = 0
+                upload_tasks = []
+                
+                for level, tiles_level in tiles_data.items():
+                    for tile_coords, tile_data in tiles_level.items():
+                        # Usa estensione dinamica basata sul formato
+                        extension = 'png' if self.format == 'png' else 'jpg'
+                        object_name = f"{site_id}/tiles/{photo_id}/{level}/{tile_coords}.{extension}"
+
+                        # Metadati archeologici
+                        tile_metadata = {
+                            'photo_id': photo_id,
+                            'site_id': site_id,
+                            'level': level,
+                            'tile_coords': tile_coords,
+                            'tile_size': self.tile_size,
+                            'format': self.format
+                        }
+
+                        if archaeological_metadata:
+                            tile_metadata.update({
+                                'inventory_number': archaeological_metadata.get('inventory_number'),
+                                'excavation_area': archaeological_metadata.get('excavation_area'),
+                                'material': archaeological_metadata.get('material')
+                            })
+
+                        task = self._upload_single_tile_with_metadata(
+                            object_name, tile_data, tile_metadata
+                        )
+                        upload_tasks.append(task)
+                
+                # Upload tiles con progress tracking ogni 10 tiles
+                batch_size = 10
+                successful_uploads = []
+                failed_uploads = []
+                
+                for i in range(0, len(upload_tasks), batch_size):
+                    batch = upload_tasks[i:i + batch_size]
+                    batch_results = await asyncio.gather(*batch, return_exceptions=True)
+                    
+                    # Processa risultati batch
+                    for result in batch_results:
+                        if result is not None and not isinstance(result, Exception):
+                            successful_uploads.append(result)
+                        else:
+                            failed_uploads.append(result)
+                    
+                    completed_tiles += len(batch)
+                    progress = 10 + int((completed_tiles / total_tiles) * 80)  # 10-90%
+                    
+                    await self._update_processing_status(
+                        photo_id, site_id, "uploading", progress, total_tiles, levels_count, completed_tiles
+                    )
+                    
+                    if completed_tiles % 50 == 0:  # Log every 50 tiles to reduce noise
+                        logger.info(
+                            "Tiles upload progress",
+                            extra={
+                                "photo_id": photo_id,
+                                "completed_tiles": completed_tiles,
+                                "total_tiles": total_tiles,
+                                "progress_percent": f"{progress}%",
+                                "successful_uploads": len(successful_uploads),
+                                "failed_uploads": len(failed_uploads)
+                            }
+                        )
+                
+                if failed_uploads:
+                    logger.warning(
+                        "Some tile uploads failed",
+                        extra={
+                            "photo_id": photo_id,
+                            "failed_count": len(failed_uploads),
+                            "successful_count": len(successful_uploads),
+                            "failure_rate": f"{(len(failed_uploads)/len(upload_tasks))*100:.1f}%"
+                        }
+                    )
+
+                # 4. Crea metadata finale
+                await self._update_processing_status(photo_id, site_id, "finalizing", 90)
+                
+                metadata_url = await self._create_and_upload_metadata(
+                    photo_id, site_id, tiles_data, archaeological_metadata, original_width, original_height
+                )
+                
+                # 5. Completa con successo
+                final_status = {
+                    "photo_id": photo_id,
+                    "site_id": site_id,
+                    "status": "completed",
+                    "progress": 100,
+                    "total_tiles": total_tiles,
+                    "completed_tiles": len(successful_uploads),
+                    "failed_tiles": len(failed_uploads),
+                    "levels": len(tiles_data),
+                    "tile_size": self.tile_size,
+                    "tile_format": self.format,
+                    "width": original_width,
+                    "height": original_height,
+                    "metadata_url": metadata_url,
+                    "started": datetime.now().isoformat(),
+                    "completed": datetime.now().isoformat(),
+                    "archaeological_metadata": archaeological_metadata or {}
+                }
+                
+                await self._update_processing_status_full(photo_id, site_id, final_status)
+                
+                # Update database with completion status
+                await self._update_photo_database_status(
+                    photo_id,
+                    "completed",
+                    tile_count=len(successful_uploads),
+                    levels=len(tiles_data)
+                )
+                
+                logger.success(
+                    "Background tiles generation completed successfully",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "successful_uploads": len(successful_uploads),
+                        "failed_uploads": len(failed_uploads),
+                        "total_tiles": total_tiles,
+                        "levels": len(tiles_data),
+                        "dimensions": f"{original_width}x{original_height}",
+                        "format": self.format,
+                        "success_rate": f"{(len(successful_uploads)/total_tiles)*100:.1f}%"
+                    }
+                )
+
+            except Exception as e:
+                logger.error(
+                    "Background tiles generation failed",
+                    extra={
+                        "photo_id": photo_id,
+                        "site_id": site_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
+                )
+                
+                # Update database with failed status
+                await self._update_photo_database_status(photo_id, "failed")
+                
+                # Aggiorna status a "failed"
+                try:
+                    await self._update_processing_status(
+                        photo_id, site_id, "failed", 0, error=str(e)
+                    )
+                except Exception as status_error:
+                    logger.error(
+                        "Failed to update error status",
+                        extra={
+                            "photo_id": photo_id,
+                            "status_error": str(status_error),
+                            "original_error": str(e)
+                        }
+                    )
 
     async def process_and_upload_tiles(
         self,
@@ -639,7 +848,7 @@ class DeepZoomMinIOService:
             "tile_format": self.format,  # FIXED: Aggiunto per compatibilità OpenSeadragon
             "total_tiles": self._count_total_tiles(tiles_data),
             "created": datetime.now().isoformat(),
-            "archeological_metadata": archaeological_metadata or {}
+            "archaeological_metadata": archaeological_metadata or {}
         }
 
         # Aggiungi informazioni per livello
@@ -725,121 +934,402 @@ class DeepZoomMinIOService:
             return None
 
     async def get_tile_content(self, site_id: str, photo_id: str, level: int, x: int, y: int) -> Optional[bytes]:
-        """Ottieni contenuto diretto del tile invece di URL presigned"""
+        """Ottieni contenuto diretto del tile invece di URL presigned con logging dettagliato"""
+        import time
+        start_time = time.time()
+        
         tile_coords = f"{x}_{y}"
         
-        # FIXED: Try both formats systematically instead of relying on metadata
-        extensions_to_try = ['png', 'jpg']
-        
-        try:
-            # Import locale per evitare circular import
-            from app.services.archaeological_minio_service import archaeological_minio_service
-            import asyncio
-            from minio.error import S3Error
+        with logger.contextualize(
+            operation="get_tile_content",
+            site_id=site_id,
+            photo_id=photo_id,
+            level=level,
+            x=x,
+            y=y,
+            tile_coords=tile_coords
+        ):
+            logger.info(
+                "🔍 TILE REQUEST STARTED",
+                extra={
+                    "site_id": site_id,
+                    "photo_id": photo_id,
+                    "level": level,
+                    "coordinates": f"{x}_{y}",
+                    "tile_coords": tile_coords,
+                    "request_timestamp": datetime.now().isoformat()
+                }
+            )
             
-            # ENHANCED: Check if this photo has incomplete tiles before attempting retrieval
-            tile_info = await self.get_deep_zoom_info(site_id, photo_id)
-            if tile_info and tile_info.get('available', False):
-                expected_total_tiles = tile_info.get('total_tiles', 0)
-                expected_levels = tile_info.get('levels', 0)
+            # FIXED: Try both formats systematically instead of relying on metadata
+            extensions_to_try = ['png', 'jpg']
+            
+            try:
+                # Import locale per evitare circular import
+                # Use self.storage instead of direct import to avoid circular imports
+                storage_service = self.storage
+                import asyncio
+                from minio.error import S3Error
                 
-                # Quick check: if we expect many tiles but can't find the requested one,
-                # there might be a generation issue
-                if expected_total_tiles > 10:  # Arbitrary threshold for "should have many tiles"
-                    # Check how many tiles actually exist at this level
-                    try:
-                        prefix = f"{site_id}/tiles/{photo_id}/{level}/"
-                        
-                        def _count_tiles_at_level():
-                            return list(archaeological_minio_service._client.list_objects(
-                                bucket_name=archaeological_minio_service.buckets['tiles'],
-                                prefix=prefix,
-                                recursive=False
-                            ))
-                        
-                        objects_at_level = await asyncio.to_thread(_count_tiles_at_level)
-                        actual_tiles_at_level = [obj for obj in objects_at_level if not obj.is_dir]
-                        
-                        if len(actual_tiles_at_level) == 0:
-                            logger.error(f"🚨 CRITICAL: No tiles found at level {level} for photo {photo_id}, but metadata expects {expected_total_tiles} total tiles")
-                            logger.error(f"🔍 This indicates incomplete tile generation. Expected levels: {expected_levels}")
-                            
-                            # Try to find any tiles at all for this photo
-                            all_prefix = f"{site_id}/tiles/{photo_id}/"
-                            
-                            def _count_all_tiles():
-                                return list(archaeological_minio_service._client.list_objects(
-                                    bucket_name=archaeological_minio_service.buckets['tiles'],
-                                    prefix=all_prefix,
-                                    recursive=True
-                                ))
-                            
-                            all_objects = await asyncio.to_thread(_count_all_tiles)
-                            all_tiles = [obj for obj in all_objects if not obj.is_dir and obj.object_name.endswith(('.png', '.jpg'))]
-                            
-                            logger.error(f"📊 ACTUAL TILE COUNT: {len(all_tiles)} tiles found vs {expected_total_tiles} expected")
-                            
-                            if len(all_tiles) < expected_total_tiles * 0.1:  # Less than 10% of expected tiles
-                                logger.error(f"🔴 SEVERE: Photo {photo_id} has incomplete tile generation ({len(all_tiles)}/{expected_total_tiles} tiles)")
-                                logger.error(f"💡 RECOMMENDATION: Regenerate all tiles for this photo")
-                                return None
-                        
-                        elif len(actual_tiles_at_level) < 4:  # Very few tiles at this level
-                            logger.warning(f"⚠️ WARNING: Only {len(actual_tiles_at_level)} tiles found at level {level} for photo {photo_id}")
-                            logger.warning(f"🔍 This might indicate partial tile generation")
+                # ENHANCED: Check if this photo has incomplete tiles before attempting retrieval
+                metadata_check_start = time.time()
+                tile_info = await self.get_deep_zoom_info(site_id, photo_id)
+                metadata_check_time = time.time() - metadata_check_start
+            
+                logger.info(
+                    "📋 TILE METADATA CHECK",
+                    extra={
+                        "photo_id": photo_id,
+                        "metadata_available": tile_info is not None,
+                        "tiles_available": tile_info.get('available', False) if tile_info else False,
+                        "metadata_check_time_ms": round(metadata_check_time * 1000, 2),
+                        "tile_info": tile_info
+                    }
+                )
+            
+                if tile_info and tile_info.get('available', False):
+                    expected_total_tiles = tile_info.get('total_tiles', 0)
+                    expected_levels = tile_info.get('levels', 0)
+                    tile_format = tile_info.get('tile_format', 'unknown')
                     
-                    except Exception as check_error:
-                        logger.warning(f"Could not verify tile completeness for photo {photo_id}: {check_error}")
-            
-            # Try to get the requested tile
-            for extension in extensions_to_try:
-                object_name = f"{site_id}/tiles/{photo_id}/{level}/{tile_coords}.{extension}"
-                
-                try:
-                    tile_data = await asyncio.to_thread(
-                        archaeological_minio_service._client.get_object,
-                        bucket_name=archaeological_minio_service.buckets['tiles'],
-                        object_name=object_name
+                    logger.info(
+                        "📊 TILE METADATA DETAILS",
+                        extra={
+                            "photo_id": photo_id,
+                            "expected_total_tiles": expected_total_tiles,
+                            "expected_levels": expected_levels,
+                            "tile_format": tile_format,
+                            "tile_size": tile_info.get('tile_size', 'unknown'),
+                            "dimensions": f"{tile_info.get('width', 0)}x{tile_info.get('height', 0)}"
+                        }
                     )
                     
-                    # Read the content
-                    content = tile_data.read()
-                    tile_data.close()
-                    tile_data.release_conn()
+                    # Quick check: if we expect many tiles but can't find the requested one,
+                    # there might be a generation issue
+                    if expected_total_tiles > 10:  # Arbitrary threshold for "should have many tiles"
+                        # Check how many tiles actually exist at this level
+                        completeness_check_start = time.time()
+                        try:
+                            prefix = f"{site_id}/tiles/{photo_id}/{level}/"
+                            
+                            logger.debug(
+                                "🔍 CHECKING TILE COMPLETENESS",
+                                extra={
+                                    "photo_id": photo_id,
+                                    "level": level,
+                                    "prefix": prefix,
+                                    "expected_total_tiles": expected_total_tiles
+                                }
+                            )
+                            
+                            def _count_tiles_at_level():
+                                return list(storage_service._client.list_objects(
+                                    bucket_name=storage_service.buckets['tiles'],
+                                    prefix=prefix,
+                                    recursive=False
+                                ))
+                            
+                            objects_at_level = await asyncio.to_thread(_count_tiles_at_level)
+                            actual_tiles_at_level = [obj for obj in objects_at_level if not obj.is_dir]
+                            completeness_check_time = time.time() - completeness_check_start
+                            
+                            logger.info(
+                                "📈 TILE LEVEL COMPLETENESS CHECK",
+                                extra={
+                                    "photo_id": photo_id,
+                                    "level": level,
+                                    "actual_tiles_at_level": len(actual_tiles_at_level),
+                                    "completeness_check_time_ms": round(completeness_check_time * 1000, 2),
+                                    "prefix": prefix
+                                }
+                            )
+                            
+                            if len(actual_tiles_at_level) == 0:
+                                logger.error(
+                                    f"🚨 CRITICAL: No tiles found at level {level} for photo {photo_id}",
+                                    extra={
+                                        "photo_id": photo_id,
+                                        "level": level,
+                                        "expected_total_tiles": expected_total_tiles,
+                                        "expected_levels": expected_levels,
+                                        "severity": "CRITICAL"
+                                    }
+                                )
+                                logger.error(
+                                    f"🔍 This indicates incomplete tile generation. Expected levels: {expected_levels}",
+                                    extra={
+                                        "photo_id": photo_id,
+                                        "diagnosis": "incomplete_tile_generation",
+                                        "recommendation": "regenerate_all_tiles"
+                                    }
+                                )
+                                
+                                # Try to find any tiles at all for this photo
+                                all_prefix = f"{site_id}/tiles/{photo_id}/"
+                                
+                                def _count_all_tiles():
+                                    return list(storage_service._client.list_objects(
+                                        bucket_name=storage_service.buckets['tiles'],
+                                        prefix=all_prefix,
+                                        recursive=True
+                                    ))
+                                
+                                all_objects = await asyncio.to_thread(_count_all_tiles)
+                                all_tiles = [obj for obj in all_objects if not obj.is_dir and obj.object_name.endswith(('.png', '.jpg'))]
+                                
+                                logger.error(
+                                    f"📊 ACTUAL TILE COUNT: {len(all_tiles)} tiles found vs {expected_total_tiles} expected",
+                                    extra={
+                                        "photo_id": photo_id,
+                                        "actual_tiles": len(all_tiles),
+                                        "expected_tiles": expected_total_tiles,
+                                        "completion_percentage": round((len(all_tiles) / expected_total_tiles * 100), 2) if expected_total_tiles > 0 else 0
+                                    }
+                                )
+                                
+                                if len(all_tiles) < expected_total_tiles * 0.1:  # Less than 10% of expected tiles
+                                    logger.error(
+                                        f"🔴 SEVERE: Photo {photo_id} has incomplete tile generation ({len(all_tiles)}/{expected_total_tiles} tiles)",
+                                        extra={
+                                            "photo_id": photo_id,
+                                            "severity": "SEVERE",
+                                            "actual_tiles": len(all_tiles),
+                                            "expected_tiles": expected_total_tiles,
+                                            "completion_percentage": round((len(all_tiles) / expected_total_tiles * 100), 2),
+                                            "recommendation": "regenerate_all_tiles"
+                                        }
+                                    )
+                                    logger.error(
+                                        f"💡 RECOMMENDATION: Regenerate all tiles for this photo",
+                                        extra={
+                                            "photo_id": photo_id,
+                                            "action": "regenerate_tiles",
+                                            "priority": "high"
+                                        }
+                                    )
+                                    return None
+                            
+                            elif len(actual_tiles_at_level) < 4:  # Very few tiles at this level
+                                logger.warning(
+                                    f"⚠️ WARNING: Only {len(actual_tiles_at_level)} tiles found at level {level} for photo {photo_id}",
+                                    extra={
+                                        "photo_id": photo_id,
+                                        "level": level,
+                                        "actual_tiles": len(actual_tiles_at_level),
+                                        "severity": "WARNING",
+                                        "diagnosis": "partial_tile_generation"
+                                    }
+                                )
+                                logger.warning(
+                                    f"🔍 This might indicate partial tile generation",
+                                    extra={
+                                        "photo_id": photo_id,
+                                        "diagnosis": "partial_tile_generation",
+                                        "recommendation": "verify_tile_generation"
+                                    }
+                                )
+                        
+                        except Exception as check_error:
+                            logger.warning(
+                                f"Could not verify tile completeness for photo {photo_id}: {check_error}",
+                                extra={
+                                    "photo_id": photo_id,
+                                    "error": str(check_error),
+                                    "error_type": type(check_error).__name__
+                                }
+                            )
+            
+                # Try to get the requested tile
+                for attempt_idx, extension in enumerate(extensions_to_try, 1):
+                    object_name = f"{site_id}/tiles/{photo_id}/{level}/{tile_coords}.{extension}"
+                    retrieval_start = time.time()
                     
-                    logger.info(f"✅ Retrieved tile content: {object_name} ({len(content)} bytes)")
-                    return content
+                    logger.info(
+                        f"🎯 TILE RETRIEVAL ATTEMPT {attempt_idx}/{len(extensions_to_try)}",
+                        extra={
+                            "photo_id": photo_id,
+                            "level": level,
+                            "coordinates": f"{x}_{y}",
+                            "extension": extension,
+                            "object_name": object_name,
+                            "attempt": attempt_idx,
+                            "total_attempts": len(extensions_to_try)
+                        }
+                    )
                     
-                except S3Error as e:
-                    if e.code == 'NoSuchKey':
-                        logger.debug(f"Tile not found with format .{extension} for photo {photo_id}")
-                        continue  # Try next format
-                    else:
-                        logger.warning(f"MinIO error accessing tile {object_name}: {e}")
-                        continue
-            
-            # If we get here, no format worked - provide enhanced error information
-            logger.error(f"❌ Tile not found in any format for photo {photo_id}: {tile_coords} at level {level}")
-            
-            # ENHANCED: Provide helpful diagnostic information
-            if tile_info and tile_info.get('available', False):
-                expected_total_tiles = tile_info.get('total_tiles', 0)
-                expected_levels = tile_info.get('levels', 0)
-                logger.error(f"📊 Tile metadata indicates {expected_total_tiles} tiles across {expected_levels} levels should exist")
-                logger.error(f"🔍 Requested tile {tile_coords} at level {level} is missing")
-                logger.error(f"💡 This may indicate:")
-                logger.error(f"   - Incomplete tile generation process")
-                logger.error(f"   - Tile generation was interrupted")
-                logger.error(f"   - Upload to MinIO failed for some tiles")
-                logger.error(f"💡 RECOMMENDATION: Regenerate tiles for photo {photo_id}")
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error retrieving tile content for photo {photo_id} tile {tile_coords} level {level}: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            return None
+                    try:
+                        tile_data = await asyncio.to_thread(
+                            storage_service._client.get_object,
+                            bucket_name=storage_service.buckets['tiles'],
+                            object_name=object_name
+                        )
+                        
+                        # Read the content
+                        content = tile_data.read()
+                        tile_data.close()
+                        tile_data.release_conn()
+                        retrieval_time = time.time() - retrieval_start
+                        total_time = time.time() - start_time
+                        
+                        logger.success(
+                            f"✅ TILE RETRIEVAL SUCCESS",
+                            extra={
+                                "photo_id": photo_id,
+                                "level": level,
+                                "coordinates": f"{x}_{y}",
+                                "extension": extension,
+                                "object_name": object_name,
+                                "content_size_bytes": len(content),
+                                "retrieval_time_ms": round(retrieval_time * 1000, 2),
+                                "total_time_ms": round(total_time * 1000, 2),
+                                "attempt": attempt_idx,
+                                "bucket": storage_service.buckets['tiles']
+                            }
+                        )
+                        return content
+                        
+                    except S3Error as e:
+                        retrieval_time = time.time() - retrieval_start
+                        if e.code == 'NoSuchKey':
+                            logger.debug(
+                                f"🔍 TILE NOT FOUND with format .{extension} for photo {photo_id}",
+                                extra={
+                                    "photo_id": photo_id,
+                                    "level": level,
+                                    "coordinates": f"{x}_{y}",
+                                    "extension": extension,
+                                    "object_name": object_name,
+                                    "error_code": e.code,
+                                    "error_message": str(e),
+                                    "retrieval_time_ms": round(retrieval_time * 1000, 2),
+                                    "attempt": attempt_idx
+                                }
+                            )
+                            continue  # Try next format
+                        else:
+                            logger.warning(
+                                f"⚠️ MINIO ERROR accessing tile {object_name}: {e}",
+                                extra={
+                                    "photo_id": photo_id,
+                                    "level": level,
+                                    "coordinates": f"{x}_{y}",
+                                    "extension": extension,
+                                    "object_name": object_name,
+                                    "error_code": e.code,
+                                    "error_message": str(e),
+                                    "error_type": type(e).__name__,
+                                    "retrieval_time_ms": round(retrieval_time * 1000, 2),
+                                    "attempt": attempt_idx,
+                                    "bucket": storage_service.buckets['tiles']
+                                }
+                            )
+                            continue
+                
+                # If we get here, no format worked - provide enhanced error information
+                total_time = time.time() - start_time
+                
+                logger.error(
+                    f"❌ TILE NOT FOUND IN ANY FORMAT",
+                    extra={
+                        "photo_id": photo_id,
+                        "level": level,
+                        "coordinates": f"{x}_{y}",
+                        "tile_coords": tile_coords,
+                        "total_time_ms": round(total_time * 1000, 2),
+                        "formats_tried": extensions_to_try,
+                        "attempts_made": len(extensions_to_try),
+                        "severity": "ERROR"
+                    }
+                )
+                
+                # ENHANCED: Provide helpful diagnostic information
+                if tile_info and tile_info.get('available', False):
+                    expected_total_tiles = tile_info.get('total_tiles', 0)
+                    expected_levels = tile_info.get('levels', 0)
+                    
+                    logger.error(
+                        f"📊 TILE METADATA VS REALITY MISMATCH",
+                        extra={
+                            "photo_id": photo_id,
+                            "expected_total_tiles": expected_total_tiles,
+                            "expected_levels": expected_levels,
+                            "requested_tile": f"{tile_coords} at level {level}",
+                            "diagnosis": "tile_missing_despite_metadata",
+                            "severity": "HIGH"
+                        }
+                    )
+                    
+                    logger.error(
+                        f"🔍 REQUESTED TILE ANALYSIS",
+                        extra={
+                            "photo_id": photo_id,
+                            "requested_level": level,
+                            "requested_coordinates": tile_coords,
+                            "missing_tile": f"{level}/{tile_coords}",
+                            "status": "missing"
+                        }
+                    )
+                    
+                    logger.error(
+                        f"💡 POSSIBLE CAUSES ANALYSIS",
+                        extra={
+                            "photo_id": photo_id,
+                            "possible_causes": [
+                                "incomplete_tile_generation_process",
+                                "tile_generation_interrupted",
+                                "upload_to_minio_failed",
+                                "corrupted_metadata",
+                                "storage_access_issues"
+                            ],
+                            "recommendation": "regenerate_tiles_for_photo"
+                        }
+                    )
+                    
+                    logger.error(
+                        f"💡 RECOMMENDATION: Regenerate tiles for photo {photo_id}",
+                        extra={
+                            "photo_id": photo_id,
+                            "action": "regenerate_tiles",
+                            "priority": "high",
+                            "reason": "tiles_missing_despite_metadata"
+                        }
+                    )
+                
+                return None
+                
+            except Exception as e:
+                total_time = time.time() - start_time
+                
+                logger.error(
+                    f"💥 CRITICAL TILE RETRIEVAL ERROR",
+                    extra={
+                        "photo_id": photo_id,
+                        "level": level,
+                        "coordinates": f"{x}_{y}",
+                        "tile_coords": tile_coords,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "total_time_ms": round(total_time * 1000, 2),
+                        "severity": "CRITICAL"
+                    }
+                )
+                
+                import traceback
+                logger.error(
+                    f"📋 TILE RETRIEVAL ERROR TRACEBACK",
+                    extra={
+                        "photo_id": photo_id,
+                        "level": level,
+                        "coordinates": f"{x}_{y}",
+                        "traceback": traceback.format_exc(),
+                        "error_details": {
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                            "module": type(e).__module__ if hasattr(type(e), '__module__') else 'unknown'
+                        }
+                    }
+                )
+                return None
 
     async def get_deep_zoom_info(self, site_id: str, photo_id: str) -> Optional[Dict[str, Any]]:
         """Ottieni informazioni deep zoom per una foto"""
@@ -850,13 +1340,14 @@ class DeepZoomMinIOService:
             # FIXED: Try direct MinIO access first to avoid path parsing issues
             try:
                 # Import locale per evitare circular import
-                from app.services.archaeological_minio_service import archaeological_minio_service
+                # Use self.storage instead of direct import to avoid circular imports
+                storage_service = self.storage
                 import asyncio
                 from minio.error import S3Error
                 
                 def _download_metadata():
-                    return archaeological_minio_service._client.get_object(
-                        bucket_name=archaeological_minio_service.buckets['tiles'],
+                    return storage_service._client.get_object(
+                        bucket_name=storage_service.buckets['tiles'],
                         object_name=metadata_path
                     )
                 
@@ -1290,7 +1781,8 @@ class DeepZoomMinIOService:
             from minio.error import S3Error
             
             # Import locale per evitare circular import
-            from app.services.archaeological_minio_service import archaeological_minio_service
+            # Use self.storage instead of direct import to avoid circular imports
+            storage_service = self.storage
             
             # Cerca tiles nei formati jpg e png
             formats_to_check = ['jpg', 'png']
@@ -1305,8 +1797,8 @@ class DeepZoomMinIOService:
                 try:
                     # Usa asyncio.to_thread per operazioni sincrone MinIO
                     objects = await asyncio.to_thread(
-                        archaeological_minio_service._client.list_objects,
-                        bucket_name=archaeological_minio_service.buckets['tiles'],
+                        storage_service._client.list_objects,
+                        bucket_name=storage_service.buckets['tiles'],
                         prefix=prefix,
                         recursive=True
                     )
@@ -1352,7 +1844,9 @@ class DeepZoomMinIOService:
             
             if found_tiles and max_level_found >= 0:
                 # Determina il formato rilevato
-                detected_format = 'png' if any(obj.object_name.endswith('.png') for obj in tile_objects) else 'jpg'
+                # Fix: tile_objects might not be defined in this scope
+                # Use a safe default if tile_objects is not available
+                detected_format = 'png' if 'tile_objects' in locals() and any(obj.object_name.endswith('.png') for obj in tile_objects) else 'jpg'
                 
                 return {
                     'found_tiles': found_tiles,

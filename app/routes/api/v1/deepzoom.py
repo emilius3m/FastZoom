@@ -130,34 +130,235 @@ async def get_deep_zoom_tile(
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
-    """Ottieni singolo tile deep zoom con supporto formato dinamico (jpg/png)"""
-    # Verify site access
-    site_info = verify_site_access(site_id, user_sites)
+    """Ottieni singolo tile deep zoom con supporto formato dinamico (jpg/png) e logging dettagliato"""
+    import time
+    request_start_time = time.time()
+    
+    with logger.contextualize(
+        operation="get_deep_zoom_tile",
+        site_id=str(site_id),
+        photo_id=str(photo_id),
+        level=level,
+        x=x,
+        y=y,
+        format=format,
+        user_id=str(current_user_id),
+        endpoint="v1_deepzoom_tile"
+    ):
+        logger.info(
+            "🎯 TILE REQUEST RECEIVED",
+            extra={
+                "site_id": str(site_id),
+                "photo_id": str(photo_id),
+                "level": level,
+                "coordinates": f"{x}_{y}",
+                "format": format,
+                "user_id": str(current_user_id),
+                "request_timestamp": datetime.now().isoformat(),
+                "endpoint": "/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.{format}"
+            }
+        )
 
-    # Verify read permissions
-    if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
-        raise HTTPException(status_code=403, detail="Permessi richiesti")
+        # Verify site access
+        access_check_start = time.time()
+        try:
+            site_info = verify_site_access(site_id, user_sites)
+            access_check_time = time.time() - access_check_start
+            
+            logger.info(
+                "✅ SITE ACCESS VERIFIED",
+                extra={
+                    "site_id": str(site_id),
+                    "user_id": str(current_user_id),
+                    "permission_level": site_info.get("permission_level"),
+                    "access_check_time_ms": round(access_check_time * 1000, 2)
+                }
+            )
+        except Exception as access_error:
+            access_check_time = time.time() - access_check_start
+            logger.error(
+                "❌ SITE ACCESS DENIED",
+                extra={
+                    "site_id": str(site_id),
+                    "user_id": str(current_user_id),
+                    "error": str(access_error),
+                    "error_type": type(access_error).__name__,
+                    "access_check_time_ms": round(access_check_time * 1000, 2)
+                }
+            )
+            raise
 
-    # Validate format
-    if format not in ['jpg', 'png', 'jpeg']:
-        raise HTTPException(status_code=400, detail="Formato tile non supportato")
+        # Verify read permissions
+        permission_check_start = time.time()
+        if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
+            permission_check_time = time.time() - permission_check_start
+            logger.warning(
+                "⚠️ TILE ACCESS PERMISSION DENIED",
+                extra={
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "user_id": str(current_user_id),
+                    "permission_level": site_info.get("permission_level"),
+                    "required_permission": "editor_or_admin",
+                    "permission_check_time_ms": round(permission_check_time * 1000, 2),
+                    "coordinates": f"{x}_{y}",
+                    "level": level
+                }
+            )
+            raise HTTPException(status_code=403, detail="Permessi richiesti")
+        
+        permission_check_time = time.time() - permission_check_start
+        logger.debug(
+            "✅ TILE ACCESS PERMISSION VERIFIED",
+            extra={
+                "site_id": str(site_id),
+                "photo_id": str(photo_id),
+                "user_id": str(current_user_id),
+                "permission_level": site_info.get("permission_level"),
+                "permission_check_time_ms": round(permission_check_time * 1000, 2)
+            }
+        )
 
-    # Ottieni contenuto del tile usando dependency injection
-    tile_content = await deep_zoom_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
+        # Validate format
+        format_validation_start = time.time()
+        if format not in ['jpg', 'png', 'jpeg']:
+            format_validation_time = time.time() - format_validation_start
+            logger.error(
+                "❌ INVALID TILE FORMAT",
+                extra={
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "requested_format": format,
+                    "supported_formats": ['jpg', 'png', 'jpeg'],
+                    "coordinates": f"{x}_{y}",
+                    "level": level,
+                    "format_validation_time_ms": round(format_validation_time * 1000, 2)
+                }
+            )
+            raise HTTPException(status_code=400, detail="Formato tile non supportato")
+        
+        format_validation_time = time.time() - format_validation_start
+        logger.debug(
+            "✅ TILE FORMAT VALIDATED",
+            extra={
+                "site_id": str(site_id),
+                "photo_id": str(photo_id),
+                "format": format,
+                "media_type": "image/jpeg" if format in ['jpg', 'jpeg'] else "image/png",
+                "format_validation_time_ms": round(format_validation_time * 1000, 2)
+            }
+        )
 
-    if not tile_content:
-        raise HTTPException(status_code=404, detail="Tile non trovato")
+        # Ottieni contenuto del tile usando dependency injection
+        tile_retrieval_start = time.time()
+        try:
+            tile_content = await deep_zoom_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
+            tile_retrieval_time = time.time() - tile_retrieval_start
+            
+            if tile_content:
+                logger.success(
+                    "✅ TILE RETRIEVAL SUCCESS",
+                    extra={
+                        "site_id": str(site_id),
+                        "photo_id": str(photo_id),
+                        "level": level,
+                        "coordinates": f"{x}_{y}",
+                        "format": format,
+                        "content_size_bytes": len(tile_content),
+                        "tile_retrieval_time_ms": round(tile_retrieval_time * 1000, 2),
+                        "user_id": str(current_user_id)
+                    }
+                )
+            else:
+                logger.error(
+                    "❌ TILE CONTENT EMPTY",
+                    extra={
+                        "site_id": str(site_id),
+                        "photo_id": str(photo_id),
+                        "level": level,
+                        "coordinates": f"{x}_{y}",
+                        "format": format,
+                        "tile_retrieval_time_ms": round(tile_retrieval_time * 1000, 2),
+                        "user_id": str(current_user_id),
+                        "issue": "empty_content"
+                    }
+                )
+        except Exception as tile_error:
+            tile_retrieval_time = time.time() - tile_retrieval_start
+            logger.error(
+                "💥 TILE RETRIEVAL ERROR",
+                extra={
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "level": level,
+                    "coordinates": f"{x}_{y}",
+                    "format": format,
+                    "error": str(tile_error),
+                    "error_type": type(tile_error).__name__,
+                    "tile_retrieval_time_ms": round(tile_retrieval_time * 1000, 2),
+                    "user_id": str(current_user_id)
+                }
+            )
+            import traceback
+            logger.error(
+                "📋 TILE RETRIEVAL ERROR TRACEBACK",
+                extra={
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "coordinates": f"{x}_{y}",
+                    "traceback": traceback.format_exc()
+                }
+            )
+            raise
 
-    # Restituisci contenuto del tile direttamente (no CSP violation)
-    media_type = "image/jpeg" if format in ['jpg', 'jpeg'] else "image/png"
-    return Response(
-        content=tile_content,
-        media_type=media_type,
-        headers={
-            "Cache-Control": "public, max-age=86400",  # Cache per 24 ore
-            "Access-Control-Allow-Origin": "*"
-        }
-    )
+        if not tile_content:
+            total_time = time.time() - request_start_time
+            logger.error(
+                "❌ TILE NOT FOUND - RETURNING 404",
+                extra={
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "level": level,
+                    "coordinates": f"{x}_{y}",
+                    "format": format,
+                    "total_time_ms": round(total_time * 1000, 2),
+                    "user_id": str(current_user_id),
+                    "http_status": 404
+                }
+            )
+            raise HTTPException(status_code=404, detail="Tile non trovato")
+
+        # Restituisci contenuto del tile direttamente (no CSP violation)
+        response_preparation_start = time.time()
+        media_type = "image/jpeg" if format in ['jpg', 'jpeg'] else "image/png"
+        response_preparation_time = time.time() - response_preparation_start
+        total_time = time.time() - request_start_time
+        
+        logger.info(
+            "📤 TILE RESPONSE PREPARED",
+            extra={
+                "site_id": str(site_id),
+                "photo_id": str(photo_id),
+                "level": level,
+                "coordinates": f"{x}_{y}",
+                "format": format,
+                "media_type": media_type,
+                "content_size_bytes": len(tile_content),
+                "response_preparation_time_ms": round(response_preparation_time * 1000, 2),
+                "total_time_ms": round(total_time * 1000, 2),
+                "cache_headers": "public, max-age=86400",
+                "user_id": str(current_user_id)
+            }
+        )
+        
+        return Response(
+            content=tile_content,
+            media_type=media_type,
+            headers={
+                "Cache-Control": "public, max-age=86400",  # Cache per 24 ore
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
 
 
 @router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.jpg",
@@ -218,116 +419,409 @@ async def get_public_deep_zoom_tile(
     Public tile endpoint that uses browser session context instead of JWT headers.
     This allows OpenSeadragon to load tiles without sending authentication headers.
     Includes fallback to try JWT authentication if session is not available.
+    Enhanced with detailed logging for tile debugging.
     """
-    # Validate format
-    if format not in ['jpg', 'png', 'jpeg']:
-        raise HTTPException(status_code=400, detail="Formato tile non supportato")
-
-    current_user_id = None
+    import time
+    request_start_time = time.time()
     
-    # Try browser session authentication first
-    session = request.session
-    if session.get("user_id"):
-        try:
-            current_user_id = UUID(session.get("user_id"))
-            logger.debug(f"Using session authentication for user {current_user_id}")
-        except (ValueError, TypeError):
-            logger.warning("Invalid user_id in session, trying fallback")
-            current_user_id = None
-    else:
-        logger.debug("No session user_id found, trying fallback authentication")
-    
-    # Fallback: Try JWT token authentication if session failed
-    if not current_user_id:
-        try:
-            # Check for Authorization header
-            auth_header = request.headers.get("Authorization")
-            if auth_header and auth_header.startswith("Bearer "):
-                token = auth_header.replace("Bearer ", "")
-                from app.core.security import SecurityService
-                payload = await SecurityService.verify_token(token, db)
-                current_user_id = UUID(payload.get("sub"))
-                logger.debug(f"Using JWT fallback authentication for user {current_user_id}")
-        except Exception as e:
-            logger.debug(f"JWT fallback authentication failed: {e}")
-    
-    # If both methods failed, check for cookie-based JWT
-    if not current_user_id:
-        try:
-            access_token_cookie = request.cookies.get("access_token")
-            if access_token_cookie:
-                token = access_token_cookie.replace("Bearer ", "")
-                from app.core.security import SecurityService
-                payload = await SecurityService.verify_token(token, db)
-                current_user_id = UUID(payload.get("sub"))
-                logger.debug(f"Using cookie JWT authentication for user {current_user_id}")
-        except Exception as e:
-            logger.debug(f"Cookie JWT authentication failed: {e}")
-    
-    # Final check: if no authentication method worked
-    if not current_user_id:
-        logger.warning(f"No valid authentication found for tile request: {site_id}/{photo_id}/tiles/{level}/{x}_{y}.{format}")
-        raise HTTPException(
-            status_code=401,
-            detail="Autenticazione richiesta. Effettua il login per accedere alle tiles."
+    with logger.contextualize(
+        operation="get_public_deep_zoom_tile",
+        site_id=str(site_id),
+        photo_id=str(photo_id),
+        level=level,
+        x=x,
+        y=y,
+        format=format,
+        endpoint="public_deepzoom_tile"
+    ):
+        logger.info(
+            "🌐 PUBLIC TILE REQUEST RECEIVED",
+            extra={
+                "site_id": str(site_id),
+                "photo_id": str(photo_id),
+                "level": level,
+                "coordinates": f"{x}_{y}",
+                "format": format,
+                "request_timestamp": datetime.now().isoformat(),
+                "endpoint": "/public/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.{format}",
+                "user_agent": request.headers.get("User-Agent", "unknown"),
+                "referer": request.headers.get("Referer", "unknown")
+            }
         )
-    
-    # Verify user has access to this site by checking database
-    from app.services.auth_service import AuthService
-    try:
-        user_sites = await AuthService.get_user_sites_with_permissions(db, current_user_id)
-        site_info = verify_site_access(site_id, user_sites)
+
+        # Validate format
+        format_validation_start = time.time()
+        if format not in ['jpg', 'png', 'jpeg']:
+            format_validation_time = time.time() - format_validation_start
+            logger.error(
+                "❌ PUBLIC TILE INVALID FORMAT",
+                extra={
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "requested_format": format,
+                    "supported_formats": ['jpg', 'png', 'jpeg'],
+                    "coordinates": f"{x}_{y}",
+                    "level": level,
+                    "format_validation_time_ms": round(format_validation_time * 1000, 2)
+                }
+            )
+            raise HTTPException(status_code=400, detail="Formato tile non supportato")
         
-        # Verify read permissions (allow viewers for tile access)
-        if not site_info.get("permission_level"):
-            raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-            
-    except Exception as e:
-        logger.error(f"Public tile access denied for user {current_user_id}, site {site_id}: {e}")
-        raise HTTPException(status_code=403, detail="Accesso al sito negato")
-
-    # Verify photo exists and belongs to site
-    photo = await db.execute(
-        select(Photo).where(
-            and_(Photo.id == str(photo_id), Photo.site_id == str(site_id))
+        format_validation_time = time.time() - format_validation_start
+        logger.debug(
+            "✅ PUBLIC TILE FORMAT VALIDATED",
+            extra={
+                "site_id": str(site_id),
+                "photo_id": str(photo_id),
+                "format": format,
+                "format_validation_time_ms": round(format_validation_time * 1000, 2)
+            }
         )
-    )
-    photo = photo.scalar_one_or_none()
-    
-    if not photo:
-        raise HTTPException(status_code=404, detail="Foto non trovata")
 
-    # Get tile content from MinIO using dependency injection
-    try:
-        tile_content = await deep_zoom_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
-
-        if not tile_content:
-            # Log detailed debug info for missing tiles
-            logger.warning(f"Tile not found: level={level}, coords={x}_{y}, format={format}, site={site_id}, photo={photo_id}")
-            raise HTTPException(status_code=404, detail=f"Tile {level}/{x}_{y} non trovato")
-
-        # Log access for security monitoring
-        logger.info(f"Public tile accessed: user={current_user_id}, site={site_id}, photo={photo_id}, tile={level}/{x}_{y}.{format}")
-
-        # Return tile content directly (no CSP violation)
-        media_type = "image/jpeg" if format in ['jpg', 'jpeg'] else "image/png"
-        return Response(
-            content=tile_content,
-            media_type=media_type,
-            headers={
-                "Cache-Control": "public, max-age=86400",  # Cache for 24 hours
-                "Access-Control-Allow-Origin": "*"
+        current_user_id = None
+        auth_method = None
+        
+        # Try browser session authentication first
+        auth_start = time.time()
+        session = request.session
+        if session.get("user_id"):
+            try:
+                current_user_id = UUID(session.get("user_id"))
+                auth_method = "session"
+                auth_time = time.time() - auth_start
+                logger.info(
+                    "🔐 SESSION AUTHENTICATION SUCCESS",
+                    extra={
+                        "user_id": str(current_user_id),
+                        "auth_method": "session",
+                        "auth_time_ms": round(auth_time * 1000, 2),
+                        "site_id": str(site_id),
+                        "photo_id": str(photo_id)
+                    }
+                )
+            except (ValueError, TypeError) as session_error:
+                auth_time = time.time() - auth_start
+                logger.warning(
+                    "⚠️ SESSION AUTHENTICATION INVALID USER_ID",
+                    extra={
+                        "session_user_id": session.get("user_id"),
+                        "error": str(session_error),
+                        "auth_time_ms": round(auth_time * 1000, 2),
+                        "fallback_attempted": True
+                    }
+                )
+                current_user_id = None
+        else:
+            auth_time = time.time() - auth_start
+            logger.debug(
+                "🔍 NO SESSION USER_ID FOUND",
+                extra={
+                    "auth_time_ms": round(auth_time * 1000, 2),
+                    "fallback_attempted": True
+                }
+            )
+        
+        # Fallback: Try JWT token authentication if session failed
+        if not current_user_id:
+            jwt_auth_start = time.time()
+            try:
+                # Check for Authorization header
+                auth_header = request.headers.get("Authorization")
+                if auth_header and auth_header.startswith("Bearer "):
+                    token = auth_header.replace("Bearer ", "")
+                    from app.core.security import SecurityService
+                    payload = await SecurityService.verify_token(token, db)
+                    current_user_id = UUID(payload.get("sub"))
+                    auth_method = "jwt_header"
+                    jwt_auth_time = time.time() - jwt_auth_start
+                    logger.info(
+                        "🔐 JWT HEADER AUTHENTICATION SUCCESS",
+                        extra={
+                            "user_id": str(current_user_id),
+                            "auth_method": "jwt_header",
+                            "jwt_auth_time_ms": round(jwt_auth_time * 1000, 2),
+                            "site_id": str(site_id),
+                            "photo_id": str(photo_id)
+                        }
+                    )
+            except Exception as jwt_error:
+                jwt_auth_time = time.time() - jwt_auth_start
+                logger.debug(
+                    "🔍 JWT HEADER AUTHENTICATION FAILED",
+                    extra={
+                        "error": str(jwt_error),
+                        "error_type": type(jwt_error).__name__,
+                        "jwt_auth_time_ms": round(jwt_auth_time * 1000, 2),
+                        "fallback_attempted": True
+                    }
+                )
+        
+        # If both methods failed, check for cookie-based JWT
+        if not current_user_id:
+            cookie_auth_start = time.time()
+            try:
+                access_token_cookie = request.cookies.get("access_token")
+                if access_token_cookie:
+                    token = access_token_cookie.replace("Bearer ", "")
+                    from app.core.security import SecurityService
+                    payload = await SecurityService.verify_token(token, db)
+                    current_user_id = UUID(payload.get("sub"))
+                    auth_method = "jwt_cookie"
+                    cookie_auth_time = time.time() - cookie_auth_start
+                    logger.info(
+                        "🔐 JWT COOKIE AUTHENTICATION SUCCESS",
+                        extra={
+                            "user_id": str(current_user_id),
+                            "auth_method": "jwt_cookie",
+                            "cookie_auth_time_ms": round(cookie_auth_time * 1000, 2),
+                            "site_id": str(site_id),
+                            "photo_id": str(photo_id)
+                        }
+                    )
+            except Exception as cookie_error:
+                cookie_auth_time = time.time() - cookie_auth_start
+                logger.debug(
+                    "🔍 JWT COOKIE AUTHENTICATION FAILED",
+                    extra={
+                        "error": str(cookie_error),
+                        "error_type": type(cookie_error).__name__,
+                        "cookie_auth_time_ms": round(cookie_auth_time * 1000, 2),
+                        "fallback_attempted": True
+                    }
+                )
+        
+        total_auth_time = time.time() - auth_start
+        
+        # Final check: if no authentication method worked
+        if not current_user_id:
+            logger.error(
+                "❌ NO VALID AUTHENTICATION FOUND",
+                extra={
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "level": level,
+                    "coordinates": f"{x}_{y}",
+                    "format": format,
+                    "total_auth_time_ms": round(total_auth_time * 1000, 2),
+                    "auth_methods_attempted": ["session", "jwt_header", "jwt_cookie"],
+                    "user_agent": request.headers.get("User-Agent", "unknown"),
+                    "referer": request.headers.get("Referer", "unknown")
+                }
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="Autenticazione richiesta. Effettua il login per accedere alle tiles."
+            )
+        
+        logger.info(
+            "✅ AUTHENTICATION SUCCESSFUL",
+            extra={
+                "user_id": str(current_user_id),
+                "auth_method": auth_method,
+                "total_auth_time_ms": round(total_auth_time * 1000, 2),
+                "site_id": str(site_id),
+                "photo_id": str(photo_id)
             }
         )
         
-    except HTTPException:
-        # Re-raise HTTP exceptions (like 404 for missing tiles)
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error getting public tile {level}/{x}_{y}.{format} for photo {photo_id}: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail="Errore durante il caricamento del tile")
+        # Verify user has access to this site by checking database
+        access_check_start = time.time()
+        from app.services.auth_service import AuthService
+        try:
+            user_sites = await AuthService.get_user_sites_with_permissions(db, current_user_id)
+            site_info = verify_site_access(site_id, user_sites)
+            access_check_time = time.time() - access_check_start
+            
+            logger.info(
+                "✅ PUBLIC TILE SITE ACCESS VERIFIED",
+                extra={
+                    "user_id": str(current_user_id),
+                    "site_id": str(site_id),
+                    "permission_level": site_info.get("permission_level"),
+                    "access_check_time_ms": round(access_check_time * 1000, 2),
+                    "auth_method": auth_method
+                }
+            )
+            
+            # Verify read permissions (allow viewers for tile access)
+            if not site_info.get("permission_level"):
+                logger.warning(
+                    "⚠️ PUBLIC TILE ACCESS PERMISSION DENIED",
+                    extra={
+                        "user_id": str(current_user_id),
+                        "site_id": str(site_id),
+                        "permission_level": site_info.get("permission_level"),
+                        "required_permission": "any_level",
+                        "coordinates": f"{x}_{y}",
+                        "level": level
+                    }
+                )
+                raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
+                
+        except Exception as access_error:
+            access_check_time = time.time() - access_check_start
+            logger.error(
+                "❌ PUBLIC TILE ACCESS DENIED",
+                extra={
+                    "user_id": str(current_user_id),
+                    "site_id": str(site_id),
+                    "error": str(access_error),
+                    "error_type": type(access_error).__name__,
+                    "access_check_time_ms": round(access_check_time * 1000, 2),
+                    "auth_method": auth_method,
+                    "coordinates": f"{x}_{y}",
+                    "level": level
+                }
+            )
+            raise HTTPException(status_code=403, detail="Accesso al sito negato")
+
+        # Verify photo exists and belongs to site
+        photo_check_start = time.time()
+        photo = await db.execute(
+            select(Photo).where(
+                and_(Photo.id == str(photo_id), Photo.site_id == str(site_id))
+            )
+        )
+        photo = photo.scalar_one_or_none()
+        photo_check_time = time.time() - photo_check_start
+        
+        if not photo:
+            logger.error(
+                "❌ PUBLIC TILE PHOTO NOT FOUND",
+                extra={
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "level": level,
+                    "coordinates": f"{x}_{y}",
+                    "photo_check_time_ms": round(photo_check_time * 1000, 2),
+                    "user_id": str(current_user_id)
+                }
+            )
+            raise HTTPException(status_code=404, detail="Foto non trovata")
+        
+        logger.info(
+            "✅ PUBLIC TILE PHOTO VERIFIED",
+            extra={
+                "user_id": str(current_user_id),
+                "site_id": str(site_id),
+                "photo_id": str(photo_id),
+                "photo_filename": photo.filename,
+                "photo_check_time_ms": round(photo_check_time * 1000, 2)
+            }
+        )
+
+        # Get tile content from MinIO using dependency injection
+        tile_retrieval_start = time.time()
+        try:
+            tile_content = await deep_zoom_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
+            tile_retrieval_time = time.time() - tile_retrieval_start
+
+            if not tile_content:
+                total_time = time.time() - request_start_time
+                logger.warning(
+                    "❌ PUBLIC TILE NOT FOUND",
+                    extra={
+                        "user_id": str(current_user_id),
+                        "site_id": str(site_id),
+                        "photo_id": str(photo_id),
+                        "level": level,
+                        "coordinates": f"{x}_{y}",
+                        "format": format,
+                        "tile_retrieval_time_ms": round(tile_retrieval_time * 1000, 2),
+                        "total_time_ms": round(total_time * 1000, 2),
+                        "http_status": 404,
+                        "auth_method": auth_method
+                    }
+                )
+                raise HTTPException(status_code=404, detail=f"Tile {level}/{x}_{y} non trovato")
+
+            # Log access for security monitoring
+            total_time = time.time() - request_start_time
+            logger.success(
+                "✅ PUBLIC TILE ACCESS SUCCESS",
+                extra={
+                    "user_id": str(current_user_id),
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "photo_filename": photo.filename,
+                    "level": level,
+                    "coordinates": f"{x}_{y}",
+                    "format": format,
+                    "content_size_bytes": len(tile_content),
+                    "tile_retrieval_time_ms": round(tile_retrieval_time * 1000, 2),
+                    "total_time_ms": round(total_time * 1000, 2),
+                    "auth_method": auth_method,
+                    "user_agent": request.headers.get("User-Agent", "unknown"),
+                    "referer": request.headers.get("Referer", "unknown")
+                }
+            )
+
+            # Return tile content directly (no CSP violation)
+            response_preparation_start = time.time()
+            media_type = "image/jpeg" if format in ['jpg', 'jpeg'] else "image/png"
+            response_preparation_time = time.time() - response_preparation_start
+            total_time = time.time() - request_start_time
+            
+            logger.info(
+                "📤 PUBLIC TILE RESPONSE PREPARED",
+                extra={
+                    "user_id": str(current_user_id),
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "level": level,
+                    "coordinates": f"{x}_{y}",
+                    "format": format,
+                    "media_type": media_type,
+                    "content_size_bytes": len(tile_content),
+                    "response_preparation_time_ms": round(response_preparation_time * 1000, 2),
+                    "total_time_ms": round(total_time * 1000, 2),
+                    "cache_headers": "public, max-age=86400"
+                }
+            )
+            
+            return Response(
+                content=tile_content,
+                media_type=media_type,
+                headers={
+                    "Cache-Control": "public, max-age=86400",  # Cache for 24 hours
+                    "Access-Control-Allow-Origin": "*"
+                }
+            )
+            
+        except HTTPException:
+            # Re-raise HTTP exceptions (like 404 for missing tiles)
+            raise
+        except Exception as tile_error:
+            tile_retrieval_time = time.time() - tile_retrieval_start
+            total_time = time.time() - request_start_time
+            logger.error(
+                "💥 PUBLIC TILE RETRIEVAL ERROR",
+                extra={
+                    "user_id": str(current_user_id),
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "level": level,
+                    "coordinates": f"{x}_{y}",
+                    "format": format,
+                    "error": str(tile_error),
+                    "error_type": type(tile_error).__name__,
+                    "tile_retrieval_time_ms": round(tile_retrieval_time * 1000, 2),
+                    "total_time_ms": round(total_time * 1000, 2),
+                    "auth_method": auth_method
+                }
+            )
+            import traceback
+            logger.error(
+                "📋 PUBLIC TILE ERROR TRACEBACK",
+                extra={
+                    "user_id": str(current_user_id),
+                    "site_id": str(site_id),
+                    "photo_id": str(photo_id),
+                    "coordinates": f"{x}_{y}",
+                    "traceback": traceback.format_exc()
+                }
+            )
+            raise HTTPException(status_code=500, detail="Errore durante il caricamento del tile")
 
 
 @router.post("/sites/{site_id}/photos/{photo_id}/process",
