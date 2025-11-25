@@ -54,7 +54,7 @@ def add_deprecation_headers(response: Response, new_endpoint: str):
 def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Verifica accesso al sito e restituisce informazioni sul sito"""
     site_info = next(
-        (site for site in user_sites if site["id"] == str(site_id)),
+        (site for site in user_sites if site["site_id"] == str(site_id)),
         None
     )
     
@@ -784,7 +784,7 @@ async def v1_get_unified_documents_count(
     """
     try:
         # Get all sites user has access to
-        accessible_site_ids = [site["id"] for site in user_sites]
+        accessible_site_ids = [site["site_id"] for site in user_sites]
         
         if not accessible_site_ids:
             return JSONResponse({"count": 0})

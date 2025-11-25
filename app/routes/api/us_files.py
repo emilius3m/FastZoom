@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/us-files", tags=["us-files"])
 
 async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> bool:
     """Verifica accesso utente al sito"""
-    return any(s["id"] == str(site_id) for s in user_sites)
+    return any(s["site_id"] == str(site_id) for s in user_sites)
 
 # ===== UPLOAD FILE US =====
 

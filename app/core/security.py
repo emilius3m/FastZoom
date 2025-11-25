@@ -193,7 +193,7 @@ class SecurityService:
         
         # Cerca sito nel token
         site_info = next(
-            (site for site in sites if site.get("id") == str(site_id)),
+            (site for site in sites if site.get("site_id") == str(site_id)),
             None
         )
 

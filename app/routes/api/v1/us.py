@@ -30,7 +30,7 @@ from app.schemas.us import (
 router = APIRouter()
 
 async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> bool:
-    return any(s["id"] == str(site_id) for s in user_sites)
+    return any(s["site_id"] == str(site_id) for s in user_sites)
 
 # ------- US CRUD - V1 ENDPOINTS -------
 
@@ -144,16 +144,72 @@ async def v1_get_us(
     
     Endpoint: /api/v1/us/sites/{site_id}/us/{us_id}
     """
+    # DEBUG LOGGING: Log request details
+    logger.info(f"🔍 [US_GET] Request received - Site ID: {site_id}, US ID: {us_id}")
+    logger.info(f"🔍 [US_GET] User has access to {len(user_sites)} sites")
+    
+    # Log user accessible sites for debugging
+    if user_sites:
+        logger.debug(f"🔍 [US_GET] Accessible sites: {[s['site_id'] for s in user_sites]}")
+    else:
+        logger.warning(f"⚠️  [US_GET] User has NO accessible sites - this is likely the root cause of 404 errors")
+    
+    # Check site access first (before database query for better performance)
+    site_access = await verify_site_access(site_id, user_sites)
+    logger.info(f"🔍 [US_GET] Site access check result: {site_access}")
+    
+    if not site_access:
+        logger.error(f"❌ [US_GET] ACCESS DENIED - User does not have access to site {site_id}")
+        logger.error(f"❌ [US_GET] Available sites: {[s['site_id'] for s in user_sites]}")
+        logger.error(f"❌ [US_GET] Requested site: {site_id}")
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Access denied",
+                "message": f"Non hai i permessi per accedere al sito {site_id}",
+                "site_id": str(site_id),
+                "accessible_sites": [s["site_id"] for s in user_sites],
+                "debug_info": "User lacks site permissions - contact administrator"
+            }
+        )
+    
+    # Query US from database
+    logger.info(f"🔍 [US_GET] Querying US {us_id} from database...")
     result = await db.execute(
         select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id)
     )
     us = result.scalar_one_or_none()
+    
     if not us:
-        raise HTTPException(status_code=404, detail="US non trovata")
-    if not await verify_site_access(site_id, user_sites):
-        raise HTTPException(status_code=403, detail="Accesso negato al sito")
+        logger.error(f"❌ [US_GET] US NOT FOUND - US {us_id} does not exist in database")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "US not found",
+                "message": f"L'Unità Stratigrafica {us_id} non esiste nel database",
+                "us_id": str(us_id),
+                "debug_info": "US ID not found in database"
+            }
+        )
+    
+    logger.info(f"🔍 [US_GET] US found - Site ID: {us.site_id}, US Code: {us.us_code}")
+    
+    # Check if US belongs to requested site
     if us.site_id != str(site_id):
-        raise HTTPException(status_code=404, detail="US non trovata per questo sito")
+        logger.error(f"❌ [US_GET] SITE MISMATCH - US {us_id} belongs to site {us.site_id}, not {site_id}")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "US not found for this site",
+                "message": f"L'US {us_id} appartiene al sito {us.site_id}, non al sito {site_id}",
+                "us_id": str(us_id),
+                "requested_site_id": str(site_id),
+                "actual_site_id": us.site_id,
+                "debug_info": "US exists but belongs to different site"
+            }
+        )
+    
+    logger.success(f"✅ [US_GET] SUCCESS - US {us_id} retrieved successfully")
     return us
 
 @router.get("/sites/{site_id}/us", response_model=List[USOut], summary="List US for site", tags=["US/USM Units"])

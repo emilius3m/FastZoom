@@ -57,7 +57,7 @@ async def v1_get_overview_stats(
         }
     
     # Calcola statistiche reali
-    site_ids = [UUID(site["id"]) for site in user_sites]
+    site_ids = [UUID(site["site_id"]) for site in user_sites]
     
     # Conteggio foto
     photos_result = await db.execute(
@@ -111,7 +111,7 @@ async def v1_get_sites_list(
     # Arricchisci siti con statistiche base
     sites_with_stats = []
     for site in user_sites:
-        site_id = UUID(site["id"])
+        site_id = UUID(site["site_id"])
         
         # Conteggio foto per sito
         photos_result = await db.execute(
@@ -149,7 +149,7 @@ async def v1_get_recent_activities(
     
     # In una implementazione reale, questo queryerebbe una tabella di attività
     # Per ora, simula attività recenti basate sui dati disponibili
-    site_ids = [UUID(site["id"]) for site in user_sites]
+    site_ids = [UUID(site["site_id"]) for site in user_sites]
     
     # Ottieni foto recenti
     recent_photos_result = await db.execute(
@@ -265,7 +265,7 @@ async def v1_get_documents_count(
     if not user_sites:
         return {"count": 0}
     
-    site_ids = [UUID(site["id"]) for site in user_sites]
+    site_ids = [UUID(site["site_id"]) for site in user_sites]
     
     try:
         from app.models import Document

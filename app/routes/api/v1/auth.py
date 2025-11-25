@@ -169,7 +169,7 @@ async def v1_login(
         # Logica di redirect intelligente
         if len(sites_data) == 1:
             # Un solo sito: redirect diretto alla dashboard
-            site_id = sites_data[0]["id"]
+            site_id = sites_data[0]["site_id"]
             return RedirectResponse(url=f"/site/{site_id}/dashboard", status_code=303)
         elif len(sites_data) > 1:
             # Più siti: redirect a selezione sito
@@ -584,7 +584,7 @@ async def v1_select_site(
     """Selezione sito specifico dopo login multi-sito"""
     try:
         # Verifica che il sito selezionato sia tra quelli accessibili
-        site_ids = [UUID(site["id"]) for site in user_sites]
+        site_ids = [UUID(site["site_id"]) for site in user_sites]
         
         if site_id not in site_ids:
             return HTMLResponse(
@@ -598,7 +598,7 @@ async def v1_select_site(
         
         # Trova i dati del sito selezionato
         selected_site = next(
-            (site for site in user_sites if UUID(site["id"]) == site_id),
+            (site for site in user_sites if UUID(site["site_id"]) == site_id),
             None
         )
         

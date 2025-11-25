@@ -37,7 +37,7 @@ USM_TEMPLATE_PATH = TEMPLATES_DIR / "USM_Template_con_Placeholder.docx"  # Da cr
 
 async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> bool:
     """Verifica accesso utente al sito"""
-    return any(s["id"] == str(site_id) for s in user_sites)
+    return any(s["site_id"] == str(site_id) for s in user_sites)
 
 
 async def compile_us_template(us: UnitaStratigrafica, template_path: Path, db: AsyncSession) -> bytes:

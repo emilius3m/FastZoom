@@ -31,7 +31,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     
     # Try exact match first
     site_info = next(
-        (site for site in user_sites if site["id"] == site_id_str),
+        (site for site in user_sites if site["site_id"] == site_id_str),
         None
     )
     
@@ -39,14 +39,14 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     if not site_info:
         site_id_no_dashes = site_id_str.replace('-', '')
         site_info = next(
-            (site for site in user_sites if site["id"].replace('-', '') == site_id_no_dashes),
+            (site for site in user_sites if site["site_id"].replace('-', '') == site_id_no_dashes),
             None
         )
     
     if not site_info:
         # Debug logging to help troubleshoot
         logger.error(f"Site access verification failed for site_id: {site_id_str}")
-        logger.error(f"Available sites for user: {[site['id'] for site in user_sites]}")
+        logger.error(f"Available sites for user: {[site['site_id'] for site in user_sites]}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Sito archeologico non trovato : {site_id_str}"

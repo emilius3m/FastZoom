@@ -25,7 +25,7 @@ from app.schemas.us import (
 us_router = APIRouter(prefix="/api", tags=["us-usm"])
 
 async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> bool:
-    return any(s["id"] == str(site_id) for s in user_sites)
+    return any(s["site_id"] == str(site_id) for s in user_sites)
 
 # ------- US CRUD -------
 

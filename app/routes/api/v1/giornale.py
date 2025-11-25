@@ -96,9 +96,9 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     
     # 🔍 DEBUG: Log all user sites for comparison
     for i, site in enumerate(user_sites):
-        logger.info(f"🐛 [DEBUG] user_site[{i}]: id={site.get('id', 'MISSING')}, name={site.get('name', 'MISSING')}")
-        if site.get('id'):
-            site_id_from_user = str(site["id"])
+        logger.info(f"🐛 [DEBUG] user_site[{i}]: id={site.get('site_id', 'MISSING')}, name={site.get('site_name', 'MISSING')}")
+        if site.get('site_id'):
+            site_id_from_user = str(site["site_id"])
             logger.info(f"🐛 [DEBUG] user_site[{i}] - raw: {site_id_from_user}")
             logger.info(f"🐛 [DEBUG] user_site[{i}] - no_hyphens: {site_id_from_user.replace('-', '')}")
             logger.info(f"🐛 [DEBUG] user_site[{i}] - lower: {site_id_from_user.lower()}")
@@ -106,11 +106,11 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     # Enhanced matching with multiple format variations
     site_info = None
     for site in user_sites:
-        if not site.get("id"):
-            logger.warning(f"🐛 [DEBUG] Site missing 'id' field: {site}")
+        if not site.get("site_id"):
+            logger.warning(f"🐛 [DEBUG] Site missing 'site_id' field: {site}")
             continue
         
-        site_user_id = str(site["id"])
+        site_user_id = str(site["site_id"])
         
         # Try multiple matching strategies with normalized ID
         if (site_user_id == normalized_site_id or
@@ -129,14 +129,14 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
         logger.error(f"🐛 [DEBUG]  - Normalized: {normalized_site_id}")
         logger.error(f"🐛 [DEBUG] Available user sites:")
         for i, site in enumerate(user_sites):
-            logger.error(f"🐛 [DEBUG]  - Site {i}: {site.get('name', 'Unknown')} (ID: {site.get('id', 'MISSING')})")
+            logger.error(f"🐛 [DEBUG]  - Site {i}: {site.get('site_name', 'Unknown')} (ID: {site.get('site_id', 'MISSING')})")
         
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Sito {site_id} non trovato o access denied. User has access to {len(user_sites)} sites."
         )
     
-    logger.info(f"🐛 [DEBUG] verify_site_access - SUCCESS: User has access to site '{site_info.get('name', 'Unknown')}'")
+    logger.info(f"🐛 [DEBUG] verify_site_access - SUCCESS: User has access to site '{site_info.get('site_name', 'Unknown')}'")
     return site_info
 
 # Import required models and schemas
@@ -246,7 +246,7 @@ async def v1_get_site_giornali(
         
         # 🔍 DEBUG: Log user sites details
         for i, site in enumerate(user_sites):
-            logger.info(f"🐛 [DEBUG] User site {i}: {site.get('name', 'Unknown')} (ID: {site.get('id', 'MISSING')})")
+            logger.info(f"🐛 [DEBUG] User site {i}: {site.get('site_name', 'Unknown')} (ID: {site.get('site_id', 'MISSING')})")
         
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
@@ -1235,7 +1235,7 @@ async def v1_get_general_stats(
         site_ids = []
         for site in user_sites:
             try:
-                site_id_str = str(site["id"])
+                site_id_str = str(site["site_id"])
                 site_ids.append(site_id_str)
                 logger.info(f"🐛 [DEBUG] Processing site: {site.get('name', 'Unknown')} (ID: {site_id_str})")
             except (KeyError, ValueError) as e:

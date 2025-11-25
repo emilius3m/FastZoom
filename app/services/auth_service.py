@@ -137,8 +137,8 @@ class AuthService:
             for row in result:
                 if row.id and row.name:
                     sites_data.append({
-                        "id": str(row.id),
-                        "name": str(row.name),
+                        "site_id": str(row.id),
+                        "site_name": str(row.name),
                         "code": str(row.code) if row.code else "",
                         "location": str(row.municipality) if row.municipality else "",
                         "permission_level": str(row.permission_level) if row.permission_level else "read"
@@ -183,8 +183,8 @@ class AuthService:
             
             for row in result:
                 sites_data.append({
-                    "id": str(row.id),
-                    "name": row.name,
+                    "site_id": str(row.id),
+                    "site_name": row.name,
                     "code": row.code,
                     "location": row.municipality or "",
                     "permission_level": "regional_admin"  # Massimo livello per superadmin
@@ -237,7 +237,7 @@ class AuthService:
         
         # Determina redirect intelligente
         redirect_url = await SiteService.smart_redirect_after_login(
-            [{"id": site["id"], "name": site["name"]} for site in sites_data]
+            [{"id": site["site_id"], "name": site["site_name"]} for site in sites_data]
         )
         
         return {

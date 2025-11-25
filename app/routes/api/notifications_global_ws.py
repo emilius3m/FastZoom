@@ -123,7 +123,7 @@ async def websocket_global_notifications(
                                 
                                 # Verifica accesso al sito
                                 site_info = next(
-                                    (site for site in user_sites if site.get("id") == site_id),
+                                    (site for site in user_sites if site.get("site_id") == site_id),
                                     None
                                 )
                                 

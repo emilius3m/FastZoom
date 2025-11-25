@@ -57,8 +57,8 @@ async def giornale_cantiere_detail(
         site_id_str = str(site_id)
         site_info = next(
             (site for site in user_sites if
-             site["id"] == site_id_str or
-             site["id"].replace("-", "") == site_id_str.replace("-", "")
+             site["site_id"] == site_id_str or
+             site["site_id"].replace("-", "") == site_id_str.replace("-", "")
             ),
             None
         )
@@ -162,7 +162,7 @@ async def operatori_management(
         
         # Se l'utente ha accesso a un solo sito, reindirizza direttamente alla pagina operatori del sito
         if len(user_sites) == 1:
-            site_id = user_sites[0]['id']
+            site_id = user_sites[0]['site_id']
             return RedirectResponse(url=f"/giornale-cantiere/site/{site_id}/operatori", status_code=302)
         
         # Altrimenti, reindirizza alla home per selezionare un sito
@@ -192,8 +192,8 @@ async def site_operatori_view(
         site_id_str = str(site_id)
         site_info = next(
             (site for site in user_sites if
-             site["id"] == site_id_str or
-             site["id"].replace("-", "") == site_id_str.replace("-", "")
+             site["site_id"] == site_id_str or
+             site["site_id"].replace("-", "") == site_id_str.replace("-", "")
             ),
             None
         )
@@ -221,14 +221,14 @@ async def site_operatori_view(
             request, current_user_id, user_sites, db, current_page="giornale-operatori"
         )
         context.update({
-            "title": f"Gestione Operatori - {site_info['name']} | Sistema Archeologico",
-            "message": f"Operatori del sito: {site_info['name']}",
+            "title": f"Gestione Operatori - {site_info['site_name']} | Sistema Archeologico",
+            "message": f"Operatori del sito: {site_info['site_name']}",
             
             # Site-specific context
             "site_id": str(site_id),
             "site": site_info,
             "site_info": site_info,
-            "site_name": site_info["name"],
+            "site_name": site_info["site_name"],
             "site_code": site_info.get("code", ""),
             "site_location": site_info.get("location", ""),
             
@@ -239,7 +239,7 @@ async def site_operatori_view(
             "is_site_specific": True
         })
         
-        logger.info(f"Site operatori view rendered: user_id={current_user_id}, site_id={site_id}, site_name={site_info['name']}")
+        logger.info(f"Site operatori view rendered: user_id={current_user_id}, site_id={site_id}, site_name={site_info['site_name']}")
         response = templates.TemplateResponse("pages/giornale_cantiere/operatori.html", context)
         
         # Se CSRF disponibile, imposta cookie firmato
@@ -276,10 +276,10 @@ async def giornale_reports(
         site_ids = []
         for site in user_sites:
             try:
-                site_ids.append(UUID(site['id']))
+                site_ids.append(UUID(site['site_id']))
             except:
                 # Skip invalid UUIDs but continue processing other sites
-                logger.warning(f"Invalid UUID format for site {site.get('id')}: {site['id']}")
+                logger.warning(f"Invalid UUID format for site {site.get('site_id')}: {site['site_id']}")
                 continue
         
         if site_ids:

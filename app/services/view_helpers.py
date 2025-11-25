@@ -137,15 +137,15 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     site_id_str = str(site_id)
     site_info = next(
         (site for site in user_sites if
-         site["id"] == site_id_str or
-         site["id"].replace("-", "") == site_id_str.replace("-", "")
+         site["site_id"] == site_id_str or
+         site["site_id"].replace("-", "") == site_id_str.replace("-", "")
         ),
         None
     )
     
     if not site_info:
         logger.error(f"Site access failed - site_id: {site_id} (type: {type(site_id)})")
-        logger.error(f"Available site IDs: {[site['id'] for site in user_sites]}")
+        logger.error(f"Available site IDs: {[site['site_id'] for site in user_sites]}")
         logger.error(f"Total user sites: {len(user_sites)}")
         
         raise HTTPException(
@@ -498,7 +498,7 @@ async def require_superuser(
         "user_name": user.full_name if user and hasattr(user, 'full_name') else user.email if user else "Admin",
         "user_type": "superuser" if user and user.is_superuser else "user",
         "is_superuser": user.is_superuser if user else False,
-        "current_site_name": user_sites[0]["name"] if user_sites else "Amministrazione",
+        "current_site_name": user_sites[0]["site_name"] if user_sites else "Amministrazione",
         "current_page": request.url.path.split("/")[-1] or "admin",
         "site": admin_site,
         "first_site": user_sites[0] if user_sites else admin_site,

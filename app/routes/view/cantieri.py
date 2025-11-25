@@ -37,8 +37,8 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     site_id_str = str(site_id)
     site_info = next(
         (site for site in user_sites if
-         site["id"] == site_id_str or
-         site["id"].replace("-", "") == site_id_str.replace("-", "")
+         site["site_id"] == site_id_str or
+         site["site_id"].replace("-", "") == site_id_str.replace("-", "")
         ),
         None
     )
@@ -46,7 +46,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     if not site_info:
         # 🔍 DEBUG: Log the site_id and available sites for troubleshooting
         logger.error(f"🐛 [DEBUG] Site access failed - site_id: {site_id} (type: {type(site_id)})")
-        logger.error(f"🐛 [DEBUG] Available site IDs: {[site['id'] for site in user_sites]}")
+        logger.error(f"🐛 [DEBUG] Available site IDs: {[site['site_id'] for site in user_sites]}")
         logger.error(f"🐛 [DEBUG] Total user sites: {len(user_sites)}")
         
         raise HTTPException(

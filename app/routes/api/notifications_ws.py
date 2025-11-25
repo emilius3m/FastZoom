@@ -367,7 +367,7 @@ async def websocket_notifications(
 
             # Verifica accesso al sito specifico
             site_info = next(
-                (site for site in user_sites if site.get("id") == site_id_str),
+                (site for site in user_sites if site.get("site_id") == site_id_str),
                 None
             )
 

@@ -74,10 +74,10 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     
     site_info = None
     for site in user_sites:
-        if not site.get("id"):
+        if not site.get("site_id"):
             continue
         
-        site_user_id = str(site["id"])
+        site_user_id = str(site["site_id"])
         
         # Try multiple matching strategies
         if (site_user_id == normalized_site_id or
@@ -631,7 +631,7 @@ async def v1_get_cantieri_stats(
     Recupera statistiche generali per i cantieri dell'utente.
     """
     try:
-        site_ids = [UUID(site["id"]) for site in user_sites]
+        site_ids = [UUID(site["site_id"]) for site in user_sites]
         if not site_ids:
             return {
                 "totali": 0,

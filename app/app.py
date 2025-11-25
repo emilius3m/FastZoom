@@ -649,7 +649,7 @@ async def dashboard_view(
         users_count = 0
         documents_count = 0
         if user_sites:
-            site_ids = [UUID(site['id']) for site in user_sites]
+            site_ids = [UUID(site['site_id']) for site in user_sites]
             
             # Conteggio foto
             photos_result = await db.execute(
@@ -683,7 +683,7 @@ async def dashboard_view(
             "users_count": users_count,
             "user_email": user.email if user else None,
             "user_type": "superuser" if user and user.is_superuser else "user",
-            "current_site_name": user_sites[0]["name"] if user_sites else None,
+            "current_site_name": user_sites[0]["site_name"] if user_sites else None,
             "current_page": "dashboard",
             "current_user": user,
             "user_profile": user_profile,
@@ -695,7 +695,7 @@ async def dashboard_view(
         logger.info(f"🐛 DEBUG Dashboard: sites_count={len(user_sites)}, sites={user_sites}")
         if user_sites:
             for site in user_sites:
-                logger.info(f"🐛 DEBUG Dashboard: Site - ID: {site.get('id')}, Name: {site.get('name')}, Permission: {site.get('permission_level')}")
+                logger.info(f"🐛 DEBUG Dashboard: Site - ID: {site.get('site_id')}, Name: {site.get('site_name')}, Permission: {site.get('permission_level')}")
 
         # Add unified-specific context
         if use_unified:
@@ -929,7 +929,7 @@ async def site_dashboard(
     
     # Verifica accesso al sito
     site_info = next(
-        (site for site in user_sites if site["id"] == str(site_id)),
+        (site for site in user_sites if site["site_id"] == str(site_id)),
         None
     )
     

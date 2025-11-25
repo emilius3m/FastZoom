@@ -208,7 +208,7 @@ async def v1_bulk_update_metadata(
         
         # Verifica accesso al sito
         site_info = next(
-            (site for site in user_sites if site["id"] == str(photo.site_id)),
+            (site for site in user_sites if site["site_id"] == str(photo.site_id)),
             None
         )
         
@@ -262,7 +262,7 @@ async def v1_search_by_metadata(
     
     # Implementazione ricerca con filtri metadata
     # Per semplicità, usa il primo sito accessibile
-    first_site_id = UUID(user_sites[0]["id"])
+    first_site_id = UUID(user_sites[0]["site_id"])
     
     # Costruisci query complessa
     query = select(Photo).where(Photo.site_id == first_site_id)
