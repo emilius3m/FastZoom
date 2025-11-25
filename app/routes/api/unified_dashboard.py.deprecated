@@ -129,7 +129,7 @@ async def get_overview_stats(
                 "users_count": 0
             }
         
-        site_ids = [UUID(site['id']) for site in user_sites]
+        site_ids = [UUID(site['site_id']) for site in user_sites]
         
         # Count photos
         photos_result = await db.execute(

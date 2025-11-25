@@ -54,7 +54,7 @@ from app.routes.api.notifications_ws import notifications_router
 # 🌐 NUOVO IMPORT - Router WebSocket Globale con token-based authentication
 #from app.routes.api.notifications_global_ws import global_notifications_router
 # 🆕 NUOVO IMPORT - Router Unified Dashboard API
-from app.routes.api.unified_dashboard import router as unified_dashboard_router
+#from app.routes.api.unified_dashboard import router as unified_dashboard_router
 # 🗄️ NUOVO IMPORT - Router Database Monitoring API
 from app.routes.api.database_monitoring import router as database_monitoring_router
 # 📋 NUOVO IMPORT - Router Queue Monitoring API
@@ -414,13 +414,6 @@ app.include_router(
 #    tags=["websocket-global-notifications"]
 #)
 
-# 🆕 INCLUSIONE ROUTER UNIFIED DASHBOARD API - API per dashboard unificata
-app.include_router(
-    unified_dashboard_router,
-    tags=["unified-dashboard"],
-    prefix="/api/unified",
-    dependencies=[Depends(get_current_user_id_with_blacklist)]
-)
 
 # 🗄️ INCLUSIONE ROUTER DATABASE MONITORING - API per monitoring connection pool
 app.include_router(

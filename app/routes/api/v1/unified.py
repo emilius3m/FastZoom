@@ -18,12 +18,13 @@ from app.database.db import get_async_session
 from app.models import Photo, Site, User, UserSitePermission
 
 # Import existing unified dashboard functions for backward compatibility
-from app.routes.api.unified_dashboard import (
-    get_overview_stats_api_unified_stats_overview_get,
-    get_sites_list_api_unified_sites_list_get,
-    get_recent_activities_api_unified_activities_recent_get,
-    get_system_status_api_unified_system_status_get
-)
+# Note: unified_dashboard.py doesn't exist yet, so we'll implement these directly
+# from app.routes.api.unified_dashboard import (
+#     get_overview_stats_api_unified_stats_overview_get,
+#     get_sites_list_api_unified_sites_list_get,
+#     get_recent_activities_api_unified_activities_recent_get,
+#     get_system_status_api_unified_system_status_get
+# )
 
 router = APIRouter()
 

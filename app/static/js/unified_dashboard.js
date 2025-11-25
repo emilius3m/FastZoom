@@ -217,7 +217,7 @@ document.addEventListener("alpine:init", () => {
             try {
                 // Load sites data with retry mechanism
                 const sitesResponse = await this.apiCallWithRetry(
-                    '/api/unified/sites/list',
+                    '/api/v1/unified/dashboard/sites/list',
                     {
                         headers: {
                             'Content-Type': 'application/json',
@@ -261,7 +261,7 @@ document.addEventListener("alpine:init", () => {
                 
                 // Load US/USM count with retry mechanism
                 const usResponse = await this.apiCallWithRetry(
-                    '/api/unified/stats/overview',
+                    '/api/v1/unified/dashboard/stats/overview',
                     {
                         headers: {
                             'Content-Type': 'application/json',
@@ -367,7 +367,7 @@ document.addEventListener("alpine:init", () => {
             
             try {
                 const response = await this.apiCallWithRetry(
-                    '/api/unified/activities/recent',
+                    '/api/v1/unified/dashboard/activities/recent',
                     {
                         headers: {
                             'Content-Type': 'application/json',
@@ -403,7 +403,7 @@ document.addEventListener("alpine:init", () => {
         async loadSystemStatus() {
             try {
                 const response = await this.apiCallWithRetry(
-                    '/api/unified/system/status',
+                    '/api/v1/unified/dashboard/system/status',
                     {
                         headers: {
                             'Content-Type': 'application/json',

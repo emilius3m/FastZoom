@@ -120,6 +120,10 @@ from app.models.sites import (
     ResearchStatusEnum
 )
 
+# ===== BACKWARD COMPATIBILITY ALIASES =====
+# Alias for backward compatibility
+Site = ArchaeologicalSite
+
 # ===== IMPORT PIANTE ARCHEOLOGICHE =====
 from app.models.archaeological_plans import (
     ArchaeologicalPlan
@@ -289,6 +293,7 @@ __all__ = [
     
     # Sites
     'ArchaeologicalSite',
+    'Site',  # Alias for ArchaeologicalSite for backward compatibility
     'SiteStatusEnum',
     'SiteTypeEnum',
     'ResearchStatusEnum',
