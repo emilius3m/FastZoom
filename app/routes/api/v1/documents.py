@@ -27,6 +27,9 @@ from app.models import UserSitePermission
 from app.models import UserActivity
 from app.models.documents import Document
 
+# Import error handling
+from app.routes.api.service_dependencies import convert_storage_error_to_http_exception
+
 # Schemas
 class DocumentUpdate(BaseModel):
     title: Optional[str] = None
@@ -639,7 +642,7 @@ async def v1_download_document(
         if not doc:
             raise HTTPException(status_code=404, detail="Documento non trovato")
 
-        # Download file from MinIO
+        # Download file from MinIO with proper error handling
         try:
             logger.info(f"Attempting to download document: {doc.filepath}")
             file_data = await archaeological_minio_service.get_file(doc.filepath)
@@ -659,11 +662,8 @@ async def v1_download_document(
             # Re-raise HTTP exceptions (like 404)
             raise
         except Exception as e:
-            logger.error(f"Error downloading from MinIO: {e}")
-            logger.error(f"Document filepath: {doc.filepath}")
-            logger.error(f"Document ID: {document_id}")
-            logger.error(f"Site ID: {site_id}")
-            raise HTTPException(status_code=500, detail=f"Errore nel download del file: {str(e)}")
+            # Convert domain storage exceptions to HTTP exceptions
+            await convert_storage_error_to_http_exception(e, "document download")
 
     except HTTPException:
         raise

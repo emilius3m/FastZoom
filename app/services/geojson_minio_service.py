@@ -66,7 +66,7 @@ class GeoJSONMinIOService:
             
             # Upload del file su MinIO
             result = await asyncio.to_thread(
-                archaeological_minio_service.client.put_object,
+                archaeological_minio_service._client.put_object,
                 bucket_name=self.bucket_name,
                 object_name=object_name,
                 data=io.BytesIO(geojson_bytes),
@@ -240,7 +240,7 @@ class GeoJSONMinIOService:
             
             # Genera URL presigned
             url = await asyncio.to_thread(
-                archaeological_minio_service.client.presigned_get_object,
+                archaeological_minio_service._client.presigned_get_object,
                 bucket_name=self.bucket_name,
                 object_name=object_name,
                 expires=timedelta(hours=expires_hours)
@@ -271,7 +271,7 @@ class GeoJSONMinIOService:
             
             # Usa il client MinIO direttamente per elencare gli oggetti
             objects = await asyncio.to_thread(
-                archaeological_minio_service.client.list_objects,
+                archaeological_minio_service._client.list_objects,
                 bucket_name=self.bucket_name,
                 prefix=prefix,
                 recursive=True
@@ -284,7 +284,7 @@ class GeoJSONMinIOService:
                     # Ottieni metadati dell'oggetto
                     try:
                         stat = await asyncio.to_thread(
-                            archaeological_minio_service.client.stat_object,
+                            archaeological_minio_service._client.stat_object,
                             bucket_name=self.bucket_name,
                             object_name=obj.object_name
                         )

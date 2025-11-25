@@ -17,6 +17,10 @@ from fastapi.responses import RedirectResponse
 from minio import Minio
 from minio.error import S3Error
 from app.core.minio_settings import settings
+from app.core.exceptions import (
+    StorageError, StorageFullError, StorageTemporaryError,
+    StorageConnectionError, StorageNotFoundError
+)
 # Import locale per evitare circular import
 # from app.services.deep_zoom_minio_service import deep_zoom_minio_service
 
@@ -65,11 +69,11 @@ class RetryWithJitter:
                         continue
                     else:
                         logger.error(f"MinIO {operation_name} failed after {self.max_retries} retries: {error_code} - {error_message}")
-                        raise HTTPException(status_code=503, detail=f"MinIO operation failed after retries: {error_message}")
+                        raise StorageTemporaryError(f"MinIO operation failed after retries: {error_message}")
                 else:
                     # Errori non retryable
                     logger.error(f"MinIO {operation_name} failed with non-retryable error: {error_code} - {error_message}")
-                    raise HTTPException(status_code=400, detail=f"MinIO operation failed: {error_message}")
+                    raise StorageError(f"MinIO operation failed: {error_message}")
             
             except Exception as e:
                 last_exception = e
@@ -80,10 +84,10 @@ class RetryWithJitter:
                     continue
                 else:
                     logger.error(f"MinIO {operation_name} failed after {self.max_retries} retries: {error_message}")
-                    raise HTTPException(status_code=500, detail=f"MinIO operation failed after retries: {error_message}")
+                    raise StorageTemporaryError(f"MinIO operation failed after retries: {error_message}")
         
         # Questo punto non dovrebbe essere raggiunto
-        raise HTTPException(status_code=500, detail=f"MinIO operation failed: {str(last_exception)}")
+        raise StorageError(f"MinIO operation failed: {str(last_exception)}")
     
     def _should_retry_error(self, error_code: str, error_message: str) -> bool:
         """Determina se l'errore è retryable"""
@@ -159,6 +163,43 @@ class ArchaeologicalMinIOService:
             secure=secure
         )
 
+    def _is_storage_full_error(self, error: Exception) -> bool:
+        """Check se errore è storage full"""
+        error_str = str(error)
+        return (
+            "XMinioStorageFull" in error_str or
+            "minimum free drive threshold" in error_str or
+            "no space left" in error_str.lower()
+        )
+
+    def _map_minio_error(self, error: Exception) -> StorageError:
+        """Mappa eccezioni MinIO a eccezioni dominio"""
+        error_str = str(error).lower()
+
+        if self._is_storage_full_error(error):
+            return StorageFullError(str(error))
+
+        if "connection" in error_str or "timeout" in error_str:
+            return StorageConnectionError(str(error))
+
+        if "temporary" in error_str or "retry" in error_str:
+            return StorageTemporaryError(str(error))
+
+        if "not found" in error_str or "nosuchkey" in error_str:
+            return StorageNotFoundError(str(error))
+
+        return StorageError(str(error))
+
+    async def _emergency_cleanup(self) -> int:
+        """Esegue cleanup emergenza, ritorna MB liberati"""
+        try:
+            from app.services.storage_management_service import storage_management_service
+            result = await storage_management_service.emergency_cleanup(target_freed_mb=100)
+            return result.get('total_freed_mb', 0)
+        except Exception as e:
+            logger.error(f"Emergency cleanup failed: {e}")
+            return 0
+
     async def _handle_storage_full_error(
         self,
         operation_func,
@@ -176,29 +217,30 @@ class ArchaeologicalMinIOService:
             error_msg = str(e)
 
             # Verifica se è errore storage full
-            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
+            if self._is_storage_full_error(e):
                 logger.error(f"MinIO storage full during {operation_name}")
 
                 # Tenta cleanup di emergenza
                 try:
-                    from app.services.storage_management_service import storage_management_service
-                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=target_freed_mb)
-
-                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > (target_freed_mb // 2):
-                        logger.info(f"Emergency cleanup successful for {operation_name}, retrying...")
+                    freed_mb = await self._emergency_cleanup()
+                    if freed_mb > 50:
+                        logger.info(f"Emergency cleanup freed {freed_mb}MB, retrying {operation_name}")
 
                         # Riprova operazione dopo cleanup
                         return await operation_func(*args, **kwargs)
                     else:
                         logger.error(f"Emergency cleanup insufficient for {operation_name}")
-                        raise HTTPException(status_code=507, detail="Storage full, cleanup insufficient")
+                        raise StorageFullError(
+                            f"Storage full. Cleanup freed only {freed_mb}MB",
+                            freed_space_mb=freed_mb
+                        )
 
                 except Exception as cleanup_error:
                     logger.error(f"Emergency cleanup failed for {operation_name}: {cleanup_error}")
-                    raise HTTPException(status_code=507, detail="Storage full, cleanup failed")
+                    raise StorageFullError("Storage full and cleanup failed")
             else:
                 logger.error(f"MinIO {operation_name} error: {e}")
-                raise HTTPException(status_code=500, detail=f"{operation_name} failed")
+                raise self._map_minio_error(e)
 
     async def _upload_with_retry(
         self,
@@ -214,10 +256,7 @@ class ArchaeologicalMinIOService:
         
         # FIXED: Check circuit breaker before attempting operation
         if not self._check_circuit_breaker():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Storage service temporarily unavailable (circuit breaker open)"
-            )
+            raise StorageTemporaryError("Storage service temporarily unavailable (circuit breaker open)")
         
         def upload_operation():
             # FIXED: Add socket timeout to prevent hanging
@@ -226,7 +265,7 @@ class ArchaeologicalMinIOService:
             socket.setdefaulttimeout(30)  # 30 seconds timeout
             
             try:
-                result = self.client.put_object(
+                result = self._client.put_object(
                     bucket_name=bucket_name,
                     object_name=object_name,
                     data=io.BytesIO(data),
@@ -258,10 +297,7 @@ class ArchaeologicalMinIOService:
         except asyncio.TimeoutError:
             logger.error(f"⏰ Upload operation timed out: {operation_name} to {bucket_name}/{object_name}")
             self._record_circuit_breaker_failure()
-            raise HTTPException(
-                status_code=status.HTTP_408_REQUEST_TIMEOUT,
-                detail=f"Upload operation timed out: {operation_name}"
-            )
+            raise StorageTemporaryError(f"Upload operation timed out: {operation_name}")
         except HTTPException as e:
             # Gestione speciale per storage full
             if "storage full" in str(e.detail).lower():
@@ -275,10 +311,7 @@ class ArchaeologicalMinIOService:
                 raise
         except Exception as e:
             self._record_circuit_breaker_failure()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Upload operation failed: {str(e)}"
-            )
+            raise StorageError(f"Upload operation failed: {str(e)}")
 
     async def _generate_presigned_url(
         self,
@@ -290,7 +323,7 @@ class ArchaeologicalMinIOService:
         """Metodo base per generazione URL presigned con retry"""
         
         def url_operation():
-            return self.client.presigned_get_object(
+            return self._client.presigned_get_object(
                 bucket_name=bucket_name,
                 object_name=object_name,
                 expires=timedelta(hours=expires_hours)
@@ -332,7 +365,7 @@ class ArchaeologicalMinIOService:
         return merged
 
     def __init__(self):
-        self.client = self._create_minio_client()
+        self._client = self._create_minio_client()  # Renamed to private
         
         # Inizializza retry pattern con jitter
         self.retry_handler = RetryWithJitter(
@@ -379,9 +412,9 @@ class ArchaeologicalMinIOService:
             for bucket_type, bucket_name in all_buckets.items():
                 try:
                     # FIXED: Add timeout to bucket existence check
-                    if not self.client.bucket_exists(bucket_name):
+                    if not self._client.bucket_exists(bucket_name):
                         logger.info(f"Creating bucket: {bucket_name} ({bucket_type})")
-                        self.client.make_bucket(bucket_name)
+                        self._client.make_bucket(bucket_name)
                         logger.info(f"Created bucket: {bucket_name} ({bucket_type})")
 
                         # Policy di accesso per bucket pubblici (thumbnails e storage)
@@ -398,7 +431,7 @@ class ArchaeologicalMinIOService:
                                 ]
                             }
                             try:
-                                self.client.set_bucket_policy(bucket_name, json.dumps(policy))
+                                self._client.set_bucket_policy(bucket_name, json.dumps(policy))
                                 logger.info(f"Set public policy for bucket: {bucket_name}")
                             except Exception as policy_error:
                                 logger.warning(f"Could not set policy for {bucket_name}: {policy_error}")
@@ -586,7 +619,7 @@ class ArchaeologicalMinIOService:
 
         try:
             objects = await asyncio.to_thread(
-                self.client.list_objects,
+                self._client.list_objects,
                 bucket_name=self.buckets['photos'],
                 prefix=prefix,
                 recursive=True
@@ -596,7 +629,7 @@ class ArchaeologicalMinIOService:
             for obj in objects:
                 # Ottieni metadati dell'oggetto
                 stat = await asyncio.to_thread(
-                    self.client.stat_object,
+                    self._client.stat_object,
                     bucket_name=self.buckets['photos'],
                     object_name=obj.object_name
                 )
@@ -762,6 +795,19 @@ class ArchaeologicalMinIOService:
                     if first_part == 'storage':
                         # Map to photos bucket, use rest of path as object name
                         return self.buckets['photos'], parts[1] if len(parts) > 1 else ''
+            # FIXED: Handle deep zoom tiles paths (UUID/tiles/photo_id/...)
+            elif len(parts) >= 3 and '/' in parts[1]:
+                # Check if this looks like a deep zoom tiles path: UUID/tiles/photo_id/...
+                try:
+                    UUID(parts[0])  # Validate first part is UUID
+                    # Check if second part starts with 'tiles/'
+                    if parts[1].startswith('tiles/'):
+                        # This is a deep zoom tiles path, map to tiles bucket
+                        object_name = path  # Keep full path as object name
+                        return self.buckets['tiles'], object_name
+                except ValueError:
+                    pass  # Not a UUID, continue to default handling
+            
             return parts[0], parts[1] if len(parts) > 1 else ''
 
     async def get_storage_stats(self, site_id: str) -> Dict[str, Any]:
@@ -774,7 +820,7 @@ class ArchaeologicalMinIOService:
                 document_count = 0
 
                 # Statistiche foto
-                photo_objects = self.client.list_objects(
+                photo_objects = self._client.list_objects(
                     self.buckets['photos'],
                     prefix=f"{site_id}/",
                     recursive=True
@@ -784,7 +830,7 @@ class ArchaeologicalMinIOService:
                     total_size += obj.size
 
                 # Statistiche documenti
-                doc_objects = self.client.list_objects(
+                doc_objects = self._client.list_objects(
                     self.buckets['documents'],
                     prefix=f"{site_id}/",
                     recursive=True
@@ -847,13 +893,13 @@ class ArchaeologicalMinIOService:
             def _get_stream():
                 if range_header:
                     # Parse range per streaming parziale
-                    response = self.client.get_object(
+                    response = self._client.get_object(
                         bucket_name=bucket,
                         object_name=obj_name,
                         request_headers={"Range": range_header}
                     )
                 else:
-                    response = self.client.get_object(
+                    response = self._client.get_object(
                         bucket_name=bucket,
                         object_name=obj_name
                     )
@@ -872,7 +918,7 @@ class ArchaeologicalMinIOService:
         try:
             # Lista tutti gli oggetti del sito
             objects = await asyncio.to_thread(
-                self.client.list_objects,
+                self._client.list_objects,
                 bucket_name=self.buckets['photos'],
                 prefix=f"{site_id}/",
                 recursive=True
@@ -963,10 +1009,11 @@ class ArchaeologicalMinIOService:
                     )
 
                     # Import locale per evitare circular import
-                    from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+                    from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
 
                     # Processa con deep zoom
-                    deep_zoom_result = await deep_zoom_minio_service.process_and_upload_tiles(
+                    deep_zoom_service = get_deep_zoom_minio_service()
+                    deep_zoom_result = await deep_zoom_service.process_and_upload_tiles(
                         photo_id=photo_id,
                         original_file=temp_file,
                         site_id=site_id,
@@ -991,14 +1038,15 @@ class ArchaeologicalMinIOService:
 
         except Exception as e:
             logger.error(f"Photo processing with deep zoom failed for {photo_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Photo processing failed: {str(e)}")
+            raise StorageError(f"Photo processing failed: {str(e)}")
 
     async def get_deep_zoom_info(self, site_id: str, photo_id: str) -> Optional[Dict[str, Any]]:
         """Ottieni informazioni deep zoom per una foto"""
         try:
             # Import locale per evitare circular import
-            from app.services.deep_zoom_minio_service import deep_zoom_minio_service
-            return await deep_zoom_minio_service.get_deep_zoom_info(site_id, photo_id)
+            from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
+            deep_zoom_service = get_deep_zoom_minio_service()
+            return await deep_zoom_service.get_deep_zoom_info(site_id, photo_id)
         except Exception as e:
             logger.error(f"Error getting deep zoom info: {e}")
             return None
@@ -1007,8 +1055,9 @@ class ArchaeologicalMinIOService:
         """Ottieni URL per singolo tile deep zoom"""
         try:
             # Import locale per evitare circular import
-            from app.services.deep_zoom_minio_service import deep_zoom_minio_service
-            return await deep_zoom_minio_service.get_tile_url(site_id, photo_id, level, x, y)
+            from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
+            deep_zoom_service = get_deep_zoom_minio_service()
+            return await deep_zoom_service.get_tile_url(site_id, photo_id, level, x, y)
         except Exception as e:
             logger.error(f"Error getting tile URL: {e}")
             return None
@@ -1016,8 +1065,9 @@ class ArchaeologicalMinIOService:
     async def get_tile_content(self, site_id: str, photo_id: str, level: int, x: int, y: int) -> Optional[bytes]:
         """Ottieni contenuto diretto del tile invece di URL presigned"""
         try:
-            from app.services.deep_zoom_minio_service import deep_zoom_minio_service
-            return await deep_zoom_minio_service.get_tile_content(site_id, photo_id, level, x, y)
+            from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
+            deep_zoom_service = get_deep_zoom_minio_service()
+            return await deep_zoom_service.get_tile_content(site_id, photo_id, level, x, y)
         except Exception as e:
             logger.error(f"Error getting tile content: {e}")
             return None
@@ -1032,7 +1082,7 @@ class ArchaeologicalMinIOService:
             def _download_file():
                 # get_object returns HTTPResponse object, need to read content
                 logger.info(f"Calling get_object on bucket {bucket} for object {object_name}")
-                response = self.client.get_object(
+                response = self._client.get_object(
                     bucket_name=bucket,
                     object_name=object_name
                 )
@@ -1049,11 +1099,16 @@ class ArchaeologicalMinIOService:
             return content
 
         except Exception as e:
+            # Check if it's a NoSuchKey error (file not found)
+            if hasattr(e, 'code') and e.code == 'NoSuchKey':
+                logger.info(f"File not found in MinIO: {object_path}")
+                raise StorageNotFoundError(f"File non trovato: {object_path}")
+            
             logger.error(f"Error downloading file {object_path}: {e}")
             logger.error(f"Exception type: {type(e).__name__}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            raise HTTPException(status_code=404, detail=f"File non trovato: {object_path}")
+            raise StorageNotFoundError(f"File non trovato: {object_path}")
 
     async def remove_file(self, object_path: str) -> bool:
         """Rimuovi file da MinIO"""
@@ -1061,7 +1116,7 @@ class ArchaeologicalMinIOService:
             bucket, object_name = self._parse_minio_path(object_path)
 
             def _remove_object():
-                self.client.remove_object(
+                self._client.remove_object(
                     bucket_name=bucket,
                     object_name=object_name
                 )
@@ -1079,7 +1134,7 @@ class ArchaeologicalMinIOService:
         """Rimuovi oggetto da bucket specifico"""
         try:
             def _remove_object():
-                self.client.remove_object(
+                self._client.remove_object(
                     bucket_name=bucket_name,
                     object_name=object_name
                 )
@@ -1092,6 +1147,125 @@ class ArchaeologicalMinIOService:
         except Exception as e:
             logger.error(f"Error removing object {object_name} from bucket {bucket_name}: {e}")
             return False
+
+
+    async def upload_bytes(
+        self,
+        bucket: str,
+        object_name: str,
+        data: bytes,
+        content_type: str,
+        metadata: Optional[Dict[str, str]] = None,
+        with_cleanup_on_full: bool = True
+    ) -> str:
+        """
+        Upload bytes con gestione automatica storage full.
+
+        Args:
+            bucket: Bucket name
+            object_name: Object key
+            data: Bytes da uploadare
+            content_type: MIME type
+            metadata: Metadata opzionali
+            with_cleanup_on_full: Se True, tenta cleanup automatico su storage full
+
+        Returns:
+            URL oggetto caricato
+
+        Raises:
+            StorageFullError: Se storage pieno e cleanup fallito
+            StorageTemporaryError: Errore temporaneo, retry raccomandato
+            StorageError: Altri errori storage
+        """
+        try:
+            return await self._upload_with_retry(
+                bucket_name=bucket,
+                object_name=object_name,
+                data=data,
+                content_type=content_type,
+                metadata=metadata
+            )
+        except Exception as e:
+            if with_cleanup_on_full and self._is_storage_full_error(e):
+                # Tenta cleanup automatico
+                freed_mb = await self._emergency_cleanup()
+                if freed_mb > 50:
+                    # Retry dopo cleanup
+                    return await self._upload_with_retry(
+                        bucket_name=bucket,
+                        object_name=object_name,
+                        data=data,
+                        content_type=content_type,
+                        metadata=metadata
+                    )
+                raise StorageFullError(
+                    f"Storage full. Cleanup freed only {freed_mb}MB",
+                    freed_space_mb=freed_mb
+                ) from e
+
+            # Mappa altri errori
+            raise self._map_minio_error(e) from e
+
+    async def upload_json(
+        self,
+        bucket: str,
+        object_name: str,
+        data: dict,
+        metadata: Optional[Dict[str, str]] = None
+    ) -> str:
+        """Upload JSON object"""
+        json_bytes = json.dumps(data, indent=2).encode('utf-8')
+        return await self.upload_bytes(
+            bucket=bucket,
+            object_name=object_name,
+            data=json_bytes,
+            content_type='application/json',
+            metadata=metadata
+        )
+
+    async def upload_thumbnail(
+        self,
+        thumbnail_bytes: bytes,
+        photo_id: str,
+        site_id: Optional[str] = None
+    ) -> str:
+        """Upload thumbnail con path automatico"""
+        object_name = f"thumbnails/{photo_id}.jpg"
+        return await self.upload_bytes(
+            bucket=self.buckets['thumbnails'],
+            object_name=object_name,
+            data=thumbnail_bytes,
+            content_type='image/jpeg',
+            metadata={'photo_id': photo_id}
+        )
+
+    async def upload_tile(
+        self,
+        tile_bytes: bytes,
+        photo_id: str,
+        level: int,
+        col: int,
+        row: int
+    ) -> str:
+        """Upload deep zoom tile"""
+        object_name = f"tiles/{photo_id}/{level}/{col}_{row}.jpg"
+        return await self.upload_bytes(
+            bucket=self.buckets['tiles'],
+            object_name=object_name,
+            data=tile_bytes,
+            content_type='image/jpeg',
+            metadata={
+                'photo_id': photo_id,
+                'level': str(level),
+                'col': str(col),
+                'row': str(row)
+            }
+        )
+
+
+    async def execute_with_retry(self, operation_func, operation_name: str):
+        """Execute operation with retry pattern using domain exceptions"""
+        return await self.retry_handler.execute_with_retry(operation_func, operation_name)
 
 
 # Istanza globale

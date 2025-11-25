@@ -16,8 +16,13 @@ from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 from app.models import UserActivity
 from app.routes.api.dependencies import get_site_access
 from app.services.deep_zoom_background_service import deep_zoom_background_service
-from app.services.deep_zoom_minio_service import deep_zoom_minio_service
-from app.services.archaeological_minio_service import archaeological_minio_service
+
+# Import refactored services with dependency injection
+from app.routes.api.service_dependencies import (
+    ArchaeologicalMinIOServiceDep,
+    DeepZoomMinIOServiceDep,
+    handle_storage_errors
+)
 
 deepzoom_tiles_router = APIRouter()
 
@@ -58,8 +63,9 @@ async def process_missing_tiles(
         if not photo:
             raise HTTPException(status_code=404, detail="Foto non trovata nel sito specificato")
         
-        # Verifica se i tiles sono già stati generati
-        existing_tiles = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo_id))
+        # Verifica se i tiles sono già stati generati usando dependency injection
+        deep_zoom_service = DeepZoomMinIOServiceDep()
+        existing_tiles = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo_id))
         
         if existing_tiles and existing_tiles.get('available', False):
             return JSONResponse({
@@ -84,9 +90,10 @@ async def process_missing_tiles(
                 "timestamp": datetime.now(timezone.utc).isoformat()
             })
         
-        # Carica il contenuto del file originale
+        # Carica il contenuto del file originale usando dependency injection
+        storage_service = ArchaeologicalMinIOServiceDep()
         try:
-            original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+            original_file_content = await storage_service.get_file(photo.filepath)
         except Exception as e:
             logger.error(f"Failed to load original file for photo {photo_id}: {e}")
             raise HTTPException(
@@ -193,9 +200,10 @@ async def verify_and_repair_tiles(
         if not photo:
             raise HTTPException(status_code=404, detail="Foto non trovata nel sito specificato")
         
-        # Verifica lo stato dei tiles
-        tile_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo_id))
-        processing_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo_id))
+        # Verifica lo stato dei tiles usando dependency injection
+        deep_zoom_service = DeepZoomMinIOServiceDep()
+        tile_info = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo_id))
+        processing_status = await deep_zoom_service.get_processing_status(str(site_id), str(photo_id))
         task_status = await deep_zoom_background_service.get_task_status(str(photo_id))
         
         # Determina lo stato attuale
@@ -251,8 +259,9 @@ async def verify_and_repair_tiles(
         # Se è richiesta la riparazione automatica e i tiles sono mancanti/falliti
         if auto_repair and repair_needed and permission.can_write():
             try:
-                # Carica il contenuto del file originale
-                original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+                # Carica il contenuto del file originale usando dependency injection
+                storage_service = ArchaeologicalMinIOServiceDep()
+                original_file_content = await storage_service.get_file(photo.filepath)
                 
                 # Prepara i metadati archeologici
                 archaeological_metadata = {
@@ -372,9 +381,10 @@ async def get_batch_tiles_status(
         batch_status = []
         
         for photo in photos:
-            # Ottieni informazioni sui tiles
-            tile_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo.id))
-            processing_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo.id))
+            # Ottieni informazioni sui tiles usando dependency injection
+            deep_zoom_service = DeepZoomMinIOServiceDep()
+            tile_info = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo.id))
+            processing_status = await deep_zoom_service.get_processing_status(str(site_id), str(photo.id))
             task_status = await deep_zoom_background_service.get_task_status(str(photo.id))
             
             # Determina lo stato complessivo
@@ -790,8 +800,9 @@ async def batch_repair_tiles(
         
         for photo in photos:
             try:
-                # Verifica lo stato attuale
-                tile_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo.id))
+                # Verifica lo stato attuale usando dependency injection
+                deep_zoom_service = DeepZoomMinIOServiceDep()
+                tile_info = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo.id))
                 task_status = await deep_zoom_background_service.get_task_status(str(photo.id))
                 
                 # Determina se la riparazione è necessaria
@@ -813,8 +824,9 @@ async def batch_repair_tiles(
                 }
                 
                 if needs_repair:
-                    # Carica il contenuto del file originale
-                    original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+                    # Carica il contenuto del file originale usando dependency injection
+                    storage_service = ArchaeologicalMinIOServiceDep()
+                    original_file_content = await storage_service.get_file(photo.filepath)
                     
                     # Prepara i metadati archeologici
                     archaeological_metadata = {

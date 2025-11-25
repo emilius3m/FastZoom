@@ -23,9 +23,14 @@ from app.database.db import get_async_session
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus, UserActivity
 
 # Services
-from app.services.archaeological_minio_service import archaeological_minio_service
-from app.services.deep_zoom_minio_service import deep_zoom_minio_service
 from app.services.deep_zoom_background_service import deep_zoom_background_service
+
+# Import refactored services with dependency injection
+from app.routes.api.service_dependencies import (
+    ArchaeologicalMinIOServiceDep,
+    DeepZoomMinIOServiceDep,
+    handle_storage_errors
+)
 
 # Schemas
 class DeepZoomConfig(BaseModel):
@@ -77,12 +82,13 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
 # CONSOLIDATED ENDPOINTS FROM sites_deepzoom.py
 # ============================================================================
 
-@router.get("/sites/{site_id}/photos/{photo_id}/info", 
-            summary="Ottieni informazioni deep zoom per una foto", 
+@router.get("/sites/{site_id}/photos/{photo_id}/info",
+            summary="Ottieni informazioni deep zoom per una foto",
             tags=["Deep Zoom"])
 async def get_deep_zoom_info(
     site_id: UUID,
     photo_id: UUID,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -95,27 +101,22 @@ async def get_deep_zoom_info(
     if not site_info.get("permission_level") or site_info.get("permission_level") == "viewer":
         raise HTTPException(status_code=403, detail="Permessi richiesti")
 
-    # Ottieni info deep zoom
-    deep_zoom_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo_id))
+    # Ottieni info deep zoom usando dependency injection
+    deep_zoom_info = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo_id))
 
-    if not deep_zoom_info:
-        return JSONResponse({
-            "photo_id": str(photo_id),
-            "site_id": str(site_id),
-            "available": False,
-            "message": "Deep zoom tiles not generated for this photo",
-            "width": 0,
-            "height": 0,
-            "levels": 0,
-            "tile_size": 256,
-            "total_tiles": 0
-        })
+    # Stampa nella console quello che viene inviato al client
+    print(f"DEEPZOOM INFO RESPONSE - Site: {site_id}, Photo: {photo_id}")
+    print(f"Response data: {deep_zoom_info}")
+    logger.info(f"DEEPZOOM INFO RESPONSE - Site: {site_id}, Photo: {photo_id}")
+    logger.info(f"Response data: {deep_zoom_info}")
 
+    # The service now always returns a structured response, never None
+    # Just return the response directly
     return JSONResponse(deep_zoom_info)
 
 
-@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.{format}", 
-            summary="Ottieni singolo tile deep zoom", 
+@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.{format}",
+            summary="Ottieni singolo tile deep zoom",
             tags=["Deep Zoom"])
 async def get_deep_zoom_tile(
     site_id: UUID,
@@ -124,6 +125,7 @@ async def get_deep_zoom_tile(
     x: int,
     y: int,
     format: str,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -140,8 +142,8 @@ async def get_deep_zoom_tile(
     if format not in ['jpg', 'png', 'jpeg']:
         raise HTTPException(status_code=400, detail="Formato tile non supportato")
 
-    # Ottieni contenuto del tile (servi direttamente invece di redirect)
-    tile_content = await deep_zoom_minio_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
+    # Ottieni contenuto del tile usando dependency injection
+    tile_content = await deep_zoom_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
 
     if not tile_content:
         raise HTTPException(status_code=404, detail="Tile non trovato")
@@ -158,8 +160,8 @@ async def get_deep_zoom_tile(
     )
 
 
-@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.jpg", 
-            summary="Legacy endpoint per tile JPG", 
+@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.jpg",
+            summary="Legacy endpoint per tile JPG",
             tags=["Deep Zoom"])
 async def get_deep_zoom_tile_jpg(
     site_id: UUID,
@@ -167,6 +169,7 @@ async def get_deep_zoom_tile_jpg(
     level: int,
     x: int,
     y: int,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -175,8 +178,8 @@ async def get_deep_zoom_tile_jpg(
     return await get_deep_zoom_tile(site_id, photo_id, level, x, y, "jpg", current_user_id, user_sites, db)
 
 
-@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.png", 
-            summary="Legacy endpoint per tile PNG", 
+@router.get("/sites/{site_id}/photos/{photo_id}/tiles/{level}/{x}_{y}.png",
+            summary="Legacy endpoint per tile PNG",
             tags=["Deep Zoom"])
 async def get_deep_zoom_tile_png(
     site_id: UUID,
@@ -184,6 +187,7 @@ async def get_deep_zoom_tile_png(
     level: int,
     x: int,
     y: int,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -207,6 +211,7 @@ async def get_public_deep_zoom_tile(
     y: int,
     format: str,
     request: Request,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -292,12 +297,14 @@ async def get_public_deep_zoom_tile(
     if not photo:
         raise HTTPException(status_code=404, detail="Foto non trovata")
 
-    # Get tile content from MinIO (serve directly instead of redirect)
+    # Get tile content from MinIO using dependency injection
     try:
-        tile_content = await deep_zoom_minio_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
+        tile_content = await deep_zoom_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
 
         if not tile_content:
-            raise HTTPException(status_code=404, detail="Tile non trovato")
+            # Log detailed debug info for missing tiles
+            logger.warning(f"Tile not found: level={level}, coords={x}_{y}, format={format}, site={site_id}, photo={photo_id}")
+            raise HTTPException(status_code=404, detail=f"Tile {level}/{x}_{y} non trovato")
 
         # Log access for security monitoring
         logger.info(f"Public tile accessed: user={current_user_id}, site={site_id}, photo={photo_id}, tile={level}/{x}_{y}.{format}")
@@ -313,17 +320,24 @@ async def get_public_deep_zoom_tile(
             }
         )
         
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404 for missing tiles)
+        raise
     except Exception as e:
-        logger.error(f"Error getting public tile {level}/{x}_{y}.{format} for photo {photo_id}: {e}")
+        logger.error(f"Unexpected error getting public tile {level}/{x}_{y}.{format} for photo {photo_id}: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Errore durante il caricamento del tile")
 
 
 @router.post("/sites/{site_id}/photos/{photo_id}/process",
-             summary="Processa foto esistente per generare deep zoom tiles", 
+             summary="Processa foto esistente per generare deep zoom tiles",
              tags=["Deep Zoom"])
 async def process_deep_zoom(
     site_id: UUID,
     photo_id: UUID,
+    storage_service: ArchaeologicalMinIOServiceDep,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -347,9 +361,9 @@ async def process_deep_zoom(
     if not photo:
         raise HTTPException(status_code=404, detail="Foto non trovata")
 
-    # Scarica foto da MinIO per processamento
+    # Scarica foto da MinIO usando dependency injection
     try:
-        photo_data = await archaeological_minio_service.get_file(photo.filepath)
+        photo_data = await storage_service.get_file(photo.filepath)
 
         # Processa con deep zoom
         temp_file = UploadFile(
@@ -357,7 +371,7 @@ async def process_deep_zoom(
             file=io.BytesIO(photo_data)
         )
 
-        result = await deep_zoom_minio_service.process_and_upload_tiles(
+        result = await deep_zoom_service.process_and_upload_tiles(
             photo_id=str(photo_id),
             original_file=temp_file,
             site_id=str(site_id),
@@ -388,12 +402,13 @@ async def process_deep_zoom(
         raise HTTPException(status_code=500, detail=f"Deep zoom processing failed: {str(e)}")
 
 
-@router.get("/sites/{site_id}/photos/{photo_id}/status", 
-            summary="Ottieni status di elaborazione deep zoom per una foto", 
+@router.get("/sites/{site_id}/photos/{photo_id}/status",
+            summary="Ottieni status di elaborazione deep zoom per una foto",
             tags=["Deep Zoom"])
 async def get_deep_zoom_processing_status(
     site_id: UUID,
     photo_id: UUID,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -417,8 +432,8 @@ async def get_deep_zoom_processing_status(
     if not photo:
         raise HTTPException(status_code=404, detail="Foto non trovata")
 
-    # Ottieni status da MinIO se disponibile
-    minio_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo_id))
+    # Ottieni status da MinIO usando dependency injection
+    minio_status = await deep_zoom_service.get_processing_status(str(site_id), str(photo_id))
 
     return JSONResponse({
         "photo_id": str(photo_id),
@@ -508,13 +523,15 @@ async def get_processing_queue_status(
 # CONSOLIDATED ENDPOINTS FROM deepzoom_tiles.py
 # ============================================================================
 
-@router.post("/deepzoom/process-missing", 
-             summary="Avvia generazione manuale tiles per foto specifica", 
+@router.post("/deepzoom/process-missing",
+             summary="Avvia generazione manuale tiles per foto specifica",
              tags=["Deep Zoom - Tiles Management"])
 async def process_missing_tiles(
     photo_id: UUID,
     site_id: UUID,
     background_tasks: BackgroundTasks,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
+    storage_service: ArchaeologicalMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -548,8 +565,8 @@ async def process_missing_tiles(
         if not photo:
             raise HTTPException(status_code=404, detail="Foto non trovata nel sito specificato")
 
-        # Verifica se i tiles sono già stati generati
-        existing_tiles = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo_id))
+        # Verifica se i tiles sono già stati generati usando dependency injection
+        existing_tiles = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo_id))
 
         if existing_tiles and existing_tiles.get('available', False):
             return JSONResponse({
@@ -574,9 +591,9 @@ async def process_missing_tiles(
                 "timestamp": datetime.now(timezone.utc).isoformat()
             })
 
-        # Carica il contenuto del file originale
+        # Carica il contenuto del file originale usando dependency injection
         try:
-            original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+            original_file_content = await storage_service.get_file(photo.filepath)
         except Exception as e:
             logger.error(f"Failed to load original file for photo {photo_id}: {e}")
             raise HTTPException(
@@ -646,12 +663,14 @@ async def process_missing_tiles(
         )
 
 
-@router.post("/deepzoom/verify-and-repair", 
-             summary="Verifica stato tiles e avvia riparazione se necessario", 
+@router.post("/deepzoom/verify-and-repair",
+             summary="Verifica stato tiles e avvia riparazione se necessario",
              tags=["Deep Zoom - Tiles Management"])
 async def verify_and_repair_tiles(
     photo_id: UUID,
     site_id: UUID,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
+    storage_service: ArchaeologicalMinIOServiceDep,
     auto_repair: bool = True,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
@@ -686,9 +705,9 @@ async def verify_and_repair_tiles(
         if not photo:
             raise HTTPException(status_code=404, detail="Foto non trovata nel sito specificato")
 
-        # Verifica lo stato dei tiles
-        tile_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo_id))
-        processing_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo_id))
+        # Verifica lo stato dei tiles usando dependency injection
+        tile_info = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo_id))
+        processing_status = await deep_zoom_service.get_processing_status(str(site_id), str(photo_id))
         task_status = await deep_zoom_background_service.get_task_status(str(photo_id))
 
         # Determina lo stato attuale
@@ -743,8 +762,8 @@ async def verify_and_repair_tiles(
         # Se è richiesta la riparazione automatica e i tiles sono mancanti/falliti
         if auto_repair and repair_needed and site_info.get("permission_level") in ["admin", "editor"]:
             try:
-                # Carica il contenuto del file originale
-                original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+                # Carica il contenuto del file originale usando dependency injection
+                original_file_content = await storage_service.get_file(photo.filepath)
 
                 # Prepara i metadati archeologici
                 archaeological_metadata = {
@@ -817,11 +836,12 @@ async def verify_and_repair_tiles(
         )
 
 
-@router.get("/deepzoom/batch-status", 
-            summary="Ottieni stato tiles per un batch di foto", 
+@router.get("/deepzoom/batch-status",
+            summary="Ottieni stato tiles per un batch di foto",
             tags=["Deep Zoom - Tiles Management"])
 async def get_batch_tiles_status(
     site_id: UUID,
+    deep_zoom_service: DeepZoomMinIOServiceDep,
     photo_ids: Optional[List[UUID]] = None,
     limit: int = 100,
     offset: int = 0,
@@ -866,9 +886,9 @@ async def get_batch_tiles_status(
         # Prepara i risultati
         batch_status = []
         for photo in photos:
-            # Ottieni informazioni sui tiles
-            tile_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo.id))
-            processing_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo.id))
+            # Ottieni informazioni sui tiles usando dependency injection
+            tile_info = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo.id))
+            processing_status = await deep_zoom_service.get_processing_status(str(site_id), str(photo.id))
             task_status = await deep_zoom_background_service.get_task_status(str(photo.id))
 
             # Determina lo stato complessivo
@@ -932,12 +952,14 @@ async def get_batch_tiles_status(
         )
 
 
-@router.post("/deepzoom/batch-repair", 
-             summary="Avvia riparazione batch tiles per più foto", 
+@router.post("/deepzoom/batch-repair",
+             summary="Avvia riparazione batch tiles per più foto",
              tags=["Deep Zoom - Tiles Management"])
 async def batch_repair_tiles(
     site_id: UUID,
     photo_ids: List[UUID],
+    deep_zoom_service: DeepZoomMinIOServiceDep,
+    storage_service: ArchaeologicalMinIOServiceDep,
     force_repair: bool = False,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
@@ -984,8 +1006,8 @@ async def batch_repair_tiles(
 
         for photo in photos:
             try:
-                # Verifica lo stato attuale
-                tile_info = await deep_zoom_minio_service.get_deep_zoom_info(str(site_id), str(photo.id))
+                # Verifica lo stato attuale usando dependency injection
+                tile_info = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo.id))
                 task_status = await deep_zoom_background_service.get_task_status(str(photo.id))
 
                 # Determina se la riparazione è necessaria
@@ -1007,8 +1029,8 @@ async def batch_repair_tiles(
                 }
 
                 if needs_repair:
-                    # Carica il contenuto del file originale
-                    original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+                    # Carica il contenuto del file originale usando dependency injection
+                    original_file_content = await storage_service.get_file(photo.filepath)
 
                     # Prepara i metadati archeologici
                     archaeological_metadata = {

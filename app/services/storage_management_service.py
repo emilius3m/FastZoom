@@ -57,7 +57,7 @@ class StorageManagementService:
                 try:
                     # Quick bucket exists check (FAST)
                     bucket_exists = await asyncio.to_thread(
-                        self.minio_service.client.bucket_exists,
+                        self.minio_service._client.bucket_exists,
                         bucket_id
                     )
                     
@@ -77,7 +77,7 @@ class StorageManagementService:
                     
                     # List objects (with sampling limit)
                     objects_iter = await asyncio.to_thread(
-                        self.minio_service.client.list_objects,
+                        self.minio_service._client.list_objects,
                         bucket_name=bucket_id,
                         recursive=True
                     )
@@ -153,7 +153,7 @@ class StorageManagementService:
             # Lista tutti i thumbnail
             thumbnail_bucket = self.minio_service.buckets['thumbnails']
             objects = await asyncio.to_thread(
-                self.minio_service.client.list_objects,
+                self.minio_service._client.list_objects,
                 bucket_name=thumbnail_bucket,
                 recursive=True
             )
@@ -172,7 +172,7 @@ class StorageManagementService:
                         
                         # Elimina thumbnail
                         await asyncio.to_thread(
-                            self.minio_service.client.remove_object,
+                            self.minio_service._client.remove_object,
                             bucket_name=thumbnail_bucket,
                             object_name=obj.object_name
                         )
@@ -227,14 +227,14 @@ class StorageManagementService:
                 try:
                     # Controlla se il bucket esiste
                     bucket_exists = await asyncio.to_thread(
-                        self.minio_service.client.bucket_exists,
+                        self.minio_service._client.bucket_exists,
                         bucket_name
                     )
                     
                     if not bucket_exists:
                         # Crea bucket
                         await asyncio.to_thread(
-                            self.minio_service.client.make_bucket,
+                            self.minio_service._client.make_bucket,
                             bucket_name
                         )
                         
@@ -261,7 +261,7 @@ class StorageManagementService:
                                 }
                                 
                                 await asyncio.to_thread(
-                                    self.minio_service.client.set_bucket_policy,
+                                    self.minio_service._client.set_bucket_policy,
                                     bucket_name,
                                     json.dumps(policy)
                                 )

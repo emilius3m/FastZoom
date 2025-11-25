@@ -14,7 +14,7 @@ from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 import piexif
 from loguru import logger
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 
 # ORIENTATION constant - handle different PIL versions
 try:
@@ -37,7 +37,8 @@ except ImportError:
 # 🔧 CORREZIONE: Import MinIO per thumbnail upload diretto
 try:
     from app.services.archaeological_minio_service import archaeological_minio_service
-    from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+    from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
+    from app.core.exceptions import StorageFullError, StorageError
     HAS_MINIO = True
 except ImportError:
     HAS_MINIO = False
@@ -165,66 +166,11 @@ class FileUtils:
             logger.warning(f"Errore pulizia file temporaneo {file_path}: {e}")
 
 
-class StorageUtils:
-    """Utility class per operazioni di storage"""
+class PhotoService:
+    """Servizio per gestione foto con storage centralizzato"""
 
-    @staticmethod
-    async def upload_thumbnail_with_fallback(thumbnail_data: bytes, photo_id: str) -> str:
-        """Upload thumbnail con gestione errori e fallback"""
-        if not HAS_MINIO:
-            raise StorageError("MinIO non disponibile")
-
-        try:
-            # Upload con servizio archeologico
-            thumbnail_url = await archaeological_minio_service.upload_thumbnail(
-                thumbnail_data, photo_id
-            )
-            logger.info(f"Thumbnail uploaded with archaeological service: {photo_id}")
-            return thumbnail_url
-
-        except Exception as upload_error:
-            error_msg = str(upload_error)
-
-            # Check if it's a storage full error
-            if "XMinioStorageFull" in error_msg or "minimum free drive threshold" in error_msg:
-                logger.error(f"MinIO storage full - triggering emergency cleanup for thumbnail: {photo_id}")
-
-                # Try emergency cleanup
-                try:
-                    from app.services.storage_management_service import storage_management_service
-                    cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=100)
-
-                    if cleanup_result['success'] and cleanup_result['total_freed_mb'] > 50:
-                        logger.info(f"Emergency cleanup freed {cleanup_result['total_freed_mb']}MB, retrying thumbnail upload")
-
-                        # Retry upload after cleanup
-                        thumbnail_url = await archaeological_minio_service.upload_thumbnail(
-                            thumbnail_data, photo_id
-                        )
-                        logger.info(f"Thumbnail uploaded after emergency cleanup: {photo_id}")
-                        return thumbnail_url
-                    else:
-                        logger.warning(f"Emergency cleanup insufficient, falling back to local storage for thumbnail: {photo_id}")
-                        raise StorageError("Storage full after cleanup attempt")
-
-                except Exception as cleanup_error:
-                    logger.error(f"Emergency cleanup failed: {cleanup_error}")
-                    raise StorageError("Storage full and cleanup failed")
-            else:
-                # Other MinIO error, fallback to local
-                raise upload_error
-
-    @staticmethod
-    def save_thumbnail_locally(thumbnail: Image.Image, photo_id: str) -> str:
-        """Salva thumbnail localmente come fallback"""
-        thumbnail_dir = Path("storage/thumbnails")
-        thumbnail_dir.mkdir(parents=True, exist_ok=True)
-
-        thumbnail_path = thumbnail_dir / f"{photo_id}.jpg"
-        thumbnail.save(thumbnail_path, 'JPEG', quality=85, optimize=True)
-
-        logger.info(f"Thumbnail saved locally: {thumbnail_path}")
-        return str(thumbnail_path)
+    def __init__(self, archaeological_minio_service):
+        self.storage = archaeological_minio_service
 
 
 class PhotoMetadataService:
@@ -770,21 +716,99 @@ class PhotoMetadataService:
             raise ImageProcessingError(f"Errore preparazione thumbnail: {e}")
 
     async def _save_thumbnail(self, thumbnail: Image.Image, photo_id: str) -> str:
-        """Salva thumbnail con gestione storage e fallback"""
-        # Salva thumbnail in memoria
-        thumbnail_buffer = io.BytesIO()
-        thumbnail.save(thumbnail_buffer, 'JPEG', quality=85, optimize=True)
-        thumbnail_buffer.seek(0)
-        thumbnail_data = thumbnail_buffer.read()
-
+        """
+        Salva thumbnail su MinIO storage
+        
+        Args:
+            thumbnail: Immagine thumbnail PIL
+            photo_id: ID foto
+            
+        Returns:
+            URL del thumbnail salvato
+        """
         try:
-            # Prova upload con MinIO
-            return await StorageUtils.upload_thumbnail_with_fallback(thumbnail_data, photo_id)
+            # Converti thumbnail in bytes
+            thumbnail_buffer = io.BytesIO()
+            thumbnail.save(thumbnail_buffer, 'JPEG', quality=85, optimize=True)
+            thumbnail_bytes = thumbnail_buffer.getvalue()
+            
+            # Usa il servizio archeologico per upload thumbnail
+            if HAS_MINIO:
+                thumbnail_url = await archaeological_minio_service.upload_thumbnail(
+                    thumbnail_bytes, photo_id
+                )
+                logger.info(f"Thumbnail uploaded successfully: {photo_id}")
+                return thumbnail_url
+            else:
+                # Fallback se MinIO non disponibile
+                logger.warning("MinIO not available, thumbnail upload skipped")
+                return f"temp_thumbnail_{photo_id}.jpg"
+                
+        except Exception as e:
+            logger.error(f"Error saving thumbnail for {photo_id}: {e}")
+            raise ImageProcessingError(f"Errore salvataggio thumbnail: {e}")
 
+    async def create_and_upload_thumbnail(
+        self,
+        photo_id: str,
+        image_data: bytes,
+        site_id: Optional[str] = None
+    ) -> str:
+        """Crea thumbnail e uploada su MinIO"""
+        try:
+            # Genera thumbnail
+            thumbnail_bytes = await self._generate_thumbnail(image_data)
+
+            # Upload via servizio archeologico (gestisce tutto lui)
+            if HAS_MINIO:
+                thumbnail_url = await archaeological_minio_service.upload_thumbnail(
+                    thumbnail_bytes=thumbnail_bytes,
+                    photo_id=photo_id,
+                    site_id=site_id
+                )
+            else:
+                logger.warning("MinIO not available, thumbnail upload skipped")
+                return f"temp_thumbnail_{photo_id}.jpg"
+
+            logger.info(f"Thumbnail uploaded: {photo_id}")
+            return thumbnail_url
+
+        except StorageFullError as e:
+            # Storage full anche dopo cleanup automatico
+            logger.error(f"Cannot upload thumbnail, storage full: {e}")
+            raise HTTPException(
+                status_code=507,
+                detail=f"Storage insufficient. Freed {e.freed_space_mb}MB but not enough"
+            )
         except StorageError as e:
-            logger.warning(f"MinIO upload failed for thumbnail: {e}, using local storage")
-            # Fallback a storage locale
-            return StorageUtils.save_thumbnail_locally(thumbnail, photo_id)
+            logger.error(f"Storage error uploading thumbnail: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Storage error during thumbnail upload"
+            )
+
+    async def _generate_thumbnail(self, image_data: bytes) -> bytes:
+        """Genera thumbnail da dati immagine"""
+        try:
+            # Carica immagine da bytes
+            image = Image.open(io.BytesIO(image_data))
+            
+            # Prepara immagine per thumbnail
+            image = ImageUtils.prepare_image_for_thumbnail(image)
+            
+            # Crea thumbnail
+            thumbnail = ImageUtils.create_thumbnail(image, 800)
+            
+            # Salva in memoria
+            thumbnail_buffer = io.BytesIO()
+            thumbnail.save(thumbnail_buffer, 'JPEG', quality=85, optimize=True)
+            thumbnail_buffer.seek(0)
+            
+            return thumbnail_buffer.read()
+            
+        except Exception as e:
+            logger.error(f"Error generating thumbnail: {e}")
+            raise ImageProcessingError(f"Thumbnail generation failed: {e}")
 
     async def generate_thumbnail_from_file(
             self,
@@ -901,14 +925,17 @@ class PhotoMetadataService:
                     logger.info(f"Generating deep zoom for large image: {width}x{height}")
 
                     try:
-                        # Processa con deep zoom
-                        result = await archaeological_minio_service.process_photo_with_deep_zoom(
-                            photo_data=content,
-                            photo_id=photo_id,
-                            site_id=site_id,
-                            archaeological_metadata=archaeological_metadata,
-                            generate_deep_zoom=True
-                        )
+                        # Processa con deep zoom usando servizio centralizzato
+                        if HAS_MINIO:
+                            result = await archaeological_minio_service.process_photo_with_deep_zoom(
+                                photo_data=content,
+                                photo_id=photo_id,
+                                site_id=site_id,
+                                archaeological_metadata=archaeological_metadata,
+                                generate_deep_zoom=True
+                            )
+                        else:
+                            logger.warning("MinIO not available, deep zoom processing skipped")
 
                         logger.info(f"Deep zoom processing completed successfully for {photo_id}")
                         return {

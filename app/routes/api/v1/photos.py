@@ -20,11 +20,18 @@ from app.models import USFile
 from app.routes.api.dependencies import get_site_access, get_photo_site_access, get_normalized_site_id
 from app.services.storage_service import storage_service
 from app.services.photo_service import photo_metadata_service
-from app.services.archaeological_minio_service import archaeological_minio_service
-from app.services.deep_zoom_minio_service import deep_zoom_minio_service
 from app.services.deep_zoom_background_service import deep_zoom_background_service
 from app.services.storage_management_service import storage_management_service
 from app.services.photo_serving_service import photo_serving_service
+
+# Import refactored services with dependency injection
+from app.routes.api.service_dependencies import (
+    ArchaeologicalMinIOServiceDep,
+    PhotoServiceDep,
+    DeepZoomMinIOServiceDep,
+    handle_storage_errors,
+    convert_storage_error_to_http_exception
+)
 
 # Import nuovi servizi modulari
 from app.services.photos.upload_service import PhotoUploadService
@@ -351,18 +358,25 @@ async def search_photos_by_metadata(
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi richiesti")
 
-    search_results = await archaeological_minio_service.search_photos_by_metadata(
-        site_id=str(site_id),
-        material=material,
-        inventory_number=inventory_number,
-        excavation_area=excavation_area,
-        chronology_period=chronology_period
-    )
+    # Use injected storage service for metadata search with proper error handling
+    storage = ArchaeologicalMinIOServiceDep()
+    
+    try:
+        search_results = await storage.search_photos_by_metadata(
+            site_id=str(site_id),
+            material=material,
+            inventory_number=inventory_number,
+            excavation_area=excavation_area,
+            chronology_period=chronology_period
+        )
 
-    return JSONResponse({
-        "results": search_results,
-        "total": len(search_results)
-    })
+        return JSONResponse({
+            "results": search_results,
+            "total": len(search_results)
+        })
+    except Exception as e:
+        # Convert domain storage exceptions to HTTP exceptions
+        await convert_storage_error_to_http_exception(e, "photo metadata search")
 
 
 @router.put("/sites/{site_id}/photos/{photo_id}/update")

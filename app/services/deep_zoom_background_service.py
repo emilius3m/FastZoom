@@ -61,7 +61,7 @@ def normalize_site_id(site_id: str) -> Optional[str]:
 from PIL import Image
 import math
 
-from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
 from app.models import Photo
 from sqlalchemy import select
 
@@ -270,6 +270,11 @@ class DeepZoomBackgroundService:
                 from app.services.archaeological_minio_service import archaeological_minio_service
                 original_file_content = await archaeological_minio_service.get_file(photo_info['file_path'])
                 
+                # 🔧 VALIDATION: Basic content validation before scheduling
+                if not original_file_content or len(original_file_content) < 100:
+                    logger.error(f"❌ Invalid or empty image content for photo {photo_info['photo_id']}: {len(original_file_content) if original_file_content else 0} bytes")
+                    continue
+                
                 await self.schedule_tile_processing(
                     photo_id=photo_info['photo_id'],
                     site_id=effective_site_id,  # Use normalized site_id
@@ -351,6 +356,11 @@ class DeepZoomBackgroundService:
                 # Load file content from MinIO using snapshot file_path
                 from app.services.archaeological_minio_service import archaeological_minio_service
                 original_file_content = await archaeological_minio_service.get_file(photo_snapshot['file_path'])
+                
+                # 🔧 VALIDATION: Basic content validation before scheduling
+                if not original_file_content or len(original_file_content) < 100:
+                    logger.error(f"❌ SNAPSHOT-BASED: Invalid or empty image content for photo {photo_id}: {len(original_file_content) if original_file_content else 0} bytes")
+                    continue
                 
                 # Extract archaeological metadata from snapshot (check both possible keys)
                 archaeological_metadata = photo_snapshot.get('archaeological_metadata', photo_snapshot.get('metadata', {}))
@@ -867,8 +877,55 @@ class DeepZoomBackgroundService:
             else:
                 logger.debug(f"🔄 Generating tiles for {photo_id} using traditional method")
             
-            # Open image from bytes
-            image = Image.open(io.BytesIO(content))
+            # 🔧 VALIDATION: Validate content before processing
+            if not content:
+                raise ValueError("Image content is empty")
+            
+            if len(content) < 100:  # Most valid images are larger than 100 bytes
+                raise ValueError(f"Image content too small: {len(content)} bytes")
+            
+            # 🔧 VALIDATION: Log content details for debugging
+            content_preview = content[:50] if len(content) >= 50 else content
+            logger.debug(f"🔧 IMAGE VALIDATION: Content size: {len(content)} bytes, preview: {content_preview}")
+            
+            # 🔧 VALIDATION: Check common image format signatures
+            if len(content) >= 4:
+                # JPEG: FF D8 FF
+                if content[0:2] == b'\xFF\xD8' and content[2] == 0xFF:
+                    logger.debug(f"🔧 IMAGE VALIDATION: JPEG signature detected for {photo_id}")
+                # PNG: 89 50 4E 47
+                elif content[0:4] == b'\x89PNG':
+                    logger.debug(f"🔧 IMAGE VALIDATION: PNG signature detected for {photo_id}")
+                # WEBP: 52 49 46 46 ... 57 45 42 50
+                elif content[0:4] == b'RIFF' and len(content) >= 12 and content[8:12] == b'WEBP':
+                    logger.debug(f"🔧 IMAGE VALIDATION: WEBP signature detected for {photo_id}")
+                else:
+                    logger.warning(f"🔧 IMAGE VALIDATION: Unknown image format for {photo_id}, first 8 bytes: {content[:8]}")
+            else:
+                logger.warning(f"🔧 IMAGE VALIDATION: Content too small to determine format for {photo_id}")
+            
+            # 🔧 VALIDATION: Try to open image with better error handling
+            try:
+                # Create BytesIO object and reset position
+                image_buffer = io.BytesIO(content)
+                image_buffer.seek(0)
+                
+                # Open image with explicit format validation
+                image = Image.open(image_buffer)
+                
+                # Verify image can be loaded
+                image.verify()  # Verify without loading pixel data
+                
+                # Reopen after verify (verify() closes the file)
+                image_buffer.seek(0)
+                image = Image.open(image_buffer)
+                
+                logger.info(f"🔧 IMAGE VALIDATION: Successfully validated and loaded image for {photo_id}, size: {image.size}, mode: {image.mode}")
+                
+            except Exception as img_error:
+                logger.error(f"🔧 IMAGE VALIDATION: Failed to validate image for {photo_id}: {img_error}")
+                logger.error(f"🔧 IMAGE VALIDATION: Content info - Size: {len(content)}, First 100 bytes: {content[:100]}")
+                raise ValueError(f"Invalid image content: {str(img_error)}")
             
             # Determine format based on image
             original_format = image.format.lower() if image.format else 'jpg'
@@ -1072,7 +1129,7 @@ class DeepZoomBackgroundService:
             from app.services.archaeological_minio_service import archaeological_minio_service
             
             result = await asyncio.to_thread(
-                archaeological_minio_service.client.put_object,
+                archaeological_minio_service._client.put_object,
                 bucket_name=archaeological_minio_service.buckets['tiles'],
                 object_name=object_name,
                 data=io.BytesIO(tile_data),
@@ -1139,7 +1196,7 @@ class DeepZoomBackgroundService:
             from app.services.archaeological_minio_service import archaeological_minio_service
             
             result = await asyncio.to_thread(
-                archaeological_minio_service.client.put_object,
+                archaeological_minio_service._client.put_object,
                 bucket_name=archaeological_minio_service.buckets['tiles'],
                 object_name=metadata_object_name,
                 data=io.BytesIO(metadata_bytes),
@@ -1201,7 +1258,7 @@ class DeepZoomBackgroundService:
             status_object_name = f"{task.site_id}/tiles/{task.photo_id}/processing_status.json"
             
             await asyncio.to_thread(
-                archaeological_minio_service.client.put_object,
+                archaeological_minio_service._client.put_object,
                 bucket_name=archaeological_minio_service.buckets['tiles'],
                 object_name=status_object_name,
                 data=io.BytesIO(status_bytes),
@@ -1227,7 +1284,7 @@ class DeepZoomBackgroundService:
             status_object_name = f"{task.site_id}/tiles/{task.photo_id}/processing_status.json"
             
             await asyncio.to_thread(
-                archaeological_minio_service.client.put_object,
+                archaeological_minio_service._client.put_object,
                 bucket_name=archaeological_minio_service.buckets['tiles'],
                 object_name=status_object_name,
                 data=io.BytesIO(status_bytes),

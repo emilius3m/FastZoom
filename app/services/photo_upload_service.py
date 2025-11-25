@@ -512,10 +512,11 @@ class PhotoUploadService:
             logger.info(f"Starting background tiles processing for {len(photos_list)} photos")
 
             # Import qui per evitare circular imports
-            from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+            from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
 
             # Processa sequenzialmente per evitare sovraccarico
-            await deep_zoom_minio_service.process_tiles_batch_sequential(
+            deep_zoom_service = get_deep_zoom_minio_service()
+            await deep_zoom_service.process_tiles_batch_sequential(
                 photos_list=photos_list,
                 site_id=str(site_id)
             )

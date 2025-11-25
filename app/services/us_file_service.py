@@ -17,7 +17,7 @@ from loguru import logger
 from app.models.stratigraphy import USFile, UnitaStratigrafica, UnitaStratigraficaMuraria
 from app.models.stratigraphy import us_files_association, usm_files_association
 from app.services.storage_service import storage_service
-from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
 
 
 class USFileService:
@@ -185,7 +185,8 @@ class USFileService:
                     file_content = await archaeological_minio_service.get_file(f"minio://{archaeological_minio_service.buckets['photos']}/{filepath}")
                     
                     # Schedula generazione tiles in background
-                    await deep_zoom_minio_service.schedule_tiles_generation_async(
+                    deep_zoom_service = get_deep_zoom_minio_service()
+                    await deep_zoom_service.schedule_tiles_generation_async(
                         str(us_file.id), file_content, str(us.site_id)
                     )
                     logger.info(f"Deep zoom schedulato per US file {us_file.id}")

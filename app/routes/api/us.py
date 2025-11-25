@@ -63,12 +63,17 @@ async def create_us(
             except (ValueError, TypeError):
                 pass
         
-        # Ensure site_id is a valid UUID
-        if 'site_id' in payload_dict and isinstance(payload_dict['site_id'], str):
-            try:
-                payload_dict['site_id'] = UUID(payload_dict['site_id'])
-            except (ValueError, TypeError):
-                raise HTTPException(status_code=422, detail="site_id non è un UUID valido")
+        # Ensure site_id is a valid UUID and convert to string for SQLite compatibility
+        if 'site_id' in payload_dict:
+            if isinstance(payload_dict['site_id'], str):
+                try:
+                    # Validate UUID format but keep as string for SQLite
+                    UUID(payload_dict['site_id'])
+                except (ValueError, TypeError):
+                    raise HTTPException(status_code=422, detail="site_id non è un UUID valido")
+            elif isinstance(payload_dict['site_id'], UUID):
+                # Convert UUID object to string for SQLite compatibility
+                payload_dict['site_id'] = str(payload_dict['site_id'])
         
         # Validate us_code format
         if 'us_code' in payload_dict:
@@ -98,9 +103,9 @@ async def create_us(
                                 detail=f"Campo '{field}': '{payload_dict[field]}' non è una data valida. Usare formato YYYY-MM-DD (es: 2025-01-15)"
                             )
         
-        # Add user_id for created_by field
-        payload_dict['created_by'] = user_id
-        payload_dict['updated_by'] = user_id
+        # Add user_id for created_by field (convert UUID to string for SQLite compatibility)
+        payload_dict['created_by'] = str(user_id)
+        payload_dict['updated_by'] = str(user_id)
         
         us = UnitaStratigrafica(**payload_dict)
         db.add(us)
@@ -274,12 +279,17 @@ async def create_usm(
             except (ValueError, TypeError):
                 pass
         
-        # Ensure site_id is a valid UUID
-        if 'site_id' in payload_dict and isinstance(payload_dict['site_id'], str):
-            try:
-                payload_dict['site_id'] = UUID(payload_dict['site_id'])
-            except (ValueError, TypeError):
-                raise HTTPException(status_code=422, detail="site_id non è un UUID valido")
+        # Ensure site_id is a valid UUID and convert to string for SQLite compatibility
+        if 'site_id' in payload_dict:
+            if isinstance(payload_dict['site_id'], str):
+                try:
+                    # Validate UUID format but keep as string for SQLite
+                    UUID(payload_dict['site_id'])
+                except (ValueError, TypeError):
+                    raise HTTPException(status_code=422, detail="site_id non è un UUID valido")
+            elif isinstance(payload_dict['site_id'], UUID):
+                # Convert UUID object to string for SQLite compatibility
+                payload_dict['site_id'] = str(payload_dict['site_id'])
         
         # Validate usm_code format
         if 'usm_code' in payload_dict:
@@ -309,9 +319,9 @@ async def create_usm(
                                 detail=f"Campo '{field}': '{payload_dict[field]}' non è una data valida. Usare formato YYYY-MM-DD (es: 2025-01-15)"
                             )
         
-        # Add user_id for created_by field
-        payload_dict['created_by'] = user_id
-        payload_dict['updated_by'] = user_id
+        # Add user_id for created_by field (convert UUID to string for SQLite compatibility)
+        payload_dict['created_by'] = str(user_id)
+        payload_dict['updated_by'] = str(user_id)
         
         usm = UnitaStratigraficaMuraria(**payload_dict)
         db.add(usm)

@@ -422,7 +422,7 @@ async def get_plan_image(
                 # Debug: List objects in bucket to see what's actually there
                 try:
                     objects = await asyncio.to_thread(
-                        archaeological_minio_service.client.list_objects,
+                        archaeological_minio_service._client.list_objects,
                         bucket_name=archaeological_minio_service.buckets['photos'],
                         prefix=f"{plan.site_id}/",
                         recursive=True

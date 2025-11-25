@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from app.models import Photo
 from app.services.deep_zoom_background_service import deep_zoom_background_service
-from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
 
 
 class PhotoDeepZoomService:
@@ -158,7 +158,8 @@ class PhotoDeepZoomService:
             if not task_status:
                 # Fallback to processing status from MinIO
                 self.logger.info(f"Task not found in background service, checking MinIO status for photo {photo_id}")
-                processing_status = await deep_zoom_minio_service.get_processing_status(
+                deep_zoom_service = get_deep_zoom_minio_service()
+                processing_status = await deep_zoom_service.get_processing_status(
                     str(site_id), str(photo_id)
                 )
                 
