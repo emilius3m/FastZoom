@@ -14,14 +14,15 @@ from app.models import UserSitePermission
 from app.models import User
 from app.templates import templates
 
+# Import helper functions unificati
+from app.services.view_helpers import (
+    get_current_user_with_profile,
+    get_base_template_context
+)
+
 us_view_router = APIRouter(prefix="/view", tags=["us-usm"])
 
 
-async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
-    """Recupera informazioni utente corrente"""
-    user_query = select(User).where(User.id == current_user_id)
-    user = await db.execute(user_query)
-    return user.scalar_one_or_none()
 
 
 @us_view_router.get("/{site_id}/us", response_class=HTMLResponse)
@@ -62,25 +63,13 @@ async def us_usm_view(
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
 
-    current_user = await get_current_user_with_context(current_user_id, db)
-
-    # Prepara context per il template
-    context = {
-        "request": request,
-        "site": site,
+    # Prepara context per il template usando la funzione helper unificata
+    context = await get_base_template_context(
+        request, current_user_id, user_sites, db, site, permission, "us"
+    )
+    context.update({
         "site_id": str(site_id),
-        "user_permission": permission,
-        "current_user": current_user,
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin(),
-        "sites": user_sites,
-        "sites_count": len(user_sites),
-        "current_site_name": site.name if site else None,
-        "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user",
-        "user_role": permission.permission_level if permission else "none",
-        "current_page": "us"
-    }
+        "user_role": permission.permission_level if permission else "none"
+    })
 
     return templates.TemplateResponse("pages/us/index.html", context)

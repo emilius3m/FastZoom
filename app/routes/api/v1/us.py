@@ -133,7 +133,7 @@ async def v1_create_us(
 @router.get("/sites/{site_id}/us/{us_id}", response_model=USOut, summary="Get US by ID", tags=["US/USM Units"])
 async def v1_get_us(
     site_id: UUID,
-    us_id: UUID,
+    us_id: str,  # Accept as string to handle both formats
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -142,8 +142,32 @@ async def v1_get_us(
     
     Endpoint: /api/v1/us/sites/{site_id}/us/{us_id}
     """
+    # Normalize UUID - handle both with and without hyphens
+    try:
+        # If us_id doesn't have hyphens, try to format it as a proper UUID
+        if '-' not in us_id and len(us_id) == 32:
+            # Format: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
+            normalized_us_id = f"{us_id[0:8]}-{us_id[8:12]}-{us_id[12:16]}-{us_id[16:20]}-{us_id[20:32]}"
+            us_id_uuid = UUID(normalized_us_id)
+            logger.info(f"🔧 [US_GET] Normalized UUID from {us_id} to {normalized_us_id}")
+        else:
+            # Try to parse as-is (with hyphens)
+            us_id_uuid = UUID(us_id)
+            normalized_us_id = str(us_id_uuid)
+    except (ValueError, TypeError) as e:
+        logger.error(f"❌ [US_GET] Invalid UUID format: {us_id} - Error: {e}")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Invalid UUID format",
+                "message": f"L'ID US '{us_id}' non è un UUID valido",
+                "us_id": us_id,
+                "debug_info": "UUID must be in standard format (with or without hyphens)"
+            }
+        )
+    
     # DEBUG LOGGING: Log request details
-    logger.info(f"🔍 [US_GET] Request received - Site ID: {site_id}, US ID: {us_id}")
+    logger.info(f"🔍 [US_GET] Request received - Site ID: {site_id}, US ID: {normalized_us_id}")
     logger.info(f"🔍 [US_GET] User has access to {len(user_sites)} sites")
     
     # Log user accessible sites for debugging
@@ -172,20 +196,20 @@ async def v1_get_us(
         )
     
     # Query US from database
-    logger.info(f"🔍 [US_GET] Querying US {us_id} from database...")
+    logger.info(f"🔍 [US_GET] Querying US {normalized_us_id} from database...")
     result = await db.execute(
-        select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id)
+        select(UnitaStratigrafica).where(UnitaStratigrafica.id == str(us_id_uuid))
     )
     us = result.scalar_one_or_none()
     
     if not us:
-        logger.error(f"❌ [US_GET] US NOT FOUND - US {us_id} does not exist in database")
+        logger.error(f"❌ [US_GET] US NOT FOUND - US {normalized_us_id} does not exist in database")
         raise HTTPException(
             status_code=404,
             detail={
                 "error": "US not found",
-                "message": f"L'Unità Stratigrafica {us_id} non esiste nel database",
-                "us_id": str(us_id),
+                "message": f"L'Unità Stratigrafica {normalized_us_id} non esiste nel database",
+                "us_id": normalized_us_id,
                 "debug_info": "US ID not found in database"
             }
         )
@@ -194,20 +218,20 @@ async def v1_get_us(
     
     # Check if US belongs to requested site
     if us.site_id != str(site_id):
-        logger.error(f"❌ [US_GET] SITE MISMATCH - US {us_id} belongs to site {us.site_id}, not {site_id}")
+        logger.error(f"❌ [US_GET] SITE MISMATCH - US {normalized_us_id} belongs to site {us.site_id}, not {site_id}")
         raise HTTPException(
             status_code=404,
             detail={
                 "error": "US not found for this site",
-                "message": f"L'US {us_id} appartiene al sito {us.site_id}, non al sito {site_id}",
-                "us_id": str(us_id),
+                "message": f"L'US {normalized_us_id} appartiene al sito {us.site_id}, non al sito {site_id}",
+                "us_id": normalized_us_id,
                 "requested_site_id": str(site_id),
                 "actual_site_id": us.site_id,
                 "debug_info": "US exists but belongs to different site"
             }
         )
     
-    logger.success(f"✅ [US_GET] SUCCESS - US {us_id} retrieved successfully")
+    logger.success(f"✅ [US_GET] SUCCESS - US {normalized_us_id} retrieved successfully")
     return us
 
 @router.get("/sites/{site_id}/us", response_model=List[USOut], summary="List US for site", tags=["US/USM Units"])
@@ -239,7 +263,7 @@ async def v1_list_us(
 @router.put("/sites/{site_id}/us/{us_id}", response_model=USOut, summary="Update US", tags=["US/USM Units"])
 async def v1_update_us(
     site_id: UUID,
-    us_id: UUID,
+    us_id: str,  # Accept as string to handle both formats
     payload: USUpdate,
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
@@ -249,10 +273,34 @@ async def v1_update_us(
     
     Endpoint: /api/v1/us/sites/{site_id}/us/{us_id}
     """
+    # Normalize UUID - handle both with and without hyphens
     try:
-        logger.info(f"Updating US {us_id} with payload: {payload.model_dump()}")
+        # If us_id doesn't have hyphens, try to format it as a proper UUID
+        if '-' not in us_id and len(us_id) == 32:
+            # Format: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
+            normalized_us_id = f"{us_id[0:8]}-{us_id[8:12]}-{us_id[12:16]}-{us_id[16:20]}-{us_id[20:32]}"
+            us_id_uuid = UUID(normalized_us_id)
+            logger.info(f"🔧 [US_UPDATE] Normalized UUID from {us_id} to {normalized_us_id}")
+        else:
+            # Try to parse as-is (with hyphens)
+            us_id_uuid = UUID(us_id)
+            normalized_us_id = str(us_id_uuid)
+    except (ValueError, TypeError) as e:
+        logger.error(f"❌ [US_UPDATE] Invalid UUID format: {us_id} - Error: {e}")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Invalid UUID format",
+                "message": f"L'ID US '{us_id}' non è un UUID valido",
+                "us_id": us_id,
+                "debug_info": "UUID must be in standard format (with or without hyphens)"
+            }
+        )
+    
+    try:
+        logger.info(f"Updating US {normalized_us_id} with payload: {payload.model_dump()}")
         
-        result = await db.execute(select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id))
+        result = await db.execute(select(UnitaStratigrafica).where(UnitaStratigrafica.id == str(us_id_uuid)))
         us = result.scalar_one_or_none()
         if not us:
             raise HTTPException(status_code=404, detail="US non trovata")
@@ -308,7 +356,7 @@ async def v1_update_us(
 @router.delete("/sites/{site_id}/us/{us_id}", status_code=204, summary="Delete US", tags=["US/USM Units"])
 async def v1_delete_us(
     site_id: UUID,
-    us_id: UUID,
+    us_id: str,  # Accept as string to handle both formats
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -317,7 +365,31 @@ async def v1_delete_us(
     
     Endpoint: /api/v1/us/sites/{site_id}/us/{us_id}
     """
-    result = await db.execute(select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id))
+    # Normalize UUID - handle both with and without hyphens
+    try:
+        # If us_id doesn't have hyphens, try to format it as a proper UUID
+        if '-' not in us_id and len(us_id) == 32:
+            # Format: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
+            normalized_us_id = f"{us_id[0:8]}-{us_id[8:12]}-{us_id[12:16]}-{us_id[16:20]}-{us_id[20:32]}"
+            us_id_uuid = UUID(normalized_us_id)
+            logger.info(f"🔧 [US_DELETE] Normalized UUID from {us_id} to {normalized_us_id}")
+        else:
+            # Try to parse as-is (with hyphens)
+            us_id_uuid = UUID(us_id)
+            normalized_us_id = str(us_id_uuid)
+    except (ValueError, TypeError) as e:
+        logger.error(f"❌ [US_DELETE] Invalid UUID format: {us_id} - Error: {e}")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Invalid UUID format",
+                "message": f"L'ID US '{us_id}' non è un UUID valido",
+                "us_id": us_id,
+                "debug_info": "UUID must be in standard format (with or without hyphens)"
+            }
+        )
+    
+    result = await db.execute(select(UnitaStratigrafica).where(UnitaStratigrafica.id == str(us_id_uuid)))
     us = result.scalar_one_or_none()
     if not us:
         raise HTTPException(status_code=404, detail="US non trovata")
@@ -449,7 +521,7 @@ async def v1_create_usm(
 @router.get("/sites/{site_id}/usm/{usm_id}", response_model=USMOut, summary="Get USM by ID", tags=["US/USM Units"])
 async def v1_get_usm(
     site_id: UUID,
-    usm_id: UUID,
+    usm_id: str,  # Accept as string to handle both formats
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -458,16 +530,60 @@ async def v1_get_usm(
     
     Endpoint: /api/v1/us/sites/{site_id}/usm/{usm_id}
     """
+    # Normalize UUID - handle both with and without hyphens
+    try:
+        # If usm_id doesn't have hyphens, try to format it as a proper UUID
+        if '-' not in usm_id and len(usm_id) == 32:
+            # Format: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
+            normalized_usm_id = f"{usm_id[0:8]}-{usm_id[8:12]}-{usm_id[12:16]}-{usm_id[16:20]}-{usm_id[20:32]}"
+            usm_id_uuid = UUID(normalized_usm_id)
+            logger.info(f"🔧 [USM_GET] Normalized UUID from {usm_id} to {normalized_usm_id}")
+        else:
+            # Try to parse as-is (with hyphens)
+            usm_id_uuid = UUID(usm_id)
+            normalized_usm_id = str(usm_id_uuid)
+    except (ValueError, TypeError) as e:
+        logger.error(f"❌ [USM_GET] Invalid UUID format: {usm_id} - Error: {e}")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Invalid UUID format",
+                "message": f"L'ID USM '{usm_id}' non è un UUID valido",
+                "usm_id": usm_id,
+                "debug_info": "UUID must be in standard format (with or without hyphens)"
+            }
+        )
+    
     result = await db.execute(
-        select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == usm_id)
+        select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == str(usm_id_uuid))
     )
     usm = result.scalar_one_or_none()
     if not usm:
-        raise HTTPException(status_code=404, detail="USM non trovata")
+        logger.error(f"❌ [USM_GET] USM NOT FOUND - USM {normalized_usm_id} does not exist in database")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "USM not found",
+                "message": f"L'Unità Stratigrafica Muraria {normalized_usm_id} non esiste nel database",
+                "usm_id": normalized_usm_id,
+                "debug_info": "USM ID not found in database"
+            }
+        )
     if not await verify_site_access(site_id, user_sites):
         raise HTTPException(status_code=403, detail="Accesso negato al sito")
     if usm.site_id != str(site_id):
-        raise HTTPException(status_code=404, detail="USM non trovata per questo sito")
+        logger.error(f"❌ [USM_GET] SITE MISMATCH - USM {normalized_usm_id} belongs to site {usm.site_id}, not {site_id}")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "USM not found for this site",
+                "message": f"L'USM {normalized_usm_id} appartiene al sito {usm.site_id}, non al sito {site_id}",
+                "usm_id": normalized_usm_id,
+                "requested_site_id": str(site_id),
+                "actual_site_id": usm.site_id,
+                "debug_info": "USM exists but belongs to different site"
+            }
+        )
     return usm
 
 @router.get("/sites/{site_id}/usm", response_model=List[USMOut], summary="List USM for site", tags=["US/USM Units"])
@@ -497,7 +613,7 @@ async def v1_list_usm(
 @router.put("/sites/{site_id}/usm/{usm_id}", response_model=USMOut, summary="Update USM", tags=["US/USM Units"])
 async def v1_update_usm(
     site_id: UUID,
-    usm_id: UUID,
+    usm_id: str,  # Accept as string to handle both formats
     payload: USMUpdate,
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
@@ -507,14 +623,38 @@ async def v1_update_usm(
     
     Endpoint: /api/v1/us/sites/{site_id}/usm/{usm_id}
     """
+    # Normalize UUID - handle both with and without hyphens
+    try:
+        # If usm_id doesn't have hyphens, try to format it as a proper UUID
+        if '-' not in usm_id and len(usm_id) == 32:
+            # Format: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
+            normalized_usm_id = f"{usm_id[0:8]}-{usm_id[8:12]}-{usm_id[12:16]}-{usm_id[16:20]}-{usm_id[20:32]}"
+            usm_id_uuid = UUID(normalized_usm_id)
+            logger.info(f"🔧 [USM_UPDATE] Normalized UUID from {usm_id} to {normalized_usm_id}")
+        else:
+            # Try to parse as-is (with hyphens)
+            usm_id_uuid = UUID(usm_id)
+            normalized_usm_id = str(usm_id_uuid)
+    except (ValueError, TypeError) as e:
+        logger.error(f"❌ [USM_UPDATE] Invalid UUID format: {usm_id} - Error: {e}")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Invalid UUID format",
+                "message": f"L'ID USM '{usm_id}' non è un UUID valido",
+                "usm_id": usm_id,
+                "debug_info": "UUID must be in standard format (with or without hyphens)"
+            }
+        )
+    
     try:
         print(f"\n{'='*80}")
-        print(f"[UPDATE USM] Updating USM {usm_id}")
+        print(f"[UPDATE USM] Updating USM {normalized_usm_id}")
         print(f"[UPDATE USM] Payload received: {payload.model_dump()}")
         print(f"{'='*80}\n")
         
         result = await db.execute(
-            select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == usm_id)
+            select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == str(usm_id_uuid))
         )
         usm = result.scalar_one_or_none()
         if not usm:
@@ -568,7 +708,7 @@ async def v1_update_usm(
         await db.commit()
         await db.refresh(usm)
         
-        print(f"\n[UPDATE USM] USM {usm_id} updated successfully")
+        print(f"\n[UPDATE USM] USM {normalized_usm_id} updated successfully")
         print(f"[UPDATE USM] data_rilevamento after save: {usm.data_rilevamento}")
         print(f"[UPDATE USM] data_rielaborazione after save: {usm.data_rielaborazione}")
         print(f"{'='*80}\n")
@@ -591,7 +731,7 @@ async def v1_update_usm(
 @router.delete("/sites/{site_id}/usm/{usm_id}", status_code=204, summary="Delete USM", tags=["US/USM Units"])
 async def v1_delete_usm(
     site_id: UUID,
-    usm_id: UUID,
+    usm_id: str,  # Accept as string to handle both formats
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -600,8 +740,32 @@ async def v1_delete_usm(
     
     Endpoint: /api/v1/us/sites/{site_id}/usm/{usm_id}
     """
+    # Normalize UUID - handle both with and without hyphens
+    try:
+        # If usm_id doesn't have hyphens, try to format it as a proper UUID
+        if '-' not in usm_id and len(usm_id) == 32:
+            # Format: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
+            normalized_usm_id = f"{usm_id[0:8]}-{usm_id[8:12]}-{usm_id[12:16]}-{usm_id[16:20]}-{usm_id[20:32]}"
+            usm_id_uuid = UUID(normalized_usm_id)
+            logger.info(f"🔧 [USM_DELETE] Normalized UUID from {usm_id} to {normalized_usm_id}")
+        else:
+            # Try to parse as-is (with hyphens)
+            usm_id_uuid = UUID(usm_id)
+            normalized_usm_id = str(usm_id_uuid)
+    except (ValueError, TypeError) as e:
+        logger.error(f"❌ [USM_DELETE] Invalid UUID format: {usm_id} - Error: {e}")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Invalid UUID format",
+                "message": f"L'ID USM '{usm_id}' non è un UUID valido",
+                "usm_id": usm_id,
+                "debug_info": "UUID must be in standard format (with or without hyphens)"
+            }
+        )
+    
     result = await db.execute(
-        select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == usm_id)
+        select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == str(usm_id_uuid))
     )
     usm = result.scalar_one_or_none()
     if not usm:
