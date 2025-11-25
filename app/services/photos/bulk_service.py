@@ -555,6 +555,68 @@ class PhotoBulkService:
                 except Exception as e:
                     self.logger.warning(f"Error deleting thumbnail {thumbnail_path}: {e}")
             
+            # NUOVO: Delete Deep Zoom tiles from MinIO
+            if photo.has_deep_zoom:
+                try:
+                    # Construct tiles path for this photo
+                    site_id = photo.site_id
+                    photo_id = str(photo.id)
+                    tiles_prefix = f"{site_id}/tiles/{photo_id}/"
+                    
+                    # List all tiles for this photo
+                    from minio.error import S3Error
+                    import asyncio
+                    
+                    def _list_tiles():
+                        return archaeological_minio_service._client.list_objects(
+                            bucket_name=archaeological_minio_service.buckets['tiles'],
+                            prefix=tiles_prefix,
+                            recursive=True
+                        )
+                    
+                    tiles_objects = await asyncio.to_thread(_list_tiles)
+                    tiles_to_delete = [obj for obj in tiles_objects if not obj.is_dir]
+                    
+                    # Delete all tiles
+                    deleted_tiles_count = 0
+                    for tile_obj in tiles_to_delete:
+                        try:
+                            def _delete_tile():
+                                archaeological_minio_service._client.remove_object(
+                                    bucket_name=archaeological_minio_service.buckets['tiles'],
+                                    object_name=tile_obj.object_name
+                                )
+                            
+                            await asyncio.to_thread(_delete_tile)
+                            deleted_tiles_count += 1
+                            
+                        except Exception as tile_error:
+                            self.logger.warning(f"Error deleting tile {tile_obj.object_name}: {tile_error}")
+                    
+                    # Delete metadata and processing status files
+                    metadata_files = [
+                        f"{tiles_prefix}metadata.json",
+                        f"{tiles_prefix}processing_status.json"
+                    ]
+                    
+                    for metadata_file in metadata_files:
+                        try:
+                            def _delete_metadata():
+                                archaeological_minio_service._client.remove_object(
+                                    bucket_name=archaeological_minio_service.buckets['tiles'],
+                                    object_name=metadata_file
+                                )
+                            
+                            await asyncio.to_thread(_delete_metadata)
+                            
+                        except Exception as meta_error:
+                            self.logger.warning(f"Error deleting metadata {metadata_file}: {meta_error}")
+                    
+                    self.logger.info(f"Deleted {deleted_tiles_count} Deep Zoom tiles for photo {photo_id}")
+                    
+                except Exception as e:
+                    self.logger.error(f"Error deleting Deep Zoom tiles for photo {photo.id}: {e}")
+            
         except Exception as e:
             self.logger.warning(f"Error during photo storage cleanup: {e}")
 
