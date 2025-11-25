@@ -93,9 +93,7 @@ class AuthService:
             # Load user with eager loading to prevent greenlet errors
             user_query = select(User).options(
                 selectinload(User.site_permissions)
-            ).where(
-                (User.id == user_id_str) | (User.id == user_id_str.replace('-', ''))
-            )
+            ).where(User.id == user_id_str)
             user_result = await db.execute(user_query)
             user = user_result.scalar_one_or_none()
             
@@ -127,7 +125,7 @@ class AuthService:
                 ArchaeologicalSite.id == UserSitePermission.site_id
             ).where(
                 and_(
-                    (UserSitePermission.user_id == user_id_str) | (UserSitePermission.user_id == user_id_str.replace('-', '')),
+                    UserSitePermission.user_id == user_id_str,
                     UserSitePermission.is_active == True,
                     ArchaeologicalSite.status == SiteStatusEnum.ACTIVE.value
                 )
