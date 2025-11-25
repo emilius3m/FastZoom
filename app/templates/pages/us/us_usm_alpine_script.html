@@ -225,7 +225,6 @@ function usUSMManagerApp() {
         async loadUSList() {
             try {
                 const queryParams = new URLSearchParams({
-                    site_id: this.currentSiteId,
                     skip: (this.pagination.currentPage - 1) * this.pagination.itemsPerPage,
                     limit: this.pagination.itemsPerPage
                 });
@@ -234,7 +233,7 @@ function usUSMManagerApp() {
                 if (this.filters.dateFrom) queryParams.append('da', this.filters.dateFrom);
                 if (this.filters.dateTo) queryParams.append('a', this.filters.dateTo);
 
-                const response = await fetch(`/api/us?${queryParams}`, {
+                const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us?${queryParams}`, {
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': this.getCSRFToken()
@@ -266,7 +265,7 @@ function usUSMManagerApp() {
             if (us) {
                 try {
                     // Fetch full US details
-                    const response = await fetch(`/api/us/${us.id}`);
+                    const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us/${us.id}`);
                     if (response.ok) {
                         const usData = await response.json();
                         
@@ -425,8 +424,8 @@ function usUSMManagerApp() {
                 delete payload.camp_setacciatura;
 
                 const url = this.editingUS
-                    ? `/api/us/${this.editingUS.id}`
-                    : '/api/us';
+                    ? `/api/v1/us/sites/${this.currentSiteId}/us/${this.editingUS.id}`
+                    : `/api/v1/us/sites/${this.currentSiteId}/us`;
                 const method = this.editingUS ? 'PUT' : 'POST';
 
                 const response = await fetch(url, {
@@ -504,7 +503,7 @@ function usUSMManagerApp() {
             }
 
             try {
-                const response = await fetch(`/api/us/${usId}`, {
+                const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us/${usId}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': this.getCSRFToken()
@@ -583,14 +582,13 @@ function usUSMManagerApp() {
         async loadUSMList() {
             try {
                 const queryParams = new URLSearchParams({
-                    site_id: this.currentSiteId,
                     skip: (this.pagination.currentPage - 1) * this.pagination.itemsPerPage,
                     limit: this.pagination.itemsPerPage
                 });
 
                 if (this.filters.search) queryParams.append('search', this.filters.search);
 
-                const response = await fetch(`/api/usm?${queryParams}`, {
+                const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm?${queryParams}`, {
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': this.getCSRFToken()
@@ -622,7 +620,7 @@ function usUSMManagerApp() {
             if (usm) {
                 try {
                     // Fetch full USM details
-                    const response = await fetch(`/api/usm/${usm.id}`);
+                    const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm/${usm.id}`);
                     if (response.ok) {
                         const usmData = await response.json();
                         console.log('USM data loaded from backend:', usmData);
@@ -861,8 +859,8 @@ function usUSMManagerApp() {
                 console.log('data_rielaborazione in payload AFTER cleanup:', payload.data_rielaborazione);
 
                 const url = this.editingUSM
-                    ? `/api/usm/${this.editingUSM.id}`
-                    : '/api/usm';
+                    ? `/api/v1/us/sites/${this.currentSiteId}/usm/${this.editingUSM.id}`
+                    : `/api/v1/us/sites/${this.currentSiteId}/usm`;
                 const method = this.editingUSM ? 'PUT' : 'POST';
 
                 const response = await fetch(url, {
@@ -943,7 +941,7 @@ function usUSMManagerApp() {
             }
 
             try {
-                const response = await fetch(`/api/usm/${usmId}`, {
+                const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm/${usmId}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': this.getCSRFToken()
