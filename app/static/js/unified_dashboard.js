@@ -616,7 +616,12 @@ document.addEventListener("alpine:init", () => {
         // API call with retry mechanism
         async apiCall(url, options = {}) {
             try {
-                const response = await fetch(url, options);
+                // Include credentials to send cookies for authentication
+                const fetchOptions = {
+                    ...options,
+                    credentials: 'include'
+                };
+                const response = await fetch(url, fetchOptions);
                 
                 // Handle authentication errors
                 if (response.status === 401) {

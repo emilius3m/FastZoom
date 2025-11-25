@@ -173,12 +173,12 @@
                     </div>
                     
                     <div x-show="!loading.sites" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <template x-for="site in sitesData" :key="site.id">
+                        <template x-for="site in sitesData" :key="site.site_id">
                             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600 hover:shadow-md transition-all cursor-pointer"
-                                 @click.stop="navigateToSite(site.id)">
+                                 @click.stop="navigateToSite(site.site_id)">
                                 <div class="flex items-start justify-between mb-3">
                                     <div class="flex-1">
-                                        <h3 class="font-semibold text-gray-900 dark:text-white" x-text="site.name"></h3>
+                                        <h3 class="font-semibold text-gray-900 dark:text-white" x-text="site.site_name"></h3>
                                         <p class="text-sm text-gray-600 dark:text-gray-400 mt-1" x-text="site.location"></p>
                                         <span class="inline-block px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded-full dark:bg-blue-900 dark:text-blue-300 mt-2"
                                               x-text="site.permission_level"></span>
@@ -219,13 +219,13 @@
                     </div>
                     
                     <div x-show="!loading.giornaleSites" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <template x-for="site in giornaleSites" :key="site.id">
+                        <template x-for="site in giornaleSites" :key="site.site_id">
                             <div class="group relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-lg transition-all duration-200 cursor-pointer"
-                                 @click.stop="navigateToGiornaleSite(site.id)">
+                                 @click.stop="navigateToGiornaleSite(site.site_id)">
                                 
                                 <div class="flex items-start justify-between mb-4">
                                     <div class="flex-1">
-                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 transition" x-text="site.name"></h3>
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-orange-600 transition" x-text="site.site_name"></h3>
                                         <p class="text-sm text-gray-600 dark:text-gray-400 mt-1" x-text="site.code"></p>
                                     </div>
                                     <div class="p-2 bg-white dark:bg-gray-700 rounded-full shadow-sm">
