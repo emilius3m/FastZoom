@@ -325,7 +325,7 @@ document.addEventListener("alpine:init", () => {
                 for (const site of this.giornaleSites) {
                     try {
                         const response = await this.apiCall(
-                            `/api/v1/giornale/stats/site/${site.id}`,
+                            `/api/v1/giornale/stats/site/${site.site_id}`,
                             {
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -336,13 +336,13 @@ document.addEventListener("alpine:init", () => {
                         
                         if (response && response.ok) {
                             const siteData = await response.json();
-                            this.giornaleSiteStats[site.id] = {
+                            this.giornaleSiteStats[site.site_id] = {
                                 total: siteData.total_giornali || 0,
                                 validated: siteData.validated_giornali || 0
                             };
                         }
                     } catch (error) {
-                        console.warn(`Failed to load stats for site ${site.id}:`, error);
+                        console.warn(`Failed to load stats for site ${site.site_id}:`, error);
                         // Continue with other sites even if one fails
                     }
                 }
@@ -516,7 +516,7 @@ document.addEventListener("alpine:init", () => {
         navigateToNewGiornale() {
             // Navigate to first available site for giornale creation
             if (this.giornaleSites.length > 0) {
-                window.location.href = `/giornale-cantiere/site/${this.giornaleSites[0].id}`;
+                window.location.href = `/giornale-cantiere/site/${this.giornaleSites[0].site_id}`;
             } else {
                 this.showError('Nessun sito disponibile per creare un giornale');
             }
@@ -525,7 +525,7 @@ document.addEventListener("alpine:init", () => {
         navigateToUpload() {
             // Navigate to first available site for upload
             if (this.sitesData.length > 0) {
-                window.location.href = `/view/${this.sitesData[0].id}/photos/`;
+                window.location.href = `/view/${this.sitesData[0].site_id}/photos/`;
             } else {
                 this.showError('Nessun sito disponibile per caricare documenti');
             }
@@ -537,7 +537,7 @@ document.addEventListener("alpine:init", () => {
         
         navigateToDocuments() {
             if (this.sitesData.length > 0) {
-                window.location.href = `/view/${this.sitesData[0].id}/documentation/`;
+                window.location.href = `/view/${this.sitesData[0].site_id}/documentation/`;
             } else {
                 this.showError('Nessun sito disponibile');
             }
@@ -853,8 +853,8 @@ document.addEventListener("alpine:init", () => {
                 this.filteredSites = [...this.sites];
             } else {
                 const query = this.searchQuery.toLowerCase();
-                this.filteredSites = this.sites.filter(site => 
-                    site.name.toLowerCase().includes(query) ||
+                this.filteredSites = this.sites.filter(site =>
+                    site.site_name.toLowerCase().includes(query) ||
                     site.code.toLowerCase().includes(query) ||
                     (site.location && site.location.toLowerCase().includes(query))
                 );
@@ -865,23 +865,23 @@ document.addEventListener("alpine:init", () => {
             console.log('Selecting site:', site, 'with context:', this.context);
             
             // Ensure we have a valid site object and ID
-            if (!site || !site.id) {
+            if (!site || !site.site_id) {
                 console.error('Invalid site object provided to selectSite');
                 return;
             }
             
             switch(this.context) {
                 case 'overview':
-                    console.log('Navigating to site dashboard:', site.id);
-                    window.location.assign(`/view/${site.id}/dashboard/`);
+                    console.log('Navigating to site dashboard:', site.site_id);
+                    window.location.assign(`/view/${site.site_id}/dashboard/`);
                     break;
                 case 'giornale':
-                    console.log('Navigating to giornale site:', site.id);
-                    window.location.assign(`/sites/${site.id}/cantieri`);
+                    console.log('Navigating to giornale site:', site.site_id);
+                    window.location.assign(`/sites/${site.site_id}/cantieri`);
                     break;
                 default:
-                    console.log('Default navigation to site dashboard:', site.id);
-                    window.location.assign(`/view/${site.id}/dashboard/`);
+                    console.log('Default navigation to site dashboard:', site.site_id);
+                    window.location.assign(`/view/${site.site_id}/dashboard/`);
             }
         },
         
@@ -926,7 +926,7 @@ document.addEventListener("alpine:init", () => {
             const parentData = Alpine.store('unifiedDashboard');
             
             if (this.context === 'giornale') {
-                return parentData?.giornaleSiteStats[site.id]?.[statType] || 0;
+                return parentData?.giornaleSiteStats[site.site_id]?.[statType] || 0;
             }
             
             // Default stats for overview
@@ -1220,7 +1220,7 @@ document.addEventListener("alpine:init", () => {
         navigateToNewGiornale() {
             const parentData = Alpine.store('unifiedDashboard');
             if (parentData?.giornaleSites?.length > 0) {
-                window.location.href = `/giornale-cantiere/site/${parentData.giornaleSites[0].id}`;
+                window.location.href = `/giornale-cantiere/site/${parentData.giornaleSites[0].site_id}`;
             } else {
                 this.showError('Nessun sito disponibile per creare un giornale');
             }
@@ -1237,7 +1237,7 @@ document.addEventListener("alpine:init", () => {
         navigateToUpload() {
             const parentData = Alpine.store('unifiedDashboard');
             if (parentData?.sitesData?.length > 0) {
-                window.location.href = `/view/${parentData.sitesData[0].id}/photos/`;
+                window.location.href = `/view/${parentData.sitesData[0].site_id}/photos/`;
             } else {
                 this.showError('Nessun sito disponibile per caricare documenti');
             }
