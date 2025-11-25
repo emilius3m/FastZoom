@@ -147,7 +147,8 @@ async def process_deep_zoom(
             file=io.BytesIO(photo_data)
         )
 
-        result = await deep_zoom_minio_service.process_and_upload_tiles(
+        deep_zoom_service = get_deep_zoom_minio_service()
+        result = await deep_zoom_service.process_and_upload_tiles(
             photo_id=str(photo_id),
             original_file=temp_file,
             site_id=str(site_id),

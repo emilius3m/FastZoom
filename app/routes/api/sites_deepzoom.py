@@ -12,7 +12,7 @@ from app.database.session import get_async_session
 from app.models import Photo
 from app.routes.api.dependencies import get_site_access
 from app.services.archaeological_minio_service import archaeological_minio_service
-from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+from app.routes.api.service_dependencies import get_deep_zoom_minio_service
 
 deepzoom_router = APIRouter()
 
@@ -147,7 +147,8 @@ async def process_deep_zoom(
             file=io.BytesIO(photo_data)
         )
 
-        result = await deep_zoom_minio_service.process_and_upload_tiles(
+        deep_zoom_service = get_deep_zoom_minio_service()
+        result = await deep_zoom_service.process_and_upload_tiles(
             photo_id=str(photo_id),
             original_file=temp_file,
             site_id=str(site_id),
@@ -203,7 +204,8 @@ async def get_deep_zoom_processing_status(
         raise HTTPException(status_code=404, detail="Foto non trovata")
 
     # Ottieni status da MinIO se disponibile
-    minio_status = await deep_zoom_minio_service.get_processing_status(str(site_id), str(photo_id))
+    deep_zoom_service = get_deep_zoom_minio_service()
+    minio_status = await deep_zoom_service.get_processing_status(str(site_id), str(photo_id))
 
     return JSONResponse({
         "photo_id": str(photo_id),

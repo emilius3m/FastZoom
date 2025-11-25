@@ -16,7 +16,7 @@ from uuid import UUID
 from app.database.engine import AsyncSessionLocal as async_session_maker
 from app.models import Photo
 from app.services.deep_zoom_background_service import deep_zoom_background_service
-from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
 from app.services.archaeological_minio_service import archaeological_minio_service
 
 
@@ -302,7 +302,8 @@ class TilesVerificationService:
             # Check if tiles are already marked as available in database
             if photo.has_deep_zoom and photo.deepzoom_status == 'completed':
                 # Verify tiles actually exist in storage
-                tile_info = await deep_zoom_minio_service.get_deep_zoom_info(site_id, str(photo.id))
+                deep_zoom_service = get_deep_zoom_minio_service()
+                tile_info = await deep_zoom_service.get_deep_zoom_info(site_id, str(photo.id))
                 if tile_info and tile_info.get('available', False):
                     return True
             
@@ -312,12 +313,14 @@ class TilesVerificationService:
                 return True  # Consider as "has tiles" since processing is underway
             
             # Check processing status
-            processing_status = await deep_zoom_minio_service.get_processing_status(site_id, str(photo.id))
+            deep_zoom_service = get_deep_zoom_minio_service()
+            processing_status = await deep_zoom_service.get_processing_status(site_id, str(photo.id))
             if processing_status and processing_status.get('status') in ['processing', 'uploading']:
                 return True
             
             # Check if tiles exist in storage
-            tile_info = await deep_zoom_minio_service.get_deep_zoom_info(site_id, str(photo.id))
+            deep_zoom_service = get_deep_zoom_minio_service()
+            tile_info = await deep_zoom_service.get_deep_zoom_info(site_id, str(photo.id))
             return tile_info is not None and tile_info.get('available', False)
             
         except Exception as e:
