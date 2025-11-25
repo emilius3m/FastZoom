@@ -9,6 +9,11 @@ from loguru import logger
 from typing import List, Dict, Any
 from uuid import UUID
 
+# Initialize Loguru logging system BEFORE any other imports
+from app.core.logging import setup_logging
+setup_logging()
+logger.info("🚀 FastZoom application starting - Loguru logging initialized")
+
 
 # IMPORT MANCANTI - Aggiungi questi:
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -142,6 +147,12 @@ except ImportError:
 
 # Configurazione
 settings = get_settings()
+
+# Log startup information
+logger.info(f"🔧 Creating FastAPI application with title: Archaeological Catalog API")
+logger.info(f"📋 Environment: {getattr(settings, 'environment', 'development')}")
+logger.info(f"🗄️ Database URL configured: {'✅' if hasattr(settings, 'database_url') else '❌'}")
+
 # Configurazione FastAPI con Swagger UI personalizzato
 app = FastAPI(
     title="Archaeological Catalog API",
@@ -165,6 +176,10 @@ app = FastAPI(
     },
     openapi_url="/openapi.json"
 )
+
+# Log FastAPI app creation success
+logger.info("✅ FastAPI application instance created successfully")
+logger.info(f"📚 Documentation available at: /docs and /redoc")
 
 # 🆕 NUOVO: CSRF Protection per forms HTMX
 @CsrfProtect.load_config
@@ -1070,7 +1085,8 @@ async def on_shutdown():
 async def on_startup():
     """Inizializzazione sistema archeologico"""
     try:
-        logger.info("🚀 Starting FastZoom application initialization...")
+        logger.info("🚀 Starting FastZoom application startup sequence...")
+        logger.info("📊 Loguru logging system is active - all startup events will be captured")
         
         # Initialize models first to ensure proper relationship mapping
         from app.database.base import init_models
