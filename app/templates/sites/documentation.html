@@ -240,6 +240,15 @@
                                 <div class="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
                                     <span x-show="document && document.author" x-text="'Autore: ' + (document.author || '')"></span>
                                     <span x-show="document && document.year" x-text="'Anno: ' + (document.year || '')"></span>
+                                    <span x-show="document && document.us_reference" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                        📍 US: <span x-text="document.us_reference"></span>
+                                    </span>
+                                    <span x-show="document && document.usm_reference" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                                        🏗️ USM: <span x-text="document.usm_reference"></span>
+                                    </span>
+                                    <span x-show="document && document.source" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                        📂 <span x-text="getSourceDisplayName(document.source)"></span>
+                                    </span>
                                     <span x-text="'Aggiunto: ' + formatDate(document ? document.created_at : null)"></span>
                                 </div>
 
@@ -269,11 +278,21 @@
                                 </svg>
                             </button>
 
-                            <a :href="document ? '/api/v1/sites/{{ site.id }}/documents/' + document.id + '/download' : '#'"
+                            <a :href="getDownloadUrl(document)"
                                class="p-2 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400"
                                title="Scarica">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </a>
+
+                            <!-- Link per risalire a US/USM -->
+                            <a x-show="document && (document.us_reference || document.usm_reference)"
+                               :href="getUsUrl(document)"
+                               class="p-2 text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400"
+                               :title="'Vai ' + (document.us_reference ? 'alla US ' + document.us_reference : 'alla USM ' + (document.usm_reference || ''))">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                                 </svg>
                             </a>
 
