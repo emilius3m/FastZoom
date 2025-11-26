@@ -568,7 +568,7 @@ class USFileService:
             # Cerca foto dove stratigraphic_unit corrisponde al codice US
             photos_query = select(Photo).where(
                 and_(
-                    Photo.stratigraphic_unit == us.us_code,
+                    Photo.stratigraphic_unit == str(us_id),
                     Photo.site_id == us.site_id
                 )
             )
@@ -637,7 +637,7 @@ class USFileService:
             # Cerca foto dove usm_reference corrisponde al codice USM
             photos_query = select(Photo).where(
                 and_(
-                    Photo.usm_reference == usm.usm_code,
+                    Photo.usm_reference == str(usm_id),
                     Photo.site_id == usm.site_id
                 )
             )
