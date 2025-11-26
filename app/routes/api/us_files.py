@@ -11,6 +11,15 @@ from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
+def normalize_uuid_string(uuid_str: str) -> str:
+    """
+    Normalize UUID string from 32-char hex to full UUID format with hyphens
+    Example: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
+    """
+    if '-' not in uuid_str and len(uuid_str) == 32:
+        return f"{uuid_str[0:8]}-{uuid_str[8:12]}-{uuid_str[12:16]}-{uuid_str[16:20]}-{uuid_str[20:32]}"
+    return uuid_str
+
 from app.database.db import get_async_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.services.us_file_service import USFileService
@@ -27,7 +36,7 @@ async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) ->
 
 @router.post("/us/{us_id}/upload/{file_type}")
 async def upload_us_file(
-    us_id: UUID,
+    us_id: str,
     file_type: str,  # 'pianta', 'sezione', 'prospetto', 'fotografia', 'documento'
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
@@ -43,6 +52,10 @@ async def upload_us_file(
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Upload file per US con metadati"""
+    
+    # Normalize UUID if needed
+    normalized_us_id = normalize_uuid_string(us_id)
+    us_id_uuid = UUID(normalized_us_id)
     
     try:
         us_file_service = USFileService(db)
@@ -68,14 +81,14 @@ async def upload_us_file(
         
         # Upload file
         us_file = await us_file_service.upload_us_file(
-            us_id=us_id,
+            us_id=us_id_uuid,
             file=file,
             file_type=file_type,
             user_id=current_user_id,
             metadata=metadata
         )
         
-        logger.info(f"File {file_type} caricato per US {us_id}: {us_file.filename}")
+        logger.info(f"File {file_type} caricato per US {us_id_uuid}: {us_file.filename}")
         
         return {
             'message': f'File {file_type} caricato con successo',
@@ -95,7 +108,7 @@ async def upload_us_file(
 
 @router.post("/usm/{usm_id}/upload/{file_type}")
 async def upload_usm_file(
-    usm_id: UUID,
+    usm_id: str,
     file_type: str,
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
@@ -111,6 +124,10 @@ async def upload_usm_file(
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Upload file per USM"""
+    
+    # Normalize UUID if needed
+    normalized_usm_id = normalize_uuid_string(usm_id)
+    usm_id_uuid = UUID(normalized_usm_id)
     
     try:
         us_file_service = USFileService(db)
@@ -133,14 +150,14 @@ async def upload_usm_file(
                 pass
         
         us_file = await us_file_service.upload_usm_file(
-            usm_id=usm_id,
+            usm_id=usm_id_uuid,
             file=file,
             file_type=file_type,
             user_id=current_user_id,
             metadata=metadata
         )
         
-        logger.info(f"File {file_type} caricato per USM {usm_id}: {us_file.filename}")
+        logger.info(f"File {file_type} caricato per USM {usm_id_uuid}: {us_file.filename}")
         
         return {
             'message': f'File {file_type} caricato con successo',
@@ -157,118 +174,138 @@ async def upload_usm_file(
 
 @router.get("/us/{us_id}/files")
 async def get_us_files(
-    us_id: UUID,
+    us_id: str,
     file_type: Optional[str] = None,
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Ottieni tutti i file di una US, opzionalmente filtrati per tipo"""
     
+    # Normalize UUID if needed
+    normalized_us_id = normalize_uuid_string(us_id)
+    us_id_uuid = UUID(normalized_us_id)
+    
     try:
         us_file_service = USFileService(db)
-        files = await us_file_service.get_us_files(us_id, file_type)
+        files = await us_file_service.get_us_files(us_id_uuid, file_type)
         
         files_data = [file.to_dict() for file in files]
         
         return {
-            'us_id': str(us_id),
+            'us_id': str(us_id_uuid),
             'file_type': file_type,
             'files': files_data,
             'count': len(files_data)
         }
         
     except Exception as e:
-        logger.error(f"Errore recupero file US {us_id}: {str(e)}")
+        logger.error(f"Errore recupero file US {us_id_uuid}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Errore recupero file: {str(e)}")
 
 # ===== GET FILE USM =====
 
 @router.get("/usm/{usm_id}/files")
 async def get_usm_files(
-    usm_id: UUID,
+    usm_id: str,
     file_type: Optional[str] = None,
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Ottieni file USM"""
     
+    # Normalize UUID if needed
+    normalized_usm_id = normalize_uuid_string(usm_id)
+    usm_id_uuid = UUID(normalized_usm_id)
+    
     try:
         us_file_service = USFileService(db)
-        files = await us_file_service.get_usm_files(usm_id, file_type)
+        files = await us_file_service.get_usm_files(usm_id_uuid, file_type)
         
         files_data = [file.to_dict() for file in files]
         
         return {
-            'usm_id': str(usm_id),
+            'usm_id': str(usm_id_uuid),
             'file_type': file_type,
             'files': files_data,
             'count': len(files_data)
         }
         
     except Exception as e:
-        logger.error(f"Errore recupero file USM {usm_id}: {str(e)}")
+        logger.error(f"Errore recupero file USM {usm_id_uuid}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Errore recupero file: {str(e)}")
 
 # ===== GET FILES SUMMARY =====
 
 @router.get("/us/{us_id}/files/summary")
 async def get_us_files_summary(
-    us_id: UUID,
+    us_id: str,
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Riassunto file US raggruppati per tipo"""
     
+    # Normalize UUID if needed
+    normalized_us_id = normalize_uuid_string(us_id)
+    us_id_uuid = UUID(normalized_us_id)
+    
     try:
         us_file_service = USFileService(db)
-        summary = await us_file_service.get_files_summary_for_us(us_id)
+        summary = await us_file_service.get_files_summary_for_us(us_id_uuid)
         
         return {
-            'us_id': str(us_id),
+            'us_id': str(us_id_uuid),
             'summary': summary
         }
         
     except Exception as e:
-        logger.error(f"Errore summary file US {us_id}: {str(e)}")
+        logger.error(f"Errore summary file US {us_id_uuid}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Errore summary: {str(e)}")
 
 @router.get("/usm/{usm_id}/files/summary")
 async def get_usm_files_summary(
-    usm_id: UUID,
+    usm_id: str,
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Riassunto file USM raggruppati per tipo"""
     
+    # Normalize UUID if needed
+    normalized_usm_id = normalize_uuid_string(usm_id)
+    usm_id_uuid = UUID(normalized_usm_id)
+    
     try:
         us_file_service = USFileService(db)
-        summary = await us_file_service.get_files_summary_for_usm(usm_id)
+        summary = await us_file_service.get_files_summary_for_usm(usm_id_uuid)
         
         return {
-            'usm_id': str(usm_id),
+            'usm_id': str(usm_id_uuid),
             'summary': summary
         }
         
     except Exception as e:
-        logger.error(f"Errore summary file USM {usm_id}: {str(e)}")
+        logger.error(f"Errore summary file USM {usm_id_uuid}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Errore summary: {str(e)}")
 
 # ===== SERVE FILE CONTENT =====
 
 @router.get("/{file_id}/view")
 async def view_us_file(
-    file_id: UUID,
+    file_id: str,
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Visualizza file US/USM (stream per immagini)"""
+    
+    # Normalize UUID if needed
+    normalized_file_id = normalize_uuid_string(file_id)
+    file_id_uuid = UUID(normalized_file_id)
     
     try:
         # Get USFile record from database
         from sqlalchemy import select
         from app.models.stratigraphy import USFile
         
-        us_file_query = select(USFile).where(USFile.id == file_id)
+        us_file_query = select(USFile).where(USFile.id == file_id_uuid)
         us_file = await db.execute(us_file_query)
         us_file = us_file.scalar_one_or_none()
         
@@ -323,18 +360,22 @@ async def view_us_file(
 
 @router.get("/{file_id}/thumbnail")
 async def get_us_file_thumbnail(
-    file_id: UUID,
+    file_id: str,
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Ottieni thumbnail file US/USM"""
+    
+    # Normalize UUID if needed
+    normalized_file_id = normalize_uuid_string(file_id)
+    file_id_uuid = UUID(normalized_file_id)
     
     try:
         # Get USFile record from database
         from sqlalchemy import select
         from app.models.stratigraphy import USFile
         
-        us_file_query = select(USFile).where(USFile.id == file_id)
+        us_file_query = select(USFile).where(USFile.id == file_id_uuid)
         us_file = await db.execute(us_file_query)
         us_file = us_file.scalar_one_or_none()
         
@@ -411,18 +452,22 @@ async def get_us_file_thumbnail(
 
 @router.get("/{file_id}/download")
 async def download_us_file(
-    file_id: UUID,
+    file_id: str,
     db: AsyncSession = Depends(get_async_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Download file US/USM"""
+    
+    # Normalize UUID if needed
+    normalized_file_id = normalize_uuid_string(file_id)
+    file_id_uuid = UUID(normalized_file_id)
     
     try:
         # Get USFile record from database
         from sqlalchemy import select
         from app.models.stratigraphy import USFile
         
-        us_file_query = select(USFile).where(USFile.id == file_id)
+        us_file_query = select(USFile).where(USFile.id == file_id_uuid)
         us_file = await db.execute(us_file_query)
         us_file = us_file.scalar_one_or_none()
         
@@ -447,7 +492,7 @@ async def download_us_file(
                 
                 if file_data and isinstance(file_data, bytes):
                     # Determine filename for download
-                    filename = us_file.original_filename or us_file.filename or f"us_file_{file_id}"
+                    filename = us_file.original_filename or us_file.filename or f"us_file_{file_id_uuid}"
                     
                     return StreamingResponse(
                         io.BytesIO(file_data),
@@ -479,7 +524,7 @@ async def download_us_file(
 
 @router.put("/{file_id}/metadata")
 async def update_us_file_metadata(
-    file_id: UUID,
+    file_id: str,
     metadata: Dict[str, Any],
     db: AsyncSession = Depends(get_async_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
@@ -487,10 +532,14 @@ async def update_us_file_metadata(
 ):
     """Aggiorna metadati file US/USM"""
     
+    # Normalize UUID if needed
+    normalized_file_id = normalize_uuid_string(file_id)
+    file_id_uuid = UUID(normalized_file_id)
+    
     try:
         us_file_service = USFileService(db)
         updated_file = await us_file_service.update_file_metadata(
-            file_id=file_id,
+            file_id=file_id_uuid,
             metadata=metadata,
             user_id=current_user_id
         )
@@ -510,19 +559,25 @@ async def update_us_file_metadata(
 
 @router.delete("/us/{us_id}/files/{file_id}")
 async def delete_us_file(
-    us_id: UUID,
-    file_id: UUID,
+    us_id: str,
+    file_id: str,
     db: AsyncSession = Depends(get_async_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Elimina file da US"""
     
+    # Normalize UUIDs if needed
+    normalized_us_id = normalize_uuid_string(us_id)
+    normalized_file_id = normalize_uuid_string(file_id)
+    us_id_uuid = UUID(normalized_us_id)
+    file_id_uuid = UUID(normalized_file_id)
+    
     try:
         us_file_service = USFileService(db)
         success = await us_file_service.delete_us_file(
-            us_id=us_id,
-            file_id=file_id,
+            us_id=us_id_uuid,
+            file_id=file_id_uuid,
             user_id=current_user_id
         )
         
@@ -534,24 +589,30 @@ async def delete_us_file(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Errore eliminazione file {file_id} da US {us_id}: {str(e)}")
+        logger.error(f"Errore eliminazione file {file_id_uuid} da US {us_id_uuid}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
 
 @router.delete("/usm/{usm_id}/files/{file_id}")
 async def delete_usm_file(
-    usm_id: UUID,
-    file_id: UUID,
+    usm_id: str,
+    file_id: str,
     db: AsyncSession = Depends(get_async_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Elimina file da USM"""
     
+    # Normalize UUIDs if needed
+    normalized_usm_id = normalize_uuid_string(usm_id)
+    normalized_file_id = normalize_uuid_string(file_id)
+    usm_id_uuid = UUID(normalized_usm_id)
+    file_id_uuid = UUID(normalized_file_id)
+    
     try:
         us_file_service = USFileService(db)
         success = await us_file_service.delete_usm_file(
-            usm_id=usm_id,
-            file_id=file_id,
+            usm_id=usm_id_uuid,
+            file_id=file_id_uuid,
             user_id=current_user_id
         )
         
@@ -563,7 +624,7 @@ async def delete_usm_file(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Errore eliminazione file {file_id} da USM {usm_id}: {str(e)}")
+        logger.error(f"Errore eliminazione file {file_id_uuid} da USM {usm_id_uuid}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
 
 # ===== UTILITY ENDPOINTS =====
@@ -582,15 +643,19 @@ async def get_supported_file_types():
 
 @router.get("/us/{us_id}/files/{file_type}/next-order")
 async def get_next_file_order(
-    us_id: UUID,
+    us_id: str,
     file_type: str,
     db: AsyncSession = Depends(get_async_session)
 ):
     """Ottieni prossimo numero d'ordine per tipo file in US"""
     
+    # Normalize UUID if needed
+    normalized_us_id = normalize_uuid_string(us_id)
+    us_id_uuid = UUID(normalized_us_id)
+    
     try:
         us_file_service = USFileService(db)
-        files = await us_file_service.get_us_files(us_id, file_type)
+        files = await us_file_service.get_us_files(us_id_uuid, file_type)
         
         # Trova ordine massimo + 1
         max_order = 0
@@ -601,7 +666,7 @@ async def get_next_file_order(
             
             max_query = select(func.max(us_files_association.c.ordine)).where(
                 and_(
-                    us_files_association.c.us_id == us_id,
+                    us_files_association.c.us_id == us_id_uuid,
                     us_files_association.c.file_type == file_type
                 )
             )
