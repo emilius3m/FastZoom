@@ -375,6 +375,12 @@ class PhotoUploadService:
                         metadata=metadata,
                         archaeological_metadata=archaeological_metadata
                     )
+                    # 🔧 CRITICAL FIX: Log stratigraphic_unit registration for debugging
+                    stratigraphic_unit_value = archaeological_metadata.get('stratigraphic_unit')
+                    if stratigraphic_unit_value:
+                        logger.info(f"🔧 PHOTO STRATIGRAPHIC_UNIT REGISTRATION: {stratigraphic_unit_value}")
+                        logger.info(f"🔧 PHOTO ID: {photo_record.id if photo_record else 'unknown'}")
+                        logger.info(f"🔧 PHOTO FILENAME: {filename}")
                     logger.debug(f"✅ Photo record created successfully: {photo_record.id if photo_record else 'unknown'}")
                 except Exception as create_error:
                     logger.error(
