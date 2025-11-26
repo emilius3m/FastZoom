@@ -102,3 +102,33 @@ __all__ = [
     'set_sqlite_pragma',         # WAL mode event listener
     'pool_monitor',              # Connection pool monitor
 ]
+# Backward compatibility alias - ensures existing code continues to work
+async_session_maker = AsyncSessionLocal
+
+# Additional alias for compatibility with middleware
+async_session_factory = AsyncSessionLocal
+
+# Initialize the connection pool monitor if available
+if POOL_MONITOR_AVAILABLE:
+    pool_monitor = initialize_pool_monitor(engine)
+    logger.info("Database connection pool monitor initialized")
+else:
+    pool_monitor = None
+    logger.info("Database connection pool monitor skipped due to import constraints")
+
+# Dependency FastAPI - centralized for all routes
+async def get_async_session() -> AsyncSession:
+    """FastAPI dependency for getting async database sessions"""
+    async with AsyncSessionLocal() as session:
+        yield session
+
+# Export the main components that should be used throughout the application
+__all__ = [
+    'engine',                    # The single database engine
+    'AsyncSessionLocal',         # The primary session factory
+    'async_session_maker',       # Backward compatibility alias
+    'async_session_factory',     # Additional compatibility alias
+    'get_async_session',         # FastAPI dependency
+    'set_sqlite_pragma',         # WAL mode event listener
+    'pool_monitor',              # Connection pool monitor
+]

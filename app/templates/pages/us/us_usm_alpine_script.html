@@ -1099,25 +1099,65 @@ function usUSMManagerApp() {
             const file = fileInput.files[0];
             console.log('File selezionato:', file.name, file.size);
             
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            // Aggiungi metadati
-            Object.keys(this.fileUploadMetadata).forEach(key => {
-                if (this.fileUploadMetadata[key]) {
-                    formData.append(key, this.fileUploadMetadata[key]);
-                    console.log(`Metadata ${key}:`, this.fileUploadMetadata[key]);
-                }
-            });
-
             this.uploadingFile = true;
 
             try {
-                const endpoint = this.editingUS ? 'us' : 'usm';
-                const uploadUrl = `/api/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`;
-                console.log('Upload URL:', uploadUrl);
+                let uploadUrl, formData, response;
                 
-                const response = await fetch(uploadUrl, {
+                // Handle photo uploads with new API endpoint
+                if (this.currentFileType === 'fotografia') {
+                    // Use new photo upload API
+                    uploadUrl = `/api/v1/sites/${this.currentSiteId}/photos/upload`;
+                    console.log('Photo Upload URL:', uploadUrl);
+                    
+                    // Prepare form data for new endpoint
+                    formData = new FormData();
+                    
+                    // New endpoint expects photos as an array
+                    formData.append('photos', file);
+                    
+                    // Map existing metadata to new archaeological metadata format
+                    const usCode = this.editingUS?.us_code || this.editingUSM?.usm_code || '';
+                    formData.append('inventory_number', usCode);
+                    formData.append('excavation_area', this.editingUS?.area_struttura || this.editingUSM?.area_struttura || '');
+                    formData.append('stratigraphic_unit', entityId.toString());
+                    formData.append('material', 'misc'); // Default material
+                    formData.append('photo_type', 'fotografia');
+                    formData.append('photo_date', this.fileUploadMetadata.photo_date || new Date().toISOString().split('T')[0]);
+                    formData.append('description', this.fileUploadMetadata.description || '');
+                    // Create keywords array from metadata
+                    const keywordsArray = [];
+                    if (this.fileUploadMetadata.photographer) {
+                        keywordsArray.push(`photographer:${this.fileUploadMetadata.photographer}`);
+                    }
+                    if (this.fileUploadMetadata.title) {
+                        keywordsArray.push(`title:${this.fileUploadMetadata.title}`);
+                    }
+                    keywordsArray.push(`us_id:${entityId}`);
+                    keywordsArray.push(this.editingUS ? 'us_type:us' : 'us_type:usm');
+                    
+                    formData.append('tags', JSON.stringify(keywordsArray));
+                    
+                    console.log('New API form data prepared');
+                } else {
+                    // Use existing endpoint for non-photo files
+                    const endpoint = this.editingUS ? 'us' : 'usm';
+                    uploadUrl = `/api/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`;
+                    console.log('File Upload URL:', uploadUrl);
+                    
+                    formData = new FormData();
+                    formData.append('file', file);
+                    
+                    // Aggiungi metadati
+                    Object.keys(this.fileUploadMetadata).forEach(key => {
+                        if (this.fileUploadMetadata[key]) {
+                            formData.append(key, this.fileUploadMetadata[key]);
+                            console.log(`Metadata ${key}:`, this.fileUploadMetadata[key]);
+                        }
+                    });
+                }
+                
+                response = await fetch(uploadUrl, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': this.getCSRFToken()
@@ -1129,17 +1169,28 @@ function usUSMManagerApp() {
                 console.log('Response ok:', response.ok);
 
                 if (response.ok) {
-                    const uploadedFile = await response.json();
-                    console.log('File caricato con successo:', uploadedFile);
+                    const result = await response.json();
+                    console.log('Upload successful:', result);
                     
                     this.showNotification('File caricato con successo', 'success');
                     this.showFileUploadModal = false;
                     
-                    // Ricarica file
-                    if (this.editingUS) {
-                        await this.loadUSFiles(entityId);
+                    // For photo uploads, we need to reload the files differently
+                    if (this.currentFileType === 'fotografia') {
+                        // The new API doesn't update the same file structure
+                        // We'll need to reload the files using the existing method
+                        if (this.editingUS) {
+                            await this.loadUSFiles(entityId);
+                        } else {
+                            await this.loadUSMFiles(entityId);
+                        }
                     } else {
-                        await this.loadUSMFiles(entityId);
+                        // Ricarica file for other types
+                        if (this.editingUS) {
+                            await this.loadUSFiles(entityId);
+                        } else {
+                            await this.loadUSMFiles(entityId);
+                        }
                     }
                 } else {
                     const errorText = await response.text();
@@ -1147,7 +1198,7 @@ function usUSMManagerApp() {
                     let errorDetail = 'Errore upload';
                     try {
                         const error = JSON.parse(errorText);
-                        errorDetail = error.detail || errorDetail;
+                        errorDetail = error.detail || error.message || errorDetail;
                     } catch (e) {
                         errorDetail = errorText;
                     }

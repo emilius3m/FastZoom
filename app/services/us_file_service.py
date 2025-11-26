@@ -16,6 +16,7 @@ from loguru import logger
 
 from app.models.stratigraphy import USFile, UnitaStratigrafica, UnitaStratigraficaMuraria
 from app.models.stratigraphy import us_files_association, usm_files_association
+from app.models.documentation_and_field import Photo
 from app.services.storage_service import storage_service
 from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
 
@@ -498,12 +499,49 @@ class USFileService:
         logger.info(f"Metadati file {file_id} aggiornati da user {user_id}")
         return us_file
     
+    def _photo_to_usfile_dict(self, photo: Photo) -> Dict[str, Any]:
+        """
+        Converte un oggetto Photo in un dizionario compatibile con USFile
+        per l'unificazione della visualizzazione delle fotografie documentarie
+        """
+        return {
+            'id': str(photo.id),
+            'filename': photo.filename,
+            'original_filename': photo.original_filename,
+            'filepath': photo.filepath,
+            'filesize': photo.file_size or 0,
+            'mimetype': photo.mime_type or 'image/jpeg',
+            'file_category': 'fotografia',
+            'title': photo.title or '',
+            'description': photo.description or '',
+            'scale_ratio': None,
+            'drawing_type': None,
+            'tavola_number': None,
+            'photo_date': photo.photo_date.isoformat() if photo.photo_date else None,
+            'photographer': photo.photographer or '',
+            'camera_info': f"{photo.camera_make or ''} {photo.camera_model or ''}".strip(),
+            'width': photo.width,
+            'height': photo.height,
+            'is_deepzoom_enabled': photo.has_deep_zoom,
+            'thumbnail_url': f"/api/v1/photos/{photo.id}/thumbnail" if photo.thumbnail_path else None,
+            'download_url': f"/api/v1/photos/{photo.id}/download",
+            'view_url': f"/api/v1/photos/{photo.id}/full",
+            'is_published': photo.is_published,
+            'is_validated': photo.is_validated,
+            'created_at': photo.created_at.isoformat() if photo.created_at else None,
+            'updated_at': photo.updated_at.isoformat() if photo.updated_at else None,
+            'source': 'photo_table',  # Campo aggiuntivo per identificare la provenienza
+            'deepzoom_status': photo.deepzoom_status,
+            'is_deepzoom_ready': photo.is_deepzoom_ready
+        }
+
     async def get_files_summary_for_us(self, us_id: UUID) -> Dict[str, Any]:
-        """Riassunto file per US con conteggi per tipo"""
+        """Riassunto file per US con conteggi per tipo, includendo foto dalla tabella Photo"""
         
+        # 1. Ottieni i file US esistenti
         files = await self.get_us_files(us_id)
         
-        # Raggruppa per tipo
+        # 2. Raggruppa per tipo i file US esistenti
         files_by_type = {}
         for file_obj in files:
             # Trova tipo dal join association
@@ -520,28 +558,59 @@ class USFileService:
                 files_by_type[file_type] = []
             files_by_type[file_type].append(file_obj.to_dict())
         
+        # 3. Recupera le foto dalla tabella Photo dove stratigraphic_unit == us_id
+        # Prima ottieni l'US per ottenere il codice US
+        us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id)
+        us_result = await self.db.execute(us_query)
+        us = us_result.scalar_one_or_none()
+        
+        if us:
+            # Cerca foto dove stratigraphic_unit corrisponde al codice US
+            photos_query = select(Photo).where(
+                and_(
+                    Photo.stratigraphic_unit == us.us_code,
+                    Photo.site_id == us.site_id
+                )
+            )
+            photos_result = await self.db.execute(photos_query)
+            photos = photos_result.scalars().all()
+            
+            # Converti le foto in formato compatibile e aggiungile alle fotografie
+            existing_fotografie = files_by_type.get('fotografia', [])
+            
+            for photo in photos:
+                photo_dict = self._photo_to_usfile_dict(photo)
+                existing_fotografie.append(photo_dict)
+            
+            files_by_type['fotografia'] = existing_fotografie
+        
+        # 4. Calcola i conteggi totali
+        fotografie_list = files_by_type.get('fotografia', [])
+        total_files = len(files) + len([f for f in fotografie_list if f.get('source') == 'photo_table'])
+        
         return {
             'piante': files_by_type.get('pianta', []),
             'sezioni': files_by_type.get('sezione', []),
             'prospetti': files_by_type.get('prospetto', []),
-            'fotografie': files_by_type.get('fotografia', []),
+            'fotografie': fotografie_list,
             'documenti': files_by_type.get('documento', []),
             'counts': {
                 'piante': len(files_by_type.get('pianta', [])),
                 'sezioni': len(files_by_type.get('sezione', [])),
                 'prospetti': len(files_by_type.get('prospetto', [])),
-                'fotografie': len(files_by_type.get('fotografia', [])),
+                'fotografie': len(fotografie_list),
                 'documenti': len(files_by_type.get('documento', [])),
-                'total': len(files)
+                'total': total_files
             }
         }
     
     async def get_files_summary_for_usm(self, usm_id: UUID) -> Dict[str, Any]:
-        """Riassunto file per USM con conteggi per tipo"""
+        """Riassunto file per USM con conteggi per tipo, includendo foto dalla tabella Photo"""
         
+        # 1. Ottieni i file USM esistenti
         files = await self.get_usm_files(usm_id)
         
-        # Raggruppa per tipo
+        # 2. Raggruppa per tipo i file USM esistenti
         files_by_type = {}
         for file_obj in files:
             # Trova tipo dal join association
@@ -558,18 +627,48 @@ class USFileService:
                 files_by_type[file_type] = []
             files_by_type[file_type].append(file_obj.to_dict())
         
+        # 3. Recupera le foto dalla tabella Photo dove usm_reference == usm_id
+        # Prima ottieni l'USM per ottenere il codice USM
+        usm_query = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == usm_id)
+        usm_result = await self.db.execute(usm_query)
+        usm = usm_result.scalar_one_or_none()
+        
+        if usm:
+            # Cerca foto dove usm_reference corrisponde al codice USM
+            photos_query = select(Photo).where(
+                and_(
+                    Photo.usm_reference == usm.usm_code,
+                    Photo.site_id == usm.site_id
+                )
+            )
+            photos_result = await self.db.execute(photos_query)
+            photos = photos_result.scalars().all()
+            
+            # Converti le foto in formato compatibile e aggiungile alle fotografie
+            existing_fotografie = files_by_type.get('fotografia', [])
+            
+            for photo in photos:
+                photo_dict = self._photo_to_usfile_dict(photo)
+                existing_fotografie.append(photo_dict)
+            
+            files_by_type['fotografia'] = existing_fotografie
+        
+        # 4. Calcola i conteggi totali
+        fotografie_list = files_by_type.get('fotografia', [])
+        total_files = len(files) + len([f for f in fotografie_list if f.get('source') == 'photo_table'])
+        
         return {
             'piante': files_by_type.get('pianta', []),
             'sezioni': files_by_type.get('sezione', []),
             'prospetti': files_by_type.get('prospetto', []),
-            'fotografie': files_by_type.get('fotografia', []),
+            'fotografie': fotografie_list,
             'documenti': files_by_type.get('documento', []),
             'counts': {
                 'piante': len(files_by_type.get('pianta', [])),
                 'sezioni': len(files_by_type.get('sezione', [])),
                 'prospetti': len(files_by_type.get('prospetto', [])),
-                'fotografie': len(files_by_type.get('fotografia', [])),
+                'fotografie': len(fotografie_list),
                 'documenti': len(files_by_type.get('documento', [])),
-                'total': len(files)
+                'total': total_files
             }
         }
