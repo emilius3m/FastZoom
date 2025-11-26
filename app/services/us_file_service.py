@@ -11,7 +11,7 @@ from uuid import UUID
 from pathlib import Path
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from loguru import logger
 
 from app.models.stratigraphy import USFile, UnitaStratigrafica, UnitaStratigraficaMuraria
@@ -535,11 +535,31 @@ class USFileService:
             'is_deepzoom_ready': photo.is_deepzoom_ready
         }
 
+    def _normalize_us_id(self, us_id: UUID) -> str:
+        """Normalizza ID US per compatibilità con diversi formati nel database"""
+        us_id_str = str(us_id)
+        
+        # Se è già un UUID standard con trattini (formato atteso nel DB), restituiscilo
+        if '-' in us_id_str and len(us_id_str) == 36:
+            return us_id_str
+        
+        # Se è un hash esadecimale senza trattini (32 caratteri), converti in formato UUID
+        if len(us_id_str) == 32:
+            return f"{us_id_str[:8]}-{us_id_str[8:12]}-{us_id_str[12:16]}-{us_id_str[16:20]}-{us_id_str[20:]}"
+        
+        # Altri formati, restituisci come sono
+        return us_id_str
+
     async def get_files_summary_for_us(self, us_id: UUID) -> Dict[str, Any]:
         """Riassunto file per US con conteggi per tipo, includendo foto dalla tabella Photo"""
         
+        # DEBUG: Log input parameters
+        us_id_str = str(us_id)
+        logger.info(f"[DEBUG] get_files_summary_for_us called with us_id: {us_id_str}")
+        
         # 1. Ottieni i file US esistenti
         files = await self.get_us_files(us_id)
+        logger.info(f"[DEBUG] Found {len(files)} US files for US {us_id_str}")
         
         # 2. Raggruppa per tipo i file US esistenti
         files_by_type = {}
@@ -553,6 +573,7 @@ class USFileService:
             )
             type_result = await self.db.execute(file_type_query)
             file_type = type_result.scalar_one_or_none()
+            logger.info(f"[DEBUG] File {file_obj.id} has type: {file_type}")
             
             if file_type not in files_by_type:
                 files_by_type[file_type] = []
@@ -564,31 +585,101 @@ class USFileService:
         us_result = await self.db.execute(us_query)
         us = us_result.scalar_one_or_none()
         
+        logger.info(f"[DEBUG] US query result: {us}")
+        
         if us:
-            # Cerca foto dove stratigraphic_unit corrisponde al codice US
+            logger.info(f"[DEBUG] US found: id={us.id}, us_code={us.us_code}, site_id={us.site_id}")
+            
+            # Normalizza l'ID US per la ricerca
+            normalized_us_id = self._normalize_us_id(us_id)
+            logger.info(f"[DEBUG] Normalized US ID: {normalized_us_id}")
+            logger.info(f"[DEBUG] Original US ID string: {us_id_str}")
+            logger.info(f"[DEBUG] US ID without dashes: {us_id_str.replace('-', '')}")
+            
+            # Cerca foto dove stratigraphic_unit corrisponde al codice US (fallback multi-livello)
             photos_query = select(Photo).where(
                 and_(
-                    Photo.stratigraphic_unit == str(us_id),
-                    Photo.site_id == us.site_id
+                    Photo.site_id == us.site_id,
+                    # Fallback: prova prima ID normalizzato, poi ID originale, poi hash senza trattini
+                    or_(
+                        Photo.stratigraphic_unit == normalized_us_id,
+                        Photo.stratigraphic_unit == us_id_str,
+                        Photo.stratigraphic_unit == us_id_str.replace('-', '')
+                    )
                 )
             )
+            
+            # DEBUG: Log the query details
+            logger.info(f"[DEBUG] Photo query - site_id: {us.site_id}")
+            logger.info(f"[DEBUG] Photo query - normalized_us_id: {normalized_us_id}")
+            logger.info(f"[DEBUG] Photo query - us_id_str: {us_id_str}")
+            logger.info(f"[DEBUG] Photo query - us_id_str_no_dashes: {us_id_str.replace('-', '')}")
+            
             photos_result = await self.db.execute(photos_query)
             photos = photos_result.scalars().all()
             
+            logger.info(f"[DEBUG] Found {len(photos)} photos for US {us_id_str}")
+            
             # Converti le foto in formato compatibile e aggiungile alle fotografie
             existing_fotografie = files_by_type.get('fotografia', [])
+            logger.info(f"[DEBUG] Existing fotografie count: {len(existing_fotografie)}")
             
             for photo in photos:
+                logger.info(f"[DEBUG] Processing photo: id={photo.id}, stratigraphic_unit={photo.stratigraphic_unit}")
                 photo_dict = self._photo_to_usfile_dict(photo)
                 existing_fotografie.append(photo_dict)
             
             files_by_type['fotografia'] = existing_fotografie
+            logger.info(f"[DEBUG] Final fotografie count: {len(existing_fotografie)}")
+        else:
+            logger.warning(f"[DEBUG] US not found for ID: {us_id_str}")
+            
+            # FALLBACK: Cerca le foto direttamente usando l'ID US quando la query US fallisce
+            logger.info(f"[FALLBACK] Attempting to find photos using US ID directly: {us_id_str}")
+            
+            # Normalizza l'ID US per la ricerca nel fallback
+            normalized_us_id = self._normalize_us_id(us_id)
+            logger.info(f"[FALLBACK] Normalized US ID: {normalized_us_id}")
+            logger.info(f"[FALLBACK] Original US ID string: {us_id_str}")
+            logger.info(f"[FALLBACK] US ID without dashes: {us_id_str.replace('-', '')}")
+            
+            # Cerca foto senza filtrare per site_id (fallback più ampio)
+            # Prova tutti i formati possibili dell'ID US
+            fallback_photos_query = select(Photo).where(
+                or_(
+                    Photo.stratigraphic_unit == normalized_us_id,
+                    Photo.stratigraphic_unit == us_id_str,
+                    Photo.stratigraphic_unit == us_id_str.replace('-', '')
+                )
+            )
+            
+            # DEBUG: Log the fallback query details
+            logger.info(f"[FALLBACK] Photo query - normalized_us_id: {normalized_us_id}")
+            logger.info(f"[FALLBACK] Photo query - us_id_str: {us_id_str}")
+            logger.info(f"[FALLBACK] Photo query - us_id_str_no_dashes: {us_id_str.replace('-', '')}")
+            
+            fallback_photos_result = await self.db.execute(fallback_photos_query)
+            fallback_photos = fallback_photos_result.scalars().all()
+            
+            logger.info(f"[FALLBACK] Found {len(fallback_photos)} photos for US {us_id_str} using fallback")
+            
+            # Converti le foto in formato compatibile e aggiungile alle fotografie
+            existing_fotografie = files_by_type.get('fotografia', [])
+            logger.info(f"[FALLBACK] Existing fotografie count: {len(existing_fotografie)}")
+            
+            for photo in fallback_photos:
+                logger.info(f"[FALLBACK] Processing photo: id={photo.id}, stratigraphic_unit={photo.stratigraphic_unit}, site_id={photo.site_id}")
+                photo_dict = self._photo_to_usfile_dict(photo)
+                existing_fotografie.append(photo_dict)
+            
+            files_by_type['fotografia'] = existing_fotografie
+            logger.info(f"[FALLBACK] Final fotografie count after fallback: {len(existing_fotografie)}")
         
         # 4. Calcola i conteggi totali
         fotografie_list = files_by_type.get('fotografia', [])
         total_files = len(files) + len([f for f in fotografie_list if f.get('source') == 'photo_table'])
         
-        return {
+        result = {
             'piante': files_by_type.get('pianta', []),
             'sezioni': files_by_type.get('sezione', []),
             'prospetti': files_by_type.get('prospetto', []),
@@ -603,6 +694,9 @@ class USFileService:
                 'total': total_files
             }
         }
+        
+        logger.info(f"[DEBUG] Final result counts: {result['counts']}")
+        return result
     
     async def get_files_summary_for_usm(self, usm_id: UUID) -> Dict[str, Any]:
         """Riassunto file per USM con conteggi per tipo, includendo foto dalla tabella Photo"""

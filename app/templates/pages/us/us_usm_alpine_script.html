@@ -1120,7 +1120,7 @@ function usUSMManagerApp() {
                     const usCode = this.editingUS?.us_code || this.editingUSM?.usm_code || '';
                     formData.append('inventory_number', usCode);
                     formData.append('excavation_area', this.editingUS?.area_struttura || this.editingUSM?.area_struttura || '');
-                    formData.append('stratigraphic_unit', entityId.toString());
+                    formData.append('stratigraphic_unit', this.editingUS ? this.editingUS.us_code : this.editingUSM.usm_code);
                     formData.append('material', 'misc'); // Default material
                     formData.append('photo_type', 'fotografia');
                     formData.append('photo_date', this.fileUploadMetadata.photo_date || new Date().toISOString().split('T')[0]);

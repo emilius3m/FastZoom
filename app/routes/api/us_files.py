@@ -245,12 +245,19 @@ async def get_us_files_summary(
     """Riassunto file US raggruppati per tipo"""
     
     # Normalize UUID if needed
+    logger.info(f"DEBUG: Original us_id parameter: {us_id}")
     normalized_us_id = normalize_uuid_string(us_id)
+    logger.info(f"DEBUG: Normalized us_id: {normalized_us_id}")
     us_id_uuid = UUID(normalized_us_id)
+    logger.info(f"DEBUG: Final UUID object: {us_id_uuid}")
     
     try:
         us_file_service = USFileService(db)
+        logger.info(f"DEBUG: Calling get_files_summary_for_us with UUID: {us_id_uuid}")
         summary = await us_file_service.get_files_summary_for_us(us_id_uuid)
+        logger.info(f"DEBUG: Summary result keys: {list(summary.keys()) if summary else 'None'}")
+        if summary and 'fotografie' in summary:
+            logger.info(f"DEBUG: Fotografie count: {len(summary['fotografie'])}")
         
         return {
             'us_id': str(us_id_uuid),
@@ -259,6 +266,7 @@ async def get_us_files_summary(
         
     except Exception as e:
         logger.error(f"Errore summary file US {us_id_uuid}: {str(e)}")
+        logger.exception(f"DEBUG: Full exception traceback for US summary:")
         raise HTTPException(status_code=500, detail=f"Errore summary: {str(e)}")
 
 @router.get("/usm/{usm_id}/files/summary")
