@@ -641,9 +641,8 @@ async def logout_user_safely(db, user_id, token_jti, ip_address=None):
     )
 
 # ===== IMPORT LOGGING =====
-import logging
+from loguru import logger
 
-logger = logging.getLogger(__name__)
 logger.info(f"FastZoom Models v{MODELS_VERSION} loaded - {MODELS_COUNT} models available")
 logger.info("✅ RIPRISTINATI: PermissionLevel + UserActivity + TokenBlacklist")
 logger.info("✅ RIPRISTINATI: PhotoType + MaterialType + ConservationStatus")

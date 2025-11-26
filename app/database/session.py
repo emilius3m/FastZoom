@@ -2,7 +2,7 @@
 # DEPRECATED: This file now imports from the centralized engine.py
 # Use app.database.engine for all new code
 
-import logging
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import declarative_base
 
@@ -16,7 +16,6 @@ from app.database.engine import (
     pool_monitor
 )
 
-logger = logging.getLogger(__name__)
 logger.info("Database session module importing from centralized engine.py")
 
 # Base dichiarativa per modelli, se non già altrove
