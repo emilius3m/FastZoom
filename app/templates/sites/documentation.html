@@ -1592,10 +1592,32 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        // Modal management
         openUploadModal() {
             this.resetUploadForm();
             this.showUploadModal = true;
+        },
+
+        // Helper functions for template
+        getSourceDisplayName(source) {
+             if (!source) return 'Caricato manualmente';
+             const sources = {
+                 'manual': 'Caricato manualmente',
+                 'import': 'Importato',
+                 'generated': 'Generato automaticamente'
+             };
+             return sources[source] || source;
+        },
+
+        getDownloadUrl(document) {
+            if (!document || !document.id) return '#';
+            return `/api/v1/sites/${this.siteId}/documents/${document.id}/download`;
+        },
+
+        getUsUrl(document) {
+            if (!document) return '#';
+            // Link to the main US/USM page, potentially with a query param if supported
+            // For now, linking to the main US management page
+            return `/view/${this.siteId}/us`;
         },
 
         closeUploadModal() {
