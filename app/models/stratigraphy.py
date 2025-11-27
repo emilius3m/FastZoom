@@ -299,7 +299,8 @@ class UnitaStratigrafica(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     )
     
     def __repr__(self):
-        return f"<US(code={self.us_code}, site={self.site.name if self.site else 'N/A'})>"
+        # Avoid accessing relationships in __repr__ to prevent async issues
+        return f"<US(code={self.us_code}, site_id={self.site_id})>"
     
     # ===== METODI HELPER FILE =====
     
@@ -497,7 +498,8 @@ class UnitaStratigraficaMuraria(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     )
     
     def __repr__(self):
-        return f"<USM(code={self.usm_code}, site={self.site.name if self.site else 'N/A'})>"
+        # Avoid accessing relationships in __repr__ to prevent async issues
+        return f"<USM(code={self.usm_code}, site_id={self.site_id})>"
     
     # ===== METODI HELPER (stessi di US) =====
     

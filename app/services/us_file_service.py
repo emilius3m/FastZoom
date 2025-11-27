@@ -707,7 +707,7 @@ class USFileService:
             us_result = await self.db.execute(us_query)
             us = us_result.scalar_one_or_none()
             
-            logger.info(f"[DEBUG] US query result: {us}")
+            logger.info(f"[DEBUG] US query result: id={us.id if us else None}, us_code={us.us_code if us else None}")
             
             if us:
                 logger.info(f"[DEBUG] US found: id={us.id}, us_code={us.us_code}, site_id={us.site_id}")
