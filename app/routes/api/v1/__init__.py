@@ -75,5 +75,14 @@ api_v1_router.include_router(teams_router, prefix="/teams", tags=["Team Manageme
 api_v1_router.include_router(admin_router, prefix="/admin", tags=["Administration"])
 api_v1_router.include_router(unified_router, prefix="/unified", tags=["Unified Dashboard"])
 
+# Moved routers from V0
+from app.routes.api.v1.form_schemas import form_schemas_router
+from app.routes.api.v1.archaeological_plans import plans_router
+from app.routes.api.v1.iccd_records import iccd_router
+
+api_v1_router.include_router(form_schemas_router)
+api_v1_router.include_router(plans_router)
+api_v1_router.include_router(iccd_router)
+
 # Esporta il router principale
 __all__ = ["api_v1_router"]
