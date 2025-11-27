@@ -417,10 +417,16 @@ class USFileService:
             if not us_file:
                 raise HTTPException(status_code=404, detail="File non trovato")
            
-            # Verifica associazione US
+            # Verifica associazione US con normalizzazione UUID per compatibilità
+            us_id_str = str(us_id)
+            normalized_us_id = self._normalize_us_id(us_id)
             assoc_query = select(us_files_association).where(
                 and_(
-                    us_files_association.c.us_id == safe_uuid_str(us_id),
+                    or_(
+                        us_files_association.c.us_id == safe_uuid_str(us_id),
+                        us_files_association.c.us_id == normalized_us_id,
+                        us_files_association.c.us_id == us_id_str.replace('-', '')
+                    ),
                     us_files_association.c.file_id == safe_uuid_str(file_id)
                 )
             )
@@ -443,10 +449,16 @@ class USFileService:
                 except Exception as e:
                     logger.warning(f"Errore eliminazione thumbnail: {e}")
            
-            # Elimina associazione
+            # Elimina associazione con normalizzazione UUID per compatibilità
+            us_id_str = str(us_id)
+            normalized_us_id = self._normalize_us_id(us_id)
             delete_assoc = us_files_association.delete().where(
                 and_(
-                    us_files_association.c.us_id == safe_uuid_str(us_id),
+                    or_(
+                        us_files_association.c.us_id == safe_uuid_str(us_id),
+                        us_files_association.c.us_id == normalized_us_id,
+                        us_files_association.c.us_id == us_id_str.replace('-', '')
+                    ),
                     us_files_association.c.file_id == safe_uuid_str(file_id)
                 )
             )
