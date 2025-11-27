@@ -11,28 +11,33 @@
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gestione Unità Stratigrafiche</h1>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                        Gestione US e USM per il sito {{ site.name if site is defined else 'Archeologico' }} ({{ site.code if site is defined else 'SITE-CODE' }})
+                        Gestione US e USM per il sito {{ site.name if site is defined else 'Archeologico' }} ({{
+                        site.code if site is defined else 'SITE-CODE' }})
                     </p>
                 </div>
                 <div class="flex items-center space-x-3 mt-4 sm:mt-0">
                     <button @click="openUSModal()"
-                            class="inline-flex items-center px-4 py-2 bg-orange-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 dark:focus:ring-offset-gray-800">
+                        class="inline-flex items-center px-4 py-2 bg-orange-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 dark:focus:ring-offset-gray-800">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
                         Nuova US
                     </button>
                     <button @click="openUSMModal()"
-                            class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800">
+                        class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
                         Nuova USM
                     </button>
                     <button @click="exportUSData"
-                            class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
                         </svg>
                         Esporta Dati
                     </button>
@@ -46,31 +51,24 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cerca</label>
-                <input type="text"
-                       x-model="filters.search"
-                       @input="loadUSList()"
-                       placeholder="Codice US, descrizione..."
-                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                <input type="text" x-model="filters.search" @input="loadUSList()"
+                    placeholder="Codice US, descrizione..."
+                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Da</label>
-                <input type="date"
-                       x-model="filters.dateFrom"
-                       @change="loadUSList()"
-                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                <input type="date" x-model="filters.dateFrom" @change="loadUSList()"
+                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data A</label>
-                <input type="date"
-                       x-model="filters.dateTo"
-                       @change="loadUSList()"
-                       class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                <input type="date" x-model="filters.dateTo" @change="loadUSList()"
+                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Affidabilità</label>
-                <select x-model="filters.affidabilita"
-                        @change="loadUSList()"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                <select x-model="filters.affidabilita" @change="loadUSList()"
+                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
                     <option value="">Tutte</option>
                     <option value="alta">Alta</option>
                     <option value="media">Media</option>
@@ -85,13 +83,13 @@
         <div class="border-b border-gray-200 dark:border-gray-700">
             <nav class="-mb-px flex space-x-8">
                 <button @click="activeTab = 'us'"
-                        :class="activeTab === 'us' ? 'border-orange-500 text-orange-600 dark:text-orange-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                        class="py-2 px-1 border-b-2 font-medium text-sm">
+                    :class="activeTab === 'us' ? 'border-orange-500 text-orange-600 dark:text-orange-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
                     Unità Stratigrafiche (US)
                 </button>
                 <button @click="activeTab = 'usm'"
-                        :class="activeTab === 'usm' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                        class="py-2 px-1 border-b-2 font-medium text-sm">
+                    :class="activeTab === 'usm' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
                     Unità Stratigrafiche Murarie (USM)
                 </button>
             </nav>
@@ -111,34 +109,43 @@
                         <div class="px-4 py-4 sm:px-6">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
-                                        <span class="text-orange-600 dark:text-orange-300 font-bold" x-text="us.us_code.substring(2)"></span>
+                                    <div
+                                        class="flex-shrink-0 h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
+                                        <span class="text-orange-600 dark:text-orange-300 font-bold"
+                                            x-text="us.us_code.substring(2)"></span>
                                     </div>
                                     <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="us.us_code"></div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="us.definizione || 'Nessuna definizione'"></div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="us.localita || ''"></div>
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white"
+                                            x-text="us.us_code"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="us.definizione || 'Nessuna definizione'"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="us.localita || ''"></div>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <span x-show="us.affidabilita_stratigrafica"
-                                          :class="{
+                                    <span x-show="us.affidabilita_stratigrafica" :class="{
                                               'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100': us.affidabilita_stratigrafica === 'alta',
                                               'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100': us.affidabilita_stratigrafica === 'media',
                                               'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100': us.affidabilita_stratigrafica === 'bassa'
-                                          }"
-                                          class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                          }" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
                                         <span x-text="us.affidabilita_stratigrafica"></span>
                                     </span>
-                                    <button @click="openUSModal(us, false)" class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center" title="Visualizza">
+                                    <button @click="openUSModal(us, false)"
+                                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                                        title="Visualizza">
                                         <i class="fas fa-eye mr-1"></i>
                                         Visualizza
                                     </button>
-                                    <button @click="openUSModal(us, true)" class="px-3 py-2 bg-red-600 text-white rounded hover:bg-orange-700 flex items-center" title="Modifica">
+                                    <button @click="openUSModal(us, true)"
+                                        class="px-3 py-2 bg-red-600 text-white rounded hover:bg-orange-700 flex items-center"
+                                        title="Modifica">
                                         <i class="fas fa-edit mr-1"></i>
                                         Modifica
                                     </button>
-                                    <button @click="deleteUS(us.id)" class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center" title="Elimina">
+                                    <button @click="deleteUS(us.id)"
+                                        class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
+                                        title="Elimina">
                                         <i class="fas fa-trash mr-1"></i>
                                         Elimina
                                     </button>
@@ -147,12 +154,15 @@
                             <div class="mt-2 sm:flex sm:justify-between">
                                 <div class="sm:flex">
                                     <div class="mr-6">
-                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Rilevamento</p>
-                                        <p class="text-sm text-gray-900 dark:text-white" x-text="formatDate(us.data_rilevamento)"></p>
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Rilevamento
+                                        </p>
+                                        <p class="text-sm text-gray-900 dark:text-white"
+                                            x-text="formatDate(us.data_rilevamento)"></p>
                                     </div>
                                     <div class="mr-6">
                                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile</p>
-                                        <p class="text-sm text-gray-900 dark:text-white" x-text="us.responsabile_compilazione || '-'"></p>
+                                        <p class="text-sm text-gray-900 dark:text-white"
+                                            x-text="us.responsabile_compilazione || '-'"></p>
                                     </div>
                                 </div>
                                 <div class="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
@@ -181,34 +191,43 @@
                         <div class="px-4 py-4 sm:px-6">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
-                                        <span class="text-red-600 dark:text-red-300 font-bold" x-text="usm.usm_code.substring(3)"></span>
+                                    <div
+                                        class="flex-shrink-0 h-10 w-10 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                                        <span class="text-red-600 dark:text-red-300 font-bold"
+                                            x-text="usm.usm_code.substring(3)"></span>
                                     </div>
                                     <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="usm.usm_code"></div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="usm.definizione || 'Nessuna definizione'"></div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="usm.localita || ''"></div>
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white"
+                                            x-text="usm.usm_code"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="usm.definizione || 'Nessuna definizione'"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="usm.localita || ''"></div>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <span x-show="usm.affidabilita_stratigrafica"
-                                          :class="{
+                                    <span x-show="usm.affidabilita_stratigrafica" :class="{
                                               'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100': usm.affidabilita_stratigrafica === 'alta',
                                               'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100': usm.affidabilita_stratigrafica === 'media',
                                               'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100': usm.affidabilita_stratigrafica === 'bassa'
-                                          }"
-                                          class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
+                                          }" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
                                         <span x-text="usm.affidabilita_stratigrafica"></span>
                                     </span>
-                                    <button @click="openUSMModal(usm, false)" class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center" title="Visualizza">
+                                    <button @click="openUSMModal(usm, false)"
+                                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                                        title="Visualizza">
                                         <i class="fas fa-eye mr-1"></i>
                                         Visualizza
                                     </button>
-                                    <button @click="openUSMModal(usm, true)" class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center" title="Modifica">
+                                    <button @click="openUSMModal(usm, true)"
+                                        class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
+                                        title="Modifica">
                                         <i class="fas fa-edit mr-1"></i>
                                         Modifica
                                     </button>
-                                    <button @click="deleteUSM(usm.id)" class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center" title="Elimina">
+                                    <button @click="deleteUSM(usm.id)"
+                                        class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
+                                        title="Elimina">
                                         <i class="fas fa-trash mr-1"></i>
                                         Elimina
                                     </button>
@@ -217,12 +236,15 @@
                             <div class="mt-2 sm:flex sm:justify-between">
                                 <div class="sm:flex">
                                     <div class="mr-6">
-                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Rilevamento</p>
-                                        <p class="text-sm text-gray-900 dark:text-white" x-text="formatDate(usm.data_rilevamento)"></p>
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Rilevamento
+                                        </p>
+                                        <p class="text-sm text-gray-900 dark:text-white"
+                                            x-text="formatDate(usm.data_rilevamento)"></p>
                                     </div>
                                     <div class="mr-6">
                                         <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile</p>
-                                        <p class="text-sm text-gray-900 dark:text-white" x-text="usm.responsabile_compilazione || '-'"></p>
+                                        <p class="text-sm text-gray-900 dark:text-white"
+                                            x-text="usm.responsabile_compilazione || '-'"></p>
                                     </div>
                                 </div>
                                 <div class="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
@@ -247,16 +269,17 @@
         </div>
         <div class="flex items-center space-x-2">
             <button @click="pagination.currentPage > 1 && (pagination.currentPage--, loadUSList())"
-                    :disabled="pagination.currentPage <= 1"
-                    class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+                :disabled="pagination.currentPage <= 1"
+                class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
                 Precedente
             </button>
             <span class="px-3 py-1 text-sm text-gray-700 dark:text-gray-300">
                 Pagina <span x-text="pagination.currentPage"></span>
             </span>
-            <button @click="pagination.currentPage * pagination.itemsPerPage < pagination.totalItems && (pagination.currentPage++, loadUSList())"
-                    :disabled="pagination.currentPage * pagination.itemsPerPage >= pagination.totalItems"
-                    class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+            <button
+                @click="pagination.currentPage * pagination.itemsPerPage < pagination.totalItems && (pagination.currentPage++, loadUSList())"
+                :disabled="pagination.currentPage * pagination.itemsPerPage >= pagination.totalItems"
+                class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
                 Successivo
             </button>
         </div>

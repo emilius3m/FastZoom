@@ -344,9 +344,15 @@ async def view_us_file(
             import io
             
             try:
+                # Determine the correct bucket based on file category
+                if us_file.file_category == 'documento' or us_file.mimetype == 'application/pdf':
+                    bucket = archaeological_minio_service.buckets['documents']
+                else:
+                    bucket = archaeological_minio_service.buckets['photos']
+                
                 # Construct proper MinIO path with bucket prefix
                 # The filepath in DB is stored as "site_id/filename", we need to prefix with bucket
-                minio_path = f"minio://{archaeological_minio_service.buckets['photos']}/{us_file.filepath}"
+                minio_path = f"minio://{bucket}/{us_file.filepath}"
                 
                 # Get file data from MinIO
                 file_data = await archaeological_minio_service.get_file(minio_path)
@@ -453,8 +459,14 @@ async def get_us_file_thumbnail(
             import io
             
             try:
+                # Determine the correct bucket based on file category
+                if us_file.file_category == 'documento' or us_file.mimetype == 'application/pdf':
+                    bucket = archaeological_minio_service.buckets['documents']
+                else:
+                    bucket = archaeological_minio_service.buckets['photos']
+                
                 # Construct proper MinIO path with bucket prefix (fallback to original if no thumbnail)
-                minio_path = f"minio://{archaeological_minio_service.buckets['photos']}/{us_file.filepath}"
+                minio_path = f"minio://{bucket}/{us_file.filepath}"
                 
                 # Get file data from MinIO
                 file_data = await archaeological_minio_service.get_file(minio_path)
@@ -529,8 +541,14 @@ async def download_us_file(
             import io
             
             try:
+                # Determine the correct bucket based on file category
+                if us_file.file_category == 'documento' or us_file.mimetype == 'application/pdf':
+                    bucket = archaeological_minio_service.buckets['documents']
+                else:
+                    bucket = archaeological_minio_service.buckets['photos']
+                
                 # Construct proper MinIO path with bucket prefix for download
-                minio_path = f"minio://{archaeological_minio_service.buckets['photos']}/{us_file.filepath}"
+                minio_path = f"minio://{bucket}/{us_file.filepath}"
                 
                 # Get file data from MinIO
                 file_data = await archaeological_minio_service.get_file(minio_path)
