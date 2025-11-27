@@ -827,9 +827,7 @@ class USFileService:
     async def get_files_summary_for_usm(self, usm_id: UUID) -> Dict[str, Any]:
         """Riassunto file per USM con conteggi per tipo, includendo foto dalla tabella Photo"""
         
-        # Use explicit transaction boundary to fix async/await context issues
-        async with self.db.begin():
-            try:
+        try:
                 # 1. Ottieni i file USM esistenti
                 files = await self.get_usm_files(usm_id)
                 
@@ -911,7 +909,6 @@ class USFileService:
                 
                 return result
                 
-            except Exception as e:
-                # Transaction will be automatically rolled back
-                logger.error(f"Error in get_files_summary_for_usm: {str(e)}")
-                raise
+        except Exception as e:
+            logger.error(f"Error in get_files_summary_for_usm: {str(e)}")
+            raise
