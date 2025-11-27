@@ -1,4 +1,4 @@
-# app/routes/api/us_files.py
+# app/routes/api/v1/us_files.py
 """
 API Endpoints per gestione file US/USM
 Integrazione con sistema upload FastZoom esistente
@@ -26,7 +26,8 @@ from app.services.us_file_service import USFileService
 from app.services.photo_serving_service import photo_serving_service
 from app.models.stratigraphy import USFile
 
-router = APIRouter(prefix="/api/us-files", tags=["us-files"])
+# Router definition - Prefix will be handled by the including router
+router = APIRouter()
 
 async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> bool:
     """Verifica accesso utente al sito"""
@@ -669,7 +670,7 @@ async def get_next_file_order(
         max_order = 0
         if files:
             # Query per ottenere ordini dalla tabella associativa
-            from sqlalchemy import select, func, and_
+            from sqlalchemy import select, func, and_, or_
             from app.models.stratigraphy import us_files_association
             
             max_query = select(func.max(us_files_association.c.ordine)).where(

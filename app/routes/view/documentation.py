@@ -173,8 +173,8 @@ async def site_documentation(
                         "us_reference": us.us_code,
                         "us_id": str(us.id),
                         "file_type": assoc.file_type,
-                        "download_url": f"/api/us-files/{us_file.id}/download",
-                        "view_url": f"/api/us-files/{us_file.id}/view"
+                        "download_url": f"/api/v1/us-files/{us_file.id}/download",
+                        "view_url": f"/api/v1/us-files/{us_file.id}/view"
                     })
         
         # 3. Aggiungi file USM associati
@@ -229,8 +229,8 @@ async def site_documentation(
                         "usm_reference": usm.usm_code,
                         "usm_id": str(usm.id),
                         "file_type": assoc.file_type,
-                        "download_url": f"/api/us-files/{usm_file.id}/download",
-                        "view_url": f"/api/us-files/{usm_file.id}/view"
+                        "download_url": f"/api/v1/us-files/{usm_file.id}/download",
+                        "view_url": f"/api/v1/us-files/{usm_file.id}/view"
                     })
         
         # Ordina tutti i documenti per data di upload (decrescente)

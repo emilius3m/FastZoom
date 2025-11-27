@@ -1026,7 +1026,7 @@
             async loadUSFiles(usId) {
                 try {
                     console.log('🔄 Caricamento file US:', usId);
-                    const response = await fetch(`/api/us-files/us/${usId}/files/summary`);
+                    const response = await fetch(`/api/v1/us-files/us/${usId}/files/summary`);
                     console.log('📡 Response status:', response.status);
 
                     if (response.ok) {
@@ -1054,7 +1054,7 @@
             async loadUSMFiles(usmId) {
                 try {
                     console.log('🔄 Caricamento file USM:', usmId);
-                    const response = await fetch(`/api/us-files/usm/${usmId}/files/summary`);
+                    const response = await fetch(`/api/v1/us-files/usm/${usmId}/files/summary`);
                     console.log('📡 USM Response status:', response.status);
 
                     if (response.ok) {
@@ -1158,7 +1158,7 @@
                     } else {
                         // Use existing endpoint for non-photo files
                         const endpoint = this.editingUS ? 'us' : 'usm';
-                        uploadUrl = `/api/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`;
+                        uploadUrl = `/api/v1/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`;
                         console.log('File Upload URL:', uploadUrl);
 
                         formData = new FormData();
@@ -1239,7 +1239,7 @@
 
                     console.log('🗑️ Tentativo eliminazione file:', file.id, 'tipo:', fileType, 'entity:', entityId);
 
-                    const response = await fetch(`/api/us-files/${endpoint}/${entityId}/files/${file.id}`, {
+                    const response = await fetch(`/api/v1/us-files/${endpoint}/${entityId}/files/${file.id}`, {
                         method: 'DELETE',
                         headers: {
                             'X-CSRFToken': this.getCSRFToken()
@@ -1272,19 +1272,19 @@
 
                 if (file.mimetype && file.mimetype.includes('pdf')) {
                     // Per PDF, apri in nuova tab
-                    const viewUrl = `/api/us-files/${file.id}/view`;
+                    const viewUrl = `/api/v1/us-files/${file.id}/view`;
                     window.open(viewUrl, '_blank');
                 } else if (file.mimetype && file.mimetype.includes('image/')) {
                     // Per immagini, usa thumbnail o view
                     if (file.thumbnail_url) {
                         window.open(file.thumbnail_url, '_blank');
                     } else {
-                        const viewUrl = `/api/us-files/${file.id}/view`;
+                        const viewUrl = `/api/v1/us-files/${file.id}/view`;
                         window.open(viewUrl, '_blank');
                     }
                 } else if (file.mimetype && (file.mimetype.includes('word') || file.mimetype.includes('document'))) {
                     // Per documenti Word, prova ad aprire in nuova tab
-                    const viewUrl = `/api/us-files/${file.id}/view`;
+                    const viewUrl = `/api/v1/us-files/${file.id}/view`;
                     window.open(viewUrl, '_blank');
                 } else {
                     // Per altri tipi, prova il download
@@ -1293,7 +1293,7 @@
             },
 
             async downloadFile(file) {
-                window.location.href = `/api/us-files/${file.id}/download`;
+                window.location.href = `/api/v1/us-files/${file.id}/download`;
             },
 
             async editFileMetadata(file) {
@@ -1301,7 +1301,7 @@
                 const newTitle = prompt('Titolo:', file.title || '');
                 if (newTitle !== null) {
                     try {
-                        const response = await fetch(`/api/files/${file.id}/metadata`, {
+                        const response = await fetch(`/api/v1/us-files/${file.id}/metadata`, {
                             method: 'PATCH',
                             headers: {
                                 'Content-Type': 'application/json',

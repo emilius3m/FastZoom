@@ -67,10 +67,9 @@ from app.routes.api.queue_monitoring import queue_monitoring_router
 # 📊 NUOVO IMPORT - Router Performance Monitoring API
 from app.routes.api.performance_monitoring import router as performance_monitoring_router
 from app.routes import photo_metadata
-from app.routes.api.us import us_router
 from app.routes.view.us import us_view_router
 from app.routes.api.us_word_export_api import router as us_word_export_router
-from app.routes.api.us_files import router as us_files_router
+# from app.routes.api.us_files import router as us_files_router
 
 
 
@@ -225,8 +224,7 @@ app.add_middleware(
 )
 
 # Aggiungi middleware all'app
-app.add_middleware(UnifiedLoggingMiddleware)
-app.add_middleware(AuditMiddleware)
+
 # 📊 NUOVO: Aggiungi Performance Tracking Middleware
 app.add_middleware(RequestCountMiddleware)
 app.add_middleware(PerformanceTrackingMiddleware)
@@ -423,12 +421,6 @@ app.include_router(
     tags=["websocket-notifications"]
 )
 
-# 🌐 INCLUSIONE ROUTER WEBSOCKET GLOBALE - Endpoint globale con token-based authentication
-#app.include_router(
-#    global_notifications_router,
-#    tags=["websocket-global-notifications"]
-#)
-
 
 # 🗄️ INCLUSIONE ROUTER DATABASE MONITORING - API per monitoring connection pool
 app.include_router(
@@ -453,12 +445,6 @@ app.include_router(
     dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
 
-# 🏺 INCLUSIONE ROUTER US/USM - API per Unità Stratigrafiche
-app.include_router(
-    us_router,
-    tags=["us-usm-api"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-)
 
 # 📄 INCLUSIONE ROUTER US/USM WORD EXPORT - Export Word per US/USM
 app.include_router(
@@ -468,17 +454,13 @@ app.include_router(
 )
 
 # 📎 INCLUSIONE ROUTER US/USM FILES - Gestione file US/USM
-app.include_router(
-    us_files_router,
-    tags=["us-files"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-)
+# app.include_router(
+#     us_files_router,
+#     tags=["us-files"],
+#     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+# )
 
-# Router esistenti - VECCHIO ADMIN ROUTER DISABILITATO (migrato in API v1)
-##### app.include_router(
-#####     admin_router,
-#####     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Admin richiede autenticazione con blacklist
-##### )
+
 
 # Include route view condizionali
 if LOGIN_ROUTE_EXISTS:
