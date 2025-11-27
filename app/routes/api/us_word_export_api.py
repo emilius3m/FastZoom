@@ -378,7 +378,7 @@ async def export_us_word(
         logger.info(f"→ Export Word US {us_id}")
 
         # Carica US
-        us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id)
+        us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.id == str(us_id))
         us_result = await db.execute(us_query)
         us = us_result.scalar_one_or_none()
 
@@ -430,7 +430,7 @@ async def export_multiple_us_word(
         logger.info(f"→ Export bulk {len(us_ids)} US")
 
         # Carica tutte le US
-        us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.id.in_(us_ids))
+        us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.id.in_([str(us_id) for us_id in us_ids]))
         us_result = await db.execute(us_query)
         us_list = us_result.scalars().all()
 
@@ -571,7 +571,7 @@ async def export_usm_word(
         logger.info(f"→ Export Word USM {usm_id}")
 
         # Carica USM
-        usm_query = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == usm_id)
+        usm_query = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == str(usm_id))
         usm_result = await db.execute(usm_query)
         usm = usm_result.scalar_one_or_none()
 
