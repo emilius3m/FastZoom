@@ -450,6 +450,7 @@ class USFileService:
                     logger.warning(f"Errore eliminazione thumbnail: {e}")
            
             # Elimina associazione con normalizzazione UUID per compatibilità
+            # Usa result.rowcount per verificare se l'eliminazione ha avuto successo
             us_id_str = str(us_id)
             normalized_us_id = self._normalize_us_id(us_id)
             delete_assoc = us_files_association.delete().where(
@@ -462,19 +463,25 @@ class USFileService:
                     us_files_association.c.file_id == safe_uuid_str(file_id)
                 )
             )
-            await self.db.execute(delete_assoc)
-           
+            result = await self.db.execute(delete_assoc)
+            
+            # Logga se l'associazione non è stata trovata (ma non è un errore critico)
+            if result.rowcount == 0:
+                logger.warning(f"Nessuna associazione US-File trovata per eliminazione: us_id={us_id}, file_id={file_id}")
+            else:
+                logger.info(f"Associazione US-File eliminata: {result.rowcount} righe")
+            
             # Elimina record file se non ha altre associazioni
             other_assoc_query = select(us_files_association).where(
                 us_files_association.c.file_id == safe_uuid_str(file_id)
             )
             other_assoc = await self.db.execute(other_assoc_query)
-           
+            
             usm_assoc_query = select(usm_files_association).where(
                 usm_files_association.c.file_id == safe_uuid_str(file_id)
             )
             usm_assoc = await self.db.execute(usm_assoc_query)
-           
+            
             if not other_assoc.first() and not usm_assoc.first():
                 await self.db.delete(us_file)
            
@@ -485,6 +492,10 @@ class USFileService:
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Errore eliminazione file US: {str(e)}")
+            # Se l'errore è solo che l'associazione non esisteva, è solo un warning
+            if "expected to delete" in str(e) and "Only 0 were matched" in str(e):
+                logger.warning(f"Associazione US-File non trovata per eliminazione (non critico): us_id={us_id}, file_id={file_id}")
+                return True
             raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
     
     async def delete_usm_file(self, usm_id: UUID, file_id: UUID, user_id: UUID) -> bool:
@@ -526,6 +537,7 @@ class USFileService:
                     logger.warning(f"Errore eliminazione thumbnail: {e}")
            
             # Elimina associazione USM con normalizzazione UUID per compatibilità
+            # Usa result.rowcount per verificare se l'eliminazione ha avuto successo
             usm_id_str = str(usm_id)
             normalized_usm_id = self._normalize_us_id(usm_id)
             delete_assoc = usm_files_association.delete().where(
@@ -538,19 +550,25 @@ class USFileService:
                     usm_files_association.c.file_id == safe_uuid_str(file_id)
                 )
             )
-            await self.db.execute(delete_assoc)
-           
+            result = await self.db.execute(delete_assoc)
+            
+            # Logga se l'associazione non è stata trovata (ma non è un errore critico)
+            if result.rowcount == 0:
+                logger.warning(f"Nessuna associazione USM-File trovata per eliminazione: usm_id={usm_id}, file_id={file_id}")
+            else:
+                logger.info(f"Associazione USM-File eliminata: {result.rowcount} righe")
+            
             # Elimina record file se non ha altre associazioni
             us_assoc_query = select(us_files_association).where(
                 us_files_association.c.file_id == safe_uuid_str(file_id)
             )
             us_assoc = await self.db.execute(us_assoc_query)
-           
+            
             usm_assoc_query = select(usm_files_association).where(
                 usm_files_association.c.file_id == safe_uuid_str(file_id)
             )
             usm_assoc = await self.db.execute(usm_assoc_query)
-           
+            
             if not us_assoc.first() and not usm_assoc.first():
                 await self.db.delete(us_file)
            
@@ -561,6 +579,10 @@ class USFileService:
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Errore eliminazione file USM: {str(e)}")
+            # Se l'errore è solo che l'associazione non esisteva, è solo un warning
+            if "expected to delete" in str(e) and "Only 0 were matched" in str(e):
+                logger.warning(f"Associazione USM-File non trovata per eliminazione (non critico): usm_id={usm_id}, file_id={file_id}")
+                return True
             raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
     
     async def update_file_metadata(
