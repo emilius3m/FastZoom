@@ -856,9 +856,6 @@
                 <!-- ========== SEZIONE 14: DOCUMENTAZIONE E FILE ========== -->
                 {% include "components/us_file_upload_section.html" %}
 
-                <!-- ========== SEZIONE 15: EXPORT WORD ========== -->
-                {% include "components/us_export_section.html" %}
-
             </form>
         </div>
 
@@ -880,6 +877,14 @@
                     class="px-8 py-3 border-2 border-red-500 dark:border-red-600 rounded-lg text-red-700 dark:text-red-300 font-semibold hover:bg-red-50 dark:hover:bg-red-900 disabled:opacity-50 transition">
                 <i :class="usmSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'" class="mr-2"></i>
                 <span x-text="usmSaving ? 'Salvataggio...' : (editingUSM ? 'Salva Modifiche' : 'Crea USM')"></span>
+            </button>
+
+            <button x-show="viewingUSM"
+                    @click="exportUSMWord()"
+                    :disabled="exportingWord"
+                    class="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 transition shadow-lg">
+                <i :class="exportingWord ? 'fas fa-spinner fa-spin' : 'fas fa-file-word'" class="mr-2"></i>
+                <span x-text="exportingWord ? 'Generando...' : 'Scarica USM Word'"></span>
             </button>
 
             <button x-show="viewingUSM"
