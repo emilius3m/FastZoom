@@ -310,16 +310,28 @@ async def view_us_file(
     file_id_uuid = UUID(normalized_file_id)
     
     try:
-        # Get USFile record from database
-        from sqlalchemy import select
+        # Get USFile record from database with fallback logic for UUID formats
+        from sqlalchemy import select, or_
         from app.models.stratigraphy import USFile
         
-        us_file_query = select(USFile).where(USFile.id == file_id_uuid)
+        # Convert to string and get different formats for fallback
+        file_id_str = str(file_id_uuid)
+        file_id_no_dashes = file_id_str.replace('-', '')
+        
+        # Add fallback logic similar to USFileService
+        us_file_query = select(USFile).where(
+            or_(
+                USFile.id == file_id_str,      # Standard UUID with dashes
+                USFile.id == file_id_no_dashes,  # 32-char hex without dashes
+                USFile.id == str(file_id_uuid)   # UUID object converted to string
+            )
+        )
         us_file = await db.execute(us_file_query)
         us_file = us_file.scalar_one_or_none()
         
         if not us_file:
-            raise HTTPException(status_code=404, detail="File US non trovato")
+            logger.error(f"File US non trovato per ID: {file_id_str} (senza trattini: {file_id_no_dashes})")
+            raise HTTPException(status_code=404, detail="File US non trovato : 404")
         
         # Verify user has access to the site
         if not verify_site_access(us_file.site_id, user_sites):
@@ -380,15 +392,27 @@ async def get_us_file_thumbnail(
     file_id_uuid = UUID(normalized_file_id)
     
     try:
-        # Get USFile record from database
-        from sqlalchemy import select
+        # Get USFile record from database with fallback logic for UUID formats
+        from sqlalchemy import select, or_
         from app.models.stratigraphy import USFile
         
-        us_file_query = select(USFile).where(USFile.id == file_id_uuid)
+        # Convert to string and get different formats for fallback
+        file_id_str = str(file_id_uuid)
+        file_id_no_dashes = file_id_str.replace('-', '')
+        
+        # Add fallback logic similar to USFileService
+        us_file_query = select(USFile).where(
+            or_(
+                USFile.id == file_id_str,      # Standard UUID with dashes
+                USFile.id == file_id_no_dashes,  # 32-char hex without dashes
+                USFile.id == str(file_id_uuid)   # UUID object converted to string
+            )
+        )
         us_file = await db.execute(us_file_query)
         us_file = us_file.scalar_one_or_none()
         
         if not us_file:
+            logger.error(f"File US thumbnail non trovato per ID: {file_id_str} (senza trattini: {file_id_no_dashes})")
             raise HTTPException(status_code=404, detail="File US non trovato")
         
         # Verify user has access to the site
@@ -472,15 +496,27 @@ async def download_us_file(
     file_id_uuid = UUID(normalized_file_id)
     
     try:
-        # Get USFile record from database
-        from sqlalchemy import select
+        # Get USFile record from database with fallback logic for UUID formats
+        from sqlalchemy import select, or_
         from app.models.stratigraphy import USFile
         
-        us_file_query = select(USFile).where(USFile.id == file_id_uuid)
+        # Convert to string and get different formats for fallback
+        file_id_str = str(file_id_uuid)
+        file_id_no_dashes = file_id_str.replace('-', '')
+        
+        # Add fallback logic similar to USFileService
+        us_file_query = select(USFile).where(
+            or_(
+                USFile.id == file_id_str,      # Standard UUID with dashes
+                USFile.id == file_id_no_dashes,  # 32-char hex without dashes
+                USFile.id == str(file_id_uuid)   # UUID object converted to string
+            )
+        )
         us_file = await db.execute(us_file_query)
         us_file = us_file.scalar_one_or_none()
         
         if not us_file:
+            logger.error(f"File US download non trovato per ID: {file_id_str} (senza trattini: {file_id_no_dashes})")
             raise HTTPException(status_code=404, detail="File US non trovato")
         
         # Verify user has access to the site
@@ -547,8 +583,9 @@ async def update_us_file_metadata(
     
     try:
         us_file_service = USFileService(db)
+        # Use string format for compatibility
         updated_file = await us_file_service.update_file_metadata(
-            file_id=file_id_uuid,
+            file_id=str(file_id_uuid),
             metadata=metadata,
             user_id=current_user_id
         )
