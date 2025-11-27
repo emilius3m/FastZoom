@@ -1,530 +1,45 @@
 <!-- app/templates/pages/us/us_usm_alpine_script.html -->
 <script>
-function usUSMManagerApp() {
-    return {
-        // ===== STATE MANAGEMENT =====
-        currentSiteId: '{{ site.id if site else "" }}',
-        activeTab: 'us',  // 'us' or 'usm'
+    function usUSMManagerApp() {
+        return {
+            // ===== STATE MANAGEMENT =====
+            currentSiteId: '{{ site.id if site else "" }}',
+            activeTab: 'us',  // 'us' or 'usm'
 
-        // US State
-        showUSModal: false,
-        editingUS: null,
-        viewingUS: false,  // true for view-only mode
-        usList: [],
-        usSaving: false,
-        usErrorMessage: '',
+            // US State
+            showUSModal: false,
+            editingUS: null,
+            viewingUS: false,  // true for view-only mode
+            usList: [],
+            usSaving: false,
+            usErrorMessage: '',
 
-        // USM State
-        showUSMModal: false,
-        editingUSM: null,
-        viewingUSM: false,  // true for view-only mode
-        usmList: [],
-        usmSaving: false,
-        usmErrorMessage: '',
+            // USM State
+            showUSMModal: false,
+            editingUSM: null,
+            viewingUSM: false,  // true for view-only mode
+            usmList: [],
+            usmSaving: false,
+            usmErrorMessage: '',
 
-        // Filters
-        filters: {
-            search: '',
-            dateFrom: '',
-            dateTo: '',
-            affidabilita: ''
-        },
+            // Filters
+            filters: {
+                search: '',
+                dateFrom: '',
+                dateTo: '',
+                affidabilita: ''
+            },
 
-        // Pagination
-        pagination: {
-            currentPage: 1,
-            itemsPerPage: 20,
-            totalItems: 0
-        },
+            // Pagination
+            pagination: {
+                currentPage: 1,
+                itemsPerPage: 20,
+                totalItems: 0
+            },
 
-        // ===== US FORM DATA =====
-        usFormData: {
-            site_id: '',
-            us_code: '',
-            ente_responsabile: '',
-            anno: null,
-            ufficio_mic: '',
-            identificativo_rif: '',
-            localita: '',
-            area_struttura: '',
-            saggio: '',
-            ambiente_unita_funzione: '',
-            posizione: '',
-            settori: '',
-            piante_riferimenti: '',
-            prospetti_riferimenti: '',
-            sezioni_riferimenti: '',
-            definizione: '',
-            criteri_distinzione: '',
-            modo_formazione: '',
-            componenti_inorganici: '',
-            componenti_organici: '',
-            consistenza: '',
-            colore: '',
-            misure: '',
-            stato_conservazione: '',
-            // Sequenza fisica
-            seq_uguale_a: '',
-            seq_si_lega_a: '',
-            seq_gli_si_appoggia: '',
-            seq_si_appoggia_a: '',
-            seq_coperto_da: '',
-            seq_copre: '',
-            seq_tagliato_da: '',
-            seq_taglia: '',
-            seq_riempito_da: '',
-            seq_riempie: '',
-            descrizione: '',
-            osservazioni: '',
-            interpretazione: '',
-            datazione: '',
-            periodo: '',
-            fase: '',
-            elementi_datanti: '',
-            dati_quantitativi_reperti: '',
-            // Campionature
-            camp_flottazione: false,
-            camp_setacciatura: false,
-            affidabilita_stratigrafica: '',
-            responsabile_scientifico: '',
-            data_rilevamento: '',
-            responsabile_compilazione: '',
-            data_rielaborazione: '',
-            responsabile_rielaborazione: ''
-        },
-
-        // ===== USM FORM DATA =====
-        usmFormData: {
-            site_id: '',
-            usm_code: '',
-            ente_responsabile: '',
-            anno: null,
-            ufficio_mic: '',
-            identificativo_rif: '',
-            localita: '',
-            area_struttura: '',
-            saggio: '',
-            ambiente_unita_funzione: '',
-            posizione: '',
-            settori: '',
-            piante: '',
-            prospetti: '',
-            sezioni: '',
-            misure: '',
-            superficie_analizzata: null,
-            definizione: '',
-            tecnica_costruttiva: '',
-            sezione_muraria_visibile: false,
-            sezione_muraria_tipo: '',
-            sezione_muraria_spessore: '',
-            funzione_statica: '',
-            modulo: '',
-            criteri_distinzione: '',
-            provenienza_materiali: '',
-            orientamento: '',
-            uso_primario: '',
-            riutilizzo: '',
-            stato_conservazione: '',
-            // Materiali Laterizi
-            lat_mattoni: false,
-            lat_tegole: false,
-            lat_embrici: false,
-            lat_altro: false,
-            lat_crudi: false,
-            lat_cotti: false,
-            lat_cotti_sole: false,
-            lat_semifusi: false,
-            // Elementi Litici
-            lit_tufo: false,
-            lit_calcare: false,
-            lit_arenaria: false,
-            lit_altro: false,
-            lit_sfaldati: false,
-            lit_spaccati: false,
-            lit_sbozzati: false,
-            lit_squadrati: false,
-            lit_spianati: false,
-            lit_bugnati: false,
-            materiali_altro: '',
-            // Legante
-            legante_tipo: '',
-            legante_consistenza: '',
-            legante_altro: '',
-            finiture_elementi_particolari: '',
-            // Sequenza fisica
-            seq_uguale_a: '',
-            seq_si_lega_a: '',
-            seq_gli_si_appoggia: '',
-            seq_si_appoggia_a: '',
-            seq_coperto_da: '',
-            seq_copre: '',
-            seq_tagliato_da: '',
-            seq_taglia: '',
-            seq_riempito_da: '',
-            seq_riempie: '',
-            descrizione: '',
-            osservazioni: '',
-            interpretazione: '',
-            datazione: '',
-            periodo: '',
-            fase: '',
-            elementi_datanti: '',
-            // Campionature
-            camp_elementi_litici: false,
-            camp_laterizi: false,
-            camp_malta: false,
-            affidabilita_stratigrafica: '',
-            responsabile_scientifico: '',
-            data_rilevamento: '',
-            responsabile_compilazione: '',
-            data_rielaborazione: '',
-            responsabile_rielaborazione: ''
-        },
-
-        // ===== FILE MANAGEMENT DATA =====
-        filesData: {
-            piante: [],
-            sezioni: [],
-            prospetti: [],
-            fotografie: [],
-            documenti: []
-        },
-        
-        // File upload state
-        uploadingFile: false,
-        showFileUploadModal: false,
-        currentFileType: '',
-        fileUploadMetadata: {
-            title: '',
-            description: '',
-            tavola_number: '',
-            scale_ratio: '',
-            photographer: '',
-            photo_date: ''
-        },
-
-        // Export state (for export component)
-        exportingWord: false,
-        exportingBulk: false,
-        exportStatus: null,
-        showBulkExport: false,
-        selectedUS: [],
-        formType: 'us',  // 'us' or 'usm'
-
-        // ===== INITIALIZATION =====
-        async init() {
-            console.log('US/USM Manager inizializzato per sito:', this.currentSiteId);
-            if (this.currentSiteId) {
-                await this.loadUSList();
-                await this.loadUSMList();
-            }
-        },
-
-        // ===== US CRUD OPERATIONS =====
-
-        async loadUSList() {
-            try {
-                const queryParams = new URLSearchParams({
-                    skip: (this.pagination.currentPage - 1) * this.pagination.itemsPerPage,
-                    limit: this.pagination.itemsPerPage
-                });
-
-                if (this.filters.search) queryParams.append('search', this.filters.search);
-                if (this.filters.dateFrom) queryParams.append('da', this.filters.dateFrom);
-                if (this.filters.dateTo) queryParams.append('a', this.filters.dateTo);
-
-                const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us?${queryParams}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': this.getCSRFToken()
-                    }
-                });
-
-                if (response.ok) {
-                    this.usList = await response.json();
-                    console.log('Lista US caricata:', this.usList.length, 'elementi');
-                } else {
-                    throw new Error('Errore caricamento US');
-                }
-            } catch (error) {
-                console.error('Errore caricamento US:', error);
-                this.showNotification('Errore nel caricamento delle US', 'error');
-            }
-        },
-
-        async openUSModal(us = null, editMode = true) {
-            console.log('openUSModal called with:', us, editMode);
-            // Close USM modal if open
-            this.showUSMModal = false;
-            
-            this.editingUS = us;
-            this.viewingUS = !editMode;
-            this.usErrorMessage = '';
-            this.formType = 'us';  // Set form type for components
-
-            if (us) {
-                try {
-                    // Fetch full US details
-                    const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us/${us.id}`);
-                    if (response.ok) {
-                        const usData = await response.json();
-                        
-                        // Modalità modifica - popola form
-                        this.usFormData = {
-                            site_id: usData.site_id,
-                            us_code: usData.us_code,
-                            ente_responsabile: usData.ente_responsabile || '',
-                            anno: usData.anno,
-                            ufficio_mic: usData.ufficio_mic || '',
-                            identificativo_rif: usData.identificativo_rif || '',
-                            localita: usData.localita || '',
-                            area_struttura: usData.area_struttura || '',
-                            saggio: usData.saggio || '',
-                            ambiente_unita_funzione: usData.ambiente_unita_funzione || '',
-                            posizione: usData.posizione || '',
-                            settori: usData.settori || '',
-                            piante_riferimenti: usData.piante_riferimenti || '',
-                            prospetti_riferimenti: usData.prospetti_riferimenti || '',
-                            sezioni_riferimenti: usData.sezioni_riferimenti || '',
-                            definizione: usData.definizione || '',
-                            criteri_distinzione: usData.criteri_distinzione || '',
-                            modo_formazione: usData.modo_formazione || '',
-                            componenti_inorganici: usData.componenti_inorganici || '',
-                            componenti_organici: usData.componenti_organici || '',
-                            consistenza: usData.consistenza || '',
-                            colore: usData.colore || '',
-                            misure: usData.misure || '',
-                            stato_conservazione: usData.stato_conservazione || '',
-                            seq_uguale_a: this.sequenzaToString(usData.sequenza_fisica?.uguale_a),
-                            seq_si_lega_a: this.sequenzaToString(usData.sequenza_fisica?.si_lega_a),
-                            seq_gli_si_appoggia: this.sequenzaToString(usData.sequenza_fisica?.gli_si_appoggia),
-                            seq_si_appoggia_a: this.sequenzaToString(usData.sequenza_fisica?.si_appoggia_a),
-                            seq_coperto_da: this.sequenzaToString(usData.sequenza_fisica?.coperto_da),
-                            seq_copre: this.sequenzaToString(usData.sequenza_fisica?.copre),
-                            seq_tagliato_da: this.sequenzaToString(usData.sequenza_fisica?.tagliato_da),
-                            seq_taglia: this.sequenzaToString(usData.sequenza_fisica?.taglia),
-                            seq_riempito_da: this.sequenzaToString(usData.sequenza_fisica?.riempito_da),
-                            seq_riempie: this.sequenzaToString(usData.sequenza_fisica?.riempie),
-                            descrizione: usData.descrizione || '',
-                            osservazioni: usData.osservazioni || '',
-                            interpretazione: usData.interpretazione || '',
-                            datazione: usData.datazione || '',
-                            periodo: usData.periodo || '',
-                            fase: usData.fase || '',
-                            elementi_datanti: usData.elementi_datanti || '',
-                            dati_quantitativi_reperti: usData.dati_quantitativi_reperti || '',
-                            camp_flottazione: usData.campionature?.flottazione || false,
-                            camp_setacciatura: usData.campionature?.setacciatura || false,
-                            affidabilita_stratigrafica: usData.affidabilita_stratigrafica || '',
-                            responsabile_scientifico: usData.responsabile_scientifico || '',
-                            data_rilevamento: usData.data_rilevamento || '',
-                            responsabile_compilazione: usData.responsabile_compilazione || '',
-                            data_rielaborazione: usData.data_rielaborazione || '',
-                            responsabile_rielaborazione: usData.responsabile_rielaborazione || ''
-                        };
-                    } else {
-                        throw new Error('Errore nel caricamento dei dati US');
-                    }
-                } catch (error) {
-                    console.error('Error fetching US data:', error);
-                    this.showNotification('Errore nel caricamento dei dati US', 'error');
-                    return;
-                }
-            } else {
-                // Modalità creazione - reset form
-                this.resetUSForm();
-                this.usFormData.site_id = this.currentSiteId;
-            }
-
-            // Load files if editing existing US
-            if (us) {
-                await this.loadUSFiles(us.id);
-            } else {
-                // Reset files for new US
-                this.filesData = {
-                    piante: [],
-                    sezioni: [],
-                    prospetti: [],
-                    fotografie: [],
-                    documenti: []
-                };
-            }
-
-            this.showUSModal = true;
-        },
-
-        closeUSModal() {
-            this.showUSModal = false;
-            this.editingUS = null;
-            this.viewingUS = false;
-            this.usErrorMessage = '';
-            this.resetUSForm();
-        },
-
-        async saveUS() {
-            this.usSaving = true;
-            this.usErrorMessage = '';
-
-            try {
-                // Debug log to check form data
-                console.log('Form data before save:', this.usFormData);
-                
-                // Clean up form data - convert empty strings to null for optional fields
-                const cleanFormData = { ...this.usFormData };
-                
-                // Convert empty strings to null for numeric fields
-                if (cleanFormData.anno === '' || cleanFormData.anno === null) {
-                    cleanFormData.anno = null;
-                }
-                
-                // Convert empty strings to null for date fields
-                if (!cleanFormData.data_rilevamento || cleanFormData.data_rilevamento === '') {
-                    cleanFormData.data_rilevamento = null;
-                }
-                if (!cleanFormData.data_rielaborazione || cleanFormData.data_rielaborazione === '') {
-                    cleanFormData.data_rielaborazione = null;
-                }
-                
-                // Prepara payload con sequenza fisica
-                const payload = {
-                    ...cleanFormData,
-                    sequenza_fisica: {
-                        uguale_a: this.stringToSequenza(this.usFormData.seq_uguale_a),
-                        si_lega_a: this.stringToSequenza(this.usFormData.seq_si_lega_a),
-                        gli_si_appoggia: this.stringToSequenza(this.usFormData.seq_gli_si_appoggia),
-                        si_appoggia_a: this.stringToSequenza(this.usFormData.seq_si_appoggia_a),
-                        coperto_da: this.stringToSequenza(this.usFormData.seq_coperto_da),
-                        copre: this.stringToSequenza(this.usFormData.seq_copre),
-                        tagliato_da: this.stringToSequenza(this.usFormData.seq_tagliato_da),
-                        taglia: this.stringToSequenza(this.usFormData.seq_taglia),
-                        riempito_da: this.stringToSequenza(this.usFormData.seq_riempito_da),
-                        riempie: this.stringToSequenza(this.usFormData.seq_riempie)
-                    },
-                    campionature: {
-                        flottazione: this.usFormData.camp_flottazione,
-                        setacciatura: this.usFormData.camp_setacciatura
-                    }
-                };
-                
-                // Debug log to check payload
-                console.log('Payload being sent:', payload);
-
-                // Rimuovi campi sequenza temporanei
-                delete payload.seq_uguale_a;
-                delete payload.seq_si_lega_a;
-                delete payload.seq_gli_si_appoggia;
-                delete payload.seq_si_appoggia_a;
-                delete payload.seq_coperto_da;
-                delete payload.seq_copre;
-                delete payload.seq_tagliato_da;
-                delete payload.seq_taglia;
-                delete payload.seq_riempito_da;
-                delete payload.seq_riempie;
-                delete payload.camp_flottazione;
-                delete payload.camp_setacciatura;
-
-                const url = this.editingUS
-                    ? `/api/v1/us/sites/${this.currentSiteId}/us/${this.editingUS.id}`
-                    : `/api/v1/us/sites/${this.currentSiteId}/us`;
-                const method = this.editingUS ? 'PUT' : 'POST';
-
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': this.getCSRFToken()
-                    },
-                    body: JSON.stringify(payload)
-                });
-                
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
-
-                if (response.ok) {
-                    const savedUS = await response.json();
-                    console.log('US salvata:', savedUS);
-
-                    this.showNotification(
-                        this.editingUS ? 'US aggiornata con successo' : 'US creata con successo',
-                        'success'
-                    );
-
-                    await this.loadUSList();
-                    this.closeUSModal();
-                } else {
-                    const error = await response.json();
-                    console.error('API Error:', error);
-                    let errorMessage = 'Errore nel salvataggio';
-                    
-                    if (error.detail) {
-                        if (typeof error.detail === 'string') {
-                            errorMessage = error.detail;
-                            
-                            // Highlight specific field if error mentions it
-                            if (errorMessage.includes("Campo '")) {
-                                const fieldNameMatch = errorMessage.match(/Campo '([^']+)'/);
-                                if (fieldNameMatch) {
-                                    const fieldName = fieldNameMatch[1];
-                                    // Try to find and highlight the field
-                                    setTimeout(() => {
-                                        const fieldElement = document.querySelector(`[x-model*="${fieldName}"]`);
-                                        if (fieldElement) {
-                                            fieldElement.classList.add('border-red-500', 'ring-2', 'ring-red-200');
-                                            setTimeout(() => {
-                                                fieldElement.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
-                                            }, 5000);
-                                        }
-                                    }, 100);
-                                }
-                            }
-                        } else if (Array.isArray(error.detail)) {
-                            // Handle validation errors array
-                            errorMessage = error.detail.map(err =>
-                                typeof err === 'object' ? err.msg || JSON.stringify(err) : err
-                            ).join(', ');
-                        } else if (typeof error.detail === 'object') {
-                            errorMessage = JSON.stringify(error.detail);
-                        }
-                    }
-                    
-                    throw new Error(errorMessage);
-                }
-            } catch (error) {
-                console.error('Errore salvataggio US:', error);
-                this.usErrorMessage = error.message || 'Errore nel salvataggio della US';
-            } finally {
-                this.usSaving = false;
-            }
-        },
-
-        async deleteUS(usId) {
-            if (!confirm('Sei sicuro di voler eliminare questa US? L\'operazione non può essere annullata.')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us/${usId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': this.getCSRFToken()
-                    }
-                });
-
-                if (response.ok) {
-                    this.showNotification('US eliminata con successo', 'success');
-                    await this.loadUSList();
-                } else {
-                    throw new Error('Errore nell\'eliminazione');
-                }
-            } catch (error) {
-                console.error('Errore eliminazione US:', error);
-                this.showNotification('Errore nell\'eliminazione della US', 'error');
-            }
-        },
-
-        resetUSForm() {
-            this.usFormData = {
-                site_id: this.currentSiteId,
+            // ===== US FORM DATA =====
+            usFormData: {
+                site_id: '',
                 us_code: '',
                 ente_responsabile: '',
                 anno: null,
@@ -548,6 +63,7 @@ function usUSMManagerApp() {
                 colore: '',
                 misure: '',
                 stato_conservazione: '',
+                // Sequenza fisica
                 seq_uguale_a: '',
                 seq_si_lega_a: '',
                 seq_gli_si_appoggia: '',
@@ -566,6 +82,7 @@ function usUSMManagerApp() {
                 fase: '',
                 elementi_datanti: '',
                 dati_quantitativi_reperti: '',
+                // Campionature
                 camp_flottazione: false,
                 camp_setacciatura: false,
                 affidabilita_stratigrafica: '',
@@ -574,917 +91,1415 @@ function usUSMManagerApp() {
                 responsabile_compilazione: '',
                 data_rielaborazione: '',
                 responsabile_rielaborazione: ''
-            };
-        },
+            },
 
-        // ===== USM CRUD OPERATIONS =====
+            // ===== USM FORM DATA =====
+            usmFormData: {
+                site_id: '',
+                usm_code: '',
+                ente_responsabile: '',
+                anno: null,
+                ufficio_mic: '',
+                identificativo_rif: '',
+                localita: '',
+                area_struttura: '',
+                saggio: '',
+                ambiente_unita_funzione: '',
+                posizione: '',
+                settori: '',
+                piante: '',
+                prospetti: '',
+                sezioni: '',
+                misure: '',
+                superficie_analizzata: null,
+                definizione: '',
+                tecnica_costruttiva: '',
+                sezione_muraria_visibile: false,
+                sezione_muraria_tipo: '',
+                sezione_muraria_spessore: '',
+                funzione_statica: '',
+                modulo: '',
+                criteri_distinzione: '',
+                provenienza_materiali: '',
+                orientamento: '',
+                uso_primario: '',
+                riutilizzo: '',
+                stato_conservazione: '',
+                // Materiali Laterizi
+                lat_mattoni: false,
+                lat_tegole: false,
+                lat_embrici: false,
+                lat_altro: false,
+                lat_crudi: false,
+                lat_cotti: false,
+                lat_cotti_sole: false,
+                lat_semifusi: false,
+                // Elementi Litici
+                lit_tufo: false,
+                lit_calcare: false,
+                lit_arenaria: false,
+                lit_altro: false,
+                lit_sfaldati: false,
+                lit_spaccati: false,
+                lit_sbozzati: false,
+                lit_squadrati: false,
+                lit_spianati: false,
+                lit_bugnati: false,
+                materiali_altro: '',
+                // Legante
+                legante_tipo: '',
+                legante_consistenza: '',
+                legante_altro: '',
+                finiture_elementi_particolari: '',
+                // Sequenza fisica
+                seq_uguale_a: '',
+                seq_si_lega_a: '',
+                seq_gli_si_appoggia: '',
+                seq_si_appoggia_a: '',
+                seq_coperto_da: '',
+                seq_copre: '',
+                seq_tagliato_da: '',
+                seq_taglia: '',
+                seq_riempito_da: '',
+                seq_riempie: '',
+                descrizione: '',
+                osservazioni: '',
+                interpretazione: '',
+                datazione: '',
+                periodo: '',
+                fase: '',
+                elementi_datanti: '',
+                // Campionature
+                camp_elementi_litici: false,
+                camp_laterizi: false,
+                camp_malta: false,
+                affidabilita_stratigrafica: '',
+                responsabile_scientifico: '',
+                data_rilevamento: '',
+                responsabile_compilazione: '',
+                data_rielaborazione: '',
+                responsabile_rielaborazione: ''
+            },
 
-        async loadUSMList() {
-            try {
-                const queryParams = new URLSearchParams({
-                    skip: (this.pagination.currentPage - 1) * this.pagination.itemsPerPage,
-                    limit: this.pagination.itemsPerPage
-                });
+            // ===== FILE MANAGEMENT DATA =====
+            filesData: {
+                piante: [],
+                sezioni: [],
+                prospetti: [],
+                fotografie: [],
+                documenti: []
+            },
 
-                if (this.filters.search) queryParams.append('search', this.filters.search);
-
-                const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm?${queryParams}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': this.getCSRFToken()
-                    }
-                });
-
-                if (response.ok) {
-                    this.usmList = await response.json();
-                    console.log('Lista USM caricata:', this.usmList.length, 'elementi');
-                } else {
-                    throw new Error('Errore caricamento USM');
-                }
-            } catch (error) {
-                console.error('Errore caricamento USM:', error);
-                this.showNotification('Errore nel caricamento delle USM', 'error');
-            }
-        },
-
-        async openUSMModal(usm = null, editMode = true) {
-            console.log('openUSMModal called with:', usm, editMode);
-            // Close US modal if open
-            this.showUSModal = false;
-            
-            this.editingUSM = usm;
-            this.viewingUSM = !editMode;
-            this.usmErrorMessage = '';
-            this.formType = 'usm';  // Set form type for components
-
-            if (usm) {
-                try {
-                    // Fetch full USM details
-                    const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm/${usm.id}`);
-                    if (response.ok) {
-                        const usmData = await response.json();
-                        console.log('USM data loaded from backend:', usmData);
-                        console.log('data_rilevamento from backend:', usmData.data_rilevamento);
-                        console.log('data_rielaborazione from backend:', usmData.data_rielaborazione);
-                        
-                        // Modalità modifica
-                        this.usmFormData = {
-                            site_id: usmData.site_id,
-                            usm_code: usmData.usm_code,
-                            ente_responsabile: usmData.ente_responsabile || '',
-                            anno: usmData.anno,
-                            ufficio_mic: usmData.ufficio_mic || '',
-                            identificativo_rif: usmData.identificativo_rif || '',
-                            localita: usmData.localita || '',
-                            area_struttura: usmData.area_struttura || '',
-                            saggio: usmData.saggio || '',
-                            ambiente_unita_funzione: usmData.ambiente_unita_funzione || '',
-                            posizione: usmData.posizione || '',
-                            settori: usmData.settori || '',
-                            piante: usmData.piante || '',
-                            prospetti: usmData.prospetti || '',
-                            sezioni: usmData.sezioni || '',
-                            misure: usmData.misure || '',
-                            superficie_analizzata: usmData.superficie_analizzata,
-                            definizione: usmData.definizione || '',
-                            tecnica_costruttiva: usmData.tecnica_costruttiva || '',
-                            sezione_muraria_visibile: usmData.sezione_muraria_visibile || false,
-                            sezione_muraria_tipo: usmData.sezione_muraria_tipo || '',
-                            sezione_muraria_spessore: usmData.sezione_muraria_spessore || '',
-                            funzione_statica: usmData.funzione_statica || '',
-                            modulo: usmData.modulo || '',
-                            criteri_distinzione: usmData.criteri_distinzione || '',
-                            provenienza_materiali: usmData.provenienza_materiali || '',
-                            orientamento: usmData.orientamento || '',
-                            uso_primario: usmData.uso_primario || '',
-                            riutilizzo: usmData.riutilizzo || '',
-                            stato_conservazione: usmData.stato_conservazione || '',
-                            // Materiali laterizi
-                            lat_mattoni: usmData.materiali_laterizi?.tipo?.includes('mattoni') || false,
-                            lat_tegole: usmData.materiali_laterizi?.tipo?.includes('tegole') || false,
-                            lat_embrici: usmData.materiali_laterizi?.tipo?.includes('embrici') || false,
-                            lat_altro: usmData.materiali_laterizi?.tipo?.includes('altro') || false,
-                            lat_crudi: usmData.materiali_laterizi?.consistenza?.includes('crudi') || false,
-                            lat_cotti: usmData.materiali_laterizi?.consistenza?.includes('cotti') || false,
-                            lat_cotti_sole: usmData.materiali_laterizi?.consistenza?.includes('cotti_sole') || false,
-                            lat_semifusi: usmData.materiali_laterizi?.consistenza?.includes('semifusi') || false,
-                            // Elementi litici
-                            lit_tufo: usmData.materiali_elementi_litici?.litotipi?.includes('tufo') || false,
-                            lit_calcare: usmData.materiali_elementi_litici?.litotipi?.includes('calcare') || false,
-                            lit_arenaria: usmData.materiali_elementi_litici?.litotipi?.includes('arenaria') || false,
-                            lit_altro: usmData.materiali_elementi_litici?.litotipi?.includes('altro') || false,
-                            lit_sfaldati: usmData.materiali_elementi_litici?.lavorazione?.includes('sfaldati') || false,
-                            lit_spaccati: usmData.materiali_elementi_litici?.lavorazione?.includes('spaccati') || false,
-                            lit_sbozzati: usmData.materiali_elementi_litici?.lavorazione?.includes('sbozzati') || false,
-                            lit_squadrati: usmData.materiali_elementi_litici?.lavorazione?.includes('squadrati') || false,
-                            lit_spianati: usmData.materiali_elementi_litici?.lavorazione?.includes('spianati') || false,
-                            lit_bugnati: usmData.materiali_elementi_litici?.lavorazione?.includes('bugnati') || false,
-                            materiali_altro: usmData.materiali_altro || '',
-                            legante_tipo: usmData.legante?.tipo || '',
-                            legante_consistenza: usmData.legante?.consistenza || '',
-                            legante_altro: usmData.legante_altro || '',
-                            finiture_elementi_particolari: usmData.finiture_elementi_particolari || '',
-                            seq_uguale_a: this.sequenzaToString(usmData.sequenza_fisica?.uguale_a),
-                            seq_si_lega_a: this.sequenzaToString(usmData.sequenza_fisica?.si_lega_a),
-                            seq_gli_si_appoggia: this.sequenzaToString(usmData.sequenza_fisica?.gli_si_appoggia),
-                            seq_si_appoggia_a: this.sequenzaToString(usmData.sequenza_fisica?.si_appoggia_a),
-                            seq_coperto_da: this.sequenzaToString(usmData.sequenza_fisica?.coperto_da),
-                            seq_copre: this.sequenzaToString(usmData.sequenza_fisica?.copre),
-                            seq_tagliato_da: this.sequenzaToString(usmData.sequenza_fisica?.tagliato_da),
-                            seq_taglia: this.sequenzaToString(usmData.sequenza_fisica?.taglia),
-                            seq_riempito_da: this.sequenzaToString(usmData.sequenza_fisica?.riempito_da),
-                            seq_riempie: this.sequenzaToString(usmData.sequenza_fisica?.riempie),
-                            descrizione: usmData.descrizione || '',
-                            osservazioni: usmData.osservazioni || '',
-                            interpretazione: usmData.interpretazione || '',
-                            datazione: usmData.datazione || '',
-                            periodo: usmData.periodo || '',
-                            fase: usmData.fase || '',
-                            elementi_datanti: usmData.elementi_datanti || '',
-                            camp_elementi_litici: usmData.campionature?.elementi_litici || false,
-                            camp_laterizi: usmData.campionature?.laterizi || false,
-                            camp_malta: usmData.campionature?.malta || false,
-                            affidabilita_stratigrafica: usmData.affidabilita_stratigrafica || '',
-                            responsabile_scientifico: usmData.responsabile_scientifico || '',
-                            data_rilevamento: usmData.data_rilevamento || '',
-                            responsabile_compilazione: usmData.responsabile_compilazione || '',
-                            data_rielaborazione: usmData.data_rielaborazione || '',
-                            responsabile_rielaborazione: usmData.responsabile_rielaborazione || ''
-                        };
-                    } else {
-                        throw new Error('Errore nel caricamento dei dati USM');
-                    }
-                } catch (error) {
-                    console.error('Error fetching USM data:', error);
-                    this.showNotification('Errore nel caricamento dei dati USM', 'error');
-                    return;
-                }
-            } else {
-                // Modalità creazione
-                this.resetUSMForm();
-                this.usmFormData.site_id = this.currentSiteId;
-            }
-
-            // Load files if editing existing USM
-            if (usm) {
-                await this.loadUSMFiles(usm.id);
-            } else {
-                // Reset files for new USM
-                this.filesData = {
-                    piante: [],
-                    sezioni: [],
-                    prospetti: [],
-                    fotografie: [],
-                    documenti: []
-                };
-            }
-
-            this.showUSMModal = true;
-        },
-
-        closeUSMModal() {
-            this.showUSMModal = false;
-            this.editingUSM = null;
-            this.viewingUSM = false;
-            this.usmErrorMessage = '';
-            this.resetUSMForm();
-        },
-
-        async saveUSM() {
-            this.usmSaving = true;
-            this.usmErrorMessage = '';
-
-            try {
-                // Debug log to check form data
-                console.log('USM Form data before save:', this.usmFormData);
-                
-                // Clean up form data - convert empty strings to null for optional fields
-                const cleanFormData = { ...this.usmFormData };
-                
-                // Convert empty strings to null for numeric fields
-                if (cleanFormData.anno === '' || cleanFormData.anno === null) {
-                    cleanFormData.anno = null;
-                }
-                if (cleanFormData.superficie_analizzata === '' || cleanFormData.superficie_analizzata === null) {
-                    cleanFormData.superficie_analizzata = null;
-                }
-                
-                // Convert empty strings to null for date fields
-                if (!cleanFormData.data_rilevamento || cleanFormData.data_rilevamento === '') {
-                    cleanFormData.data_rilevamento = null;
-                }
-                if (!cleanFormData.data_rielaborazione || cleanFormData.data_rielaborazione === '') {
-                    cleanFormData.data_rielaborazione = null;
-                }
-                
-                // Prepara payload completo
-                const payload = {
-                    ...cleanFormData,
-                    materiali_laterizi: {
-                        tipo: [
-                            this.usmFormData.lat_mattoni ? 'mattoni' : null,
-                            this.usmFormData.lat_tegole ? 'tegole' : null,
-                            this.usmFormData.lat_embrici ? 'embrici' : null,
-                            this.usmFormData.lat_altro ? 'altro' : null
-                        ].filter(Boolean),
-                        consistenza: [
-                            this.usmFormData.lat_crudi ? 'crudi' : null,
-                            this.usmFormData.lat_cotti ? 'cotti' : null,
-                            this.usmFormData.lat_cotti_sole ? 'cotti_sole' : null,
-                            this.usmFormData.lat_semifusi ? 'semifusi' : null
-                        ].filter(Boolean)
-                    },
-                    materiali_elementi_litici: {
-                        litotipi: [
-                            this.usmFormData.lit_tufo ? 'tufo' : null,
-                            this.usmFormData.lit_calcare ? 'calcare' : null,
-                            this.usmFormData.lit_arenaria ? 'arenaria' : null,
-                            this.usmFormData.lit_altro ? 'altro' : null
-                        ].filter(Boolean),
-                        lavorazione: [
-                            this.usmFormData.lit_sfaldati ? 'sfaldati' : null,
-                            this.usmFormData.lit_spaccati ? 'spaccati' : null,
-                            this.usmFormData.lit_sbozzati ? 'sbozzati' : null,
-                            this.usmFormData.lit_squadrati ? 'squadrati' : null,
-                            this.usmFormData.lit_spianati ? 'spianati' : null,
-                            this.usmFormData.lit_bugnati ? 'bugnati' : null
-                        ].filter(Boolean)
-                    },
-                    legante: {
-                        tipo: this.usmFormData.legante_tipo,
-                        consistenza: this.usmFormData.legante_consistenza
-                    },
-                    sequenza_fisica: {
-                        uguale_a: this.stringToSequenza(this.usmFormData.seq_uguale_a),
-                        si_lega_a: this.stringToSequenza(this.usmFormData.seq_si_lega_a),
-                        gli_si_appoggia: this.stringToSequenza(this.usmFormData.seq_gli_si_appoggia),
-                        si_appoggia_a: this.stringToSequenza(this.usmFormData.seq_si_appoggia_a),
-                        coperto_da: this.stringToSequenza(this.usmFormData.seq_coperto_da),
-                        copre: this.stringToSequenza(this.usmFormData.seq_copre),
-                        tagliato_da: this.stringToSequenza(this.usmFormData.seq_tagliato_da),
-                        taglia: this.stringToSequenza(this.usmFormData.seq_taglia),
-                        riempito_da: this.stringToSequenza(this.usmFormData.seq_riempito_da),
-                        riempie: this.stringToSequenza(this.usmFormData.seq_riempie)
-                    },
-                    campionature: {
-                        elementi_litici: this.usmFormData.camp_elementi_litici,
-                        laterizi: this.usmFormData.camp_laterizi,
-                        malta: this.usmFormData.camp_malta
-                    }
-                };
-                
-                // Debug log to check payload BEFORE cleanup
-                console.log('USM Payload BEFORE cleanup:', JSON.parse(JSON.stringify(payload)));
-                console.log('data_rilevamento in payload BEFORE cleanup:', payload.data_rilevamento);
-                console.log('data_rielaborazione in payload BEFORE cleanup:', payload.data_rielaborazione);
-
-                // Rimuovi campi temporanei
-                const tempFields = [
-                    'lat_mattoni', 'lat_tegole', 'lat_embrici', 'lat_altro',
-                    'lat_crudi', 'lat_cotti', 'lat_cotti_sole', 'lat_semifusi',
-                    'lit_tufo', 'lit_calcare', 'lit_arenaria', 'lit_altro',
-                    'lit_sfaldati', 'lit_spaccati', 'lit_sbozzati', 'lit_squadrati', 'lit_spianati', 'lit_bugnati',
-                    'legante_tipo', 'legante_consistenza',
-                    'seq_uguale_a', 'seq_si_lega_a', 'seq_gli_si_appoggia', 'seq_si_appoggia_a',
-                    'seq_coperto_da', 'seq_copre', 'seq_tagliato_da', 'seq_taglia',
-                    'seq_riempito_da', 'seq_riempie',
-                    'camp_elementi_litici', 'camp_laterizi', 'camp_malta'
-                ];
-
-                tempFields.forEach(field => delete payload[field]);
-                
-                // Debug log to check payload AFTER cleanup
-                console.log('USM Payload AFTER cleanup:', JSON.parse(JSON.stringify(payload)));
-                console.log('data_rilevamento in payload AFTER cleanup:', payload.data_rilevamento);
-                console.log('data_rielaborazione in payload AFTER cleanup:', payload.data_rielaborazione);
-
-                const url = this.editingUSM
-                    ? `/api/v1/us/sites/${this.currentSiteId}/usm/${this.editingUSM.id}`
-                    : `/api/v1/us/sites/${this.currentSiteId}/usm`;
-                const method = this.editingUSM ? 'PUT' : 'POST';
-
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': this.getCSRFToken()
-                    },
-                    body: JSON.stringify(payload)
-                });
-                
-                console.log('USM Response status:', response.status);
-                console.log('USM Response headers:', response.headers);
-
-                if (response.ok) {
-                    const savedUSM = await response.json();
-                    console.log('USM salvata con successo:', savedUSM);
-                    console.log('data_rilevamento salvata:', savedUSM.data_rilevamento);
-                    console.log('data_rielaborazione salvata:', savedUSM.data_rielaborazione);
-
-                    this.showNotification(
-                        this.editingUSM ? 'USM aggiornata con successo' : 'USM creata con successo',
-                        'success'
-                    );
-
-                    await this.loadUSMList();
-                    console.log('Lista USM ricaricata dopo salvataggio');
-                    this.closeUSMModal();
-                } else {
-                    const error = await response.json();
-                    console.error('API Error:', error);
-                    let errorMessage = 'Errore nel salvataggio';
-                    
-                    if (error.detail) {
-                        if (typeof error.detail === 'string') {
-                            errorMessage = error.detail;
-                            
-                            // Highlight specific field if error mentions it
-                            if (errorMessage.includes("Campo '")) {
-                                const fieldNameMatch = errorMessage.match(/Campo '([^']+)'/);
-                                if (fieldNameMatch) {
-                                    const fieldName = fieldNameMatch[1];
-                                    // Try to find and highlight the field
-                                    setTimeout(() => {
-                                        const fieldElement = document.querySelector(`[x-model*="${fieldName}"]`);
-                                        if (fieldElement) {
-                                            fieldElement.classList.add('border-red-500', 'ring-2', 'ring-red-200');
-                                            setTimeout(() => {
-                                                fieldElement.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
-                                            }, 5000);
-                                        }
-                                    }, 100);
-                                }
-                            }
-                        } else if (Array.isArray(error.detail)) {
-                            // Handle validation errors array
-                            errorMessage = error.detail.map(err =>
-                                typeof err === 'object' ? err.msg || JSON.stringify(err) : err
-                            ).join(', ');
-                        } else if (typeof error.detail === 'object') {
-                            errorMessage = JSON.stringify(error.detail);
-                        }
-                    }
-                    
-                    throw new Error(errorMessage);
-                }
-            } catch (error) {
-                console.error('Errore salvataggio USM:', error);
-                this.usmErrorMessage = error.message || 'Errore nel salvataggio della USM';
-            } finally {
-                this.usmSaving = false;
-            }
-        },
-
-        async deleteUSM(usmId) {
-            if (!confirm('Sei sicuro di voler eliminare questa USM? L\'operazione non può essere annullata.')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm/${usmId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': this.getCSRFToken()
-                    }
-                });
-
-                if (response.ok) {
-                    this.showNotification('USM eliminata con successo', 'success');
-                    await this.loadUSMList();
-                } else {
-                    throw new Error('Errore nell\'eliminazione');
-                }
-            } catch (error) {
-                console.error('Errore eliminazione USM:', error);
-                this.showNotification('Errore nell\'eliminazione della USM', 'error');
-            }
-        },
-
-        resetUSMForm() {
-            Object.keys(this.usmFormData).forEach(key => {
-                if (typeof this.usmFormData[key] === 'boolean') {
-                    this.usmFormData[key] = false;
-                } else if (typeof this.usmFormData[key] === 'number') {
-                    this.usmFormData[key] = null;
-                } else {
-                    this.usmFormData[key] = '';
-                }
-            });
-            this.usmFormData.site_id = this.currentSiteId;
-        },
-
-        // ===== UTILITY FUNCTIONS =====
-
-        sequenzaToString(arr) {
-            return Array.isArray(arr) ? arr.join(', ') : '';
-        },
-
-        stringToSequenza(str) {
-            if (!str) return [];
-            return str.split(',').map(s => s.trim()).filter(Boolean);
-        },
-
-        getCSRFToken() {
-            return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-        },
-
-        showNotification(message, type = 'info') {
-            // Implementa sistema notifiche (toast)
-            console.log(`[${type.toUpperCase()}] ${message}`);
-
-            // Esempio con alert temporaneo
-            if (type === 'error') {
-                alert('❌ ' + message);
-            } else if (type === 'success') {
-                alert('✅ ' + message);
-            }
-        },
-
-        formatDate(dateString) {
-            if (!dateString) return '-';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('it-IT');
-        },
-
-        // ===== FILE MANAGEMENT METHODS =====
-
-        async loadUSFiles(usId) {
-            try {
-                console.log('🔄 Caricamento file US:', usId);
-                const response = await fetch(`/api/us-files/us/${usId}/files/summary`);
-                console.log('📡 Response status:', response.status);
-                
-                if (response.ok) {
-                    const filesSummary = await response.json();
-                    console.log('📄 Files Summary ricevuto:', filesSummary);
-                    console.log('📊 Totale files trovati:', filesSummary.summary?.total || 0);
-                    
-                    this.filesData = {
-                        piante: filesSummary.summary.piante || [],
-                        sezioni: filesSummary.summary.sezioni || [],
-                        prospetti: filesSummary.summary.prospetti || [],
-                        fotografie: filesSummary.summary.fotografie || [],
-                        documenti: filesSummary.summary.documenti || []
-                    };
-                    
-                    console.log('💾 filesData aggiornato:', this.filesData);
-                } else {
-                    console.error('❌ Response non OK:', response.status, response.statusText);
-                }
-            } catch (error) {
-                console.error('❌ Errore caricamento file US:', error);
-            }
-        },
-
-        async loadUSMFiles(usmId) {
-            try {
-                console.log('🔄 Caricamento file USM:', usmId);
-                const response = await fetch(`/api/us-files/usm/${usmId}/files/summary`);
-                console.log('📡 USM Response status:', response.status);
-                
-                if (response.ok) {
-                    const filesSummary = await response.json();
-                    console.log('📄 USM Files Summary ricevuto:', filesSummary);
-                    console.log('📊 Totale files USM trovati:', filesSummary.summary?.total || 0);
-                    
-                    this.filesData = {
-                        piante: filesSummary.summary.piante || [],
-                        sezioni: filesSummary.summary.sezioni || [],
-                        prospetti: filesSummary.summary.prospetti || [],
-                        fotografie: filesSummary.summary.fotografie || [],
-                        documenti: filesSummary.summary.documenti || []
-                    };
-                    
-                    console.log('💾 USM filesData aggiornato:', this.filesData);
-                } else {
-                    console.error('❌ USM Response non OK:', response.status, response.statusText);
-                }
-            } catch (error) {
-                console.error('❌ Errore caricamento file USM:', error);
-            }
-        },
-
-        showUploadModal(fileType) {
-            this.currentFileType = fileType;
-            this.showFileUploadModal = true;
-            this.fileUploadMetadata = {
+            // File upload state
+            uploadingFile: false,
+            showFileUploadModal: false,
+            currentFileType: '',
+            fileUploadMetadata: {
                 title: '',
                 description: '',
                 tavola_number: '',
                 scale_ratio: '',
                 photographer: '',
                 photo_date: ''
-            };
-        },
+            },
 
-        async uploadFile(fileInput) {
-            console.log('uploadFile called with:', fileInput);
-            console.log('currentFileType:', this.currentFileType);
-            console.log('editingUS:', this.editingUS);
-            console.log('editingUSM:', this.editingUSM);
-            
-            // Check if US/USM is saved first
-            const entityId = this.editingUS?.id || this.editingUSM?.id;
-            if (!entityId) {
-                alert('Devi prima salvare la US/USM prima di poter caricare file');
-                this.showFileUploadModal = false;
-                return;
-            }
-            
-            if (!fileInput.files || fileInput.files.length === 0) {
-                alert('Seleziona un file');
-                return;
-            }
+            // Export state (for export component)
+            exportingWord: false,
+            exportingBulk: false,
+            exportStatus: null,
+            showBulkExport: false,
+            selectedUS: [],
+            formType: 'us',  // 'us' or 'usm'
 
-            const file = fileInput.files[0];
-            console.log('File selezionato:', file.name, file.size);
-            
-            this.uploadingFile = true;
+            // ===== INITIALIZATION =====
+            async init() {
+                console.log('US/USM Manager inizializzato per sito:', this.currentSiteId);
+                if (this.currentSiteId) {
+                    await this.loadUSList();
+                    await this.loadUSMList();
 
-            try {
-                let uploadUrl, formData, response;
-                
-                // Handle photo uploads with new API endpoint
-                if (this.currentFileType === 'fotografia') {
-                    // Use new photo upload API
-                    uploadUrl = `/api/v1/sites/${this.currentSiteId}/photos/upload`;
-                    console.log('Photo Upload URL:', uploadUrl);
-                    
-                    // Prepare form data for new endpoint
-                    formData = new FormData();
-                    
-                    // New endpoint expects photos as an array
-                    formData.append('photos', file);
-                    
-                    // Map existing metadata to new archaeological metadata format
-                    const usCode = this.editingUS?.us_code || this.editingUSM?.usm_code || '';
-                    formData.append('inventory_number', usCode);
-                    formData.append('excavation_area', this.editingUS?.area_struttura || this.editingUSM?.area_struttura || '');
-                    // 🔧 CRITICAL FIX: Pass UUID instead of us_code for stratigraphic_unit
-                    formData.append('stratigraphic_unit', entityId); // entityId contains the actual UUID
-                    formData.append('material', 'misc'); // Default material
-                    formData.append('photo_type', 'fotografia');
-                    formData.append('photo_date', this.fileUploadMetadata.photo_date || new Date().toISOString().split('T')[0]);
-                    formData.append('description', this.fileUploadMetadata.description || '');
-                    // Create keywords array from metadata
-                    const keywordsArray = [];
-                    if (this.fileUploadMetadata.photographer) {
-                        keywordsArray.push(`photographer:${this.fileUploadMetadata.photographer}`);
+                    // Check for URL parameters to open specific US/USM
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const usId = urlParams.get('us_id');
+                    const usmId = urlParams.get('usm_id');
+
+                    if (usId) {
+                        this.activeTab = 'us';
+                        // Pass object with id to trigger fetch in openUSModal
+                        await this.openUSModal({ id: usId }, false);
+                    } else if (usmId) {
+                        this.activeTab = 'usm';
+                        // Pass object with id to trigger fetch in openUSMModal
+                        await this.openUSMModal({ id: usmId }, false);
                     }
-                    if (this.fileUploadMetadata.title) {
-                        keywordsArray.push(`title:${this.fileUploadMetadata.title}`);
-                    }
-                    keywordsArray.push(`us_id:${entityId}`);
-                    keywordsArray.push(this.editingUS ? 'us_type:us' : 'us_type:usm');
-                    
-                    formData.append('tags', JSON.stringify(keywordsArray));
-                    
-                    console.log('New API form data prepared');
-                } else {
-                    // Use existing endpoint for non-photo files
-                    const endpoint = this.editingUS ? 'us' : 'usm';
-                    uploadUrl = `/api/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`;
-                    console.log('File Upload URL:', uploadUrl);
-                    
-                    formData = new FormData();
-                    formData.append('file', file);
-                    
-                    // Aggiungi metadati
-                    Object.keys(this.fileUploadMetadata).forEach(key => {
-                        if (this.fileUploadMetadata[key]) {
-                            formData.append(key, this.fileUploadMetadata[key]);
-                            console.log(`Metadata ${key}:`, this.fileUploadMetadata[key]);
+                }
+            },
+
+            // ===== US CRUD OPERATIONS =====
+
+            async loadUSList() {
+                try {
+                    const queryParams = new URLSearchParams({
+                        skip: (this.pagination.currentPage - 1) * this.pagination.itemsPerPage,
+                        limit: this.pagination.itemsPerPage
+                    });
+
+                    if (this.filters.search) queryParams.append('search', this.filters.search);
+                    if (this.filters.dateFrom) queryParams.append('da', this.filters.dateFrom);
+                    if (this.filters.dateTo) queryParams.append('a', this.filters.dateTo);
+
+                    const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us?${queryParams}`, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
                         }
                     });
-                }
-                
-                response = await fetch(uploadUrl, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': this.getCSRFToken()
-                    },
-                    body: formData
-                });
 
-                console.log('Response status:', response.status);
-                console.log('Response ok:', response.ok);
-
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log('Upload successful:', result);
-                    
-                    this.showNotification('File caricato con successo', 'success');
-                    this.showFileUploadModal = false;
-                    
-                    // For photo uploads, we need to reload the files differently
-                    if (this.currentFileType === 'fotografia') {
-                        // The new API doesn't update the same file structure
-                        // We'll need to reload the files using the existing method
-                        if (this.editingUS) {
-                            await this.loadUSFiles(entityId);
-                        } else {
-                            await this.loadUSMFiles(entityId);
-                        }
+                    if (response.ok) {
+                        this.usList = await response.json();
+                        console.log('Lista US caricata:', this.usList.length, 'elementi');
                     } else {
-                        // Ricarica file for other types
-                        if (this.editingUS) {
-                            await this.loadUSFiles(entityId);
-                        } else {
-                            await this.loadUSMFiles(entityId);
-                        }
+                        throw new Error('Errore caricamento US');
                     }
-                } else {
-                    const errorText = await response.text();
-                    console.error('Upload error response:', errorText);
-                    let errorDetail = 'Errore upload';
+                } catch (error) {
+                    console.error('Errore caricamento US:', error);
+                    this.showNotification('Errore nel caricamento delle US', 'error');
+                }
+            },
+
+            async openUSModal(us = null, editMode = true) {
+                console.log('openUSModal called with:', us, editMode);
+                // Close USM modal if open
+                this.showUSMModal = false;
+
+                this.editingUS = us;
+                this.viewingUS = !editMode;
+                this.usErrorMessage = '';
+                this.formType = 'us';  // Set form type for components
+
+                if (us) {
                     try {
-                        const error = JSON.parse(errorText);
-                        errorDetail = error.detail || error.message || errorDetail;
-                    } catch (e) {
-                        errorDetail = errorText;
-                    }
-                    throw new Error(errorDetail);
-                }
-            } catch (error) {
-                console.error('Errore upload file:', error);
-                this.showNotification('Errore caricamento file: ' + error.message, 'error');
-            } finally {
-                this.uploadingFile = false;
-            }
-        },
+                        // Fetch full US details
+                        const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us/${us.id}`);
+                        if (response.ok) {
+                            const usData = await response.json();
 
-        async deleteFile(file, fileType) {
-            if (!confirm('Eliminare questo file?')) {
-                return;
-            }
-
-            try {
-                const entityId = this.editingUS?.id || this.editingUSM?.id;
-                const endpoint = this.editingUS ? 'us' : 'usm';
-                
-                console.log('🗑️ Tentativo eliminazione file:', file.id, 'tipo:', fileType, 'entity:', entityId);
-                
-                const response = await fetch(`/api/us-files/${endpoint}/${entityId}/files/${file.id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': this.getCSRFToken()
+                            // Modalità modifica - popola form
+                            this.usFormData = {
+                                site_id: usData.site_id,
+                                us_code: usData.us_code,
+                                ente_responsabile: usData.ente_responsabile || '',
+                                anno: usData.anno,
+                                ufficio_mic: usData.ufficio_mic || '',
+                                identificativo_rif: usData.identificativo_rif || '',
+                                localita: usData.localita || '',
+                                area_struttura: usData.area_struttura || '',
+                                saggio: usData.saggio || '',
+                                ambiente_unita_funzione: usData.ambiente_unita_funzione || '',
+                                posizione: usData.posizione || '',
+                                settori: usData.settori || '',
+                                piante_riferimenti: usData.piante_riferimenti || '',
+                                prospetti_riferimenti: usData.prospetti_riferimenti || '',
+                                sezioni_riferimenti: usData.sezioni_riferimenti || '',
+                                definizione: usData.definizione || '',
+                                criteri_distinzione: usData.criteri_distinzione || '',
+                                modo_formazione: usData.modo_formazione || '',
+                                componenti_inorganici: usData.componenti_inorganici || '',
+                                componenti_organici: usData.componenti_organici || '',
+                                consistenza: usData.consistenza || '',
+                                colore: usData.colore || '',
+                                misure: usData.misure || '',
+                                stato_conservazione: usData.stato_conservazione || '',
+                                seq_uguale_a: this.sequenzaToString(usData.sequenza_fisica?.uguale_a),
+                                seq_si_lega_a: this.sequenzaToString(usData.sequenza_fisica?.si_lega_a),
+                                seq_gli_si_appoggia: this.sequenzaToString(usData.sequenza_fisica?.gli_si_appoggia),
+                                seq_si_appoggia_a: this.sequenzaToString(usData.sequenza_fisica?.si_appoggia_a),
+                                seq_coperto_da: this.sequenzaToString(usData.sequenza_fisica?.coperto_da),
+                                seq_copre: this.sequenzaToString(usData.sequenza_fisica?.copre),
+                                seq_tagliato_da: this.sequenzaToString(usData.sequenza_fisica?.tagliato_da),
+                                seq_taglia: this.sequenzaToString(usData.sequenza_fisica?.taglia),
+                                seq_riempito_da: this.sequenzaToString(usData.sequenza_fisica?.riempito_da),
+                                seq_riempie: this.sequenzaToString(usData.sequenza_fisica?.riempie),
+                                descrizione: usData.descrizione || '',
+                                osservazioni: usData.osservazioni || '',
+                                interpretazione: usData.interpretazione || '',
+                                datazione: usData.datazione || '',
+                                periodo: usData.periodo || '',
+                                fase: usData.fase || '',
+                                elementi_datanti: usData.elementi_datanti || '',
+                                dati_quantitativi_reperti: usData.dati_quantitativi_reperti || '',
+                                camp_flottazione: usData.campionature?.flottazione || false,
+                                camp_setacciatura: usData.campionature?.setacciatura || false,
+                                affidabilita_stratigrafica: usData.affidabilita_stratigrafica || '',
+                                responsabile_scientifico: usData.responsabile_scientifico || '',
+                                data_rilevamento: usData.data_rilevamento || '',
+                                responsabile_compilazione: usData.responsabile_compilazione || '',
+                                data_rielaborazione: usData.data_rielaborazione || '',
+                                responsabile_rielaborazione: usData.responsabile_rielaborazione || ''
+                            };
+                        } else {
+                            throw new Error('Errore nel caricamento dei dati US');
+                        }
+                    } catch (error) {
+                        console.error('Error fetching US data:', error);
+                        this.showNotification('Errore nel caricamento dei dati US', 'error');
+                        return;
                     }
-                });
-
-                if (response.ok) {
-                    console.log('✅ File eliminato con successo dal server');
-                    
-                    // Ricarica tutti i file dal server per assicurare coerenza
-                    if (this.editingUS) {
-                        await this.loadUSFiles(entityId);
-                    } else {
-                        await this.loadUSMFiles(entityId);
-                    }
-                    
-                    this.showNotification('File eliminato', 'success');
                 } else {
-                    throw new Error('Errore eliminazione');
+                    // Modalità creazione - reset form
+                    this.resetUSForm();
+                    this.usFormData.site_id = this.currentSiteId;
                 }
-            } catch (error) {
-                console.error('❌ Errore eliminazione file:', error);
-                this.showNotification('Errore eliminazione file', 'error');
-            }
-        },
 
-        previewFile(file) {
-            // Apri anteprima in modal o nuova tab
-            console.log('Preview file:', file);
-            
-            if (file.mimetype && file.mimetype.includes('pdf')) {
-                // Per PDF, apri in nuova tab
-                const viewUrl = `/api/us-files/${file.id}/view`;
-                window.open(viewUrl, '_blank');
-            } else if (file.mimetype && file.mimetype.includes('image/')) {
-                // Per immagini, usa thumbnail o view
-                if (file.thumbnail_url) {
-                    window.open(file.thumbnail_url, '_blank');
+                // Load files if editing existing US
+                if (us) {
+                    await this.loadUSFiles(us.id);
                 } else {
-                    const viewUrl = `/api/us-files/${file.id}/view`;
-                    window.open(viewUrl, '_blank');
+                    // Reset files for new US
+                    this.filesData = {
+                        piante: [],
+                        sezioni: [],
+                        prospetti: [],
+                        fotografie: [],
+                        documenti: []
+                    };
                 }
-            } else if (file.mimetype && (file.mimetype.includes('word') || file.mimetype.includes('document'))) {
-                // Per documenti Word, prova ad aprire in nuova tab
-                const viewUrl = `/api/us-files/${file.id}/view`;
-                window.open(viewUrl, '_blank');
-            } else {
-                // Per altri tipi, prova il download
-                this.downloadFile(file);
-            }
-        },
 
-        async downloadFile(file) {
-            window.location.href = `/api/us-files/${file.id}/download`;
-        },
+                this.showUSModal = true;
+            },
 
-        async editFileMetadata(file) {
-            // Implementa modal per editing metadati
-            const newTitle = prompt('Titolo:', file.title || '');
-            if (newTitle !== null) {
+            closeUSModal() {
+                this.showUSModal = false;
+                this.editingUS = null;
+                this.viewingUS = false;
+                this.usErrorMessage = '';
+                this.resetUSForm();
+            },
+
+            async saveUS() {
+                this.usSaving = true;
+                this.usErrorMessage = '';
+
                 try {
-                    const response = await fetch(`/api/files/${file.id}/metadata`, {
-                        method: 'PATCH',
+                    // Debug log to check form data
+                    console.log('Form data before save:', this.usFormData);
+
+                    // Clean up form data - convert empty strings to null for optional fields
+                    const cleanFormData = { ...this.usFormData };
+
+                    // Convert empty strings to null for numeric fields
+                    if (cleanFormData.anno === '' || cleanFormData.anno === null) {
+                        cleanFormData.anno = null;
+                    }
+
+                    // Convert empty strings to null for date fields
+                    if (!cleanFormData.data_rilevamento || cleanFormData.data_rilevamento === '') {
+                        cleanFormData.data_rilevamento = null;
+                    }
+                    if (!cleanFormData.data_rielaborazione || cleanFormData.data_rielaborazione === '') {
+                        cleanFormData.data_rielaborazione = null;
+                    }
+
+                    // Prepara payload con sequenza fisica
+                    const payload = {
+                        ...cleanFormData,
+                        sequenza_fisica: {
+                            uguale_a: this.stringToSequenza(this.usFormData.seq_uguale_a),
+                            si_lega_a: this.stringToSequenza(this.usFormData.seq_si_lega_a),
+                            gli_si_appoggia: this.stringToSequenza(this.usFormData.seq_gli_si_appoggia),
+                            si_appoggia_a: this.stringToSequenza(this.usFormData.seq_si_appoggia_a),
+                            coperto_da: this.stringToSequenza(this.usFormData.seq_coperto_da),
+                            copre: this.stringToSequenza(this.usFormData.seq_copre),
+                            tagliato_da: this.stringToSequenza(this.usFormData.seq_tagliato_da),
+                            taglia: this.stringToSequenza(this.usFormData.seq_taglia),
+                            riempito_da: this.stringToSequenza(this.usFormData.seq_riempito_da),
+                            riempie: this.stringToSequenza(this.usFormData.seq_riempie)
+                        },
+                        campionature: {
+                            flottazione: this.usFormData.camp_flottazione,
+                            setacciatura: this.usFormData.camp_setacciatura
+                        }
+                    };
+
+                    // Debug log to check payload
+                    console.log('Payload being sent:', payload);
+
+                    // Rimuovi campi sequenza temporanei
+                    delete payload.seq_uguale_a;
+                    delete payload.seq_si_lega_a;
+                    delete payload.seq_gli_si_appoggia;
+                    delete payload.seq_si_appoggia_a;
+                    delete payload.seq_coperto_da;
+                    delete payload.seq_copre;
+                    delete payload.seq_tagliato_da;
+                    delete payload.seq_taglia;
+                    delete payload.seq_riempito_da;
+                    delete payload.seq_riempie;
+                    delete payload.camp_flottazione;
+                    delete payload.camp_setacciatura;
+
+                    const url = this.editingUS
+                        ? `/api/v1/us/sites/${this.currentSiteId}/us/${this.editingUS.id}`
+                        : `/api/v1/us/sites/${this.currentSiteId}/us`;
+                    const method = this.editingUS ? 'PUT' : 'POST';
+
+                    const response = await fetch(url, {
+                        method: method,
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRFToken': this.getCSRFToken()
                         },
-                        body: JSON.stringify({ title: newTitle })
+                        body: JSON.stringify(payload)
+                    });
+
+                    console.log('Response status:', response.status);
+                    console.log('Response headers:', response.headers);
+
+                    if (response.ok) {
+                        const savedUS = await response.json();
+                        console.log('US salvata:', savedUS);
+
+                        this.showNotification(
+                            this.editingUS ? 'US aggiornata con successo' : 'US creata con successo',
+                            'success'
+                        );
+
+                        await this.loadUSList();
+                        this.closeUSModal();
+                    } else {
+                        const error = await response.json();
+                        console.error('API Error:', error);
+                        let errorMessage = 'Errore nel salvataggio';
+
+                        if (error.detail) {
+                            if (typeof error.detail === 'string') {
+                                errorMessage = error.detail;
+
+                                // Highlight specific field if error mentions it
+                                if (errorMessage.includes("Campo '")) {
+                                    const fieldNameMatch = errorMessage.match(/Campo '([^']+)'/);
+                                    if (fieldNameMatch) {
+                                        const fieldName = fieldNameMatch[1];
+                                        // Try to find and highlight the field
+                                        setTimeout(() => {
+                                            const fieldElement = document.querySelector(`[x-model*="${fieldName}"]`);
+                                            if (fieldElement) {
+                                                fieldElement.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+                                                setTimeout(() => {
+                                                    fieldElement.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+                                                }, 5000);
+                                            }
+                                        }, 100);
+                                    }
+                                }
+                            } else if (Array.isArray(error.detail)) {
+                                // Handle validation errors array
+                                errorMessage = error.detail.map(err =>
+                                    typeof err === 'object' ? err.msg || JSON.stringify(err) : err
+                                ).join(', ');
+                            } else if (typeof error.detail === 'object') {
+                                errorMessage = JSON.stringify(error.detail);
+                            }
+                        }
+
+                        throw new Error(errorMessage);
+                    }
+                } catch (error) {
+                    console.error('Errore salvataggio US:', error);
+                    this.usErrorMessage = error.message || 'Errore nel salvataggio della US';
+                } finally {
+                    this.usSaving = false;
+                }
+            },
+
+            async deleteUS(usId) {
+                if (!confirm('Sei sicuro di voler eliminare questa US? L\'operazione non può essere annullata.')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us/${usId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
                     });
 
                     if (response.ok) {
-                        file.title = newTitle;
-                        this.showNotification('Metadati aggiornati', 'success');
+                        this.showNotification('US eliminata con successo', 'success');
+                        await this.loadUSList();
+                    } else {
+                        throw new Error('Errore nell\'eliminazione');
                     }
                 } catch (error) {
-                    console.error('Errore aggiornamento metadati:', error);
+                    console.error('Errore eliminazione US:', error);
+                    this.showNotification('Errore nell\'eliminazione della US', 'error');
                 }
-            }
-        },
+            },
 
-        getTotalFilesCount() {
-            return Object.values(this.filesData).reduce((sum, arr) => sum + arr.length, 0);
-        },
+            resetUSForm() {
+                this.usFormData = {
+                    site_id: this.currentSiteId,
+                    us_code: '',
+                    ente_responsabile: '',
+                    anno: null,
+                    ufficio_mic: '',
+                    identificativo_rif: '',
+                    localita: '',
+                    area_struttura: '',
+                    saggio: '',
+                    ambiente_unita_funzione: '',
+                    posizione: '',
+                    settori: '',
+                    piante_riferimenti: '',
+                    prospetti_riferimenti: '',
+                    sezioni_riferimenti: '',
+                    definizione: '',
+                    criteri_distinzione: '',
+                    modo_formazione: '',
+                    componenti_inorganici: '',
+                    componenti_organici: '',
+                    consistenza: '',
+                    colore: '',
+                    misure: '',
+                    stato_conservazione: '',
+                    seq_uguale_a: '',
+                    seq_si_lega_a: '',
+                    seq_gli_si_appoggia: '',
+                    seq_si_appoggia_a: '',
+                    seq_coperto_da: '',
+                    seq_copre: '',
+                    seq_tagliato_da: '',
+                    seq_taglia: '',
+                    seq_riempito_da: '',
+                    seq_riempie: '',
+                    descrizione: '',
+                    osservazioni: '',
+                    interpretazione: '',
+                    datazione: '',
+                    periodo: '',
+                    fase: '',
+                    elementi_datanti: '',
+                    dati_quantitativi_reperti: '',
+                    camp_flottazione: false,
+                    camp_setacciatura: false,
+                    affidabilita_stratigrafica: '',
+                    responsabile_scientifico: '',
+                    data_rilevamento: '',
+                    responsabile_compilazione: '',
+                    data_rielaborazione: '',
+                    responsabile_rielaborazione: ''
+                };
+            },
 
-        getFilesSummaryText() {
-            const counts = [];
-            if (this.filesData.piante.length > 0) counts.push(`${this.filesData.piante.length} piante`);
-            if (this.filesData.sezioni.length > 0) counts.push(`${this.filesData.sezioni.length} sezioni`);
-            if (this.filesData.prospetti.length > 0) counts.push(`${this.filesData.prospetti.length} prospetti`);
-            if (this.filesData.fotografie.length > 0) counts.push(`${this.filesData.fotografie.length} foto`);
-            if (this.filesData.documenti.length > 0) counts.push(`${this.filesData.documenti.length} doc`);
-            return counts.join(', ');
-        },
+            // ===== USM CRUD OPERATIONS =====
 
-        getDocumentIcon(mimetype) {
-            if (!mimetype) return 'fas fa-file';
-            if (mimetype.includes('pdf')) return 'fas fa-file-pdf';
-            if (mimetype.includes('word')) return 'fas fa-file-word';
-            return 'fas fa-file';
-        },
+            async loadUSMList() {
+                try {
+                    const queryParams = new URLSearchParams({
+                        skip: (this.pagination.currentPage - 1) * this.pagination.itemsPerPage,
+                        limit: this.pagination.itemsPerPage
+                    });
 
-        formatFileSize(bytes) {
-            if (!bytes) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-        },
+                    if (this.filters.search) queryParams.append('search', this.filters.search);
 
-        // ===== EXPORT WORD METHODS =====
+                    const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm?${queryParams}`, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
+                    });
 
-        async exportUSWord() {
-            if (!this.editingUS && !this.usFormData.us_code) {
-                this.showExportStatus('error', 'Salva prima la US per esportarla');
-                return;
-            }
+                    if (response.ok) {
+                        this.usmList = await response.json();
+                        console.log('Lista USM caricata:', this.usmList.length, 'elementi');
+                    } else {
+                        throw new Error('Errore caricamento USM');
+                    }
+                } catch (error) {
+                    console.error('Errore caricamento USM:', error);
+                    this.showNotification('Errore nel caricamento delle USM', 'error');
+                }
+            },
 
-            this.exportingWord = true;
-            this.exportStatus = null;
+            async openUSMModal(usm = null, editMode = true) {
+                console.log('openUSMModal called with:', usm, editMode);
+                // Close US modal if open
+                this.showUSModal = false;
 
-            try {
-                const usId = this.editingUS?.id;
-                const response = await fetch(`/api/us-export/us/${usId}/word`, {
-                    method: 'GET',
-                    headers: {
-                        'X-CSRFToken': this.getCSRFToken()
+                this.editingUSM = usm;
+                this.viewingUSM = !editMode;
+                this.usmErrorMessage = '';
+                this.formType = 'usm';  // Set form type for components
+
+                if (usm) {
+                    try {
+                        // Fetch full USM details
+                        const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm/${usm.id}`);
+                        if (response.ok) {
+                            const usmData = await response.json();
+                            console.log('USM data loaded from backend:', usmData);
+                            console.log('data_rilevamento from backend:', usmData.data_rilevamento);
+                            console.log('data_rielaborazione from backend:', usmData.data_rielaborazione);
+
+                            // Modalità modifica
+                            this.usmFormData = {
+                                site_id: usmData.site_id,
+                                usm_code: usmData.usm_code,
+                                ente_responsabile: usmData.ente_responsabile || '',
+                                anno: usmData.anno,
+                                ufficio_mic: usmData.ufficio_mic || '',
+                                identificativo_rif: usmData.identificativo_rif || '',
+                                localita: usmData.localita || '',
+                                area_struttura: usmData.area_struttura || '',
+                                saggio: usmData.saggio || '',
+                                ambiente_unita_funzione: usmData.ambiente_unita_funzione || '',
+                                posizione: usmData.posizione || '',
+                                settori: usmData.settori || '',
+                                piante: usmData.piante || '',
+                                prospetti: usmData.prospetti || '',
+                                sezioni: usmData.sezioni || '',
+                                misure: usmData.misure || '',
+                                superficie_analizzata: usmData.superficie_analizzata,
+                                definizione: usmData.definizione || '',
+                                tecnica_costruttiva: usmData.tecnica_costruttiva || '',
+                                sezione_muraria_visibile: usmData.sezione_muraria_visibile || false,
+                                sezione_muraria_tipo: usmData.sezione_muraria_tipo || '',
+                                sezione_muraria_spessore: usmData.sezione_muraria_spessore || '',
+                                funzione_statica: usmData.funzione_statica || '',
+                                modulo: usmData.modulo || '',
+                                criteri_distinzione: usmData.criteri_distinzione || '',
+                                provenienza_materiali: usmData.provenienza_materiali || '',
+                                orientamento: usmData.orientamento || '',
+                                uso_primario: usmData.uso_primario || '',
+                                riutilizzo: usmData.riutilizzo || '',
+                                stato_conservazione: usmData.stato_conservazione || '',
+                                // Materiali laterizi
+                                lat_mattoni: usmData.materiali_laterizi?.tipo?.includes('mattoni') || false,
+                                lat_tegole: usmData.materiali_laterizi?.tipo?.includes('tegole') || false,
+                                lat_embrici: usmData.materiali_laterizi?.tipo?.includes('embrici') || false,
+                                lat_altro: usmData.materiali_laterizi?.tipo?.includes('altro') || false,
+                                lat_crudi: usmData.materiali_laterizi?.consistenza?.includes('crudi') || false,
+                                lat_cotti: usmData.materiali_laterizi?.consistenza?.includes('cotti') || false,
+                                lat_cotti_sole: usmData.materiali_laterizi?.consistenza?.includes('cotti_sole') || false,
+                                lat_semifusi: usmData.materiali_laterizi?.consistenza?.includes('semifusi') || false,
+                                // Elementi litici
+                                lit_tufo: usmData.materiali_elementi_litici?.litotipi?.includes('tufo') || false,
+                                lit_calcare: usmData.materiali_elementi_litici?.litotipi?.includes('calcare') || false,
+                                lit_arenaria: usmData.materiali_elementi_litici?.litotipi?.includes('arenaria') || false,
+                                lit_altro: usmData.materiali_elementi_litici?.litotipi?.includes('altro') || false,
+                                lit_sfaldati: usmData.materiali_elementi_litici?.lavorazione?.includes('sfaldati') || false,
+                                lit_spaccati: usmData.materiali_elementi_litici?.lavorazione?.includes('spaccati') || false,
+                                lit_sbozzati: usmData.materiali_elementi_litici?.lavorazione?.includes('sbozzati') || false,
+                                lit_squadrati: usmData.materiali_elementi_litici?.lavorazione?.includes('squadrati') || false,
+                                lit_spianati: usmData.materiali_elementi_litici?.lavorazione?.includes('spianati') || false,
+                                lit_bugnati: usmData.materiali_elementi_litici?.lavorazione?.includes('bugnati') || false,
+                                materiali_altro: usmData.materiali_altro || '',
+                                legante_tipo: usmData.legante?.tipo || '',
+                                legante_consistenza: usmData.legante?.consistenza || '',
+                                legante_altro: usmData.legante_altro || '',
+                                finiture_elementi_particolari: usmData.finiture_elementi_particolari || '',
+                                seq_uguale_a: this.sequenzaToString(usmData.sequenza_fisica?.uguale_a),
+                                seq_si_lega_a: this.sequenzaToString(usmData.sequenza_fisica?.si_lega_a),
+                                seq_gli_si_appoggia: this.sequenzaToString(usmData.sequenza_fisica?.gli_si_appoggia),
+                                seq_si_appoggia_a: this.sequenzaToString(usmData.sequenza_fisica?.si_appoggia_a),
+                                seq_coperto_da: this.sequenzaToString(usmData.sequenza_fisica?.coperto_da),
+                                seq_copre: this.sequenzaToString(usmData.sequenza_fisica?.copre),
+                                seq_tagliato_da: this.sequenzaToString(usmData.sequenza_fisica?.tagliato_da),
+                                seq_taglia: this.sequenzaToString(usmData.sequenza_fisica?.taglia),
+                                seq_riempito_da: this.sequenzaToString(usmData.sequenza_fisica?.riempito_da),
+                                seq_riempie: this.sequenzaToString(usmData.sequenza_fisica?.riempie),
+                                descrizione: usmData.descrizione || '',
+                                osservazioni: usmData.osservazioni || '',
+                                interpretazione: usmData.interpretazione || '',
+                                datazione: usmData.datazione || '',
+                                periodo: usmData.periodo || '',
+                                fase: usmData.fase || '',
+                                elementi_datanti: usmData.elementi_datanti || '',
+                                camp_elementi_litici: usmData.campionature?.elementi_litici || false,
+                                camp_laterizi: usmData.campionature?.laterizi || false,
+                                camp_malta: usmData.campionature?.malta || false,
+                                affidabilita_stratigrafica: usmData.affidabilita_stratigrafica || '',
+                                responsabile_scientifico: usmData.responsabile_scientifico || '',
+                                data_rilevamento: usmData.data_rilevamento || '',
+                                responsabile_compilazione: usmData.responsabile_compilazione || '',
+                                data_rielaborazione: usmData.data_rielaborazione || '',
+                                responsabile_rielaborazione: usmData.responsabile_rielaborazione || ''
+                            };
+                        } else {
+                            throw new Error('Errore nel caricamento dei dati USM');
+                        }
+                    } catch (error) {
+                        console.error('Error fetching USM data:', error);
+                        this.showNotification('Errore nel caricamento dei dati USM', 'error');
+                        return;
+                    }
+                } else {
+                    // Modalità creazione
+                    this.resetUSMForm();
+                    this.usmFormData.site_id = this.currentSiteId;
+                }
+
+                // Load files if editing existing USM
+                if (usm) {
+                    await this.loadUSMFiles(usm.id);
+                } else {
+                    // Reset files for new USM
+                    this.filesData = {
+                        piante: [],
+                        sezioni: [],
+                        prospetti: [],
+                        fotografie: [],
+                        documenti: []
+                    };
+                }
+
+                this.showUSMModal = true;
+            },
+
+            closeUSMModal() {
+                this.showUSMModal = false;
+                this.editingUSM = null;
+                this.viewingUSM = false;
+                this.usmErrorMessage = '';
+                this.resetUSMForm();
+            },
+
+            async saveUSM() {
+                this.usmSaving = true;
+                this.usmErrorMessage = '';
+
+                try {
+                    // Debug log to check form data
+                    console.log('USM Form data before save:', this.usmFormData);
+
+                    // Clean up form data - convert empty strings to null for optional fields
+                    const cleanFormData = { ...this.usmFormData };
+
+                    // Convert empty strings to null for numeric fields
+                    if (cleanFormData.anno === '' || cleanFormData.anno === null) {
+                        cleanFormData.anno = null;
+                    }
+                    if (cleanFormData.superficie_analizzata === '' || cleanFormData.superficie_analizzata === null) {
+                        cleanFormData.superficie_analizzata = null;
+                    }
+
+                    // Convert empty strings to null for date fields
+                    if (!cleanFormData.data_rilevamento || cleanFormData.data_rilevamento === '') {
+                        cleanFormData.data_rilevamento = null;
+                    }
+                    if (!cleanFormData.data_rielaborazione || cleanFormData.data_rielaborazione === '') {
+                        cleanFormData.data_rielaborazione = null;
+                    }
+
+                    // Prepara payload completo
+                    const payload = {
+                        ...cleanFormData,
+                        materiali_laterizi: {
+                            tipo: [
+                                this.usmFormData.lat_mattoni ? 'mattoni' : null,
+                                this.usmFormData.lat_tegole ? 'tegole' : null,
+                                this.usmFormData.lat_embrici ? 'embrici' : null,
+                                this.usmFormData.lat_altro ? 'altro' : null
+                            ].filter(Boolean),
+                            consistenza: [
+                                this.usmFormData.lat_crudi ? 'crudi' : null,
+                                this.usmFormData.lat_cotti ? 'cotti' : null,
+                                this.usmFormData.lat_cotti_sole ? 'cotti_sole' : null,
+                                this.usmFormData.lat_semifusi ? 'semifusi' : null
+                            ].filter(Boolean)
+                        },
+                        materiali_elementi_litici: {
+                            litotipi: [
+                                this.usmFormData.lit_tufo ? 'tufo' : null,
+                                this.usmFormData.lit_calcare ? 'calcare' : null,
+                                this.usmFormData.lit_arenaria ? 'arenaria' : null,
+                                this.usmFormData.lit_altro ? 'altro' : null
+                            ].filter(Boolean),
+                            lavorazione: [
+                                this.usmFormData.lit_sfaldati ? 'sfaldati' : null,
+                                this.usmFormData.lit_spaccati ? 'spaccati' : null,
+                                this.usmFormData.lit_sbozzati ? 'sbozzati' : null,
+                                this.usmFormData.lit_squadrati ? 'squadrati' : null,
+                                this.usmFormData.lit_spianati ? 'spianati' : null,
+                                this.usmFormData.lit_bugnati ? 'bugnati' : null
+                            ].filter(Boolean)
+                        },
+                        legante: {
+                            tipo: this.usmFormData.legante_tipo,
+                            consistenza: this.usmFormData.legante_consistenza
+                        },
+                        sequenza_fisica: {
+                            uguale_a: this.stringToSequenza(this.usmFormData.seq_uguale_a),
+                            si_lega_a: this.stringToSequenza(this.usmFormData.seq_si_lega_a),
+                            gli_si_appoggia: this.stringToSequenza(this.usmFormData.seq_gli_si_appoggia),
+                            si_appoggia_a: this.stringToSequenza(this.usmFormData.seq_si_appoggia_a),
+                            coperto_da: this.stringToSequenza(this.usmFormData.seq_coperto_da),
+                            copre: this.stringToSequenza(this.usmFormData.seq_copre),
+                            tagliato_da: this.stringToSequenza(this.usmFormData.seq_tagliato_da),
+                            taglia: this.stringToSequenza(this.usmFormData.seq_taglia),
+                            riempito_da: this.stringToSequenza(this.usmFormData.seq_riempito_da),
+                            riempie: this.stringToSequenza(this.usmFormData.seq_riempie)
+                        },
+                        campionature: {
+                            elementi_litici: this.usmFormData.camp_elementi_litici,
+                            laterizi: this.usmFormData.camp_laterizi,
+                            malta: this.usmFormData.camp_malta
+                        }
+                    };
+
+                    // Debug log to check payload BEFORE cleanup
+                    console.log('USM Payload BEFORE cleanup:', JSON.parse(JSON.stringify(payload)));
+                    console.log('data_rilevamento in payload BEFORE cleanup:', payload.data_rilevamento);
+                    console.log('data_rielaborazione in payload BEFORE cleanup:', payload.data_rielaborazione);
+
+                    // Rimuovi campi temporanei
+                    const tempFields = [
+                        'lat_mattoni', 'lat_tegole', 'lat_embrici', 'lat_altro',
+                        'lat_crudi', 'lat_cotti', 'lat_cotti_sole', 'lat_semifusi',
+                        'lit_tufo', 'lit_calcare', 'lit_arenaria', 'lit_altro',
+                        'lit_sfaldati', 'lit_spaccati', 'lit_sbozzati', 'lit_squadrati', 'lit_spianati', 'lit_bugnati',
+                        'legante_tipo', 'legante_consistenza',
+                        'seq_uguale_a', 'seq_si_lega_a', 'seq_gli_si_appoggia', 'seq_si_appoggia_a',
+                        'seq_coperto_da', 'seq_copre', 'seq_tagliato_da', 'seq_taglia',
+                        'seq_riempito_da', 'seq_riempie',
+                        'camp_elementi_litici', 'camp_laterizi', 'camp_malta'
+                    ];
+
+                    tempFields.forEach(field => delete payload[field]);
+
+                    // Debug log to check payload AFTER cleanup
+                    console.log('USM Payload AFTER cleanup:', JSON.parse(JSON.stringify(payload)));
+                    console.log('data_rilevamento in payload AFTER cleanup:', payload.data_rilevamento);
+                    console.log('data_rielaborazione in payload AFTER cleanup:', payload.data_rielaborazione);
+
+                    const url = this.editingUSM
+                        ? `/api/v1/us/sites/${this.currentSiteId}/usm/${this.editingUSM.id}`
+                        : `/api/v1/us/sites/${this.currentSiteId}/usm`;
+                    const method = this.editingUSM ? 'PUT' : 'POST';
+
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    console.log('USM Response status:', response.status);
+                    console.log('USM Response headers:', response.headers);
+
+                    if (response.ok) {
+                        const savedUSM = await response.json();
+                        console.log('USM salvata con successo:', savedUSM);
+                        console.log('data_rilevamento salvata:', savedUSM.data_rilevamento);
+                        console.log('data_rielaborazione salvata:', savedUSM.data_rielaborazione);
+
+                        this.showNotification(
+                            this.editingUSM ? 'USM aggiornata con successo' : 'USM creata con successo',
+                            'success'
+                        );
+
+                        await this.loadUSMList();
+                        console.log('Lista USM ricaricata dopo salvataggio');
+                        this.closeUSMModal();
+                    } else {
+                        const error = await response.json();
+                        console.error('API Error:', error);
+                        let errorMessage = 'Errore nel salvataggio';
+
+                        if (error.detail) {
+                            if (typeof error.detail === 'string') {
+                                errorMessage = error.detail;
+
+                                // Highlight specific field if error mentions it
+                                if (errorMessage.includes("Campo '")) {
+                                    const fieldNameMatch = errorMessage.match(/Campo '([^']+)'/);
+                                    if (fieldNameMatch) {
+                                        const fieldName = fieldNameMatch[1];
+                                        // Try to find and highlight the field
+                                        setTimeout(() => {
+                                            const fieldElement = document.querySelector(`[x-model*="${fieldName}"]`);
+                                            if (fieldElement) {
+                                                fieldElement.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+                                                setTimeout(() => {
+                                                    fieldElement.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+                                                }, 5000);
+                                            }
+                                        }, 100);
+                                    }
+                                }
+                            } else if (Array.isArray(error.detail)) {
+                                // Handle validation errors array
+                                errorMessage = error.detail.map(err =>
+                                    typeof err === 'object' ? err.msg || JSON.stringify(err) : err
+                                ).join(', ');
+                            } else if (typeof error.detail === 'object') {
+                                errorMessage = JSON.stringify(error.detail);
+                            }
+                        }
+
+                        throw new Error(errorMessage);
+                    }
+                } catch (error) {
+                    console.error('Errore salvataggio USM:', error);
+                    this.usmErrorMessage = error.message || 'Errore nel salvataggio della USM';
+                } finally {
+                    this.usmSaving = false;
+                }
+            },
+
+            async deleteUSM(usmId) {
+                if (!confirm('Sei sicuro di voler eliminare questa USM? L\'operazione non può essere annullata.')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm/${usmId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
+                    });
+
+                    if (response.ok) {
+                        this.showNotification('USM eliminata con successo', 'success');
+                        await this.loadUSMList();
+                    } else {
+                        throw new Error('Errore nell\'eliminazione');
+                    }
+                } catch (error) {
+                    console.error('Errore eliminazione USM:', error);
+                    this.showNotification('Errore nell\'eliminazione della USM', 'error');
+                }
+            },
+
+            resetUSMForm() {
+                Object.keys(this.usmFormData).forEach(key => {
+                    if (typeof this.usmFormData[key] === 'boolean') {
+                        this.usmFormData[key] = false;
+                    } else if (typeof this.usmFormData[key] === 'number') {
+                        this.usmFormData[key] = null;
+                    } else {
+                        this.usmFormData[key] = '';
                     }
                 });
+                this.usmFormData.site_id = this.currentSiteId;
+            },
 
-                if (response.ok) {
-                    const blob = await response.blob();
-                    this.downloadBlob(blob, response.headers.get('Content-Disposition'));
-                    this.showExportStatus('success', 'Documento Word generato');
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Errore export');
+            // ===== UTILITY FUNCTIONS =====
+
+            sequenzaToString(arr) {
+                return Array.isArray(arr) ? arr.join(', ') : '';
+            },
+
+            stringToSequenza(str) {
+                if (!str) return [];
+                return str.split(',').map(s => s.trim()).filter(Boolean);
+            },
+
+            getCSRFToken() {
+                return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+            },
+
+            showNotification(message, type = 'info') {
+                // Implementa sistema notifiche (toast)
+                console.log(`[${type.toUpperCase()}] ${message}`);
+
+                // Esempio con alert temporaneo
+                if (type === 'error') {
+                    alert('❌ ' + message);
+                } else if (type === 'success') {
+                    alert('✅ ' + message);
                 }
-            } catch (error) {
-                console.error('Errore export US Word:', error);
-                this.showExportStatus('error', 'Errore: ' + error.message);
-            } finally {
-                this.exportingWord = false;
-            }
-        },
+            },
 
-        async exportUSMWord() {
-            if (!this.editingUSM && !this.usmFormData.usm_code) {
-                this.showExportStatus('error', 'Salva prima la USM per esportarla');
-                return;
-            }
+            formatDate(dateString) {
+                if (!dateString) return '-';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('it-IT');
+            },
 
-            this.exportingWord = true;
-            this.exportStatus = null;
+            // ===== FILE MANAGEMENT METHODS =====
 
-            try {
-                const usmId = this.editingUSM?.id;
-                const response = await fetch(`/api/us-export/usm/${usmId}/word`, {
-                    method: 'GET',
-                    headers: {
-                        'X-CSRFToken': this.getCSRFToken()
+            async loadUSFiles(usId) {
+                try {
+                    console.log('🔄 Caricamento file US:', usId);
+                    const response = await fetch(`/api/us-files/us/${usId}/files/summary`);
+                    console.log('📡 Response status:', response.status);
+
+                    if (response.ok) {
+                        const filesSummary = await response.json();
+                        console.log('📄 Files Summary ricevuto:', filesSummary);
+                        console.log('📊 Totale files trovati:', filesSummary.summary?.total || 0);
+
+                        this.filesData = {
+                            piante: filesSummary.summary.piante || [],
+                            sezioni: filesSummary.summary.sezioni || [],
+                            prospetti: filesSummary.summary.prospetti || [],
+                            fotografie: filesSummary.summary.fotografie || [],
+                            documenti: filesSummary.summary.documenti || []
+                        };
+
+                        console.log('💾 filesData aggiornato:', this.filesData);
+                    } else {
+                        console.error('❌ Response non OK:', response.status, response.statusText);
                     }
-                });
+                } catch (error) {
+                    console.error('❌ Errore caricamento file US:', error);
+                }
+            },
 
-                if (response.ok) {
-                    const blob = await response.blob();
-                    this.downloadBlob(blob, response.headers.get('Content-Disposition'));
-                    this.showExportStatus('success', 'Documento USM Word scaricato');
+            async loadUSMFiles(usmId) {
+                try {
+                    console.log('🔄 Caricamento file USM:', usmId);
+                    const response = await fetch(`/api/us-files/usm/${usmId}/files/summary`);
+                    console.log('📡 USM Response status:', response.status);
+
+                    if (response.ok) {
+                        const filesSummary = await response.json();
+                        console.log('📄 USM Files Summary ricevuto:', filesSummary);
+                        console.log('📊 Totale files USM trovati:', filesSummary.summary?.total || 0);
+
+                        this.filesData = {
+                            piante: filesSummary.summary.piante || [],
+                            sezioni: filesSummary.summary.sezioni || [],
+                            prospetti: filesSummary.summary.prospetti || [],
+                            fotografie: filesSummary.summary.fotografie || [],
+                            documenti: filesSummary.summary.documenti || []
+                        };
+
+                        console.log('💾 USM filesData aggiornato:', this.filesData);
+                    } else {
+                        console.error('❌ USM Response non OK:', response.status, response.statusText);
+                    }
+                } catch (error) {
+                    console.error('❌ Errore caricamento file USM:', error);
+                }
+            },
+
+            showUploadModal(fileType) {
+                this.currentFileType = fileType;
+                this.showFileUploadModal = true;
+                this.fileUploadMetadata = {
+                    title: '',
+                    description: '',
+                    tavola_number: '',
+                    scale_ratio: '',
+                    photographer: '',
+                    photo_date: ''
+                };
+            },
+
+            async uploadFile(fileInput) {
+                console.log('uploadFile called with:', fileInput);
+                console.log('currentFileType:', this.currentFileType);
+                console.log('editingUS:', this.editingUS);
+                console.log('editingUSM:', this.editingUSM);
+
+                // Check if US/USM is saved first
+                const entityId = this.editingUS?.id || this.editingUSM?.id;
+                if (!entityId) {
+                    alert('Devi prima salvare la US/USM prima di poter caricare file');
+                    this.showFileUploadModal = false;
+                    return;
+                }
+
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    alert('Seleziona un file');
+                    return;
+                }
+
+                const file = fileInput.files[0];
+                console.log('File selezionato:', file.name, file.size);
+
+                this.uploadingFile = true;
+
+                try {
+                    let uploadUrl, formData, response;
+
+                    // Handle photo uploads with new API endpoint
+                    if (this.currentFileType === 'fotografia') {
+                        // Use new photo upload API
+                        uploadUrl = `/api/v1/sites/${this.currentSiteId}/photos/upload`;
+                        console.log('Photo Upload URL:', uploadUrl);
+
+                        // Prepare form data for new endpoint
+                        formData = new FormData();
+
+                        // New endpoint expects photos as an array
+                        formData.append('photos', file);
+
+                        // Map existing metadata to new archaeological metadata format
+                        const usCode = this.editingUS?.us_code || this.editingUSM?.usm_code || '';
+                        formData.append('inventory_number', usCode);
+                        formData.append('excavation_area', this.editingUS?.area_struttura || this.editingUSM?.area_struttura || '');
+                        // 🔧 CRITICAL FIX: Pass UUID instead of us_code for stratigraphic_unit
+                        formData.append('stratigraphic_unit', entityId); // entityId contains the actual UUID
+                        formData.append('material', 'misc'); // Default material
+                        formData.append('photo_type', 'fotografia');
+                        formData.append('photo_date', this.fileUploadMetadata.photo_date || new Date().toISOString().split('T')[0]);
+                        formData.append('description', this.fileUploadMetadata.description || '');
+                        // Create keywords array from metadata
+                        const keywordsArray = [];
+                        if (this.fileUploadMetadata.photographer) {
+                            keywordsArray.push(`photographer:${this.fileUploadMetadata.photographer}`);
+                        }
+                        if (this.fileUploadMetadata.title) {
+                            keywordsArray.push(`title:${this.fileUploadMetadata.title}`);
+                        }
+                        keywordsArray.push(`us_id:${entityId}`);
+                        keywordsArray.push(this.editingUS ? 'us_type:us' : 'us_type:usm');
+
+                        formData.append('tags', JSON.stringify(keywordsArray));
+
+                        console.log('New API form data prepared');
+                    } else {
+                        // Use existing endpoint for non-photo files
+                        const endpoint = this.editingUS ? 'us' : 'usm';
+                        uploadUrl = `/api/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`;
+                        console.log('File Upload URL:', uploadUrl);
+
+                        formData = new FormData();
+                        formData.append('file', file);
+
+                        // Aggiungi metadati
+                        Object.keys(this.fileUploadMetadata).forEach(key => {
+                            if (this.fileUploadMetadata[key]) {
+                                formData.append(key, this.fileUploadMetadata[key]);
+                                console.log(`Metadata ${key}:`, this.fileUploadMetadata[key]);
+                            }
+                        });
+                    }
+
+                    response = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': this.getCSRFToken()
+                        },
+                        body: formData
+                    });
+
+                    console.log('Response status:', response.status);
+                    console.log('Response ok:', response.ok);
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        console.log('Upload successful:', result);
+
+                        this.showNotification('File caricato con successo', 'success');
+                        this.showFileUploadModal = false;
+
+                        // For photo uploads, we need to reload the files differently
+                        if (this.currentFileType === 'fotografia') {
+                            // The new API doesn't update the same file structure
+                            // We'll need to reload the files using the existing method
+                            if (this.editingUS) {
+                                await this.loadUSFiles(entityId);
+                            } else {
+                                await this.loadUSMFiles(entityId);
+                            }
+                        } else {
+                            // Ricarica file for other types
+                            if (this.editingUS) {
+                                await this.loadUSFiles(entityId);
+                            } else {
+                                await this.loadUSMFiles(entityId);
+                            }
+                        }
+                    } else {
+                        const errorText = await response.text();
+                        console.error('Upload error response:', errorText);
+                        let errorDetail = 'Errore upload';
+                        try {
+                            const error = JSON.parse(errorText);
+                            errorDetail = error.detail || error.message || errorDetail;
+                        } catch (e) {
+                            errorDetail = errorText;
+                        }
+                        throw new Error(errorDetail);
+                    }
+                } catch (error) {
+                    console.error('Errore upload file:', error);
+                    this.showNotification('Errore caricamento file: ' + error.message, 'error');
+                } finally {
+                    this.uploadingFile = false;
+                }
+            },
+
+            async deleteFile(file, fileType) {
+                if (!confirm('Eliminare questo file?')) {
+                    return;
+                }
+
+                try {
+                    const entityId = this.editingUS?.id || this.editingUSM?.id;
+                    const endpoint = this.editingUS ? 'us' : 'usm';
+
+                    console.log('🗑️ Tentativo eliminazione file:', file.id, 'tipo:', fileType, 'entity:', entityId);
+
+                    const response = await fetch(`/api/us-files/${endpoint}/${entityId}/files/${file.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
+                    });
+
+                    if (response.ok) {
+                        console.log('✅ File eliminato con successo dal server');
+
+                        // Ricarica tutti i file dal server per assicurare coerenza
+                        if (this.editingUS) {
+                            await this.loadUSFiles(entityId);
+                        } else {
+                            await this.loadUSMFiles(entityId);
+                        }
+
+                        this.showNotification('File eliminato', 'success');
+                    } else {
+                        throw new Error('Errore eliminazione');
+                    }
+                } catch (error) {
+                    console.error('❌ Errore eliminazione file:', error);
+                    this.showNotification('Errore eliminazione file', 'error');
+                }
+            },
+
+            previewFile(file) {
+                // Apri anteprima in modal o nuova tab
+                console.log('Preview file:', file);
+
+                if (file.mimetype && file.mimetype.includes('pdf')) {
+                    // Per PDF, apri in nuova tab
+                    const viewUrl = `/api/us-files/${file.id}/view`;
+                    window.open(viewUrl, '_blank');
+                } else if (file.mimetype && file.mimetype.includes('image/')) {
+                    // Per immagini, usa thumbnail o view
+                    if (file.thumbnail_url) {
+                        window.open(file.thumbnail_url, '_blank');
+                    } else {
+                        const viewUrl = `/api/us-files/${file.id}/view`;
+                        window.open(viewUrl, '_blank');
+                    }
+                } else if (file.mimetype && (file.mimetype.includes('word') || file.mimetype.includes('document'))) {
+                    // Per documenti Word, prova ad aprire in nuova tab
+                    const viewUrl = `/api/us-files/${file.id}/view`;
+                    window.open(viewUrl, '_blank');
                 } else {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Errore export USM');
+                    // Per altri tipi, prova il download
+                    this.downloadFile(file);
                 }
-            } catch (error) {
-                console.error('Errore export USM:', error);
-                this.showExportStatus('error', 'Errore: ' + error.message);
-            } finally {
-                this.exportingWord = false;
-            }
-        },
+            },
 
-        downloadBlob(blob, contentDispositionHeader) {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
+            async downloadFile(file) {
+                window.location.href = `/api/us-files/${file.id}/download`;
+            },
 
-            let filename = 'SchediArcheologiche.docx';
-            if (contentDispositionHeader) {
-                const match = contentDispositionHeader.match(/filename=(.+)/);
-                if (match) filename = match[1].replace(/"/g, '');
-            }
+            async editFileMetadata(file) {
+                // Implementa modal per editing metadati
+                const newTitle = prompt('Titolo:', file.title || '');
+                if (newTitle !== null) {
+                    try {
+                        const response = await fetch(`/api/files/${file.id}/metadata`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': this.getCSRFToken()
+                            },
+                            body: JSON.stringify({ title: newTitle })
+                        });
 
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        },
-
-        showExportStatus(type, message) {
-            this.exportStatus = { type, message };
-
-            setTimeout(() => {
-                if (this.exportStatus && this.exportStatus.message === message) {
-                    this.exportStatus = null;
+                        if (response.ok) {
+                            file.title = newTitle;
+                            this.showNotification('Metadati aggiornati', 'success');
+                        }
+                    } catch (error) {
+                        console.error('Errore aggiornamento metadati:', error);
+                    }
                 }
-            }, 5000);
-        },
+            },
 
-        previewWordStructure() {
-            alert('Funzione anteprima in sviluppo');
-        },
+            getTotalFilesCount() {
+                return Object.values(this.filesData).reduce((sum, arr) => sum + arr.length, 0);
+            },
 
-        // ===== EXPORT DATA METHODS =====
-        
-        exportUSData() {
-            const allData = [
-                ...this.usList.map(us => ({
-                    tipo: 'US',
-                    codice: us.us_code,
-                    definizione: us.definizione || '',
-                    localita: us.localita || '',
-                    data_rilevamento: this.formatDate(us.data_rilevamento),
-                    responsabile: us.responsabile_compilazione || '',
-                    affidabilita: us.affidabilita_stratigrafica || '',
-                    aggiornato_il: this.formatDate(us.updated_at)
-                })),
-                ...this.usmList.map(usm => ({
-                    tipo: 'USM',
-                    codice: usm.usm_code,
-                    definizione: usm.definizione || '',
-                    localita: usm.localita || '',
-                    data_rilevamento: this.formatDate(usm.data_rilevamento),
-                    responsabile: usm.responsabile_compilazione || '',
-                    affidabilita: usm.affidabilita_stratigrafica || '',
-                    aggiornato_il: this.formatDate(usm.updated_at)
-                }))
-            ];
+            getFilesSummaryText() {
+                const counts = [];
+                if (this.filesData.piante.length > 0) counts.push(`${this.filesData.piante.length} piante`);
+                if (this.filesData.sezioni.length > 0) counts.push(`${this.filesData.sezioni.length} sezioni`);
+                if (this.filesData.prospetti.length > 0) counts.push(`${this.filesData.prospetti.length} prospetti`);
+                if (this.filesData.fotografie.length > 0) counts.push(`${this.filesData.fotografie.length} foto`);
+                if (this.filesData.documenti.length > 0) counts.push(`${this.filesData.documenti.length} doc`);
+                return counts.join(', ');
+            },
 
-            const headers = ['Tipo', 'Codice', 'Definizione', 'Località', 'Data Rilevamento', 'Responsabile', 'Affidabilità', 'Aggiornato il'];
-            const csvContent = [
-                headers.join(','),
-                ...allData.map(item => [
-                    item.tipo,
-                    item.codice,
-                    item.definizione,
-                    item.localita,
-                    item.data_rilevamento,
-                    item.responsabile,
-                    item.affidabilita,
-                    item.aggiornato_il
-                ].map(field => `"${field}"`).join(','))
-            ].join('\n');
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `us_usm_export_${new Date().toISOString().split('T')[0]}.csv`;
-            link.click();
-            
-            this.showNotification('Dati US/USM esportati con successo', 'success');
+            getDocumentIcon(mimetype) {
+                if (!mimetype) return 'fas fa-file';
+                if (mimetype.includes('pdf')) return 'fas fa-file-pdf';
+                if (mimetype.includes('word')) return 'fas fa-file-word';
+                return 'fas fa-file';
+            },
+
+            formatFileSize(bytes) {
+                if (!bytes) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+            },
+
+            // ===== EXPORT WORD METHODS =====
+
+            async exportUSWord() {
+                if (!this.editingUS && !this.usFormData.us_code) {
+                    this.showExportStatus('error', 'Salva prima la US per esportarla');
+                    return;
+                }
+
+                this.exportingWord = true;
+                this.exportStatus = null;
+
+                try {
+                    const usId = this.editingUS?.id;
+                    const response = await fetch(`/api/us-export/us/${usId}/word`, {
+                        method: 'GET',
+                        headers: {
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
+                    });
+
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        this.downloadBlob(blob, response.headers.get('Content-Disposition'));
+                        this.showExportStatus('success', 'Documento Word generato');
+                    } else {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Errore export');
+                    }
+                } catch (error) {
+                    console.error('Errore export US Word:', error);
+                    this.showExportStatus('error', 'Errore: ' + error.message);
+                } finally {
+                    this.exportingWord = false;
+                }
+            },
+
+            async exportUSMWord() {
+                if (!this.editingUSM && !this.usmFormData.usm_code) {
+                    this.showExportStatus('error', 'Salva prima la USM per esportarla');
+                    return;
+                }
+
+                this.exportingWord = true;
+                this.exportStatus = null;
+
+                try {
+                    const usmId = this.editingUSM?.id;
+                    const response = await fetch(`/api/us-export/usm/${usmId}/word`, {
+                        method: 'GET',
+                        headers: {
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
+                    });
+
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        this.downloadBlob(blob, response.headers.get('Content-Disposition'));
+                        this.showExportStatus('success', 'Documento USM Word scaricato');
+                    } else {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Errore export USM');
+                    }
+                } catch (error) {
+                    console.error('Errore export USM:', error);
+                    this.showExportStatus('error', 'Errore: ' + error.message);
+                } finally {
+                    this.exportingWord = false;
+                }
+            },
+
+            downloadBlob(blob, contentDispositionHeader) {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+
+                let filename = 'SchediArcheologiche.docx';
+                if (contentDispositionHeader) {
+                    const match = contentDispositionHeader.match(/filename=(.+)/);
+                    if (match) filename = match[1].replace(/"/g, '');
+                }
+
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            },
+
+            showExportStatus(type, message) {
+                this.exportStatus = { type, message };
+
+                setTimeout(() => {
+                    if (this.exportStatus && this.exportStatus.message === message) {
+                        this.exportStatus = null;
+                    }
+                }, 5000);
+            },
+
+            previewWordStructure() {
+                alert('Funzione anteprima in sviluppo');
+            },
+
+            // ===== EXPORT DATA METHODS =====
+
+            exportUSData() {
+                const allData = [
+                    ...this.usList.map(us => ({
+                        tipo: 'US',
+                        codice: us.us_code,
+                        definizione: us.definizione || '',
+                        localita: us.localita || '',
+                        data_rilevamento: this.formatDate(us.data_rilevamento),
+                        responsabile: us.responsabile_compilazione || '',
+                        affidabilita: us.affidabilita_stratigrafica || '',
+                        aggiornato_il: this.formatDate(us.updated_at)
+                    })),
+                    ...this.usmList.map(usm => ({
+                        tipo: 'USM',
+                        codice: usm.usm_code,
+                        definizione: usm.definizione || '',
+                        localita: usm.localita || '',
+                        data_rilevamento: this.formatDate(usm.data_rilevamento),
+                        responsabile: usm.responsabile_compilazione || '',
+                        affidabilita: usm.affidabilita_stratigrafica || '',
+                        aggiornato_il: this.formatDate(usm.updated_at)
+                    }))
+                ];
+
+                const headers = ['Tipo', 'Codice', 'Definizione', 'Località', 'Data Rilevamento', 'Responsabile', 'Affidabilità', 'Aggiornato il'];
+                const csvContent = [
+                    headers.join(','),
+                    ...allData.map(item => [
+                        item.tipo,
+                        item.codice,
+                        item.definizione,
+                        item.localita,
+                        item.data_rilevamento,
+                        item.responsabile,
+                        item.affidabilita,
+                        item.aggiornato_il
+                    ].map(field => `"${field}"`).join(','))
+                ].join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `us_usm_export_${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
+
+                this.showNotification('Dati US/USM esportati con successo', 'success');
+            }
         }
     }
-}
 </script>
