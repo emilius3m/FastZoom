@@ -149,36 +149,120 @@ class USFileService:
             raise HTTPException(status_code=404, detail="US non trovata")
         
         try:
-            # Upload file su MinIO (riutilizza sistema esistente)
-            filename, filepath, actual_filesize = await self.storage.save_upload_file(
-                file, str(us.site_id), str(user_id)
-            )
-           
+            # Read file content once
+            await file.seek(0)
+            file_content = await file.read()
+            actual_filesize = len(file_content)
+            await file.seek(0)  # Reset for potential re-read
+
             # Prepara metadati file
             file_metadata = metadata or {}
-           
+
             # Estrai metadati immagine se applicabile
             if file.content_type.startswith('image/'):
                 try:
                     from PIL import Image
                     import io
-                    await file.seek(0)
-                    image_content = await file.read()
-                    image = Image.open(io.BytesIO(image_content))
+                    image = Image.open(io.BytesIO(file_content))
                     file_metadata.update({
                         'width': image.width,
                         'height': image.height,
                         'format': image.format
                     })
-                    await file.seek(0)
                 except Exception as e:
                     logger.warning(f"Impossibile estrarre metadati immagine: {e}")
-           
+
+            # Generate unique filename
+            from uuid import uuid4
+            file_extension = Path(file.filename).suffix.lower()
+            unique_filename = f"{str(us.site_id)}_{str(user_id)}_{uuid4().hex[:8]}{file_extension}"
+
+            # Upload file to appropriate MinIO bucket based on file type
+            from app.services.archaeological_minio_service import archaeological_minio_service
+
+            if file_type == 'documento' or file.content_type == 'application/pdf':
+                # Upload document to documents bucket
+                document_metadata = {
+                    'document_type': file_type,
+                    'title': file_metadata.get('title', ''),
+                    'author': file_metadata.get('photographer', ''),
+                    'date': str(file_metadata.get('photo_date')) if file_metadata.get('photo_date') else None,
+                    'file_size': actual_filesize,
+                    'original_filename': file.filename,
+                    'content_type': file.content_type
+                }
+                upload_url = await archaeological_minio_service.upload_document(
+                    file_content,
+                    unique_filename,
+                    str(us.site_id),
+                    document_metadata
+                )
+                # Parse filepath from URL: minio://bucket/path -> bucket/path
+                if upload_url.startswith("minio://"):
+                    filepath = upload_url[8:]  # Remove "minio://"
+                else:
+                    filepath = f"{archaeological_minio_service.buckets['documents']}/{str(us.site_id)}/{unique_filename}"
+            else:
+                # Upload photo/image to photos bucket
+                photo_metadata = {
+                    'inventory_number': file_metadata.get('tavola_number', ''),
+                    'excavation_area': '',
+                    'stratigraphic_unit': '',
+                    'material': '',
+                    'object_type': file_type,
+                    'chronology_period': '',
+                    'photo_type': file_type,
+                    'photographer': file_metadata.get('photographer', ''),
+                    'description': file_metadata.get('description', ''),
+                    'keywords': '',
+                    'find_date': str(file_metadata.get('photo_date')) if file_metadata.get('photo_date') else None,
+                    'conservation_status': '',
+                    'catalog_number': '',
+                    'grid_square': '',
+                    'depth_level': '',
+                    'finder': '',
+                    'excavation_campaign': '',
+                    'material_details': '',
+                    'object_function': '',
+                    'length_cm': None,
+                    'width_cm': file_metadata.get('width'),
+                    'height_cm': file_metadata.get('height'),
+                    'diameter_cm': None,
+                    'weight_grams': None,
+                    'chronology_culture': '',
+                    'dating_from': None,
+                    'dating_to': None,
+                    'dating_notes': '',
+                    'conservation_notes': '',
+                    'restoration_history': '',
+                    'bibliography': '',
+                    'comparative_references': '',
+                    'external_links': '',
+                    'copyright_holder': '',
+                    'license_type': '',
+                    'usage_rights': '',
+                    'validation_notes': '',
+                    'file_size': actual_filesize,
+                    'original_filename': file.filename,
+                    'content_type': file.content_type
+                }
+                upload_url = await archaeological_minio_service.upload_photo_with_metadata(
+                    file_content,
+                    unique_filename,
+                    str(us.site_id),
+                    photo_metadata
+                )
+                # Parse filepath from URL: minio://bucket/path -> bucket/path
+                if upload_url.startswith("minio://"):
+                    filepath = upload_url[8:]  # Remove "minio://"
+                else:
+                    filepath = f"{archaeological_minio_service.buckets['photos']}/{str(us.site_id)}/{unique_filename}"
+
             # Crea record USFile
             us_file = USFile(
                 id=safe_uuid_str(uuid.uuid4()),  # Generate and convert UUID to string
                 site_id=safe_uuid_str(us.site_id),  # Convert site_id to string
-                filename=filename,
+                filename=unique_filename,
                 original_filename=file.filename,
                 filepath=filepath,
                 filesize=actual_filesize,
@@ -286,20 +370,20 @@ class USFileService:
         
         # Processo upload identico, ma con associazione USM
         try:
-            filename, filepath, actual_filesize = await self.storage.save_upload_file(
-                file, str(usm.site_id), str(user_id)
-            )
-           
+            # Read file content once
+            await file.seek(0)
+            file_content = await file.read()
+            actual_filesize = len(file_content)
+            await file.seek(0)  # Reset for potential re-read
+
             file_metadata = metadata or {}
-           
+
             # Estrai metadati immagine
             if file.content_type.startswith('image/'):
                 try:
                     from PIL import Image
                     import io
-                    await file.seek(0)
-                    image_content = await file.read()
-                    image = Image.open(io.BytesIO(image_content))
+                    image = Image.open(io.BytesIO(file_content))
                     file_metadata.update({
                         'width': image.width,
                         'height': image.height,
@@ -307,12 +391,98 @@ class USFileService:
                     })
                 except Exception as e:
                     logger.warning(f"Errore metadati immagine USM: {e}")
-           
+
+            # Generate unique filename
+            from uuid import uuid4
+            file_extension = Path(file.filename).suffix.lower()
+            unique_filename = f"{str(usm.site_id)}_{str(user_id)}_{uuid4().hex[:8]}{file_extension}"
+
+            # Upload file to appropriate MinIO bucket based on file type
+            from app.services.archaeological_minio_service import archaeological_minio_service
+
+            if file_type == 'documento' or file.content_type == 'application/pdf':
+                # Upload document to documents bucket
+                document_metadata = {
+                    'document_type': file_type,
+                    'title': file_metadata.get('title', ''),
+                    'author': file_metadata.get('photographer', ''),
+                    'date': str(file_metadata.get('photo_date')) if file_metadata.get('photo_date') else None,
+                    'file_size': actual_filesize,
+                    'original_filename': file.filename,
+                    'content_type': file.content_type
+                }
+                upload_url = await archaeological_minio_service.upload_document(
+                    file_content,
+                    unique_filename,
+                    str(usm.site_id),
+                    document_metadata
+                )
+                # Parse filepath from URL: minio://bucket/path -> bucket/path
+                if upload_url.startswith("minio://"):
+                    filepath = upload_url[8:]  # Remove "minio://"
+                else:
+                    filepath = f"{archaeological_minio_service.buckets['documents']}/{str(usm.site_id)}/{unique_filename}"
+            else:
+                # Upload photo/image to photos bucket
+                photo_metadata = {
+                    'inventory_number': file_metadata.get('tavola_number', ''),
+                    'excavation_area': '',
+                    'stratigraphic_unit': '',
+                    'material': '',
+                    'object_type': file_type,
+                    'chronology_period': '',
+                    'photo_type': file_type,
+                    'photographer': file_metadata.get('photographer', ''),
+                    'description': file_metadata.get('description', ''),
+                    'keywords': '',
+                    'find_date': str(file_metadata.get('photo_date')) if file_metadata.get('photo_date') else None,
+                    'conservation_status': '',
+                    'catalog_number': '',
+                    'grid_square': '',
+                    'depth_level': '',
+                    'finder': '',
+                    'excavation_campaign': '',
+                    'material_details': '',
+                    'object_function': '',
+                    'length_cm': None,
+                    'width_cm': file_metadata.get('width'),
+                    'height_cm': file_metadata.get('height'),
+                    'diameter_cm': None,
+                    'weight_grams': None,
+                    'chronology_culture': '',
+                    'dating_from': None,
+                    'dating_to': None,
+                    'dating_notes': '',
+                    'conservation_notes': '',
+                    'restoration_history': '',
+                    'bibliography': '',
+                    'comparative_references': '',
+                    'external_links': '',
+                    'copyright_holder': '',
+                    'license_type': '',
+                    'usage_rights': '',
+                    'validation_notes': '',
+                    'file_size': actual_filesize,
+                    'original_filename': file.filename,
+                    'content_type': file.content_type
+                }
+                upload_url = await archaeological_minio_service.upload_photo_with_metadata(
+                    file_content,
+                    unique_filename,
+                    str(usm.site_id),
+                    photo_metadata
+                )
+                # Parse filepath from URL: minio://bucket/path -> bucket/path
+                if upload_url.startswith("minio://"):
+                    filepath = upload_url[8:]  # Remove "minio://"
+                else:
+                    filepath = f"{archaeological_minio_service.buckets['photos']}/{str(usm.site_id)}/{unique_filename}"
+
             # Crea USFile
             us_file = USFile(
                 id=safe_uuid_str(uuid4()),  # Generate and convert UUID to string
                 site_id=safe_uuid_str(usm.site_id),  # Convert site_id to string
-                filename=filename,
+                filename=unique_filename,
                 original_filename=file.filename,
                 filepath=filepath,
                 filesize=actual_filesize,
