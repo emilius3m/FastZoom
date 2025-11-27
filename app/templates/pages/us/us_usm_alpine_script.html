@@ -1090,6 +1090,12 @@
                     photographer: '',
                     photo_date: ''
                 };
+
+                // Reset file input
+                const fileInput = this.$refs.fileInput;
+                if (fileInput) {
+                    fileInput.value = '';
+                }
             },
 
             async uploadFile(fileInput) {
@@ -1137,6 +1143,10 @@
                         formData.append('excavation_area', this.editingUS?.area_struttura || this.editingUSM?.area_struttura || '');
                         // 🔧 CRITICAL FIX: Pass UUID instead of us_code for stratigraphic_unit
                         formData.append('stratigraphic_unit', entityId); // entityId contains the actual UUID
+                        // For USM, also set usm_reference for compatibility
+                        if (this.editingUSM) {
+                            formData.append('usm_reference', entityId);
+                        }
                         formData.append('material', 'misc'); // Default material
                         formData.append('photo_type', 'fotografia');
                         formData.append('photo_date', this.fileUploadMetadata.photo_date || new Date().toISOString().split('T')[0]);
