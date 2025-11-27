@@ -674,7 +674,11 @@ async def get_next_file_order(
             
             max_query = select(func.max(us_files_association.c.ordine)).where(
                 and_(
-                    us_files_association.c.us_id == us_id_uuid,
+                    or_(
+                        us_files_association.c.us_id == str(us_id_uuid),
+                        us_files_association.c.us_id == us_id,  # Fallback to original string
+                        us_files_association.c.us_id == us_id.replace('-', '')  # Fallback without dashes
+                    ),
                     us_files_association.c.file_type == file_type
                 )
             )

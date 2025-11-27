@@ -7,7 +7,8 @@ Riutilizza l'infrastruttura esistente di upload/storage foto
 import asyncio
 import json
 from typing import List, Dict, Any, Optional, Tuple
-from uuid import UUID
+import uuid
+from uuid import UUID, uuid4
 from pathlib import Path
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,37 @@ from app.models.stratigraphy import us_files_association, usm_files_association
 from app.models.documentation_and_field import Photo
 from app.services.storage_service import storage_service
 from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
+
+
+def safe_uuid_str(uuid_input) -> str:
+    """
+    Safely convert UUID to string for database operations.
+    
+    This helper function ensures UUID objects are always converted to strings
+    before being passed to database operations, preventing SQLite binding errors.
+    
+    Args:
+        uuid_input: UUID object or string
+        
+    Returns:
+        String representation of UUID
+    """
+    if uuid_input is None:
+        return ""
+    
+    # If it's already a string, handle different formats
+    if isinstance(uuid_input, str):
+        # If it's a 32-char hex string, convert to standard UUID format
+        if len(uuid_input) == 32 and '-' not in uuid_input:
+            try:
+                uuid_obj = UUID(uuid_input)
+                return str(uuid_obj)
+            except:
+                return uuid_input  # Return as-is if conversion fails
+        return uuid_input
+    
+    # Convert UUID object to string
+    return str(uuid_input)
 
 
 class USFileService:
@@ -97,12 +129,23 @@ class USFileService:
                 detail=f"File troppo grande. Max {file_config['max_size_mb']}MB per {file_type}"
             )
         
-        # Verifica esistenza US
-        us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id)
+        # Verifica esistenza US con normalizzazione UUID per compatibilità
+        # Prova prima con l'UUID normalizzato, poi con fallback multi-livello
+        us_id_str = str(us_id)
+        normalized_us_id = self._normalize_us_id(us_id)
+        
+        us_query = select(UnitaStratigrafica).where(
+            or_(
+                UnitaStratigrafica.id == us_id,
+                UnitaStratigrafica.id == normalized_us_id,
+                UnitaStratigrafica.id == us_id_str.replace('-', '')
+            )
+        )
         us_result = await self.db.execute(us_query)
         us = us_result.scalar_one_or_none()
         
         if not us:
+            logger.error(f"US non trovata con ID: {us_id} (normalizzato: {normalized_us_id}, senza trattini: {us_id_str.replace('-', '')})")
             raise HTTPException(status_code=404, detail="US non trovata")
         
         try:
@@ -110,10 +153,10 @@ class USFileService:
             filename, filepath, actual_filesize = await self.storage.save_upload_file(
                 file, str(us.site_id), str(user_id)
             )
-            
+           
             # Prepara metadati file
             file_metadata = metadata or {}
-            
+           
             # Estrai metadati immagine se applicabile
             if file.content_type.startswith('image/'):
                 try:
@@ -130,10 +173,11 @@ class USFileService:
                     await file.seek(0)
                 except Exception as e:
                     logger.warning(f"Impossibile estrarre metadati immagine: {e}")
-            
+           
             # Crea record USFile
             us_file = USFile(
-                site_id=us.site_id,
+                id=safe_uuid_str(uuid.uuid4()),  # Generate and convert UUID to string
+                site_id=safe_uuid_str(us.site_id),  # Convert site_id to string
                 filename=filename,
                 original_filename=file.filename,
                 filepath=filepath,
@@ -150,41 +194,42 @@ class USFileService:
                 camera_info=file_metadata.get('camera_info', ''),
                 width=file_metadata.get('width'),
                 height=file_metadata.get('height'),
-                uploaded_by=user_id,
-                created_by=user_id,
-                updated_by=user_id,
+                uploaded_by=safe_uuid_str(user_id),
+                created_by=safe_uuid_str(user_id),
+                updated_by=safe_uuid_str(user_id),
+                validated_by=safe_uuid_str(file_metadata.get('validated_by')) if file_metadata.get('validated_by') else None,
                 is_published=file_metadata.get('is_published', False)
             )
-            
+           
             self.db.add(us_file)
             await self.db.flush()  # Per ottenere ID
-            
+           
             # Crea associazione US-File
             association_stmt = us_files_association.insert().values(
-                us_id=us_id,
-                file_id=us_file.id,
+                us_id=safe_uuid_str(us_id),
+                file_id=safe_uuid_str(us_file.id),  # Convert file_id to string
                 file_type=file_type,
                 ordine=file_metadata.get('ordine', 0)
             )
             await self.db.execute(association_stmt)
-            
+           
             await self.db.commit()
-            
+           
             # Avvia deep zoom per immagini grandi
             if (file.content_type.startswith('image/') and 
                 file_metadata.get('width', 0) > 2000 and 
                 file_metadata.get('height', 0) > 2000):
-                
+               
                 us_file.is_deepzoom_enabled = True
                 us_file.deepzoom_status = 'scheduled'
                 await self.db.commit()
-                
+               
                 # Avvia processing deep zoom in background
                 try:
                     # Carica il contenuto del file per il deep zoom
                     from app.services.archaeological_minio_service import archaeological_minio_service
                     file_content = await archaeological_minio_service.get_file(f"minio://{archaeological_minio_service.buckets['photos']}/{filepath}")
-                    
+                   
                     # Schedula generazione tiles in background
                     deep_zoom_service = get_deep_zoom_minio_service()
                     await deep_zoom_service.schedule_tiles_generation_async(
@@ -194,10 +239,10 @@ class USFileService:
                 except Exception as e:
                     logger.warning(f"Impossibile schedulare deep zoom per US file {us_file.id}: {e}")
                     # Non bloccare l'upload se il deep zoom fallisce
-            
+           
             logger.info(f"File {file_type} caricato per US {us.us_code}: {filename}")
             return us_file
-            
+           
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Errore upload file US: {str(e)}")
@@ -220,12 +265,23 @@ class USFileService:
         if file_type not in self.SUPPORTED_FILE_TYPES:
             raise HTTPException(status_code=400, detail=f"Tipo file non supportato: {file_type}")
         
-        # Verifica esistenza USM
-        usm_query = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == usm_id)
+        # Verifica esistenza USM con normalizzazione UUID per compatibilità
+        # Prova prima con l'UUID normalizzato, poi con fallback multi-livello
+        usm_id_str = str(usm_id)
+        normalized_usm_id = self._normalize_us_id(usm_id)
+        
+        usm_query = select(UnitaStratigraficaMuraria).where(
+            or_(
+                UnitaStratigraficaMuraria.id == usm_id,
+                UnitaStratigraficaMuraria.id == normalized_usm_id,
+                UnitaStratigraficaMuraria.id == usm_id_str.replace('-', '')
+            )
+        )
         usm_result = await self.db.execute(usm_query)
         usm = usm_result.scalar_one_or_none()
         
         if not usm:
+            logger.error(f"USM non trovata con ID: {usm_id} (normalizzato: {normalized_usm_id}, senza trattini: {usm_id_str.replace('-', '')})")
             raise HTTPException(status_code=404, detail="USM non trovata")
         
         # Processo upload identico, ma con associazione USM
@@ -233,9 +289,9 @@ class USFileService:
             filename, filepath, actual_filesize = await self.storage.save_upload_file(
                 file, str(usm.site_id), str(user_id)
             )
-            
+           
             file_metadata = metadata or {}
-            
+           
             # Estrai metadati immagine
             if file.content_type.startswith('image/'):
                 try:
@@ -251,10 +307,11 @@ class USFileService:
                     })
                 except Exception as e:
                     logger.warning(f"Errore metadati immagine USM: {e}")
-            
+           
             # Crea USFile
             us_file = USFile(
-                site_id=usm.site_id,
+                id=safe_uuid_str(uuid4()),  # Generate and convert UUID to string
+                site_id=safe_uuid_str(usm.site_id),  # Convert site_id to string
                 filename=filename,
                 original_filename=file.filename,
                 filepath=filepath,
@@ -270,28 +327,29 @@ class USFileService:
                 photographer=file_metadata.get('photographer', ''),
                 width=file_metadata.get('width'),
                 height=file_metadata.get('height'),
-                uploaded_by=user_id,
-                created_by=user_id,
-                updated_by=user_id
+                uploaded_by=safe_uuid_str(user_id),
+                created_by=safe_uuid_str(user_id),
+                updated_by=safe_uuid_str(user_id),
+                validated_by=safe_uuid_str(file_metadata.get('validated_by')) if file_metadata.get('validated_by') else None
             )
-            
+           
             self.db.add(us_file)
             await self.db.flush()
-            
+           
             # Associazione USM-File
             association_stmt = usm_files_association.insert().values(
-                usm_id=usm_id,
-                file_id=us_file.id,
+                usm_id=safe_uuid_str(usm_id),
+                file_id=safe_uuid_str(us_file.id),  # Convert file_id to string
                 file_type=file_type,
                 ordine=file_metadata.get('ordine', 0)
             )
             await self.db.execute(association_stmt)
-            
+           
             await self.db.commit()
-            
+           
             logger.info(f"File {file_type} caricato per USM {usm.usm_code}: {filename}")
             return us_file
-            
+           
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Errore upload file USM: {str(e)}")
@@ -300,9 +358,19 @@ class USFileService:
     async def get_us_files(self, us_id: UUID, file_type: Optional[str] = None) -> List[USFile]:
         """Ottieni file di una US, opzionalmente filtrati per tipo"""
         
+        # Normalizza UUID per compatibilità con fallback multi-livello
+        us_id_str = str(us_id)
+        normalized_us_id = self._normalize_us_id(us_id)
+        
         query = select(USFile).join(
             us_files_association, USFile.id == us_files_association.c.file_id
-        ).where(us_files_association.c.us_id == us_id)
+        ).where(
+            or_(
+                us_files_association.c.us_id == safe_uuid_str(us_id),
+                us_files_association.c.us_id == normalized_us_id,
+                us_files_association.c.us_id == us_id_str.replace('-', '')
+            )
+        )
         
         if file_type:
             query = query.where(us_files_association.c.file_type == file_type)
@@ -315,9 +383,19 @@ class USFileService:
     async def get_usm_files(self, usm_id: UUID, file_type: Optional[str] = None) -> List[USFile]:
         """Ottieni file di una USM"""
         
+        # Normalizza UUID per compatibilità con fallback multi-livello
+        usm_id_str = str(usm_id)
+        normalized_usm_id = self._normalize_us_id(usm_id)
+        
         query = select(USFile).join(
             usm_files_association, USFile.id == usm_files_association.c.file_id
-        ).where(usm_files_association.c.usm_id == usm_id)
+        ).where(
+            or_(
+                usm_files_association.c.usm_id == safe_uuid_str(usm_id),
+                usm_files_association.c.usm_id == normalized_usm_id,
+                usm_files_association.c.usm_id == usm_id_str.replace('-', '')
+            )
+        )
         
         if file_type:
             query = query.where(usm_files_association.c.file_type == file_type)
@@ -332,24 +410,24 @@ class USFileService:
         
         try:
             # Trova file
-            file_query = select(USFile).where(USFile.id == file_id)
+            file_query = select(USFile).where(USFile.id == safe_uuid_str(file_id))
             file_result = await self.db.execute(file_query)
             us_file = file_result.scalar_one_or_none()
-            
+           
             if not us_file:
                 raise HTTPException(status_code=404, detail="File non trovato")
-            
+           
             # Verifica associazione US
             assoc_query = select(us_files_association).where(
                 and_(
-                    us_files_association.c.us_id == us_id,
-                    us_files_association.c.file_id == file_id
+                    us_files_association.c.us_id == safe_uuid_str(us_id),
+                    us_files_association.c.file_id == safe_uuid_str(file_id)
                 )
             )
             assoc_result = await self.db.execute(assoc_query)
             if not assoc_result.first():
                 raise HTTPException(status_code=404, detail="Associazione file-US non trovata")
-            
+           
             # Elimina file da storage
             if us_file.filepath:
                 try:
@@ -357,41 +435,41 @@ class USFileService:
                     logger.info(f"File eliminato da storage: {us_file.filepath}")
                 except Exception as e:
                     logger.warning(f"Errore eliminazione storage: {e}")
-            
+           
             # Elimina thumbnail se esiste
             if us_file.thumbnail_path:
                 try:
                     await self.storage.delete_file(us_file.thumbnail_path)
                 except Exception as e:
                     logger.warning(f"Errore eliminazione thumbnail: {e}")
-            
+           
             # Elimina associazione
             delete_assoc = us_files_association.delete().where(
                 and_(
-                    us_files_association.c.us_id == us_id,
-                    us_files_association.c.file_id == file_id
+                    us_files_association.c.us_id == safe_uuid_str(us_id),
+                    us_files_association.c.file_id == safe_uuid_str(file_id)
                 )
             )
             await self.db.execute(delete_assoc)
-            
+           
             # Elimina record file se non ha altre associazioni
             other_assoc_query = select(us_files_association).where(
-                us_files_association.c.file_id == file_id
+                us_files_association.c.file_id == safe_uuid_str(file_id)
             )
             other_assoc = await self.db.execute(other_assoc_query)
-            
+           
             usm_assoc_query = select(usm_files_association).where(
-                usm_files_association.c.file_id == file_id
+                usm_files_association.c.file_id == safe_uuid_str(file_id)
             )
             usm_assoc = await self.db.execute(usm_assoc_query)
-            
+           
             if not other_assoc.first() and not usm_assoc.first():
                 await self.db.delete(us_file)
-            
+           
             await self.db.commit()
             logger.info(f"File US {file_id} eliminato da US {us_id}")
             return True
-            
+           
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Errore eliminazione file US: {str(e)}")
@@ -402,24 +480,24 @@ class USFileService:
         
         try:
             # Trova file
-            file_query = select(USFile).where(USFile.id == file_id)
+            file_query = select(USFile).where(USFile.id == safe_uuid_str(file_id))
             file_result = await self.db.execute(file_query)
             us_file = file_result.scalar_one_or_none()
-            
+           
             if not us_file:
                 raise HTTPException(status_code=404, detail="File non trovato")
-            
+           
             # Verifica associazione USM
             assoc_query = select(usm_files_association).where(
                 and_(
-                    usm_files_association.c.usm_id == usm_id,
-                    usm_files_association.c.file_id == file_id
+                    usm_files_association.c.usm_id == safe_uuid_str(usm_id),
+                    usm_files_association.c.file_id == safe_uuid_str(file_id)
                 )
             )
             assoc_result = await self.db.execute(assoc_query)
             if not assoc_result.first():
                 raise HTTPException(status_code=404, detail="Associazione file-USM non trovata")
-            
+           
             # Elimina file da storage
             if us_file.filepath:
                 try:
@@ -427,41 +505,47 @@ class USFileService:
                     logger.info(f"File eliminato da storage: {us_file.filepath}")
                 except Exception as e:
                     logger.warning(f"Errore eliminazione storage: {e}")
-            
+           
             # Elimina thumbnail se esiste
             if us_file.thumbnail_path:
                 try:
                     await self.storage.delete_file(us_file.thumbnail_path)
                 except Exception as e:
                     logger.warning(f"Errore eliminazione thumbnail: {e}")
-            
-            # Elimina associazione
+           
+            # Elimina associazione USM con normalizzazione UUID per compatibilità
+            usm_id_str = str(usm_id)
+            normalized_usm_id = self._normalize_us_id(usm_id)
             delete_assoc = usm_files_association.delete().where(
                 and_(
-                    usm_files_association.c.usm_id == usm_id,
-                    usm_files_association.c.file_id == file_id
+                    or_(
+                        usm_files_association.c.usm_id == safe_uuid_str(usm_id),
+                        usm_files_association.c.usm_id == normalized_usm_id,
+                        usm_files_association.c.usm_id == usm_id_str.replace('-', '')
+                    ),
+                    usm_files_association.c.file_id == safe_uuid_str(file_id)
                 )
             )
             await self.db.execute(delete_assoc)
-            
+           
             # Elimina record file se non ha altre associazioni
             us_assoc_query = select(us_files_association).where(
-                us_files_association.c.file_id == file_id
+                us_files_association.c.file_id == safe_uuid_str(file_id)
             )
             us_assoc = await self.db.execute(us_assoc_query)
-            
+           
             usm_assoc_query = select(usm_files_association).where(
-                usm_files_association.c.file_id == file_id
+                usm_files_association.c.file_id == safe_uuid_str(file_id)
             )
             usm_assoc = await self.db.execute(usm_assoc_query)
-            
+           
             if not us_assoc.first() and not usm_assoc.first():
                 await self.db.delete(us_file)
-            
+           
             await self.db.commit()
             logger.info(f"File USM {file_id} eliminato da USM {usm_id}")
             return True
-            
+           
         except Exception as e:
             await self.db.rollback()
             logger.error(f"Errore eliminazione file USM: {str(e)}")
@@ -475,7 +559,7 @@ class USFileService:
     ) -> USFile:
         """Aggiorna metadati file US/USM"""
         
-        file_query = select(USFile).where(USFile.id == file_id)
+        file_query = select(USFile).where(USFile.id == safe_uuid_str(file_id))
         file_result = await self.db.execute(file_query)
         us_file = file_result.scalar_one_or_none()
         
@@ -504,36 +588,48 @@ class USFileService:
         Converte un oggetto Photo in un dizionario compatibile con USFile
         per l'unificazione della visualizzazione delle fotografie documentarie
         """
-        return {
-            'id': str(photo.id),
-            'filename': photo.filename,
-            'original_filename': photo.original_filename,
-            'filepath': photo.filepath,
-            'filesize': photo.file_size or 0,
-            'mimetype': photo.mime_type or 'image/jpeg',
-            'file_category': 'fotografia',
-            'title': photo.title or '',
-            'description': photo.description or '',
-            'scale_ratio': None,
-            'drawing_type': None,
-            'tavola_number': None,
-            'photo_date': photo.photo_date.isoformat() if photo.photo_date else None,
-            'photographer': photo.photographer or '',
-            'camera_info': f"{photo.camera_make or ''} {photo.camera_model or ''}".strip(),
-            'width': photo.width,
-            'height': photo.height,
-            'is_deepzoom_enabled': photo.has_deep_zoom,
-            'thumbnail_url': f"/api/v1/photos/{photo.id}/thumbnail" if photo.thumbnail_path else None,
-            'download_url': f"/api/v1/photos/{photo.id}/download",
-            'view_url': f"/api/v1/photos/{photo.id}/full",
-            'is_published': photo.is_published,
-            'is_validated': photo.is_validated,
-            'created_at': photo.created_at.isoformat() if photo.created_at else None,
-            'updated_at': photo.updated_at.isoformat() if photo.updated_at else None,
-            'source': 'photo_table',  # Campo aggiuntivo per identificare la provenienza
-            'deepzoom_status': photo.deepzoom_status,
-            'is_deepzoom_ready': photo.is_deepzoom_ready
-        }
+        try:
+            # Safely handle all attributes to avoid any potential async context issues
+            return {
+                'id': str(photo.id) if photo.id else '',
+                'filename': getattr(photo, 'filename', ''),
+                'original_filename': getattr(photo, 'original_filename', ''),
+                'filepath': getattr(photo, 'filepath', ''),
+                'filesize': getattr(photo, 'file_size', 0) or 0,
+                'mimetype': getattr(photo, 'mime_type', 'image/jpeg') or 'image/jpeg',
+                'file_category': 'fotografia',
+                'title': getattr(photo, 'title', '') or '',
+                'description': getattr(photo, 'description', '') or '',
+                'scale_ratio': None,
+                'drawing_type': None,
+                'tavola_number': None,
+                'photo_date': photo.photo_date.isoformat() if getattr(photo, 'photo_date', None) else None,
+                'photographer': getattr(photo, 'photographer', '') or '',
+                'camera_info': f"{getattr(photo, 'camera_make', '') or ''} {getattr(photo, 'camera_model', '') or ''}".strip(),
+                'width': getattr(photo, 'width', None),
+                'height': getattr(photo, 'height', None),
+                'is_deepzoom_enabled': getattr(photo, 'has_deep_zoom', False),
+                'thumbnail_url': f"/api/v1/photos/{photo.id}/thumbnail" if getattr(photo, 'thumbnail_path', None) else None,
+                'download_url': f"/api/v1/photos/{photo.id}/download" if photo.id else None,
+                'view_url': f"/api/v1/photos/{photo.id}/full" if photo.id else None,
+                'is_published': getattr(photo, 'is_published', False),
+                'is_validated': getattr(photo, 'is_validated', False),
+                'created_at': photo.created_at.isoformat() if getattr(photo, 'created_at', None) else None,
+                'updated_at': photo.updated_at.isoformat() if getattr(photo, 'updated_at', None) else None,
+                'source': 'photo_table',  # Campo aggiuntivo per identificare la provenienza
+                'deepzoom_status': getattr(photo, 'deepzoom_status', None),
+                'is_deepzoom_ready': getattr(photo, 'is_deepzoom_ready', False)
+            }
+        except Exception as e:
+            logger.error(f"Error converting photo to USFile dict: {e}")
+            # Return a minimal safe dict if conversion fails
+            return {
+                'id': str(photo.id) if photo.id else '',
+                'filename': getattr(photo, 'filename', 'error'),
+                'file_category': 'fotografia',
+                'source': 'photo_table',
+                'error': True
+            }
 
     def _normalize_us_id(self, us_id: UUID) -> str:
         """Normalizza ID US per compatibilità con diversi formati nel database"""
@@ -557,212 +653,265 @@ class USFileService:
         us_id_str = str(us_id)
         logger.info(f"[DEBUG] get_files_summary_for_us called with us_id: {us_id_str}")
         
-        # 1. Ottieni i file US esistenti
-        files = await self.get_us_files(us_id)
-        logger.info(f"[DEBUG] Found {len(files)} US files for US {us_id_str}")
-        
-        # 2. Raggruppa per tipo i file US esistenti
-        files_by_type = {}
-        for file_obj in files:
-            # Trova tipo dal join association
-            file_type_query = select(us_files_association.c.file_type).where(
-                and_(
-                    us_files_association.c.us_id == us_id,
-                    us_files_association.c.file_id == file_obj.id
+        try:
+            # 1. Ottieni i file US esistenti direttamente con query invece di chiamare get_us_files()
+            # Questo evita il problema di contesto async/await
+            files_query = select(USFile).join(
+                us_files_association, USFile.id == us_files_association.c.file_id
+            ).where(
+                or_(
+                    us_files_association.c.us_id == safe_uuid_str(us_id),
+                    us_files_association.c.us_id == self._normalize_us_id(us_id),
+                    us_files_association.c.us_id == us_id_str.replace('-', '')
                 )
-            )
-            type_result = await self.db.execute(file_type_query)
-            file_type = type_result.scalar_one_or_none()
-            logger.info(f"[DEBUG] File {file_obj.id} has type: {file_type}")
+            ).order_by(us_files_association.c.ordine, USFile.created_at)
             
-            if file_type not in files_by_type:
-                files_by_type[file_type] = []
-            files_by_type[file_type].append(file_obj.to_dict())
-        
-        # 3. Recupera le foto dalla tabella Photo dove stratigraphic_unit == us_id
-        # Prima ottieni l'US per ottenere il codice US
-        us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.id == us_id)
-        us_result = await self.db.execute(us_query)
-        us = us_result.scalar_one_or_none()
-        
-        logger.info(f"[DEBUG] US query result: {us}")
-        
-        if us:
-            logger.info(f"[DEBUG] US found: id={us.id}, us_code={us.us_code}, site_id={us.site_id}")
+            files_result = await self.db.execute(files_query)
+            files = files_result.scalars().all()
+            logger.info(f"[DEBUG] Found {len(files)} US files for US {us_id_str}")
             
-            # Normalizza l'ID US per la ricerca
-            normalized_us_id = self._normalize_us_id(us_id)
-            logger.info(f"[DEBUG] Normalized US ID: {normalized_us_id}")
-            logger.info(f"[DEBUG] Original US ID string: {us_id_str}")
-            logger.info(f"[DEBUG] US ID without dashes: {us_id_str.replace('-', '')}")
+            # 2. Raggruppa per tipo i file US esistenti
+            files_by_type = {}
             
-            # Cerca foto dove stratigraphic_unit corrisponde al codice US (fallback multi-livello)
-            photos_query = select(Photo).where(
-                and_(
-                    Photo.site_id == us.site_id,
-                    # Fallback: prova prima ID normalizzato, poi ID originale, poi hash senza trattini
+            # Collect all file IDs to batch query their types
+            file_ids = [safe_uuid_str(file_obj.id) for file_obj in files]
+            
+            # Batch query for all file types at once to reduce context switches
+            if file_ids:
+                file_types_query = select(
+                    us_files_association.c.file_id,
+                    us_files_association.c.file_type
+                ).where(
+                    and_(
+                        us_files_association.c.us_id == safe_uuid_str(us_id),
+                        us_files_association.c.file_id.in_(file_ids)
+                    )
+                )
+                file_types_result = await self.db.execute(file_types_query)
+                file_types = {row[0]: row[1] for row in file_types_result.all()}
+            else:
+                file_types = {}
+            
+            # Group files by type using the batched results
+            for file_obj in files:
+                file_type = file_types.get(safe_uuid_str(file_obj.id))
+                logger.info(f"[DEBUG] File {file_obj.id} has type: {file_type}")
+                
+                if file_type not in files_by_type:
+                    files_by_type[file_type] = []
+                files_by_type[file_type].append(file_obj.to_dict())
+            
+            # 3. Recupera le foto dalla tabella Photo dove stratigraphic_unit == us_id
+            # Prima ottieni l'US per ottenere il codice US
+            us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.id == safe_uuid_str(us_id))
+            us_result = await self.db.execute(us_query)
+            us = us_result.scalar_one_or_none()
+            
+            logger.info(f"[DEBUG] US query result: {us}")
+            
+            if us:
+                logger.info(f"[DEBUG] US found: id={us.id}, us_code={us.us_code}, site_id={us.site_id}")
+                
+                # Normalizza l'ID US per la ricerca
+                normalized_us_id = self._normalize_us_id(us_id)
+                logger.info(f"[DEBUG] Normalized US ID: {normalized_us_id}")
+                logger.info(f"[DEBUG] Original US ID string: {us_id_str}")
+                logger.info(f"[DEBUG] US ID without dashes: {us_id_str.replace('-', '')}")
+                
+                # Cerca foto dove stratigraphic_unit corrisponde al codice US (fallback multi-livello)
+                photos_query = select(Photo).where(
+                    and_(
+                        Photo.site_id == us.site_id,
+                        # Fallback: prova prima ID normalizzato, poi ID originale, poi hash senza trattini
+                        or_(
+                            Photo.stratigraphic_unit == normalized_us_id,
+                            Photo.stratigraphic_unit == us_id_str,
+                            Photo.stratigraphic_unit == us_id_str.replace('-', '')
+                        )
+                    )
+                )
+                
+                # DEBUG: Log the query details
+                logger.info(f"[DEBUG] Photo query - site_id: {us.site_id}")
+                logger.info(f"[DEBUG] Photo query - normalized_us_id: {normalized_us_id}")
+                logger.info(f"[DEBUG] Photo query - us_id_str: {us_id_str}")
+                logger.info(f"[DEBUG] Photo query - us_id_str_no_dashes: {us_id_str.replace('-', '')}")
+                
+                photos_result = await self.db.execute(photos_query)
+                photos = photos_result.scalars().all()
+                
+                logger.info(f"[DEBUG] Found {len(photos)} photos for US {us_id_str}")
+                
+                # Converti le foto in formato compatibile e aggiungile alle fotografie
+                existing_fotografie = files_by_type.get('fotografia', [])
+                logger.info(f"[DEBUG] Existing fotografie count: {len(existing_fotografie)}")
+                
+                for photo in photos:
+                    logger.info(f"[DEBUG] Processing photo: id={photo.id}, stratigraphic_unit={photo.stratigraphic_unit}")
+                    photo_dict = self._photo_to_usfile_dict(photo)
+                    existing_fotografie.append(photo_dict)
+                
+                files_by_type['fotografia'] = existing_fotografie
+                logger.info(f"[DEBUG] Final fotografie count: {len(existing_fotografie)}")
+            else:
+                logger.warning(f"[DEBUG] US not found for ID: {us_id_str}")
+                
+                # FALLBACK: Cerca le foto direttamente usando l'ID US quando la query US fallisce
+                logger.info(f"[FALLBACK] Attempting to find photos using US ID directly: {us_id_str}")
+                
+                # Normalizza l'ID US per la ricerca nel fallback
+                normalized_us_id = self._normalize_us_id(us_id)
+                logger.info(f"[FALLBACK] Normalized US ID: {normalized_us_id}")
+                logger.info(f"[FALLBACK] Original US ID string: {us_id_str}")
+                logger.info(f"[FALLBACK] US ID without dashes: {us_id_str.replace('-', '')}")
+                
+                # Cerca foto senza filtrare per site_id (fallback più ampio)
+                # Prova tutti i formati possibili dell'ID US
+                fallback_photos_query = select(Photo).where(
                     or_(
                         Photo.stratigraphic_unit == normalized_us_id,
                         Photo.stratigraphic_unit == us_id_str,
                         Photo.stratigraphic_unit == us_id_str.replace('-', '')
                     )
                 )
-            )
+                
+                # DEBUG: Log the fallback query details
+                logger.info(f"[FALLBACK] Photo query - normalized_us_id: {normalized_us_id}")
+                logger.info(f"[FALLBACK] Photo query - us_id_str: {us_id_str}")
+                logger.info(f"[FALLBACK] Photo query - us_id_str_no_dashes: {us_id_str.replace('-', '')}")
+                
+                fallback_photos_result = await self.db.execute(fallback_photos_query)
+                fallback_photos = fallback_photos_result.scalars().all()
+                
+                logger.info(f"[FALLBACK] Found {len(fallback_photos)} photos for US {us_id_str} using fallback")
+                
+                # Converti le foto in formato compatibile e aggiungile alle fotografie
+                existing_fotografie = files_by_type.get('fotografia', [])
+                logger.info(f"[FALLBACK] Existing fotografie count: {len(existing_fotografie)}")
+                
+                for photo in fallback_photos:
+                    logger.info(f"[FALLBACK] Processing photo: id={photo.id}, stratigraphic_unit={photo.stratigraphic_unit}, site_id={photo.site_id}")
+                    photo_dict = self._photo_to_usfile_dict(photo)
+                    existing_fotografie.append(photo_dict)
+                
+                files_by_type['fotografia'] = existing_fotografie
+                logger.info(f"[FALLBACK] Final fotografie count after fallback: {len(existing_fotografie)}")
             
-            # DEBUG: Log the query details
-            logger.info(f"[DEBUG] Photo query - site_id: {us.site_id}")
-            logger.info(f"[DEBUG] Photo query - normalized_us_id: {normalized_us_id}")
-            logger.info(f"[DEBUG] Photo query - us_id_str: {us_id_str}")
-            logger.info(f"[DEBUG] Photo query - us_id_str_no_dashes: {us_id_str.replace('-', '')}")
+            # 4. Calcola i conteggi totali
+            fotografie_list = files_by_type.get('fotografia', [])
+            total_files = len(files) + len([f for f in fotografie_list if f.get('source') == 'photo_table'])
             
-            photos_result = await self.db.execute(photos_query)
-            photos = photos_result.scalars().all()
-            
-            logger.info(f"[DEBUG] Found {len(photos)} photos for US {us_id_str}")
-            
-            # Converti le foto in formato compatibile e aggiungile alle fotografie
-            existing_fotografie = files_by_type.get('fotografia', [])
-            logger.info(f"[DEBUG] Existing fotografie count: {len(existing_fotografie)}")
-            
-            for photo in photos:
-                logger.info(f"[DEBUG] Processing photo: id={photo.id}, stratigraphic_unit={photo.stratigraphic_unit}")
-                photo_dict = self._photo_to_usfile_dict(photo)
-                existing_fotografie.append(photo_dict)
-            
-            files_by_type['fotografia'] = existing_fotografie
-            logger.info(f"[DEBUG] Final fotografie count: {len(existing_fotografie)}")
-        else:
-            logger.warning(f"[DEBUG] US not found for ID: {us_id_str}")
-            
-            # FALLBACK: Cerca le foto direttamente usando l'ID US quando la query US fallisce
-            logger.info(f"[FALLBACK] Attempting to find photos using US ID directly: {us_id_str}")
-            
-            # Normalizza l'ID US per la ricerca nel fallback
-            normalized_us_id = self._normalize_us_id(us_id)
-            logger.info(f"[FALLBACK] Normalized US ID: {normalized_us_id}")
-            logger.info(f"[FALLBACK] Original US ID string: {us_id_str}")
-            logger.info(f"[FALLBACK] US ID without dashes: {us_id_str.replace('-', '')}")
-            
-            # Cerca foto senza filtrare per site_id (fallback più ampio)
-            # Prova tutti i formati possibili dell'ID US
-            fallback_photos_query = select(Photo).where(
-                or_(
-                    Photo.stratigraphic_unit == normalized_us_id,
-                    Photo.stratigraphic_unit == us_id_str,
-                    Photo.stratigraphic_unit == us_id_str.replace('-', '')
-                )
-            )
-            
-            # DEBUG: Log the fallback query details
-            logger.info(f"[FALLBACK] Photo query - normalized_us_id: {normalized_us_id}")
-            logger.info(f"[FALLBACK] Photo query - us_id_str: {us_id_str}")
-            logger.info(f"[FALLBACK] Photo query - us_id_str_no_dashes: {us_id_str.replace('-', '')}")
-            
-            fallback_photos_result = await self.db.execute(fallback_photos_query)
-            fallback_photos = fallback_photos_result.scalars().all()
-            
-            logger.info(f"[FALLBACK] Found {len(fallback_photos)} photos for US {us_id_str} using fallback")
-            
-            # Converti le foto in formato compatibile e aggiungile alle fotografie
-            existing_fotografie = files_by_type.get('fotografia', [])
-            logger.info(f"[FALLBACK] Existing fotografie count: {len(existing_fotografie)}")
-            
-            for photo in fallback_photos:
-                logger.info(f"[FALLBACK] Processing photo: id={photo.id}, stratigraphic_unit={photo.stratigraphic_unit}, site_id={photo.site_id}")
-                photo_dict = self._photo_to_usfile_dict(photo)
-                existing_fotografie.append(photo_dict)
-            
-            files_by_type['fotografia'] = existing_fotografie
-            logger.info(f"[FALLBACK] Final fotografie count after fallback: {len(existing_fotografie)}")
-        
-        # 4. Calcola i conteggi totali
-        fotografie_list = files_by_type.get('fotografia', [])
-        total_files = len(files) + len([f for f in fotografie_list if f.get('source') == 'photo_table'])
-        
-        result = {
-            'piante': files_by_type.get('pianta', []),
-            'sezioni': files_by_type.get('sezione', []),
-            'prospetti': files_by_type.get('prospetto', []),
-            'fotografie': fotografie_list,
-            'documenti': files_by_type.get('documento', []),
-            'counts': {
-                'piante': len(files_by_type.get('pianta', [])),
-                'sezioni': len(files_by_type.get('sezione', [])),
-                'prospetti': len(files_by_type.get('prospetto', [])),
-                'fotografie': len(fotografie_list),
-                'documenti': len(files_by_type.get('documento', [])),
-                'total': total_files
+            result = {
+                'piante': files_by_type.get('pianta', []),
+                'sezioni': files_by_type.get('sezione', []),
+                'prospetti': files_by_type.get('prospetto', []),
+                'fotografie': fotografie_list,
+                'documenti': files_by_type.get('documento', []),
+                'counts': {
+                    'piante': len(files_by_type.get('pianta', [])),
+                    'sezioni': len(files_by_type.get('sezione', [])),
+                    'prospetti': len(files_by_type.get('prospetto', [])),
+                    'fotografie': len(fotografie_list),
+                    'documenti': len(files_by_type.get('documento', [])),
+                    'total': total_files
+                }
             }
-        }
-        
-        logger.info(f"[DEBUG] Final result counts: {result['counts']}")
-        return result
-    
+            
+            logger.info(f"[DEBUG] Final result counts: {result['counts']}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in get_files_summary_for_us: {str(e)}")
+            raise
+
     async def get_files_summary_for_usm(self, usm_id: UUID) -> Dict[str, Any]:
         """Riassunto file per USM con conteggi per tipo, includendo foto dalla tabella Photo"""
         
-        # 1. Ottieni i file USM esistenti
-        files = await self.get_usm_files(usm_id)
-        
-        # 2. Raggruppa per tipo i file USM esistenti
-        files_by_type = {}
-        for file_obj in files:
-            # Trova tipo dal join association
-            file_type_query = select(usm_files_association.c.file_type).where(
-                and_(
-                    usm_files_association.c.usm_id == usm_id,
-                    usm_files_association.c.file_id == file_obj.id
-                )
-            )
-            type_result = await self.db.execute(file_type_query)
-            file_type = type_result.scalar_one_or_none()
-            
-            if file_type not in files_by_type:
-                files_by_type[file_type] = []
-            files_by_type[file_type].append(file_obj.to_dict())
-        
-        # 3. Recupera le foto dalla tabella Photo dove usm_reference == usm_id
-        # Prima ottieni l'USM per ottenere il codice USM
-        usm_query = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == usm_id)
-        usm_result = await self.db.execute(usm_query)
-        usm = usm_result.scalar_one_or_none()
-        
-        if usm:
-            # Cerca foto dove usm_reference corrisponde al codice USM
-            photos_query = select(Photo).where(
-                and_(
-                    Photo.usm_reference == str(usm_id),
-                    Photo.site_id == usm.site_id
-                )
-            )
-            photos_result = await self.db.execute(photos_query)
-            photos = photos_result.scalars().all()
-            
-            # Converti le foto in formato compatibile e aggiungile alle fotografie
-            existing_fotografie = files_by_type.get('fotografia', [])
-            
-            for photo in photos:
-                photo_dict = self._photo_to_usfile_dict(photo)
-                existing_fotografie.append(photo_dict)
-            
-            files_by_type['fotografia'] = existing_fotografie
-        
-        # 4. Calcola i conteggi totali
-        fotografie_list = files_by_type.get('fotografia', [])
-        total_files = len(files) + len([f for f in fotografie_list if f.get('source') == 'photo_table'])
-        
-        return {
-            'piante': files_by_type.get('pianta', []),
-            'sezioni': files_by_type.get('sezione', []),
-            'prospetti': files_by_type.get('prospetto', []),
-            'fotografie': fotografie_list,
-            'documenti': files_by_type.get('documento', []),
-            'counts': {
-                'piante': len(files_by_type.get('pianta', [])),
-                'sezioni': len(files_by_type.get('sezione', [])),
-                'prospetti': len(files_by_type.get('prospetto', [])),
-                'fotografie': len(fotografie_list),
-                'documenti': len(files_by_type.get('documento', [])),
-                'total': total_files
-            }
-        }
+        # Use explicit transaction boundary to fix async/await context issues
+        async with self.db.begin():
+            try:
+                # 1. Ottieni i file USM esistenti
+                files = await self.get_usm_files(usm_id)
+                
+                # 2. Raggruppa per tipo i file USM esistenti
+                files_by_type = {}
+                
+                # Collect all file IDs to batch query their types
+                file_ids = [safe_uuid_str(file_obj.id) for file_obj in files]
+                
+                # Batch query for all file types at once to reduce context switches
+                if file_ids:
+                    file_types_query = select(
+                        usm_files_association.c.file_id,
+                        usm_files_association.c.file_type
+                    ).where(
+                        and_(
+                            usm_files_association.c.usm_id == safe_uuid_str(usm_id),
+                            usm_files_association.c.file_id.in_(file_ids)
+                        )
+                    )
+                    file_types_result = await self.db.execute(file_types_query)
+                    file_types = {row[0]: row[1] for row in file_types_result.all()}
+                else:
+                    file_types = {}
+                
+                # Group files by type using the batched results
+                for file_obj in files:
+                    file_type = file_types.get(safe_uuid_str(file_obj.id))
+                    
+                    if file_type not in files_by_type:
+                        files_by_type[file_type] = []
+                    files_by_type[file_type].append(file_obj.to_dict())
+                
+                # 3. Recupera le foto dalla tabella Photo dove usm_reference == usm_id
+                # Prima ottieni l'USM per ottenere il codice USM
+                usm_query = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.id == safe_uuid_str(usm_id))
+                usm_result = await self.db.execute(usm_query)
+                usm = usm_result.scalar_one_or_none()
+                
+                if usm:
+                    # Cerca foto dove usm_reference corrisponde al codice USM
+                    photos_query = select(Photo).where(
+                        and_(
+                            Photo.usm_reference == safe_uuid_str(usm_id),
+                            Photo.site_id == safe_uuid_str(usm.site_id)
+                        )
+                    )
+                    photos_result = await self.db.execute(photos_query)
+                    photos = photos_result.scalars().all()
+                    
+                    # Converti le foto in formato compatibile e aggiungile alle fotografie
+                    existing_fotografie = files_by_type.get('fotografia', [])
+                    
+                    for photo in photos:
+                        photo_dict = self._photo_to_usfile_dict(photo)
+                        existing_fotografie.append(photo_dict)
+                    
+                    files_by_type['fotografia'] = existing_fotografie
+                
+                # 4. Calcola i conteggi totali
+                fotografie_list = files_by_type.get('fotografia', [])
+                total_files = len(files) + len([f for f in fotografie_list if f.get('source') == 'photo_table'])
+                
+                result = {
+                    'piante': files_by_type.get('pianta', []),
+                    'sezioni': files_by_type.get('sezione', []),
+                    'prospetti': files_by_type.get('prospetto', []),
+                    'fotografie': fotografie_list,
+                    'documenti': files_by_type.get('documento', []),
+                    'counts': {
+                        'piante': len(files_by_type.get('pianta', [])),
+                        'sezioni': len(files_by_type.get('sezione', [])),
+                        'prospetti': len(files_by_type.get('prospetto', [])),
+                        'fotografie': len(fotografie_list),
+                        'documenti': len(files_by_type.get('documento', [])),
+                        'total': total_files
+                    }
+                }
+                
+                return result
+                
+            except Exception as e:
+                # Transaction will be automatically rolled back
+                logger.error(f"Error in get_files_summary_for_usm: {str(e)}")
+                raise

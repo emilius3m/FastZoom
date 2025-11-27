@@ -58,13 +58,24 @@
                 <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Stato Sistema</p>
                 <p class="text-2xl font-semibold text-gray-900 dark:text-white">
                     <span class="flex items-center">
-                        <i :class="['fas', systemStatus.database.icon, 'mr-2', systemStatus.database.class]" x-text="systemStatus.database.text"></i>
+                        <template x-if="systemStatus?.database">
+                            <i :class="['fas', systemStatus.database.icon, 'mr-2', systemStatus.database.class]" x-text="systemStatus.database.text"></i>
+                        </template>
+                        <template x-if="!systemStatus?.database">
+                            <i class="fas fa-question-circle mr-2 text-gray-600 dark:text-gray-400" x-text="'Caricamento...'"></i>
+                        </template>
                     </span>
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     <span class="flex items-center">
-                        <i :class="['fas', systemStatus.storage.icon, 'mr-1', 'text-sm', systemStatus.storage.class]"></i>
-                        <span :class="systemStatus.storage.class" x-text="systemStatus.storage.text"></span>
+                        <template x-if="systemStatus?.storage">
+                            <i :class="['fas', systemStatus.storage.icon, 'mr-1', 'text-sm', systemStatus.storage.class]"></i>
+                            <span :class="systemStatus.storage.class" x-text="systemStatus.storage.text"></span>
+                        </template>
+                        <template x-if="!systemStatus?.storage">
+                            <i class="fas fa-question-circle mr-1 text-sm text-gray-600 dark:text-gray-400"></i>
+                            <span class="text-gray-600 dark:text-gray-400" x-text="'Caricamento...'"></span>
+                        </template>
                     </span>
                 </p>
             </div>
