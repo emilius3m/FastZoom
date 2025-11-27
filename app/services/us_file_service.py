@@ -324,7 +324,7 @@ class USFileService:
                     logger.warning(f"Impossibile schedulare deep zoom per US file {us_file.id}: {e}")
                     # Non bloccare l'upload se il deep zoom fallisce
            
-            logger.info(f"File {file_type} caricato per US {us.us_code}: {filename}")
+            logger.info(f"File {file_type} caricato per US {us.us_code}: {unique_filename}")
             return us_file
            
         except Exception as e:
@@ -517,7 +517,7 @@ class USFileService:
            
             await self.db.commit()
            
-            logger.info(f"File {file_type} caricato per USM {usm.usm_code}: {filename}")
+            logger.info(f"File {file_type} caricato per USM {usm.usm_code}: {unique_filename}")
             return us_file
            
         except Exception as e:

@@ -1091,15 +1091,20 @@
                     photo_date: ''
                 };
 
-                // Reset file input
-                const fileInput = this.$refs.fileInput;
-                if (fileInput) {
-                    fileInput.value = '';
-                }
+                // Reset file input with timeout to ensure DOM is ready
+                this.$nextTick(() => {
+                    const fileInput = this.$refs.fileInput || document.querySelector('[x-ref="fileInput"]');
+                    if (fileInput) {
+                        fileInput.value = '';
+                        console.log('File input reset completed');
+                    } else {
+                        console.log('File input element not found');
+                    }
+                });
             },
 
-            async uploadFile(fileInput) {
-                console.log('uploadFile called with:', fileInput);
+            async uploadFile() {
+                console.log('🚀 uploadFile called');
                 console.log('currentFileType:', this.currentFileType);
                 console.log('editingUS:', this.editingUS);
                 console.log('editingUSM:', this.editingUSM);
@@ -1112,12 +1117,52 @@
                     return;
                 }
 
-                if (!fileInput.files || fileInput.files.length === 0) {
+                // Wait for DOM to be ready before accessing file input
+                await this.$nextTick();
+
+                // Get the file input element using multiple approaches
+                let fileInputElement = this.$refs.fileInput;
+
+                if (!fileInputElement) {
+                    fileInputElement = document.querySelector('[x-ref="fileInput"]');
+                }
+
+                if (!fileInputElement) {
+                    fileInputElement = document.querySelector('#fileInput');
+                }
+
+                if (!fileInputElement) {
+                    fileInputElement = document.querySelector('input[type="file"]');
+                }
+
+                console.log('🔍 File input search results:', {
+                    foundElement: !!fileInputElement,
+                    elementId: fileInputElement?.id,
+                    elementName: fileInputElement?.name,
+                    hasFiles: !!fileInputElement?.files,
+                    filesLength: fileInputElement?.files?.length,
+                    files: fileInputElement?.files
+                });
+
+                if (!fileInputElement) {
+                    console.error('❌ File input element not found');
+                    alert('Impossibile trovare l\'elemento file input');
+                    return;
+                }
+
+                if (!fileInputElement.files || fileInputElement.files.length === 0) {
+                    console.log('❌ No files selected in input');
                     alert('Seleziona un file');
                     return;
                 }
 
-                const file = fileInput.files[0];
+                const file = fileInputElement.files[0];
+                console.log('Selected file details:', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    lastModified: file.lastModified
+                });
                 console.log('File selezionato:', file.name, file.size);
 
                 this.uploadingFile = true;
