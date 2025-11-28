@@ -1,0 +1,827 @@
+{% extends "base/site_base.html" %}
+
+{% block title %}Harris Matrix Viewer - {{ site.name }}{% endblock %}
+
+{% block additional_head %}
+<!-- Cytoscape.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+<!-- Cytoscape.js layout extensions -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape-dagre.min.js"></script>
+<!-- Additional styling for Cytoscape -->
+<style>
+[x-cloak] { display: none !important; }
+
+#cy {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background-color: #f9fafb;
+}
+
+.matrix-container {
+    position: relative;
+    min-height: 700px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.legend-item:last-child {
+    border-bottom: none;
+}
+
+.node-tooltip {
+    position: absolute;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-width: 300px;
+    pointer-events: none;
+}
+
+.control-button {
+    @apply bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200;
+}
+
+.control-button.active {
+    @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700;
+}
+
+.stats-card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4;
+}
+
+.stats-card .number {
+    @apply text-2xl font-bold;
+}
+
+.stats-card .label {
+    @apply text-sm text-gray-600 mt-1;
+}
+
+.edge-style-preview {
+    width: 40px;
+    height: 2px;
+    margin-right: 0.5rem;
+}
+
+/* Dark mode support */
+.dark #cy {
+    background-color: #1f2937;
+    border-color: #374151;
+}
+
+.dark .matrix-container {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+}
+
+.dark .loading-overlay {
+    background: rgba(31, 41, 55, 0.9);
+}
+
+.dark .node-tooltip {
+    background: #1f2937;
+    border-color: #374151;
+    color: white;
+}
+
+.dark .stats-card {
+    @apply bg-gray-800 border-gray-700;
+}
+
+.dark .legend-item {
+    border-bottom-color: #374151;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="harrisMatrixViewer()" x-init="init()" class="container mx-auto px-4 py-6">
+    
+    <!-- Header -->
+    <div class="mb-6">
+        <nav class="flex mb-4" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                <li class="inline-flex items-center">
+                    <a href="/view/{{ site.id }}/dashboard" class="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </a>
+                </li>
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <a href="/view/{{ site.id }}/us" class="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">US/USM</a>
+                    </div>
+                </li>
+                <li aria-current="page">
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <span class="text-gray-500 dark:text-gray-400">Harris Matrix</span>
+                    </div>
+                </li>
+            </ol>
+        </nav>
+        
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-project-diagram mr-3 text-blue-600"></i>
+                    Harris Matrix Viewer
+                </h1>
+                <p class="text-xl text-gray-600 dark:text-gray-300 mt-1">{{ site.name }} ({{ site.code }})</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Stratigraphic relationships visualization</p>
+            </div>
+            
+            <div class="flex gap-3">
+                <button @click="showSettings = !showSettings"
+                        :class="showSettings ? 'control-button active' : 'control-button'"
+                        title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button @click="exportImage()" 
+                        class="control-button"
+                        title="Export as PNG">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button @click="resetView()" 
+                        class="control-button"
+                        title="Reset View">
+                    <i class="fas fa-compress-arrows-alt"></i>
+                </button>
+                <button @click="fitToScreen()" 
+                        class="control-button"
+                        title="Fit to Screen">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button @click="loadMatrix()" :disabled="loading"
+                        class="control-button"
+                        :class="{ 'opacity-50 cursor-not-allowed': loading }"
+                        title="Refresh Matrix">
+                    <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">US Units</p>
+                    <p class="number text-blue-600 dark:text-blue-400" x-text="matrixData.metadata?.total_us || 0"></p>
+                </div>
+                <i class="fas fa-layer-group text-blue-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">USM Units</p>
+                    <p class="number text-purple-600 dark:text-purple-400" x-text="matrixData.metadata?.total_usm || 0"></p>
+                </div>
+                <i class="fas fa-cube text-purple-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Relationships</p>
+                    <p class="number text-green-600 dark:text-green-400" x-text="matrixData.metadata?.total_edges || 0"></p>
+                </div>
+                <i class="fas fa-link text-green-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Chronological Levels</p>
+                    <p class="number text-orange-600 dark:text-orange-400" x-text="Object.keys(matrixData.levels || {}).length || 0"></p>
+                </div>
+                <i class="fas fa-history text-orange-500 text-xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="flex gap-6">
+        
+        <!-- Left Sidebar - Settings -->
+        <div x-show="showSettings" x-cloak class="w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto">
+            <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Visualization Settings</h3>
+            
+            <div class="space-y-4">
+                <!-- Layout Type -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Layout Algorithm</label>
+                    <select x-model="settings.layout" @change="updateLayout()" 
+                            class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="dagre">Hierarchical (Dagre)</option>
+                        <option value="breadthfirst">Breadth First</option>
+                        <option value="circle">Circular</option>
+                        <option value="grid">Grid</option>
+                        <option value="concentric">Concentric</option>
+                    </select>
+                </div>
+                
+                <!-- Node Size -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Node Size</label>
+                    <select x-model="settings.nodeSize" @change="updateNodeStyles()" 
+                            class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                    </select>
+                </div>
+                
+                <!-- Edge Style -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Edge Style</label>
+                    <select x-model="settings.edgeStyle" @change="updateEdgeStyles()" 
+                            class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="default">Default</option>
+                        <option value="curved">Curved</option>
+                        <option value="straight">Straight</option>
+                    </select>
+                </div>
+                
+                <!-- Toggle Options -->
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="settings.showLabels" @change="updateNodeStyles()" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Show Labels</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="settings.showEdgeLabels" @change="updateEdgeStyles()" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Show Edge Labels</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="settings.animateLayout" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Animate Layout</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Visualization Area -->
+        <div class="flex-1">
+            <div class="matrix-container">
+                <!-- Loading Overlay -->
+                <div x-show="loading" class="loading-overlay">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
+                        <p class="text-lg font-medium text-gray-900 dark:text-white">Loading Harris Matrix...</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Analyzing stratigraphic relationships</p>
+                    </div>
+                </div>
+                
+                <!-- Cytoscape Container -->
+                <div id="cy" x-show="!loading"></div>
+                
+                <!-- Empty State -->
+                <div x-show="!loading && (!matrixData.nodes || matrixData.nodes.length === 0)" 
+                     class="absolute inset-0 flex items-center justify-center">
+                    <div class="text-center max-w-md">
+                        <i class="fas fa-project-diagram text-6xl text-gray-300 dark:text-gray-600 mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No Harris Matrix Data</h3>
+                        <p class="text-gray-600 dark:text-gray-400 mb-4">No stratigraphic units or relationships found for this site.</p>
+                        <a href="/view/{{ site.id }}/us" 
+                           class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                            <i class="fas fa-plus mr-2"></i>Create US/USM Units
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Selected Node Details -->
+            <div x-show="selectedNode" x-cloak class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                            <span x-text="selectedNode?.label || ''"></span>
+                            <span class="text-sm text-blue-700 dark:text-blue-300 ml-2" x-text="'(' + (selectedNode?.type || '').toUpperCase() + ')'"></span>
+                        </h4>
+                        <div class="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                            <div x-show="selectedNode?.data?.definition">
+                                <span class="font-medium">Definition:</span>
+                                <span x-text="truncateText(selectedNode?.data?.definition, 150)"></span>
+                            </div>
+                            <div x-show="selectedNode?.data?.localita">
+                                <span class="font-medium">Location:</span>
+                                <span x-text="selectedNode?.data?.localita"></span>
+                            </div>
+                            <div x-show="selectedNode?.data?.datazione">
+                                <span class="font-medium">Dating:</span>
+                                <span x-text="selectedNode?.data?.datazione"></span>
+                            </div>
+                            <div x-show="selectedNode?.data?.periodo">
+                                <span class="font-medium">Period:</span>
+                                <span x-text="selectedNode?.data?.periodo"></span>
+                            </div>
+                            <div x-show="selectedNode?.data?.fase">
+                                <span class="font-medium">Phase:</span>
+                                <span x-text="selectedNode?.data?.fase"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <button @click="selectedNode = null" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar - Legend -->
+        <div class="w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
+            <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Legend</h3>
+            
+            <!-- Node Types -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Unit Types</h4>
+                <div class="space-y-2">
+                    <div class="legend-item">
+                        <div class="w-4 h-4 bg-blue-500 rounded"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">US (Stratigraphic Unit)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="w-4 h-4 bg-purple-500 rounded"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">USM (Wall Unit)</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Relationship Types -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Relationships</h4>
+                <div class="space-y-2">
+                    <div class="legend-item">
+                        <div class="edge-style-preview bg-gray-600"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">copre / si appoggia a</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="edge-style-preview bg-red-600"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">taglia / tagliato da</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="edge-style-preview bg-blue-600"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">riempie / riempito da</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="edge-style-preview bg-green-600" style="border-top: 2px dashed green;"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">uguale a / si lega a</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Controls -->
+            <div>
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Controls</h4>
+                <div class="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                    <div><i class="fas fa-mouse-pointer mr-2"></i>Click: Select node</div>
+                    <div><i class="fas fa-hand-paper mr-2"></i>Drag: Pan view</div>
+                    <div><i class="fas fa-search-plus mr-2"></i>Scroll: Zoom in/out</div>
+                    <div><i class="fas fa-expand-arrows-alt mr-2"></i>Double-click: Focus node</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Node Tooltip -->
+    <div x-show="tooltip.visible" x-cloak 
+         class="node-tooltip" 
+         :style="`left: ${tooltip.x}px; top: ${tooltip.y}px;`">
+        <div class="text-sm">
+            <div class="font-semibold mb-1" x-text="tooltip.content?.label || ''"></div>
+            <div x-show="tooltip.content?.data?.definition" class="text-gray-600 dark:text-gray-400">
+                <span x-text="truncateText(tooltip.content?.data?.definition, 100)"></span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function harrisMatrixViewer() {
+    return {
+        // Core data
+        cy: null,
+        matrixData: { nodes: [], edges: [], levels: {}, metadata: {} },
+        selectedNode: null,
+        loading: false,
+        error: null,
+        
+        // UI state
+        showSettings: false,
+        tooltip: {
+            visible: false,
+            x: 0,
+            y: 0,
+            content: null
+        },
+        
+        // Settings
+        settings: {
+            layout: 'dagre',
+            nodeSize: 'medium',
+            edgeStyle: 'default',
+            showLabels: true,
+            showEdgeLabels: true,
+            animateLayout: true
+        },
+        
+        // Site ID from template
+        siteId: '{{ site.id }}',
+        
+        // Initialize component
+        async init() {
+            await this.loadMatrix();
+        },
+        
+        // Load matrix data from API
+        async loadMatrix() {
+            this.loading = true;
+            this.error = null;
+            
+            try {
+                const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                this.matrixData = await response.json();
+                this.initializeCytoscape();
+                
+            } catch (error) {
+                console.error('Error loading Harris Matrix:', error);
+                this.error = error.message;
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        // Initialize Cytoscape.js
+        initializeCytoscape() {
+            if (!this.matrixData.nodes || this.matrixData.nodes.length === 0) {
+                return;
+            }
+            
+            // Convert API data to Cytoscape format
+            const elements = this.convertToCytoscapeElements();
+            
+            // Initialize Cytoscape
+            this.cy = cytoscape({
+                container: document.getElementById('cy'),
+                elements: elements,
+                style: this.getCytoscapeStyles(),
+                layout: {
+                    name: 'preset'
+                },
+                minZoom: 0.1,
+                maxZoom: 5,
+                wheelSensitivity: 0.2
+            });
+            
+            // Apply initial layout
+            this.updateLayout();
+            
+            // Setup event handlers
+            this.setupEventHandlers();
+        },
+        
+        // Convert API data to Cytoscape elements format
+        convertToCytoscapeElements() {
+            const elements = [];
+            
+            // Add nodes
+            this.matrixData.nodes.forEach(node => {
+                elements.push({
+                    data: {
+                        id: node.id,
+                        label: node.label,
+                        type: node.type,
+                        definition: node.definition,
+                        data: node.data,
+                        level: this.matrixData.levels[node.id] || 0
+                    }
+                });
+            });
+            
+            // Add edges
+            this.matrixData.edges.forEach(edge => {
+                elements.push({
+                    data: {
+                        id: `${edge.from}-${edge.to}`,
+                        source: edge.from,
+                        target: edge.to,
+                        type: edge.type,
+                        label: edge.label,
+                        bidirectional: edge.bidirectional
+                    }
+                });
+            });
+            
+            return elements;
+        },
+        
+        // Get Cytoscape styles
+        getCytoscapeStyles() {
+            const nodeSizes = {
+                small: 30,
+                medium: 50,
+                large: 70
+            };
+            
+            const nodeSize = nodeSizes[this.settings.nodeSize] || nodeSizes.medium;
+            
+            return [
+                // Node styles
+                {
+                    selector: 'node',
+                    style: {
+                        'width': nodeSize,
+                        'height': nodeSize * 0.7,
+                        'shape': 'round-rectangle',
+                        'background-color': (ele) => this.getNodeColor(ele),
+                        'border-width': 2,
+                        'border-color': (ele) => this.getNodeBorderColor(ele),
+                        'color': 'white',
+                        'font-size': '12px',
+                        'font-weight': 'bold',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'text-wrap': 'wrap',
+                        'text-max-width': nodeSize,
+                        'label': (ele) => this.settings.showLabels ? ele.data('label') : '',
+                        'overlay-opacity': 0,
+                        'transition-property': 'background-color, border-color, width, height',
+                        'transition-duration': '0.3s'
+                    }
+                },
+                
+                // Node hover styles
+                {
+                    selector: 'node:hover',
+                    style: {
+                        'border-width': 4,
+                        'border-color': '#1f2937',
+                        'overlay-color': '#1f2937',
+                        'overlay-opacity': 0.2
+                    }
+                },
+                
+                // Selected node styles
+                {
+                    selector: 'node:selected',
+                    style: {
+                        'border-width': 4,
+                        'border-color': '#3b82f6',
+                        'overlay-color': '#3b82f6',
+                        'overlay-opacity': 0.3
+                    }
+                },
+                
+                // Edge styles
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 2,
+                        'line-color': (ele) => this.getEdgeColor(ele),
+                        'target-arrow-color': (ele) => this.getEdgeColor(ele),
+                        'target-arrow-shape': (ele) => ele.data('bidirectional') ? 'none' : 'triangle',
+                        'source-arrow-color': (ele) => this.getEdgeColor(ele),
+                        'source-arrow-shape': (ele) => ele.data('bidirectional') ? 'triangle' : 'none',
+                        'curve-style': (ele) => this.settings.edgeStyle === 'curved' ? 'bezier' : 'straight',
+                        'label': (ele) => this.settings.showEdgeLabels ? ele.data('label') : '',
+                        'font-size': '10px',
+                        'color': '#6b7280',
+                        'text-rotation': 'autorotate',
+                        'text-margin-y': -10,
+                        'overlay-opacity': 0
+                    }
+                },
+                
+                // Edge hover styles
+                {
+                    selector: 'edge:hover',
+                    style: {
+                        'width': 4,
+                        'overlay-color': '#1f2937',
+                        'overlay-opacity': 0.3
+                    }
+                }
+            ];
+        },
+        
+        // Get node color based on type
+        getNodeColor(node) {
+            const type = node.data('type');
+            return type === 'usm' ? '#8b5cf6' : '#3b82f6'; // purple for USM, blue for US
+        },
+        
+        // Get node border color
+        getNodeBorderColor(node) {
+            const type = node.data('type');
+            return type === 'usm' ? '#6d28d9' : '#1d4ed8'; // darker purple/blue
+        },
+        
+        // Get edge color based on relationship type
+        getEdgeColor(edge) {
+            const type = edge.data('type');
+            const colors = {
+                'copre': '#6b7280',
+                'si_appoggia_a': '#6b7280',
+                'taglia': '#ef4444',
+                'tagliato_da': '#ef4444',
+                'riempie': '#3b82f6',
+                'riempito_da': '#3b82f6',
+                'uguale_a': '#10b981',
+                'si_lega_a': '#10b981'
+            };
+            return colors[type] || '#6b7280';
+        },
+        
+        // Setup event handlers
+        setupEventHandlers() {
+            // Node click
+            this.cy.on('tap', 'node', (event) => {
+                const node = event.target;
+                this.selectedNode = node.data();
+            });
+            
+            // Node double click - focus on node
+            this.cy.on('dbltap', 'node', (event) => {
+                const node = event.target;
+                this.cy.animate({
+                    center: { eles: node },
+                    zoom: 1.5
+                }, {
+                    duration: 500
+                });
+            });
+            
+            // Mouse over - show tooltip
+            this.cy.on('mouseover', 'node', (event) => {
+                const node = event.target;
+                const pos = event.renderedPosition || event.position;
+                
+                this.tooltip = {
+                    visible: true,
+                    x: pos.x + 10,
+                    y: pos.y - 10,
+                    content: node.data()
+                };
+            });
+            
+            // Mouse out - hide tooltip
+            this.cy.on('mouseout', 'node', () => {
+                this.tooltip.visible = false;
+            });
+            
+            // Background click - deselect
+            this.cy.on('tap', (event) => {
+                if (event.target === this.cy) {
+                    this.selectedNode = null;
+                }
+            });
+        },
+        
+        // Update layout
+        updateLayout() {
+            if (!this.cy) return;
+            
+            const layoutOptions = this.getLayoutOptions();
+            
+            this.cy.layout({
+                ...layoutOptions,
+                animate: this.settings.animateLayout,
+                animationDuration: this.settings.animateLayout ? 500 : 0
+            }).run();
+        },
+        
+        // Get layout options based on selected algorithm
+        getLayoutOptions() {
+            const layouts = {
+                dagre: {
+                    name: 'dagre',
+                    rankDir: 'TB', // Top to bottom (chronological)
+                    align: 'UL',
+                    rankSep: 100,
+                    nodeSep: 50,
+                    edgeSep: 10
+                },
+                breadthfirst: {
+                    name: 'breadthfirst',
+                    directed: true,
+                    roots: (node) => node.indegree() === 0,
+                    spacingFactor: 1.5
+                },
+                circle: {
+                    name: 'circle',
+                    radius: 200,
+                    startAngle: -90,
+                    counterclockwise: false
+                },
+                grid: {
+                    name: 'grid',
+                    rows: Math.ceil(Math.sqrt(this.cy.nodes().length)),
+                    cols: Math.ceil(Math.sqrt(this.cy.nodes().length)),
+                    position: (node) => ({
+                        row: this.matrixData.levels[node.id()] || 0,
+                        col: node.index() % Math.ceil(Math.sqrt(this.cy.nodes().length))
+                    })
+                },
+                concentric: {
+                    name: 'concentric',
+                    concentric: (node) => this.matrixData.levels[node.id()] || 0,
+                    minNodeSpacing: 50
+                }
+            };
+            
+            return layouts[this.settings.layout] || layouts.dagre;
+        },
+        
+        // Update node styles
+        updateNodeStyles() {
+            if (!this.cy) return;
+            this.cy.style(this.getCytoscapeStyles());
+        },
+        
+        // Update edge styles
+        updateEdgeStyles() {
+            if (!this.cy) return;
+            this.cy.style(this.getCytoscapeStyles());
+        },
+        
+        // Control functions
+        resetView() {
+            if (!this.cy) return;
+            this.cy.fit();
+        },
+        
+        fitToScreen() {
+            if (!this.cy) return;
+            this.cy.fit(undefined, 50);
+        },
+        
+        async exportImage() {
+            if (!this.cy) return;
+            
+            try {
+                const png = this.cy.png({
+                    output: 'blob',
+                    bg: 'white',
+                    full: true,
+                    scale: 2
+                });
+                
+                const url = URL.createObjectURL(png);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `harris-matrix-${this.siteId}-${Date.now()}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+            } catch (error) {
+                console.error('Error exporting image:', error);
+                alert('Error exporting image. Please try again.');
+            }
+        },
+        
+        // Utility functions
+        truncateText(text, length) {
+            if (!text) return '';
+            return text.length > length ? text.substring(0, length) + '...' : text;
+        }
+    };
+}
+</script>
+{% endblock %}

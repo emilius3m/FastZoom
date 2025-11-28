@@ -17,25 +17,6 @@ from app.routes.api.v1.documents import router as documents_router
 from app.routes.api.v1.us import router as us_router
 from app.routes.api.v1.geographic import router as geographic_router
 # from app.routes.api.v1.archaeological import router as archaeological_router
-"""
-API v1 - Riorganizzazione del Sistema Archeologico Multi-Sito
-Struttura RESTful con domini funzionali chiari e backward compatibility.
-"""
-
-from fastapi import APIRouter
-from app.routes.api.v1.auth import router as auth_router
-# Enable sites and photos routers for v1 API
-from app.routes.api.v1.sites import router as sites_router
-from app.routes.api.v1.photos import router as photos_router  # Now includes consolidated photo endpoints
-# Temporarily comment out problematic routers to resolve import issues
-# from app.routes.api.v1.metadata import router as metadata_router
-# Temporarily comment out deepzoom router due to syntax issues
-from app.routes.api.v1.deepzoom import router as deepzoom_router
-from app.routes.api.v1.documents import router as documents_router
-# from app.routes.api.v1.iccd import router as iccd_router
-from app.routes.api.v1.us import router as us_router
-from app.routes.api.v1.geographic import router as geographic_router
-# from app.routes.api.v1.archaeological import router as archaeological_router
 from app.routes.api.v1.giornale import router as giornale_router
 from app.routes.api.v1.cantieri import router as cantieri_router
 from app.routes.api.v1.teams import router as teams_router
@@ -44,6 +25,7 @@ from app.routes.api.v1.teams import router as teams_router
 from app.routes.api.v1.admin import router as admin_router
 from app.routes.api.v1.unified import router as unified_router
 from app.routes.api.v1.us_files import router as us_files_router
+from app.routes.api.v1.harris_matrix import router as harris_matrix_router
 
 # Router principale API v1
 api_v1_router = APIRouter(
@@ -65,6 +47,7 @@ api_v1_router.include_router(documents_router, tags=["Documents"])
 # api_v1_router.include_router(iccd_router, prefix="/iccd", tags=["ICCD Cataloging"])
 api_v1_router.include_router(us_router, prefix="/us", tags=["US/USM Units"])
 api_v1_router.include_router(us_files_router, prefix="/us-files", tags=["US/USM Files"])
+api_v1_router.include_router(harris_matrix_router, prefix="/harris-matrix", tags=["Harris Matrix"])
 api_v1_router.include_router(geographic_router, prefix="/geographic", tags=["Geographic Maps"])
 # api_v1_router.include_router(archaeological_router, prefix="/archaeological", tags=["Archaeological Plans"])
 api_v1_router.include_router(giornale_router, prefix="/giornale", tags=["Giornale di Cantiere"])
