@@ -701,9 +701,20 @@ class ArchaeologicalMinIOService:
         site_id: str,
         document_metadata: Dict[str, Any]
     ) -> str:
-        """Upload documento con metadati"""
+        """
+        Upload documento con metadati
+        
+        FIXED: Preserve original file extension instead of forcing .pdf.
+        
+        Previous issues:
+        1. PDF extension duplication when document_id already had .pdf
+        2. All documents (including Word files) getting .pdf extension forced
+        
+        Now it preserves the original extension from document_id.
+        """
 
-        object_name = f"{site_id}/{document_id}.pdf"
+        # Use document_id as-is since us_file_service.py already includes the correct extension
+        object_name = f"{site_id}/{document_id}"
 
         # Crea metadati usando il sistema unificato
         base_metadata = self._create_base_metadata(site_id, 'application/pdf')

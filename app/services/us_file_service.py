@@ -576,183 +576,202 @@ class USFileService:
         return result.scalars().all()
     
     async def delete_us_file(self, us_id: UUID, file_id: UUID, user_id: UUID) -> bool:
-        """Elimina file US con cleanup storage"""
+        """Elimina file US con cleanup storage e gestione StaleDataError"""
         
         try:
-            # Trova file
-            file_query = select(USFile).where(USFile.id == safe_uuid_str(file_id))
-            file_result = await self.db.execute(file_query)
-            us_file = file_result.scalar_one_or_none()
-           
+            # Trova file con fallback multi-livello per UUID
+            us_file = await self._find_file_with_uuid_fallback(file_id)
             if not us_file:
+                logger.error(f"File US non trovato per ID: {file_id} (formato originale)")
                 raise HTTPException(status_code=404, detail="File non trovato")
-           
-            # Verifica associazione US con normalizzazione UUID per compatibilità
-            us_id_str = str(us_id)
-            normalized_us_id = self._normalize_us_id(us_id)
-            assoc_query = select(us_files_association).where(
-                and_(
-                    or_(
-                        us_files_association.c.us_id == safe_uuid_str(us_id),
-                        us_files_association.c.us_id == normalized_us_id,
-                        us_files_association.c.us_id == us_id_str.replace('-', '')
-                    ),
-                    us_files_association.c.file_id == safe_uuid_str(file_id)
-                )
-            )
-            assoc_result = await self.db.execute(assoc_query)
-            if not assoc_result.first():
-                raise HTTPException(status_code=404, detail="Associazione file-US non trovata")
-           
-            # Elimina file da storage
+            
+            # Log dettagli per debugging
+            logger.info(f"Trovato file US per eliminazione: id={us_file.id}, filename={us_file.filename}, filepath={us_file.filepath}")
+            
+            # Verifica se il file ha altre associazioni PRIMA di eliminare
+            has_other_us_assoc = await self._check_file_has_us_associations(file_id)
+            has_usm_assoc = await self._check_file_has_usm_associations(file_id)
+            
+            logger.info(f"Verifica associazioni file {file_id}: US-other={has_other_us_assoc}, USM={has_usm_assoc}")
+            
+            # Elimina file da storage con retry
+            storage_deleted = False
             if us_file.filepath:
                 try:
                     await self.storage.delete_file(us_file.filepath)
-                    logger.info(f"File eliminato da storage: {us_file.filepath}")
+                    storage_deleted = True
+                    logger.info(f"✅ File eliminato da storage: {us_file.filepath}")
                 except Exception as e:
-                    logger.warning(f"Errore eliminazione storage: {e}")
-           
+                    logger.error(f"❌ Errore eliminazione storage: {e}")
+                    # Continua con l'eliminazione del database anche se storage fallisce
+            
             # Elimina thumbnail se esiste
             if us_file.thumbnail_path:
                 try:
                     await self.storage.delete_file(us_file.thumbnail_path)
+                    logger.info(f"✅ Thumbnail eliminato da storage: {us_file.thumbnail_path}")
                 except Exception as e:
-                    logger.warning(f"Errore eliminazione thumbnail: {e}")
-           
-            # Elimina associazione con normalizzazione UUID per compatibilità
-            # Usa result.rowcount per verificare se l'eliminazione ha avuto successo
-            us_id_str = str(us_id)
-            normalized_us_id = self._normalize_us_id(us_id)
-            delete_assoc = us_files_association.delete().where(
-                and_(
-                    or_(
-                        us_files_association.c.us_id == safe_uuid_str(us_id),
-                        us_files_association.c.us_id == normalized_us_id,
-                        us_files_association.c.us_id == us_id_str.replace('-', '')
-                    ),
-                    us_files_association.c.file_id == safe_uuid_str(file_id)
+                    logger.warning(f"❌ Errore eliminazione thumbnail: {e}")
+            
+            # STRATEGIA: Usa SQLAlchemy cascade per evitare StaleDataError
+            # Rimuovi il file dalla collezione delle associazioni US per il suo specifico us_id
+            if has_other_us_assoc:
+                logger.info(f"File {file_id} ha altre associazioni US, elimino solo questa associazione")
+                
+                # Trova e rimuovi solo l'associazione specifica
+                us_id_str = str(us_id)
+                normalized_us_id = self._normalize_us_id(us_id)
+                us_id_no_dashes = us_id_str.replace('-', '')
+                
+                # Rimuovi dalla collezione usando query diretta per evitare cascade
+                delete_assoc = us_files_association.delete().where(
+                    and_(
+                        or_(
+                            us_files_association.c.us_id == us_id_str,
+                            us_files_association.c.us_id == normalized_us_id,
+                            us_files_association.c.us_id == us_id_no_dashes
+                        ),
+                        us_files_association.c.file_id == safe_uuid_str(file_id)
+                    )
                 )
-            )
-            result = await self.db.execute(delete_assoc)
-            
-            # Logga se l'associazione non è stata trovata (ma non è un errore critico)
-            if result.rowcount == 0:
-                logger.warning(f"Nessuna associazione US-File trovata per eliminazione: us_id={us_id}, file_id={file_id}")
+                
+                try:
+                    result = await self.db.execute(delete_assoc)
+                    logger.info(f"Associazione US-File eliminata: {result.rowcount} righe")
+                except Exception as e:
+                    if "expected to delete" in str(e) and "Only 0 were matched" in str(e):
+                        logger.warning(f"Associazione US-File non trovata (già eliminata): us_id={us_id}, file_id={file_id}")
+                    else:
+                        raise
             else:
-                logger.info(f"Associazione US-File eliminata: {result.rowcount} righe")
+                logger.info(f"File {file_id} non ha altre associazioni US, provo eliminazione tramite SQLAlchemy cascade")
+                
+                # Lascia che SQLAlchemy gestisca l'eliminazione tramite cascade
+                # Questo evita StaleDataError perché SQLAlchemy gestisce l'ordine di eliminazione
+                try:
+                    # Aggiorna il file per forzarne il rilevamento da SQLAlchemy
+                    await self.db.flush()
+                    
+                    # Elimina il file - SQLAlchemy gestirà automaticamente le associazioni
+                    await self.db.delete(us_file)
+                    logger.info(f"File {file_id} eliminato dal database con cascade")
+                except Exception as e:
+                    if "is not bound" in str(e) or "detached" in str(e).lower():
+                        logger.info(f"File {file_id} già eliminato dal database (cascade)")
+                    else:
+                        logger.warning(f"Errore eliminazione file cascade: {e}")
+                        # Fallback: eliminazione manuale delle associazioni rimanenti
+                        await self._fallback_delete_all_associations(file_id)
             
-            # Elimina record file se non ha altre associazioni
-            other_assoc_query = select(us_files_association).where(
-                us_files_association.c.file_id == safe_uuid_str(file_id)
-            )
-            other_assoc = await self.db.execute(other_assoc_query)
-            
-            usm_assoc_query = select(usm_files_association).where(
-                usm_files_association.c.file_id == safe_uuid_str(file_id)
-            )
-            usm_assoc = await self.db.execute(usm_assoc_query)
-            
-            if not other_assoc.first() and not usm_assoc.first():
-                await self.db.delete(us_file)
-           
             await self.db.commit()
-            logger.info(f"File US {file_id} eliminato da US {us_id}")
+            
+            # Log finale con stato completo
+            status = "completato con successo" if storage_deleted else "completato (storage error)"
+            logger.info(f"🗑️ Eliminazione file US {file_id} {status}: storage={storage_deleted}, db=True")
             return True
-           
+            
+        except HTTPException:
+            await self.db.rollback()
+            raise
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Errore eliminazione file US: {str(e)}")
-            # Se l'errore è solo che l'associazione non esisteva, è solo un warning
-            if "expected to delete" in str(e) and "Only 0 were matched" in str(e):
-                logger.warning(f"Associazione US-File non trovata per eliminazione (non critico): us_id={us_id}, file_id={file_id}")
-                return True
+            logger.error(f"❌ Errore critico eliminazione file US {file_id}: {str(e)}")
+            logger.exception(f"Full traceback per eliminazione file US {file_id}")
             raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
     
     async def delete_usm_file(self, usm_id: UUID, file_id: UUID, user_id: UUID) -> bool:
-        """Elimina file USM con cleanup storage"""
+        """Elimina file USM con cleanup storage e gestione errori migliorata"""
         
         try:
-            # Trova file
-            file_query = select(USFile).where(USFile.id == safe_uuid_str(file_id))
-            file_result = await self.db.execute(file_query)
-            us_file = file_result.scalar_one_or_none()
-           
+            # Trova file con fallback multi-livello per UUID
+            us_file = await self._find_file_with_uuid_fallback(file_id)
             if not us_file:
+                logger.error(f"File USM non trovato per ID: {file_id} (formato originale)")
                 raise HTTPException(status_code=404, detail="File non trovato")
-           
-            # Verifica associazione USM
-            assoc_query = select(usm_files_association).where(
-                and_(
-                    usm_files_association.c.usm_id == safe_uuid_str(usm_id),
-                    usm_files_association.c.file_id == safe_uuid_str(file_id)
-                )
-            )
-            assoc_result = await self.db.execute(assoc_query)
-            if not assoc_result.first():
-                raise HTTPException(status_code=404, detail="Associazione file-USM non trovata")
-           
-            # Elimina file da storage
-            if us_file.filepath:
-                try:
-                    await self.storage.delete_file(us_file.filepath)
-                    logger.info(f"File eliminato da storage: {us_file.filepath}")
-                except Exception as e:
-                    logger.warning(f"Errore eliminazione storage: {e}")
-           
-            # Elimina thumbnail se esiste
-            if us_file.thumbnail_path:
-                try:
-                    await self.storage.delete_file(us_file.thumbnail_path)
-                except Exception as e:
-                    logger.warning(f"Errore eliminazione thumbnail: {e}")
-           
-            # Elimina associazione USM con normalizzazione UUID per compatibilità
-            # Usa result.rowcount per verificare se l'eliminazione ha avuto successo
+            
+            # Log dettagli per debugging
+            logger.info(f"Trovato file USM per eliminazione: id={us_file.id}, filename={us_file.filename}, filepath={us_file.filepath}")
+            
+            # Verifica associazione USM con fallback multi-livello
             usm_id_str = str(usm_id)
             normalized_usm_id = self._normalize_us_id(usm_id)
-            delete_assoc = usm_files_association.delete().where(
+            usm_id_no_dashes = usm_id_str.replace('-', '')
+            
+            logger.info(f"Ricerca associazione USM-File con ID originali: usm_id={usm_id}, normalized={normalized_usm_id}, no_dashes={usm_id_no_dashes}")
+            logger.info(f"Ricerca associazione USM-File con file_id: {safe_uuid_str(file_id)}")
+            
+            # Trova associazione con fallback multi-livello
+            assoc_query = select(usm_files_association).where(
                 and_(
                     or_(
-                        usm_files_association.c.usm_id == safe_uuid_str(usm_id),
+                        usm_files_association.c.usm_id == usm_id_str,
                         usm_files_association.c.usm_id == normalized_usm_id,
-                        usm_files_association.c.usm_id == usm_id_str.replace('-', '')
+                        usm_files_association.c.usm_id == usm_id_no_dashes
                     ),
                     usm_files_association.c.file_id == safe_uuid_str(file_id)
                 )
             )
-            result = await self.db.execute(delete_assoc)
+            assoc_result = await self.db.execute(assoc_query)
+            association = assoc_result.first()
             
-            # Logga se l'associazione non è stata trovata (ma non è un errore critico)
-            if result.rowcount == 0:
-                logger.warning(f"Nessuna associazione USM-File trovata per eliminazione: usm_id={usm_id}, file_id={file_id}")
-            else:
-                logger.info(f"Associazione USM-File eliminata: {result.rowcount} righe")
+            if not association:
+                logger.error(f"Associazione USM-File non trovata: usm_id={usm_id}, file_id={file_id}")
+                # Tenta comunque di eliminare il file dal database se non ha più associazioni
+                await self._try_orphan_file_cleanup(file_id)
+                raise HTTPException(status_code=404, detail="Associazione file-USM non trovata")
             
-            # Elimina record file se non ha altre associazioni
-            us_assoc_query = select(us_files_association).where(
-                us_files_association.c.file_id == safe_uuid_str(file_id)
+            logger.info(f"Associazione USM-File trovata: usm_id={association.usm_id}, file_id={association.file_id}")
+            
+            # Elimina file da storage con retry
+            storage_deleted = False
+            if us_file.filepath:
+                try:
+                    await self.storage.delete_file(us_file.filepath)
+                    storage_deleted = True
+                    logger.info(f"✅ File eliminato da storage: {us_file.filepath}")
+                except Exception as e:
+                    logger.error(f"❌ Errore eliminazione storage: {e}")
+                    # Continua con l'eliminazione del database anche se storage fallisce
+            
+            # Elimina thumbnail se esiste
+            if us_file.thumbnail_path:
+                try:
+                    await self.storage.delete_file(us_file.thumbnail_path)
+                    logger.info(f"✅ Thumbnail eliminato da storage: {us_file.thumbnail_path}")
+                except Exception as e:
+                    logger.warning(f"❌ Errore eliminazione thumbnail: {e}")
+            
+            # PRIMA: Elimina l'associazione USM-File
+            delete_assoc = usm_files_association.delete().where(
+                and_(
+                    or_(
+                        usm_files_association.c.usm_id == usm_id_str,
+                        usm_files_association.c.usm_id == normalized_usm_id,
+                        usm_files_association.c.usm_id == usm_id_no_dashes
+                    ),
+                    usm_files_association.c.file_id == safe_uuid_str(file_id)
+                )
             )
-            us_assoc = await self.db.execute(us_assoc_query)
+            assoc_result = await self.db.execute(delete_assoc)
+            logger.info(f"Associazione USM-File eliminata: {assoc_result.rowcount} righe")
             
-            usm_assoc_query = select(usm_files_association).where(
-                usm_files_association.c.file_id == safe_uuid_str(file_id)
-            )
-            usm_assoc = await self.db.execute(usm_assoc_query)
+            # DOPO: Verifica se il file ha altre associazioni ed elimina se orfano
+            await self._cleanup_file_if_orphaned(file_id)
             
-            if not us_assoc.first() and not usm_assoc.first():
-                await self.db.delete(us_file)
-           
             await self.db.commit()
-            logger.info(f"File USM {file_id} eliminato da USM {usm_id}")
+            
+            # Log finale con stato completo
+            status = "completato con successo" if storage_deleted else "completato (storage error)"
+            logger.info(f"🗑️ Eliminazione file USM {file_id} {status}: storage={storage_deleted}, db=True")
             return True
            
+        except HTTPException:
+            await self.db.rollback()
+            raise
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"Errore eliminazione file USM: {str(e)}")
-            # Se l'errore è solo che l'associazione non esisteva, è solo un warning
-            if "expected to delete" in str(e) and "Only 0 were matched" in str(e):
-                logger.warning(f"Associazione USM-File non trovata per eliminazione (non critico): usm_id={usm_id}, file_id={file_id}")
-                return True
+            logger.error(f"❌ Errore critico eliminazione file USM {file_id}: {str(e)}")
+            logger.exception(f"Full traceback per eliminazione file USM {file_id}")
             raise HTTPException(status_code=500, detail=f"Errore eliminazione: {str(e)}")
     
     async def update_file_metadata(
@@ -835,6 +854,125 @@ class USFileService:
                 'error': True
             }
 
+    async def _find_file_with_uuid_fallback(self, file_id: UUID) -> Optional[USFile]:
+        """Trova file con fallback multi-livello per differenti formati UUID"""
+        
+        file_id_str = str(file_id)
+        file_id_no_dashes = file_id_str.replace('-', '')
+        
+        logger.info(f"Ricerca file con fallback: original={file_id_str}, no_dashes={file_id_no_dashes}")
+        
+        # Primo tentativo: UUID standard con trattini
+        file_query = select(USFile).where(USFile.id == file_id_str)
+        result = await self.db.execute(file_query)
+        us_file = result.scalar_one_or_none()
+        
+        if us_file:
+            logger.info(f"File trovato con UUID standard: {file_id_str}")
+            return us_file
+        
+        # Secondo tentativo: UUID senza trattini
+        file_query = select(USFile).where(USFile.id == file_id_no_dashes)
+        result = await self.db.execute(file_query)
+        us_file = result.scalar_one_or_none()
+        
+        if us_file:
+            logger.info(f"File trovato con UUID senza trattini: {file_id_no_dashes}")
+            return us_file
+        
+        # Terzo tentativo: formato normalizzato
+        normalized_id = self._normalize_us_id(file_id)
+        file_query = select(USFile).where(USFile.id == normalized_id)
+        result = await self.db.execute(file_query)
+        us_file = result.scalar_one_or_none()
+        
+        if us_file:
+            logger.info(f"File trovato con UUID normalizzato: {normalized_id}")
+            return us_file
+        
+        logger.error(f"File non trovato con nessun formato UUID: {file_id_str}")
+        return None
+    
+    async def _try_orphan_file_cleanup(self, file_id: UUID) -> bool:
+        """Tenta di eliminare file orfano dal database"""
+        try:
+            # Controlla se il file esiste nel database
+            file_id_str = safe_uuid_str(file_id)
+            file_query = select(USFile).where(USFile.id == file_id_str)
+            result = await self.db.execute(file_query)
+            us_file = result.scalar_one_or_none()
+            
+            if not us_file:
+                logger.info(f"File {file_id} non trovato nel database (già eliminato)")
+                return True
+            
+            # Controlla se ha ancora associazioni
+            us_assoc_query = select(us_files_association).where(
+                us_files_association.c.file_id == file_id_str
+            )
+            us_assoc_result = await self.db.execute(us_assoc_query)
+            
+            usm_assoc_query = select(usm_files_association).where(
+                usm_files_association.c.file_id == file_id_str
+            )
+            usm_assoc_result = await self.db.execute(usm_assoc_query)
+            
+            if not us_assoc_result.first() and not usm_assoc_result.first():
+                # Il file è orfano, eliminalo
+                await self.db.delete(us_file)
+                logger.info(f"🗑️ File orfano {file_id} eliminato dal database")
+                return True
+            else:
+                logger.info(f"File {file_id} ha ancora associazioni, non eliminato")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Errore cleanup file orfano {file_id}: {e}")
+            return False
+    
+    async def _cleanup_file_if_orphaned(self, file_id: UUID) -> bool:
+        """Elimina file dal database se non ha più associazioni"""
+        try:
+            file_id_str = safe_uuid_str(file_id)
+            
+            # Controlla associazioni US
+            us_assoc_query = select(us_files_association).where(
+                us_files_association.c.file_id == file_id_str
+            )
+            us_assoc_result = await self.db.execute(us_assoc_query)
+            
+            # Controlla associazioni USM
+            usm_assoc_query = select(usm_files_association).where(
+                usm_files_association.c.file_id == file_id_str
+            )
+            usm_assoc_result = await self.db.execute(usm_assoc_query)
+            
+            us_has_assoc = us_assoc_result.first() is not None
+            usm_has_assoc = usm_assoc_result.first() is not None
+            
+            logger.info(f"Verifica associazioni file {file_id}: US={us_has_assoc}, USM={usm_has_assoc}")
+            
+            if not us_has_assoc and not usm_has_assoc:
+                # Il file è orfano, eliminalo dal database
+                file_query = select(USFile).where(USFile.id == file_id_str)
+                result = await self.db.execute(file_query)
+                us_file = result.scalar_one_or_none()
+                
+                if us_file:
+                    await self.db.delete(us_file)
+                    logger.info(f"🗑️ File orfano {file_id} eliminato dal database: {us_file.filename}")
+                    return True
+                else:
+                    logger.warning(f"File {file_id} da eliminare non trovato nel database")
+                    return False
+            else:
+                logger.info(f"File {file_id} mantiene associazioni, non eliminato dal database")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Errore verifica cleanup file {file_id}: {e}")
+            return False
+    
     def _normalize_us_id(self, us_id: UUID) -> str:
         """Normalizza ID US per compatibilità con diversi formati nel database"""
         us_id_str = str(us_id)

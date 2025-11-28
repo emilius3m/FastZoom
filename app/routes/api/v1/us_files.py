@@ -346,13 +346,20 @@ async def view_us_file(
             try:
                 # Determine the correct bucket based on file category
                 if us_file.file_category == 'documento' or us_file.mimetype == 'application/pdf':
-                    bucket = archaeological_minio_service.buckets['documents']
+                    expected_bucket = archaeological_minio_service.buckets['documents']
                 else:
-                    bucket = archaeological_minio_service.buckets['photos']
+                    expected_bucket = archaeological_minio_service.buckets['photos']
                 
-                # Construct proper MinIO path with bucket prefix
-                # The filepath in DB is stored as "site_id/filename", we need to prefix with bucket
-                minio_path = f"minio://{bucket}/{us_file.filepath}"
+                # Check if filepath already contains bucket prefix to avoid duplication
+                if us_file.filepath.startswith('minio://'):
+                    # Filepath is already complete, use as-is
+                    minio_path = us_file.filepath
+                elif us_file.filepath.startswith(f"{expected_bucket}/"):
+                    # Filepath already has bucket prefix, just add minio://
+                    minio_path = f"minio://{us_file.filepath}"
+                else:
+                    # Filepath is relative, construct full path with bucket
+                    minio_path = f"minio://{expected_bucket}/{us_file.filepath}"
                 
                 # Get file data from MinIO
                 file_data = await archaeological_minio_service.get_file(minio_path)
@@ -461,12 +468,20 @@ async def get_us_file_thumbnail(
             try:
                 # Determine the correct bucket based on file category
                 if us_file.file_category == 'documento' or us_file.mimetype == 'application/pdf':
-                    bucket = archaeological_minio_service.buckets['documents']
+                    expected_bucket = archaeological_minio_service.buckets['documents']
                 else:
-                    bucket = archaeological_minio_service.buckets['photos']
+                    expected_bucket = archaeological_minio_service.buckets['photos']
                 
-                # Construct proper MinIO path with bucket prefix (fallback to original if no thumbnail)
-                minio_path = f"minio://{bucket}/{us_file.filepath}"
+                # Check if filepath already contains bucket prefix to avoid duplication
+                if us_file.filepath.startswith('minio://'):
+                    # Filepath is already complete, use as-is
+                    minio_path = us_file.filepath
+                elif us_file.filepath.startswith(f"{expected_bucket}/"):
+                    # Filepath already has bucket prefix, just add minio://
+                    minio_path = f"minio://{us_file.filepath}"
+                else:
+                    # Filepath is relative, construct full path with bucket
+                    minio_path = f"minio://{expected_bucket}/{us_file.filepath}"
                 
                 # Get file data from MinIO
                 file_data = await archaeological_minio_service.get_file(minio_path)
@@ -543,12 +558,20 @@ async def download_us_file(
             try:
                 # Determine the correct bucket based on file category
                 if us_file.file_category == 'documento' or us_file.mimetype == 'application/pdf':
-                    bucket = archaeological_minio_service.buckets['documents']
+                    expected_bucket = archaeological_minio_service.buckets['documents']
                 else:
-                    bucket = archaeological_minio_service.buckets['photos']
+                    expected_bucket = archaeological_minio_service.buckets['photos']
                 
-                # Construct proper MinIO path with bucket prefix for download
-                minio_path = f"minio://{bucket}/{us_file.filepath}"
+                # Check if filepath already contains bucket prefix to avoid duplication
+                if us_file.filepath.startswith('minio://'):
+                    # Filepath is already complete, use as-is
+                    minio_path = us_file.filepath
+                elif us_file.filepath.startswith(f"{expected_bucket}/"):
+                    # Filepath already has bucket prefix, just add minio://
+                    minio_path = f"minio://{us_file.filepath}"
+                else:
+                    # Filepath is relative, construct full path with bucket
+                    minio_path = f"minio://{expected_bucket}/{us_file.filepath}"
                 
                 # Get file data from MinIO
                 file_data = await archaeological_minio_service.get_file(minio_path)
