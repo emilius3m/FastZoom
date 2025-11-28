@@ -194,13 +194,25 @@
             uploadingFile: false,
             showFileUploadModal: false,
             currentFileType: '',
+            
+            // Modern drag & drop upload state
+            dragOver: false,
+            filePreviews: [],
+            uploadProgress: 0,
+            filesCompleted: 0,
+            notification: {
+                message: '',
+                type: 'info'
+            },
+            
             fileUploadMetadata: {
                 title: '',
                 description: '',
                 tavola_number: '',
                 scale_ratio: '',
                 photographer: '',
-                photo_date: ''
+                photo_date: '',
+                is_published: false
             },
 
             // Export state (for export component)
@@ -1082,13 +1094,22 @@
             showUploadModal(fileType) {
                 this.currentFileType = fileType;
                 this.showFileUploadModal = true;
+                
+                // Reset modern upload state
+                this.filePreviews = [];
+                this.uploadProgress = 0;
+                this.filesCompleted = 0;
+                this.dragOver = false;
+                this.notification.message = '';
+                
                 this.fileUploadMetadata = {
                     title: '',
                     description: '',
                     tavola_number: '',
                     scale_ratio: '',
                     photographer: '',
-                    photo_date: ''
+                    photo_date: '',
+                    is_published: false
                 };
 
                 // Reset file input with timeout to ensure DOM is ready
@@ -1101,6 +1122,288 @@
                         console.log('File input element not found');
                     }
                 });
+            },
+
+            // ===== MODERN DRAG & DROP UPLOAD METHODS =====
+
+            handleFiles(evt) {
+                evt.preventDefault();
+                const newFiles = evt.target.files || evt.dataTransfer.files;
+                
+                for (const file of newFiles) {
+                    if (!this.validateFile(file)) continue;
+                    
+                    // Generate preview for the file
+                    this.generatePreview(file).then(preview => {
+                        this.filePreviews.push({
+                            ...preview,
+                            file: file
+                        });
+                    }).catch(error => {
+                        console.warn('Failed to generate preview for file:', file.name, error);
+                        // Still add file without preview
+                        this.filePreviews.push({
+                            name: file.name,
+                            size: file.size,
+                            type: file.type,
+                            isImage: false,
+                            src: null,
+                            file: file
+                        });
+                    });
+                }
+                
+                // Clear the input
+                if (evt.target.files) {
+                    evt.target.value = '';
+                }
+            },
+
+            handleDrop(evt) {
+                evt.preventDefault();
+                evt.stopPropagation();
+                this.handleFiles(evt);
+                this.dragOver = false;
+            },
+
+            handleDragOver(evt) {
+                evt.preventDefault();
+                this.dragOver = true;
+            },
+
+            handleDragLeave(evt) {
+                evt.preventDefault();
+                this.dragOver = false;
+            },
+
+            async generatePreview(file) {
+                const preview = {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    isImage: file.type.startsWith('image/'),
+                    src: null
+                };
+                
+                // Generate image preview if it's an image
+                if (preview.isImage) {
+                    try {
+                        preview.src = await this.createImagePreview(file);
+                    } catch (error) {
+                        console.warn('Failed to generate image preview:', error);
+                    }
+                }
+                
+                return preview;
+            },
+
+            createImagePreview(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            },
+
+            removeFile(index) {
+                this.filePreviews.splice(index, 1);
+            },
+
+            validateFile(file) {
+                // File size validation
+                const maxSizeMB = 50;
+                const maxSizeBytes = maxSizeMB * 1024 * 1024;
+                
+                if (file.size > maxSizeBytes) {
+                    this.notify(`File "${file.name}" troppo grande (max ${maxSizeMB}MB)`, 'error');
+                    return false;
+                }
+                
+                // File type validation
+                const allowedTypes = [
+                    'image/jpeg', 'image/png', 'image/tiff', 'image/webp',
+                    'application/pdf', 'application/msword',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                ];
+                
+                if (!allowedTypes.includes(file.type)) {
+                    this.notify(`Formato non supportato: ${file.type}`, 'error');
+                    return false;
+                }
+                
+                return true;
+            },
+
+            async uploadAllFiles() {
+                if (this.filePreviews.length === 0) {
+                    this.notify('Nessun file selezionato', 'warning');
+                    return;
+                }
+                
+                // Check if US/USM is saved first
+                const entityId = this.editingUS?.id || this.editingUSM?.id;
+                if (!entityId) {
+                    this.notify('Devi prima salvare la US/USM prima di poter caricare file', 'error');
+                    return;
+                }
+                
+                this.uploadingFile = true;
+                this.uploadProgress = 0;
+                this.filesCompleted = 0;
+                
+                try {
+                    // Upload files sequentially for better progress tracking
+                    for (let i = 0; i < this.filePreviews.length; i++) {
+                        const preview = this.filePreviews[i];
+                        await this.uploadSingleFile(preview.file, preview.name);
+                        
+                        this.filesCompleted++;
+                        this.uploadProgress = Math.round((this.filesCompleted / this.filePreviews.length) * 100);
+                    }
+                    
+                    this.notify('Upload completato con successo!', 'success');
+                    
+                    // Reset and close modal
+                    setTimeout(() => {
+                        this.closeUploadModal();
+                        // Refresh file list
+                        if (this.editingUS) {
+                            this.loadUSFiles(this.editingUS.id);
+                        } else {
+                            this.loadUSMFiles(this.editingUSM.id);
+                        }
+                    }, 1500);
+                    
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    this.notify(`Errore upload: ${error.message}`, 'error');
+                } finally {
+                    this.uploadingFile = false;
+                    this.uploadProgress = 0;
+                }
+            },
+
+            async uploadSingleFile(file, fileName) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('file_type', this.currentFileType);
+                
+                // Add metadata
+                if (this.fileUploadMetadata.title) {
+                    formData.append('title', this.fileUploadMetadata.title);
+                }
+                if (this.fileUploadMetadata.description) {
+                    formData.append('description', this.fileUploadMetadata.description);
+                }
+                if (this.fileUploadMetadata.scale_ratio) {
+                    formData.append('scale_ratio', this.fileUploadMetadata.scale_ratio);
+                }
+                if (this.fileUploadMetadata.tavola_number) {
+                    formData.append('tavola_number', this.fileUploadMetadata.tavola_number);
+                }
+                if (this.fileUploadMetadata.photographer) {
+                    formData.append('photographer', this.fileUploadMetadata.photographer);
+                }
+                if (this.fileUploadMetadata.photo_date) {
+                    formData.append('photo_date', this.fileUploadMetadata.photo_date);
+                }
+                
+                const entityId = this.editingUS?.id || this.editingUSM?.id;
+                const endpoint = this.editingUS ? 'us' : 'usm';
+                
+                let uploadUrl, response;
+                
+                // Handle photo uploads with new API endpoint
+                if (this.currentFileType === 'fotografia') {
+                    // Use new photo upload API
+                    uploadUrl = `/api/v1/sites/${this.currentSiteId}/photos/upload`;
+                    
+                    // Prepare form data for new endpoint
+                    formData = new FormData();
+                    
+                    // New endpoint expects photos as an array
+                    formData.append('photos', file);
+                    
+                    // Map existing metadata to new archaeological metadata format
+                    const usCode = this.editingUS?.us_code || this.editingUSM?.usm_code || '';
+                    formData.append('inventory_number', usCode);
+                    formData.append('excavation_area', this.editingUS?.area_struttura || this.editingUSM?.area_struttura || '');
+                    // 🔧 CRITICAL FIX: Pass UUID instead of us_code for stratigraphic_unit
+                    formData.append('stratigraphic_unit', entityId); // entityId contains actual UUID
+                    // For USM, also set usm_reference for compatibility
+                    if (this.editingUSM) {
+                        formData.append('usm_reference', entityId);
+                    }
+                    formData.append('material', 'misc'); // Default material
+                    formData.append('photo_type', 'fotografia');
+                    formData.append('photo_date', this.fileUploadMetadata.photo_date || new Date().toISOString().split('T')[0]);
+                    formData.append('description', this.fileUploadMetadata.description || '');
+                    // Create keywords array from metadata
+                    const keywordsArray = [];
+                    if (this.fileUploadMetadata.photographer) {
+                        keywordsArray.push(`photographer:${this.fileUploadMetadata.photographer}`);
+                    }
+                    if (this.fileUploadMetadata.title) {
+                        keywordsArray.push(`title:${this.fileUploadMetadata.title}`);
+                    }
+                    keywordsArray.push(`us_id:${entityId}`);
+                    keywordsArray.push(this.editingUS ? 'us_type:us' : 'us_type:usm');
+
+                    formData.append('tags', JSON.stringify(keywordsArray));
+                } else {
+                    // Use existing endpoint for non-photo files
+                    uploadUrl = `/api/v1/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`;
+                }
+                
+                response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken(),
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Upload failed: ${response.status} ${errorText}`);
+                }
+                
+                const result = await response.json();
+                if (!result.valid && result.errors) {
+                    throw new Error(result.errors.join(', '));
+                }
+                
+                return result;
+            },
+
+            closeUploadModal() {
+                this.showFileUploadModal = false;
+                this.filePreviews = [];
+                this.uploadProgress = 0;
+                this.filesCompleted = 0;
+                this.dragOver = false;
+                this.notification.message = '';
+            },
+
+            notify(message, type = 'info') {
+                this.notification = { message, type };
+                
+                // Auto-hide success messages
+                if (type === 'success') {
+                    setTimeout(() => {
+                        this.notification.message = '';
+                    }, 5000);
+                }
+            },
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
             },
 
             async uploadFile() {

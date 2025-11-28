@@ -415,19 +415,87 @@
                 <div class="p-6">
                     <div class="space-y-4">
                         
-                        <!-- File Input -->
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                Seleziona File <span class="text-red-500">*</span>
-                            </label>
+                        <!-- Modern Drag & Drop Zone -->
+                        <div
+                            class="upload-dropzone mb-4"
+                            :class="{'dragover': dragOver}"
+                            @dragover.prevent="dragOver=true"
+                            @dragleave.prevent="dragOver=false"
+                            @drop.prevent="handleDrop($event)"
+                        >
                             <input type="file"
                                    x-ref="fileInput"
                                    name="fileInput"
+                                   multiple
                                    required
                                    accept="image/*,.pdf,.doc,.docx"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Formati supportati: immagini, PDF, DOC, DOCX</p>
+                                   @change="handleFiles($event)"
+                                   class="hidden">
+                            
+                            <div class="text-center p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors">
+                                <div class="mb-4">
+                                    <i class="fas fa-cloud-upload-alt fa-4x text-emerald-500"></i>
+                                </div>
+                                <button
+                                    @click="$refs.fileInput.click()"
+                                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors mb-3"
+                                >
+                                    <i class="fas fa-folder-open mr-2"></i>Scegli File o Trascina Qui
+                                </button>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                    <span x-text="currentFileType"></span> - Formati supportati: immagini, PDF, DOC, DOCX
+                                </p>
+                                <small class="text-xs text-gray-500 dark:text-gray-500">
+                                    <i class="fas fa-info-circle"></i>
+                                    Max 50MB per file - Supporta selezione multipla
+                                </small>
+                            </div>
                         </div>
+                        
+                        <!-- File Previews Grid -->
+                        <template x-if="filePreviews.length > 0">
+                            <div class="mb-4">
+                                <h6 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                                    Anteprime File (<span x-text="filePreviews.length"></span>)
+                                </h6>
+                                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <template x-for="(preview, index) in filePreviews" :key="index">
+                                        <div class="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+                                            <div class="aspect-[4/3] bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                                                <!-- Image Preview -->
+                                                <img x-show="preview.isImage"
+                                                     :src="preview.src"
+                                                     :alt="preview.name"
+                                                     class="w-full h-full object-cover">
+                                                
+                                                <!-- File Icon for non-images -->
+                                                <div x-show="!preview.isImage" class="text-center">
+                                                    <i class="fas fa-file-pdf fa-3x text-red-500" x-show="preview.type === 'application/pdf'"></i>
+                                                    <i class="fas fa-file-word fa-3x text-blue-500" x-show="preview.type.includes('word')"></i>
+                                                    <i class="fas fa-file fa-3x text-gray-500" x-show="!preview.type.includes('pdf') && !preview.type.includes('word')"></i>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- File Info and Actions -->
+                                            <div class="p-2">
+                                                <div class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate mb-1" x-text="preview.name"></div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400 mb-2" x-text="formatFileSize(preview.size)"></div>
+                                                
+                                                <div class="absolute top-2 right-2">
+                                                    <button
+                                                        @click="removeFile(index)"
+                                                        class="bg-red-600 hover:bg-red-700 text-white p-1 rounded-full text-xs transition-colors"
+                                                        title="Rimuovi file"
+                                                    >
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
                         
                         <!-- Titolo -->
                         <div>
@@ -492,21 +560,63 @@
                             </div>
                         </div>
                         
+                        <!-- Progress Bar -->
+                        <template x-if="uploadingFile">
+                            <div class="mb-4">
+                                <h6 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Stato Upload</h6>
+                                <div class="progress w-full bg-gray-200 rounded-full h-6 overflow-hidden">
+                                    <div
+                                        class="progress-bar progress-bar-striped progress-bar-animated bg-emerald-600 h-6 flex items-center justify-center text-white text-xs font-semibold"
+                                        role="progressbar"
+                                        :style="'width: ' + uploadProgress + '%'"
+                                        :aria-valuenow="uploadProgress"
+                                        aria-valuemin="0"
+                                        aria-valuemax="100"
+                                    >
+                                        <span x-text="uploadProgress + '%'"></span>
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                                    <span x-text="filesCompleted"></span> / <span x-text="filePreviews.length"></span> file completati
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <!-- Notifications -->
+                        <template x-if="notification.message">
+                            <div class="mb-4">
+                                <div
+                                    class="alert alert-dismissible fade show"
+                                    :class="'alert-' + notification.type"
+                                    role="alert"
+                                >
+                                    <i :class="'fas fa-' + (notification.type === 'success' ? 'check-circle' : 'exclamation-triangle')"></i>
+                                    <span x-text="notification.message"></span>
+                                    <button type="button" class="btn-close" @click="notification.message = ''"></button>
+                                </div>
+                            </div>
+                        </template>
+                        
                         <!-- Actions -->
                         <div class="flex justify-end space-x-3 pt-4 border-t dark:border-gray-600">
                             <button type="button"
-                                    @click="showFileUploadModal = false"
+                                    @click="closeUploadModal()"
                                     :disabled="uploadingFile"
                                     class="px-6 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition">
-                                Annulla
+                                <i class="fas fa-times mr-2"></i>Annulla
                             </button>
                             
                             <button type="button"
-                                    @click="uploadFile()"
-                                    :disabled="uploadingFile"
+                                    @click="uploadAllFiles()"
+                                    :disabled="filePreviews.length === 0 || uploadingFile"
                                     class="px-6 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-50 transition">
-                                <i :class="uploadingFile ? 'fas fa-spinner fa-spin' : 'fas fa-upload'" class="mr-2"></i>
-                                <span x-text="uploadingFile ? 'Caricamento...' : 'Carica File'"></span>
+                                <span x-show="!uploadingFile">
+                                    <i class="fas fa-upload mr-2"></i>Carica Tutti
+                                </span>
+                                <span x-show="uploadingFile">
+                                    <span class="spinner-border spinner-border-sm mr-2"></span>
+                                    Caricamento...
+                                </span>
                             </button>
                         </div>
                         
