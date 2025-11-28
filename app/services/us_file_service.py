@@ -576,100 +576,63 @@ class USFileService:
         return result.scalars().all()
     
     async def delete_us_file(self, us_id: UUID, file_id: UUID, user_id: UUID) -> bool:
-        """Elimina file US con cleanup storage e gestione StaleDataError"""
+        """Elimina file US con cleanup storage e gestione StaleDataError - supporta sia USFile che Photo"""
         
         try:
-            # Trova file con fallback multi-livello per UUID
+            # Primo tentativo: cerca file nella tabella USFile con fallback multi-livello per UUID
             us_file = await self._find_file_with_uuid_fallback(file_id)
-            if not us_file:
-                logger.error(f"File US non trovato per ID: {file_id} (formato originale)")
-                raise HTTPException(status_code=404, detail="File non trovato")
             
-            # Log dettagli per debugging
-            logger.info(f"Trovato file US per eliminazione: id={us_file.id}, filename={us_file.filename}, filepath={us_file.filepath}")
+            if us_file:
+                # File trovato nella tabella USFile - procedi con eliminazione standard
+                logger.info(f"File US trovato nella tabella USFile: id={us_file.id}, filename={us_file.filename}")
+                return await self._delete_us_file_logic(us_id, us_file, user_id)
             
-            # Verifica se il file ha altre associazioni PRIMA di eliminare
-            has_other_us_assoc = await self._check_file_has_us_associations(file_id)
-            has_usm_assoc = await self._check_file_has_usm_associations(file_id)
+            # Secondo tentativo: cerca nella tabella Photo (foto archeologiche)
+            photo = await self._find_photo_with_uuid_fallback(file_id)
             
-            logger.info(f"Verifica associazioni file {file_id}: US-other={has_other_us_assoc}, USM={has_usm_assoc}")
+            if photo:
+                # Foto trovata nella tabella Photo - procedi con eliminazione specifica per foto
+                logger.info(f"Foto trovata nella tabella Photo: id={photo.id}, filename={photo.filename}")
+                return await self._delete_photo_logic(photo)
             
-            # Elimina file da storage con retry
-            storage_deleted = False
-            if us_file.filepath:
-                try:
-                    await self.storage.delete_file(us_file.filepath)
-                    storage_deleted = True
-                    logger.info(f"✅ File eliminato da storage: {us_file.filepath}")
-                except Exception as e:
-                    logger.error(f"❌ Errore eliminazione storage: {e}")
-                    # Continua con l'eliminazione del database anche se storage fallisce
+            # Terzo tentativo: fallback - ricerca esplicita per compatibilità con formati UUID diversi
+            file_id_str = str(file_id)
+            file_id_no_dashes = file_id_str.replace('-', '')
             
-            # Elimina thumbnail se esiste
-            if us_file.thumbnail_path:
-                try:
-                    await self.storage.delete_file(us_file.thumbnail_path)
-                    logger.info(f"✅ Thumbnail eliminato da storage: {us_file.thumbnail_path}")
-                except Exception as e:
-                    logger.warning(f"❌ Errore eliminazione thumbnail: {e}")
-            
-            # STRATEGIA: Usa SQLAlchemy cascade per evitare StaleDataError
-            # Rimuovi il file dalla collezione delle associazioni US per il suo specifico us_id
-            if has_other_us_assoc:
-                logger.info(f"File {file_id} ha altre associazioni US, elimino solo questa associazione")
-                
-                # Trova e rimuovi solo l'associazione specifica
-                us_id_str = str(us_id)
-                normalized_us_id = self._normalize_us_id(us_id)
-                us_id_no_dashes = us_id_str.replace('-', '')
-                
-                # Rimuovi dalla collezione usando query diretta per evitare cascade
-                delete_assoc = us_files_association.delete().where(
-                    and_(
-                        or_(
-                            us_files_association.c.us_id == us_id_str,
-                            us_files_association.c.us_id == normalized_us_id,
-                            us_files_association.c.us_id == us_id_no_dashes
-                        ),
-                        us_files_association.c.file_id == safe_uuid_str(file_id)
-                    )
+            # Ultimo tentativo USFile con fallback diretto
+            us_file_query = select(USFile).where(
+                or_(
+                    USFile.id == file_id_str,
+                    USFile.id == file_id_no_dashes,
+                    USFile.id == self._normalize_us_id(file_id)
                 )
-                
-                try:
-                    result = await self.db.execute(delete_assoc)
-                    logger.info(f"Associazione US-File eliminata: {result.rowcount} righe")
-                except Exception as e:
-                    if "expected to delete" in str(e) and "Only 0 were matched" in str(e):
-                        logger.warning(f"Associazione US-File non trovata (già eliminata): us_id={us_id}, file_id={file_id}")
-                    else:
-                        raise
-            else:
-                logger.info(f"File {file_id} non ha altre associazioni US, provo eliminazione tramite SQLAlchemy cascade")
-                
-                # Lascia che SQLAlchemy gestisca l'eliminazione tramite cascade
-                # Questo evita StaleDataError perché SQLAlchemy gestisce l'ordine di eliminazione
-                try:
-                    # Aggiorna il file per forzarne il rilevamento da SQLAlchemy
-                    await self.db.flush()
-                    
-                    # Elimina il file - SQLAlchemy gestirà automaticamente le associazioni
-                    await self.db.delete(us_file)
-                    logger.info(f"File {file_id} eliminato dal database con cascade")
-                except Exception as e:
-                    if "is not bound" in str(e) or "detached" in str(e).lower():
-                        logger.info(f"File {file_id} già eliminato dal database (cascade)")
-                    else:
-                        logger.warning(f"Errore eliminazione file cascade: {e}")
-                        # Fallback: eliminazione manuale delle associazioni rimanenti
-                        await self._fallback_delete_all_associations(file_id)
+            )
+            us_result = await self.db.execute(us_file_query)
+            us_file = us_result.scalar_one_or_none()
             
-            await self.db.commit()
+            if us_file:
+                logger.info(f"File US trovato con fallback diretto: id={us_file.id}")
+                return await self._delete_us_file_logic(us_id, us_file, user_id)
             
-            # Log finale con stato completo
-            status = "completato con successo" if storage_deleted else "completato (storage error)"
-            logger.info(f"🗑️ Eliminazione file US {file_id} {status}: storage={storage_deleted}, db=True")
-            return True
+            # Ultimo tentativo Photo con fallback diretto
+            photo_query = select(Photo).where(
+                or_(
+                    Photo.id == file_id_str,
+                    Photo.id == file_id_no_dashes,
+                    Photo.id == self._normalize_us_id(file_id)
+                )
+            )
+            photo_result = await self.db.execute(photo_query)
+            photo = photo_result.scalar_one_or_none()
             
+            if photo:
+                logger.info(f"Foto trovata con fallback diretto: id={photo.id}")
+                return await self._delete_photo_logic(photo)
+            
+            # File non trovato in nessuna tabella
+            logger.error(f"File/foto non trovato in nessuna tabella con ID: {file_id} (formati provati: {file_id_str}, {file_id_no_dashes}, {self._normalize_us_id(file_id)})")
+            raise HTTPException(status_code=404, detail="File non trovato con nessun formato UUID")
+        
         except HTTPException:
             await self.db.rollback()
             raise
@@ -1058,7 +1021,162 @@ class USFileService:
         
         # Altri formati, restituisci come sono
         return us_id_str
+    
+    async def _find_photo_with_uuid_fallback(self, file_id: UUID) -> Optional[Photo]:
+        """Trova foto con fallback multi-livello per differenti formati UUID"""
+        
+        file_id_str = str(file_id)
+        file_id_no_dashes = file_id_str.replace('-', '')
+        
+        logger.info(f"Ricerca foto con fallback: original={file_id_str}, no_dashes={file_id_no_dashes}")
+        
+        # Primo tentativo: UUID standard con trattini
+        photo_query = select(Photo).where(Photo.id == file_id_str)
+        result = await self.db.execute(photo_query)
+        photo = result.scalar_one_or_none()
+        
+        if photo:
+            logger.info(f"Foto trovata con UUID standard: {file_id_str}")
+            return photo
+        
+        # Secondo tentativo: UUID senza trattini
+        photo_query = select(Photo).where(Photo.id == file_id_no_dashes)
+        result = await self.db.execute(photo_query)
+        photo = result.scalar_one_or_none()
+        
+        if photo:
+            logger.info(f"Foto trovata con UUID senza trattini: {file_id_no_dashes}")
+            return photo
+        
+        # Terzo tentativo: formato normalizzato
+        normalized_id = self._normalize_us_id(file_id)
+        photo_query = select(Photo).where(Photo.id == normalized_id)
+        result = await self.db.execute(photo_query)
+        photo = result.scalar_one_or_none()
+        
+        if photo:
+            logger.info(f"Foto trovata con UUID normalizzato: {normalized_id}")
+            return photo
+        
+        logger.error(f"Foto non trovata con nessun formato UUID: {file_id_str}")
+        return None
+    async def _delete_us_file_logic(self, us_id: UUID, us_file: USFile, user_id: UUID) -> bool:
+        """Logica di eliminazione specifica per i file US dalla tabella USFile"""
+        
+        # Log dettagli per debugging
+        logger.info(f"Trovato file US per eliminazione: id={us_file.id}, filename={us_file.filename}, filepath={us_file.filepath}")
+        
+        # Verifica se il file ha altre associazioni PRIMA di eliminare
+        has_other_us_assoc = await self._check_file_has_us_associations(us_file.id)
+        has_usm_assoc = await self._check_file_has_usm_associations(us_file.id)
+        
+        logger.info(f"Verifica associazioni file {us_file.id}: US-other={has_other_us_assoc}, USM={has_usm_assoc}")
+        
+        # Elimina file da storage con retry
+        storage_deleted = False
+        if us_file.filepath:
+            try:
+                await self.storage.delete_file(us_file.filepath)
+                storage_deleted = True
+                logger.info(f"✅ File eliminato da storage: {us_file.filepath}")
+            except Exception as e:
+                logger.error(f"❌ Errore eliminazione storage: {e}")
+                # Continua con l'eliminazione del database anche se storage fallisce
+        
+        # Elimina thumbnail se esiste
+        if us_file.thumbnail_path:
+            try:
+                await self.storage.delete_file(us_file.thumbnail_path)
+                logger.info(f"✅ Thumbnail eliminato da storage: {us_file.thumbnail_path}")
+            except Exception as e:
+                logger.warning(f"❌ Errore eliminazione thumbnail: {e}")
+        
+        # STRATEGIA: Usa SQLAlchemy cascade per evitare StaleDataError
+        # Rimuovi il file dalla collezione delle associazioni US per il suo specifico us_id
+        if has_other_us_assoc:
+            logger.info(f"File {us_file.id} ha altre associazioni US, elimino solo questa associazione")
+            
+            # Trova e rimuovi solo l'associazione specifica
+            us_id_str = str(us_id)
+            normalized_us_id = self._normalize_us_id(us_id)
+            us_id_no_dashes = us_id_str.replace('-', '')
+            
+            # Rimuovi dalla collezione usando query diretta per evitare cascade
+            delete_assoc = us_files_association.delete().where(
+                and_(
+                    or_(
+                        us_files_association.c.us_id == us_id_str,
+                        us_files_association.c.us_id == normalized_us_id,
+                        us_files_association.c.us_id == us_id_no_dashes
+                    ),
+                    us_files_association.c.file_id == safe_uuid_str(us_file.id)
+                )
+            )
+            
+            try:
+                result = await self.db.execute(delete_assoc)
+                logger.info(f"Associazione US-File eliminata: {result.rowcount} righe")
+            except Exception as e:
+                if "expected to delete" in str(e) and "Only 0 were matched" in str(e):
+                    logger.warning(f"Associazione US-File non trovata (già eliminata): us_id={us_id}, file_id={us_file.id}")
+                else:
+                    raise
+        else:
+            logger.info(f"File {us_file.id} non ha altre associazioni US, provo eliminazione tramite SQLAlchemy cascade")
+            
+            # Lascia che SQLAlchemy gestisca l'eliminazione tramite cascade
+            # Questo evita StaleDataError perché SQLAlchemy gestisce l'ordine di eliminazione
+            try:
+                # Aggiorna il file per forzarne il rilevamento da SQLAlchemy
+                await self.db.flush()
+                
+                # Elimina il file - SQLAlchemy gestirà automaticamente le associazioni
+                await self.db.delete(us_file)
+                logger.info(f"File {us_file.id} eliminato dal database con cascade")
+            except Exception as e:
+                if "is not bound" in str(e) or "detached" in str(e).lower():
+                    logger.info(f"File {us_file.id} già eliminato dal database (cascade)")
+                else:
+                    logger.warning(f"Errore eliminazione file cascade: {e}")
+                    # Fallback: eliminazione manuale delle associazioni rimanenti
+                    await self._fallback_delete_all_associations(us_file.id)
+        
+        await self.db.commit()
+        
+        # Log finale con stato completo
+        status = "completato con successo" if storage_deleted else "completato (storage error)"
+        logger.info(f"🗑️ Eliminazione file US {us_file.id} {status}: storage={storage_deleted}, db=True")
+        return True
 
+    
+    async def _delete_photo_logic(self, photo: Photo) -> bool:
+        """Logica di eliminazione specifica per le foto dal Photo service"""
+        try:
+            # Elimina da storage
+            if photo.filepath:
+                try:
+                    await self.storage.delete_file(photo.filepath)
+                    logger.info(f"✅ File foto eliminato da storage: {photo.filepath}")
+                except Exception as storage_e:
+                    logger.warning(f"❌ Errore eliminazione storage foto: {storage_e}")
+            
+            # Elimina thumbnail se esiste
+            if photo.thumbnail_path:
+                try:
+                    await self.storage.delete_file(photo.thumbnail_path)
+                    logger.info(f"✅ Thumbnail foto eliminato da storage: {photo.thumbnail_path}")
+                except Exception as thumb_e:
+                    logger.warning(f"❌ Errore eliminazione thumbnail foto: {thumb_e}")
+            
+            # Elimina dal database
+            await self.db.delete(photo)
+            logger.info(f"✅ Foto {photo.id} eliminata dal database")
+            return True
+                
+        except Exception as e:
+            logger.error(f"❌ Errore eliminazione foto {photo.id}: {e}")
+            return False
+    
     async def get_files_summary_for_us(self, us_id: UUID) -> Dict[str, Any]:
         """Riassunto file per US con conteggi per tipo, includendo foto dalla tabella Photo"""
         
