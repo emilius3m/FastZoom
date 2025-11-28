@@ -893,6 +893,77 @@ class USFileService:
         logger.error(f"File non trovato con nessun formato UUID: {file_id_str}")
         return None
     
+    async def _check_file_has_us_associations(self, file_id: UUID) -> bool:
+        """Verifica se il file ha altre associazioni US (escluso l'US corrente)"""
+        try:
+            file_id_str = safe_uuid_str(file_id)
+            
+            # Conta tutte le associazioni US per questo file
+            assoc_query = select(us_files_association).where(
+                us_files_association.c.file_id == file_id_str
+            )
+            assoc_result = await self.db.execute(assoc_query)
+            associations = assoc_result.all()
+            
+            # Se ci sono più di 0 associazioni, il file è ancora utilizzato
+            has_associations = len(associations) > 0
+            
+            logger.info(f"File {file_id} ha {len(associations)} associazioni US: {has_associations}")
+            
+            return has_associations
+            
+        except Exception as e:
+            logger.error(f"Errore verifica associazioni US per file {file_id}: {e}")
+            # In caso di errore, assumi che ci siano associazioni per sicurezza
+            return True
+    
+    async def _check_file_has_usm_associations(self, file_id: UUID) -> bool:
+        """Verifica se il file ha associazioni USM"""
+        try:
+            file_id_str = safe_uuid_str(file_id)
+            
+            # Conta tutte le associazioni USM per questo file
+            assoc_query = select(usm_files_association).where(
+                usm_files_association.c.file_id == file_id_str
+            )
+            assoc_result = await self.db.execute(assoc_query)
+            associations = assoc_result.all()
+            
+            # Se ci sono più di 0 associazioni, il file è utilizzato da USM
+            has_associations = len(associations) > 0
+            
+            logger.info(f"File {file_id} ha {len(associations)} associazioni USM: {has_associations}")
+            
+            return has_associations
+            
+        except Exception as e:
+            logger.error(f"Errore verifica associazioni USM per file {file_id}: {e}")
+            # In caso di errore, assumi che non ci siano associazioni USM
+            return False
+    
+    async def _fallback_delete_all_associations(self, file_id: UUID) -> None:
+        """Elimina tutte le associazioni di un file come fallback per gestire StaleDataError"""
+        try:
+            file_id_str = safe_uuid_str(file_id)
+            
+            # Elimina tutte le associazioni US
+            delete_us_assoc = us_files_association.delete().where(
+                us_files_association.c.file_id == file_id_str
+            )
+            us_result = await self.db.execute(delete_us_assoc)
+            logger.info(f"Eliminate {us_result.rowcount} associazioni US per file {file_id}")
+            
+            # Elimina tutte le associazioni USM
+            delete_usm_assoc = usm_files_association.delete().where(
+                usm_files_association.c.file_id == file_id_str
+            )
+            usm_result = await self.db.execute(delete_usm_assoc)
+            logger.info(f"Eliminate {usm_result.rowcount} associazioni USM per file {file_id}")
+            
+        except Exception as e:
+            logger.error(f"Errore eliminazione associazioni fallback per file {file_id}: {e}")
+            # Non sollevare eccezione per non bloccare il processo principale
+
     async def _try_orphan_file_cleanup(self, file_id: UUID) -> bool:
         """Tenta di eliminare file orfano dal database"""
         try:
