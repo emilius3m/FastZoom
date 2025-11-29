@@ -3,10 +3,12 @@
 {% block title %}Harris Matrix Viewer - {{ site.name }}{% endblock %}
 
 {% block additional_head %}
-<!-- Cytoscape.js CDN -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-<!-- Cytoscape.js layout extensions -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape-dagre.min.js"></script>
+<!-- Cytoscape.js local -->
+<script src="/static/js/cytoscape.min.js"></script>
+<!-- Dagre library (required for cytoscape-dagre) -->
+<script src="/static/js/dagre.min.js"></script>
+<!-- Cytoscape.js layout extensions local -->
+<script src="/static/js/cytoscape-dagre.min.js"></script>
 <!-- Additional styling for Cytoscape -->
 <style>
 [x-cloak] { display: none !important; }
