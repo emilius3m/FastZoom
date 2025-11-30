@@ -19,6 +19,14 @@
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
     background-color: #f9fafb;
+
+
+    width: 100%;
+    height: 800px;
+    min-height: 600px;
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
 }
 
 .matrix-container {
@@ -307,7 +315,7 @@
                 </div>
                 
                 <!-- Cytoscape Container -->
-                <div id="cy" x-show="!loading"></div>
+                <div id="cy" style="height: 800px !important; background: #f5f5f5;" x-show="!loading"></div>
                 
                 <!-- Empty State -->
                 <div x-show="!loading && (!matrixData.nodes || matrixData.nodes.length === 0)" 
@@ -573,7 +581,7 @@ function harrisMatrixViewer() {
                         'height': nodeSize * 0.7,
                         'shape': 'round-rectangle',
                         'background-color': (ele) => this.getNodeColor(ele),
-                        'border-width': 2,
+                        'border-width': 0.5,
                         'border-color': (ele) => this.getNodeBorderColor(ele),
                         'color': 'white',
                         'font-size': '12px',
@@ -593,10 +601,10 @@ function harrisMatrixViewer() {
                 {
                     selector: 'node:hover',
                     style: {
-                        'border-width': 4,
+                        'border-width': 1,
                         'border-color': '#1f2937',
                         'overlay-color': '#1f2937',
-                        'overlay-opacity': 0.2
+                        'overlay-opacity': 0.1
                     }
                 },
                 
@@ -604,10 +612,10 @@ function harrisMatrixViewer() {
                 {
                     selector: 'node:selected',
                     style: {
-                        'border-width': 4,
+                        'border-width': 1,
                         'border-color': '#3b82f6',
                         'overlay-color': '#3b82f6',
-                        'overlay-opacity': 0.3
+                        'overlay-opacity': 0.1
                     }
                 },
                 
@@ -621,13 +629,19 @@ function harrisMatrixViewer() {
                         'target-arrow-shape': (ele) => ele.data('bidirectional') ? 'none' : 'triangle',
                         'source-arrow-color': (ele) => this.getEdgeColor(ele),
                         'source-arrow-shape': (ele) => ele.data('bidirectional') ? 'triangle' : 'none',
-                        'curve-style': (ele) => this.settings.edgeStyle === 'curved' ? 'bezier' : 'straight',
                         'label': (ele) => this.settings.showEdgeLabels ? ele.data('label') : '',
                         'font-size': '10px',
                         'color': '#6b7280',
                         'text-rotation': 'autorotate',
                         'text-margin-y': -10,
-                        'overlay-opacity': 0
+                        'border-width': 0,
+                        'outline-width': 0,
+                        'overlay-opacity': 0,
+                        //'curve-style': (ele) => this.settings.edgeStyle === 'curved' ? 'bezier' : 'straight',
+
+                         'curve-style': 'taxi',
+                        'taxi-direction': 'downward',
+                        'taxi-turn': 50
                     }
                 },
                 
@@ -635,9 +649,9 @@ function harrisMatrixViewer() {
                 {
                     selector: 'edge:hover',
                     style: {
-                        'width': 4,
+                        'width': 1,
                         'overlay-color': '#1f2937',
-                        'overlay-opacity': 0.3
+                        'overlay-opacity': 0.0
                     }
                 }
             ];
