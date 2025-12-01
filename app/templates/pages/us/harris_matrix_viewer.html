@@ -9,6 +9,10 @@
 <script src="/static/js/dagre.min.js"></script>
 <!-- Cytoscape.js layout extensions local -->
 <script src="/static/js/cytoscape-dagre.min.js"></script>
+
+<!-- Elk.js per layout compound nodes -->
+<script src="/static/js/elk.bundled.js"></script>
+<script src="/static/js/cytoscape-elk.min.js"></script>
 <!-- Additional styling for Cytoscape -->
 <style>
 [x-cloak] { display: none !important; }
@@ -252,8 +256,9 @@
                 <!-- Layout Type -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Layout Algorithm</label>
-                    <select x-model="settings.layout" @change="updateLayout()" 
+                    <select x-model="settings.layout" @change="updateLayout()"
                             class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="elk">Hierarchical with Period Boxes (Elk)</option>
                         <option value="dagre">Hierarchical (Dagre)</option>
                         <option value="breadthfirst">Breadth First</option>
                         <option value="circle">Circular</option>
@@ -389,6 +394,17 @@
                 </div>
             </div>
             
+            <!-- Period Lines -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Period Separators</h4>
+                <div class="space-y-2">
+                    <div class="legend-item">
+                        <div class="edge-style-preview bg-gray-400" style="border-top: 2px dashed #9ca3af;"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Historical Periods</span>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Relationship Types -->
             <div class="mb-6">
                 <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Relationships</h4>
@@ -460,7 +476,7 @@ function harrisMatrixViewer() {
         
         // Settings
         settings: {
-            layout: 'dagre',
+            layout: 'elk',
             nodeSize: 'medium',
             edgeStyle: 'default',
             showLabels: true,
@@ -500,6 +516,17 @@ function harrisMatrixViewer() {
         
         // Initialize Cytoscape.js
         initializeCytoscape() {
+            console.log('🎨 Rendering Harris Matrix with period boxes...');
+
+            // ⭐ REGISTRA ESTENSIONE ELK
+            if (typeof cytoscapeElk !== 'undefined') {
+                cytoscape.use(cytoscapeElk);
+                console.log('✅ Elk extension registered');
+            } else {
+                console.error('❌ Elk extension not loaded! Check <head> scripts.');
+                return;
+            }
+
             if (!this.matrixData.nodes || this.matrixData.nodes.length === 0) {
                 return;
             }
@@ -530,36 +557,143 @@ function harrisMatrixViewer() {
         // Convert API data to Cytoscape elements format
         convertToCytoscapeElements() {
             const elements = [];
-            
-            // Add nodes
+
+            // ===== 1. RAGGRUPPA NODI PER PERIODO =====
+            const periodGroups = {};
             this.matrixData.nodes.forEach(node => {
-                elements.push({
-                    data: {
-                        id: node.id,
-                        label: node.label,
-                        type: node.type,
-                        definition: node.definition,
-                        data: node.data,
-                        level: this.matrixData.levels[node.id] || 0
-                    }
-                });
+                const period = node.data?.periodo || 'Non datato';
+                const phase = node.data?.fase || '';
+
+                // Chiave: "Periodo - Fase" oppure solo "Periodo"
+                const key = phase ? `${period} - ${phase}` : period;
+
+                if (!periodGroups[key]) {
+                    periodGroups[key] = {
+                        period: period,
+                        phase: phase,
+                        dating: node.data?.datazione || '',
+                        nodes: []
+                    };
+                }
+                periodGroups[key].nodes.push(node);
             });
-            
-            // Add edges
+
+            console.log('📊 Period groups:', periodGroups);
+
+            // ===== 2. CREA PARENT NODES (rettangoli periodo) + CHILD NODES (US/USM) =====
+            let periodIndex = 0;
+            Object.entries(periodGroups).forEach(([key, group]) => {
+                const parentId = `period-${periodIndex}`;
+
+                // Label: "Periodo (datazione)" o solo "Periodo"
+                const label = group.dating
+                    ? `${key} (${group.dating})`
+                    : key;
+
+                // ⭐ PARENT NODE - Rettangolo periodo
+                elements.push({
+                    group: 'nodes',
+                    data: {
+                        id: parentId,
+                        label: label,
+                        type: 'period-box',
+                        period: group.period,
+                        phase: group.phase,
+                        dating: group.dating
+                    },
+                    classes: 'period-box'
+                });
+
+                console.log(`📦 Created period box: ${label}`);
+
+                // ⭐ CHILD NODES - US/USM dentro il rettangolo
+                group.nodes.forEach(node => {
+                    elements.push({
+                        group: 'nodes',
+                        data: {
+                            id: node.id,
+                            label: node.label,
+                            type: node.type,
+                            parent: parentId,  // ⭐ Assegna al rettangolo periodo
+                            period: group.period,
+                            phase: group.phase,
+                            dating: group.dating,
+                            definition: node.definition,
+                            data: node.data,
+                            level: this.matrixData.levels[node.id] || 0
+                        },
+                        classes: node.type === 'usm' ? 'usm' : 'us'
+                    });
+                });
+
+                periodIndex++;
+            });
+
+            console.log(`✅ Created ${periodIndex} period boxes with ${this.matrixData.nodes.length} child nodes`);
+
+            // ===== 3. AGGIUNGI EDGES STRATIGRAFICI =====
             this.matrixData.edges.forEach(edge => {
+                const source = edge.source || edge.from;
+                const target = edge.target || edge.to;
+
                 elements.push({
+                    group: 'edges',
                     data: {
-                        id: `${edge.from}-${edge.to}`,
-                        source: edge.from,
-                        target: edge.to,
-                        type: edge.type,
-                        label: edge.label,
+                        id: edge.id || `edge-${source}-${target}`,
+                        source: source,
+                        target: target,
+                        label: edge.label || '',
+                        relationship: edge.type,
                         bidirectional: edge.bidirectional
-                    }
+                    },
+                    classes: this.getEdgeClass(edge.type)
                 });
             });
-            
+
+            console.log(`✅ Added ${this.matrixData.edges.length} edges`);
+
             return elements;
+        },
+
+        // Helper function to get edge class based on type
+        getEdgeClass(type) {
+            const edgeClasses = {
+                'copre': 'edge-copre',
+                'si_appoggia_a': 'edge-copre',
+                'taglia': 'edge-taglia',
+                'tagliato_da': 'edge-taglia',
+                'riempie': 'edge-riempie',
+                'riempito_da': 'edge-riempie',
+                'uguale_a': 'edge-uguale',
+                'si_lega_a': 'edge-uguale'
+            };
+            return edgeClasses[type] || 'edge-default';
+        },
+
+        // ===== HELPER: Raggruppa nodi per periodo =====
+        groupNodesByPeriod(nodes) {
+            const groups = {};
+
+            nodes.forEach(node => {
+                const period = node.data?.periodo || 'Non datato';
+                const phase = node.data?.fase || '';
+
+                // Chiave: "Periodo - Fase" o solo "Periodo"
+                const key = phase ? `${period} - ${phase}` : period;
+
+                if (!groups[key]) {
+                    groups[key] = {
+                        period: period,
+                        phase: phase,
+                        dating: node.data?.datazione || '',
+                        nodes: []
+                    };
+                }
+
+                groups[key].nodes.push(node);
+            });
+
+            return groups;
         },
         
         // Get Cytoscape styles
@@ -573,27 +707,92 @@ function harrisMatrixViewer() {
             const nodeSize = nodeSizes[this.settings.nodeSize] || nodeSizes.medium;
             
             return [
-                // Node styles
+                // ===== RETTANGOLI PERIODO (parent nodes con bordo tratteggiato) =====
                 {
-                    selector: 'node',
+                    selector: 'node.period-box',
                     style: {
-                        'width': nodeSize,
-                        'height': nodeSize * 0.7,
-                        'shape': 'round-rectangle',
-                        'background-color': (ele) => this.getNodeColor(ele),
-                        'border-width': 0.5,
-                        'border-color': (ele) => this.getNodeBorderColor(ele),
-                        'color': 'white',
-                        'font-size': '12px',
+                        // Forma rettangolare
+                        'shape': 'rectangle',
+
+                        // Background quasi trasparente
+                        'background-color': '#f9fafb',
+                        'background-opacity': 0.08,
+
+                        // ⭐ BORDO TRATTEGGIATO
+                        'border-width': 2,
+                        'border-color': '#9ca3af',
+                        'border-style': 'dashed',
+                        'border-dash-pattern': [15, 8],
+
+                        // Label periodo (in alto)
+                        'label': 'data(label)',
+                        'font-size': '14px',
                         'font-weight': 'bold',
+                        'color': '#6b7280',
+                        'text-valign': 'top',
+                        'text-halign': 'center',
+                        'text-margin-y': -12,
+
+                        // ⭐ PADDING interno (spazio tra bordo e nodi figli)
+                        'padding': '35px',
+
+                        // Sizing automatico
+                        'compound-sizing-wrt-labels': 'include',
+
+                        // Dietro ai nodi figli
+                        'z-index': 0,
+
+                        // ⭐ NON intercetta click (puoi cliccare attraverso)
+                        'events': 'no'
+                    }
+                },
+
+                // Colori alternati per periodi (opzionale)
+                {
+                    selector: 'node.period-box:nth-child(odd)',
+                    style: {
+                        'background-color': '#eff6ff',
+                        'border-color': '#93c5fd'
+                    }
+                },
+
+                {
+                    selector: 'node.period-box:nth-child(even)',
+                    style: {
+                        'background-color': '#fef3c7',
+                        'border-color': '#fbbf24'
+                    }
+                },
+
+                // ===== NODI US (figli dentro i rettangoli) =====
+                {
+                    selector: 'node.us',
+                    style: {
+                        'label': 'data(label)',
+                        'background-color': '#3b82f6',
+                        'width': '100px',
+                        'height': '60px',
+                        'shape': 'roundrectangle',
+                        'border-width': 3,
+                        'border-color': '#1e40af',
                         'text-valign': 'center',
                         'text-halign': 'center',
+                        'font-size': '16px',
+                        'font-weight': 'bold',
+                        'color': '#ffffff',
                         'text-wrap': 'wrap',
-                        'text-max-width': nodeSize,
-                        'label': (ele) => this.settings.showLabels ? ele.data('label') : '',
-                        'overlay-opacity': 0,
-                        'transition-property': 'background-color, border-color, width, height',
-                        'transition-duration': '0.3s'
+                        'text-max-width': '90px',
+                        'z-index': 10  // Sopra i rettangoli periodo
+                    }
+                },
+
+                // ===== NODI USM (viola) =====
+                {
+                    selector: 'node.usm',
+                    style: {
+                        'background-color': '#8b5cf6',
+                        'border-color': '#6d28d9',
+                        'z-index': 10
                     }
                 },
                 
@@ -619,29 +818,58 @@ function harrisMatrixViewer() {
                     }
                 },
                 
-                // Edge styles
+                // ===== EDGES STRATIGRAFICI NORMALI =====
                 {
                     selector: 'edge',
                     style: {
-                        'width': 2,
+                        'width': 3,
                         'line-color': (ele) => this.getEdgeColor(ele),
                         'target-arrow-color': (ele) => this.getEdgeColor(ele),
                         'target-arrow-shape': (ele) => ele.data('bidirectional') ? 'none' : 'triangle',
                         'source-arrow-color': (ele) => this.getEdgeColor(ele),
                         'source-arrow-shape': (ele) => ele.data('bidirectional') ? 'triangle' : 'none',
                         'label': (ele) => this.settings.showEdgeLabels ? ele.data('label') : '',
-                        'font-size': '10px',
-                        'color': '#6b7280',
-                        'text-rotation': 'autorotate',
-                        'text-margin-y': -10,
+                        'font-size': '12px',
+                        'color': '#1f2937',
+                        'text-background-color': '#ffffff',
+                        'text-background-opacity': 0.9,
+                        'text-background-padding': '3px',
                         'border-width': 0,
                         'outline-width': 0,
                         'overlay-opacity': 0,
-                        //'curve-style': (ele) => this.settings.edgeStyle === 'curved' ? 'bezier' : 'straight',
-
-                         'curve-style': 'taxi',
+                        'curve-style': 'taxi',
                         'taxi-direction': 'downward',
                         'taxi-turn': 50
+                    }
+                },
+
+                // Edge "copre"
+                {
+                    selector: 'edge.edge-copre',
+                    style: {
+                        'line-color': '#1f2937',
+                        'target-arrow-color': '#1f2937'
+                    }
+                },
+
+                // Edge "taglia" (rosso dashed)
+                {
+                    selector: 'edge.edge-taglia',
+                    style: {
+                        'line-color': '#ef4444',
+                        'target-arrow-color': '#ef4444',
+                        'line-style': 'dashed'
+                    }
+                },
+
+                // Edge "uguale_a" (verde dotted)
+                {
+                    selector: 'edge.edge-uguale',
+                    style: {
+                        'line-color': '#10b981',
+                        'target-arrow-shape': 'none',
+                        'line-style': 'dotted',
+                        'width': 2
                     }
                 },
                 
@@ -746,6 +974,47 @@ function harrisMatrixViewer() {
         // Get layout options based on selected algorithm
         getLayoutOptions() {
             const layouts = {
+                elk: {
+                    name: 'elk',
+
+                    elk: {
+                        algorithm: 'layered',
+
+                        // Direzione verticale
+                        'elk.direction': 'DOWN',
+
+                        // ⭐ SUPPORTO COMPOUND NODES (parent/child)
+                        'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+
+                        // ⭐ EDGE ROUTING ORTOGONALE (angoli 90°)
+                        'elk.edgeRouting': 'ORTHOGONAL',
+
+                        // Spaziature
+                        'elk.spacing.nodeNode': 80,
+                        'elk.layered.spacing.nodeNodeBetweenLayers': 100,
+                        'elk.spacing.edgeNode': 40,
+
+                        // ⭐ PADDING interno compound nodes (rettangoli periodo)
+                        'elk.padding': '[top=55,left=35,bottom=35,right=35]',
+
+                        // Allineamento
+                        'elk.alignment': 'CENTER',
+
+                        // Minimizza incroci
+                        'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+
+                        // Node placement
+                        'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+
+                        // Cycle breaking
+                        'elk.layered.cycleBreaking.strategy': 'GREEDY'
+                    },
+
+                    fit: true,
+                    padding: 60,
+                    animate: true,
+                    animationDuration: 500
+                },
                 dagre: {
                     name: 'dagre',
                     rankDir: 'TB', // Top to bottom (chronological)
@@ -782,7 +1051,7 @@ function harrisMatrixViewer() {
                 }
             };
             
-            return layouts[this.settings.layout] || layouts.dagre;
+            return layouts[this.settings.layout] || layouts.elk;
         },
         
         // Update node styles
