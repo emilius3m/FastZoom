@@ -219,6 +219,10 @@ async def v1_get_matrix_statistics(
         us_nodes = [n for n in nodes if n['type'] == 'us']
         usm_nodes = [n for n in nodes if n['type'] == 'usm']
         
+        # US positive/negative statistics
+        us_positive = [n for n in us_nodes if n.get('tipo') == 'positiva']
+        us_negative = [n for n in us_nodes if n.get('tipo') == 'negativa']
+        
         # Relationship type statistics
         relationship_types = {}
         for edge in edges:
@@ -234,6 +238,8 @@ async def v1_get_matrix_statistics(
             "site_id": str(site_id),
             "units": {
                 "total_us": len(us_nodes),
+                "us_positive": len(us_positive),
+                "us_negative": len(us_negative),
                 "total_usm": len(usm_nodes),
                 "total_units": len(nodes)
             },

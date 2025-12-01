@@ -41,6 +41,7 @@
             usFormData: {
                 site_id: '',
                 us_code: '',
+                tipo: 'positiva',  // Default US positiva
                 ente_responsabile: '',
                 anno: null,
                 ufficio_mic: '',
@@ -300,6 +301,7 @@
                             this.usFormData = {
                                 site_id: usData.site_id,
                                 us_code: usData.us_code,
+                                tipo: usData.tipo || 'positiva',
                                 ente_responsabile: usData.ente_responsabile || '',
                                 anno: usData.anno,
                                 ufficio_mic: usData.ufficio_mic || '',
@@ -553,6 +555,7 @@
                 this.usFormData = {
                     site_id: this.currentSiteId,
                     us_code: '',
+                    tipo: 'positiva',  // Default US positiva
                     ente_responsabile: '',
                     anno: null,
                     ufficio_mic: '',
@@ -1816,6 +1819,7 @@
                     ...this.usList.map(us => ({
                         tipo: 'US',
                         codice: us.us_code,
+                        tipo_us: us.tipo || 'positiva',
                         definizione: us.definizione || '',
                         localita: us.localita || '',
                         data_rilevamento: this.formatDate(us.data_rilevamento),
@@ -1835,12 +1839,13 @@
                     }))
                 ];
 
-                const headers = ['Tipo', 'Codice', 'Definizione', 'Località', 'Data Rilevamento', 'Responsabile', 'Affidabilità', 'Aggiornato il'];
+                const headers = ['Tipo', 'Codice', 'Tipo US', 'Definizione', 'Località', 'Data Rilevamento', 'Responsabile', 'Affidabilità', 'Aggiornato il'];
                 const csvContent = [
                     headers.join(','),
                     ...allData.map(item => [
                         item.tipo,
                         item.codice,
+                        item.tipo_us,
                         item.definizione,
                         item.localita,
                         item.data_rilevamento,

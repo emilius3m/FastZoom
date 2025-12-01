@@ -2,13 +2,22 @@
 from datetime import date, datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from pydantic import BaseModel, Field
+from enum import Enum
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 SequenzaFisica = Dict[str, List[str]]
+
+class TipoUS(str, Enum):
+    POSITIVA = "positiva"
+    NEGATIVA = "negativa"
 
 class USBase(BaseModel):
     site_id: UUID
     us_code: str = Field(..., pattern=r"^US\d{3,4}$")
+    tipo: TipoUS = Field(
+        default=TipoUS.POSITIVA,
+        description="Tipo US: positiva (accumulo) o negativa (asporto/taglio)"
+    )
     ente_responsabile: Optional[str] = None
     anno: Optional[int] = None
     ufficio_mic: Optional[str] = None
@@ -49,10 +58,23 @@ class USBase(BaseModel):
     responsabile_rielaborazione: Optional[str] = None
 
 class USCreate(USBase):
-    pass
+    
+    @field_validator('tipo')
+    @classmethod
+    def validate_tipo_negative(cls, v, info):
+        # US negative non possono avere certe definizioni
+        if v == TipoUS.NEGATIVA:
+            values = info.data if isinstance(info.data, dict) else {}
+            definizione = values.get('definizione', '')
+            if 'strato' in definizione.lower():
+                raise ValueError(
+                    "US negative non possono essere strati (solo interfacce)"
+                )
+        return v
 
 class USUpdate(BaseModel):
     # Tutti opzionali per patch
+    tipo: Optional[TipoUS] = None
     us_code: Optional[str] = Field(None, pattern=r"^US\d{3,4}$")
     ente_responsabile: Optional[str] = None
     anno: Optional[int] = None
@@ -98,8 +120,7 @@ class USOut(USBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class USMBase(BaseModel):
@@ -216,5 +237,4 @@ class USMOut(USMBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

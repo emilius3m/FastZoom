@@ -110,6 +110,28 @@ async def _get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any
     )
     us_count = us_count.scalar() or 0
     
+    # ⭐ NUOVO: Conta US positive
+    us_positive = await db.execute(
+        select(func.count(UnitaStratigrafica.id)).where(
+            and_(
+                UnitaStratigrafica.site_id == str(site_id),
+                UnitaStratigrafica.tipo == 'positiva'
+            )
+        )
+    )
+    us_positive = us_positive.scalar() or 0
+    
+    # ⭐ NUOVO: Conta US negative
+    us_negative = await db.execute(
+        select(func.count(UnitaStratigrafica.id)).where(
+            and_(
+                UnitaStratigrafica.site_id == str(site_id),
+                UnitaStratigrafica.tipo == 'negativa'
+            )
+        )
+    )
+    us_negative = us_negative.scalar() or 0
+    
     usm_count = await db.execute(
         select(func.count(UnitaStratigraficaMuraria.id)).where(UnitaStratigraficaMuraria.site_id == str(site_id))
     )
@@ -122,6 +144,8 @@ async def _get_site_statistics(db: AsyncSession, site_id: UUID) -> Dict[str, Any
         "documents_count": documents_count,
         "us_usm_count": us_usm_count,
         "us_count": us_count,
+        "us_positive": us_positive,  # ⭐ NUOVO
+        "us_negative": us_negative,  # ⭐ NUOVO
         "usm_count": usm_count,
         "giornali_totali": giornali_totali,  # 🔥 NUOVO
         "giornali_validati": giornali_validati,  # 🔥 NUOVO

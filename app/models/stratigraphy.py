@@ -47,6 +47,12 @@ usm_files_association = Table(
 
 # ===== ENUMS PER US/USM =====
 
+class TipoUSEnum(str, PyEnum):
+    """Tipo Unità Stratigrafica"""
+    POSITIVA = "positiva"  # Accumulo/costruzione
+    NEGATIVA = "negativa"  # Asporto/taglio/fossa
+
+
 class ConsistenzaEnum(str, PyEnum):
     """Consistenza unità stratigrafiche"""
     COMPATTA = "compatta"
@@ -188,6 +194,14 @@ class UnitaStratigrafica(Base, SiteMixin, UserMixin, SoftDeleteMixin):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     site_id = Column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
+
+    # ===== TIPOLOGIA UNITÀ STRATIGRAFICA =====
+    tipo = Column(
+        String(20),
+        nullable=False,
+        default=TipoUSEnum.POSITIVA.value,
+        comment="Tipo US: positiva (accumulo) o negativa (asporto/taglio)"
+    )
 
     # ===== INTESTAZIONE E IDENTIFICAZIONE =====
     us_code = Column(String(16), nullable=False, index=True)  # US003

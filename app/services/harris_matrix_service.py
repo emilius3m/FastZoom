@@ -120,9 +120,14 @@ class HarrisMatrixService:
             # Calculate chronological levels using topological sort
             levels = self._calculate_chronological_levels(nodes, edges)
             
-            # Generate metadata
+            # Generate metadata with US positive/negative counts
+            us_positive = sum(1 for us in us_units if us.tipo == 'positiva')
+            us_negative = sum(1 for us in us_units if us.tipo == 'negativa')
+            
             metadata = {
                 'total_us': len(us_units),
+                'us_positive': us_positive,
+                'us_negative': us_negative,
                 'total_usm': len(usm_units),
                 'total_nodes': len(nodes),
                 'total_edges': len(edges),
@@ -345,6 +350,7 @@ class HarrisMatrixService:
                 'type': 'us',
                 'label': us.us_code,
                 'definition': us.definizione or '',
+                'tipo': us.tipo or 'positiva',  # ⭐ Aggiungi campo tipo
                 'data': {
                     'id': str(us.id),
                     'localita': us.localita or '',
@@ -503,6 +509,8 @@ class HarrisMatrixService:
             'levels': {},
             'metadata': {
                 'total_us': 0,
+                'us_positive': 0,
+                'us_negative': 0,
                 'total_usm': 0,
                 'total_nodes': 0,
                 'total_edges': 0

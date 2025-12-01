@@ -203,14 +203,24 @@
     </div>
 
     <!-- Statistics Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div class="stats-card">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">US Units</p>
-                    <p class="number text-blue-600 dark:text-blue-400" x-text="matrixData.metadata?.total_us || 0"></p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">US Positive</p>
+                    <p class="number text-blue-600 dark:text-blue-400" x-text="getUSPositiveCount()"></p>
                 </div>
-                <i class="fas fa-layer-group text-blue-500 text-xl"></i>
+                <i class="fas fa-plus-circle text-blue-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">US Negative</p>
+                    <p class="number text-red-600 dark:text-red-400" x-text="getUSNegativeCount()"></p>
+                </div>
+                <i class="fas fa-minus-circle text-red-500 text-xl"></i>
             </div>
         </div>
         
@@ -384,8 +394,12 @@
                 <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Unit Types</h4>
                 <div class="space-y-2">
                     <div class="legend-item">
-                        <div class="w-4 h-4 bg-blue-500 rounded"></div>
-                        <span class="text-sm text-gray-700 dark:text-gray-300">US (Stratigraphic Unit)</span>
+                        <div class="w-4 h-4 bg-blue-500 border-2 border-blue-700 rounded"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">US Positiva (accumulo)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="w-4 h-4 bg-red-500 border-2 border-red-800 border-dashed"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">US Negativa (asporto/taglio)</span>
                     </div>
                     <div class="legend-item">
                         <div class="w-4 h-4 bg-purple-500 rounded"></div>
@@ -614,6 +628,7 @@ function harrisMatrixViewer() {
                             id: node.id,
                             label: node.label,
                             type: node.type,
+                            tipo: node.data?.tipo || 'positiva',  // ⭐ Aggiungi campo tipo
                             parent: parentId,  // ⭐ Assegna al rettangolo periodo
                             period: group.period,
                             phase: group.phase,
@@ -764,9 +779,9 @@ function harrisMatrixViewer() {
                     }
                 },
 
-                // ===== NODI US (figli dentro i rettangoli) =====
+                // ===== US POSITIVE (blu con bordo continuo) =====
                 {
-                    selector: 'node.us',
+                    selector: 'node.us[tipo="positiva"]',
                     style: {
                         'label': 'data(label)',
                         'background-color': '#3b82f6',
@@ -774,6 +789,7 @@ function harrisMatrixViewer() {
                         'height': '60px',
                         'shape': 'roundrectangle',
                         'border-width': 3,
+                        'border-style': 'solid',
                         'border-color': '#1e40af',
                         'text-valign': 'center',
                         'text-halign': 'center',
@@ -783,6 +799,40 @@ function harrisMatrixViewer() {
                         'text-wrap': 'wrap',
                         'text-max-width': '90px',
                         'z-index': 10  // Sopra i rettangoli periodo
+                    }
+                },
+
+                // ===== US NEGATIVE (rosso con bordo tratteggiato) =====
+                {
+                    selector: 'node.us[tipo="negativa"]',
+                    style: {
+                        'label': 'data(label)',
+                        'background-color': '#ef4444',       // Rosso
+                        'width': '100px',
+                        'height': '60px',
+                        'shape': 'rectangle',                // Forma rettangolare
+                        'border-width': 3,
+                        'border-style': 'dashed',            // Bordo tratteggiato
+                        'border-dash-pattern': [8, 4],
+                        'border-color': '#991b1b',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'font-size': '16px',
+                        'font-weight': 'bold',
+                        'color': '#ffffff',
+                        'text-wrap': 'wrap',
+                        'text-max-width': '90px',
+                        'z-index': 10  // Sopra i rettangoli periodo
+                    }
+                },
+
+                // ===== Label US negative con simbolo =====
+                {
+                    selector: 'node.us[tipo="negativa"]',
+                    style: {
+                        'label': function(ele) {
+                            return '⊖ ' + ele.data('label');  // Simbolo asporto
+                        }
                     }
                 },
 
@@ -1105,6 +1155,22 @@ function harrisMatrixViewer() {
         truncateText(text, length) {
             if (!text) return '';
             return text.length > length ? text.substring(0, length) + '...' : text;
+        },
+        
+        // Count US positive units
+        getUSPositiveCount() {
+            if (!this.matrixData.nodes) return 0;
+            return this.matrixData.nodes.filter(node =>
+                node.type === 'us' && (!node.data?.tipo || node.data?.tipo === 'positiva')
+            ).length;
+        },
+        
+        // Count US negative units
+        getUSNegativeCount() {
+            if (!this.matrixData.nodes) return 0;
+            return this.matrixData.nodes.filter(node =>
+                node.type === 'us' && node.data?.tipo === 'negativa'
+            ).length;
         }
     };
 }
