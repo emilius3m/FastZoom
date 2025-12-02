@@ -557,7 +557,7 @@ function harrisMatrixViewer() {
                     console.log('🔍 Analisi nodi:');
                     this.matrixData.nodes.forEach((node, index) => {
                         if (node.type === 'us') {
-                            console.log(`Node ${index}: ${node.id}, tipo: ${node.tipo}, data.tipo: ${node.data?.tipo}, label: ${node.label}`);
+                            console.log(`Node ${index}: ${node.id}, tipo: ${node.tipo}, data.tipo: ${node.tipo}, label: ${node.label}`);
                         }
                     });
                     
@@ -666,6 +666,7 @@ function harrisMatrixViewer() {
                     data: {
                         id: parentId,
                         label: label,
+                        tipo: label || 'positiva',
                         type: 'period-box',
                         period: group.period,
                         phase: group.phase,
@@ -682,6 +683,11 @@ function harrisMatrixViewer() {
                     
                     // 🔍 DEBUG: Verifica campo tipo per ogni nodo
                     console.log(`🏷️ Nodo ${node.id}: tipo="${nodeTipo}", label="${node.label}"`);
+                    console.log(`🔍 Nodo ${node.id} raw data:`, {
+                        original_tipo: node.tipo,
+                        data_tipo: nodeTipo,
+                        node_tipo: nodeTipo
+                    });
                     
                     elements.push({
                         group: 'nodes',
@@ -689,7 +695,7 @@ function harrisMatrixViewer() {
                             id: node.id,
                             label: node.label,
                             type: node.type,
-                            tipo: node.tipo || node.data?.tipo || 'positiva',
+                            tipo: node.tipo || 'positiva',
                             parent: parentId,  // ⭐ Assegna al rettangolo periodo
                             period: group.period,
                             phase: group.phase,
@@ -727,6 +733,14 @@ function harrisMatrixViewer() {
             });
 
             console.log(`✅ Added ${this.matrixData.edges.length} edges`);
+
+            // 🔍 DEBUG: Verifica finale dei nodi creati
+            console.log('🔬 Final node verification:');
+            elements.forEach(elem => {
+                if (elem.group === 'nodes' && elem.data.type === 'us') {
+                    console.log(`Node ${elem.data.id}: tipo="${elem.data.tipo}", label="${elem.data.label}"`);
+                }
+            });
 
             return elements;
         },
@@ -842,7 +856,7 @@ function harrisMatrixViewer() {
 
                 // ===== US POSITIVE (blu con bordo continuo) =====
                 {
-                    selector: 'node.us[tipo="positiva"]',
+                    selector: 'node.us[tipo = "positiva"]',
                     style: {
                         'label': 'data(label)',
                         'background-color': '#3b82f6',
@@ -863,7 +877,7 @@ function harrisMatrixViewer() {
 
                 // ===== US NEGATIVE (rosso con bordo tratteggiato) =====
                 {
-                    selector: 'node.us[tipo="negativa"]',
+                    selector: 'node.us[tipo = "negativa"]',
                     style: {
                         'label': function(ele) {
                             return '⊖ ' + ele.data('label');
