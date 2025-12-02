@@ -803,3 +803,181 @@ async def migration_help():
             "action_required": "Aggiornare client applications per usare nuovi endpoints US/USM"
         }
     }
+
+
+@router.post(
+    "/sites/{site_id}/harris-matrix/bulk-create",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk create US/USM from Harris Matrix editor",
+    tags=["Harris Matrix Editor"]
+)
+async def bulk_create_from_matrix(
+    site_id: UUID,
+    payload: Dict[str, Any],  # nodes e edges dal frontend
+    db: AsyncSession = Depends(get_async_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """
+    Create US/USM units and relationships in bulk from Harris Matrix editor.
+
+    Input format:
+    {
+        "nodes": [
+            {
+                "temp_id": "temp_1",
+                "type": "us",  # "us" or "usm"
+                "tipo": "positiva",  # solo per US
+                "periodo": "Medievale",
+                "fase": "Fase 1",
+                "definition": "Strato di terra",
+                "datazione": "XII sec.",
+                "localita": "Area A"
+            }
+        ],
+        "edges": [
+            {
+                "from": "temp_1",
+                "to": "temp_2",
+                "relationship": "copre"  # copre, taglia, riempie, etc.
+            }
+        ]
+    }
+    """
+    try:
+        # Verifica accesso al sito
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Accesso negato al sito")
+
+        nodes = payload.get("nodes", [])
+        edges = payload.get("edges", [])
+
+        if not nodes:
+            raise HTTPException(status_code=422, detail="Almeno un nodo è richiesto")
+
+        # Genera codici sequenziali per US e USM
+        us_nodes = [n for n in nodes if n.get("type") == "us"]
+        usm_nodes = [n for n in nodes if n.get("type") == "usm"]
+
+        # Trova il prossimo numero disponibile per US
+        us_count_result = await db.execute(
+            select(UnitaStratigrafica)
+            .where(UnitaStratigrafica.site_id == str(site_id))
+        )
+        existing_us = us_count_result.scalars().all()
+        next_us_num = len(existing_us) + 1
+
+        # Trova il prossimo numero disponibile per USM
+        usm_count_result = await db.execute(
+            select(UnitaStratigraficaMuraria)
+            .where(UnitaStratigraficaMuraria.site_id == str(site_id))
+        )
+        existing_usm = usm_count_result.scalars().all()
+        next_usm_num = len(existing_usm) + 1
+
+        # Mapping temp_id -> codice reale
+        temp_id_mapping = {}
+        created_units = {}
+
+        # Crea US
+        for i, node in enumerate(us_nodes):
+            us_code = f"US{next_us_num + i:03d}"  # US001, US002, etc.
+            temp_id_mapping[node["temp_id"]] = us_code
+
+            us_data = {
+                "site_id": str(site_id),
+                "us_code": us_code,
+                "tipo": node.get("tipo", "positiva"),
+                "definizione": node.get("definition", ""),
+                "periodo": node.get("periodo"),
+                "fase": node.get("fase"),
+                "datazione": node.get("datazione"),
+                "localita": node.get("localita"),
+                "sequenza_fisica": {},  # Sarà popolato dopo con le relazioni
+                "created_by": str(user_id),
+                "updated_by": str(user_id)
+            }
+
+            us = UnitaStratigrafica(**us_data)
+            db.add(us)
+            created_units[node["temp_id"]] = us
+
+        # Crea USM
+        for i, node in enumerate(usm_nodes):
+            usm_code = f"USM{next_usm_num + i:03d}"  # USM001, USM002, etc.
+            temp_id_mapping[node["temp_id"]] = usm_code
+
+            usm_data = {
+                "site_id": str(site_id),
+                "usm_code": usm_code,
+                "definizione": node.get("definition", ""),
+                "periodo": node.get("periodo"),
+                "fase": node.get("fase"),
+                "datazione": node.get("datazione"),
+                "localita": node.get("localita"),
+                "sequenza_fisica": {},
+                "created_by": str(user_id),
+                "updated_by": str(user_id)
+            }
+
+            usm = UnitaStratigraficaMuraria(**usm_data)
+            db.add(usm)
+            created_units[node["temp_id"]] = usm
+
+        # Flush per ottenere gli ID prima di aggiornare le relazioni
+        await db.flush()
+
+        # Costruisci sequenza_fisica per ogni unità
+        for edge in edges:
+            from_temp_id = edge["from"]
+            to_temp_id = edge["to"]
+            relationship = edge["relationship"]  # copre, taglia, etc.
+
+            if from_temp_id not in created_units or to_temp_id not in created_units:
+                logger.warning(f"Edge skipped: {from_temp_id} -> {to_temp_id} (unit not found)")
+                continue
+
+            from_unit = created_units[from_temp_id]
+            to_code = temp_id_mapping[to_temp_id]
+
+            # Aggiungi relazione a sequenza_fisica
+            if not from_unit.sequenza_fisica:
+                from_unit.sequenza_fisica = {}
+
+            if relationship not in from_unit.sequenza_fisica:
+                from_unit.sequenza_fisica[relationship] = []
+
+            # Aggiungi suffisso "usm" se il target è USM
+            to_node_type = next(n["type"] for n in nodes if n["temp_id"] == to_temp_id)
+            target_ref = f"{to_code}usm" if to_node_type == "usm" else to_code
+
+            if target_ref not in from_unit.sequenza_fisica[relationship]:
+                from_unit.sequenza_fisica[relationship].append(target_ref)
+
+        # Commit finale
+        await db.commit()
+
+        # Refresh per ottenere dati completi
+        for unit in created_units.values():
+            await db.refresh(unit)
+
+        return {
+            "success": True,
+            "created": {
+                "us": len(us_nodes),
+                "usm": len(usm_nodes)
+            },
+            "mapping": temp_id_mapping,
+            "message": f"Creati {len(us_nodes)} US e {len(usm_nodes)} USM con {len(edges)} relazioni"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk_create_from_matrix: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore durante la creazione: {str(e)}"
+        )

@@ -13,7 +13,34 @@ from app.core.security import (
     get_current_user_sites_with_blacklist,
 )
 from app.services.harris_matrix_service import HarrisMatrixService
-from sqlalchemy import select, and_
+from app.schemas.harris_matrix_editor import (
+    HarrisMatrixBulkCreateRequest,
+    HarrisMatrixBulkCreateResponse,
+    HarrisMatrixBulkUpdateRequest,
+    HarrisMatrixBulkUpdateResponse,
+    HarrisMatrixDeleteRequest,
+    HarrisMatrixDeleteResponse,
+    HarrisMatrixValidationResult,
+    HarrisMatrixGraphData,
+    HarrisMatrixNode,
+    HarrisMatrixEdge,
+    StratigraphicRelation,
+    UnitTypeEnum,
+    TipoUSEnum,
+    RelationshipValidation,
+    CycleDetectionResult,
+    UnitCodeValidation
+)
+from app.exceptions import (
+    HarrisMatrixValidationError,
+    StratigraphicCycleDetected,
+    UnitCodeConflict,
+    InvalidStratigraphicRelation,
+    HarrisMatrixServiceError,
+    BusinessLogicError
+)
+from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+from sqlalchemy import select, and_, or_
 
 router = APIRouter()
 
@@ -265,6 +292,695 @@ async def v1_get_matrix_statistics(
         raise
     except Exception as e:
         logger.error(f"Error getting Harris Matrix statistics for site {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+# ===== NUOVI ENDPOINTS PER EDITOR GRAFICO =====
+
+@router.post(
+    "/sites/{site_id}/harris-matrix/bulk-create",
+    summary="Bulk create units and relationships for Harris Matrix editor",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_bulk_create_harris_matrix(
+    site_id: UUID,
+    request: HarrisMatrixBulkCreateRequest,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> HarrisMatrixBulkCreateResponse:
+    """
+    Bulk create multiple US/USM units and their relationships.
+
+    This endpoint allows the Harris Matrix editor to create multiple units
+    and establish relationships between them in a single atomic operation.
+    Automatically generates sequential codes if not provided.
+
+    Args:
+        site_id: UUID of the archaeological site
+        request: Bulk creation request with units and relationships
+    
+    Returns:
+        Created units, relationships, and mapping information
+    """
+    try:
+        logger.info(f"Bulk creating Harris Matrix for site_id: {site_id}")
+    
+        # Verify site access
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to this site"
+            )
+    
+        # Convert Pydantic models to dictionaries for service
+        units_data = [
+            {
+                **unit.dict(exclude_none=True),
+                'created_by': user_sites[0].get('user_id') if user_sites else None
+            }
+            for unit in request.units
+        ]
+    
+        relationships_data = [rel.dict() for rel in request.relationships]
+    
+        # Initialize service and perform bulk creation
+        harris_service = HarrisMatrixService(db)
+        result = await harris_service.bulk_create_units_with_relationships(
+            site_id=site_id,
+            units_data=units_data,
+            relationships_data=relationships_data
+        )
+    
+        # Convert result to response schema
+        response = HarrisMatrixBulkCreateResponse(
+            success=True,
+            message=f"Created {result['created_units']} units and {result['created_relationships']} relationships",
+            site_id=site_id,
+            created_units=result['created_units'],
+            created_relationships=result['created_relationships'],
+            unit_mapping=result['unit_mapping'],
+            relationship_mapping=result['relationship_mapping'],
+            units=result['units'],
+            relationships=result['relationships']
+        )
+    
+        logger.info(f"Bulk creation completed successfully for site {site_id}")
+        return response
+    
+    except BusinessLogicError as e:
+        logger.error(f"Business logic error in bulk creation for site {site_id}: {str(e)}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Error in bulk creation for site {site_id}: {str(e)}")
+        raise HTTPException(
+        )
+
+
+@router.put(
+    "/sites/{site_id}/harris-matrix/bulk-update",
+    summary="Bulk update relationships for a unit",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_bulk_update_harris_matrix(
+    site_id: UUID,
+    request: HarrisMatrixBulkUpdateRequest,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> HarrisMatrixBulkUpdateResponse:
+    """
+    Bulk update relationships for a specific unit.
+
+    This endpoint allows the Harris Matrix editor to update all relationships
+    for a specific unit in a single operation, ensuring consistency
+    and validation of the updated relationships.
+
+    Args:
+        site_id: UUID of the archaeological site
+        request: Bulk update request with unit ID and new relationships
+    
+    Returns:
+        Update results with old and new relationship data
+    """
+    try:
+        logger.info(f"Bulk updating Harris Matrix for unit {request.unit_id} in site {site_id}")
+        
+        # Verify site access
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to this site"
+            )
+        
+        # Convert relationship enum keys to strings for service
+        relationships_update = {
+            rel_type.value: targets for rel_type, targets in request.relationships.items()
+        }
+        
+        # Initialize service and perform bulk update
+        harris_service = HarrisMatrixService(db)
+        result = await harris_service.bulk_update_relationships(
+            site_id=site_id,
+            unit_id=request.unit_id,
+            unit_type=request.unit_type.value,
+            relationships_update=relationships_update
+        )
+        
+        # Convert back to enum keys for response
+        new_relationships_enum = {
+            StratigraphicRelation(rel_type): targets
+            for rel_type, targets in result['new_relationships'].items()
+        }
+        old_relationships_enum = {
+            StratigraphicRelation(rel_type): targets
+            for rel_type, targets in result['old_relationships'].items()
+        }
+        
+        response = HarrisMatrixBulkUpdateResponse(
+            success=True,
+            message=f"Updated {result['updated_relationships']} relationship types for {request.unit_type.value.upper()}{result.get('unit_code', '')}",
+            site_id=site_id,
+            unit_id=request.unit_id,
+            unit_type=request.unit_type,
+            updated_relationships=result['updated_relationships'],
+            old_relationships=old_relationships_enum,
+            new_relationships=new_relationships_enum
+        )
+        
+        logger.info(f"Bulk update completed successfully for unit {request.unit_id}")
+        return response
+        
+    except BusinessLogicError as e:
+        logger.error(f"Business logic error in bulk update for unit {request.unit_id}: {str(e)}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Error in bulk update for unit {request.unit_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.delete(
+    "/sites/{site_id}/harris-matrix/units/{unit_id}",
+    summary="Delete a unit with relationship cleanup",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_delete_harris_matrix_unit(
+    site_id: UUID,
+    unit_id: UUID,
+    unit_type: UnitTypeEnum = Query(..., description="Unit type: 'us' or 'usm'"),
+    cleanup_references: bool = Query(True, description="Whether to cleanup references from other units"),
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> HarrisMatrixDeleteResponse:
+    """
+    Delete a unit with proper cleanup of relationships.
+
+    This endpoint allows the Harris Matrix editor to delete a unit and
+    optionally remove all references to it from other units' relationships,
+    maintaining the integrity of the Harris Matrix.
+
+    Args:
+        site_id: UUID of the archaeological site
+        unit_id: UUID of the unit to delete
+        unit_type: Type of unit ('us' or 'usm')
+        cleanup_references: Whether to cleanup references from other units
+        
+    Returns:
+        Deletion results with cleanup information
+    """
+    try:
+        logger.info(f"Deleting {unit_type.value} unit {unit_id} from site {site_id}")
+        
+        # Verify site access
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to this site"
+            )
+        
+        # Initialize service and perform deletion with cleanup
+        harris_service = HarrisMatrixService(db)
+        result = await harris_service.delete_unit_with_cleanup(
+            site_id=site_id,
+            unit_id=unit_id,
+            unit_type=unit_type.value
+        )
+        
+        response = HarrisMatrixDeleteResponse(
+            success=True,
+            message=f"Deleted {unit_type.value.upper()} {result['deleted_unit']['code']} with reference cleanup",
+            site_id=site_id,
+            deleted_unit=result['deleted_unit'],
+            cleaned_references=result['cleaned_references'],
+            affected_units_count=result.get('affected_units_count', 0)
+        )
+        
+        logger.info(f"Unit deletion completed successfully: {result['deleted_unit']['code']}")
+        return response
+        
+    except BusinessLogicError as e:
+        logger.error(f"Business logic error in unit deletion for {unit_id}: {str(e)}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Error in unit deletion for {unit_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/harris-matrix/validate",
+    summary="Validate Harris Matrix relationships",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_validate_harris_matrix(
+    site_id: UUID,
+    request: Optional[Dict[str, Any]] = None,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> HarrisMatrixValidationResult:
+    """
+    Validate Harris Matrix relationships for business rules and cycles.
+
+    This endpoint validates the current Harris Matrix structure or a provided
+    set of relationships against business rules and checks for cycles
+    in the stratigraphic graph.
+
+    Args:
+        site_id: UUID of the archaeological site
+        request: Optional dictionary with specific validation data
+        
+    Returns:
+        Validation results with errors, warnings, and cycle information
+    """
+    try:
+        logger.info(f"Validating Harris Matrix for site_id: {site_id}")
+        
+        # Verify site access
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to this site"
+            )
+        
+        # Get current Harris Matrix data
+        harris_service = HarrisMatrixService(db)
+        matrix_data = await harris_service.generate_harris_matrix(site_id)
+        
+        # Build validation data structure
+        units = matrix_data.get('nodes', [])
+        edges = matrix_data.get('edges', [])
+        
+        # Convert to validation format
+        validation_units = []
+        for unit in units:
+            unit_data = {
+                'id': unit['data']['id'],
+                'unit_type': unit['type'],
+                'unit': unit  # Pass the full unit data for validation
+            }
+            validation_units.append(unit_data)
+        
+        validation_relationships = []
+        for edge in edges:
+            rel_data = {
+                'from_unit_id': edge['from'],
+                'to_unit_id': edge['to'],
+                'relation_type': edge['type']
+            }
+            validation_relationships.append(rel_data)
+        
+        # Perform validation
+        await harris_service.validate_stratigraphic_relationships(
+            validation_units, validation_relationships
+        )
+        
+        # Detect cycles
+        graph = harris_service._build_validation_graph(validation_units, validation_relationships)
+        cycles = harris_service.detect_cycles_in_graph(graph)
+        
+        # Build validation result
+        validation_result = HarrisMatrixValidationResult(
+            is_valid=len(cycles) == 0,
+            errors=[],
+            warnings=[],
+            cycles=[[unit for unit in cycle] for cycle in cycles]
+        )
+        
+        # Add warnings for potential issues
+        if len(units) > 100:
+            validation_result.warnings.append("Large number of units may impact performance")
+        
+        if len(edges) > len(units) * 2:
+            validation_result.warnings.append("High density of relationships detected")
+        
+        logger.info(f"Validation completed for site {site_id}: {len(cycles)} cycles detected")
+        return validation_result
+        
+    except StratigraphicCycleDetected as e:
+        logger.warning(f"Cycles detected in Harris Matrix for site {site_id}: {str(e)}")
+        return HarrisMatrixValidationResult(
+            is_valid=False,
+            errors=[str(e)],
+            warnings=[],
+            cycles=[e.cycle_path] if e.cycle_path else []
+        )
+    except BusinessLogicError as e:
+        logger.error(f"Business logic error in validation for site {site_id}: {str(e)}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Error in validation for site {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/harris-matrix/validate-relationship",
+    summary="Validate a single stratigraphic relationship",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_validate_relationship(
+    site_id: UUID,
+    request: RelationshipValidation,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> HarrisMatrixValidationResult:
+    """
+    Validate a single stratigraphic relationship against business rules.
+
+    This endpoint allows the Harris Matrix editor to validate individual
+    relationships before adding them to ensure they follow business rules
+    and stratigraphic principles.
+
+    Args:
+        site_id: UUID of the archaeological site
+        request: Relationship validation request
+        
+    Returns:
+        Validation result for the specific relationship
+    """
+    try:
+        logger.info(f"Validating relationship {request.from_unit_code} -> {request.to_unit_code} ({request.relation_type})")
+        
+        # Verify site access
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to this site"
+            )
+        
+        # Find the units
+        harris_service = HarrisMatrixService(db)
+        
+        # Get source unit
+        if request.from_unit_type == UnitTypeEnum.US:
+            from_query = select(UnitaStratigrafica).where(
+                and_(
+                    UnitaStratigrafica.site_id == str(site_id),
+                    UnitaStratigrafica.us_code == request.from_unit_code,
+                    UnitaStratigrafica.deleted_at.is_(None)
+                )
+            )
+            from_result = await db.execute(from_query)
+            from_unit = from_result.scalar_one_or_none()
+        else:  # USM
+            from_query = select(UnitaStratigraficaMuraria).where(
+                and_(
+                    UnitaStratigraficaMuraria.site_id == str(site_id),
+                    UnitaStratigraficaMuraria.usm_code == request.from_unit_code,
+                    UnitaStratigraficaMuraria.deleted_at.is_(None)
+                )
+            )
+            from_result = await db.execute(from_query)
+            from_unit = from_result.scalar_one_or_none()
+        
+        # Get target unit
+        if request.to_unit_type == UnitTypeEnum.US:
+            to_query = select(UnitaStratigrafica).where(
+                and_(
+                    UnitaStratigrafica.site_id == str(site_id),
+                    UnitaStratigrafica.us_code == request.to_unit_code,
+                    UnitaStratigrafica.deleted_at.is_(None)
+                )
+            )
+            to_result = await db.execute(to_query)
+            to_unit = to_result.scalar_one_or_none()
+        else:  # USM
+            to_query = select(UnitaStratigraficaMuraria).where(
+                and_(
+                    UnitaStratigraficaMuraria.site_id == str(site_id),
+                    UnitaStratigraficaMuraria.usm_code == request.to_unit_code,
+                    UnitaStratigraficaMuraria.deleted_at.is_(None)
+                )
+            )
+            to_result = await db.execute(to_query)
+            to_unit = to_result.scalar_one_or_none()
+        
+        if not from_unit:
+            return HarrisMatrixValidationResult(
+                is_valid=False,
+                errors=[f"Source unit {request.from_unit_type.value.upper()}{request.from_unit_code} not found"],
+                warnings=[],
+                cycles=[]
+            )
+        
+        if not to_unit:
+            return HarrisMatrixValidationResult(
+                is_valid=False,
+                errors=[f"Target unit {request.to_unit_type.value.upper()}{request.to_unit_code} not found"],
+                warnings=[],
+                cycles=[]
+            )
+        
+        # Validate the relationship
+        await harris_service._validate_single_relationship(
+            from_unit, to_unit, request.relation_type.value
+        )
+        
+        # Additional business rule validation
+        errors = []
+        warnings = []
+        
+        # Check self-relationship
+        if from_unit.id == to_unit.id:
+            errors.append("Unit cannot have relationship with itself")
+        
+        # Check US type rules
+        if hasattr(from_unit, 'tipo') and request.relation_type in [StratigraphicRelation.TAGLIA, StratigraphicRelation.TAGLIATO_DA]:
+            if from_unit.tipo != 'negativa':
+                errors.append("Only negative US units can cut other units")
+        
+        if hasattr(from_unit, 'tipo') and request.relation_type in [StratigraphicRelation.COPRE, StratigraphicRelation.RIEMPIE]:
+            if from_unit.tipo != 'positiva':
+                errors.append("Only positive US units can cover or fill other units")
+        
+        validation_result = HarrisMatrixValidationResult(
+            is_valid=len(errors) == 0,
+            errors=errors,
+            warnings=warnings,
+            cycles=[]
+        )
+        
+        logger.info(f"Relationship validation completed: {validation_result.is_valid}")
+        return validation_result
+        
+    except BusinessLogicError as e:
+        logger.error(f"Business logic error in relationship validation: {str(e)}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Error in relationship validation: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/harris-matrix/detect-cycles",
+    summary="Detect cycles in Harris Matrix relationships",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_detect_harris_matrix_cycles(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> CycleDetectionResult:
+    """
+    Detect cycles in Harris Matrix stratigraphic relationships.
+
+    This endpoint analyzes the current Harris Matrix structure to identify
+    any cycles in the stratigraphic graph, which would indicate
+    logical inconsistencies in the relationships.
+
+    Args:
+        site_id: UUID of the archaeological site
+        
+    Returns:
+        Cycle detection results with affected units
+    """
+    try:
+        logger.info(f"Detecting cycles in Harris Matrix for site_id: {site_id}")
+        
+        # Verify site access
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to this site"
+            )
+        
+        # Get current Harris Matrix data
+        harris_service = HarrisMatrixService(db)
+        matrix_data = await harris_service.generate_harris_matrix(site_id)
+        
+        # Build graph for cycle detection
+        nodes = matrix_data.get('nodes', [])
+        edges = matrix_data.get('edges', [])
+        
+        # Convert to validation format
+        validation_units = [
+            {'id': unit['data']['id'], 'unit_type': unit['type'], 'unit': unit}
+            for unit in nodes
+        ]
+        
+        validation_relationships = [
+            {
+                'from_unit_id': edge['from'],
+                'to_unit_id': edge['to'],
+                'relation_type': edge['type']
+            }
+            for edge in edges
+        ]
+        
+        # Build graph and detect cycles
+        graph = harris_service._build_validation_graph(validation_units, validation_relationships)
+        cycles = harris_service.detect_cycles_in_graph(graph)
+        
+        # Get affected units
+        affected_units = set()
+        for cycle in cycles:
+            affected_units.update(cycle)
+        
+        cycle_result = CycleDetectionResult(
+            has_cycles=len(cycles) > 0,
+            cycles=[[unit for unit in cycle] for cycle in cycles],
+            cycle_count=len(cycles),
+            affected_units=list(affected_units)
+        )
+        
+        logger.info(f"Cycle detection completed for site {site_id}: {len(cycles)} cycles found")
+        return cycle_result
+        
+    except Exception as e:
+        logger.error(f"Error in cycle detection for site {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/harris-matrix/validate-code",
+    summary="Validate unit code availability",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_validate_unit_code(
+    site_id: UUID,
+    request: UnitCodeValidation,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> HarrisMatrixValidationResult:
+    """
+    Validate if a unit code is available for use.
+
+    This endpoint allows the Harris Matrix editor to check if a proposed
+    unit code is already in use or follows the correct format before
+    creating a new unit.
+
+    Args:
+        site_id: UUID of the archaeological site
+        request: Unit code validation request
+        
+    Returns:
+        Validation result for the unit code
+    """
+    try:
+        logger.info(f"Validating unit code {request.code} for site {site_id}")
+        
+        # Verify site access
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied to this site"
+            )
+        
+        errors = []
+        warnings = []
+        
+        # Check code format
+        if request.unit_type == UnitTypeEnum.US:
+            if not request.code.startswith('US'):
+                errors.append("US codes should start with 'US'")
+            if len(request.code) < 3:
+                errors.append("US codes should be at least 3 characters long")
+        else:  # USM
+            if not request.code.startswith('USM'):
+                errors.append("USM codes should start with 'USM'")
+            if len(request.code) < 4:
+                errors.append("USM codes should be at least 4 characters long")
+        
+        # Check if code already exists
+        harris_service = HarrisMatrixService(db)
+        
+        if request.unit_type == UnitTypeEnum.US:
+            existing_query = select(UnitaStratigrafica).where(
+                and_(
+                    UnitaStratigrafica.site_id == str(site_id),
+                    UnitaStratigrafica.us_code == request.code,
+                    UnitaStratigrafica.deleted_at.is_(None)
+                )
+            )
+            existing_result = await db.execute(existing_query)
+            existing_unit = existing_result.scalar_one_or_none()
+        else:  # USM
+            existing_query = select(UnitaStratigraficaMuraria).where(
+                and_(
+                    UnitaStratigraficaMuraria.site_id == str(site_id),
+                    UnitaStratigraficaMuraria.usm_code == request.code,
+                    UnitaStratigraficaMuraria.deleted_at.is_(None)
+                )
+            )
+            existing_result = await db.execute(existing_query)
+            existing_unit = existing_result.scalar_one_or_none()
+        
+        if existing_unit:
+            errors.append(f"Unit code {request.code} is already in use")
+        
+        # Check for similar codes that might cause confusion
+        similar_query = None
+        if request.unit_type == UnitTypeEnum.US:
+            similar_query = select(UnitaStratigrafica.us_code).where(
+                and_(
+                    UnitaStratigrafica.site_id == str(site_id),
+                    UnitaStratigrafica.us_code.ilike(f"%{request.code[2:]}%"),
+                    UnitaStratigrafica.deleted_at.is_(None),
+                    UnitaStratigrafica.us_code != request.code
+                )
+            )
+        else:  # USM
+            similar_query = select(UnitaStratigraficaMuraria.usm_code).where(
+                and_(
+                    UnitaStratigraficaMuraria.site_id == str(site_id),
+                    UnitaStratigraficaMuraria.usm_code.ilike(f"%{request.code[3:]}%"),
+                    UnitaStratigraficaMuraria.deleted_at.is_(None),
+                    UnitaStratigraficaMuraria.usm_code != request.code
+                )
+            )
+        
+        if similar_query:
+            similar_result = await db.execute(similar_query)
+            similar_codes = similar_result.scalars().all()
+            if similar_codes:
+                warnings.append(f"Similar codes found that might cause confusion: {', '.join(similar_codes[:3])}")
+        
+        validation_result = HarrisMatrixValidationResult(
+            is_valid=len(errors) == 0,
+            errors=errors,
+            warnings=warnings,
+            cycles=[]
+        )
+        
+        logger.info(f"Unit code validation completed for {request.code}: {validation_result.is_valid}")
+        return validation_result
+        
+    except Exception as e:
+        logger.error(f"Error in unit code validation for {request.code}: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"

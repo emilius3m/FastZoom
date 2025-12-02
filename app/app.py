@@ -144,6 +144,13 @@ except ImportError:
     logger.warning("Cantieri view route not found")
     CANTIERI_ROUTE_EXISTS = False
 
+try:
+    from app.routes.view.harris_matrix import harris_matrix_view_router
+    HARRIS_MATRIX_ROUTE_EXISTS = True
+except ImportError:
+    logger.warning("Harris Matrix view route not found")
+    HARRIS_MATRIX_ROUTE_EXISTS = False
+
 # Configurazione
 settings = get_settings()
 
@@ -542,6 +549,14 @@ if CANTIERI_ROUTE_EXISTS:
     app.include_router(
         cantieri_view_router,
         tags=["Pages", "Cantieri"],
+        dependencies=[Depends(get_current_user_id_with_blacklist)]
+    )
+
+# 🎯 INCLUSIONE ROUTER HARRIS MATRIX VIEW - Editor grafico Matrix di Harris
+if HARRIS_MATRIX_ROUTE_EXISTS:
+    app.include_router(
+        harris_matrix_view_router,
+        tags=["Pages", "Harris Matrix"],
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
