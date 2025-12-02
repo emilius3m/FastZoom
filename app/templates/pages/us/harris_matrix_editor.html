@@ -21,20 +21,19 @@
     height: 100%;
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
-    background-color: #f9fafb;
-    
-    width: 100%;
-    height: 800px;
-    min-height: 600px;
     background-color: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
     cursor: crosshair;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .editor-container {
     position: relative;
-    min-height: 700px;
+    flex: 1;
+    min-height: 600px;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     border-radius: 0.75rem;
     overflow: hidden;
@@ -346,7 +345,7 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="harrisMatrixEditor()" x-init="init()" class="container mx-auto px-4 py-6">
+<div x-data="harrisMatrixEditor()" x-init="init()" class="mx-auto px-4 py-6">
     
     <!-- Header with Breadcrumbs -->
     <div class="mb-6">
@@ -467,7 +466,7 @@
     </div>
 
     <!-- Main Content Area -->
-    <div class="flex gap-6">
+    <div class="flex gap-6 min-h-screen">
         
         <!-- Left Sidebar - Editor Settings -->
         <div x-show="showSettings" x-cloak class="w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto">
@@ -514,6 +513,41 @@
                         <input type="checkbox" x-model="settings.gridSnap" class="mr-2">
                         <span class="text-sm text-gray-700 dark:text-gray-300">Enable Grid Snap</span>
                     </label>
+                    
+                    <!-- Magnetic Snap Toggle -->
+                    <label class="flex items-center">
+                        <input
+                            type="checkbox"
+                            x-model="settings.magneticSnap"
+                            class="mr-2"
+                            title="Attira nodi vicini orizzontalmente">
+
+                        <span class="text-sm text-gray-700 dark:text-gray-300">
+                            <i class="fas fa-magnet mr-2 text-purple-500"></i>
+                            Magnetic Snap Orizzontale
+                        </span>
+                    </label>
+
+                    <!-- Magnetic Snap Distance Slider -->
+                    <div class="flex items-center gap-2" x-show="settings.magneticSnap">
+                        <label class="text-xs font-medium text-gray-600 dark:text-gray-400 w-24">
+                            Distanza:
+                        </label>
+
+                        <input
+                            type="range"
+                            x-model.number="settings.magneticSnapDistance"
+                            min="10"
+                            max="100"
+                            step="5"
+                            class="flex-1 h-2 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                            title="Aumenta per attirare da più lontano">
+
+                        <span class="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
+                            x-text="settings.magneticSnapDistance + 'px'"
+                        </span>
+                    </div>
+                    
                     <label class="flex items-center">
                         <input type="checkbox" x-model="settings.showLabels" @change="updateNodeStyles()" class="mr-2">
                         <span class="text-sm text-gray-700 dark:text-gray-300">Show Labels</span>
@@ -542,7 +576,7 @@
         </div>
 
         <!-- Main Editor Area -->
-        <div class="flex-1">
+        <div class="flex-1 flex flex-col">
             <!-- Toolbar -->
             <div class="editor-toolbar mb-4">
                 <!-- Node Creation Tools -->
@@ -651,7 +685,7 @@
             </div>
 
             <!-- Canvas Container -->
-            <div class="editor-container">
+            <div class="editor-container flex-1 min-h-[600px]">
                 <!-- Mode Indicator -->
                 <div class="absolute top-4 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 z-10">
                     <div class="flex items-center gap-2">
@@ -980,7 +1014,9 @@ function harrisMatrixEditor() {
             animateLayout: true,
             validateRelationships: true,
             preventCycles: true,
-            edgeCurveStyle: 'taxi'
+            edgeCurveStyle: 'taxi',
+            magneticSnap: true,      // ✅ Abilita magnetic snap
+            magneticSnapDistance: 30  // ✅ Distanza attrazione (px)
         },
 
         // Confirmation dialog state
@@ -1071,14 +1107,41 @@ function harrisMatrixEditor() {
 
             // Drag handling for move mode
             this.cy.on('drag', 'node', (evt) => {
-                if (this.editMode === 'move' && this.settings.gridSnap) {
-                    const pos = evt.position;
+                if (this.editMode !== 'move') return;
+
+                let pos = evt.position;
+                const movedNode = evt.target;
+
+                // Grid snap (se abilitato)
+                if (this.settings.gridSnap) {
                     const gridSize = 20;
-                    evt.position = {
+                    pos = {
                         x: Math.round(pos.x / gridSize) * gridSize,
                         y: Math.round(pos.y / gridSize) * gridSize
                     };
                 }
+
+                // Magnetic snap orizzontale (se abilitato)
+                if (this.settings.magneticSnap) {
+                    pos = this.magneticSnapNode(movedNode, pos);
+                }
+
+                evt.position = pos;
+            });
+
+            // End drag - ripristina stili
+            this.cy.on('free', 'node', (evt) => {
+                const node = evt.target;
+                // Ripristina stile originale
+                node.style('border-width', 3);
+                node.style('border-color', function(ele) {
+                    if (ele.data('type') === 'us') {
+                        return ele.data('tipo') === 'positiva' ? '#1e40af' : '#991b1b';
+                    } else if (ele.data('type') === 'usm') {
+                        return '#6d28d9';
+                    }
+                    return '#1e40af';
+                });
             });
 
             // Background click - deselect
@@ -1509,7 +1572,7 @@ function harrisMatrixEditor() {
             }
 
             try {
-                const response = await fetch(`/api/v1/sites/${this.siteId}/harris-matrix/bulk-create`, {
+                const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-create`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1652,6 +1715,59 @@ function harrisMatrixEditor() {
             this.cy.edges().style('taxi-direction', 'auto');
             this.cy.edges().style('taxi-turn', 20);
             this.cy.edges().style('taxi-gap', 5);
+        },
+
+        // Magnetic snap - attira nodi vicini in orizzontale
+        magneticSnapNode(movedNode, position) {
+            const threshold = this.settings.magneticSnapDistance;
+            const allNodes = this.cy.nodes();
+
+            let snappedX = position.x;
+            let snappedY = position.y;
+            let closestDistance = Infinity;
+            let closestNode = null;
+
+            // Cerca il nodo più vicino in orizzontale
+            allNodes.forEach(node => {
+                // Salta il nodo che stai trascinando
+                if (node.id() === movedNode.id()) return;
+
+                const otherPos = node.position();
+                const verticalDistance = Math.abs(otherPos.y - position.y);
+                const horizontalDistance = Math.abs(otherPos.x - position.x);
+
+                // Verifica se è entro la soglia di attrazione
+                // (verticalmente vicino + orizzontalmente il più vicino)
+                if (verticalDistance < threshold && horizontalDistance < closestDistance) {
+                    closestDistance = horizontalDistance;
+                    closestNode = node;
+                }
+            });
+
+            // Se entro soglia, attira orizzontalmente
+            if (closestNode && closestDistance < threshold) {
+                snappedX = closestNode.position().x;
+
+                // Visualizza attrazione con stile viola
+                movedNode.style('border-width', 4);
+                movedNode.style('border-color', '#a78bfa');
+
+                // Log per debug
+                console.log(`🧲 Magnetic snap attivo: ${Math.round(closestDistance)}px`);
+            } else {
+                // Ripristina stile se non attratti
+                movedNode.style('border-width', 3);
+                movedNode.style('border-color', function(ele) {
+                    if (ele.data('type') === 'us') {
+                        return ele.data('tipo') === 'positiva' ? '#1e40af' : '#991b1b';
+                    } else if (ele.data('type') === 'usm') {
+                        return '#6d28d9';
+                    }
+                    return '#1e40af';
+                });
+            }
+
+            return { x: snappedX, y: snappedY };
         },
 
         // Get Cytoscape styles

@@ -301,7 +301,7 @@ async def v1_get_matrix_statistics(
 # ===== NUOVI ENDPOINTS PER EDITOR GRAFICO =====
 
 @router.post(
-    "/sites/{site_id}/harris-matrix/bulk-create",
+    "/sites/{site_id}/bulk-create",
     summary="Bulk create units and relationships for Harris Matrix editor",
     tags=["Harris Matrix Editor"]
 )
@@ -380,7 +380,7 @@ async def v1_bulk_create_harris_matrix(
 
 
 @router.put(
-    "/sites/{site_id}/harris-matrix/bulk-update",
+    "/sites/{site_id}/bulk-update",
     summary="Bulk update relationships for a unit",
     tags=["Harris Matrix Editor"]
 )
@@ -464,7 +464,7 @@ async def v1_bulk_update_harris_matrix(
 
 
 @router.delete(
-    "/sites/{site_id}/harris-matrix/units/{unit_id}",
+    "/sites/{site_id}/units/{unit_id}",
     summary="Delete a unit with relationship cleanup",
     tags=["Harris Matrix Editor"]
 )
@@ -534,7 +534,7 @@ async def v1_delete_harris_matrix_unit(
 
 
 @router.post(
-    "/sites/{site_id}/harris-matrix/validate",
+    "/sites/{site_id}/validate",
     summary="Validate Harris Matrix relationships",
     tags=["Harris Matrix Editor"]
 )
@@ -642,7 +642,7 @@ async def v1_validate_harris_matrix(
 
 
 @router.post(
-    "/sites/{site_id}/harris-matrix/validate-relationship",
+    "/sites/{site_id}/validate-relationship",
     summary="Validate a single stratigraphic relationship",
     tags=["Harris Matrix Editor"]
 )
@@ -783,7 +783,7 @@ async def v1_validate_relationship(
 
 
 @router.post(
-    "/sites/{site_id}/harris-matrix/detect-cycles",
+    "/sites/{site_id}/detect-cycles",
     summary="Detect cycles in Harris Matrix relationships",
     tags=["Harris Matrix Editor"]
 )
@@ -866,7 +866,7 @@ async def v1_detect_harris_matrix_cycles(
 
 
 @router.post(
-    "/sites/{site_id}/harris-matrix/validate-code",
+    "/sites/{site_id}/validate-code",
     summary="Validate unit code availability",
     tags=["Harris Matrix Editor"]
 )
