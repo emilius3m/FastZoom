@@ -488,13 +488,23 @@
                 <!-- Auto Layout -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Auto Layout</label>
-                    <select x-model="settings.layout" @change="autoLayout()" 
+                    <select x-model="settings.layout" @change="autoLayout()"
                             class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="none">Manual Positioning</option>
                         <option value="dagre">Hierarchical (Dagre)</option>
                         <option value="elk">Advanced Hierarchical (ELK)</option>
                         <option value="breadthfirst">Breadth First</option>
                         <option value="grid">Grid</option>
+                    </select>
+                </div>
+                
+                <!-- Edge Curve Style -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Edge Curve Style</label>
+                    <select x-model="settings.edgeCurveStyle" @change="updateEdgeStyles()"
+                            class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="taxi">Angoli Retti (Taxi)</option>
+                        <option value="bezier">Curve Fluide (Bezier)</option>
                     </select>
                 </div>
                 
@@ -745,6 +755,22 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Edge Style Status -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Edge Style</h4>
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-bezier-curve text-blue-500"></i>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <span x-text="settings.edgeCurveStyle === 'taxi' ? 'Angoli Retti (Taxi)' : 'Curve Fluide (Bezier)'"></span>
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Stile corrente per le relazioni stratigrafiche
+                    </p>
+                </div>
+            </div>
             
             <!-- Editor Controls -->
             <div>
@@ -953,7 +979,8 @@ function harrisMatrixEditor() {
             showLabels: true,
             animateLayout: true,
             validateRelationships: true,
-            preventCycles: true
+            preventCycles: true,
+            edgeCurveStyle: 'taxi'
         },
 
         // Confirmation dialog state
@@ -1614,6 +1641,19 @@ function harrisMatrixEditor() {
             this.cy.style(this.getCytoscapeStyles());
         },
 
+        // Update edge styles
+        updateEdgeStyles() {
+            if (!this.cy) return;
+            console.log('Updating edge styles to:', this.settings.edgeCurveStyle);
+            this.cy.style(this.getCytoscapeStyles());
+            
+            // Force redraw of edges
+            this.cy.edges().style('curve-style', this.settings.edgeCurveStyle);
+            this.cy.edges().style('taxi-direction', 'auto');
+            this.cy.edges().style('taxi-turn', 20);
+            this.cy.edges().style('taxi-gap', 5);
+        },
+
         // Get Cytoscape styles
         getCytoscapeStyles() {
             const nodeSizes = {
@@ -1749,13 +1789,16 @@ function harrisMatrixEditor() {
                         'line-color': '#6b7280',
                         'target-arrow-color': '#6b7280',
                         'target-arrow-shape': 'triangle',
-                        'curve-style': 'bezier',
+                        'curve-style': this.settings.edgeCurveStyle,
                         'label': this.settings.showLabels ? 'data(label)' : '',
                         'font-size': '12px',
                         'color': '#1f2937',
                         'text-background-color': '#ffffff',
                         'text-background-opacity': 0.9,
-                        'text-background-padding': '3px'
+                        'text-background-padding': '3px',
+                        'taxi-direction': 'auto',
+                        'taxi-turn': 20,
+                        'taxi-gap': 5
                     }
                 },
 
