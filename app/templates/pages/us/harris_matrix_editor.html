@@ -873,6 +873,38 @@
         </div>
     </div>
 
+    <!-- Confirmation Dialog -->
+    <div x-show="confirmDialog.visible" x-cloak
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[3000]"
+         @click.self="cancelDeleteConfirmation()">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="p-6">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center mr-4">
+                        <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="confirmDialog.title"></h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300 mt-1" x-text="confirmDialog.message"></p>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 justify-end">
+                    <button @click="cancelDeleteConfirmation()"
+                            class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors">
+                        <i class="fas fa-times mr-2"></i>
+                        Annulla
+                    </button>
+                    <button @click="confirmDialog.onConfirm && confirmDialog.onConfirm()"
+                            class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md transition-colors">
+                        <i class="fas fa-trash mr-2"></i>
+                        Elimina
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Node Tooltip -->
     <div x-show="tooltip.visible" x-cloak 
          class="node-tooltip" 
@@ -924,6 +956,16 @@ function harrisMatrixEditor() {
             preventCycles: true
         },
 
+        // Confirmation dialog state
+        confirmDialog: {
+            visible: false,
+            title: '',
+            message: '',
+            itemType: '', // 'node' or 'edge'
+            itemId: null,
+            onConfirm: null
+        },
+
         // Site ID from template
         siteId: '{{ site.id }}',
 
@@ -969,9 +1011,27 @@ function harrisMatrixEditor() {
             });
 
             this.cy.on('cxttap', 'node', (evt) => {
-                // Right click - delete node
-                this.selectedNode = evt.target.data();
-                this.deleteSelected();
+                // Right click on node - show confirmation
+                const node = evt.target;
+                this.showDeleteConfirmation(
+                    'node',
+                    node.id(),
+                    `Elimina nodo "${node.data('label')}"?`,
+                    `Saranno rimosse tutte le relazioni collegate. Questa azione non può essere annullata.`
+                );
+            });
+
+            // Right click on edge - show confirmation
+            this.cy.on('cxttap', 'edge', (evt) => {
+                const edge = evt.target;
+                const sourceLabel = this.cy.$id(edge.source().id()).data('label');
+                const targetLabel = this.cy.$id(edge.target().id()).data('label');
+                this.showDeleteConfirmation(
+                    'edge',
+                    edge.id(),
+                    `Elimina relazione tra "${sourceLabel}" e "${targetLabel}"?`,
+                    `La relazione stratigraffica sarà rimossa. Questa azione non può essere annullata.`
+                );
             });
 
             this.cy.on('mouseover', 'node', (evt) => {
@@ -1744,6 +1804,70 @@ function harrisMatrixEditor() {
                     }
                 }
             ];
+        },
+
+        // Show delete confirmation dialog
+        showDeleteConfirmation(itemType, itemId, title, message) {
+            this.confirmDialog = {
+                visible: true,
+                title: title,
+                message: message,
+                itemType: itemType,
+                itemId: itemId,
+                onConfirm: () => {
+                    if (itemType === 'node') {
+                        this.deleteNodeById(itemId);
+                    } else if (itemType === 'edge') {
+                        this.deleteEdgeById(itemId);
+                    }
+                    this.confirmDialog.visible = false;
+                }
+            };
+        },
+
+        // Delete node by ID with confirmation
+        deleteNodeById(nodeId) {
+            // Remove from Cytoscape
+            this.cy.$id(nodeId).remove();
+
+            // Remove from nodes array
+            this.nodes = this.nodes.filter(n => n.temp_id !== nodeId);
+
+            // Remove connected edges
+            this.edges = this.edges.filter(e => e.from !== nodeId && e.to !== nodeId);
+
+            // Deselect if this was the selected node
+            if (this.selectedNode && this.selectedNode.temp_id === nodeId) {
+                this.selectedNode = null;
+            }
+
+            console.log(`✓ Nodo ${nodeId} eliminato`);
+        },
+
+        // Delete edge by ID with confirmation
+        deleteEdgeById(edgeId) {
+            const edge = this.cy.$id(edgeId);
+
+            if (edge.length === 0) return;
+
+            const sourceId = edge.source().id();
+            const targetId = edge.target().id();
+            const relationship = edge.data('relationship');
+
+            // Remove from Cytoscape
+            edge.remove();
+
+            // Remove from edges array
+            this.edges = this.edges.filter(e =>
+                !(e.from === sourceId && e.to === targetId && e.relationship === relationship)
+            );
+
+            console.log(`✓ Relazione ${edgeId} eliminata`);
+        },
+
+        // Cancel confirmation dialog
+        cancelDeleteConfirmation() {
+            this.confirmDialog.visible = false;
         }
     };
 }
