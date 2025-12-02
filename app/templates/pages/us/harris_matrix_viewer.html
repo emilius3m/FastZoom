@@ -689,7 +689,7 @@ function harrisMatrixViewer() {
                             id: node.id,
                             label: node.label,
                             type: node.type,
-                            tipo: node.tipo || node.data?.tipo || 'positiva',    // ⭐ AGGIUNGI QUESTA RIGA
+                            tipo: node.tipo || node.data?.tipo || 'positiva',
                             parent: parentId,  // ⭐ Assegna al rettangolo periodo
                             period: group.period,
                             phase: group.phase,
@@ -846,20 +846,18 @@ function harrisMatrixViewer() {
                     style: {
                         'label': 'data(label)',
                         'background-color': '#3b82f6',
+                        'border-color': '#1e40af',
+                        'border-width': 3,
+                        'border-style': 'solid',
                         'width': '100px',
                         'height': '60px',
                         'shape': 'roundrectangle',
-                        'border-width': 3,
-                        'border-style': 'solid',
-                        'border-color': '#1e40af',
                         'text-valign': 'center',
                         'text-halign': 'center',
                         'font-size': '16px',
                         'font-weight': 'bold',
                         'color': '#ffffff',
-                        'text-wrap': 'wrap',
-                        'text-max-width': '90px',
-                        'z-index': 10  // Sopra i rettangoli periodo
+                        'z-index': 10
                     }
                 },
 
@@ -868,24 +866,22 @@ function harrisMatrixViewer() {
                     selector: 'node.us[tipo="negativa"]',
                     style: {
                         'label': function(ele) {
-                            return '⊖ ' + ele.data('label');  // ⭐ Simbolo asporto
+                            return '⊖ ' + ele.data('label');
                         },
-                        'background-color': '#ef4444',       // ⭐ Rosso
+                        'background-color': '#ef4444',
+                        'border-color': '#991b1b',
+                        'border-width': 3,
+                        'border-style': 'dashed',
+                        'border-dash-pattern': [8, 4],
                         'width': '100px',
                         'height': '60px',
-                        'shape': 'rectangle',                // ⭐ Forma rettangolare
-                        'border-width': 3,
-                        'border-style': 'dashed',            // ⭐ Bordo tratteggiato
-                        'border-dash-pattern': [8, 4],
-                        'border-color': '#991b1b',
+                        'shape': 'rectangle',
                         'text-valign': 'center',
                         'text-halign': 'center',
                         'font-size': '16px',
                         'font-weight': 'bold',
                         'color': '#ffffff',
-                        'text-wrap': 'wrap',
-                        'text-max-width': '90px',
-                        'z-index': 10  // Sopra i rettangoli periodo
+                        'z-index': 10
                     }
                 },
 
@@ -911,7 +907,7 @@ function harrisMatrixViewer() {
                     }
                 },
 
-                // ===== Fallback per US senza tipo (assume positiva) =====
+                // ===== Fallback US senza tipo =====
                 {
                     selector: 'node.us:not([tipo])',
                     style: {
