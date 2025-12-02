@@ -1,0 +1,1751 @@
+{% extends "base/site_base.html" %}
+
+{% block title %}Harris Matrix Editor - {{ site.name }}{% endblock %}
+
+{% block additional_head %}
+<!-- Cytoscape.js -->
+<script src="{{ url_for('static', path='js/cytoscape.min.js') }}"></script>
+<script src="{{ url_for('static', path='js/dagre.min.js') }}"></script>
+<script src="{{ url_for('static', path='js/cytoscape-dagre.min.js') }}"></script>
+
+<!-- Elk.js per layout avanzati -->
+<script src="{{ url_for('static', path='js/elk.bundled.js') }}"></script>
+<script src="{{ url_for('static', path='js/cytoscape-elk.min.js') }}"></script>
+
+<!-- Additional styling for Editor -->
+<style>
+[x-cloak] { display: none !important; }
+
+#cy {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background-color: #f9fafb;
+    
+    width: 100%;
+    height: 800px;
+    min-height: 600px;
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    cursor: crosshair;
+}
+
+.editor-container {
+    position: relative;
+    min-height: 700px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.editor-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 0.5rem;
+    border: 1px solid #d1d5db;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.editor-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.editor-btn:hover {
+    background: #f3f4f6;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.editor-btn.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+    transform: translateY(0);
+}
+
+.editor-btn.save {
+    background: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+.editor-btn.save:hover {
+    background: #059669;
+}
+
+.editor-btn.danger {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+.editor-btn.danger:hover {
+    background: #dc2626;
+}
+
+.node-properties-panel {
+    position: fixed;
+    right: 0;
+    top: 100px;
+    width: 320px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    max-height: 600px;
+    overflow-y: auto;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+}
+
+.node-properties-panel.show {
+    transform: translateX(-20px);
+}
+
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: #374151;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.625rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.relationship-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+
+.relationship-modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 0.75rem;
+    max-width: 450px;
+    width: 90%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.legend-item:last-child {
+    border-bottom: none;
+}
+
+.node-tooltip {
+    position: absolute;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-width: 320px;
+    pointer-events: none;
+}
+
+.control-button {
+    @apply bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200;
+}
+
+.control-button.active {
+    @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700;
+}
+
+.stats-card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4;
+}
+
+.stats-card .number {
+    @apply text-2xl font-bold;
+}
+
+.stats-card .label {
+    @apply text-sm text-gray-600 mt-1;
+}
+
+.edge-style-preview {
+    width: 40px;
+    height: 2px;
+    margin-right: 0.5rem;
+}
+
+/* Temporary nodes styling */
+.node-temporary {
+    opacity: 0.7;
+    border-style: dashed !important;
+    background-color: #fef3c7 !important;
+    border-color: #f59e0b !important;
+}
+
+/* Edge creation mode */
+.edge-source-highlighted {
+    border-width: 4px !important;
+    border-color: #f59e0b !important;
+    animation: pulse 2s infinite;
+}
+
+.edge-target-ready {
+    border-color: #10b981 !important;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+}
+
+/* Dark mode support */
+.dark #cy {
+    background-color: #1f2937;
+    border-color: #374151;
+}
+
+.dark .editor-container {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+}
+
+.dark .loading-overlay {
+    background: rgba(31, 41, 55, 0.9);
+}
+
+.dark .node-tooltip {
+    background: #1f2937;
+    border-color: #374151;
+    color: white;
+}
+
+.dark .stats-card {
+    @apply bg-gray-800 border-gray-700;
+}
+
+.dark .legend-item {
+    border-bottom-color: #374151;
+}
+
+.dark .editor-toolbar {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+.dark .editor-btn {
+    background: #374151;
+    color: white;
+    border-color: #4b5563;
+}
+
+.dark .editor-btn:hover {
+    background: #4b5563;
+}
+
+.dark .node-properties-panel {
+    background: #1f2937;
+    border-color: #374151;
+}
+
+.dark .form-group label {
+    color: #e5e7eb;
+}
+
+.dark .form-group input,
+.dark .form-group select,
+.dark .form-group textarea {
+    background: #374151;
+    border-color: #4b5563;
+    color: white;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .editor-toolbar {
+        padding: 0.5rem;
+    }
+    
+    .editor-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    .node-properties-panel {
+        width: 280px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="harrisMatrixEditor()" x-init="init()" class="container mx-auto px-4 py-6">
+    
+    <!-- Header with Breadcrumbs -->
+    <div class="mb-6">
+        <nav class="flex mb-4" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                <li class="inline-flex items-center">
+                    <a href="/view/{{ site.id }}/dashboard" class="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </a>
+                </li>
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <a href="/view/{{ site.id }}/us" class="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">US/USM</a>
+                    </div>
+                </li>
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <a href="/view/{{ site.id }}/harris-matrix" class="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Harris Matrix</a>
+                    </div>
+                </li>
+                <li aria-current="page">
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <span class="text-gray-500 dark:text-gray-400">Editor</span>
+                    </div>
+                </li>
+            </ol>
+        </nav>
+        
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                    <i class="fas fa-edit mr-3 text-blue-600"></i>
+                    Harris Matrix Editor
+                </h1>
+                <p class="text-xl text-gray-600 dark:text-gray-300 mt-1">{{ site.name }} ({{ site.code }})</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Costruisci visualmente la matrice stratigrafica</p>
+            </div>
+            
+            <div class="flex gap-3">
+                <button @click="showSettings = !showSettings"
+                        :class="showSettings ? 'control-button active' : 'control-button'"
+                        title="Editor Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <button @click="exportImage()" 
+                        class="control-button"
+                        title="Export as PNG">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button @click="resetView()" 
+                        class="control-button"
+                        title="Reset View">
+                    <i class="fas fa-compress-arrows-alt"></i>
+                </button>
+                <button @click="fitToScreen()" 
+                        class="control-button"
+                        title="Fit to Screen">
+                    <i class="fas fa-expand"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards for Editor -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">US Positive</p>
+                    <p class="number text-blue-600 dark:text-blue-400" x-text="getUSPositiveCount()"></p>
+                </div>
+                <i class="fas fa-plus-circle text-blue-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">US Negative</p>
+                    <p class="number text-red-600 dark:text-red-400" x-text="getUSNegativeCount()"></p>
+                </div>
+                <i class="fas fa-minus-circle text-red-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">USM Units</p>
+                    <p class="number text-purple-600 dark:text-purple-400" x-text="getUSMCount()"></p>
+                </div>
+                <i class="fas fa-cube text-purple-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Relationships</p>
+                    <p class="number text-green-600 dark:text-green-400" x-text="edges.length"></p>
+                </div>
+                <i class="fas fa-link text-green-500 text-xl"></i>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Total Nodes</p>
+                    <p class="number text-orange-600 dark:text-orange-400" x-text="nodes.length"></p>
+                </div>
+                <i class="fas fa-layer-group text-orange-500 text-xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="flex gap-6">
+        
+        <!-- Left Sidebar - Editor Settings -->
+        <div x-show="showSettings" x-cloak class="w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto">
+            <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Editor Settings</h3>
+            
+            <div class="space-y-4">
+                <!-- Node Size -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Node Size</label>
+                    <select x-model="settings.nodeSize" @change="updateNodeStyles()" 
+                            class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                    </select>
+                </div>
+                
+                <!-- Auto Layout -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Auto Layout</label>
+                    <select x-model="settings.layout" @change="autoLayout()" 
+                            class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="none">Manual Positioning</option>
+                        <option value="dagre">Hierarchical (Dagre)</option>
+                        <option value="elk">Advanced Hierarchical (ELK)</option>
+                        <option value="breadthfirst">Breadth First</option>
+                        <option value="grid">Grid</option>
+                    </select>
+                </div>
+                
+                <!-- Grid Snap -->
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="settings.gridSnap" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Enable Grid Snap</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="settings.showLabels" @change="updateNodeStyles()" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Show Labels</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="settings.animateLayout" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Animate Layout</span>
+                    </label>
+                </div>
+                
+                <!-- Validation Settings -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Validation</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" x-model="settings.validateRelationships" class="mr-2">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Validate Relationships</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" x-model="settings.preventCycles" class="mr-2">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Prevent Cycles</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Editor Area -->
+        <div class="flex-1">
+            <!-- Toolbar -->
+            <div class="editor-toolbar mb-4">
+                <!-- Node Creation Tools -->
+                <button 
+                    @click="setMode('add-us-positive')" 
+                    :class="{'active': editMode === 'add-us-positive'}"
+                    class="editor-btn"
+                    title="Add US Positive">
+                    <i class="fas fa-plus-circle text-blue-500"></i>
+                    <span>US+</span>
+                </button>
+
+                <button 
+                    @click="setMode('add-us-negative')" 
+                    :class="{'active': editMode === 'add-us-negative'}"
+                    class="editor-btn"
+                    title="Add US Negative">
+                    <i class="fas fa-minus-circle text-red-500"></i>
+                    <span>US-</span>
+                </button>
+
+                <button 
+                    @click="setMode('add-usm')" 
+                    :class="{'active': editMode === 'add-usm'}"
+                    class="editor-btn"
+                    title="Add USM">
+                    <i class="fas fa-cube text-purple-500"></i>
+                    <span>USM</span>
+                </button>
+
+                <!-- Separator -->
+                <div class="border-l border-gray-300 mx-2"></div>
+
+                <!-- Edge Creation Tools -->
+                <button 
+                    @click="setMode('add-edge')" 
+                    :class="{'active': editMode === 'add-edge'}"
+                    class="editor-btn"
+                    title="Create Relationship">
+                    <i class="fas fa-link text-green-500"></i>
+                    <span>Connect</span>
+                </button>
+
+                <button 
+                    @click="setMode('select')" 
+                    :class="{'active': editMode === 'select'}"
+                    class="editor-btn"
+                    title="Select/Edit Nodes">
+                    <i class="fas fa-mouse-pointer"></i>
+                    <span>Select</span>
+                </button>
+
+                <button 
+                    @click="setMode('move')" 
+                    :class="{'active': editMode === 'move'}"
+                    class="editor-btn"
+                    title="Move Nodes">
+                    <i class="fas fa-arrows-alt"></i>
+                    <span>Move</span>
+                </button>
+
+                <!-- Separator -->
+                <div class="border-l border-gray-300 mx-2"></div>
+
+                <!-- Action Buttons -->
+                <button @click="duplicateSelected()" class="editor-btn" 
+                        :disabled="!selectedNode"
+                        :class="{'opacity-50 cursor-not-allowed': !selectedNode}"
+                        title="Duplicate Selected Node">
+                    <i class="fas fa-copy"></i>
+                    <span>Duplicate</span>
+                </button>
+
+                <button @click="deleteSelected()" class="editor-btn danger" 
+                        :disabled="!selectedNode"
+                        :class="{'opacity-50 cursor-not-allowed': !selectedNode}"
+                        title="Delete Selected Node">
+                    <i class="fas fa-trash"></i>
+                    <span>Delete</span>
+                </button>
+
+                <!-- Spacer -->
+                <div style="flex-grow: 1;"></div>
+
+                <!-- File Operations -->
+                <button @click="loadExistingMatrix()" class="editor-btn"
+                        title="Load Existing Matrix">
+                    <i class="fas fa-folder-open"></i>
+                    <span>Load</span>
+                </button>
+
+                <button @click="clearGraph()" class="editor-btn danger"
+                        title="Clear All"
+                        x-show="nodes.length > 0">
+                    <i class="fas fa-eraser"></i>
+                    <span>Clear</span>
+                </button>
+
+                <button @click="saveMatrix()" class="editor-btn save"
+                        :disabled="nodes.length === 0"
+                        :class="{'opacity-50 cursor-not-allowed': nodes.length === 0}"
+                        title="Save to Database">
+                    <i class="fas fa-save"></i>
+                    <span>Save Matrix</span>
+                </button>
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="editor-container">
+                <!-- Mode Indicator -->
+                <div class="absolute top-4 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 z-10">
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full"
+                             :class="{
+                                 'bg-blue-500': editMode.startsWith('add-'),
+                                 'bg-green-500': editMode === 'add-edge',
+                                 'bg-gray-500': editMode === 'select',
+                                 'bg-purple-500': editMode === 'move'
+                             }"></div>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <span x-text="getModeLabel()"></span>
+                        </span>
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <span x-text="nodes.length"></span> nodes, 
+                        <span x-text="edges.length"></span> relationships
+                    </div>
+                </div>
+
+                <!-- Cytoscape Canvas -->
+                <div id="cy"></div>
+                
+                <!-- Empty State -->
+                <div x-show="nodes.length === 0" 
+                     class="absolute inset-0 flex items-center justify-center bg-white/90 dark:bg-gray-800/90">
+                    <div class="text-center max-w-md px-6">
+                        <i class="fas fa-edit text-6xl text-gray-300 dark:text-gray-600 mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Start Building Your Matrix</h3>
+                        <p class="text-gray-600 dark:text-gray-400 mb-4">Use the toolbar above to add US/USM units and create stratigraphic relationships.</p>
+                        <div class="space-y-2">
+                            <div class="text-sm text-gray-500 dark:text-gray-400">
+                                <i class="fas fa-info-circle mr-2"></i>
+                                Click on the canvas to add nodes, or select a tool from the toolbar
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar - Legend and Controls -->
+        <div class="w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
+            <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Legend & Help</h3>
+            
+            <!-- Legend for Node Types -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Node Types</h4>
+                <div class="space-y-2">
+                    <div class="legend-item">
+                        <div class="w-10 h-8 rounded bg-blue-500 border-2 border-blue-700 flex items-center justify-center flex-shrink-0">
+                            <span class="text-white text-xs font-bold">+</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900">US Positiva</div>
+                            <div class="text-xs text-gray-500">Accumulo/costruzione</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="w-10 h-8 bg-red-500 border-2 border-red-800 border-dashed flex items-center justify-center flex-shrink-0">
+                            <span class="text-white text-xs font-bold">⊖</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900">US Negativa</div>
+                            <div class="text-xs text-gray-500">Taglio/fossa/asporto</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="w-10 h-8 rounded bg-purple-500 border-2 border-purple-700 flex items-center justify-center flex-shrink-0">
+                            <span class="text-white text-xs font-bold">M</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900">USM</div>
+                            <div class="text-xs text-gray-500">Unità Stratigr. Muraria</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Legend for Relationship Types -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Relationships</h4>
+                <div class="space-y-2">
+                    <div class="legend-item">
+                        <div class="edge-style-preview bg-gray-600"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">copre / si appoggia a</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="edge-style-preview bg-red-600"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">taglia / tagliato da</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="edge-style-preview bg-blue-600"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">riempie / riempito da</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="edge-style-preview bg-green-600" style="border-top: 2px dashed green;"></div>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">uguale a / si lega a</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Editor Controls -->
+            <div>
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Controls</h4>
+                <div class="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                    <div><i class="fas fa-mouse-pointer mr-2"></i><strong>Click:</strong> Select node</div>
+                    <div><i class="fas fa-hand-paper mr-2"></i><strong>Drag:</strong> Move node (Move mode)</div>
+                    <div><i class="fas fa-search-plus mr-2"></i><strong>Scroll:</strong> Zoom in/out</div>
+                    <div><i class="fas fa-crosshairs mr-2"></i><strong>Canvas click:</strong> Add node</div>
+                    <div><i class="fas fa-link mr-2"></i><strong>Double click:</strong> Create edge</div>
+                    <div><i class="fas fa-trash mr-2"></i><strong>Right click:</strong> Delete node</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Properties Panel (slide from right) -->
+    <div class="node-properties-panel" :class="{'show': selectedNode !== null}">
+        <template x-if="selectedNode">
+            <div>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-lg text-gray-900 dark:text-white">
+                        <span x-text="selectedNode.label"></span>
+                        <span class="text-sm text-gray-500 ml-2" x-text="'(' + selectedNode.type.toUpperCase() + ')'"></span>
+                    </h3>
+                    <button @click="selectedNode = null; updateNodeStyle()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Basic Properties -->
+                <div class="form-group">
+                    <label>Node Type</label>
+                    <input type="text" :value="selectedNode.type.toUpperCase()" disabled class="bg-gray-100 dark:bg-gray-700">
+                </div>
+
+                <div class="form-group" x-show="selectedNode.type === 'us'">
+                    <label>US Type</label>
+                    <select x-model="selectedNode.tipo" @change="updateNodeStyle()">
+                        <option value="positiva">Positiva (+)</option>
+                        <option value="negativa">Negativa (-)</option>
+                    </select>
+                </div>
+
+                <!-- Stratigraphic Information -->
+                <div class="form-group">
+                    <label>Definition</label>
+                    <textarea x-model="selectedNode.definition" rows="3" placeholder="Describe the stratigraphic unit..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Period</label>
+                    <input type="text" x-model="selectedNode.periodo" placeholder="e.g., Romano, Medievale...">
+                </div>
+
+                <div class="form-group">
+                    <label>Phase</label>
+                    <input type="text" x-model="selectedNode.fase" placeholder="e.g., Fase I, Fase II...">
+                </div>
+
+                <div class="form-group">
+                    <label>Dating</label>
+                    <input type="text" x-model="selectedNode.datazione" placeholder="e.g., I-II secolo d.C.">
+                </div>
+
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" x-model="selectedNode.localita" placeholder="Specific location within site...">
+                </div>
+
+                <!-- Technical Properties -->
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea x-model="selectedNode.note" rows="2" placeholder="Additional notes..."></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="space-y-2 mt-4">
+                    <button @click="duplicateSelected()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                        <i class="fas fa-copy mr-2"></i>Duplicate Node
+                    </button>
+                    <button @click="deleteSelected()" class="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">
+                        <i class="fas fa-trash mr-2"></i>Delete Node
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Modal per selezionare tipo relazione -->
+    <div class="relationship-modal" :class="{'show': showRelationshipModal}">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold mb-4 text-gray-900 dark:text-white">Select Relationship Type</h3>
+
+            <div class="space-y-2">
+                <button @click="createEdge('copre')" class="w-full px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition">
+                    <i class="fas fa-layer-group mr-2"></i>
+                    Copre
+                    <div class="text-xs text-gray-300">One layer covers another</div>
+                </button>
+                <button @click="createEdge('taglia')" class="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
+                    <i class="fas fa-cut mr-2"></i>
+                    Taglia
+                    <div class="text-xs text-red-200">One cuts through another</div>
+                </button>
+                <button @click="createEdge('riempie')" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+                    <i class="fas fa-fill mr-2"></i>
+                    Riempie
+                    <div class="text-xs text-blue-200">One fills another</div>
+                </button>
+                <button @click="createEdge('si_appoggia_a')" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
+                    <i class="fas fa-hand-holding mr-2"></i>
+                    Si appoggia a
+                    <div class="text-xs text-green-200">One rests on another</div>
+                </button>
+                <button @click="createEdge('uguale_a')" class="w-full px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition">
+                    <i class="fas fa-equals mr-2"></i>
+                    Uguale a / Si lega a
+                    <div class="text-xs text-purple-200">Same level or bonded</div>
+                </button>
+            </div>
+
+            <button @click="cancelEdgeCreation()" class="w-full mt-4 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <!-- Node Tooltip -->
+    <div x-show="tooltip.visible" x-cloak 
+         class="node-tooltip" 
+         :style="`left: ${tooltip.x}px; top: ${tooltip.y}px;`">
+        <div class="text-sm">
+            <div class="font-semibold mb-1" x-text="tooltip.content?.label || ''"></div>
+            <div x-show="tooltip.content?.definition" class="text-gray-600 dark:text-gray-400">
+                <span x-text="tooltip.content?.definition"></span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function harrisMatrixEditor() {
+    return {
+        // Core data
+        cy: null,
+        nodes: [],
+        edges: [],
+        editMode: 'select',
+        selectedNode: null,
+        tempIdCounter: 0,
+        loading: false,
+
+        // UI state
+        showSettings: false,
+        showRelationshipModal: false,
+        tooltip: {
+            visible: false,
+            x: 0,
+            y: 0,
+            content: null
+        },
+
+        // Edge creation state
+        edgeSourceNode: null,
+        edgeTargetNode: null,
+
+        // Settings
+        settings: {
+            nodeSize: 'medium',
+            layout: 'none',
+            gridSnap: false,
+            showLabels: true,
+            animateLayout: true,
+            validateRelationships: true,
+            preventCycles: true
+        },
+
+        // Site ID from template
+        siteId: '{{ site.id }}',
+
+        // Initialize component
+        async init() {
+            this.initCytoscape();
+        },
+
+        // Initialize Cytoscape.js
+        initCytoscape() {
+            // Register Elk extension if available
+            if (typeof cytoscapeElk !== 'undefined') {
+                cytoscape.use(cytoscapeElk);
+            }
+
+            this.cy = cytoscape({
+                container: document.getElementById('cy'),
+                elements: [],
+                style: this.getCytoscapeStyles(),
+                layout: { name: 'preset' },
+                minZoom: 0.1,
+                maxZoom: 5,
+                wheelSensitivity: 0.2,
+                selectionType: 'single'
+            });
+
+            // Setup event handlers
+            this.setupEventHandlers();
+        },
+
+        // Setup all event handlers
+        setupEventHandlers() {
+            // Canvas click
+            this.cy.on('tap', (evt) => {
+                if (evt.target === this.cy) {
+                    this.handleCanvasClick(evt);
+                }
+            });
+
+            // Node interactions
+            this.cy.on('tap', 'node', (evt) => {
+                this.handleNodeClick(evt.target);
+            });
+
+            this.cy.on('cxttap', 'node', (evt) => {
+                // Right click - delete node
+                this.selectedNode = evt.target.data();
+                this.deleteSelected();
+            });
+
+            this.cy.on('mouseover', 'node', (evt) => {
+                this.showTooltip(evt);
+            });
+
+            this.cy.on('mouseout', 'node', () => {
+                this.tooltip.visible = false;
+            });
+
+            // Drag handling for move mode
+            this.cy.on('drag', 'node', (evt) => {
+                if (this.editMode === 'move' && this.settings.gridSnap) {
+                    const pos = evt.position;
+                    const gridSize = 20;
+                    evt.position = {
+                        x: Math.round(pos.x / gridSize) * gridSize,
+                        y: Math.round(pos.y / gridSize) * gridSize
+                    };
+                }
+            });
+
+            // Background click - deselect
+            this.cy.on('tap', (event) => {
+                if (event.target === this.cy) {
+                    this.selectedNode = null;
+                }
+            });
+        },
+
+        // Handle canvas click for adding nodes
+        handleCanvasClick(evt) {
+            if (this.editMode === 'select' || this.editMode === 'move') return;
+
+            if (this.editMode.startsWith('add-us') || this.editMode === 'add-usm') {
+                let pos = evt.position;
+                if (this.settings.gridSnap) {
+                    const gridSize = 20;
+                    pos = {
+                        x: Math.round(pos.x / gridSize) * gridSize,
+                        y: Math.round(pos.y / gridSize) * gridSize
+                    };
+                }
+                this.addNodeAtPosition(pos);
+            }
+        },
+
+        // Handle node click
+        handleNodeClick(node) {
+            if (this.editMode === 'select') {
+                this.selectedNode = node.data();
+                return;
+            }
+
+            if (this.editMode === 'move') {
+                // Allow dragging in move mode
+                return;
+            }
+
+            if (this.editMode === 'add-edge') {
+                if (!this.edgeSourceNode) {
+                    this.edgeSourceNode = node;
+                    node.addClass('edge-source-highlighted');
+                } else if (this.edgeSourceNode.id() !== node.id()) {
+                    this.edgeTargetNode = node;
+                    node.addClass('edge-target-ready');
+                    this.showRelationshipModal = true;
+                }
+            }
+        },
+
+        // Add node at specific position
+        addNodeAtPosition(pos) {
+            const tempId = `temp_${++this.tempIdCounter}`;
+            let type, tipo, label, icon;
+
+            if (this.editMode === 'add-us-positive') {
+                type = 'us';
+                tipo = 'positiva';
+                label = `US${this.tempIdCounter}`;
+                icon = '+';
+            } else if (this.editMode === 'add-us-negative') {
+                type = 'us';
+                tipo = 'negativa';
+                label = `US${this.tempIdCounter}`;
+                icon = '⊖';
+            } else if (this.editMode === 'add-usm') {
+                type = 'usm';
+                tipo = null;
+                label = `USM${this.tempIdCounter}`;
+                icon = 'M';
+            }
+
+            const nodeData = {
+                temp_id: tempId,
+                type: type,
+                tipo: tipo,
+                definition: '',
+                periodo: '',
+                fase: '',
+                datazione: '',
+                localita: '',
+                note: '',
+                icon: icon
+            };
+
+            this.nodes.push(nodeData);
+
+            const cyNode = this.cy.add({
+                group: 'nodes',
+                data: { 
+                    id: tempId, 
+                    label: label,
+                    ...nodeData
+                },
+                position: pos,
+                classes: 'node-temporary'
+            });
+
+            this.cy.style(this.getCytoscapeStyles());
+
+            // Auto-select newly created node
+            if (this.editMode === 'select') {
+                this.selectedNode = nodeData;
+            }
+
+            // Reset to select mode after adding
+            this.setMode('select');
+        },
+
+        // Create edge between nodes
+        createEdge(relType) {
+            if (!this.edgeSourceNode || !this.edgeTargetNode) return;
+
+            // Validation
+            if (this.settings.validateRelationships && !this.validateRelationship(this.edgeSourceNode, this.edgeTargetNode, relType)) {
+                alert('Invalid relationship: This would create a cycle or violates stratigraphic rules.');
+                this.cancelEdgeCreation();
+                return;
+            }
+
+            const edgeId = `edge_${this.edgeSourceNode.id()}_${this.edgeTargetNode.id()}_${Date.now()}`;
+
+            const edgeData = {
+                from: this.edgeSourceNode.id(),
+                to: this.edgeTargetNode.id(),
+                relationship: relType
+            };
+
+            this.edges.push(edgeData);
+
+            this.cy.add({
+                group: 'edges',
+                data: {
+                    id: edgeId,
+                    source: this.edgeSourceNode.id(),
+                    target: this.edgeTargetNode.id(),
+                    label: relType.replace('_', ' '),
+                    relationship: relType
+                },
+                classes: `edge-${relType}`
+            });
+
+            // Reset edge creation state
+            this.cancelEdgeCreation();
+            this.cy.style(this.getCytoscapeStyles());
+
+            // Reset to select mode
+            this.setMode('select');
+        },
+
+        // Validate relationship rules
+        validateRelationship(source, target, type) {
+            // TODO: Implement proper stratigraphic validation rules
+            // For now, just check for basic cycles
+            if (this.settings.preventCycles) {
+                return !this.wouldCreateCycle(source, target);
+            }
+            return true;
+        },
+
+        // Check if edge would create cycle
+        wouldCreateCycle(source, target) {
+            // Simple cycle detection using DFS
+            const visited = new Set();
+            const stack = [target];
+
+            while (stack.length > 0) {
+                const current = stack.pop();
+                if (current === source) return true;
+                
+                if (visited.has(current)) continue;
+                visited.add(current);
+
+                const outgoingEdges = this.cy.edges(`[source = "${current.id()}"]`);
+                outgoingEdges.forEach(edge => {
+                    const targetNode = edge.target();
+                    if (!visited.has(targetNode)) {
+                        stack.push(targetNode);
+                    }
+                });
+            }
+
+            return false;
+        },
+
+        // Cancel edge creation
+        cancelEdgeCreation() {
+            if (this.edgeSourceNode) {
+                this.edgeSourceNode.removeClass('edge-source-highlighted');
+            }
+            if (this.edgeTargetNode) {
+                this.edgeTargetNode.removeClass('edge-target-ready');
+            }
+            this.edgeSourceNode = null;
+            this.edgeTargetNode = null;
+            this.showRelationshipModal = false;
+        },
+
+        // Update node styling
+        updateNodeStyle() {
+            if (!this.selectedNode) return;
+
+            const cyNode = this.cy.$id(this.selectedNode.temp_id);
+            if (cyNode.length > 0) {
+                cyNode.data(this.selectedNode);
+                this.cy.style(this.getCytoscapeStyles());
+            }
+
+            // Update in nodes array
+            const idx = this.nodes.findIndex(n => n.temp_id === this.selectedNode.temp_id);
+            if (idx !== -1) {
+                this.nodes[idx] = {...this.selectedNode};
+            }
+        },
+
+        // Delete selected node
+        deleteSelected() {
+            if (!this.selectedNode) return;
+
+            if (!confirm(`Delete "${this.selectedNode.label}" and all its relationships?`)) return;
+
+            const tempId = this.selectedNode.temp_id;
+            
+            // Remove from Cytoscape
+            this.cy.$id(tempId).remove();
+
+            // Remove from arrays
+            this.nodes = this.nodes.filter(n => n.temp_id !== tempId);
+            this.edges = this.edges.filter(e => e.from !== tempId && e.to !== tempId);
+
+            this.selectedNode = null;
+        },
+
+        // Duplicate selected node
+        duplicateSelected() {
+            if (!this.selectedNode) return;
+
+            const originalNode = this.selectedNode;
+            const cyNode = this.cy.$id(originalNode.temp_id);
+            const pos = cyNode.position();
+
+            // Offset position slightly
+            const newPos = {
+                x: pos.x + 50,
+                y: pos.y + 50
+            };
+
+            // Create duplicate with same properties
+            const tempId = `temp_${++this.tempIdCounter}`;
+            const label = originalNode.label + '_copy';
+
+            const nodeData = {
+                ...originalNode,
+                temp_id: tempId,
+                label: label
+            };
+
+            this.nodes.push(nodeData);
+
+            this.cy.add({
+                group: 'nodes',
+                data: { 
+                    id: tempId, 
+                    ...nodeData
+                },
+                position: newPos,
+                classes: 'node-temporary'
+            });
+
+            this.cy.style(this.getCytoscapeStyles());
+            this.selectedNode = nodeData;
+        },
+
+        // Clear entire graph
+        clearGraph() {
+            if (this.nodes.length === 0) return;
+            
+            if (!confirm('Clear all nodes and relationships? This cannot be undone.')) return;
+
+            this.cy.elements().remove();
+            this.nodes = [];
+            this.edges = [];
+            this.tempIdCounter = 0;
+            this.selectedNode = null;
+        },
+
+        // Auto layout nodes
+        autoLayout() {
+            if (!this.cy || this.nodes.length === 0) return;
+
+            const layoutOptions = this.getLayoutOptions();
+            
+            this.cy.layout({
+                ...layoutOptions,
+                animate: this.settings.animateLayout,
+                animationDuration: this.settings.animateLayout ? 500 : 0
+            }).run();
+        },
+
+        // Get layout options based on settings
+        getLayoutOptions() {
+            const layouts = {
+                dagre: {
+                    name: 'dagre',
+                    rankDir: 'TB', // Top to bottom
+                    align: 'UL',
+                    rankSep: 100,
+                    nodeSep: 50,
+                    edgeSep: 10
+                },
+                elk: {
+                    name: 'elk',
+                    elk: {
+                        algorithm: 'layered',
+                        'elk.direction': 'DOWN',
+                        'elk.spacing.nodeNode': 80,
+                        'elk.layered.spacing.nodeNodeBetweenLayers': 100,
+                        'elk.alignment': 'CENTER'
+                    },
+                    fit: true,
+                    padding: 60
+                },
+                breadthfirst: {
+                    name: 'breadthfirst',
+                    directed: true,
+                    spacingFactor: 1.5
+                },
+                grid: {
+                    name: 'grid',
+                    rows: Math.ceil(Math.sqrt(this.cy.nodes().length)),
+                    cols: Math.ceil(Math.sqrt(this.cy.nodes().length))
+                }
+            };
+
+            return layouts[this.settings.layout] || { name: 'preset' };
+        },
+
+        // Load existing matrix from database
+        async loadExistingMatrix() {
+            try {
+                const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const matrixData = await response.json();
+                
+                // Convert to editor format and load
+                this.loadMatrixData(matrixData);
+                
+                alert(`Loaded ${matrixData.nodes?.length || 0} nodes and ${matrixData.edges?.length || 0} relationships`);
+                
+            } catch (error) {
+                console.error('Error loading existing matrix:', error);
+                alert('Error loading existing matrix: ' + error.message);
+            }
+        },
+
+        // Load matrix data into editor
+        loadMatrixData(matrixData) {
+            this.clearGraph();
+
+            if (matrixData.nodes) {
+                matrixData.nodes.forEach(node => {
+                    const nodeData = {
+                        temp_id: node.id,
+                        type: node.type,
+                        tipo: node.tipo,
+                        definition: node.data?.definition || '',
+                        periodo: node.data?.periodo || '',
+                        fase: node.data?.fase || '',
+                        datazione: node.data?.datazione || '',
+                        localita: node.data?.localita || '',
+                        note: node.data?.note || ''
+                    };
+
+                    this.nodes.push(nodeData);
+
+                    this.cy.add({
+                        group: 'nodes',
+                        data: { 
+                            id: node.id, 
+                            label: node.label,
+                            ...nodeData
+                        },
+                        position: { x: Math.random() * 400, y: Math.random() * 400 }
+                    });
+                });
+            }
+
+            if (matrixData.edges) {
+                matrixData.edges.forEach(edge => {
+                    const edgeData = {
+                        from: edge.source || edge.from,
+                        to: edge.target || edge.to,
+                        relationship: edge.type
+                    };
+
+                    this.edges.push(edgeData);
+
+                    this.cy.add({
+                        group: 'edges',
+                        data: {
+                            id: edge.id || `edge-${edgeData.from}-${edgeData.to}`,
+                            source: edgeData.from,
+                            target: edgeData.to,
+                            label: edge.label || edgeData.relationship.replace('_', ' '),
+                            relationship: edgeData.relationship
+                        }
+                    });
+                });
+            }
+
+            this.cy.style(this.getCytoscapeStyles());
+            this.autoLayout();
+        },
+
+        // Save matrix to database
+        async saveMatrix() {
+            if (this.nodes.length === 0) {
+                alert('No nodes to save!');
+                return;
+            }
+
+            if (!confirm(`Save ${this.nodes.length} nodes and ${this.edges.length} relationships to the database?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/sites/${this.siteId}/harris-matrix/bulk-create`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        nodes: this.nodes,
+                        edges: this.edges
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Error saving matrix');
+                }
+
+                const result = await response.json();
+
+                alert(`✅ Harris Matrix saved successfully!\n\nCreated:\n- ${result.created?.us || 0} US\n- ${result.created?.usm || 0} USM\n\n${result.message || 'Matrix saved successfully'}`);
+
+                // Redirect to viewer
+                window.location.href = `/view/${this.siteId}/harris-matrix`;
+
+            } catch (error) {
+                console.error('Error saving matrix:', error);
+                alert(`❌ Error during save: ${error.message}`);
+            }
+        },
+
+        // Export matrix as image
+        exportImage() {
+            if (!this.cy) return;
+            
+            try {
+                const png = this.cy.png({
+                    output: 'blob',
+                    bg: 'white',
+                    full: true,
+                    scale: 2
+                });
+                
+                const url = URL.createObjectURL(png);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `harris-matrix-editor-${this.siteId}-${Date.now()}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+            } catch (error) {
+                console.error('Error exporting image:', error);
+                alert('Error exporting image. Please try again.');
+            }
+        },
+
+        // Reset view
+        resetView() {
+            if (!this.cy) return;
+            this.cy.fit();
+        },
+
+        // Fit to screen
+        fitToScreen() {
+            if (!this.cy) return;
+            this.cy.fit(undefined, 50);
+        },
+
+        // Set editing mode
+        setMode(mode) {
+            this.editMode = mode;
+            this.edgeSourceNode = null;
+            this.edgeTargetNode = null;
+            this.selectedNode = null;
+
+            // Update cursor
+            const cy_el = document.getElementById('cy');
+            if (mode === 'select') {
+                cy_el.style.cursor = 'default';
+            } else if (mode === 'move') {
+                cy_el.style.cursor = 'move';
+            } else if (mode.startsWith('add-')) {
+                cy_el.style.cursor = 'crosshair';
+            } else if (mode === 'add-edge') {
+                cy_el.style.cursor = 'pointer';
+            }
+        },
+
+        // Show tooltip
+        showTooltip(evt) {
+            const node = evt.target;
+            const pos = evt.renderedPosition || evt.position;
+            
+            this.tooltip = {
+                visible: true,
+                x: pos.x + 10,
+                y: pos.y - 10,
+                content: node.data()
+            };
+        },
+
+        // Get mode label
+        getModeLabel() {
+            const labels = {
+                'select': 'Selection Mode',
+                'move': 'Move Nodes',
+                'add-us-positive': 'Add US Positive (+)',
+                'add-us-negative': 'Add US Negative (-)',
+                'add-usm': 'Add USM',
+                'add-edge': 'Create Relationship'
+            };
+            return labels[this.editMode] || this.editMode;
+        },
+
+        // Get count functions for statistics
+        getUSPositiveCount() {
+            return this.nodes.filter(n => n.type === 'us' && n.tipo === 'positiva').length;
+        },
+
+        getUSNegativeCount() {
+            return this.nodes.filter(n => n.type === 'us' && n.tipo === 'negativa').length;
+        },
+
+        getUSMCount() {
+            return this.nodes.filter(n => n.type === 'usm').length;
+        },
+
+        // Update node styles
+        updateNodeStyles() {
+            if (!this.cy) return;
+            this.cy.style(this.getCytoscapeStyles());
+        },
+
+        // Get Cytoscape styles
+        getCytoscapeStyles() {
+            const nodeSizes = {
+                small: { width: 60, height: 40, fontSize: 12 },
+                medium: { width: 80, height: 50, fontSize: 14 },
+                large: { width: 100, height: 60, fontSize: 16 }
+            };
+            
+            const nodeSize = nodeSizes[this.settings.nodeSize] || nodeSizes.medium;
+
+            return [
+                // US Positive (blue)
+                {
+                    selector: 'node[type = "us"][tipo = "positiva"]',
+                    style: {
+                        'label': this.settings.showLabels ? 'data(label)' : '',
+                        'background-color': '#3b82f6',
+                        'border-color': '#1e40af',
+                        'border-width': 3,
+                        'width': nodeSize.width,
+                        'height': nodeSize.height,
+                        'shape': 'roundrectangle',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'font-size': nodeSize.fontSize,
+                        'font-weight': 'bold',
+                        'color': '#ffffff',
+                        'text-wrap': 'wrap',
+                        'text-max-width': `${nodeSize.width - 10}px`
+                    }
+                },
+
+                // US Negative (red with dashed border)
+                {
+                    selector: 'node[type = "us"][tipo = "negativa"]',
+                    style: {
+                        'label': this.settings.showLabels ? '⊖ data(label)' : '',
+                        'background-color': '#ef4444',
+                        'border-color': '#991b1b',
+                        'border-width': 3,
+                        'border-style': 'dashed',
+                        'border-dash-pattern': [8, 4],
+                        'width': nodeSize.width,
+                        'height': nodeSize.height,
+                        'shape': 'rectangle',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'font-size': nodeSize.fontSize,
+                        'font-weight': 'bold',
+                        'color': '#ffffff',
+                        'text-wrap': 'wrap',
+                        'text-max-width': `${nodeSize.width - 10}px`
+                    }
+                },
+
+                // USM (purple)
+                {
+                    selector: 'node[type = "usm"]',
+                    style: {
+                        'label': this.settings.showLabels ? 'data(label)' : '',
+                        'background-color': '#8b5cf6',
+                        'border-color': '#6d28d9',
+                        'border-width': 3,
+                        'width': nodeSize.width,
+                        'height': nodeSize.height,
+                        'shape': 'roundrectangle',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'font-size': nodeSize.fontSize,
+                        'font-weight': 'bold',
+                        'color': '#ffffff',
+                        'text-wrap': 'wrap',
+                        'text-max-width': `${nodeSize.width - 10}px`
+                    }
+                },
+
+                // Temporary nodes
+                {
+                    selector: '.node-temporary',
+                    style: {
+                        'opacity': 0.8,
+                        'border-style': 'dashed',
+                        'background-color': '#fef3c7',
+                        'border-color': '#f59e0b'
+                    }
+                },
+
+                // Edge source highlighted
+                {
+                    selector: '.edge-source-highlighted',
+                    style: {
+                        'border-width': 5,
+                        'border-color': '#f59e0b',
+                        'animation': 'pulse 2s infinite'
+                    }
+                },
+
+                // Edge target ready
+                {
+                    selector: '.edge-target-ready',
+                    style: {
+                        'border-color': '#10b981',
+                        'border-width': 4
+                    }
+                },
+
+                // Node hover styles
+                {
+                    selector: 'node:hover',
+                    style: {
+                        'border-width': 4,
+                        'overlay-color': '#1f2937',
+                        'overlay-opacity': 0.2
+                    }
+                },
+
+                // Selected node styles
+                {
+                    selector: 'node:selected',
+                    style: {
+                        'border-width': 4,
+                        'border-color': '#3b82f6',
+                        'overlay-color': '#3b82f6',
+                        'overlay-opacity': 0.2
+                    }
+                },
+
+                // Default edge styles
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 3,
+                        'line-color': '#6b7280',
+                        'target-arrow-color': '#6b7280',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'label': this.settings.showLabels ? 'data(label)' : '',
+                        'font-size': '12px',
+                        'color': '#1f2937',
+                        'text-background-color': '#ffffff',
+                        'text-background-opacity': 0.9,
+                        'text-background-padding': '3px'
+                    }
+                },
+
+                // Specific edge type styles
+                {
+                    selector: '.edge-copre',
+                    style: {
+                        'line-color': '#6b7280',
+                        'target-arrow-color': '#6b7280'
+                    }
+                },
+
+                {
+                    selector: '.edge-taglia',
+                    style: {
+                        'line-color': '#ef4444',
+                        'target-arrow-color': '#ef4444',
+                        'line-style': 'dashed'
+                    }
+                },
+
+                {
+                    selector: '.edge-riempie',
+                    style: {
+                        'line-color': '#3b82f6',
+                        'target-arrow-color': '#3b82f6'
+                    }
+                },
+
+                {
+                    selector: '.edge-uguale_a',
+                    style: {
+                        'line-color': '#10b981',
+                        'line-style': 'dotted',
+                        'target-arrow-shape': 'none'
+                    }
+                },
+
+                // Edge hover styles
+                {
+                    selector: 'edge:hover',
+                    style: {
+                        'width': 4,
+                        'overlay-color': '#1f2937',
+                        'overlay-opacity': 0.1
+                    }
+                }
+            ];
+        }
+    };
+}
+</script>
+{% endblock %}
