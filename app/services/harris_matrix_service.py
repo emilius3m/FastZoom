@@ -102,6 +102,7 @@ class HarrisMatrixService:
         """
         try:
             logger.info(f"Generating Harris Matrix for site_id: {site_id}")
+            logger.info(f"DEBUG: Logging level set to DEBUG for troubleshooting")
             
             # Query all US and USM units for the site
             us_units, usm_units = await self._query_stratigraphic_units(site_id)
@@ -345,12 +346,15 @@ class HarrisMatrixService:
         
         # Add US nodes
         for us in us_units:
+            # Debug logging per verificare il campo tipo
+            logger.debug(f"Processing US {us.us_code}: tipo={getattr(us, 'tipo', 'NOT_FOUND')}")
+            
             node = {
                 'id': f"US{us.us_code}",
                 'type': 'us',
                 'label': us.us_code,
                 'definition': us.definizione or '',
-                'tipo': us.tipo or 'positiva',  # ⭐ Aggiungi campo tipo
+                'tipo': getattr(us, 'tipo', 'positiva') or 'positiva',  # ⭐ Aggiungi campo tipo con fallback
                 'data': {
                     'id': str(us.id),
                     'localita': us.localita or '',
@@ -362,6 +366,9 @@ class HarrisMatrixService:
                 }
             }
             nodes.append(node)
+            
+            # Debug logging per verificare il nodo creato
+            logger.debug(f"Created node for US {us.us_code}: tipo={node['tipo']}")
         
         # Add USM nodes
         for usm in usm_units:
