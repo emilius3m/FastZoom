@@ -389,21 +389,51 @@
         <div class="w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
             <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Legend</h3>
             
-            <!-- Node Types -->
-            <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Unit Types</h4>
+            <!-- Legenda Tipi di Unità -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                    </svg>
+                    Tipi di Unità
+                </h3>
+
                 <div class="space-y-2">
-                    <div class="legend-item">
-                        <div class="w-4 h-4 bg-blue-500 border-2 border-blue-700 rounded"></div>
-                        <span class="text-sm text-gray-700 dark:text-gray-300">US Positiva (accumulo)</span>
+                    <!-- US Positiva -->
+                    <div class="legend-item flex items-center gap-3">
+                        <div class="w-10 h-8 rounded bg-blue-500 border-2 border-blue-700 flex items-center justify-center flex-shrink-0">
+                            <span class="text-white text-xs font-bold">US</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900">US Positiva</div>
+                            <div class="text-xs text-gray-500">Accumulo/costruzione</div>
+                        </div>
+                        <span class="text-xs text-gray-400" x-text="getUSPositiveCount()"></span>
                     </div>
-                    <div class="legend-item">
-                        <div class="w-4 h-4 bg-red-500 border-2 border-red-800 border-dashed"></div>
-                        <span class="text-sm text-gray-700 dark:text-gray-300">US Negativa (asporto/taglio)</span>
+
+                    <!-- US Negativa -->
+                    <div class="legend-item flex items-center gap-3">
+                        <div class="w-10 h-8 bg-red-500 border-2 border-red-800 border-dashed flex items-center justify-center flex-shrink-0">
+                            <span class="text-white text-xs font-bold">⊖</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900">US Negativa</div>
+                            <div class="text-xs text-gray-500">Taglio/fossa/asporto</div>
+                        </div>
+                        <span class="text-xs text-gray-400" x-text="getUSNegativeCount()"></span>
                     </div>
-                    <div class="legend-item">
-                        <div class="w-4 h-4 bg-purple-500 rounded"></div>
-                        <span class="text-sm text-gray-700 dark:text-gray-300">USM (Wall Unit)</span>
+
+                    <!-- USM -->
+                    <div class="legend-item flex items-center gap-3">
+                        <div class="w-10 h-8 rounded bg-purple-500 border-2 border-purple-700 flex items-center justify-center flex-shrink-0">
+                            <span class="text-white text-xs font-bold">M</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-900">USM</div>
+                            <div class="text-xs text-gray-500">Unità Stratigr. Muraria</div>
+                        </div>
+                        <span class="text-xs text-gray-400" x-text="matrixData.metadata?.total_usm || 0"></span>
                     </div>
                 </div>
             </div>
@@ -518,6 +548,25 @@ function harrisMatrixViewer() {
                 }
                 
                 this.matrixData = await response.json();
+                
+                // 🔍 DEBUG: Stampa dati ricevuti dal backend
+                console.log('📊 Dati ricevuti dal backend:', this.matrixData);
+                
+                // 🔍 DEBUG: Analizza nodi per verificare campo tipo
+                if (this.matrixData.nodes) {
+                    console.log('🔍 Analisi nodi:');
+                    this.matrixData.nodes.forEach((node, index) => {
+                        if (node.type === 'us') {
+                            console.log(`Node ${index}: ${node.id}, tipo: ${node.tipo}, data.tipo: ${node.data?.tipo}, label: ${node.label}`);
+                        }
+                    });
+                    
+                    // Conta US positive/negative per verifica
+                    const usPositive = this.matrixData.nodes.filter(n => n.type === 'us' && n.tipo === 'positiva').length;
+                    const usNegative = this.matrixData.nodes.filter(n => n.type === 'us' && n.tipo === 'negativa').length;
+                    console.log(`📈 Conteggio US: Positive=${usPositive}, Negative=${usNegative}`);
+                }
+                
                 this.initializeCytoscape();
                 
             } catch (error) {
@@ -531,6 +580,13 @@ function harrisMatrixViewer() {
         // Initialize Cytoscape.js
         initializeCytoscape() {
             console.log('🎨 Rendering Harris Matrix with period boxes...');
+            
+            // 🔍 DEBUG: Verifica dati prima del rendering
+            console.log('🔬 Dati per Cytoscape:', {
+                totalNodes: this.matrixData.nodes?.length || 0,
+                totalEdges: this.matrixData.edges?.length || 0,
+                metadata: this.matrixData.metadata
+            });
 
             // ⭐ REGISTRA ESTENSIONE ELK
             if (typeof cytoscapeElk !== 'undefined') {
@@ -622,13 +678,18 @@ function harrisMatrixViewer() {
 
                 // ⭐ CHILD NODES - US/USM dentro il rettangolo
                 group.nodes.forEach(node => {
+                    const nodeTipo = node.tipo || node.data?.tipo || 'positiva';
+                    
+                    // 🔍 DEBUG: Verifica campo tipo per ogni nodo
+                    console.log(`🏷️ Nodo ${node.id}: tipo="${nodeTipo}", label="${node.label}"`);
+                    
                     elements.push({
                         group: 'nodes',
                         data: {
                             id: node.id,
                             label: node.label,
                             type: node.type,
-                            tipo: node.data?.tipo || 'positiva',  // ⭐ Aggiungi campo tipo
+                            tipo: node.tipo || node.data?.tipo || 'positiva',    // ⭐ AGGIUNGI QUESTA RIGA
                             parent: parentId,  // ⭐ Assegna al rettangolo periodo
                             period: group.period,
                             phase: group.phase,
@@ -806,13 +867,15 @@ function harrisMatrixViewer() {
                 {
                     selector: 'node.us[tipo="negativa"]',
                     style: {
-                        'label': 'data(label)',
-                        'background-color': '#ef4444',       // Rosso
+                        'label': function(ele) {
+                            return '⊖ ' + ele.data('label');  // ⭐ Simbolo asporto
+                        },
+                        'background-color': '#ef4444',       // ⭐ Rosso
                         'width': '100px',
                         'height': '60px',
-                        'shape': 'rectangle',                // Forma rettangolare
+                        'shape': 'rectangle',                // ⭐ Forma rettangolare
                         'border-width': 3,
-                        'border-style': 'dashed',            // Bordo tratteggiato
+                        'border-style': 'dashed',            // ⭐ Bordo tratteggiato
                         'border-dash-pattern': [8, 4],
                         'border-color': '#991b1b',
                         'text-valign': 'center',
@@ -826,22 +889,45 @@ function harrisMatrixViewer() {
                     }
                 },
 
-                // ===== Label US negative con simbolo =====
-                {
-                    selector: 'node.us[tipo="negativa"]',
-                    style: {
-                        'label': function(ele) {
-                            return '⊖ ' + ele.data('label');  // Simbolo asporto
-                        }
-                    }
-                },
-
                 // ===== NODI USM (viola) =====
                 {
                     selector: 'node.usm',
                     style: {
+                        'label': 'data(label)',
                         'background-color': '#8b5cf6',
                         'border-color': '#6d28d9',
+                        'border-width': 3,
+                        'width': '100px',
+                        'height': '60px',
+                        'shape': 'roundrectangle',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'font-size': '16px',
+                        'font-weight': 'bold',
+                        'color': '#ffffff',
+                        'text-wrap': 'wrap',
+                        'text-max-width': '90px',
+                        'z-index': 10
+                    }
+                },
+
+                // ===== Fallback per US senza tipo (assume positiva) =====
+                {
+                    selector: 'node.us:not([tipo])',
+                    style: {
+                        'label': 'data(label)',
+                        'background-color': '#3b82f6',
+                        'border-color': '#1e40af',
+                        'border-width': 3,
+                        'border-style': 'solid',
+                        'width': '100px',
+                        'height': '60px',
+                        'shape': 'roundrectangle',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'font-size': '16px',
+                        'font-weight': 'bold',
+                        'color': '#ffffff',
                         'z-index': 10
                     }
                 },
@@ -1161,7 +1247,7 @@ function harrisMatrixViewer() {
         getUSPositiveCount() {
             if (!this.matrixData.nodes) return 0;
             return this.matrixData.nodes.filter(node =>
-                node.type === 'us' && (!node.data?.tipo || node.data?.tipo === 'positiva')
+                node.type === 'us' && (!node.tipo && !node.data?.tipo) || node.tipo === 'positiva' || node.data?.tipo === 'positiva'
             ).length;
         },
         
@@ -1169,7 +1255,7 @@ function harrisMatrixViewer() {
         getUSNegativeCount() {
             if (!this.matrixData.nodes) return 0;
             return this.matrixData.nodes.filter(node =>
-                node.type === 'us' && node.data?.tipo === 'negativa'
+                node.type === 'us' && (node.tipo === 'negativa' || node.data?.tipo === 'negativa')
             ).length;
         }
     };
