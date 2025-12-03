@@ -11,6 +11,7 @@ from typing import Dict, List, Any, Optional, Union
 from uuid import UUID
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
+import re
 
 
 class StratigraphicRelation(str, Enum):
@@ -84,25 +85,118 @@ class HarrisMatrixEdge(BaseModel):
 class HarrisMatrixBulkCreateUnit(BaseModel):
     """Schema for creating a single unit in bulk operations."""
     
-    temp_id: str = Field(..., description="Temporary identifier for client-side mapping")
-    unit_type: UnitTypeEnum = Field(..., description="Type of unit (us or usm)")
-    code: Optional[str] = Field(None, description="Unit code (auto-generated if not provided)")
-    definition: Optional[str] = Field(None, description="Unit definition")
-    tipo: Optional[TipoUSEnum] = Field(None, description="US type (positive/negative)")
-    localita: Optional[str] = Field(None, description="Location")
-    datazione: Optional[str] = Field(None, description="Dating information")
-    periodo: Optional[str] = Field(None, description="Period")
-    fase: Optional[str] = Field(None, description="Phase")
-    affidabilita_stratigrafica: Optional[str] = Field(None, description="Stratigraphic reliability")
-    tecnica_costruttiva: Optional[str] = Field(None, description="Construction technique (USM only)")
-    created_by: Optional[str] = Field(None, description="User ID who created the unit")
+    temp_id: str = Field(
+        ...,
+        description="Temporary identifier for client-side mapping",
+        min_length=1,
+        max_length=100,
+        pattern=r'^[a-zA-Z0-9_-]+$',
+        example="temp_unit_1"
+    )
+    unit_type: UnitTypeEnum = Field(
+        ...,
+        description="Type of unit (us or usm)",
+        example="us"
+    )
+    code: Optional[str] = Field(
+        None,
+        description="Unit code (auto-generated if not provided)",
+        min_length=1,
+        max_length=20,
+        example="US001"
+    )
+    definition: Optional[str] = Field(
+        None,
+        description="Unit definition",
+        max_length=2000,
+        example="Stratigraphic unit description"
+    )
+    tipo: Optional[TipoUSEnum] = Field(
+        None,
+        description="US type (positive/negative) - only applicable to US units",
+        example="positiva"
+    )
+    localita: Optional[str] = Field(
+        None,
+        description="Location",
+        max_length=500,
+        example="Area A"
+    )
+    datazione: Optional[str] = Field(
+        None,
+        description="Dating information",
+        max_length=500,
+        example="Medioevo"
+    )
+    periodo: Optional[str] = Field(
+        None,
+        description="Period",
+        max_length=200,
+        example="XII secolo"
+    )
+    fase: Optional[str] = Field(
+        None,
+        description="Phase",
+        max_length=200,
+        example="Fase 1"
+    )
+    affidabilita_stratigrafica: Optional[str] = Field(
+        None,
+        description="Stratigraphic reliability",
+        max_length=500,
+        example="Alta"
+    )
+    tecnica_costruttiva: Optional[str] = Field(
+        None,
+        description="Construction technique (USM only)",
+        max_length=500,
+        example="Muratura a sacco"
+    )
+    created_by: Optional[str] = Field(
+        None,
+        description="User ID who created the unit",
+        max_length=100
+    )
     
     @validator('code')
-    def validate_code(cls, v):
+    def validate_code(cls, v, values):
         if v:
             v = v.strip().upper()
             if not v:
                 raise ValueError('Unit code cannot be empty')
+            
+            # Basic format validation
+            if not re.match(r'^[A-Z0-9]+$', v):
+                raise ValueError('Unit code must contain only uppercase letters and numbers')
+            
+            # Check length
+            if len(v) < 2 or len(v) > 20:
+                raise ValueError('Unit code must be between 2 and 20 characters')
+            
+            # Unit type specific validation
+            unit_type = values.get('unit_type')
+            if unit_type:
+                if unit_type == UnitTypeEnum.US and not v.startswith('US'):
+                    raise ValueError('US codes should start with US (e.g., US001)')
+                elif unit_type == UnitTypeEnum.USM and not v.startswith('USM'):
+                    raise ValueError('USM codes should start with USM (e.g., USM001)')
+        
+        return v
+    
+    @validator('tipo')
+    def validate_tipo(cls, v, values):
+        # USM units should not have tipo field
+        unit_type = values.get('unit_type')
+        if unit_type == UnitTypeEnum.USM and v is not None:
+            raise ValueError('USM units should not have tipo field')
+        return v
+    
+    @validator('tecnica_costruttiva')
+    def validate_tecnica_costruttiva(cls, v, values):
+        # Only USM units should have tecnica_costruttiva
+        unit_type = values.get('unit_type')
+        if unit_type == UnitTypeEnum.US and v is not None:
+            raise ValueError('Only USM units should have tecnica_costruttiva field')
         return v
     
     class Config:
@@ -114,45 +208,139 @@ class HarrisMatrixBulkCreateUnit(BaseModel):
 class HarrisMatrixBulkCreateRelationship(BaseModel):
     """Schema for creating a single relationship in bulk operations."""
     
-    temp_id: str = Field(..., description="Temporary identifier for client-side mapping")
-    from_temp_id: str = Field(..., description="Temporary ID of source unit")
-    to_temp_id: str = Field(..., description="Temporary ID of target unit")
-    relation_type: StratigraphicRelation = Field(..., description="Type of relationship")
+    temp_id: str = Field(
+        ...,
+        description="Temporary identifier for client-side mapping",
+        min_length=1,
+        max_length=100,
+        pattern=r'^[a-zA-Z0-9_-]+$',
+        example="temp_rel_1"
+    )
+    from_temp_id: str = Field(
+        ...,
+        description="Temporary ID of source unit",
+        min_length=1,
+        max_length=100,
+        example="temp_unit_1"
+    )
+    to_temp_id: str = Field(
+        ...,
+        description="Temporary ID of target unit",
+        min_length=1,
+        max_length=100,
+        example="temp_unit_2"
+    )
+    relation_type: StratigraphicRelation = Field(
+        ...,
+        description="Type of relationship",
+        example=StratigraphicRelation.COPRE
+    )
     
     @validator('from_temp_id', 'to_temp_id')
     def validate_temp_ids(cls, v):
         if not v or not v.strip():
             raise ValueError('Temporary IDs cannot be empty')
-        return v.strip()
+        
+        v = v.strip()
+        
+        # Basic validation for temp_id format
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError('Temporary IDs can only contain letters, numbers, underscores, and hyphens')
+        
+        if len(v) > 100:
+            raise ValueError('Temporary IDs cannot exceed 100 characters')
+        
+        return v
+    
+    @validator('to_temp_id')
+    def validate_no_self_reference(cls, v, values):
+        if 'from_temp_id' in values and v == values['from_temp_id']:
+            raise ValueError('Unit cannot have relationship with itself')
+        return v
 
 
 class HarrisMatrixBulkCreateRequest(BaseModel):
     """Schema for bulk creating units and relationships."""
     
-    units: List[HarrisMatrixBulkCreateUnit] = Field(..., min_items=1, description="Units to create")
+    units: List[HarrisMatrixBulkCreateUnit] = Field(
+        ...,
+        min_items=1,
+        max_items=100,
+        description="Units to create (1-100 units per request)",
+        example=[
+            {
+                "temp_id": "temp_unit_1",
+                "unit_type": "us",
+                "code": "US001",
+                "definition": "Sample US unit",
+                "tipo": "positiva"
+            }
+        ]
+    )
     relationships: List[HarrisMatrixBulkCreateRelationship] = Field(
-        default=[], description="Relationships to create"
+        default=[],
+        max_items=500,
+        description="Relationships to create (max 500 relationships)",
+        example=[
+            {
+                "temp_id": "temp_rel_1",
+                "from_temp_id": "temp_unit_1",
+                "to_temp_id": "temp_unit_2",
+                "relation_type": "copre"
+            }
+        ]
     )
     
     @validator('units')
     def validate_unique_temp_ids(cls, v):
+        if not v:
+            raise ValueError('At least one unit must be provided')
+        
         temp_ids = [unit.temp_id for unit in v]
         if len(temp_ids) != len(set(temp_ids)):
-            raise ValueError('Duplicate temporary IDs found in units')
+            duplicates = [tid for tid in temp_ids if temp_ids.count(tid) > 1]
+            raise ValueError(f'Duplicate temporary IDs found in units: {list(set(duplicates))}')
+        
+        # Check for empty or invalid temp_ids
+        invalid_ids = [unit.temp_id for unit in v if not unit.temp_id or not unit.temp_id.strip()]
+        if invalid_ids:
+            raise ValueError(f'Invalid temporary IDs found: {invalid_ids}')
+        
         return v
     
     @validator('relationships')
     def validate_relationship_temp_ids(cls, v, values):
+        if not v:
+            return v  # Empty relationships are allowed
+            
         if 'units' not in values:
             return v
             
         unit_temp_ids = {unit.temp_id for unit in values['units']}
+        relationship_temp_ids = [rel.temp_id for rel in v]
+        
+        # Check for duplicate relationship temp_ids
+        if len(relationship_temp_ids) != len(set(relationship_temp_ids)):
+            duplicates = [tid for tid in relationship_temp_ids if relationship_temp_ids.count(tid) > 1]
+            raise ValueError(f'Duplicate relationship temporary IDs found: {list(set(duplicates))}')
+        
+        # Check relationship references
+        invalid_refs = []
+        self_refs = []
         
         for rel in v:
             if rel.from_temp_id not in unit_temp_ids:
-                raise ValueError(f"Source unit temp_id '{rel.from_temp_id}' not found in units")
+                invalid_refs.append(f"Source unit '{rel.from_temp_id}'")
             if rel.to_temp_id not in unit_temp_ids:
-                raise ValueError(f"Target unit temp_id '{rel.to_temp_id}' not found in units")
+                invalid_refs.append(f"Target unit '{rel.to_temp_id}'")
+            if rel.from_temp_id == rel.to_temp_id:
+                self_refs.append(f"Relationship '{rel.temp_id}'")
+        
+        if invalid_refs:
+            raise ValueError(f'Referenced units not found: {list(set(invalid_refs))}')
+        
+        if self_refs:
+            raise ValueError(f'Self-references found: {self_refs}')
         
         return v
 
@@ -231,6 +419,15 @@ class HarrisMatrixBulkCreateResponse(HarrisMatrixResponse):
     relationships: List[Dict[str, Any]] = Field(..., description="Created relationships data")
     validation_result: Optional[HarrisMatrixValidationResult] = Field(
         None, description="Validation results"
+    )
+    processing_time_ms: Optional[float] = Field(
+        None, description="Processing time in milliseconds"
+    )
+    warnings: List[str] = Field(
+        default_factory=list, description="Processing warnings"
+    )
+    suggestions: List[str] = Field(
+        default_factory=list, description="Suggestions for improvement"
     )
 
 

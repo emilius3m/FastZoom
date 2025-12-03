@@ -1132,16 +1132,25 @@ function harrisMatrixEditor() {
             // End drag - ripristina stili
             this.cy.on('free', 'node', (evt) => {
                 const node = evt.target;
+                
                 // Ripristina stile originale
                 node.style('border-width', 3);
-                node.style('border-color', function(ele) {
-                    if (ele.data('type') === 'us') {
-                        return ele.data('tipo') === 'positiva' ? '#1e40af' : '#991b1b';
-                    } else if (ele.data('type') === 'usm') {
-                        return '#6d28d9';
-                    }
-                    return '#1e40af';
-                });
+                
+                // Ripristina colore basato sul tipo
+                const nodeType = node.data('type');
+                const nodeData = node.data();
+                
+                let borderColor = '#1e40af'; // default
+                
+                if (nodeType === 'us') {
+                    borderColor = nodeData.tipo === 'positiva' ? '#1e40af' : '#991b1b';
+                } else if (nodeType === 'usm') {
+                    borderColor = '#6d28d9';
+                }
+                
+                node.style('border-color', borderColor);
+                
+                console.log('✓ Drag ended, styles restored');
             });
 
             // Background click - deselect
@@ -1728,7 +1737,7 @@ function harrisMatrixEditor() {
             let closestNode = null;
 
             // Cerca il nodo più vicino in orizzontale
-            allNodes.forEach(node => {
+            allNodes.forEach((node) => {
                 // Salta il nodo che stai trascinando
                 if (node.id() === movedNode.id()) return;
 
@@ -1756,15 +1765,19 @@ function harrisMatrixEditor() {
                 console.log(`🧲 Magnetic snap attivo: ${Math.round(closestDistance)}px`);
             } else {
                 // Ripristina stile se non attratti
+                const nodeType = movedNode.data('type');
+                const nodeData = movedNode.data();
+                
+                let borderColor = '#1e40af'; // default
+                
+                if (nodeType === 'us') {
+                    borderColor = nodeData.tipo === 'positiva' ? '#1e40af' : '#991b1b';
+                } else if (nodeType === 'usm') {
+                    borderColor = '#6d28d9';
+                }
+                
                 movedNode.style('border-width', 3);
-                movedNode.style('border-color', function(ele) {
-                    if (ele.data('type') === 'us') {
-                        return ele.data('tipo') === 'positiva' ? '#1e40af' : '#991b1b';
-                    } else if (ele.data('type') === 'usm') {
-                        return '#6d28d9';
-                    }
-                    return '#1e40af';
-                });
+                movedNode.style('border-color', borderColor);
             }
 
             return { x: snappedX, y: snappedY };

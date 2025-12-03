@@ -5,6 +5,8 @@ Service for generating Harris Matrix graph data from US/USM stratigraphic relati
 This service queries both US and USM tables for a given site_id, extracts relationships
 from the sequenza_fisica JSON field, and generates graph data structures suitable
 for Cytoscape.js visualization with topological sorting for chronological levels.
+
+Enhanced with UnitResolver for intelligent unit code resolution and reference validation.
 """
 
 import re
@@ -19,6 +21,7 @@ from sqlalchemy import select, and_, or_, func, text
 from loguru import logger
 
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.services.harris_matrix_unit_resolver import UnitResolver
 from app.exceptions import (
     HarrisMatrixValidationError,
     StratigraphicCycleDetected,
@@ -92,12 +95,13 @@ class HarrisMatrixService:
     
     def __init__(self, db: AsyncSession):
         """
-        Initialize the Harris Matrix service.
+        Initialize the Harris Matrix service with enhanced unit resolver.
         
         Args:
             db: AsyncSession for database operations
         """
         self.db = db
+        self.unit_resolver = UnitResolver(db)
     
     async def generate_harris_matrix(self, site_id: UUID) -> Dict[str, Any]:
         """
@@ -207,7 +211,7 @@ class HarrisMatrixService:
         usm_units: List[UnitaStratigraficaMuraria]
     ) -> List[Dict[str, Any]]:
         """
-        Extract relationships from sequenza_fisica JSON fields.
+        Extract relationships from sequenza_fisica JSON fields with enhanced unit resolution.
         
         Args:
             us_units: List of US units
@@ -222,13 +226,23 @@ class HarrisMatrixService:
         us_lookup = {us.us_code: us for us in us_units}
         usm_lookup = {usm.usm_code: usm for usm in usm_units}
         
+        # Get site ID from first unit (all units should be from same site)
+        site_id = us_units[0].site_id if us_units else (usm_units[0].site_id if usm_units else None)
+        
+        if not site_id:
+            logger.warning("No site ID found for unit resolution")
+            return relationships
+        
+        # Set resolver context
+        self.unit_resolver._current_site_id = site_id
+        
         # Process US units
         for us in us_units:
             if not us.sequenza_fisica:
                 continue
                 
-            us_relationships = self._extract_unit_relationships(
-                us.sequenza_fisica, us.us_code, 'us', us_lookup, usm_lookup
+            us_relationships = await self._extract_unit_relationships(
+                us.sequenza_fisica, us.us_code, 'us', us_lookup, usm_lookup, site_id
             )
             relationships.extend(us_relationships)
         
@@ -237,24 +251,25 @@ class HarrisMatrixService:
             if not usm.sequenza_fisica:
                 continue
                 
-            usm_relationships = self._extract_unit_relationships(
-                usm.sequenza_fisica, usm.usm_code, 'usm', us_lookup, usm_lookup
+            usm_relationships = await self._extract_unit_relationships(
+                usm.sequenza_fisica, usm.usm_code, 'usm', us_lookup, usm_lookup, site_id
             )
             relationships.extend(usm_relationships)
         
-        logger.info(f"Extracted {len(relationships)} relationships from sequenza_fisica")
+        logger.info(f"Extracted {len(relationships)} relationships from sequenza_fisica using enhanced resolution")
         return relationships
     
-    def _extract_unit_relationships(
+    async def _extract_unit_relationships(
         self,
         sequenza_fisica: Dict[str, List[str]],
         source_code: str,
         source_type: str,
         us_lookup: Dict[str, UnitaStratigrafica],
-        usm_lookup: Dict[str, UnitaStratigraficaMuraria]
+        usm_lookup: Dict[str, UnitaStratigraficaMuraria],
+        site_id: str
     ) -> List[Dict[str, Any]]:
         """
-        Extract relationships for a single unit from its sequenza_fisica.
+        Extract relationships for a single unit from its sequenza_fisica with enhanced resolution.
         
         Args:
             sequenza_fisica: JSON structure containing relationships
@@ -262,6 +277,7 @@ class HarrisMatrixService:
             source_type: Type of source unit ('us' or 'usm')
             us_lookup: Dictionary mapping US codes to US objects
             usm_lookup: Dictionary mapping USM codes to USM objects
+            site_id: Site ID for context in unit resolution
             
         Returns:
             List of relationship dictionaries
@@ -278,13 +294,31 @@ class HarrisMatrixService:
                 # Parse target to handle cross-references like "174(usm)"
                 target_code, target_type = self._parse_target_reference(target)
                 
-                # Validate target exists
-                if target_type == 'us' and target_code not in us_lookup:
-                    logger.warning(f"US target {target_code} not found for relationship {rel_type}")
-                    continue
-                elif target_type == 'usm' and target_code not in usm_lookup:
-                    logger.warning(f"USM target {target_code} not found for relationship {rel_type}")
-                    continue
+                # Enhanced target validation using unit resolver
+                target_exists = False
+                
+                # First, try traditional lookup for performance
+                if target_type == 'us' and target_code in us_lookup:
+                    target_exists = True
+                elif target_type == 'usm' and target_code in usm_lookup:
+                    target_exists = True
+                else:
+                    # Use enhanced resolver for missing units
+                    logger.debug(f"Traditional lookup failed for {target_type}{target_code}, trying enhanced resolution")
+                    resolved_id = await self.unit_resolver.resolve_unit_code(target_code, target_type)
+                    if resolved_id:
+                        target_exists = True
+                        logger.info(f"Successfully resolved {target_type}{target_code} using enhanced resolver")
+                    else:
+                        # Check for specific known issues
+                        if target_code in ['402', '412', 'US402', 'US412', 'USM402', 'USM402']:
+                            logger.warning(
+                                f"Known problematic unit reference found: {target_type}{target_code}. "
+                                f"This unit may not exist in the database or has format issues."
+                            )
+                        else:
+                            logger.warning(f"Cannot resolve {target_type}{target_code} for relationship {rel_type}")
+                        continue
                 
                 # Determine relationship direction
                 if rel_config['bidirectional']:
@@ -309,7 +343,9 @@ class HarrisMatrixService:
                     'type': rel_type,
                     'label': rel_config['label'],
                     'bidirectional': bidirectional,
-                    'description': rel_config['description']
+                    'description': rel_config['description'],
+                    'resolved': target_exists,
+                    'resolution_method': 'enhanced_resolver' if target_exists and target_type == 'us' and target_code not in us_lookup else 'direct_lookup'
                 }
                 
                 relationships.append(relationship)
