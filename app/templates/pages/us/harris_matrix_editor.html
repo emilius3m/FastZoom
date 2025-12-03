@@ -1581,6 +1581,34 @@ function harrisMatrixEditor() {
             }
 
             try {
+                // ✅ Transform editor data to backend format
+                const backendUnits = this.nodes.map(node => ({
+                    temp_id: node.temp_id,
+                    unit_type: node.type,           // type → unit_type
+                    code: null,                      // Let backend auto-generate
+                    definition: node.definition || '',
+                    tipo: node.tipo,
+                    localita: node.localita || '',
+                    datazione: node.datazione || '',
+                    periodo: node.periodo || '',
+                    fase: node.fase || '',
+                    note: node.note || ''
+                }));
+
+                const backendRelationships = this.edges.map((edge, index) => ({
+                    temp_id: `rel_${index + 1}`,    // Required temp_id for relationships
+                    from_temp_id: edge.from,          // from → from_temp_id
+                    to_temp_id: edge.to,              // to → to_temp_id
+                    relation_type: edge.relationship  // relationship → relation_type
+                }));
+
+                console.log('📤 Sending to backend:', {
+                    units: backendUnits.length,
+                    relationships: backendRelationships.length
+                });
+                console.log('Sample unit:', backendUnits[0]);
+                console.log('Sample relationship:', backendRelationships[0]);
+
                 const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-create`, {
                     method: 'POST',
                     headers: {
@@ -1588,26 +1616,52 @@ function harrisMatrixEditor() {
                     },
                     credentials: 'include',
                     body: JSON.stringify({
-                        nodes: this.nodes,
-                        edges: this.edges
+                        units: backendUnits,              // ✅ Correct field name
+                        relationships: backendRelationships // ✅ Correct field name
                     })
                 });
 
                 if (!response.ok) {
                     const error = await response.json();
-                    throw new Error(error.detail || 'Error saving matrix');
+                    console.error('❌ Backend error:', error);
+                    
+                    // Enhanced error reporting
+                    if (error.detail) {
+                        if (typeof error.detail === 'string') {
+                            throw new Error(error.detail);
+                        } else if (error.detail.validation_errors) {
+                            const validationErrors = error.detail.validation_errors.join('\n- ');
+                            throw new Error(`Validation errors:\n- ${validationErrors}`);
+                        } else {
+                            throw new Error(JSON.stringify(error.detail, null, 2));
+                        }
+                    } else {
+                        throw new Error('Error saving matrix');
+                    }
                 }
 
                 const result = await response.json();
 
-                alert(`✅ Harris Matrix saved successfully!\n\nCreated:\n- ${result.created?.us || 0} US\n- ${result.created?.usm || 0} USM\n\n${result.message || 'Matrix saved successfully'}`);
+                alert(`✅ Harris Matrix saved successfully!\n\nCreated:\n- ${result.created_units || 0} units\n- ${result.created_relationships || 0} relationships\n\n${result.message || 'Matrix saved successfully'}`);
 
                 // Redirect to viewer
                 window.location.href = `/view/${this.siteId}/harris-matrix`;
 
             } catch (error) {
-                console.error('Error saving matrix:', error);
-                alert(`❌ Error during save: ${error.message}`);
+                console.error('❌ Error saving matrix:', error);
+                
+                // Enhanced error display
+                let errorMessage = error.message;
+                if (error.response) {
+                    try {
+                        const errorData = await error.response.json();
+                        errorMessage = JSON.stringify(errorData, null, 2);
+                    } catch (e) {
+                        errorMessage = error.message;
+                    }
+                }
+                
+                alert(`❌ Error during save:\n${errorMessage}`);
             }
         },
 

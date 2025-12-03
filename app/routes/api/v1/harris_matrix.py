@@ -776,6 +776,36 @@ async def v1_bulk_create_harris_matrix(
     """
     try:
         logger.info(f"Bulk creating Harris Matrix for site_id: {site_id}")
+        
+        # 🔍 DEBUG: Log the exact request structure received
+        logger.info(f"🔍 REQUEST DEBUG - Raw request structure:")
+        logger.info(f"  - Request type: {type(request)}")
+        logger.info(f"  - Request units field: {hasattr(request, 'units')}")
+        logger.info(f"  - Request relationships field: {hasattr(request, 'relationships')}")
+        logger.info(f"  - Request nodes field: {hasattr(request, 'nodes')}")
+        logger.info(f"  - Request edges field: {hasattr(request, 'edges')}")
+        
+        # Log the actual content if available
+        if hasattr(request, 'dict'):
+            request_dict = request.dict()
+            logger.info(f"🔍 REQUEST DICT KEYS: {list(request_dict.keys())}")
+            
+            if 'units' in request_dict:
+                logger.info(f"  - Units count: {len(request_dict['units'])}")
+                if request_dict['units']:
+                    logger.info(f"  - Sample unit keys: {list(request_dict['units'][0].keys())}")
+            
+            if 'relationships' in request_dict:
+                logger.info(f"  - Relationships count: {len(request_dict['relationships'])}")
+                if request_dict['relationships']:
+                    logger.info(f"  - Sample relationship keys: {list(request_dict['relationships'][0].keys())}")
+                    
+        # Try to log original units/edges if they exist
+        if hasattr(request, 'dict') and 'nodes' in request.dict():
+            logger.warning(f"⚠️  Found 'nodes' field instead of 'units'!")
+            if 'edges' in request.dict():
+                logger.warning(f"⚠️  Found 'edges' field instead of 'relationships'!")
+
         logger.info(f"Request contains {len(request.units)} units and {len(request.relationships)} relationships")
 
         # Verify site access

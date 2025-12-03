@@ -680,35 +680,34 @@ class HarrisMatrixService:
         try:
             logger.info(f"Bulk creating {len(units_data)} units and {len(relationships_data)} relationships for site {site_id}")
             
-            async with self.db.begin():
-                # Check for code conflicts first
-                await self._check_code_conflicts(site_id, units_data)
+            # Check for code conflicts first
+            await self._check_code_conflicts(site_id, units_data)
                 
-                # Generate sequential codes if not provided
-                units_with_codes = await self._generate_sequential_codes(site_id, units_data)
+            # Generate sequential codes if not provided
+            units_with_codes = await self._generate_sequential_codes(site_id, units_data)
                 
-                # Create units
-                created_units = await self._bulk_create_units(site_id, units_with_codes)
+            # Create units
+            created_units = await self._bulk_create_units(site_id, units_with_codes)
                 
-                # Create relationships
-                created_relationships = await self._bulk_create_relationships(
+            # Create relationships
+            created_relationships = await self._bulk_create_relationships(
                     created_units, relationships_data
-                )
+            )
                 
-                # Validate relationships for cycles
-                await self.validate_stratigraphic_relationships(created_units, created_relationships)
+            # Validate relationships for cycles
+            await self.validate_stratigraphic_relationships(created_units, created_relationships)
                 
-                result = {
+            result = {
                     'created_units': len(created_units),
                     'created_relationships': len(created_relationships),
                     'unit_mapping': {unit['temp_id']: unit['id'] for unit in created_units},
                     'relationship_mapping': {rel['temp_id']: rel['id'] for rel in created_relationships},
                     'units': created_units,
                     'relationships': created_relationships
-                }
+            }
                 
-                logger.info(f"Bulk creation completed successfully: {result}")
-                return result
+            logger.info(f"Bulk creation completed successfully: {result}")
+            return result
                 
         except Exception as e:
             logger.error(f"Error in bulk creation for site {site_id}: {str(e)}")
