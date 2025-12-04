@@ -341,6 +341,80 @@
         width: 280px;
     }
 }
+
+/* ========================================
+   MAGNETIC SNAP STYLES
+   ======================================== */
+
+/* Linea guida orizzontale per allineamento */
+#alignment-guide-horizontal {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #a78bfa 15%, #a78bfa 85%, transparent 100%);
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 0 10px rgba(167, 139, 250, 0.7);
+    display: none;
+    transition: top 0.05s ease-out;
+}
+
+/* Linea guida verticale per allineamento (opzionale) */
+#alignment-guide-vertical {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, transparent 0%, #34d399 15%, #34d399 85%, transparent 100%);
+    pointer-events: none;
+    z-index: 100;
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.7);
+    display: none;
+    transition: left 0.05s ease-out;
+}
+
+/* Indicatore di snap attivo sul nodo */
+.node-snapped {
+    box-shadow: 0 0 15px rgba(167, 139, 250, 0.8) !important;
+}
+
+/* Indicatore sul nodo di riferimento */
+.node-snap-target {
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.6) !important;
+}
+
+/* Animazione pulse per feedback visivo */
+@keyframes magnetic-pulse {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(167, 139, 250, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(167, 139, 250, 0.9);
+    }
+}
+
+.magnetic-active {
+    animation: magnetic-pulse 0.8s ease-in-out infinite;
+}
+
+/* Indicatore distanza snap nelle impostazioni */
+.snap-distance-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 45px;
+    padding: 2px 8px;
+    background: #e0e7ff;
+    border-radius: 4px;
+    font-weight: 600;
+    color: #4338ca;
+}
+
+.dark .snap-distance-indicator {
+    background: #3730a3;
+    color: #c7d2fe;
+}
 </style>
 {% endblock %}
 
@@ -500,17 +574,15 @@
                 <div class="space-y-2">
                     <label class="flex items-center">
                         <input type="checkbox" x-model="settings.gridSnap" class="mr-2">
-                        <span class="text-sm text-gray-700 dark:text-gray-300">Enable Grid Snap</span>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">
+                            <i class="fas fa-th mr-2 text-gray-500"></i>
+                            Enable Grid Snap
+                        </span>
                     </label>
-                    
+
                     <!-- Magnetic Snap Toggle -->
                     <label class="flex items-center">
-                        <input
-                            type="checkbox"
-                            x-model="settings.magneticSnap"
-                            class="mr-2"
-                            title="Attira nodi vicini orizzontalmente">
-
+                        <input type="checkbox" x-model="settings.magneticSnap" class="mr-2">
                         <span class="text-sm text-gray-700 dark:text-gray-300">
                             <i class="fas fa-magnet mr-2 text-purple-500"></i>
                             Magnetic Snap Orizzontale
@@ -518,25 +590,57 @@
                     </label>
 
                     <!-- Magnetic Snap Distance Slider -->
-                    <div class="flex items-center gap-2" x-show="settings.magneticSnap">
-                        <label class="text-xs font-medium text-gray-600 dark:text-gray-400 w-24">
-                            Distanza:
+                    <div class="pl-6 space-y-2" x-show="settings.magneticSnap" x-cloak>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">
+                                Distanza Y
+                            </label>
+                            <input
+                                type="range"
+                                x-model.number="settings.magneticSnapDistance"
+                                min="10"
+                                max="100"
+                                step="5"
+                                class="flex-1 h-2 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                            >
+                            <span class="snap-distance-indicator" x-text="settings.magneticSnapDistance + 'px'"></span>
+                        </div>
+
+                        <!-- Vertical Snap Toggle -->
+                        <label class="flex items-center">
+                            <input type="checkbox" x-model="settings.magneticSnapVertical" class="mr-2">
+                            <span class="text-xs text-gray-600 dark:text-gray-400">
+                                <i class="fas fa-arrows-alt-v mr-1 text-green-500"></i>
+                                Anche verticale (colonne)
+                            </span>
                         </label>
 
-                        <input
-                            type="range"
-                            x-model.number="settings.magneticSnapDistance"
-                            min="10"
-                            max="100"
-                            step="5"
-                            class="flex-1 h-2 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
-                            title="Aumenta per attirare da più lontano">
+                        <!-- Vertical Snap Distance -->
+                        <div class="flex items-center gap-2" x-show="settings.magneticSnapVertical">
+                            <label class="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">
+                                Distanza X
+                            </label>
+                            <input
+                                type="range"
+                                x-model.number="settings.magneticSnapVerticalDistance"
+                                min="20"
+                                max="150"
+                                step="10"
+                                class="flex-1 h-2 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                            >
+                            <span class="snap-distance-indicator" x-text="settings.magneticSnapVerticalDistance + 'px'"></span>
+                        </div>
 
-                        <span class="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
-                            x-text="settings.magneticSnapDistance + 'px'"
-                        </span>
+                        <!-- Show Alignment Guides -->
+                        <label class="flex items-center">
+                            <input type="checkbox" x-model="settings.showAlignmentGuides" class="mr-2">
+                            <span class="text-xs text-gray-600 dark:text-gray-400">
+                                <i class="fas fa-ruler-horizontal mr-1 text-blue-500"></i>
+                                Mostra linee guida
+                            </span>
+                        </label>
                     </div>
-                    
+
                     <label class="flex items-center">
                         <input type="checkbox" x-model="settings.showLabels" @change="updateNodeStyles()" class="mr-2">
                         <span class="text-sm text-gray-700 dark:text-gray-300">Show Labels</span>
@@ -625,6 +729,32 @@
                     title="Move Nodes">
                     <i class="fas fa-arrows-alt"></i>
                     <span>Move</span>
+                </button>
+
+                <!-- Separator -->
+                <div class="border-l border-gray-300 mx-2"></div>
+
+                <!-- Alignment Tools -->
+                <button
+                    @click="alignSelectedNodesHorizontally()"
+                    class="editor-btn"
+                    :disabled="cy?.nodes(':selected').length < 2"
+                    :class="{'opacity-50 cursor-not-allowed': cy?.nodes(':selected').length < 2}"
+                    title="Allinea nodi selezionati orizzontalmente"
+                >
+                    <i class="fas fa-align-center text-purple-500"></i>
+                    <span>Align H</span>
+                </button>
+
+                <button
+                    @click="distributeSelectedNodesHorizontally()"
+                    class="editor-btn"
+                    :disabled="cy?.nodes(':selected').length < 3"
+                    :class="{'opacity-50 cursor-not-allowed': cy?.nodes(':selected').length < 3}"
+                    title="Distribuisci nodi selezionati uniformemente"
+                >
+                    <i class="fas fa-arrows-alt-h text-green-500"></i>
+                    <span>Distribute</span>
                 </button>
 
                 <!-- Separator -->
@@ -791,6 +921,28 @@
                     </div>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Stile corrente per le relazioni stratigrafiche
+                    </p>
+                </div>
+            </div>
+
+            <!-- Magnetic Snap Info -->
+            <div class="mb-6" x-show="settings.magneticSnap">
+                <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    <i class="fas fa-magnet mr-2 text-purple-500"></i>
+                    Magnetic Snap
+                </h4>
+                <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-xs text-gray-600 dark:text-gray-400">
+                    <p class="mb-2">
+                        Quando trascini un nodo vicino ad altri, si allineerà automaticamente:
+                    </p>
+                    <ul class="space-y-1 ml-4 list-disc">
+                        <li><span class="text-purple-600 dark:text-purple-400 font-medium">Linea viola</span> = stessa riga (Y)</li>
+                        <li x-show="settings.magneticSnapVertical">
+                            <span class="text-green-600 dark:text-green-400 font-medium">Linea verde</span> = stessa colonna (X)
+                        </li>
+                    </ul>
+                    <p class="mt-2 text-gray-500 dark:text-gray-500">
+                        Distanza attrazione: <span class="font-medium" x-text="settings.magneticSnapDistance + 'px'"></span>
                     </p>
                 </div>
             </div>
@@ -1004,8 +1156,21 @@ function harrisMatrixEditor() {
             validateRelationships: true,
             preventCycles: true,
             edgeCurveStyle: 'taxi',
-            magneticSnap: true,      // ✅ Abilita magnetic snap
-            magneticSnapDistance: 30  // ✅ Distanza attrazione (px)
+            // Magnetic Snap Settings - ENHANCED
+            magneticSnap: true,
+            magneticSnapDistance: 30,      // Distanza soglia per snap orizzontale (Y)
+            magneticSnapVertical: false,   // Abilita anche snap verticale (X)
+            magneticSnapVerticalDistance: 50, // Distanza soglia per snap verticale
+            showAlignmentGuides: true,     // Mostra linee guida durante snap
+            snapToLevels: true,            // Snap ai livelli cronologici calcolati
+        },
+
+        // Stato per tracking degli snap
+        snapState: {
+            isSnapping: false,
+            snapTargetNode: null,
+            snapAxis: null,  // 'horizontal', 'vertical', 'both'
+            originalY: null,
         },
 
         // Confirmation dialog state
@@ -1108,52 +1273,69 @@ this.cy.on('mouseout', 'edge', (evt) => {
 
 
 
-            // Drag handling for move mode
+            // ========================================
+            // DRAG HANDLING - ENHANCED WITH MAGNETIC SNAP
+            // ========================================
+
+            // Inizio drag
+            this.cy.on('grab', 'node', (evt) => {
+                if (this.editMode !== 'move') return;
+
+                const node = evt.target;
+                // Salva posizione originale per eventuale undo
+                this.snapState.originalY = node.position('y');
+
+                console.log(`🎯 Drag started: ${node.data('label')}`);
+            });
+
+            // Durante il drag
             this.cy.on('drag', 'node', (evt) => {
                 if (this.editMode !== 'move') return;
 
-                let pos = evt.position;
                 const movedNode = evt.target;
+                let pos = { ...evt.position };
 
-                // Grid snap (se abilitato)
+                // Grid snap se abilitato
                 if (this.settings.gridSnap) {
                     const gridSize = 20;
-                    pos = {
-                        x: Math.round(pos.x / gridSize) * gridSize,
-                        y: Math.round(pos.y / gridSize) * gridSize
-                    };
+                    pos.x = Math.round(pos.x / gridSize) * gridSize;
+                    pos.y = Math.round(pos.y / gridSize) * gridSize;
                 }
 
-                // Magnetic snap orizzontale (se abilitato)
+                // Magnetic snap se abilitato
                 if (this.settings.magneticSnap) {
                     pos = this.magneticSnapNode(movedNode, pos);
                 }
 
-                evt.position = pos;
+                // IMPORTANTE: Aggiorna effettivamente la posizione del nodo
+                movedNode.position(pos);
             });
 
-            // End drag - ripristina stili
+            // Fine drag
             this.cy.on('free', 'node', (evt) => {
+                if (this.editMode !== 'move') return;
+
                 const node = evt.target;
-                
-                // Ripristina stile originale
-                node.style('border-width', 3);
-                
-                // Ripristina colore basato sul tipo
-                const nodeType = node.data('type');
-                const nodeData = node.data();
-                
-                let borderColor = '#1e40af'; // default
-                
-                if (nodeType === 'us') {
-                    borderColor = nodeData.tipo === 'positiva' ? '#1e40af' : '#991b1b';
-                } else if (nodeType === 'usm') {
-                    borderColor = '#6d28d9';
+
+                // Pulisci tutti gli highlights e guide
+                this.resetAllNodeStyles();
+                this.hideAllAlignmentGuides();
+                this.clearSnapHighlights();
+
+                // Reset stato snap
+                this.snapState.isSnapping = false;
+                this.snapState.snapTargetNode = null;
+
+                // Log posizione finale
+                const finalPos = node.position();
+                console.log(`✅ Drag ended: ${node.data('label')} at (${Math.round(finalPos.x)}, ${Math.round(finalPos.y)})`);
+
+                // Trova e logga nodi allineati
+                const alignedNodes = this.findNodesOnSameRow(finalPos.y, 5);
+                if (alignedNodes.length > 1) {
+                    const labels = alignedNodes.map(n => n.data('label')).join(', ');
+                    console.log(`📐 Nodi allineati sulla stessa riga: ${labels}`);
                 }
-                
-                node.style('border-color', borderColor);
-                
-                console.log('✓ Drag ended, styles restored');
             });
 
             // Background click - deselect
@@ -1783,61 +1965,286 @@ this.cy.on('mouseout', 'edge', (evt) => {
             this.cy.edges().style('taxi-gap', 5);
         },
 
-        // Magnetic snap - attira nodi vicini in orizzontale
+        // ========================================
+        // MAGNETIC SNAP SYSTEM
+        // ========================================
+
+        /**
+         * Sistema di snap magnetico per allineare nodi sulla stessa riga/colonna
+         * @param {Object} movedNode - Il nodo Cytoscape che viene trascinato
+         * @param {Object} position - Posizione corrente {x, y}
+         * @returns {Object} Posizione snappata {x, y}
+         */
         magneticSnapNode(movedNode, position) {
-            const threshold = this.settings.magneticSnapDistance;
+            const thresholdY = this.settings.magneticSnapDistance;
+            const thresholdX = this.settings.magneticSnapVerticalDistance;
             const allNodes = this.cy.nodes();
 
-            let snappedX = position.x;
-            let snappedY = position.y;
-            let closestDistance = Infinity;
-            let closestNode = null;
+            let snappedPos = { x: position.x, y: position.y };
+            let snapTargetH = null;  // Target per snap orizzontale
+            let snapTargetV = null;  // Target per snap verticale
+            let minYDistance = Infinity;
+            let minXDistance = Infinity;
 
-            // Cerca il nodo più vicino in orizzontale
-            allNodes.forEach((node) => {
+            // Resetta stato precedente
+            this.clearSnapHighlights();
+
+            // Itera su tutti i nodi per trovare candidati di snap
+            allNodes.forEach(node => {
                 // Salta il nodo che stai trascinando
                 if (node.id() === movedNode.id()) return;
 
                 const otherPos = node.position();
-                const verticalDistance = Math.abs(otherPos.y - position.y);
-                const horizontalDistance = Math.abs(otherPos.x - position.x);
+                const yDistance = Math.abs(otherPos.y - position.y);
+                const xDistance = Math.abs(otherPos.x - position.x);
 
-                // Verifica se è entro la soglia di attrazione
-                // (verticalmente vicino + orizzontalmente il più vicino)
-                if (verticalDistance < threshold && horizontalDistance < closestDistance) {
-                    closestDistance = horizontalDistance;
-                    closestNode = node;
+                // SNAP ORIZZONTALE (stessa riga Y)
+                if (yDistance < thresholdY && yDistance < minYDistance) {
+                    minYDistance = yDistance;
+                    snappedPos.y = otherPos.y;
+                    snapTargetH = node;
+                }
+
+                // SNAP VERTICALE (stessa colonna X) - se abilitato
+                if (this.settings.magneticSnapVertical) {
+                    if (xDistance < thresholdX && xDistance < minXDistance) {
+                        minXDistance = xDistance;
+                        snappedPos.x = otherPos.x;
+                        snapTargetV = node;
+                    }
                 }
             });
 
-            // Se entro soglia, attira orizzontalmente
-            if (closestNode && closestDistance < threshold) {
-                snappedX = closestNode.position().x;
+            // Applica feedback visivo
+            this.applySnapFeedback(movedNode, snapTargetH, snapTargetV, snappedPos);
 
-                // Visualizza attrazione con stile viola
+            // Aggiorna stato snap
+            this.snapState.isSnapping = (snapTargetH !== null || snapTargetV !== null);
+            this.snapState.snapTargetNode = snapTargetH || snapTargetV;
+
+            return snappedPos;
+        },
+
+        /**
+         * Applica feedback visivo durante lo snap
+         */
+        applySnapFeedback(movedNode, snapTargetH, snapTargetV, snappedPos) {
+            // Stile per il nodo trascinato quando snappa
+            if (snapTargetH || snapTargetV) {
                 movedNode.style('border-width', 4);
                 movedNode.style('border-color', '#a78bfa');
-
-                // Log per debug
-                console.log(`🧲 Magnetic snap attivo: ${Math.round(closestDistance)}px`);
-            } else {
-                // Ripristina stile se non attratti
-                const nodeType = movedNode.data('type');
-                const nodeData = movedNode.data();
-                
-                let borderColor = '#1e40af'; // default
-                
-                if (nodeType === 'us') {
-                    borderColor = nodeData.tipo === 'positiva' ? '#1e40af' : '#991b1b';
-                } else if (nodeType === 'usm') {
-                    borderColor = '#6d28d9';
-                }
-                
-                movedNode.style('border-width', 3);
-                movedNode.style('border-color', borderColor);
+                movedNode.addClass('magnetic-active');
             }
 
-            return { x: snappedX, y: snappedY };
+            // Evidenzia nodo target orizzontale
+            if (snapTargetH) {
+                snapTargetH.style('border-color', '#a78bfa');
+                snapTargetH.style('border-width', 4);
+                snapTargetH.addClass('node-snap-target');
+
+                // Mostra linea guida orizzontale
+                if (this.settings.showAlignmentGuides) {
+                    this.showAlignmentGuide('horizontal', snappedPos.y);
+                }
+
+                console.log(`🧲 Snap H: allineato a ${snapTargetH.data('label')} (Y: ${Math.round(snappedPos.y)}px)`);
+            } else {
+                this.hideAlignmentGuide('horizontal');
+            }
+
+            // Evidenzia nodo target verticale
+            if (snapTargetV) {
+                snapTargetV.style('border-color', '#34d399');
+                snapTargetV.style('border-width', 4);
+                snapTargetV.addClass('node-snap-target');
+
+                // Mostra linea guida verticale
+                if (this.settings.showAlignmentGuides) {
+                    this.showAlignmentGuide('vertical', snappedPos.x);
+                }
+
+                console.log(`🧲 Snap V: allineato a ${snapTargetV.data('label')} (X: ${Math.round(snappedPos.x)}px)`);
+            } else {
+                this.hideAlignmentGuide('vertical');
+            }
+        },
+
+        /**
+         * Pulisce gli highlight di snap da tutti i nodi
+         */
+        clearSnapHighlights() {
+            this.cy.nodes().forEach(node => {
+                node.removeClass('magnetic-active');
+                node.removeClass('node-snap-target');
+            });
+        },
+
+        /**
+         * Ripristina lo stile originale di un nodo
+         */
+        resetNodeStyle(node) {
+            const nodeType = node.data('type');
+            const nodeData = node.data();
+            let borderColor = '#1e40af'; // default blue
+
+            if (nodeType === 'us') {
+                borderColor = nodeData.tipo === 'positiva' ? '#1e40af' : '#991b1b';
+            } else if (nodeType === 'usm') {
+                borderColor = '#6d28d9';
+            }
+
+            node.style('border-width', 3);
+            node.style('border-color', borderColor);
+            node.removeClass('magnetic-active');
+            node.removeClass('node-snap-target');
+        },
+
+        /**
+         * Ripristina stili di tutti i nodi
+         */
+        resetAllNodeStyles() {
+            this.cy.nodes().forEach(node => {
+                this.resetNodeStyle(node);
+            });
+        },
+
+        /**
+         * Mostra linea guida di allineamento
+         * @param {string} axis - 'horizontal' o 'vertical'
+         * @param {number} position - Posizione nel canvas (Y per horizontal, X per vertical)
+         */
+        showAlignmentGuide(axis, position) {
+            const guideId = `alignment-guide-${axis}`;
+            let guide = document.getElementById(guideId);
+
+            // Crea la linea guida se non esiste
+            if (!guide) {
+                guide = document.createElement('div');
+                guide.id = guideId;
+                const container = document.getElementById('cy').parentElement;
+                container.appendChild(guide);
+            }
+
+            // Converti posizione del grafo in posizione dello schermo
+            const pan = this.cy.pan();
+            const zoom = this.cy.zoom();
+
+            if (axis === 'horizontal') {
+                const screenY = (position * zoom) + pan.y;
+                guide.style.cssText = `
+                    position: absolute;
+                    left: 0;
+                    right: 0;
+                    height: 2px;
+                    background: linear-gradient(90deg, transparent 0%, #a78bfa 15%, #a78bfa 85%, transparent 100%);
+                    pointer-events: none;
+                    z-index: 100;
+                    box-shadow: 0 0 10px rgba(167, 139, 250, 0.7);
+                    top: ${screenY}px;
+                    display: block;
+                `;
+            } else {
+                const screenX = (position * zoom) + pan.x;
+                guide.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    bottom: 0;
+                    width: 2px;
+                    background: linear-gradient(180deg, transparent 0%, #34d399 15%, #34d399 85%, transparent 100%);
+                    pointer-events: none;
+                    z-index: 100;
+                    box-shadow: 0 0 10px rgba(52, 211, 153, 0.7);
+                    left: ${screenX}px;
+                    display: block;
+                `;
+            }
+        },
+
+        /**
+         * Nasconde linea guida
+         * @param {string} axis - 'horizontal' o 'vertical'
+         */
+        hideAlignmentGuide(axis) {
+            const guide = document.getElementById(`alignment-guide-${axis}`);
+            if (guide) {
+                guide.style.display = 'none';
+            }
+        },
+
+        /**
+         * Nasconde tutte le linee guida
+         */
+        hideAllAlignmentGuides() {
+            this.hideAlignmentGuide('horizontal');
+            this.hideAlignmentGuide('vertical');
+        },
+
+        /**
+         * Trova nodi allineati sulla stessa riga Y
+         * @param {number} targetY - Coordinata Y
+         * @param {number} tolerance - Tolleranza in pixel
+         * @returns {Array} Array di nodi allineati
+         */
+        findNodesOnSameRow(targetY, tolerance = 5) {
+            const alignedNodes = [];
+            this.cy.nodes().forEach(node => {
+                const nodeY = node.position('y');
+                if (Math.abs(nodeY - targetY) <= tolerance) {
+                    alignedNodes.push(node);
+                }
+            });
+            return alignedNodes;
+        },
+
+        /**
+         * Allinea automaticamente tutti i nodi selezionati alla stessa Y
+         */
+        alignSelectedNodesHorizontally() {
+            const selectedNodes = this.cy.nodes(':selected');
+            if (selectedNodes.length < 2) {
+                alert('Seleziona almeno 2 nodi da allineare');
+                return;
+            }
+
+            // Usa la Y media come riferimento
+            let totalY = 0;
+            selectedNodes.forEach(node => {
+                totalY += node.position('y');
+            });
+            const avgY = totalY / selectedNodes.length;
+
+            // Allinea tutti i nodi
+            selectedNodes.forEach(node => {
+                node.position('y', avgY);
+            });
+
+            console.log(`✅ Allineati ${selectedNodes.length} nodi a Y=${Math.round(avgY)}`);
+        },
+
+        /**
+         * Distribuisce uniformemente i nodi selezionati orizzontalmente
+         */
+        distributeSelectedNodesHorizontally() {
+            const selectedNodes = this.cy.nodes(':selected');
+            if (selectedNodes.length < 3) {
+                alert('Seleziona almeno 3 nodi da distribuire');
+                return;
+            }
+
+            // Ordina per X
+            const sortedNodes = selectedNodes.toArray().sort((a, b) =>
+                a.position('x') - b.position('x')
+            );
+
+            const firstX = sortedNodes[0].position('x');
+            const lastX = sortedNodes[sortedNodes.length - 1].position('x');
+            const spacing = (lastX - firstX) / (sortedNodes.length - 1);
+
+            sortedNodes.forEach((node, index) => {
+                node.position('x', firstX + (spacing * index));
+            });
+
+            console.log(`✅ Distribuiti ${selectedNodes.length} nodi con spacing=${Math.round(spacing)}px`);
         },
 
         // Get Cytoscape styles

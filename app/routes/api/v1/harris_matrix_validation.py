@@ -3,8 +3,15 @@
 API Routes for Harris Matrix Reference Validation and Cleanup
 
 This module provides REST API endpoints for validating and cleaning up broken
-references in the Harris Matrix system. It integrates with the enhanced unit
-resolver service to provide comprehensive reference management.
+references in the Harris Matrix system. It integrates with both the enhanced unit
+resolver service and the centralized stratigraphy utilities from
+app.utils.stratigraphy_helpers to provide comprehensive reference management.
+
+The module now includes enhanced validation capabilities using centralized utilities:
+- Cycle detection with CycleDetector
+- Business rules validation with StratigraphicRulesValidator
+- Comprehensive validation with validate_stratigraphic_data()
+- Enhanced error handling with specialized exception classes
 
 Endpoints:
 - GET /api/v1/harris-matrix/validation/sites/{site_id} - Validate specific site
@@ -13,6 +20,8 @@ Endpoints:
 - GET /api/v1/harris-matrix/validation/statistics/{site_id} - Reference statistics
 - POST /api/v1/harris-matrix/validation/backup/{site_id} - Create backup
 - POST /api/v1/harris-matrix/validation/restore/{site_id} - Restore from backup
+- GET /api/v1/harris-matrix/validation/comprehensive/{site_id} - Comprehensive validation
+- POST /api/v1/harris-matrix/validation/validate-business-rules/{site_id} - Business rules validation
 """
 
 from datetime import datetime
@@ -27,12 +36,19 @@ from loguru import logger
 from app.database.db import get_async_db
 from app.services.harris_matrix_unit_resolver import UnitResolver
 from app.utils.stratigraphy_helpers import (
-    UnitLookupService,
     CycleDetector,
     StratigraphicRulesValidator,
     validate_stratigraphic_data,
-    create_unit_lookup_service,
-    create_rules_validator
+    create_rules_validator,
+    parse_target_reference,
+    get_default_sequenza_fisica
+)
+from app.exceptions import (
+    HarrisMatrixValidationError,
+    StratigraphicCycleDetected,
+    UnitCodeConflict,
+    InvalidStratigraphicRelation,
+    HarrisMatrixServiceError
 )
 from app.core.security import get_current_user
 from app.models.users import User
@@ -126,10 +142,21 @@ class BackupResult(BaseModel):
     error: Optional[str] = None
 
 
+class ComprehensiveValidationResult(BaseModel):
+    """Model for comprehensive validation results using centralized utilities."""
+    site_id: str
+    validation_timestamp: str
+    is_valid: bool
+    errors: List[str]
+    warnings: List[str]
+    business_rules: Dict[str, Any]
+    statistics: Dict[str, Any]
+
+
 # Utility Functions
-async def get_unit_lookup_service(db: AsyncSession) -> UnitLookupService:
-    """Get unit lookup service instance."""
-    return create_unit_lookup_service(db)
+async def get_unit_resolver(db: AsyncSession) -> UnitResolver:
+    """Get unit resolver instance."""
+    return UnitResolver(db)
 
 
 # API Endpoints
@@ -158,7 +185,7 @@ async def validate_site_references(
     try:
         logger.info(f"User {current_user.id} validating references for site {site_id}")
         
-        resolver = await get_unit_lookup_service(db)
+        resolver = await get_unit_resolver(db)
         
         # Perform validation
         broken_refs = await resolver.validate_references(site_id)
@@ -234,7 +261,7 @@ async def validate_all_sites(
     try:
         logger.info(f"User {current_user.id} starting batch validation")
         
-        resolver = await get_unit_lookup_service(db)
+        resolver = await get_unit_resolver(db)
         
         # Determine which sites to validate
         if request.site_ids:
@@ -341,7 +368,7 @@ async def cleanup_site_references(
     try:
         logger.info(f"User {current_user.id} cleaning up references for site {site_id}")
         
-        resolver = await get_unit_lookup_service(db)
+        resolver = await get_unit_resolver(db)
         
         # Create backup if requested
         backup_info = None
@@ -417,7 +444,7 @@ async def get_site_statistics(
     try:
         logger.info(f"User {current_user.id} getting statistics for site {site_id}")
         
-        resolver = await get_unit_lookup_service(db)
+        resolver = await get_unit_resolver(db)
         stats = await resolver.get_reference_statistics(site_id)
         
         result = StatisticsResult(
@@ -459,7 +486,7 @@ async def create_site_backup(
     try:
         logger.info(f"User {current_user.id} creating backup for site {site_id}")
         
-        resolver = await get_unit_lookup_service(db)
+        resolver = await get_unit_resolver(db)
         backup_info = await resolver.create_reference_backup(site_id)
         
         result = BackupResult(
@@ -509,7 +536,7 @@ async def restore_site_backup(
     try:
         logger.info(f"User {current_user.id} restoring backup for site {site_id}")
         
-        resolver = await get_unit_lookup_service(db)
+        resolver = await get_unit_resolver(db)
         restore_stats = await resolver.restore_reference_backup(site_id, backup_data)
         
         # Calculate unit counts from restore stats
@@ -558,7 +585,7 @@ async def get_site_health_check(
         Simple health check result
     """
     try:
-        resolver = await get_unit_lookup_service(db)
+        resolver = await get_unit_resolver(db)
         
         # Get basic statistics (lighter than full validation)
         stats = await resolver.get_reference_statistics(site_id)
@@ -598,6 +625,126 @@ async def get_site_health_check(
             "message": f"Health check failed: {str(e)}",
             "timestamp": datetime.now().isoformat()
         }
+
+
+@router.get("/comprehensive/{site_id}", response_model=ComprehensiveValidationResult)
+async def validate_site_comprehensive(
+    site_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Perform comprehensive validation using centralized stratigraphy utilities.
+    
+    This endpoint uses the enhanced validation capabilities from stratigraphy_helpers
+    to provide deeper analysis including business rules validation, cycle detection,
+    and comprehensive data integrity checks.
+    
+    Args:
+        site_id: UUID of the archaeological site
+        
+    Returns:
+        ComprehensiveValidationResult with detailed validation information
+    """
+    try:
+        logger.info(f"User {current_user.id} performing comprehensive validation for site {site_id}")
+        
+        # Convert site_id to UUID
+        site_uuid = UUID(site_id)
+        
+        # Use the comprehensive validation function
+        validation_result = await validate_stratigraphic_data(db, site_uuid)
+        
+        # Format result
+        result = ComprehensiveValidationResult(
+            site_id=site_id,
+            validation_timestamp=validation_result.get('validation_timestamp', datetime.now().isoformat()),
+            is_valid=validation_result['is_valid'],
+            errors=validation_result['errors'],
+            warnings=validation_result['warnings'],
+            business_rules=validation_result['business_rules'],
+            statistics=validation_result['statistics']
+        )
+        
+        logger.info(f"Comprehensive validation completed for site {site_id}: {'PASS' if validation_result['is_valid'] else 'FAIL'}")
+        return result
+        
+    except (HarrisMatrixValidationError, StratigraphicCycleDetected,
+            InvalidStratigraphicRelation, UnitCodeConflict) as e:
+        # Handle specific stratigraphy validation errors
+        logger.error(f"Stratigraphy validation error for site {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Validation failed: {str(e)}"
+        )
+    except HarrisMatrixServiceError as e:
+        # Handle service-level errors
+        logger.error(f"Harris Matrix service error for site {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Service unavailable: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in comprehensive validation for site {site_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Comprehensive validation error: {str(e)}"
+        )
+
+
+@router.post("/validate-business-rules/{site_id}")
+async def validate_business_rules(
+    site_id: str,
+    units_data: Optional[List[Dict[str, Any]]] = None,
+    relationships_data: Optional[List[Dict[str, Any]]] = None,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Validate business rules for stratigraphic relationships.
+    
+    This endpoint uses the centralized StratigraphicRulesValidator to ensure
+    that all relationships follow archaeological principles and domain constraints.
+    
+    Args:
+        site_id: UUID of the archaeological site
+        units_data: Optional list of units to validate (if not provided, uses existing units)
+        relationships_data: Optional list of relationships to validate
+        
+    Returns:
+        Business rules validation result
+    """
+    try:
+        logger.info(f"User {current_user.id} validating business rules for site {site_id}")
+        
+        # Convert site_id to UUID
+        site_uuid = UUID(site_id)
+        
+        # Use the comprehensive validation which includes business rules
+        validation_result = await validate_stratigraphic_data(db, site_uuid, units_data, relationships_data)
+        
+        return {
+            "site_id": site_id,
+            "validation_timestamp": validation_result.get('validation_timestamp', datetime.now().isoformat()),
+            "business_rules_passed": validation_result['is_valid'],
+            "business_rule_violations": validation_result['business_rules'],
+            "errors": validation_result['errors'],
+            "warnings": validation_result['warnings']
+        }
+        
+    except (InvalidStratigraphicRelation, UnitCodeConflict) as e:
+        # Handle specific business rule violations
+        logger.error(f"Business rules violation for site {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Business rules validation failed: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error validating business rules for site {site_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Business rules validation error: {str(e)}"
+        )
 
 
 # Helper Functions
