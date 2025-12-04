@@ -22,6 +22,21 @@ from loguru import logger
 
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
 from app.services.harris_matrix_unit_resolver import UnitResolver
+from app.utils.stratigraphy_helpers import (
+    UnitLookupService,
+    StratigraphicGraphBuilder,
+    CycleDetector,
+    StratigraphicRulesValidator,
+    RELATIONSHIP_TYPES,
+    DIRECTED_RELATIONSHIPS,
+    REVERSE_DIRECTED_RELATIONSHIPS,
+    BIDIRECTIONAL_RELATIONSHIPS,
+    VALID_RELATIONSHIP_TYPES,
+    get_default_sequenza_fisica,
+    parse_target_reference,
+    build_nodes_for_graph,
+    build_edges_from_relationships
+)
 from app.exceptions import (
     HarrisMatrixValidationError,
     StratigraphicCycleDetected,
@@ -39,69 +54,18 @@ class HarrisMatrixService:
     relationships to create chronological graphs suitable for visualization.
     """
     
-    # Relationship type mappings from sequenza_fisica JSON
-    RELATIONSHIP_TYPES = {
-        'uguale_a': {
-            'label': 'uguale a',
-            'bidirectional': True,
-            'description': 'Equal to (contemporaneous)'
-        },
-        'si_lega_a': {
-            'label': 'si lega a',
-            'bidirectional': True,
-            'description': 'Bonds with'
-        },
-        'gli_si_appoggia': {
-            'label': 'gli si appoggia',
-            'bidirectional': True,
-            'description': 'Others rest on this'
-        },
-        'si_appoggia_a': {
-            'label': 'si appoggia a',
-            'bidirectional': False,
-            'description': 'This unit rests on others'
-        },
-        'coperto_da': {
-            'label': 'coperto da',
-            'bidirectional': False,
-            'description': 'Covered by'
-        },
-        'copre': {
-            'label': 'copre',
-            'bidirectional': False,
-            'description': 'Covers'
-        },
-        'tagliato_da': {
-            'label': 'tagliato da',
-            'bidirectional': False,
-            'description': 'Cut by'
-        },
-        'taglia': {
-            'label': 'taglia',
-            'bidirectional': False,
-            'description': 'Cuts'
-        },
-        'riempito_da': {
-            'label': 'riempito da',
-            'bidirectional': False,
-            'description': 'Filled by'
-        },
-        'riempie': {
-            'label': 'riempie',
-            'bidirectional': False,
-            'description': 'Fills'
-        }
-    }
-    
     def __init__(self, db: AsyncSession):
         """
-        Initialize the Harris Matrix service with enhanced unit resolver.
+        Initialize the Harris Matrix service with enhanced unit resolver and centralized utilities.
         
         Args:
             db: AsyncSession for database operations
         """
         self.db = db
         self.unit_resolver = UnitResolver(db)
+        self.unit_lookup = UnitLookupService(db)
+        self.graph_builder = StratigraphicGraphBuilder(self.unit_lookup)
+        self.rules_validator = StratigraphicRulesValidator()
     
     async def generate_harris_matrix(self, site_id: UUID) -> Dict[str, Any]:
         """
@@ -117,8 +81,8 @@ class HarrisMatrixService:
             logger.info(f"Generating Harris Matrix for site_id: {site_id}")
             logger.info(f"DEBUG: Logging level set to DEBUG for troubleshooting")
             
-            # Query all US and USM units for the site
-            us_units, usm_units = await self._query_stratigraphic_units(site_id)
+            # Query all US and USM units for the site using centralized service
+            us_units, usm_units = await self.unit_lookup.get_units_by_site(site_id)
             
             if not us_units and not usm_units:
                 logger.warning(f"No stratigraphic units found for site_id: {site_id}")
@@ -127,12 +91,12 @@ class HarrisMatrixService:
             # Extract relationships from sequenza_fisica
             relationships = await self._extract_relationships(us_units, usm_units)
             
-            # Build graph data structures
-            nodes = self._build_nodes(us_units, usm_units)
-            edges = self._build_edges(relationships)
+            # Build graph data structures using centralized utilities
+            nodes = build_nodes_for_graph(us_units, usm_units)
+            edges = build_edges_from_relationships(relationships)
             
             # Calculate chronological levels using topological sort
-            levels = self._calculate_chronological_levels(nodes, edges)
+            levels = self.graph_builder.calculate_chronological_levels(nodes, edges)
             
             # Generate metadata with US positive/negative counts
             us_positive = sum(1 for us in us_units if us.tipo == 'positiva')
@@ -162,48 +126,6 @@ class HarrisMatrixService:
             logger.error(f"Error generating Harris Matrix for site_id {site_id}: {str(e)}")
             raise
     
-    async def _query_stratigraphic_units(
-        self, 
-        site_id: UUID
-    ) -> Tuple[List[UnitaStratigrafica], List[UnitaStratigraficaMuraria]]:
-        """
-        Query all US and USM units for a site with eager loading.
-        
-        Args:
-            site_id: UUID of the archaeological site
-            
-        Returns:
-            Tuple of (US units list, USM units list)
-        """
-        try:
-            # Query US units
-            us_query = select(UnitaStratigrafica).where(
-                and_(
-                    UnitaStratigrafica.site_id == str(site_id),
-                    UnitaStratigrafica.deleted_at.is_(None)  # Soft delete filter
-                )
-            ).order_by(UnitaStratigrafica.us_code)
-            
-            us_result = await self.db.execute(us_query)
-            us_units = us_result.scalars().all()
-            
-            # Query USM units
-            usm_query = select(UnitaStratigraficaMuraria).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == str(site_id),
-                    UnitaStratigraficaMuraria.deleted_at.is_(None)  # Soft delete filter
-                )
-            ).order_by(UnitaStratigraficaMuraria.usm_code)
-            
-            usm_result = await self.db.execute(usm_query)
-            usm_units = usm_result.scalars().all()
-            
-            logger.info(f"Found {len(us_units)} US units and {len(usm_units)} USM units for site {site_id}")
-            return us_units, usm_units
-            
-        except Exception as e:
-            logger.error(f"Error querying stratigraphic units for site_id {site_id}: {str(e)}")
-            raise
     
     async def _extract_relationships(
         self,
@@ -222,9 +144,8 @@ class HarrisMatrixService:
         """
         relationships = []
         
-        # Create lookup dictionaries for unit codes
-        us_lookup = {us.us_code: us for us in us_units}
-        usm_lookup = {usm.usm_code: usm for usm in usm_units}
+        # Create lookup dictionaries for unit codes using centralized service
+        us_lookup, usm_lookup = self.unit_lookup.get_unit_lookup_dictionaries(us_units, usm_units)
         
         # Get site ID from first unit (all units should be from same site)
         site_id = us_units[0].site_id if us_units else (usm_units[0].site_id if usm_units else None)
@@ -285,10 +206,10 @@ class HarrisMatrixService:
         relationships = []
         
         for rel_type, targets in sequenza_fisica.items():
-            if not targets or rel_type not in self.RELATIONSHIP_TYPES:
+            if not targets or rel_type not in RELATIONSHIP_TYPES:
                 continue
             
-            rel_config = self.RELATIONSHIP_TYPES[rel_type]
+            rel_config = RELATIONSHIP_TYPES[rel_type]
             
             for target in targets:
                 # Parse target to handle cross-references like "174(usm)"
@@ -362,105 +283,9 @@ class HarrisMatrixService:
         Returns:
             Tuple of (code, type) where type is 'us' or 'usm'
         """
-        # Check for explicit type specification
-        match = re.match(r'^(\w+)\((usm?)\)$', target.lower())
-        if match:
-            code = match.group(1).upper()
-            unit_type = match.group(2)
-            return code, unit_type
-        
-        # Default to US if no type specified
-        return target.upper(), 'us'
+        return parse_target_reference(target)
     
-    def _build_nodes(
-        self,
-        us_units: List[UnitaStratigrafica],
-        usm_units: List[UnitaStratigraficaMuraria]
-    ) -> List[Dict[str, Any]]:
-        """
-        Build node list for graph visualization.
-        
-        Args:
-            us_units: List of US units
-            usm_units: List of USM units
-            
-        Returns:
-            List of node dictionaries
-        """
-        nodes = []
-        
-        # Add US nodes
-        for us in us_units:
-            # Debug logging per verificare il campo tipo
-            logger.debug(f"Processing US {us.us_code}: tipo={getattr(us, 'tipo', 'NOT_FOUND')}")
-            
-            node = {
-                'id': f"US{us.us_code}",
-                'type': 'us',
-                'label': us.us_code,
-                'definition': us.definizione or '',
-                'tipo': getattr(us, 'tipo', 'positiva') or 'positiva',  # ⭐ Aggiungi campo tipo con fallback
-                'data': {
-                    'id': str(us.id),
-                    'localita': us.localita or '',
-                    'datazione': us.datazione or '',
-                    'periodo': us.periodo or '',
-                    'fase': us.fase or '',
-                    'affidabilita': us.affidabilita_stratigrafica or '',
-                    'site_id': us.site_id
-                }
-            }
-            nodes.append(node)
-            
-            # Debug logging per verificare il nodo creato
-            logger.debug(f"Created node for US {us.us_code}: tipo={node['tipo']}")
-        
-        # Add USM nodes
-        for usm in usm_units:
-            node = {
-                'id': f"USM{usm.usm_code}",
-                'type': 'usm',
-                'label': usm.usm_code,
-                'definition': usm.definizione or '',
-                'data': {
-                    'id': str(usm.id),
-                    'localita': usm.localita or '',
-                    'datazione': usm.datazione or '',
-                    'periodo': usm.periodo or '',
-                    'fase': usm.fase or '',
-                    'tecnica_costruttiva': usm.tecnica_costruttiva or '',
-                    'site_id': usm.site_id
-                }
-            }
-            nodes.append(node)
-        
-        logger.info(f"Built {len(nodes)} nodes for graph")
-        return nodes
     
-    def _build_edges(self, relationships: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Build edge list for graph visualization.
-        
-        Args:
-            relationships: List of relationship dictionaries
-            
-        Returns:
-            List of edge dictionaries
-        """
-        edges = []
-        
-        for rel in relationships:
-            edge = {
-                'from': rel['from'],
-                'to': rel['to'],
-                'type': rel['type'],
-                'label': rel['label'],
-                'bidirectional': rel['bidirectional']
-            }
-            edges.append(edge)
-        
-        logger.info(f"Built {len(edges)} edges for graph")
-        return edges
     
     def _calculate_chronological_levels(
         self,
@@ -480,73 +305,7 @@ class HarrisMatrixService:
         Returns:
             Dictionary mapping node IDs to their chronological levels
         """
-        # Build adjacency list for directed graph
-        graph = defaultdict(list)
-        in_degree = defaultdict(int)
-        node_set = set(node['id'] for node in nodes)
-        
-        # Initialize graph
-        for node_id in node_set:
-            in_degree[node_id] = 0
-            graph[node_id] = []
-        
-        # Add edges (considering direction)
-        for edge in edges:
-            from_node = edge['from']
-            to_node = edge['to']
-            
-            if from_node in node_set and to_node in node_set:
-                # For chronological ordering, we need to understand the stratigraphic direction
-                # "copre" (covers) means from_node is above to_node (more recent)
-                # "taglia" (cuts) means from_node cuts through to_node (more recent)
-                # "si appoggia a" (rests on) means from_node is above to_node (more recent)
-                
-                if edge['type'] in ['copre', 'taglia', 'si_appoggia_a']:
-                    # from_node is more recent than to_node
-                    graph[from_node].append(to_node)
-                    in_degree[to_node] += 1
-                elif edge['type'] in ['coperto_da', 'tagliato_da', 'riempito_da']:
-                    # from_node is older than to_node
-                    graph[to_node].append(from_node)
-                    in_degree[from_node] += 1
-                elif edge['bidirectional']:
-                    # For bidirectional relationships, we don't affect chronological ordering
-                    pass
-        
-        # Topological sort to assign levels
-        levels = {}
-        queue = deque()
-        
-        # Find nodes with no incoming edges (most recent)
-        for node_id in node_set:
-            if in_degree[node_id] == 0:
-                queue.append(node_id)
-                levels[node_id] = 0
-        
-        # Process nodes in topological order
-        while queue:
-            current = queue.popleft()
-            current_level = levels[current]
-            
-            for neighbor in graph[current]:
-                in_degree[neighbor] -= 1
-                
-                # Update neighbor level (should be deeper/older)
-                if neighbor not in levels or levels[neighbor] <= current_level:
-                    levels[neighbor] = current_level + 1
-                
-                if in_degree[neighbor] == 0:
-                    queue.append(neighbor)
-        
-        # Handle any remaining nodes (cycles) by assigning them to the deepest level
-        max_level = max(levels.values()) if levels else 0
-        for node_id in node_set:
-            if node_id not in levels:
-                levels[node_id] = max_level + 1
-                logger.warning(f"Node {node_id} assigned to level {max_level + 1} due to cycle")
-        
-        logger.info(f"Calculated chronological levels for {len(levels)} nodes")
-        return levels
+        return self.graph_builder.calculate_chronological_levels(nodes, edges)
     
     def _empty_graph(self) -> Dict[str, Any]:
         """
@@ -971,16 +730,16 @@ class HarrisMatrixService:
         try:
             logger.info("Validating stratigraphic relationships")
             
-            # Build graph representation
-            graph = self._build_validation_graph(units, relationships)
+            # Build graph representation using centralized service
+            graph = self.graph_builder.build_validation_graph(units, relationships)
             
-            # Check for cycles
-            cycles = self.detect_cycles_in_graph(graph)
+            # Check for cycles using centralized detector
+            cycles = CycleDetector.detect_cycles_in_graph(graph)
             if cycles:
                 raise StratigraphicCycleDetected(cycles[0])
             
-            # Validate business rules
-            await self._validate_business_rules(units, relationships)
+            # Validate business rules using centralized validator
+            self.rules_validator.validate_business_rules(units, relationships)
             
             logger.info("Stratigraphic relationships validation passed")
             
@@ -988,131 +747,8 @@ class HarrisMatrixService:
             logger.error(f"Error validating stratigraphic relationships: {str(e)}")
             raise
     
-    def _build_validation_graph(
-        self,
-        units: List[Dict[str, Any]],
-        relationships: List[Dict[str, Any]]
-    ) -> Dict[str, List[str]]:
-        """Build graph representation for cycle detection."""
-        graph = defaultdict(list)
-        
-        # Build unit lookup
-        unit_lookup = {unit['id']: unit for unit in units}
-        
-        for rel in relationships:
-            from_id = rel['from_unit_id']
-            to_id = rel['to_unit_id']
-            relation_type = rel['relation_type']
-            
-            # Only consider directed relationships for cycle detection
-            if relation_type in ['copre', 'taglia', 'si_appoggia_a', 'riempie']:
-                graph[from_id].append(to_id)
-            elif relation_type in ['coperto_da', 'tagliato_da', 'riempito_da']:
-                graph[to_id].append(from_id)
-        
-        return graph
     
-    def detect_cycles_in_graph(self, graph: Dict[str, List[str]]) -> List[List[str]]:
-        """
-        Detect cycles in the stratigraphic graph using DFS.
-        
-        Args:
-            graph: Dictionary representing the graph
-            
-        Returns:
-            List of cycles found (each cycle is a list of node IDs)
-        """
-        try:
-            visited = set()
-            rec_stack = set()
-            cycles = []
-            
-            def dfs(node: str, path: List[str]) -> bool:
-                if node in rec_stack:
-                    # Found a cycle
-                    cycle_start = path.index(node)
-                    cycle = path[cycle_start:] + [node]
-                    cycles.append(cycle)
-                    return True
-                
-                if node in visited:
-                    return False
-                
-                visited.add(node)
-                rec_stack.add(node)
-                path.append(node)
-                
-                for neighbor in graph.get(node, []):
-                    if dfs(neighbor, path.copy()):
-                        return True
-                
-                rec_stack.remove(node)
-                return False
-            
-            for node in graph:
-                if node not in visited:
-                    dfs(node, [])
-            
-            return cycles
-            
-        except Exception as e:
-            logger.error(f"Error detecting cycles in graph: {str(e)}")
-            return []
     
-    async def _validate_business_rules(
-        self,
-        units: List[Dict[str, Any]],
-        relationships: List[Dict[str, Any]]
-    ) -> None:
-        """Validate business rules for stratigraphic relationships."""
-        try:
-            # Build unit lookup with type information
-            unit_lookup = {}
-            for unit in units:
-                unit_obj = unit['unit']
-                if hasattr(unit_obj, 'us_code'):
-                    unit_lookup[unit['id']] = {
-                        'code': unit_obj.us_code,
-                        'type': 'us',
-                        'tipo': getattr(unit_obj, 'tipo', 'positiva')
-                    }
-                elif hasattr(unit_obj, 'usm_code'):
-                    unit_lookup[unit['id']] = {
-                        'code': unit_obj.usm_code,
-                        'type': 'usm'
-                    }
-            
-            for rel in relationships:
-                from_unit = unit_lookup.get(rel['from_unit_id'])
-                to_unit = unit_lookup.get(rel['to_unit_id'])
-                relation_type = rel['relation_type']
-                
-                if not from_unit or not to_unit:
-                    continue
-                
-                # Rule: Only negative US can cut (taglia/tagliato_da)
-                if relation_type in ['taglia', 'tagliato_da']:
-                    if from_unit['type'] == 'us' and from_unit['tipo'] != 'negativa':
-                        raise InvalidStratigraphicRelation(
-                            relation_type,
-                            from_unit['code'],
-                            to_unit['code'],
-                            "Solo US negative possono tagliare altre unità"
-                        )
-                
-                # Rule: Positive US can cover/fill (copre/riempie)
-                if relation_type in ['copre', 'riempie']:
-                    if from_unit['type'] == 'us' and from_unit['tipo'] != 'positiva':
-                        raise InvalidStratigraphicRelation(
-                            relation_type,
-                            from_unit['code'],
-                            to_unit['code'],
-                            "Solo US positive possono coprire o riempire altre unità"
-                        )
-            
-        except Exception as e:
-            logger.error(f"Error validating business rules: {str(e)}")
-            raise
     
     async def _validate_single_relationship(
         self,
@@ -1120,35 +756,8 @@ class HarrisMatrixService:
         to_unit,
         relation_type: str
     ) -> None:
-        """Validate a single relationship."""
-        try:
-            # Check if relation type is valid
-            valid_relations = [
-                'uguale_a', 'si_lega_a', 'gli_si_appoggia', 'si_appoggia_a',
-                'coperto_da', 'copre', 'tagliato_da', 'taglia',
-                'riempito_da', 'riempie'
-            ]
-            
-            if relation_type not in valid_relations:
-                raise InvalidStratigraphicRelation(
-                    relation_type,
-                    getattr(from_unit, 'us_code', getattr(from_unit, 'usm_code', 'Unknown')),
-                    getattr(to_unit, 'us_code', getattr(to_unit, 'usm_code', 'Unknown')),
-                    f"Tipo di relazione non valido. Valori validi: {valid_relations}"
-                )
-            
-            # Validate self-relationships (should not exist)
-            if from_unit.id == to_unit.id:
-                raise InvalidStratigraphicRelation(
-                    relation_type,
-                    getattr(from_unit, 'us_code', getattr(from_unit, 'usm_code', 'Unknown')),
-                    getattr(to_unit, 'us_code', getattr(to_unit, 'usm_code', 'Unknown')),
-                    "Un'unità non può avere relazioni con se stessa"
-                )
-            
-        except Exception as e:
-            logger.error(f"Error validating single relationship: {str(e)}")
-            raise
+        """Validate a single relationship using centralized validator."""
+        self.rules_validator.validate_single_relationship(from_unit, to_unit, relation_type)
     
     async def bulk_update_relationships(
         self,

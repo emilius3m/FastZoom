@@ -43,6 +43,11 @@ from app.exceptions import (
 )
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
 from sqlalchemy import select, and_, or_
+from app.utils.stratigraphy_helpers import (
+    UnitLookupService,
+    CycleDetector,
+    StratigraphicRulesValidator
+)
 
 router = APIRouter()
 
@@ -149,28 +154,9 @@ async def v1_get_unit_relationships(
                 detail="unit_type must be 'us' or 'usm'"
             )
         
-        # Find the unit by code and site
-        if unit_type == 'us':
-            from app.models.stratigraphy import UnitaStratigrafica
-            query = select(UnitaStratigrafica).where(
-                and_(
-                    UnitaStratigrafica.site_id == str(site_id),
-                    UnitaStratigrafica.us_code == unit_code,
-                    UnitaStratigrafica.deleted_at.is_(None)
-                )
-            )
-        else:  # usm
-            from app.models.stratigraphy import UnitaStratigraficaMuraria
-            query = select(UnitaStratigraficaMuraria).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == str(site_id),
-                    UnitaStratigraficaMuraria.usm_code == unit_code,
-                    UnitaStratigraficaMuraria.deleted_at.is_(None)
-                )
-            )
-        
-        result = await db.execute(query)
-        unit = result.scalar_one_or_none()
+        # Use centralized unit lookup service
+        unit_lookup = UnitLookupService(db)
+        unit = await unit_lookup.get_unit_by_code(site_id, unit_code, unit_type)
         
         if not unit:
             raise HTTPException(
@@ -637,30 +623,15 @@ async def _validate_business_rules(
         
         rel_type = rel.relation_type.value
         
-        # Rule: Only negative US can cut (taglia/tagliato_da)
-        if rel_type in ['taglia', 'tagliato_da']:
-            if from_unit.unit_type == 'us' and from_unit.tipo != 'negativa':
-                errors.append(
-                    f"Unit {from_unit.temp_id} ({from_unit.tipo}) cannot {rel_type}. "
-                    f"Only negative US units can cut other units"
-                )
-                field_errors[f"relationships.{rel.temp_id}"] = "Business rule violation"
-                suggestions.append("Change US type to 'negativa' or use different relationship")
-        
-        # Rule: Positive US can cover/fill (copre/riempie)
-        if rel_type in ['copre', 'riempie']:
-            if from_unit.unit_type == 'us' and from_unit.tipo != 'positiva':
-                errors.append(
-                    f"Unit {from_unit.temp_id} ({from_unit.tipo}) cannot {rel_type}. "
-                    f"Only positive US units can cover or fill other units"
-                )
-                field_errors[f"relationships.{rel.temp_id}"] = "Business rule violation"
-                suggestions.append("Change US type to 'positiva' or use different relationship")
-        
-        # Rule: USM units should not have tipo field
-        if from_unit.unit_type == 'usm' and from_unit.tipo:
-            errors.append(f"USM unit {from_unit.temp_id} should not have tipo field")
-            field_errors[f"units.{from_unit.temp_id}.tipo"] = "Field not applicable"
+        # Use centralized business rules validation
+        try:
+            StratigraphicRulesValidator.validate_single_relationship(
+                from_unit, to_unit, rel_type
+            )
+        except Exception as e:
+            errors.append(f"Relationship {rel.temp_id}: {str(e)}")
+            field_errors[f"relationships.{rel.temp_id}"] = "Business rule violation"
+            suggestions.append("Check unit types and relationship compatibility")
     
     return {
         "errors": errors,
@@ -677,59 +648,28 @@ async def _detect_potential_cycles(
     """
     Detect potential cycles in relationships before processing.
     
-    This is a simplified cycle detection for the request data.
-    More comprehensive cycle detection happens in the service layer.
+    Uses centralized cycle detection from stratigraphy_helpers.
     """
     try:
-        # Build graph from relationships
-        graph = {}
-        unit_temp_ids = {unit.temp_id for unit in units}
+        # Convert units and relationships to validation format
+        validation_units = []
+        for unit in units:
+            validation_units.append({
+                'id': unit.temp_id,
+                'unit_type': unit.unit_type,
+                'unit': unit
+            })
         
-        # Initialize graph
-        for temp_id in unit_temp_ids:
-            graph[temp_id] = []
-        
-        # Add directed relationships
-        directed_relationships = ['copre', 'taglia', 'si_appoggia_a', 'riempie']
-        
+        validation_relationships = []
         for rel in relationships:
-            if rel.relation_type.value in directed_relationships:
-                from_temp = rel.from_temp_id
-                to_temp = rel.to_temp_id
-                if from_temp in graph and to_temp in unit_temp_ids:
-                    graph[from_temp].append(to_temp)
+            validation_relationships.append({
+                'from_unit_id': rel.from_temp_id,
+                'to_unit_id': rel.to_temp_id,
+                'relation_type': rel.relation_type.value
+            })
         
-        # DFS cycle detection
-        visited = set()
-        rec_stack = set()
-        cycles = []
-        
-        def dfs(node: str, path: List[str]) -> bool:
-            if node in rec_stack:
-                # Found a cycle
-                cycle_start = path.index(node)
-                cycle = path[cycle_start:] + [node]
-                cycles.append(cycle)
-                return True
-            
-            if node in visited:
-                return False
-            
-            visited.add(node)
-            rec_stack.add(node)
-            path.append(node)
-            
-            for neighbor in graph.get(node, []):
-                if dfs(neighbor, path.copy()):
-                    return True
-            
-            rec_stack.remove(node)
-            return False
-        
-        for temp_id in unit_temp_ids:
-            if temp_id not in visited:
-                dfs(temp_id, [])
-        
+        # Use centralized cycle detection
+        cycles = CycleDetector.detect_cycles_from_relationships(validation_relationships)
         return cycles
         
     except Exception as e:
@@ -1230,49 +1170,15 @@ async def v1_validate_relationship(
         # Find the units
         harris_service = HarrisMatrixService(db)
         
-        # Get source unit
-        if request.from_unit_type == UnitTypeEnum.US:
-            from_query = select(UnitaStratigrafica).where(
-                and_(
-                    UnitaStratigrafica.site_id == str(site_id),
-                    UnitaStratigrafica.us_code == request.from_unit_code,
-                    UnitaStratigrafica.deleted_at.is_(None)
-                )
-            )
-            from_result = await db.execute(from_query)
-            from_unit = from_result.scalar_one_or_none()
-        else:  # USM
-            from_query = select(UnitaStratigraficaMuraria).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == str(site_id),
-                    UnitaStratigraficaMuraria.usm_code == request.from_unit_code,
-                    UnitaStratigraficaMuraria.deleted_at.is_(None)
-                )
-            )
-            from_result = await db.execute(from_query)
-            from_unit = from_result.scalar_one_or_none()
+        # Use centralized unit lookup for both source and target units
+        unit_lookup = UnitLookupService(db)
         
-        # Get target unit
-        if request.to_unit_type == UnitTypeEnum.US:
-            to_query = select(UnitaStratigrafica).where(
-                and_(
-                    UnitaStratigrafica.site_id == str(site_id),
-                    UnitaStratigrafica.us_code == request.to_unit_code,
-                    UnitaStratigrafica.deleted_at.is_(None)
-                )
-            )
-            to_result = await db.execute(to_query)
-            to_unit = to_result.scalar_one_or_none()
-        else:  # USM
-            to_query = select(UnitaStratigraficaMuraria).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == str(site_id),
-                    UnitaStratigraficaMuraria.usm_code == request.to_unit_code,
-                    UnitaStratigraficaMuraria.deleted_at.is_(None)
-                )
-            )
-            to_result = await db.execute(to_query)
-            to_unit = to_result.scalar_one_or_none()
+        from_unit = await unit_lookup.get_unit_by_code(
+            site_id, request.from_unit_code, request.from_unit_type.value
+        )
+        to_unit = await unit_lookup.get_unit_by_code(
+            site_id, request.to_unit_code, request.to_unit_type.value
+        )
         
         if not from_unit:
             return HarrisMatrixValidationResult(
@@ -1469,56 +1375,32 @@ async def v1_validate_unit_code(
         # Check if code already exists
         harris_service = HarrisMatrixService(db)
         
-        if request.unit_type == UnitTypeEnum.US:
-            existing_query = select(UnitaStratigrafica).where(
-                and_(
-                    UnitaStratigrafica.site_id == str(site_id),
-                    UnitaStratigrafica.us_code == request.code,
-                    UnitaStratigrafica.deleted_at.is_(None)
-                )
-            )
-            existing_result = await db.execute(existing_query)
-            existing_unit = existing_result.scalar_one_or_none()
-        else:  # USM
-            existing_query = select(UnitaStratigraficaMuraria).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == str(site_id),
-                    UnitaStratigraficaMuraria.usm_code == request.code,
-                    UnitaStratigraficaMuraria.deleted_at.is_(None)
-                )
-            )
-            existing_result = await db.execute(existing_query)
-            existing_unit = existing_result.scalar_one_or_none()
+        # Use centralized unit lookup to check if code exists
+        unit_lookup = UnitLookupService(db)
+        existing_unit = await unit_lookup.get_unit_by_code(
+            site_id, request.code, request.unit_type.value
+        )
         
         if existing_unit:
             errors.append(f"Unit code {request.code} is already in use")
         
-        # Check for similar codes that might cause confusion
-        similar_query = None
-        if request.unit_type == UnitTypeEnum.US:
-            similar_query = select(UnitaStratigrafica.us_code).where(
-                and_(
-                    UnitaStratigrafica.site_id == str(site_id),
-                    UnitaStratigrafica.us_code.ilike(f"%{request.code[2:]}%"),
-                    UnitaStratigrafica.deleted_at.is_(None),
-                    UnitaStratigrafica.us_code != request.code
-                )
-            )
-        else:  # USM
-            similar_query = select(UnitaStratigraficaMuraria.usm_code).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == str(site_id),
-                    UnitaStratigraficaMuraria.usm_code.ilike(f"%{request.code[3:]}%"),
-                    UnitaStratigraficaMuraria.deleted_at.is_(None),
-                    UnitaStratigraficaMuraria.usm_code != request.code
-                )
-            )
+        # Check for similar codes using unit lookup service
+        us_units, usm_units = await unit_lookup.get_units_by_site(site_id)
         
-        if similar_query:
-            similar_result = await db.execute(similar_query)
-            similar_codes = similar_result.scalars().all()
-            if similar_codes:
-                warnings.append(f"Similar codes found that might cause confusion: {', '.join(similar_codes[:3])}")
+        similar_codes = []
+        if request.unit_type == UnitTypeEnum.US:
+            code_num = request.code[2:] if len(request.code) > 2 else ""
+            for us in us_units:
+                if code_num and code_num in us.us_code and us.us_code != request.code:
+                    similar_codes.append(us.us_code)
+        else:  # USM
+            code_num = request.code[3:] if len(request.code) > 3 else ""
+            for usm in usm_units:
+                if code_num and code_num in usm.usm_code and usm.usm_code != request.code:
+                    similar_codes.append(usm.usm_code)
+        
+        if similar_codes:
+            warnings.append(f"Similar codes found that might cause confusion: {', '.join(similar_codes[:3])}")
         
         validation_result = HarrisMatrixValidationResult(
             is_valid=len(errors) == 0,

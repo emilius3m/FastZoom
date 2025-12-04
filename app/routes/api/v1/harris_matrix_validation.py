@@ -26,6 +26,14 @@ from loguru import logger
 
 from app.database.db import get_async_db
 from app.services.harris_matrix_unit_resolver import UnitResolver
+from app.utils.stratigraphy_helpers import (
+    UnitLookupService,
+    CycleDetector,
+    StratigraphicRulesValidator,
+    validate_stratigraphic_data,
+    create_unit_lookup_service,
+    create_rules_validator
+)
 from app.core.security import get_current_user
 from app.models.users import User
 
@@ -119,9 +127,9 @@ class BackupResult(BaseModel):
 
 
 # Utility Functions
-async def get_unit_resolver(db: AsyncSession) -> UnitResolver:
-    """Get unit resolver instance."""
-    return UnitResolver(db)
+async def get_unit_lookup_service(db: AsyncSession) -> UnitLookupService:
+    """Get unit lookup service instance."""
+    return create_unit_lookup_service(db)
 
 
 # API Endpoints
@@ -150,7 +158,7 @@ async def validate_site_references(
     try:
         logger.info(f"User {current_user.id} validating references for site {site_id}")
         
-        resolver = await get_unit_resolver(db)
+        resolver = await get_unit_lookup_service(db)
         
         # Perform validation
         broken_refs = await resolver.validate_references(site_id)
@@ -226,7 +234,7 @@ async def validate_all_sites(
     try:
         logger.info(f"User {current_user.id} starting batch validation")
         
-        resolver = await get_unit_resolver(db)
+        resolver = await get_unit_lookup_service(db)
         
         # Determine which sites to validate
         if request.site_ids:
@@ -333,7 +341,7 @@ async def cleanup_site_references(
     try:
         logger.info(f"User {current_user.id} cleaning up references for site {site_id}")
         
-        resolver = await get_unit_resolver(db)
+        resolver = await get_unit_lookup_service(db)
         
         # Create backup if requested
         backup_info = None
@@ -409,7 +417,7 @@ async def get_site_statistics(
     try:
         logger.info(f"User {current_user.id} getting statistics for site {site_id}")
         
-        resolver = await get_unit_resolver(db)
+        resolver = await get_unit_lookup_service(db)
         stats = await resolver.get_reference_statistics(site_id)
         
         result = StatisticsResult(
@@ -451,7 +459,7 @@ async def create_site_backup(
     try:
         logger.info(f"User {current_user.id} creating backup for site {site_id}")
         
-        resolver = await get_unit_resolver(db)
+        resolver = await get_unit_lookup_service(db)
         backup_info = await resolver.create_reference_backup(site_id)
         
         result = BackupResult(
@@ -501,7 +509,7 @@ async def restore_site_backup(
     try:
         logger.info(f"User {current_user.id} restoring backup for site {site_id}")
         
-        resolver = await get_unit_resolver(db)
+        resolver = await get_unit_lookup_service(db)
         restore_stats = await resolver.restore_reference_backup(site_id, backup_data)
         
         # Calculate unit counts from restore stats
@@ -550,7 +558,7 @@ async def get_site_health_check(
         Simple health check result
     """
     try:
-        resolver = await get_unit_resolver(db)
+        resolver = await get_unit_lookup_service(db)
         
         # Get basic statistics (lighter than full validation)
         stats = await resolver.get_reference_statistics(site_id)
