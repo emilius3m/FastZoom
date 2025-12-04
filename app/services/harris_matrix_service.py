@@ -12,7 +12,7 @@ Enhanced with UnitResolver for intelligent unit code resolution and reference va
 import re
 import asyncio
 from typing import Dict, List, Any, Optional, Set, Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
@@ -664,7 +664,8 @@ class HarrisMatrixService:
         self,
         site_id: UUID,
         units_data: List[Dict[str, Any]],
-        relationships_data: List[Dict[str, Any]]
+        relationships_data: List[Dict[str, Any]],
+        current_user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Create multiple US/USM units with their relationships in a single transaction.
@@ -679,20 +680,31 @@ class HarrisMatrixService:
         """
         try:
             logger.info(f"Bulk creating {len(units_data)} units and {len(relationships_data)} relationships for site {site_id}")
+            logger.debug(f"DEBUG: Starting bulk creation, site_id={site_id}")
+            logger.debug(f"DEBUG: units_data sample: {units_data[:1] if units_data else 'None'}")
+            logger.debug(f"DEBUG: relationships_data sample: {relationships_data[:1] if relationships_data else 'None'}")
             
             # Check for code conflicts first
+            logger.debug("DEBUG: Checking code conflicts...")
             await self._check_code_conflicts(site_id, units_data)
+            logger.debug("DEBUG: Code conflicts check passed")
                 
             # Generate sequential codes if not provided
+            logger.debug("DEBUG: Generating sequential codes...")
             units_with_codes = await self._generate_sequential_codes(site_id, units_data)
+            logger.debug(f"DEBUG: Generated codes: {[u.get('code') for u in units_with_codes[:3]]}")
                 
             # Create units
-            created_units = await self._bulk_create_units(site_id, units_with_codes)
+            logger.debug("DEBUG: Creating units...")
+            created_units = await self._bulk_create_units(site_id, units_with_codes, current_user_id)
+            logger.debug(f"DEBUG: Created {len(created_units)} units")
                 
             # Create relationships
+            logger.debug("DEBUG: Creating relationships...")
             created_relationships = await self._bulk_create_relationships(
                     created_units, relationships_data
             )
+            logger.debug(f"DEBUG: Created {len(created_relationships)} relationships")
                 
             # Validate relationships for cycles
             await self.validate_stratigraphic_relationships(created_units, created_relationships)
@@ -701,7 +713,7 @@ class HarrisMatrixService:
                     'created_units': len(created_units),
                     'created_relationships': len(created_relationships),
                     'unit_mapping': {unit['temp_id']: unit['id'] for unit in created_units},
-                    'relationship_mapping': {rel['temp_id']: rel['id'] for rel in created_relationships},
+                    'relationship_mapping': {rel['temp_id']: rel['temp_id'] for rel in created_relationships},
                     'units': created_units,
                     'relationships': created_relationships
             }
@@ -804,14 +816,17 @@ class HarrisMatrixService:
             logger.error(f"Error generating sequential codes for site {site_id}: {str(e)}")
             raise
     
-    async def _bulk_create_units(self, site_id: UUID, units_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _bulk_create_units(self, site_id: UUID, units_data: List[Dict[str, Any]], current_user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Create multiple units in bulk."""
         try:
             created_units = []
             
             for unit_data in units_data:
                 unit_type = unit_data.get('unit_type', 'us')
-                temp_id = unit_data.get('temp_id', str(UUID.uuid4()))
+                # Debug logging to validate assumptions
+                logger.debug(f"DEBUG: Creating temp_id for unit_type={unit_type}, unit_data={unit_data}")
+                temp_id = unit_data.get('temp_id', str(uuid4()))
+                logger.debug(f"DEBUG: Generated temp_id={temp_id} for unit_type={unit_type}")
                 
                 if unit_type == 'us':
                     unit = UnitaStratigrafica(
@@ -825,7 +840,8 @@ class HarrisMatrixService:
                         fase=unit_data.get('fase'),
                         affidabilita_stratigrafica=unit_data.get('affidabilita_stratigrafica'),
                         sequenza_fisica=self._get_default_sequenza_fisica(),
-                        created_by=unit_data.get('created_by')
+                        created_by=unit_data.get('created_by') or current_user_id,
+                        updated_by=unit_data.get('updated_by') or current_user_id
                     )
                 else:  # usm
                     unit = UnitaStratigraficaMuraria(
@@ -838,18 +854,20 @@ class HarrisMatrixService:
                         fase=unit_data.get('fase'),
                         tecnica_costruttiva=unit_data.get('tecnica_costruttiva'),
                         sequenza_fisica=self._get_default_sequenza_fisica(),
-                        created_by=unit_data.get('created_by')
+                        created_by=unit_data.get('created_by') or current_user_id,
+                        updated_by=unit_data.get('updated_by') or current_user_id
                     )
                 
+                logger.debug(f"DEBUG: Adding {unit_type} unit to database: code={unit_data['code']}")
                 self.db.add(unit)
                 await self.db.flush()  # Get the ID
+                logger.debug(f"DEBUG: Unit added successfully, got ID={unit.id}")
                 
                 created_units.append({
                     'temp_id': temp_id,
                     'id': str(unit.id),
                     'code': unit_data['code'],
-                    'unit_type': unit_type,
-                    'unit': unit
+                    'unit_type': unit_type
                 })
             
             return created_units
@@ -922,12 +940,15 @@ class HarrisMatrixService:
                     if target_reference not in from_unit.sequenza_fisica.get(relation_type, []):
                         from_unit.sequenza_fisica[relation_type].append(target_reference)
                 
+                # Debug logging to validate assumptions
+                logger.debug(f"DEBUG: Creating temp_id for relationship from={from_unit.id} to={to_unit.id}, type={relation_type}")
                 created_relationships.append({
-                    'temp_id': rel_data.get('temp_id', str(UUID.uuid4())),
+                    'temp_id': rel_data.get('temp_id', str(uuid4())),
                     'from_unit_id': str(from_unit.id),
                     'to_unit_id': str(to_unit.id),
                     'relation_type': relation_type
                 })
+                logger.debug(f"DEBUG: Created relationship temp_id={created_relationships[-1]['temp_id']}")
             
             return created_relationships
             

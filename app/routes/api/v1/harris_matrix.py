@@ -748,6 +748,7 @@ async def v1_bulk_create_harris_matrix(
     site_id: UUID,
     request: HarrisMatrixBulkCreateRequest,
     db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: list = Depends(get_current_user_sites_with_blacklist)
 ) -> HarrisMatrixBulkCreateResponse:
     """
@@ -862,13 +863,18 @@ async def v1_bulk_create_harris_matrix(
         # ===== PROCEED WITH BULK CREATION =====
         
         # Convert Pydantic models to dictionaries for service
-        units_data = [
-            {
-                **unit.dict(exclude_none=True),
-                'created_by': user_sites[0].get('user_id') if user_sites else None
-            }
-            for unit in request.units
-        ]
+        # Use the properly authenticated user ID from dependency injection
+        logger.debug(f"DEBUG: Using current_user_id from auth dependency: {current_user_id}")
+        
+        units_data = []
+        for unit in request.units:
+            unit_dict = unit.dict(exclude_none=True)
+            # Always set created_by: current authenticated user
+            unit_dict['created_by'] = str(current_user_id)
+            unit_dict['updated_by'] = str(current_user_id)
+            logger.debug(f"DEBUG: Unit {unit.temp_id} created_by set to: {unit_dict['created_by']}")
+            logger.debug(f"DEBUG: Unit {unit.temp_id} updated_by set to: {unit_dict['updated_by']}")
+            units_data.append(unit_dict)
         
         relationships_data = [rel.dict() for rel in request.relationships]
         
@@ -876,7 +882,8 @@ async def v1_bulk_create_harris_matrix(
         result = await harris_service.bulk_create_units_with_relationships(
             site_id=site_id,
             units_data=units_data,
-            relationships_data=relationships_data
+            relationships_data=relationships_data,
+            current_user_id=current_user_id
         )
         
         # Convert result to response schema
