@@ -969,7 +969,7 @@
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-bold text-lg text-gray-900 dark:text-white">
                         <span x-text="selectedNode.label"></span>
-                        <span class="text-sm text-gray-500 ml-2" x-text="'(' + selectedNode.type.toUpperCase() + ')'"></span>
+                        <span class="text-sm text-gray-500 ml-2" x-text="'(' + selectedNode.unitType.toUpperCase() + ')'"></span>
                     </h3>
                     <button @click="selectedNode = null; updateNodeStyle()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                         <i class="fas fa-times"></i>
@@ -979,12 +979,12 @@
                 <!-- Basic Properties -->
                 <div class="form-group">
                     <label>Node Type</label>
-                    <input type="text" :value="selectedNode.type.toUpperCase()" disabled class="bg-gray-100 dark:bg-gray-700">
+                    <input type="text" :value="selectedNode.unitType.toUpperCase()" disabled class="bg-gray-100 dark:bg-gray-700">
                 </div>
 
-                <div class="form-group" x-show="selectedNode.type === 'us'">
+                <div class="form-group" x-show="selectedNode.unitType === 'us'">
                     <label>US Type</label>
-                    <select x-model="selectedNode.tipo" @change="updateNodeStyle()">
+                    <select x-model="selectedNode.usType" @change="updateNodeStyle()">
                         <option value="positiva">Positiva (+)</option>
                         <option value="negativa">Negativa (-)</option>
                     </select>
@@ -1417,8 +1417,8 @@ function harrisMatrixEditor() {
 
             const nodeData = {
                 temp_id: tempId,
-                type: type,
-                tipo: tipo,
+                unitType: type,
+                usType: tipo,
                 definition: '',
                 periodo: '',
                 fase: '',
@@ -1707,10 +1707,11 @@ function harrisMatrixEditor() {
 
             if (matrixData.nodes) {
                 matrixData.nodes.forEach(node => {
+                    const nodeLabel = node.label || node.code || `${node.type?.toUpperCase() || 'US'}${node.id?.slice(-3) || '???'}`;
                     const nodeData = {
                         temp_id: node.id,
-                        type: node.type,
-                        tipo: node.tipo,
+                        unitType: node.type,
+                        usType: node.tipo,
                         definition: node.data?.definition || '',
                         periodo: node.data?.periodo || '',
                         fase: node.data?.fase || '',
@@ -1725,7 +1726,7 @@ function harrisMatrixEditor() {
                         group: 'nodes',
                         data: { 
                             id: node.id, 
-                            label: node.label,
+                            label: nodeLabel,
                             ...nodeData
                         },
                         position: { x: Math.random() * 400, y: Math.random() * 400 }
@@ -1775,10 +1776,10 @@ function harrisMatrixEditor() {
                 // ✅ Transform editor data to backend format
                 const backendUnits = this.nodes.map(node => ({
                     temp_id: node.temp_id,
-                    unit_type: node.type,           // type → unit_type
+                    unit_type: node.unitType,       // unitType → unit_type
                     code: null,                      // Let backend auto-generate
                     definition: node.definition || '',
-                    tipo: node.tipo,
+                    tipo: node.usType,              // usType → tipo
                     localita: node.localita || '',
                     datazione: node.datazione || '',
                     periodo: node.periodo || '',
@@ -1973,15 +1974,15 @@ function harrisMatrixEditor() {
 
         // Get count functions for statistics
         getUSPositiveCount() {
-            return this.nodes.filter(n => n.type === 'us' && n.tipo === 'positiva').length;
+            return this.nodes.filter(n => n.unitType === 'us' && n.usType === 'positiva').length;
         },
 
         getUSNegativeCount() {
-            return this.nodes.filter(n => n.type === 'us' && n.tipo === 'negativa').length;
+            return this.nodes.filter(n => n.unitType === 'us' && n.usType === 'negativa').length;
         },
 
         getUSMCount() {
-            return this.nodes.filter(n => n.type === 'usm').length;
+            return this.nodes.filter(n => n.unitType === 'usm').length;
         },
 
         // Update node styles
@@ -2121,12 +2122,12 @@ function harrisMatrixEditor() {
          * Ripristina lo stile originale di un nodo
          */
         resetNodeStyle(node) {
-            const nodeType = node.data('type');
+            const nodeType = node.data('unitType');
             const nodeData = node.data();
             let borderColor = '#1e40af'; // default blue
 
             if (nodeType === 'us') {
-                borderColor = nodeData.tipo === 'positiva' ? '#1e40af' : '#991b1b';
+                borderColor = nodeData.usType === 'positiva' ? '#1e40af' : '#991b1b';
             } else if (nodeType === 'usm') {
                 borderColor = '#6d28d9';
             }
@@ -2298,7 +2299,7 @@ function harrisMatrixEditor() {
             return [
                 // US Positive (blue)
                 {
-                    selector: 'node[type = "us"][tipo = "positiva"]',
+                    selector: 'node[unitType = "us"][usType = "positiva"]',
                     style: {
                         'label': this.settings.showLabels ? 'data(label)' : '',
                         'background-color': '#3b82f6',
@@ -2319,7 +2320,7 @@ function harrisMatrixEditor() {
 
                 // US Negative (red with dashed border)
                 {
-                    selector: 'node[type = "us"][tipo = "negativa"]',
+                    selector: 'node[unitType = "us"][usType = "negativa"]',
                     style: {
                         'label': this.settings.showLabels ? '⊖ data(label)' : '',
                         'background-color': '#ef4444',
@@ -2342,7 +2343,7 @@ function harrisMatrixEditor() {
 
                 // USM (purple)
                 {
-                    selector: 'node[type = "usm"]',
+                    selector: 'node[unitType = "usm"]',
                     style: {
                         'label': this.settings.showLabels ? 'data(label)' : '',
                         'background-color': '#8b5cf6',
@@ -2417,8 +2418,7 @@ function harrisMatrixEditor() {
                     style: {
                         'width': 3,
                         'line-color': '#6b7280',
-                        'target-arrow-color': '#6b7280',
-                        'target-arrow-shape': 'triangle',
+                        'target-arrow-shape': 'none',      // ✅ Nessuna freccia
                         'curve-style': this.settings.edgeCurveStyle,
                         'label': this.settings.showLabels ? 'data(label)' : '',
                         'font-size': '12px',

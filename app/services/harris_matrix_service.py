@@ -34,6 +34,7 @@ from app.utils.stratigraphy_helpers import (
     VALID_RELATIONSHIP_TYPES,
     get_default_sequenza_fisica,
     parse_target_reference,
+    generate_sequential_codes,
     build_nodes_for_graph,
     build_edges_from_relationships
 )
@@ -213,7 +214,7 @@ class HarrisMatrixService:
             
             for target in targets:
                 # Parse target to handle cross-references like "174(usm)"
-                target_code, target_type = self._parse_target_reference(target)
+                target_code, target_type = parse_target_reference(target)
                 
                 # Enhanced target validation using unit resolver
                 target_exists = False
@@ -273,39 +274,9 @@ class HarrisMatrixService:
         
         return relationships
     
-    def _parse_target_reference(self, target: str) -> Tuple[str, str]:
-        """
-        Parse target reference to extract code and type.
-        
-        Args:
-            target: Target string, possibly with type suffix like "174(usm)"
-            
-        Returns:
-            Tuple of (code, type) where type is 'us' or 'usm'
-        """
-        return parse_target_reference(target)
     
     
     
-    def _calculate_chronological_levels(
-        self,
-        nodes: List[Dict[str, Any]],
-        edges: List[Dict[str, Any]]
-    ) -> Dict[str, int]:
-        """
-        Calculate chronological levels using topological sort.
-        
-        Level 0 = most recent units (highest in stratigraphic sequence)
-        Higher numbers = older units (deeper in stratigraphic sequence)
-        
-        Args:
-            nodes: List of node dictionaries
-            edges: List of edge dictionaries
-            
-        Returns:
-            Dictionary mapping node IDs to their chronological levels
-        """
-        return self.graph_builder.calculate_chronological_levels(nodes, edges)
     
     def _empty_graph(self) -> Dict[str, Any]:
         """
@@ -395,12 +366,12 @@ class HarrisMatrixService:
             # Extract relationships
             relationships = {}
             for rel_type, targets in sequenza_fisica.items():
-                if targets and rel_type in self.RELATIONSHIP_TYPES:
+                if targets and rel_type in RELATIONSHIP_TYPES:
                     relationships[rel_type] = {
                         'targets': targets,
-                        'label': self.RELATIONSHIP_TYPES[rel_type]['label'],
-                        'description': self.RELATIONSHIP_TYPES[rel_type]['description'],
-                        'bidirectional': self.RELATIONSHIP_TYPES[rel_type]['bidirectional']
+                        'label': RELATIONSHIP_TYPES[rel_type]['label'],
+                        'description': RELATIONSHIP_TYPES[rel_type]['description'],
+                        'bidirectional': RELATIONSHIP_TYPES[rel_type]['bidirectional']
                     }
             
             result = {
@@ -445,12 +416,12 @@ class HarrisMatrixService:
             
             # Check for code conflicts first
             logger.debug("DEBUG: Checking code conflicts...")
-            await self._check_code_conflicts(site_id, units_data)
+            await self.unit_lookup.check_code_conflicts(site_id, units_data)
             logger.debug("DEBUG: Code conflicts check passed")
                 
             # Generate sequential codes if not provided
             logger.debug("DEBUG: Generating sequential codes...")
-            units_with_codes = await self._generate_sequential_codes(site_id, units_data)
+            units_with_codes = await generate_sequential_codes(site_id, self.db, units_data)
             logger.debug(f"DEBUG: Generated codes: {[u.get('code') for u in units_with_codes[:3]]}")
                 
             # Create units
@@ -484,96 +455,6 @@ class HarrisMatrixService:
             logger.error(f"Error in bulk creation for site {site_id}: {str(e)}")
             raise HarrisMatrixServiceError(str(e), "bulk_create_units_with_relationships")
     
-    async def _check_code_conflicts(self, site_id: UUID, units_data: List[Dict[str, Any]]) -> None:
-        """Check for existing unit codes in the site."""
-        try:
-            existing_us_codes = set()
-            existing_usm_codes = set()
-            
-            # Get existing US codes
-            us_query = select(UnitaStratigrafica.us_code).where(
-                and_(
-                    UnitaStratigrafica.site_id == str(site_id),
-                    UnitaStratigrafica.deleted_at.is_(None)
-                )
-            )
-            us_result = await self.db.execute(us_query)
-            existing_us_codes = set(row[0] for row in us_result.fetchall())
-            
-            # Get existing USM codes
-            usm_query = select(UnitaStratigraficaMuraria.usm_code).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == str(site_id),
-                    UnitaStratigraficaMuraria.deleted_at.is_(None)
-                )
-            )
-            usm_result = await self.db.execute(usm_query)
-            existing_usm_codes = set(row[0] for row in usm_result.fetchall())
-            
-            # Check for conflicts
-            for unit_data in units_data:
-                unit_type = unit_data.get('unit_type', 'us')
-                code = unit_data.get('code')
-                
-                if code:
-                    if unit_type == 'us' and code in existing_us_codes:
-                        raise UnitCodeConflict(code, 'us')
-                    elif unit_type == 'usm' and code in existing_usm_codes:
-                        raise UnitCodeConflict(code, 'usm')
-                        
-        except Exception as e:
-            logger.error(f"Error checking code conflicts for site {site_id}: {str(e)}")
-            raise
-    
-    async def _generate_sequential_codes(self, site_id: UUID, units_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Generate sequential codes for units without explicit codes."""
-        try:
-            # Get current max codes
-            us_max_query = select(func.max(UnitaStratigrafica.us_code)).where(
-                and_(
-                    UnitaStratigrafica.site_id == str(site_id),
-                    UnitaStratigrafica.deleted_at.is_(None)
-                )
-            )
-            us_max_result = await self.db.execute(us_max_query)
-            us_max = us_max_result.scalar() or 0
-            
-            usm_max_query = select(func.max(UnitaStratigraficaMuraria.usm_code)).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == str(site_id),
-                    UnitaStratigraficaMuraria.deleted_at.is_(None)
-                )
-            )
-            usm_max_result = await self.db.execute(usm_max_query)
-            usm_max = usm_max_result.scalar() or 0
-            
-            # Extract numeric parts
-            us_max_num = int(re.sub(r'\D', '', str(us_max))) if us_max else 0
-            usm_max_num = int(re.sub(r'\D', '', str(usm_max))) if usm_max else 0
-            
-            us_counter = us_max_num + 1
-            usm_counter = usm_max_num + 1
-            
-            # Generate codes for units without them
-            result = []
-            for unit_data in units_data:
-                unit_type = unit_data.get('unit_type', 'us')
-                
-                if not unit_data.get('code'):
-                    if unit_type == 'us':
-                        unit_data['code'] = f"US{us_counter:03d}"
-                        us_counter += 1
-                    elif unit_type == 'usm':
-                        unit_data['code'] = f"USM{usm_counter:03d}"
-                        usm_counter += 1
-                
-                result.append(unit_data)
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error generating sequential codes for site {site_id}: {str(e)}")
-            raise
     
     async def _bulk_create_units(self, site_id: UUID, units_data: List[Dict[str, Any]], current_user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Create multiple units in bulk."""
@@ -598,7 +479,7 @@ class HarrisMatrixService:
                         periodo=unit_data.get('periodo'),
                         fase=unit_data.get('fase'),
                         affidabilita_stratigrafica=unit_data.get('affidabilita_stratigrafica'),
-                        sequenza_fisica=self._get_default_sequenza_fisica(),
+                        sequenza_fisica=get_default_sequenza_fisica(),
                         created_by=unit_data.get('created_by') or current_user_id,
                         updated_by=unit_data.get('updated_by') or current_user_id
                     )
@@ -612,7 +493,7 @@ class HarrisMatrixService:
                         periodo=unit_data.get('periodo'),
                         fase=unit_data.get('fase'),
                         tecnica_costruttiva=unit_data.get('tecnica_costruttiva'),
-                        sequenza_fisica=self._get_default_sequenza_fisica(),
+                        sequenza_fisica=get_default_sequenza_fisica(),
                         created_by=unit_data.get('created_by') or current_user_id,
                         updated_by=unit_data.get('updated_by') or current_user_id
                     )
@@ -634,21 +515,6 @@ class HarrisMatrixService:
         except Exception as e:
             logger.error(f"Error in bulk unit creation for site {site_id}: {str(e)}")
             raise
-    
-    def _get_default_sequenza_fisica(self) -> Dict[str, List[str]]:
-        """Get default sequenza_fisica structure."""
-        return {
-            "uguale_a": [],
-            "si_lega_a": [],
-            "gli_si_appoggia": [],
-            "si_appoggia_a": [],
-            "coperto_da": [],
-            "copre": [],
-            "tagliato_da": [],
-            "taglia": [],
-            "riempito_da": [],
-            "riempie": []
-        }
     
     async def _bulk_create_relationships(
         self,
@@ -956,7 +822,7 @@ class HarrisMatrixService:
                 
                 # Update relationships
                 if not unit.sequenza_fisica:
-                    unit.sequenza_fisica = self._get_default_sequenza_fisica()
+                    unit.sequenza_fisica = get_default_sequenza_fisica()
                 
                 # Apply updates
                 for rel_type, targets in relationships_update.items():
@@ -1340,12 +1206,12 @@ class HarrisMatrixService:
             
             # Count relationships
             rel_counts = {}
-            for rel_type in self.RELATIONSHIP_TYPES.keys():
+            for rel_type in RELATIONSHIP_TYPES.keys():
                 rel_counts[rel_type] = 0
             
             # Process US relationships
             for row in us_rows + usm_rows:
-                for rel_type in self.RELATIONSHIP_TYPES.keys():
+                for rel_type in RELATIONSHIP_TYPES.keys():
                     rel_data = getattr(row, rel_type)
                     if rel_data and isinstance(rel_data, list):
                         rel_counts[rel_type] += len(rel_data)
@@ -1515,7 +1381,7 @@ class HarrisMatrixService:
                     if edge['type'] in ['copre', 'taglia', 'si_appoggia_a', 'riempie']:
                         graph[edge['from']].append(edge['to'])
                 
-                cycles = self.detect_cycles_in_graph(graph)
+                cycles = CycleDetector.detect_cycles_in_graph(graph)
                 if cycles:
                     validation_results['business_rules']['cycles_detected'] = True
                     validation_results['is_valid'] = False

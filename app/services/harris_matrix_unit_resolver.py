@@ -28,6 +28,13 @@ from sqlalchemy import select, and_, or_, func, text
 from loguru import logger
 
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.utils.stratigraphy_helpers import (
+    parse_target_reference,
+    UnitLookupService,
+    StratigraphicRulesValidator,
+    create_unit_lookup_service,
+    RELATIONSHIP_TYPES
+)
 
 
 class UnitResolver:
@@ -62,6 +69,7 @@ class UnitResolver:
         self._lookup_cache = {}
         self._cache_timestamps = {}
         self._resolution_stats = defaultdict(int)
+        self._unit_lookup_service = create_unit_lookup_service(db)
     
     async def resolve_unit_code(
         self, 
@@ -182,17 +190,13 @@ class UnitResolver:
     async def _direct_match(self, code: str, unit_type: str) -> Optional[str]:
         """Strategy 1: Direct exact match (case-sensitive)."""
         try:
-            # Build lookup tables for this site if needed
             site_id = await self._get_current_site_id()
             if not site_id:
                 return None
             
-            lookup_tables = await self.build_lookup_tables(site_id)
-            
-            if unit_type == 'us':
-                return lookup_tables['us_exact'].get(code)
-            else:  # usm
-                return lookup_tables['usm_exact'].get(code)
+            # Use centralized UnitLookupService
+            unit = await self._unit_lookup_service.get_unit_by_code(site_id, code, unit_type)
+            return str(unit.id) if unit else None
                 
         except Exception as e:
             logger.error(f"Direct match failed for {code}: {str(e)}")
@@ -205,16 +209,17 @@ class UnitResolver:
             if not site_id:
                 return None
             
-            lookup_tables = await self.build_lookup_tables(site_id)
+            # Get all units for case-insensitive search
+            us_units, usm_units = await self._unit_lookup_service.get_units_by_site(site_id)
             
             if unit_type == 'us':
-                for us_code, us_id in lookup_tables['us_exact'].items():
-                    if us_code.lower() == code.lower():
-                        return us_id
+                for us in us_units:
+                    if us.us_code.lower() == code.lower():
+                        return str(us.id)
             else:  # usm
-                for usm_code, usm_id in lookup_tables['usm_exact'].items():
-                    if usm_code.lower() == code.lower():
-                        return usm_id
+                for usm in usm_units:
+                    if usm.usm_code.lower() == code.lower():
+                        return str(usm.id)
                         
         except Exception as e:
             logger.error(f"Case-insensitive match failed for {code}: {str(e)}")
@@ -313,10 +318,9 @@ class UnitResolver:
             logger.error(f"Soft-deleted lookup failed for {code}: {str(e)}")
             return None
     
-    @lru_cache(maxsize=CACHE_MAX_SIZE)
     async def build_lookup_tables(self, site_id: str) -> Dict[str, Dict]:
         """
-        Build comprehensive lookup tables for all units in a site.
+        Build comprehensive lookup tables for all units in a site using centralized UnitLookupService.
         
         Args:
             site_id: UUID of the archaeological site
@@ -328,7 +332,7 @@ class UnitResolver:
         current_time = datetime.now()
         
         # Check cache validity
-        if (cache_key in self._lookup_cache and 
+        if (cache_key in self._lookup_cache and
             cache_key in self._cache_timestamps):
             cache_age = current_time - self._cache_timestamps[cache_key]
             if cache_age < timedelta(minutes=self.CACHE_TTL_MINUTES):
@@ -339,29 +343,10 @@ class UnitResolver:
             logger.info(f"Building lookup tables for site {site_id}")
             start_time = time.time()
             
-            # Query active US units
-            us_query = select(UnitaStratigrafica).where(
-                and_(
-                    UnitaStratigrafica.site_id == site_id,
-                    UnitaStratigrafica.deleted_at.is_(None)
-                )
-            ).order_by(UnitaStratigrafica.us_code)
+            # Use centralized UnitLookupService for active units
+            us_units, usm_units = await self._unit_lookup_service.get_units_by_site(site_id)
             
-            us_result = await self.db.execute(us_query)
-            us_units = us_result.scalars().all()
-            
-            # Query active USM units
-            usm_query = select(UnitaStratigraficaMuraria).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == site_id,
-                    UnitaStratigraficaMuraria.deleted_at.is_(None)
-                )
-            ).order_by(UnitaStratigraficaMuraria.usm_code)
-            
-            usm_result = await self.db.execute(usm_query)
-            usm_units = usm_result.scalars().all()
-            
-            # Query soft-deleted US units
+            # For deleted units, we still need to query directly as UnitLookupService filters them out
             us_deleted_query = select(UnitaStratigrafica).where(
                 and_(
                     UnitaStratigrafica.site_id == site_id,
@@ -372,7 +357,6 @@ class UnitResolver:
             us_deleted_result = await self.db.execute(us_deleted_query)
             us_deleted_units = us_deleted_result.scalars().all()
             
-            # Query soft-deleted USM units
             usm_deleted_query = select(UnitaStratigraficaMuraria).where(
                 and_(
                     UnitaStratigraficaMuraria.site_id == site_id,
@@ -444,7 +428,7 @@ class UnitResolver:
     
     async def validate_references(self, site_id: str) -> Dict[str, List[str]]:
         """
-        Validate all references and identify broken relationships system-wide.
+        Validate all references and identify broken relationships using centralized validation services.
         
         Args:
             site_id: UUID of the archaeological site
@@ -456,8 +440,11 @@ class UnitResolver:
             logger.info(f"Validating references for site {site_id}")
             start_time = time.time()
             
-            # Build lookup tables
-            lookup_tables = await self.build_lookup_tables(site_id)
+            # Use centralized UnitLookupService to get units
+            us_units, usm_units = await self._unit_lookup_service.get_units_by_site(site_id)
+            
+            # Create lookup dictionaries for validation
+            us_lookup, usm_lookup = self._unit_lookup_service.get_unit_lookup_dictionaries(us_units, usm_units)
             
             broken_references = {
                 'us_units': [],
@@ -467,41 +454,19 @@ class UnitResolver:
             }
             
             # Validate US units
-            us_units_query = select(UnitaStratigrafica).where(
-                and_(
-                    UnitaStratigrafica.site_id == site_id,
-                    UnitaStratigrafica.deleted_at.is_(None),
-                    UnitaStratigrafica.sequenza_fisica.is_not(None)
-                )
-            )
-            
-            us_result = await self.db.execute(us_units_query)
-            us_units = us_result.scalars().all()
-            
             for us in us_units:
                 if us.sequenza_fisica:
                     unit_issues = await self._validate_unit_references(
-                        us.us_code, 'us', us.sequenza_fisica, lookup_tables
+                        us.us_code, 'us', us.sequenza_fisica, us_lookup, usm_lookup
                     )
                     if unit_issues:
                         broken_references['us_units'].extend(unit_issues)
             
             # Validate USM units
-            usm_units_query = select(UnitaStratigraficaMuraria).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == site_id,
-                    UnitaStratigraficaMuraria.deleted_at.is_(None),
-                    UnitaStratigraficaMuraria.sequenza_fisica.is_not(None)
-                )
-            )
-            
-            usm_result = await self.db.execute(usm_units_query)
-            usm_units = usm_result.scalars().all()
-            
             for usm in usm_units:
                 if usm.sequenza_fisica:
                     unit_issues = await self._validate_unit_references(
-                        usm.usm_code, 'usm', usm.sequenza_fisica, lookup_tables
+                        usm.usm_code, 'usm', usm.sequenza_fisica, us_lookup, usm_lookup
                     )
                     if unit_issues:
                         broken_references['usm_units'].extend(unit_issues)
@@ -530,7 +495,8 @@ class UnitResolver:
         unit_code: str,
         unit_type: str,
         sequenza_fisica: Dict[str, List[str]],
-        lookup_tables: Dict[str, Dict]
+        us_lookup: Dict[str, UnitaStratigrafica],
+        usm_lookup: Dict[str, UnitaStratigraficaMuraria]
     ) -> List[str]:
         """
         Validate references for a single unit.
@@ -552,39 +518,31 @@ class UnitResolver:
                     continue
                 
                 for target in targets:
-                    # Parse target reference (handle format like "174(usm)")
-                    target_code, target_type = self._parse_target_reference(target)
+                    # Parse target reference using centralized function
+                    target_code, target_type = parse_target_reference(target)
                     
                     # Try to resolve the target using our resolver
                     resolved_id = await self.resolve_unit_code(target_code, target_type)
                     
                     if not resolved_id:
-                        # Check if it's in soft-deleted
-                        if target_type == 'us':
-                            if target_code.lower() in lookup_tables['us_deleted']:
-                                issues.append(
-                                    f"{unit_type.upper()}{unit_code} references deleted US{target_code}"
-                                )
-                            else:
-                                issues.append(
-                                    f"{unit_type.upper()}{unit_code} cannot find US{target_code}"
-                                )
-                        else:  # usm
-                            if target_code.lower() in lookup_tables['usm_deleted']:
-                                issues.append(
-                                    f"{unit_type.upper()}{unit_code} references deleted USM{target_code}"
-                                )
-                            else:
-                                issues.append(
-                                    f"{unit_type.upper()}{unit_code} cannot find USM{target_code}"
-                                )
+                        # Check if it exists in lookup tables
+                        exists = False
+                        if target_type == 'us' and target_code in us_lookup:
+                            exists = True
+                        elif target_type == 'usm' and target_code in usm_lookup:
+                            exists = True
+                        
+                        if not exists:
+                            issues.append(
+                                f"{unit_type.upper()}{unit_code} cannot find {target_type.upper()}{target_code}"
+                            )
                     
-                    # Check for cross-type inconsistencies
-                    original_target_type = self._extract_target_type_from_reference(target)
-                    if original_target_type and original_target_type != target_type:
+                    # Cross-type consistency check using centralized function
+                    _, parsed_target_type = parse_target_reference(target)
+                    if parsed_target_type and parsed_target_type != target_type:
                         issues.append(
                             f"{unit_type.upper()}{unit_code} has cross-type reference: "
-                            f"{target} (expected {original_target_type}, resolved as {target_type})"
+                            f"{target} (resolved as {target_type}, but parsed as {parsed_target_type})"
                         )
                         
         except Exception as e:
@@ -702,7 +660,7 @@ class UnitResolver:
                 
                 valid_targets = []
                 for target in targets:
-                    target_code, target_type = self._parse_target_reference(target)
+                    target_code, target_type = parse_target_reference(target)
                     
                     # Check if target exists
                     if target_type == 'us':
@@ -733,40 +691,8 @@ class UnitResolver:
             logger.error(f"Error cleaning up references for {unit_type}: {str(e)}")
             return 0
     
-    def _parse_target_reference(self, target: str) -> Tuple[str, str]:
-        """
-        Parse target reference to extract code and type.
-        
-        Args:
-            target: Target string, possibly with type suffix like "174(usm)"
-            
-        Returns:
-            Tuple of (code, type) where type is 'us' or 'usm'
-        """
-        # Check for explicit type specification
-        match = re.match(r'^(\w+)\((usm?)\)$', target.lower())
-        if match:
-            code = match.group(1).upper()
-            unit_type = match.group(2)
-            return code, unit_type
-        
-        # Default to US if no type specified
-        return target.upper(), 'us'
-    
-    def _extract_target_type_from_reference(self, target: str) -> Optional[str]:
-        """
-        Extract the target type from a reference string.
-        
-        Args:
-            target: Reference string like "174(usm)"
-            
-        Returns:
-            Target type ('us', 'usm') or None if not specified
-        """
-        match = re.match(r'^\w+\((usm?)\)$', target.lower())
-        if match:
-            return match.group(1)
-        return None
+    # REMOVED: _parse_target_reference() - now using parse_target_reference() from stratigraphy_helpers
+    # REMOVED: _extract_target_type_from_reference() - now using parse_target_reference() from stratigraphy_helpers
     
     async def _get_current_site_id(self) -> Optional[str]:
         """
@@ -949,7 +875,7 @@ class UnitResolver:
             for us_backup in backup_data.get('us_units', []):
                 try:
                     us_query = select(UnitaStratigrafica).where(
-                        UnitStratigrafica.id == UUID(us_backup['id'])
+                        UnitaStratigrafica.id == UUID(us_backup['id'])
                     )
                     us_result = await self.db.execute(us_query)
                     us_unit = us_result.scalar_one_or_none()
@@ -1057,39 +983,22 @@ class UnitResolver:
                 }
             }
             
-            # Build lookup tables for validation
-            lookup_tables = await self.build_lookup_tables(site_id)
-            
-            # Get US units statistics
-            us_query = select(UnitaStratigrafica).where(
-                and_(
-                    UnitaStratigrafica.site_id == site_id,
-                    UnitaStratigrafica.deleted_at.is_(None)
-                )
-            )
-            
-            us_result = await self.db.execute(us_query)
-            us_units = us_result.scalars().all()
+            # Use centralized UnitLookupService to get units
+            us_units, usm_units = await self._unit_lookup_service.get_units_by_site(site_id)
             stats['us_units']['total'] = len(us_units)
-            
-            # Get USM units statistics
-            usm_query = select(UnitaStratigraficaMuraria).where(
-                and_(
-                    UnitaStratigraficaMuraria.site_id == site_id,
-                    UnitaStratigraficaMuraria.deleted_at.is_(None)
-                )
-            )
-            
-            usm_result = await self.db.execute(usm_query)
-            usm_units = usm_result.scalars().all()
             stats['usm_units']['total'] = len(usm_units)
+            
+            # Create lookup dictionaries for analysis
+            us_lookup, usm_lookup = self._unit_lookup_service.get_unit_lookup_dictionaries(us_units, usm_units)
             
             # Analyze US units
             for us in us_units:
                 if us.sequenza_fisica:
                     stats['us_units']['with_references'] += 1
+                    # Create lookup dictionaries for analysis
+                    us_lookup, usm_lookup = self._unit_lookup_service.get_unit_lookup_dictionaries(us_units, usm_units)
                     unit_stats = self._analyze_unit_references(
-                        us.sequenza_fisica, lookup_tables
+                        us.sequenza_fisica, us_lookup, usm_lookup
                     )
                     
                     stats['us_units']['total_references'] += unit_stats['total_refs']
@@ -1109,7 +1018,7 @@ class UnitResolver:
                 if usm.sequenza_fisica:
                     stats['usm_units']['with_references'] += 1
                     unit_stats = self._analyze_unit_references(
-                        usm.sequenza_fisica, lookup_tables
+                        usm.sequenza_fisica, us_lookup, usm_lookup
                     )
                     
                     stats['usm_units']['total_references'] += unit_stats['total_refs']
@@ -1168,14 +1077,16 @@ class UnitResolver:
     def _analyze_unit_references(
         self,
         sequenza_fisica: Dict[str, List[str]],
-        lookup_tables: Dict[str, Dict]
+        us_lookup: Dict[str, UnitaStratigrafica],
+        usm_lookup: Dict[str, UnitaStratigraficaMuraria]
     ) -> Dict[str, Any]:
         """
-        Analyze references for a single unit.
+        Analyze references for a single unit using centralized lookup services.
         
         Args:
             sequenza_fisica: JSON structure containing relationships
-            lookup_tables: Pre-built lookup tables
+            us_lookup: US unit lookup dictionary
+            usm_lookup: USM unit lookup dictionary
             
         Returns:
             Dictionary with analysis results
@@ -1195,16 +1106,14 @@ class UnitResolver:
                 analysis['total_refs'] += len(targets)
                 
                 for target in targets:
-                    target_code, target_type = self._parse_target_reference(target)
+                    target_code, target_type = parse_target_reference(target)
                     
-                    # Check if target exists
+                    # Check if target exists in lookup dictionaries
                     exists = False
                     if target_type == 'us':
-                        exists = (target_code in lookup_tables['us_exact'] or
-                                 target_code.lower() in lookup_tables['us_deleted'])
+                        exists = target_code in us_lookup
                     else:  # usm
-                        exists = (target_code in lookup_tables['usm_exact'] or
-                                 target_code.lower() in lookup_tables['usm_deleted'])
+                        exists = target_code in usm_lookup
                     
                     if not exists:
                         analysis['broken_refs'] += 1
