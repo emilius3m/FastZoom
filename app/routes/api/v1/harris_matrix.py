@@ -1205,8 +1205,17 @@ async def v1_validate_relationship(
         errors = []
         warnings = []
         
-        # Check self-relationship
-        if from_unit.id == to_unit.id:
+        # Check self-relationship (handle both database models and bulk creation objects)
+        def get_unit_id(unit):
+            """Get unit ID from either database model (.id) or bulk creation object (.temp_id)"""
+            if hasattr(unit, 'temp_id'):
+                return unit.temp_id
+            elif hasattr(unit, 'id'):
+                return unit.id
+            else:
+                raise ValueError(f"Unit object has no 'id' or 'temp_id' attribute: {unit}")
+        
+        if get_unit_id(from_unit) == get_unit_id(to_unit):
             errors.append("Unit cannot have relationship with itself")
         
         # Check US type rules

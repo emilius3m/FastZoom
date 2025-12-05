@@ -1131,6 +1131,7 @@ function harrisMatrixEditor() {
         selectedNode: null,
         tempIdCounter: 0,
         loading: false,
+        isDragging: false,
 
         // UI state
         showSettings: false,
@@ -1281,38 +1282,45 @@ this.cy.on('mouseout', 'edge', (evt) => {
             this.cy.on('grab', 'node', (evt) => {
                 if (this.editMode !== 'move') return;
 
+                this.isDragging = true;  // <-- ADD THIS
                 const node = evt.target;
-                // Salva posizione originale per eventuale undo
                 this.snapState.originalY = node.position('y');
-
                 console.log(`🎯 Drag started: ${node.data('label')}`);
             });
 
-            // Durante il drag
-            this.cy.on('drag', 'node', (evt) => {
+            // Durante il drag - usa 'position' event che viene chiamato DOPO l'update
+            this.cy.on('position', 'node', (evt) => {
                 if (this.editMode !== 'move') return;
+                if (!this.isDragging) return; // Solo durante drag attivo
 
                 const movedNode = evt.target;
-                let pos = { ...evt.position };
+                const currentPos = movedNode.position();
 
                 // Grid snap se abilitato
+                let targetPos = { x: currentPos.x, y: currentPos.y };
+
                 if (this.settings.gridSnap) {
                     const gridSize = 20;
-                    pos.x = Math.round(pos.x / gridSize) * gridSize;
-                    pos.y = Math.round(pos.y / gridSize) * gridSize;
+                    targetPos.x = Math.round(targetPos.x / gridSize) * gridSize;
+                    targetPos.y = Math.round(targetPos.y / gridSize) * gridSize;
                 }
 
                 // Magnetic snap se abilitato
                 if (this.settings.magneticSnap) {
-                    pos = this.magneticSnapNode(movedNode, pos);
+                    const snappedPos = this.magneticSnapNode(movedNode, targetPos);
+                    targetPos = snappedPos;
                 }
 
-                // IMPORTANTE: Aggiorna effettivamente la posizione del nodo
-                movedNode.position(pos);
+                // Applica la posizione solo se diversa (evita loop infinito)
+                if (targetPos.x !== currentPos.x || targetPos.y !== currentPos.y) {
+                    movedNode.position(targetPos);
+                }
             });
 
             // Fine drag
             this.cy.on('free', 'node', (evt) => {
+                this.isDragging = false;  // <-- ADD THIS
+
                 if (this.editMode !== 'move') return;
 
                 const node = evt.target;
@@ -1809,8 +1817,37 @@ this.cy.on('mouseout', 'edge', (evt) => {
                 if (!response.ok) {
                     const error = await response.json();
                     console.error('❌ Backend error:', error);
+                    console.error('📊 Response structure:', {
+                        status: response.status,
+                        hasError: !!error.error,
+                        hasValidationErrors: !!error.validation_errors,
+                        hasDetail: !!error.detail,
+                        errorKeys: Object.keys(error)
+                    });
                     
-                    // Enhanced error reporting
+                    // ✅ Fixed error parsing - handle correct backend response format
+                    if (error.validation_errors && Array.isArray(error.validation_errors)) {
+                        // Backend returns validation_errors at root level
+                        const validationErrors = error.validation_errors.join('\n- ');
+                        let errorMessage = `❌ Validation errors:\n- ${validationErrors}`;
+                        
+                        // Add warnings if present
+                        if (error.validation_warnings && error.validation_warnings.length > 0) {
+                            errorMessage += `\n\n⚠️ Warnings:\n- ${error.validation_warnings.join('\n- ')}`;
+                        }
+                        
+                        // Add field errors if present
+                        if (error.field_errors && Object.keys(error.field_errors).length > 0) {
+                            errorMessage += `\n\n📝 Field errors:`;
+                            for (const [field, messages] of Object.entries(error.field_errors)) {
+                                errorMessage += `\n• ${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`;
+                            }
+                        }
+                        
+                        throw new Error(errorMessage);
+                    }
+                    
+                    // Fallback for other error formats
                     if (error.detail) {
                         if (typeof error.detail === 'string') {
                             throw new Error(error.detail);
@@ -1820,8 +1857,11 @@ this.cy.on('mouseout', 'edge', (evt) => {
                         } else {
                             throw new Error(JSON.stringify(error.detail, null, 2));
                         }
+                    } else if (error.error) {
+                        // Handle simple error message
+                        throw new Error(error.error);
                     } else {
-                        throw new Error('Error saving matrix');
+                        throw new Error(`Error saving matrix (HTTP ${response.status}): ${JSON.stringify(error, null, 2)}`);
                     }
                 }
 

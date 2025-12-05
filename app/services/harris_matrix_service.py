@@ -657,13 +657,23 @@ class HarrisMatrixService:
     ) -> List[Dict[str, Any]]:
         """Create multiple relationships in bulk."""
         try:
-            # Create unit lookup
+            # DEBUG: Log the structure of created_units to validate assumptions
+            logger.debug(f"DEBUG: created_units structure: {created_units}")
+            logger.debug(f"DEBUG: created_units type: {type(created_units)}")
+            if created_units:
+                logger.debug(f"DEBUG: first unit structure: {created_units[0]}")
+                logger.debug(f"DEBUG: first unit keys: {list(created_units[0].keys())}")
+            
+            # Create unit lookup using the actual data structure
             unit_lookup = {
-                unit['temp_id']: unit['unit'] for unit in created_units
+                unit['temp_id']: unit for unit in created_units
             }
+            logger.debug(f"DEBUG: unit_lookup created successfully: {list(unit_lookup.keys())}")
+            
             code_lookup = {
-                (unit['unit_type'], unit['code']): unit['unit'] for unit in created_units
+                (unit['unit_type'], unit['code']): unit for unit in created_units
             }
+            logger.debug(f"DEBUG: code_lookup created successfully: {list(code_lookup.keys())}")
             
             created_relationships = []
             
@@ -676,18 +686,53 @@ class HarrisMatrixService:
                     logger.warning(f"Skipping incomplete relationship: {rel_data}")
                     continue
                 
-                from_unit = unit_lookup.get(from_temp_id)
-                to_unit = unit_lookup.get(to_temp_id)
+                from_unit_data = unit_lookup.get(from_temp_id)
+                to_unit_data = unit_lookup.get(to_temp_id)
                 
-                if not from_unit or not to_unit:
+                if not from_unit_data or not to_unit_data:
                     logger.warning(f"Missing units for relationship: {rel_data}")
                     continue
                 
-                # Validate the relationship type
-                await self._validate_single_relationship(from_unit, to_unit, relation_type)
+                logger.debug(f"DEBUG: Processing relationship {from_temp_id} -> {to_temp_id} ({relation_type})")
+                logger.debug(f"DEBUG: from_unit_data: {from_unit_data}")
+                logger.debug(f"DEBUG: to_unit_data: {to_unit_data}")
                 
-                # Add relationship to from_unit's sequenza_fisica
-                if hasattr(from_unit, 'sequenza_fisica'):
+                # Fetch the actual database units to access their attributes
+                try:
+                    if from_unit_data['unit_type'] == 'us':
+                        from_query = select(UnitaStratigrafica).where(
+                            UnitaStratigrafica.id == from_unit_data['id']
+                        )
+                    else:  # usm
+                        from_query = select(UnitaStratigraficaMuraria).where(
+                            UnitaStratigraficaMuraria.id == from_unit_data['id']
+                        )
+                    
+                    from_result = await self.db.execute(from_query)
+                    from_unit = from_result.scalar_one_or_none()
+                    
+                    if to_unit_data['unit_type'] == 'us':
+                        to_query = select(UnitaStratigrafica).where(
+                            UnitaStratigrafica.id == to_unit_data['id']
+                        )
+                    else:  # usm
+                        to_query = select(UnitaStratigraficaMuraria).where(
+                            UnitaStratigraficaMuraria.id == to_unit_data['id']
+                        )
+                    
+                    to_result = await self.db.execute(to_query)
+                    to_unit = to_result.scalar_one_or_none()
+                    
+                    if not from_unit or not to_unit:
+                        logger.warning(f"Could not fetch database units for relationship: {rel_data}")
+                        continue
+                    
+                    logger.debug(f"DEBUG: Successfully fetched database units: from={from_unit.id}, to={to_unit.id}")
+                    
+                    # Validate the relationship type
+                    await self._validate_single_relationship(from_unit, to_unit, relation_type)
+                    
+                    # Add relationship to from_unit's sequenza_fisica
                     target_code = to_unit.usm_code if hasattr(to_unit, 'usm_code') else to_unit.us_code
                     
                     # Add type suffix for cross-references
@@ -696,18 +741,27 @@ class HarrisMatrixService:
                     else:
                         target_reference = target_code
                     
+                    logger.debug(f"DEBUG: Adding target_reference '{target_reference}' to relationship type '{relation_type}'")
+                    
                     if target_reference not in from_unit.sequenza_fisica.get(relation_type, []):
                         from_unit.sequenza_fisica[relation_type].append(target_reference)
+                        logger.debug(f"DEBUG: Added relationship successfully")
+                    else:
+                        logger.debug(f"DEBUG: Relationship already exists, skipping")
                 
-                # Debug logging to validate assumptions
-                logger.debug(f"DEBUG: Creating temp_id for relationship from={from_unit.id} to={to_unit.id}, type={relation_type}")
-                created_relationships.append({
-                    'temp_id': rel_data.get('temp_id', str(uuid4())),
-                    'from_unit_id': str(from_unit.id),
-                    'to_unit_id': str(to_unit.id),
-                    'relation_type': relation_type
-                })
-                logger.debug(f"DEBUG: Created relationship temp_id={created_relationships[-1]['temp_id']}")
+                    # Debug logging to validate assumptions
+                    logger.debug(f"DEBUG: Creating temp_id for relationship from={from_unit.id} to={to_unit.id}, type={relation_type}")
+                    created_relationships.append({
+                        'temp_id': rel_data.get('temp_id', str(uuid4())),
+                        'from_unit_id': str(from_unit.id),
+                        'to_unit_id': str(to_unit.id),
+                        'relation_type': relation_type
+                    })
+                    logger.debug(f"DEBUG: Created relationship temp_id={created_relationships[-1]['temp_id']}")
+                    
+                except Exception as e:
+                    logger.error(f"DEBUG: Error processing relationship {rel_data}: {e}")
+                    continue
             
             return created_relationships
             
@@ -730,8 +784,14 @@ class HarrisMatrixService:
         try:
             logger.info("Validating stratigraphic relationships")
             
+            # Transform units data to match expected format for validation
+            validation_units = await self._prepare_units_for_validation(units)
+            
+            # Transform relationships to use proper unit IDs
+            validation_relationships = await self._prepare_relationships_for_validation(units, relationships)
+            
             # Build graph representation using centralized service
-            graph = self.graph_builder.build_validation_graph(units, relationships)
+            graph = self.graph_builder.build_validation_graph(validation_units, validation_relationships)
             
             # Check for cycles using centralized detector
             cycles = CycleDetector.detect_cycles_in_graph(graph)
@@ -739,12 +799,97 @@ class HarrisMatrixService:
                 raise StratigraphicCycleDetected(cycles[0])
             
             # Validate business rules using centralized validator
-            self.rules_validator.validate_business_rules(units, relationships)
+            self.rules_validator.validate_business_rules(validation_units, validation_relationships)
             
             logger.info("Stratigraphic relationships validation passed")
             
         except Exception as e:
             logger.error(f"Error validating stratigraphic relationships: {str(e)}")
+            raise
+    
+    async def _prepare_units_for_validation(self, units: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Transform unit data to match the expected validation format.
+        
+        The validate_business_rules function expects each unit dictionary to have a 'unit' key
+        containing the actual unit object, but bulk creation provides a different structure.
+        
+        Args:
+            units: List of unit dictionaries from bulk creation
+            
+        Returns:
+            List of unit dictionaries in validation format
+        """
+        try:
+            validation_units = []
+            
+            for unit in units:
+                # Fetch the actual database unit object
+                if unit['unit_type'] == 'us':
+                    query = select(UnitaStratigrafica).where(
+                        UnitaStratigrafica.id == unit['id']
+                    )
+                else:  # usm
+                    query = select(UnitaStratigraficaMuraria).where(
+                        UnitaStratigraficaMuraria.id == unit['id']
+                    )
+                
+                result = await self.db.execute(query)
+                unit_obj = result.scalar_one_or_none()
+                
+                if unit_obj:
+                    validation_unit = {
+                        'id': unit['id'],
+                        'unit_type': unit['unit_type'],
+                        'unit': unit_obj  # This is the key fix - include the actual unit object
+                    }
+                    validation_units.append(validation_unit)
+                else:
+                    logger.warning(f"Could not find unit {unit['id']} for validation")
+            
+            logger.debug(f"Prepared {len(validation_units)} units for validation")
+            return validation_units
+            
+        except Exception as e:
+            logger.error(f"Error preparing units for validation: {str(e)}")
+            raise
+    
+    async def _prepare_relationships_for_validation(self, units: List[Dict[str, Any]], relationships: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Transform relationships to use proper unit IDs for validation.
+        
+        Args:
+            units: List of unit dictionaries from bulk creation
+            relationships: List of relationship dictionaries
+            
+        Returns:
+            List of relationship dictionaries in validation format
+        """
+        try:
+            # Create mapping from temp_id to actual database ID
+            id_mapping = {unit['temp_id']: unit['id'] for unit in units}
+            
+            validation_relationships = []
+            
+            for rel in relationships:
+                from_temp_id = rel.get('from_temp_id')
+                to_temp_id = rel.get('to_temp_id')
+                
+                if from_temp_id in id_mapping and to_temp_id in id_mapping:
+                    validation_rel = {
+                        'from_unit_id': id_mapping[from_temp_id],
+                        'to_unit_id': id_mapping[to_temp_id],
+                        'relation_type': rel['relation_type']
+                    }
+                    validation_relationships.append(validation_rel)
+                else:
+                    logger.warning(f"Skipping relationship with missing units: {from_temp_id} -> {to_temp_id}")
+            
+            logger.debug(f"Prepared {len(validation_relationships)} relationships for validation")
+            return validation_relationships
+            
+        except Exception as e:
+            logger.error(f"Error preparing relationships for validation: {str(e)}")
             raise
     
     
