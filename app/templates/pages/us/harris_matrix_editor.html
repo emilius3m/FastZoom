@@ -1690,6 +1690,37 @@ function harrisMatrixEditor() {
                 
                 const matrixData = await response.json();
                 
+                // Load layout positions if not included in matrix data
+                if (!matrixData.nodes?.some(n => n.position)) {
+                    try {
+                        const layoutResponse = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/layout`, {
+                            method: 'GET',
+                            credentials: 'include'
+                        });
+
+                        if (layoutResponse.ok) {
+                            const layoutData = await layoutResponse.json();
+                            const positionMap = {};
+
+                            layoutData.positions?.forEach(pos => {
+                                positionMap[pos.unit_id] = { x: pos.x, y: pos.y };
+                            });
+
+                            // Add positions to nodes
+                            matrixData.nodes?.forEach(node => {
+                                const nodeId = node.label || node.code || node.id;
+                                if (positionMap[nodeId]) {
+                                    node.position = positionMap[nodeId];
+                                }
+                            });
+
+                            console.log(`Loaded ${layoutData.positions?.length || 0} saved positions`);
+                        }
+                    } catch (layoutError) {
+                        console.warn('Could not load layout positions:', layoutError);
+                    }
+                }
+                
                 // Convert to editor format and load
                 this.loadMatrixData(matrixData);
                 
@@ -1729,7 +1760,7 @@ function harrisMatrixEditor() {
                             label: nodeLabel,
                             ...nodeData
                         },
-                        position: { x: Math.random() * 400, y: Math.random() * 400 }
+                        position: node.position || { x: Math.random() * 400, y: Math.random() * 400 }
                     });
                 });
             }
@@ -1865,6 +1896,36 @@ function harrisMatrixEditor() {
                 }
 
                 const result = await response.json();
+
+                // ============ SAVE NODE POSITIONS ============
+                try {
+                    const positions = this.cy.nodes().map(node => ({
+                        unit_id: node.data('label') || node.id(),
+                        unit_type: node.data('unitType') || 'us',
+                        x: Math.round(node.position('x')),
+                        y: Math.round(node.position('y'))
+                    }));
+
+                    const layoutResponse = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/layout`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({ positions: positions })
+                    });
+
+                    if (layoutResponse.ok) {
+                        const layoutResult = await layoutResponse.json();
+                        console.log(`Layout saved: ${layoutResult.saved_positions} positions`);
+                    } else {
+                        console.warn('Failed to save layout positions');
+                    }
+                } catch (layoutError) {
+                    console.error('Error saving layout:', layoutError);
+                    // Don't fail the whole save if layout save fails
+                }
+                // ============ END SAVE NODE POSITIONS ============
 
                 alert(`✅ Harris Matrix saved successfully!\n\nCreated:\n- ${result.created_units || 0} units\n- ${result.created_relationships || 0} relationships\n\n${result.message || 'Matrix saved successfully'}`);
 

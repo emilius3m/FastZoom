@@ -13,6 +13,7 @@ from app.core.security import (
     get_current_user_sites_with_blacklist,
 )
 from app.services.harris_matrix_service import HarrisMatrixService
+from app.models.harris_matrix_layout import HarrisMatrixLayout
 from app.schemas.harris_matrix_editor import (
     HarrisMatrixBulkCreateRequest,
     HarrisMatrixBulkCreateResponse,
@@ -31,7 +32,9 @@ from app.schemas.harris_matrix_editor import (
     CycleDetectionResult,
     UnitCodeValidation,
     HarrisMatrixBulkCreateUnit,
-    HarrisMatrixBulkCreateRelationship
+    HarrisMatrixBulkCreateRelationship,
+    HarrisMatrixLayoutSaveRequest,
+    NodePosition
 )
 from app.exceptions import (
     HarrisMatrixValidationError,
@@ -42,7 +45,7 @@ from app.exceptions import (
     BusinessLogicError
 )
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, delete
 from app.utils.stratigraphy_helpers import (
     UnitLookupService,
     CycleDetector,
@@ -1426,4 +1429,115 @@ async def v1_validate_unit_code(
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/layout",
+    summary="Save Harris Matrix node positions",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_save_harris_matrix_layout(
+    site_id: str,
+    request: HarrisMatrixLayoutSaveRequest,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> Dict[str, Any]:
+    """
+    Save node positions for Harris Matrix layout.
+
+    This endpoint saves the X,Y coordinates of all nodes in the Harris Matrix
+    editor, allowing the layout to be restored when reloading.
+    """
+    if not await verify_site_access(site_id, user_sites):
+        raise HTTPException(status_code=403, detail="Access denied to this site")
+
+    try:
+        # Delete existing positions for this site
+        await db.execute(
+            delete(HarrisMatrixLayout).where(
+                HarrisMatrixLayout.site_id == site_id
+            )
+        )
+
+        # Insert new positions
+        saved_count = 0
+        for pos in request.positions:
+            layout = HarrisMatrixLayout(
+                site_id=site_id,
+                unit_id=pos.unit_id,
+                unit_type=pos.unit_type,
+                x=pos.x,
+                y=pos.y
+            )
+            db.add(layout)
+            saved_count += 1
+
+        await db.commit()
+
+        logger.info(f"Saved {saved_count} node positions for site {site_id}")
+        return {
+            "success": True,
+            "saved_positions": saved_count,
+            "site_id": site_id
+        }
+
+    except Exception as e:
+        logger.error(f"Error saving layout for site {site_id}: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error saving layout: {str(e)}"
+        )
+
+
+@router.get(
+    "/sites/{site_id}/layout",
+    summary="Get Harris Matrix node positions",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_get_harris_matrix_layout(
+    site_id: str,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> Dict[str, Any]:
+    """
+    Get saved node positions for Harris Matrix layout.
+
+    Returns the saved X,Y coordinates for all nodes, allowing the editor
+    to restore the previous layout.
+    """
+    if not await verify_site_access(site_id, user_sites):
+        raise HTTPException(status_code=403, detail="Access denied to this site")
+
+    try:
+        result = await db.execute(
+            select(HarrisMatrixLayout).where(
+                HarrisMatrixLayout.site_id == site_id
+            )
+        )
+        layouts = result.scalars().all()
+
+        positions = [
+            {
+                "unit_id": layout.unit_id,
+                "unit_type": layout.unit_type,
+                "x": layout.x,
+                "y": layout.y
+            }
+            for layout in layouts
+        ]
+
+        logger.info(f"Retrieved {len(positions)} node positions for site {site_id}")
+        return {
+            "site_id": site_id,
+            "positions": positions,
+            "count": len(positions)
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting layout for site {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting layout: {str(e)}"
         )

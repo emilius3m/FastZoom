@@ -21,6 +21,7 @@ from sqlalchemy import select, and_, or_, func, text
 from loguru import logger
 
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.harris_matrix_layout import HarrisMatrixLayout
 from app.services.harris_matrix_unit_resolver import UnitResolver
 from app.utils.stratigraphy_helpers import (
     UnitLookupService,
@@ -95,6 +96,33 @@ class HarrisMatrixService:
             # Build graph data structures using centralized utilities
             nodes = build_nodes_for_graph(us_units, usm_units)
             edges = build_edges_from_relationships(relationships)
+
+            # Fetch saved positions for nodes
+            try:
+                layout_result = await self.db.execute(
+                    select(HarrisMatrixLayout).where(
+                        HarrisMatrixLayout.site_id == str(site_id)
+                    )
+                )
+                layouts = {
+                    layout.unit_id: {"x": layout.x, "y": layout.y}
+                    for layout in layout_result.scalars().all()
+                }
+
+                # Add positions to nodes
+                for node in nodes:
+                    node_id = node.get("label") or node.get("id")
+                    if node_id in layouts:
+                        node["position"] = layouts[node_id]
+                    else:
+                        # Default position if not saved
+                        node["position"] = None
+
+                logger.debug(f"Added {len(layouts)} saved positions to nodes")
+
+            except Exception as e:
+                logger.warning(f"Could not load layout positions: {str(e)}")
+                # Continue without positions - they will be random in frontend
             
             # Calculate chronological levels using topological sort
             levels = self.graph_builder.calculate_chronological_levels(nodes, edges)

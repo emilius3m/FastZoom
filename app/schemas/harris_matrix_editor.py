@@ -517,3 +517,71 @@ class CycleDetectionResult(BaseModel):
     cycles: List[List[str]] = Field(..., description="List of detected cycles")
     cycle_count: int = Field(..., description="Total number of cycles")
     affected_units: List[str] = Field(..., description="Units involved in cycles")
+
+
+class NodePosition(BaseModel):
+    """Position data for a single Harris Matrix node"""
+    unit_id: str = Field(..., description="Unit identifier (e.g., 'US001', 'USM002')")
+    unit_type: str = Field(..., description="Unit type: 'us' or 'usm'")
+    x: float = Field(..., description="X coordinate position")
+    y: float = Field(..., description="Y coordinate position")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "unit_id": "US001",
+                "unit_type": "us",
+                "x": 150.5,
+                "y": 200.0
+            }
+        }
+
+
+class HarrisMatrixLayoutSaveRequest(BaseModel):
+    """Request model for saving Harris Matrix node positions"""
+    positions: List[NodePosition] = Field(..., description="List of node positions to save")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "positions": [
+                    {
+                        "unit_id": "US001",
+                        "unit_type": "us",
+                        "x": 150.5,
+                        "y": 200.0
+                    },
+                    {
+                        "unit_id": "USM002",
+                        "unit_type": "usm",
+                        "x": 300.0,
+                        "y": 100.5
+                    }
+                ]
+            }
+        }
+
+
+class HarrisMatrixLayoutResponse(BaseModel):
+    """Response model for saved Harris Matrix layout"""
+    site_id: UUID = Field(..., description="Site identifier")
+    positions: List[NodePosition] = Field(default_factory=list, description="Saved node positions")
+    saved_count: int = Field(default=0, description="Number of positions saved")
+    success: bool = Field(default=True, description="Operation success status")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "site_id": "123e4567-e89b-12d3-a456-426614174000",
+                "positions": [
+                    {
+                        "unit_id": "US001",
+                        "unit_type": "us",
+                        "x": 150.5,
+                        "y": 200.0
+                    }
+                ],
+                "saved_count": 1,
+                "success": True
+            }
+        }
