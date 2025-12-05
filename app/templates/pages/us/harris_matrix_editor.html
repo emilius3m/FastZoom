@@ -1255,24 +1255,22 @@ function harrisMatrixEditor() {
 
             ///
             // Hover nodi
-this.cy.on('mouseover', 'node', (evt) => {
-  evt.target.addClass('hovered');
-  this.showTooltip(evt);
-});
-this.cy.on('mouseout', 'node', (evt) => {
-  evt.target.removeClass('hovered');
-  this.tooltip.visible = false;
-});
+            this.cy.on('mouseover', 'node', (evt) => {
+                evt.target.addClass('hovered');
+                this.showTooltip(evt);
+            });
+            this.cy.on('mouseout', 'node', (evt) => {
+                evt.target.removeClass('hovered');
+                this.tooltip.visible = false;
+            });
 
-// Hover archi
-this.cy.on('mouseover', 'edge', (evt) => {
-  evt.target.addClass('hovered');
-});
-this.cy.on('mouseout', 'edge', (evt) => {
-  evt.target.removeClass('hovered');
-});
-
-
+            // Hover archi
+            this.cy.on('mouseover', 'edge', (evt) => {
+                evt.target.addClass('hovered');
+            });
+            this.cy.on('mouseout', 'edge', (evt) => {
+                evt.target.removeClass('hovered');
+            });
 
             // ========================================
             // DRAG HANDLING - ENHANCED WITH MAGNETIC SNAP
