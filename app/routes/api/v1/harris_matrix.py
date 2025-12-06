@@ -1541,3 +1541,208 @@ async def v1_get_harris_matrix_layout(
             status_code=500,
             detail=f"Error getting layout: {str(e)}"
         )
+
+
+@router.get(
+    "/sites/{site_id}/fallback-layout",
+    summary="Generate complete fallback layout based on stratigraphic relationships",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_generate_fallback_layout(
+    site_id: UUID,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> Dict[str, Any]:
+    """
+    Generate complete fallback layout based on stratigraphic relationships.
+    
+    This endpoint provides a comprehensive fallback layout generation service
+    that analyzes all US/USM units and their relationships to create
+    logical X,Y positions when no manual positioning is available.
+    """
+    if not await verify_site_access(site_id, user_sites):
+        raise HTTPException(status_code=403, detail="Access denied to this site")
+
+    try:
+        logger.info(f"Generating fallback layout for site {site_id}")
+        
+        # Initialize service and get matrix data
+        harris_service = HarrisMatrixService(db)
+        matrix_data = await harris_service.generate_harris_matrix(site_id)
+        
+        nodes = matrix_data.get('nodes', [])
+        relationships = matrix_data.get('edges', [])
+        
+        if not nodes:
+            logger.warning(f"No nodes found for site {site_id}")
+            return {
+                "success": False,
+                "message": "No stratigraphic units found for this site",
+                "positions": []
+            }
+        
+        # Check if nodes already have positions
+        nodes_without_positions = [node for node in nodes if not node.get('position')]
+        
+        if not nodes_without_positions:
+            logger.info(f"All nodes for site {site_id} already have positions")
+            return {
+                "success": True,
+                "message": "All nodes already have positions",
+                "positions": []
+            }
+        
+        # Generate fallback positions
+        fallback_positions = await harris_service._calculate_fallback_positions(
+            site_id, nodes_without_positions, relationships
+        )
+        
+        # Convert to API format
+        positions = []
+        for unit_id, position in fallback_positions.items():
+            node = next((n for n in nodes_without_positions
+                       if (n.get("label") or n.get("id")) == unit_id), None)
+            
+            if node:
+                positions.append({
+                    "unit_id": unit_id,
+                    "unit_type": node.get("type", "us"),
+                    "unit_code": node.get("label", unit_id),
+                    "x": position["x"],
+                    "y": position["y"]
+                })
+        
+        return {
+            "success": True,
+            "message": f"Generated {len(positions)} fallback positions",
+            "site_id": str(site_id),
+            "total_nodes": len(nodes),
+            "positioned_nodes": len(positions),
+            "positions": positions
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating fallback layout for site {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating fallback layout: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/bulk-update-sequenza-fisica",
+    summary="Bulk update sequenza_fisica based on physical order",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_bulk_update_sequenza_fisica(
+    site_id: str,
+    request: Dict[str, Any],
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> Dict[str, Any]:
+    """
+    Bulk update sequenza_fisica for multiple units based on physical order.
+    
+    This endpoint updates the sequenza_fisica JSON field for multiple units
+    based on their physical arrangement in the Harris Matrix editor.
+    """
+    if not await verify_site_access(site_id, user_sites):
+        raise HTTPException(status_code=403, detail="Access denied to this site")
+
+    try:
+        logger.info(f"Bulk updating sequenza_fisica for site {site_id}")
+        
+        updates = request.get('updates', {})
+        if not updates:
+            raise HTTPException(status_code=400, detail="No updates provided")
+        
+        updated_units = 0
+        errors = []
+        
+        async with db.begin():
+            for unit_id, update_data in updates.items():
+                try:
+                    # Determine unit type and fetch the appropriate unit
+                    unit = await _fetch_unit_by_temp_id(db, site_id, unit_id)
+                    if not unit:
+                        errors.append(f"Unit {unit_id} not found")
+                        continue
+                    
+                    # Update sequenza_fisica
+                    new_sequenza_fisica = update_data.get('sequenza_fisica', {})
+                    if new_sequenza_fisica:
+                        unit.sequenza_fisica = new_sequenza_fisica
+                        updated_units += 1
+                        logger.debug(f"Updated sequenza_fisica for unit {unit_id}")
+                    
+                except Exception as e:
+                    error_msg = f"Error updating unit {unit_id}: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+        
+        result = {
+            "success": len(errors) == 0,
+            "site_id": site_id,
+            "updated_units": updated_units,
+            "total_requested": len(updates),
+            "errors": errors,
+            "message": f"Updated sequenza_fisica for {updated_units} units"
+        }
+        
+        logger.info(f"Bulk sequenza_fisica update completed: {result}")
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk sequenza_fisica update for site {site_id}: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating sequenza_fisica: {str(e)}"
+        )
+
+
+async def _fetch_unit_by_temp_id(db: AsyncSession, site_id: str, temp_id: str):
+    """
+    Fetch unit by temp_id, checking both US and USM tables.
+    
+    Args:
+        db: Database session
+        site_id: Site ID
+        temp_id: Temporary ID from frontend
+        
+    Returns:
+        Unit object or None if not found
+    """
+    try:
+        # Try US table first
+        us_query = select(UnitaStratigrafica).where(
+            and_(
+                UnitaStratigrafica.site_id == site_id,
+                UnitaStratigrafica.id == temp_id,
+                UnitaStratigrafica.deleted_at.is_(None)
+            )
+        )
+        us_result = await db.execute(us_query)
+        us_unit = us_result.scalar_one_or_none()
+        
+        if us_unit:
+            return us_unit
+        
+        # Try USM table
+        usm_query = select(UnitaStratigraficaMuraria).where(
+            and_(
+                UnitaStratigraficaMuraria.site_id == site_id,
+                UnitaStratigraficaMuraria.id == temp_id,
+                UnitaStratigraficaMuraria.deleted_at.is_(None)
+            )
+        )
+        usm_result = await db.execute(usm_query)
+        usm_unit = usm_result.scalar_one_or_none()
+        
+        return usm_unit
+        
+    except Exception as e:
+        logger.error(f"Error fetching unit by temp_id {temp_id}: {str(e)}")
+        return None

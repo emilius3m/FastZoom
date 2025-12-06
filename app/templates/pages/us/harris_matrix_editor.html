@@ -1691,8 +1691,12 @@ function harrisMatrixEditor() {
                 const matrixData = await response.json();
                 
                 // Load layout positions if not included in matrix data
-                if (!matrixData.nodes?.some(n => n.position)) {
+                let hasPositions = matrixData.nodes?.some(n => n.position);
+                let loadedPositions = false;
+                
+                if (!hasPositions) {
                     try {
+                        // 1. Try to load saved layout positions first
                         const layoutResponse = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/layout`, {
                             method: 'GET',
                             credentials: 'include'
@@ -1714,11 +1718,72 @@ function harrisMatrixEditor() {
                                 }
                             });
 
+                            hasPositions = true;
+                            loadedPositions = true;
                             console.log(`Loaded ${layoutData.positions?.length || 0} saved positions`);
+                        } else {
+                            console.warn('No saved layout positions found');
                         }
                     } catch (layoutError) {
                         console.warn('Could not load layout positions:', layoutError);
                     }
+                }
+                
+                // 2. If still no positions, try fallback generation
+                if (!hasPositions && matrixData.nodes?.length > 0) {
+                    try {
+                        console.log('Attempting to generate fallback positions based on stratigraphic relationships...');
+                        
+                        const fallbackResponse = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/fallback-layout`, {
+                            method: 'GET',
+                            credentials: 'include'
+                        });
+
+                        if (fallbackResponse.ok) {
+                            const fallbackData = await fallbackResponse.json();
+                            const positionMap = {};
+
+                            fallbackData.positions?.forEach(pos => {
+                                positionMap[pos.unit_id] = { x: pos.x, y: pos.y };
+                            });
+
+                            // Add fallback positions to nodes
+                            let positionedCount = 0;
+                            matrixData.nodes?.forEach(node => {
+                                const nodeId = node.label || node.code || node.id;
+                                if (positionMap[nodeId]) {
+                                    node.position = positionMap[nodeId];
+                                    positionedCount++;
+                                }
+                            });
+
+                            if (positionedCount > 0) {
+                                console.log(`Generated fallback positions for ${positionedCount} nodes`);
+                                hasPositions = true;
+                                
+                                // Show notification to user
+                                const message = `Generated automatic layout for ${positionedCount} stratigraphic units based on their relationships`;
+                                if (!alert(message)) {
+                                    console.log('User acknowledged automatic layout generation');
+                                }
+                            }
+                        } else {
+                            console.warn('Fallback position generation failed');
+                        }
+                    } catch (fallbackError) {
+                        console.warn('Could not generate fallback positions:', fallbackError);
+                    }
+                }
+                
+                // 3. Final fallback: assign random positions if still no positions
+                if (!hasPositions) {
+                    console.warn('No positions available, using random positioning');
+                    matrixData.nodes?.forEach((node, index) => {
+                        node.position = {
+                            x: 50 + (Math.random() * 300),
+                            y: 50 + (Math.random() * 200)
+                        };
+                    });
                 }
                 
                 // Convert to editor format and load
@@ -1926,6 +1991,17 @@ function harrisMatrixEditor() {
                     // Don't fail the whole save if layout save fails
                 }
                 // ============ END SAVE NODE POSITIONS ============
+
+                // ============ UPDATE SEQUENZA_FISICA BASED ON PHYSICAL ORDER ============
+                try {
+                    await this.updateSequenzaFisicaFromPhysicalOrder();
+                    console.log('✅ sequenza_fisica updated based on physical order');
+                } catch (sequenzaError) {
+                    console.error('❌ Error updating sequenza_fisica:', sequenzaError);
+                    // Non fallire l'intero salvataggio se l'aggiornamento della sequenza_fisica fallisce
+                    console.warn('⚠️ Matrix saved but sequenza_fisica update failed');
+                }
+                // ============ END UPDATE SEQUENZA_FISICA ============
 
                 alert(`✅ Harris Matrix saved successfully!\n\nCreated:\n- ${result.created_units || 0} units\n- ${result.created_relationships || 0} relationships\n\n${result.message || 'Matrix saved successfully'}`);
 
@@ -2601,6 +2677,166 @@ function harrisMatrixEditor() {
         // Cancel confirmation dialog
         cancelDeleteConfirmation() {
             this.confirmDialog.visible = false;
+        },
+
+        // ===== UPDATE SEQUENZA_FISICA BASED ON PHYSICAL ORDER =====
+        /**
+         * Aggiorna il campo sequenza_fisica delle unità basandosi sull'ordine fisico
+         * dei nodi nella Harris Matrix (posizione Y)
+         */
+        async updateSequenzaFisicaFromPhysicalOrder() {
+            if (!this.cy || this.nodes.length === 0) {
+                console.warn('No nodes to update sequenza_fisica');
+                return;
+            }
+
+            try {
+                console.log('🔄 Updating sequenza_fisica based on physical order...');
+                
+                // 1. Ottieni tutti i nodi ordinati per posizione Y (ordine fisico dall'alto al basso)
+                const cyNodes = this.cy.nodes();
+                const nodesWithPositions = [];
+
+                cyNodes.forEach(node => {
+                    const pos = node.position();
+                    const data = node.data();
+                    
+                    nodesWithPositions.push({
+                        id: data.id,
+                        label: data.label,
+                        unitType: data.unitType,
+                        temp_id: data.temp_id,
+                        y: pos.y,
+                        // Rimuovi prefissi US/USM per ottenere il codice numerico
+                        code: data.label.replace(/^(US|USM)/, '')
+                    });
+                });
+
+                // 2. Ordina i nodi per posizione Y (dall'alto al basso = ordine cronologico)
+                nodesWithPositions.sort((a, b) => a.y - b.y);
+
+                console.log(`📊 Physical order: ${nodesWithPositions.map(n => n.label).join(' > ')}`);
+
+                // 3. Calcola le relazioni basate sull'ordine fisico
+                const sequenzaUpdates = this.calculatePhysicalSequenzaFisica(nodesWithPositions);
+                
+                console.log(`🔗 Calculated ${Object.keys(sequenzaUpdates).length} sequenza_fisica updates`);
+
+                // 4. Invia gli aggiornamenti al backend
+                if (Object.keys(sequenzaUpdates).length > 0) {
+                    const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-update-sequenza-fisica`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            updates: sequenzaUpdates
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(`Backend error: ${error.detail || JSON.stringify(error)}`);
+                    }
+
+                    const result = await response.json();
+                    console.log(`✅ Backend updated sequenza_fisica:`, result);
+                }
+
+            } catch (error) {
+                console.error('❌ Error in updateSequenzaFisicaFromPhysicalOrder:', error);
+                throw error;
+            }
+        },
+
+        /**
+         * Calcola le relazioni sequenza_fisica basate sull'ordine fisico
+         * @param {Array} orderedNodes - Nodi ordinati per posizione Y
+         * @returns {Object} - Mappa delle relazioni da aggiornare
+         */
+        calculatePhysicalSequenzaFisica(orderedNodes) {
+            const updates = {};
+
+            for (let i = 0; i < orderedNodes.length; i++) {
+                const currentNode = orderedNodes[i];
+                
+                // Initialize sequenza_fisica for this node
+                updates[currentNode.id] = {
+                    sequenza_fisica: {
+                        uguale_a: [],
+                        si_lega_a: [],
+                        gli_si_appoggia: [],
+                        si_appoggia_a: [],
+                        coperto_da: [],
+                        copre: [],
+                        tagliato_da: [],
+                        taglia: [],
+                        riempito_da: [],
+                        riempie: []
+                    }
+                };
+
+                // Nodi sopra (più recenti, coprono/tagliano il nodo corrente)
+                for (let j = 0; j < i; j++) {
+                    const upperNode = orderedNodes[j];
+                    
+                    // Logica per determinare il tipo di relazione
+                    if (upperNode.unitType === 'us') {
+                        if (upperNode.usType === 'positiva') {
+                            // US positiva copre o riempie nodi inferiori
+                            if (this.shouldCover(upperNode, currentNode)) {
+                                updates[upperNode.id].sequenza_fisica.copre.push(currentNode.label);
+                                updates[currentNode.id].sequenza_fisica.coperto_da.push(upperNode.label);
+                            } else {
+                                updates[upperNode.id].sequenza_fisica.riempie.push(currentNode.label);
+                                updates[currentNode.id].sequenza_fisica.riempito_da.push(upperNode.label);
+                            }
+                        } else if (upperNode.usType === 'negativa') {
+                            // US negativa taglia nodi inferiori
+                            updates[upperNode.id].sequenza_fisica.taglia.push(currentNode.label);
+                            updates[currentNode.id].sequenza_fisica.tagliato_da.push(upperNode.label);
+                        }
+                    } else if (upperNode.unitType === 'usm') {
+                        // USM si appoggia a nodi inferiori
+                        updates[upperNode.id].sequenza_fisica.si_appoggia_a.push(currentNode.label);
+                        updates[currentNode.id].sequenza_fisica.gli_si_appoggia.push(upperNode.label);
+                    }
+                }
+
+                // Nodi allo stesso livello Y (potrebbero essere uguali o legati)
+                for (let j = i + 1; j < orderedNodes.length; j++) {
+                    const lowerNode = orderedNodes[j];
+                    
+                    // Se sono sulla stessa riga Y (con tolleranza), potrebbero essere uguali o legati
+                    if (Math.abs(currentNode.y - lowerNode.y) < 10) {
+                        if (currentNode.unitType === lowerNode.unitType) {
+                            // Stesso tipo: uguale_a
+                            updates[currentNode.id].sequenza_fisica.uguale_a.push(lowerNode.label);
+                        } else {
+                            // Tipi diversi: si_lega_a
+                            updates[currentNode.id].sequenza_fisica.si_lega_a.push(lowerNode.label);
+                        }
+                    }
+                }
+            }
+
+            return updates;
+        },
+
+        /**
+         * Determina se una US positiva dovrebbe coprire o riempire
+         * @param {Object} upperNode - Nodo superiore
+         * @param {Object} lowerNode - Nodo inferiore
+         * @returns {boolean} - True se deve coprire, false se deve riempire
+         */
+        shouldCover(upperNode, lowerNode) {
+            // Logica semplificata: se la US inferiore è negativa (taglio), la US positiva la copre
+            // Altrimenti la riempie
+            if (lowerNode.unitType === 'us' && lowerNode.usType === 'negativa') {
+                return true; // Copre un taglio
+            }
+            return false; // Riempie
         }
     };
 }

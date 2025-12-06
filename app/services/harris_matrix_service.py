@@ -11,6 +11,7 @@ Enhanced with UnitResolver for intelligent unit code resolution and reference va
 
 import re
 import asyncio
+import math
 from typing import Dict, List, Any, Optional, Set, Tuple
 from uuid import UUID, uuid4
 from collections import defaultdict, deque
@@ -110,19 +111,50 @@ class HarrisMatrixService:
                 }
 
                 # Add positions to nodes
+                positioned_nodes = 0
+                unpositioned_nodes = []
+                
                 for node in nodes:
                     node_id = node.get("label") or node.get("id")
                     if node_id in layouts:
                         node["position"] = layouts[node_id]
+                        positioned_nodes += 1
                     else:
                         # Default position if not saved
                         node["position"] = None
+                        unpositioned_nodes.append(node)
 
                 logger.debug(f"Added {len(layouts)} saved positions to nodes")
+                
+                # ===== FALLBACK: Calcola posizioni da relazioni US/USM =====
+                if unpositioned_nodes and len(layouts) == 0:
+                    logger.info(f"No saved positions found, calculating fallback positions for {len(unpositioned_nodes)} nodes based on stratigraphic relationships")
+                    fallback_positions = await self._calculate_fallback_positions(site_id, unpositioned_nodes, relationships)
+                    
+                    # Applica le posizioni calcolate
+                    for node in unpositioned_nodes:
+                        node_id = node.get("label") or node.get("id")
+                        if node_id in fallback_positions:
+                            node["position"] = fallback_positions[node_id]
+                    
+                    logger.info(f"Generated fallback positions for {len(fallback_positions)} nodes")
 
             except Exception as e:
                 logger.warning(f"Could not load layout positions: {str(e)}")
-                # Continue without positions - they will be random in frontend
+                # Try fallback calculation as last resort
+                try:
+                    logger.info("Attempting fallback position calculation due to layout loading error")
+                    fallback_positions = await self._calculate_fallback_positions(site_id, nodes, relationships)
+                    
+                    for node in nodes:
+                        node_id = node.get("label") or node.get("id")
+                        if node_id in fallback_positions:
+                            node["position"] = fallback_positions[node_id]
+                    
+                    logger.info(f"Emergency fallback: Generated positions for {len(fallback_positions)} nodes")
+                except Exception as fallback_error:
+                    logger.error(f"Fallback position calculation also failed: {str(fallback_error)}")
+                    # Continue without positions - they will be random in frontend
             
             # Calculate chronological levels using topological sort
             levels = self.graph_builder.calculate_chronological_levels(nodes, edges)
@@ -1428,3 +1460,287 @@ class HarrisMatrixService:
         except Exception as e:
             logger.error(f"Error in matrix integrity validation for site {site_id}: {str(e)}")
             raise
+    
+    async def _calculate_fallback_positions(
+        self,
+        site_id: UUID,
+        nodes: List[Dict[str, Any]],
+        relationships: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, float]]:
+        """
+        Calcola posizioni X,Y per i nodi basandosi sulle relazioni stratigrafiche.
+        
+        Questo metodo di fallback analizza il campo sequenza_fisica delle US/USM
+        per generare un layout logico che rispetti le relazioni fisiche.
+        
+        Args:
+            site_id: UUID del sito archeologico
+            nodes: Lista dei nodi senza posizioni
+            relationships: Lista delle relazioni stratigrafiche
+            
+        Returns:
+            Dizionario con le posizioni calcolate per ogni nodo
+        """
+        try:
+            logger.info(f"Calculating fallback positions for {len(nodes)} nodes using {len(relationships)} relationships")
+            
+            # 1. Analizza le relazioni per determinare la gerarchia temporale
+            temporal_hierarchy = self._build_temporal_hierarchy(nodes, relationships)
+            
+            # 2. Calcola posizioni Y basate sulla gerarchia (più recenti in alto = Y minore)
+            y_positions = self._calculate_y_positions(temporal_hierarchy)
+            
+            # 3. Distribuisci i nodi sull'asse X per leggibilità
+            x_positions = self._calculate_x_positions(temporal_hierarchy, y_positions)
+            
+            # 4. Combina le posizioni X,Y
+            positions = {}
+            for node in nodes:
+                node_id = node.get("label") or node.get("id")
+                positions[node_id] = {
+                    "x": x_positions.get(node_id, 0.0),
+                    "y": y_positions.get(node_id, 0.0)
+                }
+            
+            logger.info(f"Generated fallback positions for {len(positions)} nodes")
+            return positions
+            
+        except Exception as e:
+            logger.error(f"Error calculating fallback positions: {str(e)}")
+            # Fallback base: griglia semplice
+            return self._generate_grid_fallback(nodes)
+    
+    def _build_temporal_hierarchy(
+        self,
+        nodes: List[Dict[str, Any]],
+        relationships: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Costruisce una gerarchia temporale basata sulle relazioni stratigrafiche.
+        
+        Analizza i tipi di relazione per determinare quali nodi sono più antichi
+        o più recenti rispetto ad altri.
+        """
+        hierarchy = {}
+        
+        # Inizializza tutti i nodi nella gerarchia
+        for node in nodes:
+            node_id = node.get("label") or node.get("id")
+            hierarchy[node_id] = {
+                "node": node,
+                "covers": set(),      # Nodi che questo nodo copre (più antichi)
+                "covered_by": set(),  # Nodi che coprono questo (più recenti)
+                "cuts": set(),        # Nodi che questo taglia (più antichi)
+                "cut_by": set(),      # Nodi che tagliano questo (più recenti)
+                "fills": set(),       # Nodi che questo riempie (più antichi)
+                "filled_by": set(),   # Nodi che riempiono questo (più recenti)
+                "same_level": set(),  # Nodi allo stesso livello
+                "level": None         # Livello temporale calcolato
+            }
+        
+        # Analizza le relazioni
+        for rel in relationships:
+            from_node = rel.get("from")
+            to_node = rel.get("to")
+            rel_type = rel.get("type")
+            
+            if from_node in hierarchy and to_node in hierarchy:
+                if rel_type == "copre":
+                    hierarchy[from_node]["covers"].add(to_node)
+                    hierarchy[to_node]["covered_by"].add(from_node)
+                elif rel_type == "coperto_da":
+                    hierarchy[to_node]["covers"].add(from_node)
+                    hierarchy[from_node]["covered_by"].add(to_node)
+                elif rel_type == "taglia":
+                    hierarchy[from_node]["cuts"].add(to_node)
+                    hierarchy[to_node]["cut_by"].add(from_node)
+                elif rel_type == "tagliato_da":
+                    hierarchy[to_node]["cuts"].add(from_node)
+                    hierarchy[from_node]["cut_by"].add(to_node)
+                elif rel_type == "riempie":
+                    hierarchy[from_node]["fills"].add(to_node)
+                    hierarchy[to_node]["filled_by"].add(from_node)
+                elif rel_type == "riempito_da":
+                    hierarchy[to_node]["fills"].add(from_node)
+                    hierarchy[from_node]["filled_by"].add(to_node)
+                elif rel_type in ["uguale_a", "si_lega_a"]:
+                    hierarchy[from_node]["same_level"].add(to_node)
+                    hierarchy[to_node]["same_level"].add(from_node)
+        
+        # Calcola i livelli temporali usando topological sort
+        self._calculate_temporal_levels(hierarchy)
+        
+        return hierarchy
+    
+    def _calculate_temporal_levels(self, hierarchy: Dict[str, Dict[str, Any]]) -> None:
+        """
+        Calcola i livelli temporali per ogni nodo usando un approccio di topological sort.
+        
+        I nodi più recenti avranno livelli più bassi (Y più piccolo),
+        i nodi più antichi avranno livelli più alti (Y più grande).
+        """
+        # Inizializza tutti i nodi a livello sconosciuto
+        for node_id in hierarchy:
+            hierarchy[node_id]["level"] = None
+        
+        # Trova nodi senza dipendenze (più recenti) - livello 0
+        current_level = 0
+        unprocessed = set(hierarchy.keys())
+        
+        while unprocessed:
+            # Trova nodi che possono essere processati a questo livello
+            ready_nodes = []
+            for node_id in list(unprocessed):
+                node_data = hierarchy[node_id]
+                
+                # Un nodo è pronto se non ha nodi che lo coprono/tagliano/riempiono non processati
+                blockers = (node_data["covered_by"] | node_data["cut_by"] | node_data["filled_by"])
+                unprocessed_blockers = blockers & unprocessed
+                
+                if not unprocessed_blockers:
+                    ready_nodes.append(node_id)
+            
+            if not ready_nodes:
+                # Ciclo detectato o relazioni complesse - assegna livello rimanente
+                for node_id in unprocessed:
+                    hierarchy[node_id]["level"] = current_level + 1
+                break
+            
+            # Assegna livello ai nodi pronti
+            for node_id in ready_nodes:
+                hierarchy[node_id]["level"] = current_level
+                unprocessed.remove(node_id)
+            
+            current_level += 1
+            
+            # Preveni loop infiniti
+            if current_level > len(hierarchy) * 2:
+                logger.warning("Potential cycle detected in temporal level calculation")
+                for node_id in unprocessed:
+                    hierarchy[node_id]["level"] = current_level
+                break
+    
+    def _calculate_y_positions(self, hierarchy: Dict[str, Dict[str, Any]]) -> Dict[str, float]:
+        """
+        Calcola le posizioni Y basate sui livelli temporali.
+        
+        Più recenti = Y più piccolo (in alto)
+        Più antichi = Y più grande (in basso)
+        """
+        y_positions = {}
+        
+        # Raccogli tutti i livelli unici
+        levels = set()
+        for node_id, node_data in hierarchy.items():
+            if node_data["level"] is not None:
+                levels.add(node_data["level"])
+        
+        if not levels:
+            # Fallback: tutti allo stesso livello
+            y_base = 100
+            for node_id in hierarchy:
+                y_positions[node_id] = y_base
+            return y_positions
+        
+        # Ordina i livelli (dal più recente al più antico)
+        sorted_levels = sorted(levels)
+        
+        # Calcola Y per ogni livello (spaziatura verticale)
+        y_spacing = 120  # Spazio tra livelli
+        y_base = 50     # Y di partenza (alto)
+        
+        for level in sorted_levels:
+            nodes_at_level = [node_id for node_id, node_data in hierarchy.items()
+                            if node_data["level"] == level]
+            
+            y_position = y_base + (level * y_spacing)
+            
+            for node_id in nodes_at_level:
+                y_positions[node_id] = float(y_position)
+        
+        return y_positions
+    
+    def _calculate_x_positions(
+        self,
+        hierarchy: Dict[str, Dict[str, Any]],
+        y_positions: Dict[str, float]
+    ) -> Dict[str, float]:
+        """
+        Calcola le posizioni X distribuendo i nodi per leggibilità.
+        
+        Nodi allo stesso livello Y vengono distribuiti orizzontalmente.
+        """
+        x_positions = {}
+        
+        # Raggruppa nodi per posizione Y
+        y_groups = {}
+        for node_id, y_pos in y_positions.items():
+            if y_pos not in y_groups:
+                y_groups[y_pos] = []
+            y_groups[y_pos].append(node_id)
+        
+        # Calcola posizioni X per ogni gruppo
+        x_spacing = 150  # Spazio orizzontale tra nodi
+        x_base = 100     # X di partenza (sinistra)
+        
+        for y_pos, nodes in y_groups.items():
+            # Ordina i nodi per tipo (US positive, US negative, USM)
+            nodes.sort(key=lambda node_id: self._get_node_sort_key(hierarchy[node_id]["node"]))
+            
+            for i, node_id in enumerate(nodes):
+                x_position = x_base + (i * x_spacing)
+                x_positions[node_id] = float(x_position)
+        
+        return x_positions
+    
+    def _get_node_sort_key(self, node: Dict[str, Any]) -> tuple:
+        """
+        Restituisce una chiave di ordinamento per i nodi.
+        
+        Ordine: US positive, USM, US negative
+        """
+        node_type = node.get("type", "")
+        us_type = node.get("tipo", "")
+        
+        if node_type == "us" and us_type == "positiva":
+            return (0, 0)  # US positive prima
+        elif node_type == "usm":
+            return (0, 1)  # USM dopo US positive
+        elif node_type == "us" and us_type == "negativa":
+            return (0, 2)  # US negative dopo
+        else:
+            return (1, 0)  # Altri tipi alla fine
+    
+    def _generate_grid_fallback(self, nodes: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+        """
+        Fallback di base: disposizione a griglia semplice.
+        
+        Usato quando il calcolo basato su relazioni fallisce.
+        """
+        positions = {}
+        
+        # Calcola dimensioni della griglia
+        num_nodes = len(nodes)
+        if num_nodes == 0:
+            return positions
+        
+        cols = int(math.ceil(math.sqrt(num_nodes)))
+        rows = int(math.ceil(num_nodes / cols))
+        
+        x_spacing = 150
+        y_spacing = 120
+        x_base = 100
+        y_base = 100
+        
+        for i, node in enumerate(nodes):
+            node_id = node.get("label") or node.get("id")
+            row = i // cols
+            col = i % cols
+            
+            positions[node_id] = {
+                "x": float(x_base + (col * x_spacing)),
+                "y": float(y_base + (row * y_spacing))
+            }
+        
+        logger.info(f"Generated grid fallback positions for {len(positions)} nodes")
+        return positions

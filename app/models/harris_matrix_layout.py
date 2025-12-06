@@ -13,7 +13,7 @@ from sqlalchemy import Column, String, Float, DateTime, ForeignKey, UniqueConstr
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from app.models.base import Base, TimestampMixin, UserMixin
+from app.models.base import Base, TimestampMixin
 
 
 class UnitTypeEnum(str, PyEnum):
@@ -22,7 +22,7 @@ class UnitTypeEnum(str, PyEnum):
     USM = "usm" # Unità Stratigrafica Muraria
 
 
-class HarrisMatrixLayout(Base, TimestampMixin, UserMixin):
+class HarrisMatrixLayout(Base, TimestampMixin):
     """
     Modello per le posizioni dei nodi nella Harris Matrix
     Memorizza le coordinate X,Y di ogni unità stratigrafica per il layout della matrice
@@ -51,7 +51,7 @@ class HarrisMatrixLayout(Base, TimestampMixin, UserMixin):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # === RELAZIONI ===
-    site = relationship("ArchaeologicalSite", back_populates="harris_matrix_layouts")
+    # site = relationship("ArchaeologicalSite", back_populates="harris_matrix_layouts")
 
     # Constraint per garantire unicità del layout per ogni unità all'interno di un sito
     __table_args__ = (
