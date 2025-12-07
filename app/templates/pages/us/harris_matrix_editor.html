@@ -1416,9 +1416,11 @@ function harrisMatrixEditor() {
             }
 
             const nodeData = {
-                temp_id: tempId,
+                tempid: tempId,
+                dbId: null,        // ← ADD THIS: No DB ID for new nodes
                 unitType: type,
                 usType: tipo,
+                isExisting: false, // ← ADD THIS: New node, not from DB
                 definition: '',
                 periodo: '',
                 fase: '',
@@ -1432,8 +1434,8 @@ function harrisMatrixEditor() {
 
             const cyNode = this.cy.add({
                 group: 'nodes',
-                data: { 
-                    id: tempId, 
+                data: {
+                    id: tempId,
                     label: label,
                     ...nodeData
                 },
@@ -1804,10 +1806,13 @@ function harrisMatrixEditor() {
             if (matrixData.nodes) {
                 matrixData.nodes.forEach(node => {
                     const nodeLabel = node.label || node.code || `${node.type?.toUpperCase() || 'US'}${node.id?.slice(-3) || '???'}`;
+                    
                     const nodeData = {
-                        temp_id: node.id,
+                        tempid: node.id,
+                        dbId: node.id,  // ← ADD THIS: Store real DB ID
                         unitType: node.type,
                         usType: node.tipo,
+                        isExisting: true,  // ← ADD THIS: Mark as existing unit
                         definition: node.data?.definition || '',
                         periodo: node.data?.periodo || '',
                         fase: node.data?.fase || '',
@@ -1820,8 +1825,8 @@ function harrisMatrixEditor() {
 
                     this.cy.add({
                         group: 'nodes',
-                        data: { 
-                            id: node.id, 
+                        data: {
+                            id: node.id,
                             label: nodeLabel,
                             ...nodeData
                         },
@@ -1869,160 +1874,185 @@ function harrisMatrixEditor() {
             }
 
             try {
-                // ✅ Transform editor data to backend format
-                const backendUnits = this.nodes.map(node => ({
-                    temp_id: node.temp_id,
-                    unit_type: node.unitType,       // unitType → unit_type
-                    code: null,                      // Let backend auto-generate
-                    definition: node.definition || '',
-                    tipo: node.usType,              // usType → tipo
-                    localita: node.localita || '',
-                    datazione: node.datazione || '',
-                    periodo: node.periodo || '',
-                    fase: node.fase || '',
-                    note: node.note || ''
-                }));
-
-                const backendRelationships = this.edges.map((edge, index) => ({
-                    temp_id: `rel_${index + 1}`,    // Required temp_id for relationships
-                    from_temp_id: edge.from,          // from → from_temp_id
-                    to_temp_id: edge.to,              // to → to_temp_id
-                    relation_type: edge.relationship  // relationship → relation_type
-                }));
-
-                console.log('📤 Sending to backend:', {
-                    units: backendUnits.length,
-                    relationships: backendRelationships.length
-                });
-                console.log('Sample unit:', backendUnits[0]);
-                console.log('Sample relationship:', backendRelationships[0]);
-
-                const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-create`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        units: backendUnits,              // ✅ Correct field name
-                        relationships: backendRelationships // ✅ Correct field name
-                    })
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    console.error('❌ Backend error:', error);
-                    console.error('📊 Response structure:', {
-                        status: response.status,
-                        hasError: !!error.error,
-                        hasValidationErrors: !!error.validation_errors,
-                        hasDetail: !!error.detail,
-                        errorKeys: Object.keys(error)
+                // ===== STEP 1: Separare nodi nuovi vs esistenti =====
+                const newNodes = this.nodes.filter(n => !n.isExisting);
+                const existingNodes = this.nodes.filter(n => n.isExisting);
+                
+                console.log(`Save strategy: ${newNodes.length} new nodes, ${existingNodes.length} existing nodes`);
+                
+                // ===== STEP 2: Creare solo le unità NUOVE con bulk-create =====
+                if (newNodes.length > 0) {
+                    const backendUnits = newNodes.map(node => ({
+                        tempid: node.tempid,
+                        unittype: node.unitType,
+                        code: null,  // Let backend generate
+                        definition: node.definition || "",
+                        tipo: node.usType,
+                        localita: node.localita || "",
+                        datazione: node.datazione || "",
+                        periodo: node.periodo || "",
+                        fase: node.fase || "",
+                        note: node.note || ""
+                    }));
+                    
+                    // Solo relazioni che coinvolgono almeno un nodo nuovo
+                    const newTempIds = new Set(newNodes.map(n => n.tempid));
+                    const backendRelationships = this.edges
+                        .filter(edge => newTempIds.has(edge.from) || newTempIds.has(edge.to))
+                        .map((edge, index) => ({
+                            tempid: `rel${index + 1}`,
+                            fromtempid: edge.from,
+                            totempid: edge.to,
+                            relationtype: edge.relationship
+                        }));
+                    
+                    console.log(`Creating ${backendUnits.length} new units with ${backendRelationships.length} relationships`);
+                    
+                    const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-create`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            units: backendUnits,
+                            relationships: backendRelationships
+                        })
                     });
                     
-                    // ✅ Fixed error parsing - handle correct backend response format
-                    if (error.validation_errors && Array.isArray(error.validation_errors)) {
-                        // Backend returns validation_errors at root level
-                        const validationErrors = error.validation_errors.join('\n- ');
-                        let errorMessage = `❌ Validation errors:\n- ${validationErrors}`;
-                        
-                        // Add warnings if present
-                        if (error.validation_warnings && error.validation_warnings.length > 0) {
-                            errorMessage += `\n\n⚠️ Warnings:\n- ${error.validation_warnings.join('\n- ')}`;
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(JSON.stringify(error, null, 2));
+                    }
+                    
+                    const result = await response.json();
+                    
+                    // Aggiornare tempid -> dbId per i nodi nuovi
+                    const mapping = result.unit_mapping || result.unitmapping || {};
+                    this.nodes.forEach(node => {
+                        if (mapping[node.tempid]) {
+                            node.dbId = mapping[node.tempid];
+                            node.isExisting = true;
+                        }
+                    });
+                    
+                    console.log('New units created successfully');
+                }
+                
+                // ===== STEP 3: Aggiornare sequenza_fisica delle unità ESISTENTI =====
+                if (existingNodes.length > 0) {
+                    const sequenzaUpdates = {};
+                    
+                    for (const node of existingNodes) {
+                        if (!node.dbId) {
+                            console.warn(`Skipping node ${node.tempid}: missing dbId`);
+                            continue;
                         }
                         
-                        // Add field errors if present
-                        if (error.field_errors && Object.keys(error.field_errors).length > 0) {
-                            errorMessage += `\n\n📝 Field errors:`;
-                            for (const [field, messages] of Object.entries(error.field_errors)) {
-                                errorMessage += `\n• ${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`;
+                        // Costruisci sequenzafisica completa per questo nodo
+                        const sequenza = {
+                            copre: [],
+                            taglia: [],
+                            riempie: [],
+                            siappoggiaa: [],
+                            ugualea: [],
+                            silegaa: []
+                        };
+                        
+                        // Raccogli tutte le relazioni USCENTI da questo nodo
+                        const outgoing = this.edges.filter(e => e.from === node.tempid);
+                        
+                        for (const edge of outgoing) {
+                            const targetNode = this.nodes.find(n => n.tempid === edge.to);
+                            if (!targetNode) continue;
+                            
+                            const relType = edge.relationship;
+                            
+                            // Trova il codice target (etichetta visibile nel grafo)
+                            const cyNode = this.cy.$id(targetNode.tempid);
+                            const targetCode = cyNode?.data('label') || targetNode.tempid;
+                            
+                            // Aggiungi a sequenzafisica
+                            if (sequenza[relType]) {
+                                sequenza[relType].push(targetCode);
                             }
                         }
                         
-                        throw new Error(errorMessage);
+                        // Pulisci array vuoti
+                        Object.keys(sequenza).forEach(key => {
+                            if (sequenza[key].length === 0) {
+                                delete sequenza[key];
+                            }
+                        });
+                        
+                        sequenzaUpdates[node.dbId] = sequenza;
                     }
                     
-                    // Fallback for other error formats
-                    if (error.detail) {
-                        if (typeof error.detail === 'string') {
-                            throw new Error(error.detail);
-                        } else if (error.detail.validation_errors) {
-                            const validationErrors = error.detail.validation_errors.join('\n- ');
-                            throw new Error(`Validation errors:\n- ${validationErrors}`);
-                        } else {
-                            throw new Error(JSON.stringify(error.detail, null, 2));
+                    if (Object.keys(sequenzaUpdates).length > 0) {
+                        console.log(`Updating sequenzafisica for ${Object.keys(sequenzaUpdates).length} existing units`);
+                        
+                        const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-update-sequenza-fisica-units`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                updates: sequenzaUpdates
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            const error = await response.json();
+                            console.error('Failed to update sequenzafisica:', error);
+                            throw new Error(`Sequenzafisica update failed: ${error.detail || JSON.stringify(error)}`);
                         }
-                    } else if (error.error) {
-                        // Handle simple error message
-                        throw new Error(error.error);
-                    } else {
-                        throw new Error(`Error saving matrix (HTTP ${response.status}): ${JSON.stringify(error, null, 2)}`);
+                        
+                        const result = await response.json();
+                        console.log('Sequenzafisica updated:', result);
                     }
                 }
-
-                const result = await response.json();
-
-                // ============ SAVE NODE POSITIONS ============
+                
+                // ===== STEP 4: Salvare posizioni layout =====
                 try {
-                    const positions = this.cy.nodes().map(node => ({
-                        unit_id: node.data('label') || node.id(),
-                        unit_type: node.data('unitType') || 'us',
-                        x: Math.round(node.position('x')),
-                        y: Math.round(node.position('y'))
-                    }));
-
-                    const layoutResponse = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/layout`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        credentials: 'include',
-                        body: JSON.stringify({ positions: positions })
+                    const positions = [];
+                    this.cy.nodes().forEach(node => {
+                        const nodeData = this.nodes.find(n => n.tempid === node.id());
+                        const dbId = nodeData?.dbId;
+                        
+                        if (dbId) {
+                            positions.push({
+                                unitid: dbId,
+                                unittype: nodeData.unitType || 'us',
+                                x: Math.round(node.position().x),
+                                y: Math.round(node.position().y)
+                            });
+                        }
                     });
-
-                    if (layoutResponse.ok) {
-                        const layoutResult = await layoutResponse.json();
-                        console.log(`Layout saved: ${layoutResult.saved_positions} positions`);
-                    } else {
-                        console.warn('Failed to save layout positions');
+                    
+                    if (positions.length > 0) {
+                        const layoutResponse = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/layout`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ positions })
+                        });
+                        
+                        if (layoutResponse.ok) {
+                            console.log(`Layout saved: ${positions.length} positions`);
+                        } else {
+                            console.warn('Failed to save layout positions');
+                        }
                     }
                 } catch (layoutError) {
                     console.error('Error saving layout:', layoutError);
-                    // Don't fail the whole save if layout save fails
+                    // Don't fail the entire save if layout fails
                 }
-                // ============ END SAVE NODE POSITIONS ============
-
-                // ============ UPDATE SEQUENZA_FISICA BASED ON PHYSICAL ORDER ============
-                try {
-                    await this.updateSequenzaFisicaFromPhysicalOrder();
-                    console.log('✅ sequenza_fisica updated based on physical order');
-                } catch (sequenzaError) {
-                    console.error('❌ Error updating sequenza_fisica:', sequenzaError);
-                    // Non fallire l'intero salvataggio se l'aggiornamento della sequenza_fisica fallisce
-                    console.warn('⚠️ Matrix saved but sequenza_fisica update failed');
-                }
-                // ============ END UPDATE SEQUENZA_FISICA ============
-
-                alert(`✅ Harris Matrix saved successfully!\n\nCreated:\n- ${result.created_units || 0} units\n- ${result.created_relationships || 0} relationships\n\n${result.message || 'Matrix saved successfully'}`);
-
+                
+                alert(`Harris Matrix saved successfully!\n- ${newNodes.length} new units created\n- ${existingNodes.length} existing units updated`);
+                
                 // Redirect to viewer
                 window.location.href = `/view/${this.siteId}/harris-matrix`;
-
+                
             } catch (error) {
-                console.error('❌ Error saving matrix:', error);
-                
-                // Enhanced error display
-                let errorMessage = error.message;
-                if (error.response) {
-                    try {
-                        const errorData = await error.response.json();
-                        errorMessage = JSON.stringify(errorData, null, 2);
-                    } catch (e) {
-                        errorMessage = error.message;
-                    }
-                }
-                
-                alert(`❌ Error during save:\n${errorMessage}`);
+                console.error('Error saving matrix:', error);
+                alert(`Error during save:\n${error.message}`);
             }
         },
 

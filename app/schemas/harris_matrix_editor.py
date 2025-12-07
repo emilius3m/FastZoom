@@ -585,3 +585,23 @@ class HarrisMatrixLayoutResponse(BaseModel):
                 "success": True
             }
         }
+
+
+class SequenzaFisicaBulkUpdateRequest(BaseModel):
+    """Request model for bulk updating sequenzafisica of existing units."""
+    updates: Dict[str, Dict[str, List[str]]] = Field(
+        ...,
+        description="Map of unit_id -> sequenzafisica dictionary"
+    )
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "updates": {
+                    "550e8400-e29b-41d4-a716-446655440000": {
+                        "copre": ["US002", "US003"],
+                        "taglia": ["US001usm"]
+                    }
+                }
+            }
+        }

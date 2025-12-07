@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 from uuid import UUID
 from typing import Dict, Any, Optional, List
 from loguru import logger
@@ -34,7 +35,8 @@ from app.schemas.harris_matrix_editor import (
     HarrisMatrixBulkCreateUnit,
     HarrisMatrixBulkCreateRelationship,
     HarrisMatrixLayoutSaveRequest,
-    NodePosition
+    NodePosition,
+    SequenzaFisicaBulkUpdateRequest
 )
 from app.exceptions import (
     HarrisMatrixValidationError,
@@ -1199,11 +1201,6 @@ async def v1_validate_relationship(
                 cycles=[]
             )
         
-        # Validate the relationship
-        await harris_service._validate_single_relationship(
-            from_unit, to_unit, request.relation_type.value
-        )
-        
         # Additional business rule validation
         errors = []
         warnings = []
@@ -1221,14 +1218,13 @@ async def v1_validate_relationship(
         if get_unit_id(from_unit) == get_unit_id(to_unit):
             errors.append("Unit cannot have relationship with itself")
         
-        # Check US type rules
-        if hasattr(from_unit, 'tipo') and request.relation_type in [StratigraphicRelation.TAGLIA, StratigraphicRelation.TAGLIATO_DA]:
-            if from_unit.tipo != 'negativa':
-                errors.append("Only negative US units can cut other units")
-        
-        if hasattr(from_unit, 'tipo') and request.relation_type in [StratigraphicRelation.COPRE, StratigraphicRelation.RIEMPIE]:
-            if from_unit.tipo != 'positiva':
-                errors.append("Only positive US units can cover or fill other units")
+        # Validate the relationship using the centralized service
+        try:
+            await harris_service.validate_single_relationship(
+                from_unit, to_unit, request.relation_type.value
+            )
+        except InvalidStratigraphicRelation as e:
+            errors.append(str(e))
         
         validation_result = HarrisMatrixValidationResult(
             is_valid=len(errors) == 0,
@@ -1701,6 +1697,97 @@ async def v1_bulk_update_sequenza_fisica(
             status_code=500,
             detail=f"Error updating sequenza_fisica: {str(e)}"
         )
+
+
+@router.post("/sites/{site_id}/bulk-update-sequenza-fisica-units", summary="Bulk update sequenzafisica for existing units")
+async def v1_bulk_update_sequenza_fisica_units(
+    site_id: UUID,
+    request: SequenzaFisicaBulkUpdateRequest,
+    db: AsyncSession = Depends(get_async_session),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist),
+) -> Dict[str, Any]:
+    """
+    Update sequenzafisica field for multiple existing US/USM units.
+    
+    This endpoint is used by the Harris Matrix editor when modifying relationships
+    of existing units without creating new ones.
+    
+    Args:
+        site_id: UUID of the archaeological site
+        request: Dictionary mapping unit IDs to their new sequenzafisica
+        
+    Returns:
+        Dictionary with update statistics
+    """
+    try:
+        logger.info(f"Bulk updating sequenzafisica for {len(request.updates)} units in site {site_id}")
+        
+        # Verify site access
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Access denied to this site")
+        
+        updated_count = 0
+        errors = []
+        
+        async with db.begin():
+            for unit_id, new_sequenza in request.updates.items():
+                try:
+                    # Try US first
+                    query = select(UnitaStratigrafica).where(
+                        and_(
+                            UnitaStratigrafica.id == unit_id,
+                            UnitaStratigrafica.site_id == str(site_id),
+                            UnitaStratigrafica.deleted_at.is_(None)
+                        )
+                    )
+                    result = await db.execute(query)
+                    unit = result.scalar_one_or_none()
+                    
+                    # If not US, try USM
+                    if not unit:
+                        query = select(UnitaStratigraficaMuraria).where(
+                            and_(
+                                UnitaStratigraficaMuraria.id == unit_id,
+                                UnitaStratigraficaMuraria.site_id == str(site_id),
+                                UnitaStratigraficaMuraria.deleted_at.is_(None)
+                            )
+                        )
+                        result = await db.execute(query)
+                        unit = result.scalar_one_or_none()
+                    
+                    if not unit:
+                        errors.append(f"Unit {unit_id} not found")
+                        continue
+                    
+                    # Update sequenzafisica
+                    unit.sequenzafisica = new_sequenza
+                    
+                    # CRITICAL: Mark as modified
+                    flag_modified(unit, "sequenzafisica")
+                    
+                    updated_count += 1
+                    logger.debug(f"Updated sequenzafisica for unit {unit_id}")
+                    
+                except Exception as e:
+                    logger.error(f"Error updating unit {unit_id}: {str(e)}")
+                    errors.append(f"Unit {unit_id}: {str(e)}")
+        
+        result = {
+            "success": len(errors) == 0,
+            "updated_count": updated_count,
+            "total_requested": len(request.updates),
+            "errors": errors
+        }
+        
+        logger.info(f"Bulk sequenzafisica update completed: {updated_count}/{len(request.updates)} successful")
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk sequenzafisica update: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 async def _fetch_unit_by_temp_id(db: AsyncSession, site_id: str, temp_id: str):

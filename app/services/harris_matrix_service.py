@@ -19,6 +19,7 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, text
+from sqlalchemy.orm.attributes import flag_modified
 from loguru import logger
 
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
@@ -656,7 +657,7 @@ class HarrisMatrixService:
                     logger.debug(f"DEBUG: Successfully fetched database units: from={from_unit.id}, to={to_unit.id}")
                     
                     # Validate the relationship type
-                    await self._validate_single_relationship(from_unit, to_unit, relation_type)
+                    await self.validate_single_relationship(from_unit, to_unit, relation_type)
                     
                     # Add relationship to from_unit's sequenza_fisica
                     target_code = to_unit.usm_code if hasattr(to_unit, 'usm_code') else to_unit.us_code
@@ -669,11 +670,20 @@ class HarrisMatrixService:
                     
                     logger.debug(f"DEBUG: Adding target_reference '{target_reference}' to relationship type '{relation_type}'")
                     
-                    if target_reference not in from_unit.sequenza_fisica.get(relation_type, []):
+                    # Ensure the relationship type key exists
+                    if relation_type not in from_unit.sequenza_fisica:
+                        from_unit.sequenza_fisica[relation_type] = []
+
+                    # Add target reference if not already present
+                    if target_reference not in from_unit.sequenza_fisica[relation_type]:
                         from_unit.sequenza_fisica[relation_type].append(target_reference)
-                        logger.debug(f"DEBUG: Added relationship successfully")
+                        
+                        # CRITICAL: Mark JSON field as modified for SQLAlchemy
+                        flag_modified(from_unit, "sequenza_fisica")
+                        
+                        logger.debug(f"Added {target_reference} to {relation_type} for unit {from_unit.id}")
                     else:
-                        logger.debug(f"DEBUG: Relationship already exists, skipping")
+                        logger.debug(f"Relationship {target_reference} already exists in {relation_type}")
                 
                     # Debug logging to validate assumptions
                     logger.debug(f"DEBUG: Creating temp_id for relationship from={from_unit.id} to={to_unit.id}, type={relation_type}")
@@ -688,6 +698,10 @@ class HarrisMatrixService:
                 except Exception as e:
                     logger.error(f"DEBUG: Error processing relationship {rel_data}: {e}")
                     continue
+            
+            # Flush all pending changes to database
+            await self.db.flush()
+            logger.debug(f"Flushed {len(created_relationships)} relationship updates to database")
             
             return created_relationships
             
@@ -821,13 +835,26 @@ class HarrisMatrixService:
     
     
     
-    async def _validate_single_relationship(
+    async def validate_single_relationship(
         self,
         from_unit,
         to_unit,
         relation_type: str
     ) -> None:
-        """Validate a single relationship using centralized validator."""
+        """
+        Valida una singola relazione utilizzando il validator Harris/ICCD.
+        
+        Questo metodo utilizza il nuovo validate_single_relationship() del validator
+        che implementa le regole specifiche del sistema Harris/ICCD.
+        
+        Args:
+            from_unit: Unità stratigrafica di origine
+            to_unit: Unità stratigrafica di destinazione
+            relation_type: Tipo di relazione (es. 'taglia', 'copre', etc.)
+            
+        Raises:
+            InvalidStratigraphicRelation: Se la relazione viola le regole Harris/ICCD
+        """
         self.rules_validator.validate_single_relationship(from_unit, to_unit, relation_type)
     
     async def bulk_update_relationships(
@@ -888,6 +915,9 @@ class HarrisMatrixService:
                 for rel_type, targets in relationships_update.items():
                     if rel_type in unit.sequenza_fisica:
                         unit.sequenza_fisica[rel_type] = targets or []
+                        
+                        # CRITICAL: Mark JSON field as modified for SQLAlchemy
+                        flag_modified(unit, "sequenza_fisica")
                 
                 # Validate the updated relationships
                 # This would require more complex validation logic

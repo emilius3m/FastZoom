@@ -718,6 +718,65 @@ class StratigraphicRulesValidator:
     principles and domain constraints.
     """
     
+    # Relazioni logiche consentite (soggetto -> oggetto)
+    # Chiave: (from_kind, to_kind, relation_type)
+    # from_kind / to_kind in: 'us_pos', 'us_neg', 'usm'
+    ALLOWED_RELATIONS = {
+        # --- US NEGATIVA (taglio) come soggetto ---
+        ("us_neg", "us_pos", "taglia"),
+        ("us_neg", "us_neg", "taglia"),
+        ("us_neg", "us_pos", "uguale_a"),
+        ("us_neg", "us_neg", "uguale_a"),
+
+        # --- US POSITIVA come soggetto ---
+        ("us_pos", "us_pos", "copre"),
+        ("us_pos", "us_neg", "copre"),
+        ("us_pos", "us_pos", "riempie"),
+        ("us_pos", "us_neg", "riempie"),
+        ("us_pos", "usm",    "si_appoggia_a"),
+
+        # --- USM come soggetto (muri/strutture) ---
+        ("usm", "usm",    "si_lega_a"),
+        ("usm", "usm",    "si_appoggia_a"),
+        ("usm", "us_pos", "si_appoggia_a"),
+        ("usm", "us_pos", "copre"),
+        ("usm", "us_neg", "copre"),
+        ("usm", "us_neg", "riempie"),
+    }
+    
+    @staticmethod
+    def _get_unit_kind(unit) -> str:
+        """
+        Ritorna 'us_pos', 'us_neg', 'usm' in base al tipo di unità.
+        - US: controlla campo .tipo (positiva/negativa)
+        - USM: è sempre 'usm'
+        """
+        # USM ha attributo usm_code, US ha us_code
+        if hasattr(unit, "usm_code"):
+            return "usm"
+
+        # US "normale"
+        tipo = getattr(unit, "tipo", None)
+        if tipo == "negativa":
+            return "us_neg"
+        return "us_pos"
+    
+    @staticmethod
+    def _normalize_relation_type(relation_type: str) -> str:
+        """
+        Normalizza i tipi relazione alle forme 'attive':
+        - coperto_da -> copre
+        - tagliato_da -> taglia
+        - riempito_da -> riempie
+        Altri rimangono invariati.
+        """
+        mapping = {
+            "coperto_da": "copre",
+            "tagliato_da": "taglia",
+            "riempito_da": "riempie",
+        }
+        return mapping.get(relation_type, relation_type)
+    
     @staticmethod
     def validate_business_rules(
         units: List[Dict[str, Any]],
@@ -782,108 +841,62 @@ class StratigraphicRulesValidator:
             logger.error(f"Error validating business rules: {str(e)}")
             raise
     
-    @staticmethod
-    def validate_single_relationship(
-        from_unit,
-        to_unit,
-        relation_type: str
-    ) -> None:
+    @classmethod
+    def validate_single_relationship(cls, from_unit, to_unit, relation_type: str) -> None:
         """
-        Validate a single relationship.
+        Valida una singola relazione in base a:
+        - tipo unità (US+, US-, USM)
+        - tipo relazione (taglia, copre, riempie, siappoggiaa, silegaa, ugualea)
+        Lancia InvalidStratigraphicRelation in caso di violazione.
+        """
+        if from_unit is None or to_unit is None:
+            raise InvalidStratigraphicRelation("Missing units for relationship validation")
+
+        from_kind = cls._get_unit_kind(from_unit)
+        to_kind = cls._get_unit_kind(to_unit)
+        rel = cls._normalize_relation_type(relation_type)
+
+        key = (from_kind, to_kind, rel)
+
+        if key not in cls.ALLOWED_RELATIONS:
+            msg = (
+                f"Relationship not allowed: {from_kind} -> {to_kind} with '{rel}'. "
+                "Check Harris/ICCD rules (es. US- può solo tagliare; "
+                "solo US+/USM possono coprire/riempire; solo USM può silega/siappoggia correttamente)."
+            )
+            raise InvalidStratigraphicRelation(msg)
+
+        # Helper functions to handle both database models and bulk creation objects
+        def get_unit_id(unit):
+            """Get unit ID from either database model (.id) or bulk creation object (.temp_id)"""
+            if hasattr(unit, 'temp_id'):
+                return unit.temp_id
+            elif hasattr(unit, 'id'):
+                return unit.id
+            else:
+                raise ValueError(f"Unit object has no 'id' or 'temp_id' attribute: {unit}")
         
-        Args:
-            from_unit: Source unit object (database model or bulk creation object)
-            to_unit: Target unit object (database model or bulk creation object)
-            relation_type: Type of relationship
-            
-        Raises:
-            InvalidStratigraphicRelation: If validation fails
-        """
-        try:
-            # Helper functions to handle both database models and bulk creation objects
-            def get_unit_id(unit):
-                """Get unit ID from either database model (.id) or bulk creation object (.temp_id)"""
-                if hasattr(unit, 'temp_id'):
-                    return unit.temp_id
-                elif hasattr(unit, 'id'):
-                    return unit.id
-                else:
-                    raise ValueError(f"Unit object has no 'id' or 'temp_id' attribute: {unit}")
-            
-            def get_unit_code(unit):
-                """Extract unit code consistently from both object types"""
-                return getattr(unit, 'us_code', getattr(unit, 'usm_code', getattr(unit, 'code', 'Unknown')))
-            
-            def get_unit_type(unit):
-                """Determine unit type consistently for both object types"""
-                if hasattr(unit, 'unit_type'):  # Bulk creation object
-                    return unit.unit_type
-                elif hasattr(unit, 'us_code'):  # US database model
-                    return 'us'
-                elif hasattr(unit, 'usm_code'):  # USM database model
-                    return 'usm'
-                else:
-                    return 'unknown'
-            
-            def get_us_tipo(unit):
-                """Get US tipo (positive/negative) from database model or bulk creation object"""
-                if hasattr(unit, 'tipo'):
-                    return unit.tipo
-                elif hasattr(unit, 'us_tipo'):
-                    return unit.us_tipo
-                else:
-                    return 'positiva'  # Default for USM or unspecified
-            
-            # Check if relation type is valid
-            if relation_type not in VALID_RELATIONSHIP_TYPES:
-                raise InvalidStratigraphicRelation(
-                    relation_type,
-                    get_unit_code(from_unit),
-                    get_unit_code(to_unit),
-                    f"Tipo di relazione non valido. Valori validi: {VALID_RELATIONSHIP_TYPES}"
-                )
-            
-            # Validate self-relationships (should not exist)
-            if get_unit_id(from_unit) == get_unit_id(to_unit):
-                raise InvalidStratigraphicRelation(
-                    relation_type,
-                    get_unit_code(from_unit),
-                    get_unit_code(to_unit),
-                    "Un'unità non può avere relazioni con se stessa"
-                )
-            
-            # Additional US type validation
-            from_unit_type = get_unit_type(from_unit)
-            
-            # Rule: Only negative US can cut (taglia/tagliato_da)
-            if relation_type in ['taglia', 'tagliato_da']:
-                # This rule only applies to US units, not USM
-                if from_unit_type == 'us':
-                    us_tipo = get_us_tipo(from_unit)
-                    if us_tipo != 'negativa':
-                        raise InvalidStratigraphicRelation(
-                            relation_type,
-                            get_unit_code(from_unit),
-                            get_unit_code(to_unit),
-                            "Solo US negative possono tagliare altre unità"
-                        )
-            
-            # Rule: Positive US can cover/fill (copre/riempie)
-            if relation_type in ['copre', 'riempie']:
-                # This rule only applies to US units, not USM
-                if from_unit_type == 'us':
-                    us_tipo = get_us_tipo(from_unit)
-                    if us_tipo != 'positiva':
-                        raise InvalidStratigraphicRelation(
-                            relation_type,
-                            get_unit_code(from_unit),
-                            get_unit_code(to_unit),
-                            "Solo US positive possono coprire o riempire altre unità"
-                        )
-            
-        except Exception as e:
-            logger.error(f"Error validating single relationship: {str(e)}")
-            raise
+        def get_unit_code(unit):
+            """Extract unit code consistently from both object types"""
+            return getattr(unit, 'us_code', getattr(unit, 'usm_code', getattr(unit, 'code', 'Unknown')))
+        
+        # Check if relation type is valid
+        if relation_type not in VALID_RELATIONSHIP_TYPES:
+            raise InvalidStratigraphicRelation(
+                relation_type,
+                get_unit_code(from_unit),
+                get_unit_code(to_unit),
+                f"Tipo di relazione non valido. Valori validi: {VALID_RELATIONSHIP_TYPES}"
+            )
+        
+        # Validate self-relationships (should not exist)
+        if get_unit_id(from_unit) == get_unit_id(to_unit):
+            raise InvalidStratigraphicRelation(
+                relation_type,
+                get_unit_code(from_unit),
+                get_unit_code(to_unit),
+                "Un'unità non può avere relazioni con se stessa"
+            )
     
     @staticmethod
     def validate_relationship_type(relation_type: str) -> None:
