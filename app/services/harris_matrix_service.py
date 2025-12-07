@@ -49,6 +49,7 @@ from app.exceptions import (
     InvalidStratigraphicRelation,
     HarrisMatrixServiceError
 )
+from app.schemas.harris_matrix_editor import HarrisMatrixCreateRequest
 
 
 # ============================================================================

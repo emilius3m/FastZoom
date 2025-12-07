@@ -2023,8 +2023,6 @@ async def _fetch_unit_by_temp_id(db: AsyncSession, site_id: str, temp_id: str):
         return None
 # ===== COMPREHENSIVE VALIDATION AND ERROR HANDLING FIX #2 =====
 
-from app.core.exceptions import ValidationError
-
 async def harris_matrix_error_handler(func):
     """Decorator for comprehensive error handling"""
     async def wrapper(*args, **kwargs):
