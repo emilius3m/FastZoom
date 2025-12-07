@@ -915,14 +915,33 @@ async def v1_bulk_update_harris_matrix(
             rel_type.value: targets for rel_type, targets in request.relationships.items()
         }
         
-        # Initialize service and perform bulk update
+        # Initialize service and perform bulk update with proper transaction handling
         harris_service = HarrisMatrixService(db)
-        result = await harris_service.bulk_update_relationships(
-            site_id=site_id,
-            unit_id=request.unit_id,
-            unit_type=request.unit_type.value,
-            relationships_update=relationships_update
-        )
+        
+        # Use transaction with rollback on validation failure
+        async with db.begin() as transaction:
+            try:
+                result = await harris_service.bulk_update_relationships(
+                    site_id=site_id,
+                    unit_id=request.unit_id,
+                    unit_type=request.unit_type.value,
+                    relationships_update=relationships_update
+                )
+                # Transaction will commit automatically if no exceptions
+            except (StratigraphicCycleDetected, InvalidStratigraphicRelation, HarrisMatrixValidationError) as e:
+                # Validation failed - transaction will be rolled back automatically
+                logger.error(f"Bulk update validation failed for unit {request.unit_id}: {str(e)}")
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "error": "Validation failed - transaction rolled back",
+                        "type": "validation_error",
+                        "validation_error": str(e),
+                        "unit_id": str(request.unit_id),
+                        "unit_type": request.unit_type.value,
+                        "suggestion": "Review the relationships and try again"
+                    }
+                )
         
         # Convert back to enum keys for response
         new_relationships_enum = {

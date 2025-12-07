@@ -94,7 +94,7 @@ RELATIONSHIP_TYPES = {
 
 DIRECTED_RELATIONSHIPS = {'copre', 'taglia', 'si_appoggia_a', 'riempie'}
 REVERSE_DIRECTED_RELATIONSHIPS = {'coperto_da', 'tagliato_da', 'riempito_da'}
-BIDIRECTIONAL_RELATIONSHIPS = {'uguale_a', 'si_lega_a', 'gli_si_appoggia'}
+BIDIRECTIONAL_RELATIONSHIPS = {'uguale_a', 'si_lega_a', 'gli_si_lega', 'gli_si_appoggia'}
 VALID_RELATIONSHIP_TYPES = list(RELATIONSHIP_TYPES.keys())
 
 
@@ -734,6 +734,8 @@ class StratigraphicRulesValidator:
         ("us_pos", "us_pos", "riempie"),
         ("us_pos", "us_neg", "riempie"),
         ("us_pos", "usm",    "si_appoggia_a"),
+        ("us_pos", "us_pos", "uguale_a"),  # ADDED: US positive uguale_a US positive
+        ("us_pos", "us_neg", "uguale_a"),  # ADDED: US positive uguale_a US negative
 
         # --- USM come soggetto (muri/strutture) ---
         ("usm", "usm",    "si_lega_a"),
@@ -742,6 +744,7 @@ class StratigraphicRulesValidator:
         ("usm", "us_pos", "copre"),
         ("usm", "us_neg", "copre"),
         ("usm", "us_neg", "riempie"),
+        ("usm", "usm",    "uguale_a"),        # ADDED: USM uguale_a USM
     }
     
     @staticmethod
@@ -889,14 +892,16 @@ class StratigraphicRulesValidator:
                 f"Tipo di relazione non valido. Valori validi: {VALID_RELATIONSHIP_TYPES}"
             )
         
-        # Validate self-relationships (should not exist)
+        # Validate self-relationships (allowed only for self-inverse relationships)
         if get_unit_id(from_unit) == get_unit_id(to_unit):
-            raise InvalidStratigraphicRelation(
-                relation_type,
-                get_unit_code(from_unit),
-                get_unit_code(to_unit),
-                "Un'unità non può avere relazioni con se stessa"
-            )
+            # Allow self-relationships only for self-inverse types like 'uguale_a'
+            if relation_type != 'uguale_a':
+                raise InvalidStratigraphicRelation(
+                    relation_type,
+                    get_unit_code(from_unit),
+                    get_unit_code(to_unit),
+                    "Un'unità non può avere relazioni con se stessa (solo 'uguale_a' è consentito)"
+                )
     
     @staticmethod
     def validate_relationship_type(relation_type: str) -> None:

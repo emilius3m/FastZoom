@@ -50,6 +50,25 @@ from app.exceptions import (
 )
 
 
+# ============================================================================
+# INVERSE RELATIONSHIP MAPPING FOR BIDIRECTIONAL CONSISTENCY
+# ============================================================================
+
+INVERSE_RELATIONSHIPS = {
+    'uguale_a': 'uguale_a',        # self-inverse ✓
+    'si_lega_a': 'gli_si_lega',    # FIXED: was 'gli_si_appoggia'
+    'gli_si_lega': 'si_lega_a',    # ADDED: missing inverse
+    'si_appoggia_a': 'gli_si_appoggia',  # ✓
+    'gli_si_appoggia': 'si_appoggia_a',  # FIXED: was 'si_lega_a'
+    'copre': 'coperto_da',         # ✓
+    'coperto_da': 'copre',         # ✓
+    'taglia': 'tagliato_da',       # ✓
+    'tagliato_da': 'taglia',       # ✓
+    'riempie': 'riempito_da',      # ✓
+    'riempito_da': 'riempie'       # ✓
+}
+
+
 class HarrisMatrixService:
     """
     Service for generating Harris Matrix graph data from stratigraphic relationships.
@@ -682,6 +701,34 @@ class HarrisMatrixService:
                         flag_modified(from_unit, "sequenza_fisica")
                         
                         logger.debug(f"Added {target_reference} to {relation_type} for unit {from_unit.id}")
+                        
+                        # ===== BIDIRECTIONAL RELATIONSHIP CONSISTENCY FIX =====
+                        # Add inverse relationship to target unit if applicable
+                        if relation_type in INVERSE_RELATIONSHIPS:
+                            inverse_rel_type = INVERSE_RELATIONSHIPS[relation_type]
+                            
+                            # Only add inverse for bidirectional relationship types
+                            if inverse_rel_type in RELATIONSHIP_TYPES:
+                                # Generate source reference for target unit
+                                if hasattr(from_unit, 'us_code'):
+                                    source_reference = from_unit.us_code
+                                else:  # usm
+                                    source_reference = f"{from_unit.usm_code}(usm)"
+                                
+                                # Initialize inverse relationship type if it doesn't exist
+                                if inverse_rel_type not in to_unit.sequenza_fisica:
+                                    to_unit.sequenza_fisica[inverse_rel_type] = []
+                                
+                                # Add inverse relationship if not already present
+                                if source_reference not in to_unit.sequenza_fisica[inverse_rel_type]:
+                                    to_unit.sequenza_fisica[inverse_rel_type].append(source_reference)
+                                    
+                                    # CRITICAL: Mark target unit's JSON field as modified
+                                    flag_modified(to_unit, "sequenza_fisica")
+                                    
+                                    logger.debug(f"Added inverse relationship {source_reference} to {inverse_rel_type} for target unit {to_unit.id}")
+                                else:
+                                    logger.debug(f"Inverse relationship {source_reference} already exists in {inverse_rel_type}")
                     else:
                         logger.debug(f"Relationship {target_reference} already exists in {relation_type}")
                 
@@ -921,9 +968,8 @@ class HarrisMatrixService:
                     # CRITICAL: Mark JSON field as modified for SQLAlchemy
                     flag_modified(unit, "sequenza_fisica")
             
-            # Validate the updated relationships
-            # This would require more complex validation logic
-            # For now, we'll skip full validation in bulk updates
+            # Validate the updated relationships with comprehensive validation
+            await self._validate_bulk_update(site_id, unit, old_relationships)
             
             result = {
                 'unit_id': str(unit_id),
@@ -940,8 +986,228 @@ class HarrisMatrixService:
             return result
             
         except Exception as e:
-            logger.error(f"Error in bulk relationship update for {unit_type} {unit_id}: {str(e)}")
+            logger.error(f"Error in bulk update relationships for {unit_type} {unit_id}: {str(e)}")
             raise HarrisMatrixServiceError(str(e), "bulk_update_relationships")
+            
+    async def _validate_bulk_update(
+        self,
+        site_id: UUID,
+        unit,
+        old_relationships: Dict[str, List[str]]
+    ) -> None:
+        """
+        Validate bulk update with comprehensive cycle detection and business rules validation.
+        
+        This method performs validation after relationships have been updated but before
+        the transaction is committed. If validation fails, the transaction should be rolled back.
+        
+        Args:
+            site_id: UUID of the archaeological site
+            unit: The unit that was updated (US or USM)
+            old_relationships: The old relationships before the update (for rollback info)
+            
+        Raises:
+            StratigraphicCycleDetected: If cycles are detected in the updated relationships
+            InvalidStratigraphicRelation: If business rules are violated
+            HarrisMatrixValidationError: For other validation errors
+        """
+        try:
+            logger.info(f"Starting comprehensive validation for bulk update: {unit.id}")
+            
+            # 1. Get all units for the site to build complete graph
+            us_units, usm_units = await self.unit_lookup.get_units_by_site(site_id)
+            
+            # 2. Extract relationships from all units to build complete graph
+            all_relationships = await self._extract_relationships(us_units, usm_units)
+            
+            # 3. Build validation units list
+            validation_units = []
+            
+            # Add US units
+            for us in us_units:
+                validation_unit = {
+                    'id': str(us.id),
+                    'unit_type': 'us',
+                    'unit': us
+                }
+                validation_units.append(validation_unit)
+            
+            # Add USM units
+            for usm in usm_units:
+                validation_unit = {
+                    'id': str(usm.id),
+                    'unit_type': 'usm',
+                    'unit': usm
+                }
+                validation_units.append(validation_unit)
+            
+            # 4. Build validation relationships from current state
+            validation_relationships = await self._build_validation_relationships_from_units(validation_units)
+            
+            # 5. Perform cycle detection
+            logger.debug("Performing cycle detection on updated graph")
+            graph = self.graph_builder.build_validation_graph(validation_units, validation_relationships)
+            cycles = CycleDetector.detect_cycles_in_graph(graph)
+            
+            if cycles:
+                logger.error(f"Stratigraphic cycles detected after bulk update: {cycles}")
+                
+                # Provide detailed cycle information
+                cycle_details = []
+                for cycle in cycles:
+                    cycle_str = " → ".join(cycle[:-1])  # Exclude the repeated last node
+                    cycle_details.append(f"Cycle: {cycle_str}")
+                
+                # Construct informative error message with rollback guidance
+                unit_code = unit.us_code if hasattr(unit, 'us_code') else unit.usm_code
+                unit_type = 'US' if hasattr(unit, 'us_code') else 'USM'
+                
+                raise StratigraphicCycleDetected(
+                    f"Bulk update created invalid stratigraphic cycles in {unit_type} {unit_code}. "
+                    f"Detected cycles: {'; '.join(cycle_details)}. "
+                    f"Transaction will be rolled back to maintain data integrity."
+                )
+            
+            # 6. Validate business rules
+            logger.debug("Performing business rules validation")
+            try:
+                self.rules_validator.validate_business_rules(validation_units, validation_relationships)
+                logger.debug("Business rules validation passed")
+            except InvalidStratigraphicRelation as e:
+                logger.error(f"Business rules validation failed: {str(e)}")
+                
+                # Add contextual information about the bulk update
+                unit_code = unit.us_code if hasattr(unit, 'us_code') else unit.usm_code
+                unit_type = 'US' if hasattr(unit, 'us_code') else 'USM'
+                
+                raise InvalidStratigraphicRelation(
+                    f"Bulk update violated stratigraphic business rules in {unit_type} {unit_code}. "
+                    f"Error: {str(e)}. "
+                    f"Transaction will be rolled back to maintain data integrity."
+                )
+            
+            # 7. Validate specific relationship types for the updated unit
+            logger.debug("Validating individual relationships in updated unit")
+            await self._validate_unit_relationships(unit)
+            
+            logger.info("Bulk update validation completed successfully")
+            
+        except (StratigraphicCycleDetected, InvalidStratigraphicRelation) as e:
+            # These are expected validation errors - re-raise for rollback
+            logger.error(f"Bulk update validation failed: {str(e)}")
+            raise
+        except Exception as e:
+            # Unexpected validation error
+            logger.error(f"Unexpected error during bulk update validation: {str(e)}", exc_info=True)
+            raise HarrisMatrixValidationError(f"Validation system error: {str(e)}")
+    
+    async def _build_validation_relationships_from_units(self, validation_units: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Build validation relationship list from current unit relationships.
+        
+        Args:
+            validation_units: List of unit dictionaries with 'unit' objects
+            
+        Returns:
+            List of relationship dictionaries in validation format
+        """
+        validation_relationships = []
+        
+        for unit_data in validation_units:
+            unit = unit_data['unit']
+            unit_id = unit_data['id']
+            unit_type = unit_data['unit_type']
+            
+            if not unit.sequenza_fisica:
+                continue
+                
+            for rel_type, targets in unit.sequenza_fisica.items():
+                if not targets or rel_type not in VALID_RELATIONSHIP_TYPES:
+                    continue
+                
+                for target in targets:
+                    # Parse target reference to extract code and type
+                    target_code, target_type = parse_target_reference(target)
+                    
+                    # Find target unit by lookup
+                    target_unit = None
+                    if target_type == 'us':
+                        target_unit = await self.unit_lookup.get_unit_by_code(
+                            site_id=unit.site_id,
+                            unit_code=target_code,
+                            unit_type='us'
+                        )
+                    elif target_type == 'usm':
+                        target_unit = await self.unit_lookup.get_unit_by_code(
+                            site_id=unit.site_id,
+                            unit_code=target_code,
+                            unit_type='usm'
+                        )
+                    
+                    if target_unit:
+                        validation_relationships.append({
+                            'from_unit_id': unit_id,
+                            'to_unit_id': str(target_unit.id),
+                            'relation_type': rel_type
+                        })
+        
+        return validation_relationships
+    
+    async def _validate_unit_relationships(self, unit) -> None:
+        """
+        Validate individual relationships within a unit for basic constraints.
+        
+        Args:
+            unit: The unit to validate (US or USM)
+            
+        Raises:
+            InvalidStratigraphicRelation: If individual relationships are invalid
+        """
+        if not unit.sequenza_fisica:
+            return
+            
+        for rel_type, targets in unit.sequenza_fisica.items():
+            if not targets or rel_type not in VALID_RELATIONSHIP_TYPES:
+                continue
+            
+            # Check for duplicate targets
+            if len(set(targets)) != len(targets):
+                unit_code = unit.us_code if hasattr(unit, 'us_code') else unit.usm_code
+                unit_type = 'US' if hasattr(unit, 'us_code') else 'USM'
+                
+                # Find duplicates
+                duplicates = [target for target in targets if targets.count(target) > 1]
+                unique_duplicates = list(set(duplicates))
+                
+                raise InvalidStratigraphicRelation(
+                    f"{unit_type} {unit_code} has duplicate relationships in '{rel_type}': "
+                    f"{', '.join(unique_duplicates)}. Each relationship should only appear once."
+                )
+            
+            # Validate each individual relationship
+            for target in targets:
+                target_code, target_type = parse_target_reference(target)
+                
+                # Find target unit for validation
+                target_unit = await self.unit_lookup.get_unit_by_code(
+                    site_id=unit.site_id,
+                    unit_code=target_code,
+                    unit_type=target_type
+                )
+                
+                if target_unit:
+                    try:
+                        await self.validate_single_relationship(unit, target_unit, rel_type)
+                    except InvalidStratigraphicRelation as e:
+                        # Add context about which relationship failed
+                        unit_code = unit.us_code if hasattr(unit, 'us_code') else unit.usm_code
+                        unit_type = 'US' if hasattr(unit, 'us_code') else 'USM'
+                        target_display = f"{target_type.upper()}{target_code}"
+                        
+                        raise InvalidStratigraphicRelation(
+                            f"Invalid relationship in {unit_type} {unit_code}: {unit_code} {rel_type} {target_display}. "
+                            f"Error: {str(e)}"
+                        )
     
     async def bulk_update_sequenza_fisica_units(
         self,
@@ -1863,3 +2129,137 @@ class HarrisMatrixService:
         
         logger.info(f"Generated grid fallback positions for {len(positions)} nodes")
         return positions
+    
+    async def _add_inverse_relationship(
+        self,
+        site_id: UUID,
+        source_reference: str,
+        target_reference: str,
+        inverse_rel_type: str
+    ) -> None:
+        """
+        Add inverse relationship to target unit.
+        
+        Args:
+            site_id: UUID of the archaeological site
+            source_reference: Reference of the source unit (e.g., "US001" or "USM001(usm)")
+            target_reference: Reference of the target unit (e.g., "US002" or "002(usm)")
+            inverse_rel_type: Type of inverse relationship to add
+        """
+        try:
+            # Parse target reference to extract code and type
+            target_code, target_type = parse_target_reference(target_reference)
+            
+            # Find the target unit
+            target_unit = None
+            if target_type == 'us':
+                query = select(UnitaStratigrafica).where(
+                    and_(
+                        UnitaStratigrafica.site_id == str(site_id),
+                        UnitaStratigrafica.us_code == target_code,
+                        UnitaStratigrafica.deleted_at.is_(None)
+                    )
+                )
+                result = await self.db.execute(query)
+                target_unit = result.scalar_one_or_none()
+            elif target_type == 'usm':
+                query = select(UnitaStratigraficaMuraria).where(
+                    and_(
+                        UnitaStratigraficaMuraria.site_id == str(site_id),
+                        UnitaStratigraficaMuraria.usm_code == target_code,
+                        UnitaStratigraficaMuraria.deleted_at.is_(None)
+                    )
+                )
+                result = await self.db.execute(query)
+                target_unit = result.scalar_one_or_none()
+            
+            if not target_unit:
+                logger.warning(f"Target unit not found for inverse relationship: {target_type}{target_code}")
+                return
+            
+            # Initialize inverse relationship type if it doesn't exist
+            if not target_unit.sequenza_fisica:
+                target_unit.sequenza_fisica = get_default_sequenza_fisica()
+            
+            if inverse_rel_type not in target_unit.sequenza_fisica:
+                target_unit.sequenza_fisica[inverse_rel_type] = []
+            
+            # Add inverse relationship if not already present
+            if source_reference not in target_unit.sequenza_fisica[inverse_rel_type]:
+                target_unit.sequenza_fisica[inverse_rel_type].append(source_reference)
+                
+                # CRITICAL: Mark JSON field as modified for SQLAlchemy
+                flag_modified(target_unit, "sequenza_fisica")
+                
+                logger.debug(f"Added inverse relationship {source_reference} to {inverse_rel_type} for target unit {target_unit.id}")
+            else:
+                logger.debug(f"Inverse relationship {source_reference} already exists in {inverse_rel_type}")
+                
+        except Exception as e:
+            logger.error(f"Error adding inverse relationship: {str(e)}")
+            # Don't raise - inverse relationship failures shouldn't break the main operation
+    
+    async def _remove_inverse_relationship(
+        self,
+        site_id: UUID,
+        source_reference: str,
+        target_reference: str,
+        inverse_rel_type: str
+    ) -> None:
+        """
+        Remove inverse relationship from target unit.
+        
+        Args:
+            site_id: UUID of the archaeological site
+            source_reference: Reference of the source unit (e.g., "US001" or "USM001(usm)")
+            target_reference: Reference of the target unit (e.g., "US002" or "002(usm)")
+            inverse_rel_type: Type of inverse relationship to remove
+        """
+        try:
+            # Parse target reference to extract code and type
+            target_code, target_type = parse_target_reference(target_reference)
+            
+            # Find the target unit
+            target_unit = None
+            if target_type == 'us':
+                query = select(UnitaStratigrafica).where(
+                    and_(
+                        UnitaStratigrafica.site_id == str(site_id),
+                        UnitaStratigrafica.us_code == target_code,
+                        UnitaStratigrafica.deleted_at.is_(None)
+                    )
+                )
+                result = await self.db.execute(query)
+                target_unit = result.scalar_one_or_none()
+            elif target_type == 'usm':
+                query = select(UnitaStratigraficaMuraria).where(
+                    and_(
+                        UnitaStratigraficaMuraria.site_id == str(site_id),
+                        UnitaStratigraficaMuraria.usm_code == target_code,
+                        UnitaStratigraficaMuraria.deleted_at.is_(None)
+                    )
+                )
+                result = await self.db.execute(query)
+                target_unit = result.scalar_one_or_none()
+            
+            if not target_unit:
+                logger.warning(f"Target unit not found for inverse relationship removal: {target_type}{target_code}")
+                return
+            
+            # Remove inverse relationship if it exists
+            if (target_unit.sequenza_fisica and
+                inverse_rel_type in target_unit.sequenza_fisica and
+                source_reference in target_unit.sequenza_fisica[inverse_rel_type]):
+                
+                target_unit.sequenza_fisica[inverse_rel_type].remove(source_reference)
+                
+                # CRITICAL: Mark JSON field as modified for SQLAlchemy
+                flag_modified(target_unit, "sequenza_fisica")
+                
+                logger.debug(f"Removed inverse relationship {source_reference} from {inverse_rel_type} for target unit {target_unit.id}")
+            else:
+                logger.debug(f"Inverse relationship {source_reference} not found in {inverse_rel_type}")
+                
+        except Exception as e:
+            logger.error(f"Error removing inverse relationship: {str(e)}")
+            # Don't raise - inverse relationship failures shouldn't break the main operation

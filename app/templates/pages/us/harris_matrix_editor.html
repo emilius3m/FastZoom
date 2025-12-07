@@ -1879,6 +1879,22 @@ function harrisMatrixEditor() {
                 const existingNodes = this.nodes.filter(n => n.isExisting);
                 
                 console.log(`Save strategy: ${newNodes.length} new nodes, ${existingNodes.length} existing nodes`);
+
+                // ===== INVERSE RELATIONSHIP MAPPING =====
+                // Create mapping of relationship types to their inverses that matches the backend
+                const inverseRelationships = {
+                    'uguale_a': 'uguale_a',           // self-inverse ✓
+                    'si_lega_a': 'gli_si_lega',       // FIXED: was 'gli_si_appoggia'
+                    'gli_si_lega': 'si_lega_a',       // ADDED: missing inverse
+                    'si_appoggia_a': 'gli_si_appoggia', // ✓
+                    'gli_si_appoggia': 'si_appoggia_a', // FIXED: was 'si_lega_a'
+                    'copre': 'coperto_da',             // ✓
+                    'coperto_da': 'copre',             // ✓
+                    'taglia': 'tagliato_da',           // ✓
+                    'tagliato_da': 'taglia',           // ✓
+                    'riempie': 'riempito_da',          // ✓
+                    'riempito_da': 'riempie'           // ✓
+                };
                 
                 // ===== STEP 2: Creare solo le unità NUOVE con bulk-create =====
                 if (newNodes.length > 0) {
@@ -1973,6 +1989,33 @@ function harrisMatrixEditor() {
                             // Aggiungi a sequenzafisica
                             if (sequenza[relType]) {
                                 sequenza[relType].push(targetCode);
+                            }
+                        }
+
+                        // ===== PROCESS INCOMING EDGES FOR INVERSE RELATIONSHIPS =====
+                        // Raccogli tutte le relazioni INCOMENTI verso questo nodo
+                        const incoming = this.edges.filter(e => e.to === node.tempid);
+                        
+                        for (const edge of incoming) {
+                            const sourceNode = this.nodes.find(n => n.tempid === edge.from);
+                            if (!sourceNode) continue;
+                            
+                            const relType = edge.relationship;
+                            const inverseRelType = inverseRelationships[relType];
+                            
+                            // Skip if no inverse mapping exists
+                            if (!inverseRelType) continue;
+                            
+                            // Trova il codice source (etichetta visibile nel grafo)
+                            const cyNode = this.cy.$id(sourceNode.tempid);
+                            const sourceCode = cyNode?.data('label') || sourceNode.tempid;
+                            
+                            // Aggiungi la relazione inversa a sequenzafisica
+                            if (sequenza[inverseRelType]) {
+                                // Evita duplicati: controlla se già presente
+                                if (!sequenza[inverseRelType].includes(sourceCode)) {
+                                    sequenza[inverseRelType].push(sourceCode);
+                                }
                             }
                         }
                         
