@@ -16,6 +16,7 @@ from typing import Dict, List, Any, Optional, Set, Tuple, Union
 from uuid import UUID, uuid4
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func, text
@@ -54,19 +55,29 @@ from app.exceptions import (
 # INVERSE RELATIONSHIP MAPPING FOR BIDIRECTIONAL CONSISTENCY
 # ============================================================================
 
-INVERSE_RELATIONSHIPS = {
-    'uguale_a': 'uguale_a',        # self-inverse ✓
-    'si_lega_a': 'gli_si_lega',    # FIXED: was 'gli_si_appoggia'
-    'gli_si_lega': 'si_lega_a',    # ADDED: missing inverse
-    'si_appoggia_a': 'gli_si_appoggia',  # ✓
-    'gli_si_appoggia': 'si_appoggia_a',  # FIXED: was 'si_lega_a'
-    'copre': 'coperto_da',         # ✓
-    'coperto_da': 'copre',         # ✓
-    'taglia': 'tagliato_da',       # ✓
-    'tagliato_da': 'taglia',       # ✓
-    'riempie': 'riempito_da',      # ✓
-    'riempito_da': 'riempie'       # ✓
+# ===== CRITICAL FIX: Complete inverse relationship mapping =====
+# MUST match frontend RELATIONSHIP_INVERSES in harris_matrix_editor.html
+RELATIONSHIP_INVERSES = {
+    # Standard bidirectional relationships
+    'copre': 'copertoda',
+    'copertoda': 'copre',
+    
+    'taglia': 'tagliatoda',
+    'tagliatoda': 'taglia',
+    
+    'riempie': 'riempitoda',
+    'riempitoda': 'riempie',
+    
+    'siappoggiaa': 'glisiappoggia',
+    'glisiappoggia': 'siappoggiaa',
+    
+    # Self-inverse relationships
+    'silegaa': 'silegaa',
+    'ugualea': 'ugualea'
 }
+
+# Log at startup for debugging
+logger.info(f"[RELATIONSHIP INVERSES] Initialized with {len(RELATIONSHIP_INVERSES)} relationship types")
 
 
 class HarrisMatrixService:
@@ -519,13 +530,17 @@ class HarrisMatrixService:
             # Validate relationships for cycles
             await self.validate_stratigraphic_relationships(created_units, created_relationships)
                 
+            # ===== CRITICAL: Match response to frontend expectations =====
             result = {
                     'created_units': len(created_units),
                     'created_relationships': len(created_relationships),
                     'unit_mapping': {unit['temp_id']: unit['id'] for unit in created_units},
                     'relationship_mapping': {rel['temp_id']: rel['temp_id'] for rel in created_relationships},
-                    'units': created_units,
-                    'relationships': created_relationships
+                    'units': created_units,        # Frontend expects this for created units data
+                    'relationships': created_relationships,  # Frontend expects this for created relationships data
+                    # Add explicit compatibility fields
+                    'created_units_list': created_units,     # Additional alias for clarity
+                    'created_relationships_list': created_relationships  # Additional alias for clarity
             }
                 
             logger.info(f"Bulk creation completed successfully: {result}")
@@ -583,12 +598,35 @@ class HarrisMatrixService:
                 await self.db.flush()  # Get the ID
                 logger.debug(f"DEBUG: Unit added successfully, got ID={unit.id}")
                 
-                created_units.append({
+                # ===== CRITICAL FIX: Return complete unit data for UnitResponse schema =====
+                unit_response_data = {
                     'temp_id': temp_id,
                     'id': str(unit.id),
                     'code': unit_data['code'],
-                    'unit_type': unit_type
-                })
+                    'type': unit_type,
+                    'site_id': str(site_id),
+                    'description': unit_data.get('definition', ''),
+                    'sequenzafisica': unit.sequenza_fisica or {},
+                    'data': {},
+                    'position': None,
+                    'created_by': unit_data.get('created_by') or current_user_id,
+                    'updated_by': unit_data.get('updated_by') or current_user_id,
+                    'created_at': unit.created_at.isoformat() if unit.created_at else None,
+                    'updated_at': unit.updated_at.isoformat() if unit.updated_at else None
+                }
+                
+                # Add unit-specific fields
+                if unit_type == 'us':
+                    unit_response_data['tipo'] = unit_data.get('tipo')
+                    unit_response_data['localita'] = unit_data.get('localita')
+                    unit_response_data['datazione'] = unit_data.get('datazione')
+                    unit_response_data['periodo'] = unit_data.get('periodo')
+                    unit_response_data['fase'] = unit_data.get('fase')
+                    unit_response_data['affidabilita_stratigrafica'] = unit_data.get('affidabilita_stratigrafica')
+                else:  # usm
+                    unit_response_data['tecnica_costruttiva'] = unit_data.get('tecnica_costruttiva')
+                
+                created_units.append(unit_response_data)
             
             return created_units
             
@@ -704,8 +742,8 @@ class HarrisMatrixService:
                         
                         # ===== BIDIRECTIONAL RELATIONSHIP CONSISTENCY FIX =====
                         # Add inverse relationship to target unit if applicable
-                        if relation_type in INVERSE_RELATIONSHIPS:
-                            inverse_rel_type = INVERSE_RELATIONSHIPS[relation_type]
+                        if relation_type in RELATIONSHIP_INVERSES:
+                            inverse_rel_type = RELATIONSHIP_INVERSES[relation_type]
                             
                             # Only add inverse for bidirectional relationship types
                             if inverse_rel_type in RELATIONSHIP_TYPES:
@@ -732,19 +770,120 @@ class HarrisMatrixService:
                     else:
                         logger.debug(f"Relationship {target_reference} already exists in {relation_type}")
                 
-                    # Debug logging to validate assumptions
-                    logger.debug(f"DEBUG: Creating temp_id for relationship from={from_unit.id} to={to_unit.id}, type={relation_type}")
-                    created_relationships.append({
-                        'temp_id': rel_data.get('temp_id', str(uuid4())),
+                    # ===== CRITICAL FIX: Return complete relationship data for RelationshipResponse schema =====
+                    rel_temp_id = rel_data.get('temp_id', str(uuid4()))
+                    
+                    # Determine if relationship is bidirectional
+                    rel_config = RELATIONSHIP_TYPES.get(relation_type, {})
+                    is_bidirectional = rel_config.get('bidirectional', False)
+                    
+                    # Create target reference for frontend
+                    if hasattr(to_unit, 'usm_code'):
+                        target_reference = f"{to_unit.usm_code}(usm)"
+                    else:
+                        target_reference = to_unit.us_code
+                    
+                    relationship_response_data = {
+                        'temp_id': rel_temp_id,
+                        'id': rel_temp_id,  # Use temp_id as ID for now
                         'from_unit_id': str(from_unit.id),
                         'to_unit_id': str(to_unit.id),
-                        'relation_type': relation_type
-                    })
-                    logger.debug(f"DEBUG: Created relationship temp_id={created_relationships[-1]['temp_id']}")
+                        'relationship_type': relation_type,
+                        'resolved': True,  # Successfully created
+                        'from_tempid': from_temp_id,
+                        'to_tempid': to_temp_id,
+                        'tempid': rel_temp_id,
+                        'bidirectional': is_bidirectional,
+                        'description': rel_config.get('description', ''),
+                        'label': rel_config.get('label', relation_type),
+                        'created_at': datetime.utcnow().isoformat(),
+                        'updated_at': datetime.utcnow().isoformat()
+                    }
+                    
+                    logger.debug(f"DEBUG: Creating relationship response from={from_unit.id} to={to_unit.id}, type={relation_type}")
+                    created_relationships.append(relationship_response_data)
+                    logger.debug(f"DEBUG: Created relationship temp_id={rel_temp_id}")
                     
                 except Exception as e:
                     logger.error(f"DEBUG: Error processing relationship {rel_data}: {e}")
                     continue
+            
+            # ===== CRITICAL FIX: Ensure bidirectional relationship consistency =====
+            for tempid, relationship_data in created_relationships:
+                from_unit_id = relationship_data['from_unit_id']
+                to_unit_id = relationship_data['to_unit_id']
+                rel_type = relationship_data['relationship_type']
+                inverse_type = RELATIONSHIP_INVERSES.get(rel_type)
+                
+                # Check if inverse relationship needs to be created
+                if inverse_type and from_unit_id and to_unit_id:
+                    # Check if inverse already exists
+                    existing_inverse = await db.execute(
+                        select(UnitaStratigrafica).where(
+                            and_(
+                                UnitaStratigrafica.id == to_unit_id,
+                                UnitaStratigrafica.sequenza_fisica.isnot(None),
+                                func.json_extract(UnitaStratigrafica.sequenza_fisica, f'$.{inverse_type}').isnot(None)
+                            )
+                        )
+                    )
+                    
+                    inverse_exists = False
+                    if existing_inverse.scalar_one_or_none():
+                        # Check if the specific inverse relationship exists in the JSON
+                        from_unit = await db.execute(
+                            select(UnitaStratigrafica).where(UnitaStratigrafica.id == from_unit_id)
+                        )
+                        from_unit_obj = from_unit.scalar_one_or_none()
+                        
+                        if from_unit_obj:
+                            from_code = from_unit_obj.us_code if hasattr(from_unit_obj, 'us_code') else from_unit_obj.usm_code
+                            to_unit_check = await db.execute(
+                                select(UnitaStratigrafica).where(UnitaStratigrafica.id == to_unit_id)
+                            )
+                            to_unit_obj = to_unit_check.scalar_one_or_none()
+                            
+                            if to_unit_obj and to_unit_obj.sequenza_fisica and inverse_type in to_unit_obj.sequenza_fisica:
+                                inverse_exists = from_code in to_unit_obj.sequenza_fisica[inverse_type]
+                    
+                    if not inverse_exists:
+                        # Create inverse relationship
+                        to_unit_check = await db.execute(
+                            select(UnitaStratigrafica).where(UnitaStratigrafica.id == to_unit_id)
+                        )
+                        target_unit = to_unit_check.scalar_one_or_none()
+                        
+                        if target_unit:
+                            # Get source unit code
+                            from_unit_check = await db.execute(
+                                select(UnitaStratigrafica).where(UnitaStratigrafica.id == from_unit_id)
+                            )
+                            source_unit = from_unit_check.scalar_one_or_none()
+                            
+                            if source_unit:
+                                source_code = source_unit.us_code if hasattr(source_unit, 'us_code') else source_unit.usm_code
+                                
+                                # Add type suffix for cross-references if needed
+                                if hasattr(source_unit, 'usm_code'):
+                                    source_reference = f"{source_code}(usm)"
+                                else:
+                                    source_reference = source_code
+                                
+                                # Initialize sequenza_fisica if needed
+                                if not target_unit.sequenza_fisica:
+                                    target_unit.sequenza_fisica = get_default_sequenza_fisica()
+                                
+                                # Add inverse relationship
+                                if inverse_type not in target_unit.sequenza_fisica:
+                                    target_unit.sequenza_fisica[inverse_type] = []
+                                
+                                if source_reference not in target_unit.sequenza_fisica[inverse_type]:
+                                    target_unit.sequenza_fisica[inverse_type].append(source_reference)
+                                    
+                                    # Mark JSON field as modified for SQLAlchemy
+                                    flag_modified(target_unit, "sequenza_fisica")
+                                    
+                                    logger.info(f"[INVERSE REL] Created inverse: {inverse_type} from {to_unit_id} to {from_unit_id}")
             
             # Flush all pending changes to database
             await self.db.flush()
@@ -1591,6 +1730,142 @@ class HarrisMatrixService:
             # Unexpected validation error
             logger.error(f"Unexpected error during comprehensive validation: {str(e)}", exc_info=True)
             raise HarrisMatrixValidationError(f"Validation system error: {str(e)}")
+    async def bulk_update_sequenzafisica_units(
+        self,
+        site_id: UUID,
+        updates: Dict[str, Dict[str, Any]],
+        db: AsyncSession
+    ) -> Dict[str, Any]:
+        """Enhanced bulk update that properly handles bidirectional relationships"""
+        
+        logger.info(f"[BULK UPDATE] Starting sequenzafisica update for site {site_id} with {len(updates)} units")
+        
+        try:
+            # Phase 1: Load all units and relationships for the site
+            from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+            
+            # Load all units for this site
+            us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.site_id == str(site_id))
+            us_result = await db.execute(us_query)
+            us_units = us_result.scalars().all()
+            
+            usm_query = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.site_id == str(site_id))
+            usm_result = await db.execute(usm_query)
+            usm_units = usm_result.scalars().all()
+            
+            all_units = {}
+            for unit in us_units:
+                all_units[str(unit.id)] = unit
+            for unit in usm_units:
+                all_units[str(unit.id)] = unit
+            
+            # Load all relationships from sequenza_fisica for this site
+            all_relationships = []
+            unit_code_map = {}
+            
+            for unit in all_units.values():
+                unit_code = unit.us_code if hasattr(unit, 'us_code') else unit.usm_code
+                unit_code_map[str(unit.id)] = unit_code
+                
+                if unit.sequenza_fisica:
+                    for rel_type, targets in unit.sequenza_fisica.items():
+                        if targets:
+                            for target in targets:
+                                # Parse target reference
+                                target_code, target_type = parse_target_reference(target)
+                                
+                                # Find target unit
+                                target_unit = None
+                                for search_unit in all_units.values():
+                                    search_code = search_unit.us_code if hasattr(search_unit, 'us_code') else search_unit.usm_code
+                                    if search_code == target_code:
+                                        target_unit = search_unit
+                                        break
+                                
+                                if target_unit:
+                                    all_relationships.append({
+                                        'from_unit_id': str(unit.id),
+                                        'to_unit_id': str(target_unit.id),
+                                        'relationship_type': rel_type
+                                    })
+            
+            logger.info(f"[BULK UPDATE] Loaded {len(all_units)} units and {len(all_relationships)} relationships")
+            
+            # Phase 2: Build complete relationship map
+            relationship_map = {}
+            
+            for rel in all_relationships:
+                from_id = rel['from_unit_id']
+                to_id = rel['to_unit_id']
+                rel_type = rel['relationship_type']
+                inverse_type = RELATIONSHIP_INVERSES.get(rel_type)
+                
+                # Add outgoing relationship
+                if from_id not in relationship_map:
+                    relationship_map[from_id] = {}
+                if rel_type not in relationship_map[from_id]:
+                    relationship_map[from_id][rel_type] = []
+                if to_id not in relationship_map[from_id][rel_type]:
+                    relationship_map[from_id][rel_type].append(to_id)
+                
+                # Add inverse relationship
+                if inverse_type and to_id not in relationship_map:
+                    relationship_map[to_id] = {}
+                if inverse_type and to_id in relationship_map:
+                    if inverse_type not in relationship_map[to_id]:
+                        relationship_map[to_id][inverse_type] = []
+                    if from_id not in relationship_map[to_id][inverse_type]:
+                        relationship_map[to_id][inverse_type].append(from_id)
+            
+            # Phase 3: Apply updates while maintaining bidirectional consistency
+            updated_units = []
+            
+            for unit_id, new_sequenza in updates.items():
+                if unit_id not in all_units:
+                    logger.warning(f"[BULK UPDATE] Unit {unit_id} not found in site {site_id}")
+                    continue
+                
+                unit = all_units[unit_id]
+                
+                # Convert relationship IDs to codes using unit_code_map
+                sequenza_with_codes = {}
+                for rel_type, target_ids in new_sequenza.items():
+                    codes = []
+                    for target_id in target_ids:
+                        if target_id in unit_code_map:
+                            codes.append(unit_code_map[target_id])
+                        else:
+                            logger.warning(f"[BULK UPDATE] Target unit {target_id} not found for {unit_id}")
+                    if codes:
+                        sequenza_with_codes[rel_type] = codes
+                
+                # Update the unit
+                unit.sequenza_fisica = sequenza_with_codes
+                
+                # Mark JSON field as modified for SQLAlchemy
+                flag_modified(unit, "sequenza_fisica")
+                
+                updated_units.append(unit)
+                logger.debug(f"[BULK UPDATE] Updated sequenzafisica for unit {unit_code_map[unit_id]}")
+            
+            # Phase 4: Commit transaction
+            if updated_units:
+                await db.commit()
+                logger.info(f"[BULK UPDATE] Successfully updated sequenzafisica for {len(updated_units)} units")
+            else:
+                logger.warning(f"[BULK UPDATE] No units were updated")
+            
+            return {
+                "success": True,
+                "updated_units_count": len(updated_units),
+                "total_relationships_processed": len(all_relationships)
+            }
+            
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"[BULK UPDATE ERROR] Failed to update sequenzafisica: {str(e)}", exc_info=True)
+            raise
+
     
     async def delete_unit_with_cleanup(
         self,
@@ -2565,3 +2840,336 @@ class HarrisMatrixService:
         except Exception as e:
             logger.error(f"Error removing inverse relationship: {str(e)}")
             # Don't raise - inverse relationship failures shouldn't break the main operation
+    async def validate_relationship_consistency(self, site_id: UUID, db: AsyncSession) -> Dict[str, Any]:
+        """Validate relationship consistency and bidirectional integrity"""
+        
+        from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+        
+        try:
+            # Load all units for the site
+            us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.site_id == str(site_id))
+            us_result = await db.execute(us_query)
+            us_units = us_result.scalars().all()
+            
+            usm_query = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.site_id == str(site_id))
+            usm_result = await db.execute(usm_query)
+            usm_units = usm_result.scalars().all()
+            
+            # Build relationship list from sequenza_fisica
+            relationships = []
+            all_units = {}
+            
+            for unit in us_units + usm_units:
+                all_units[str(unit.id)] = unit
+                unit_code = unit.us_code if hasattr(unit, 'us_code') else unit.usm_code
+                
+                if unit.sequenza_fisica:
+                    for rel_type, targets in unit.sequenza_fisica.items():
+                        if targets:
+                            for target in targets:
+                                # Parse target reference
+                                target_code, target_type = parse_target_reference(target)
+                                
+                                # Find target unit
+                                target_unit = None
+                                for search_unit in all_units.values():
+                                    search_code = search_unit.us_code if hasattr(search_unit, 'us_code') else search_unit.usm_code
+                                    if search_code == target_code:
+                                        target_unit = search_unit
+                                        break
+                                
+                                if target_unit:
+                                    relationships.append({
+                                        'from_unit_id': str(unit.id),
+                                        'from_unit_code': unit_code,
+                                        'to_unit_id': str(target_unit.id),
+                                        'to_unit_code': target_code,
+                                        'relationship_type': rel_type
+                                    })
+            
+            # Check for bidirectional consistency
+            issues = []
+            relationship_map = {}
+            
+            for rel in relationships:
+                from_id = rel['from_unit_id']
+                to_id = rel['to_unit_id']
+                rel_type = rel['relationship_type']
+                inverse_type = RELATIONSHIP_INVERSES.get(rel_type)
+                
+                # Track direct relationships
+                key = f"{from_id}->{to_id}:{rel_type}"
+                relationship_map[key] = rel
+                
+                # Check if inverse exists
+                if inverse_type:
+                    inverse_key = f"{to_id}->{from_id}:{inverse_type}"
+                    if inverse_key not in relationship_map:
+                        issues.append({
+                            "type": "missing_inverse",
+                            "relationship_id": None,
+                            "from_unit": rel['from_unit_code'],
+                            "to_unit": rel['to_unit_code'],
+                            "relationship_type": rel_type,
+                            "expected_inverse": inverse_type,
+                            "severity": "warning"
+                        })
+            
+            return {
+                "total_relationships": len(relationships),
+                "consistency_issues": issues,
+                "is_consistent": len(issues) == 0,
+                "site_id": str(site_id)
+            }
+            
+        except Exception as e:
+            logger.error(f"[VALIDATION ERROR] Failed to validate relationships: {str(e)}", exc_info=True)
+            raise
+
+# ===== COMPREHENSIVE VALIDATION AND ERROR HANDLING FIX #3 =====
+
+    async def validate_harris_matrix_structure(self, site_id: UUID, units: List[Dict], relationships: List[Dict], db: AsyncSession) -> Dict[str, Any]:
+        """Comprehensive validation of Harris Matrix structure"""
+        
+        validation_errors = []
+        warnings = []
+        
+        # Phase 1: Validate units
+        unit_codes = set()
+        for unit in units:
+            if 'code' not in unit:
+                validation_errors.append({
+                    "type": "missing_code",
+                    "unit": unit.get('tempid', 'unknown'),
+                    "message": "Each unit must have a code"
+                })
+                continue
+            
+            code = unit['code']
+            if code in unit_codes:
+                validation_errors.append({
+                    "type": "duplicate_code",
+                    "code": code,
+                    "message": f"Duplicate unit code: {code}"
+                })
+            unit_codes.add(code)
+        
+        # Phase 2: Validate relationships
+        unit_tempids = {unit.get('tempid') for unit in units}
+        for rel in relationships:
+            from_tempid = rel.get('from_tempid')
+            to_tempid = rel.get('to_tempid')
+            
+            if from_tempid not in unit_tempids:
+                validation_errors.append({
+                    "type": "invalid_from_unit",
+                    "relationship": rel.get('tempid', 'unknown'),
+                    "from_tempid": from_tempid,
+                    "message": f"Source unit {from_tempid} not found in units"
+                })
+            
+            if to_tempid not in unit_tempids:
+                validation_errors.append({
+                    "type": "invalid_to_unit",
+                    "relationship": rel.get('tempid', 'unknown'),
+                    "to_tempid": to_tempid,
+                    "message": f"Target unit {to_tempid} not found in units"
+                })
+            
+            # Check for self-relationships (except for self-inverse types)
+            if from_tempid == to_tempid:
+                rel_type = rel.get('relationship_type')
+                if rel_type not in ['silegaa', 'ugualea']:
+                    validation_errors.append({
+                        "type": "self_relationship",
+                        "relationship": rel.get('tempid', 'unknown'),
+                        "from_tempid": from_tempid,
+                        "relationship_type": rel_type,
+                        "message": f"Self-relationships not allowed for {rel_type}"
+                    })
+        
+        # Phase 3: Cycle detection
+        if validation_errors:
+            return {
+                "is_valid": False,
+                "validation_errors": validation_errors,
+                "warnings": warnings
+            }
+        
+        # Build graph for cycle detection
+        graph = {}
+        for rel in relationships:
+            from_tempid = rel.get('from_tempid')
+            to_tempid = rel.get('to_tempid')
+            rel_type = rel.get('relationship_type')
+            
+            # Only check for cycles in "covers" relationships (copre, taglia, riempie)
+            if rel_type in ['copre', 'taglia', 'riempie']:
+                if from_tempid not in graph:
+                    graph[from_tempid] = []
+                graph[from_tempid].append(to_tempid)
+        
+        # Detect cycles using DFS
+        cycles = self._detect_cycles(graph)
+        
+        for cycle in cycles:
+            validation_errors.append({
+                "type": "cycle_detected",
+                "cycle": cycle,
+                "message": f"Cycle detected: {' -> '.join(cycle)} -> {cycle[0]}"
+            })
+        
+        # Phase 4: Check for logical inconsistencies
+        logical_issues = await self._check_logical_consistency(relationships, db)
+        validation_errors.extend(logical_issues)
+        
+        return {
+            "is_valid": len(validation_errors) == 0,
+            "validation_errors": validation_errors,
+            "warnings": warnings,
+            "units_count": len(units),
+            "relationships_count": len(relationships)
+        }
+
+    def _detect_cycles(self, graph: Dict[str, List[str]]) -> List[List[str]]:
+        """Detect cycles in the relationship graph using DFS"""
+        visited = set()
+        rec_stack = set()
+        cycles = []
+        
+        def dfs(node, path):
+            if node in rec_stack:
+                # Found a cycle
+                cycle_start = path.index(node)
+                cycle = path[cycle_start:] + [node]
+                cycles.append(cycle)
+                return
+            
+            if node in visited:
+                return
+            
+            visited.add(node)
+            rec_stack.add(node)
+            
+            for neighbor in graph.get(node, []):
+                dfs(neighbor, path + [node])
+            
+            rec_stack.remove(node)
+        
+        for node in graph:
+            if node not in visited:
+                dfs(node, [])
+        
+        return cycles
+
+    async def _check_logical_consistency(self, relationships: List[Dict], db: AsyncSession) -> List[Dict]:
+        """Check for logical inconsistencies in relationships"""
+        issues = []
+        
+        # Group relationships by unit pairs
+        relationship_map = {}
+        for rel in relationships:
+            from_tempid = rel.get('from_tempid')
+            to_tempid = rel.get('to_tempid')
+            rel_type = rel.get('relationship_type')
+            
+            pair_key = f"{from_tempid}-{to_tempid}"
+            if pair_key not in relationship_map:
+                relationship_map[pair_key] = []
+            relationship_map[pair_key].append(rel_type)
+        
+        # Check for conflicting relationships
+        for pair_key, rel_types in relationship_map.items():
+            if len(rel_types) > 1:
+                # Check for conflicting relationship types
+                conflicting_pairs = [
+                    ('copre', 'copertoda'),
+                    ('taglia', 'tagliatoda'), 
+                    ('riempie', 'riempitoda')
+                ]
+                
+                for conflict_a, conflict_b in conflicting_pairs:
+                    if conflict_a in rel_types and conflict_b in rel_types:
+                        from_tempid, to_tempid = pair_key.split('-')
+                        issues.append({
+                            "type": "conflicting_relationships",
+                            "from_tempid": from_tempid,
+                            "to_tempid": to_tempid,
+                            "relationships": rel_types,
+                            "message": f"Conflicting relationships {conflict_a} and {conflict_b} between same units"
+                        })
+        
+        return issues
+
+# ===== COMPREHENSIVE VALIDATION AND ERROR HANDLING FIX #4 =====
+
+    async def create_harris_matrix_with_rollback(self, site_id: UUID, request: HarrisMatrixCreateRequest, db: AsyncSession) -> Dict[str, Any]:
+        """Create Harris Matrix with comprehensive rollback on failure"""
+        
+        try:
+            # Start transaction
+            async with db.begin():
+                # Phase 1: Validation
+                validation_result = await self.validate_harris_matrix_structure(
+                    site_id, request.units, request.relationships, db
+                )
+                
+                if not validation_result["is_valid"]:
+                    raise ValidationError(f"Validation failed: {len(validation_result['validation_errors'])} errors found")
+                
+                # Phase 2: Create units
+                created_units = []
+                unit_tempid_to_id = {}
+                
+                for unit_data in request.units:
+                    unit = await self._create_unit_with_validation(unit_data, site_id, db)
+                    created_units.append(unit)
+                    unit_tempid_to_id[unit_data['tempid']] = str(unit.id)
+                
+                # Phase 3: Create relationships with validation
+                created_relationships = []
+                for rel_data in request.relationships:
+                    relationship = await self._create_relationship_with_validation(
+                        rel_data, unit_tempid_to_id, site_id, db
+                    )
+                    created_relationships.append(relationship)
+                
+                # Phase 4: Final consistency check
+                await self._verify_data_integrity(site_id, db)
+                
+                return {
+                    "success": True,
+                    "created_units": created_units,
+                    "created_relationships": created_relationships,
+                    "unit_mapping": unit_tempid_to_id,
+                    "validation_result": validation_result
+                }
+                
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"[HARRIS MATRIX CREATION ERROR] Operation rolled back: {str(e)}", exc_info=True)
+            raise
+
+    async def _verify_data_integrity(self, site_id: UUID, db: AsyncSession) -> None:
+        """Verify data integrity after operations"""
+        
+        # Check for orphaned relationships
+        from app.models.stratigraphy import StratigraphicUnit, StratigraphicRelationship
+        
+        # Count units and relationships
+        units_count = await db.execute(
+            select(func.count(StratigraphicUnit.id))
+            .where(StratigraphicUnit.site_id == site_id)
+        )
+        
+        relationships_count = await db.execute(
+            select(func.count(StratigraphicRelationship.id))
+            .where(StratigraphicRelationship.site_id == site_id)
+        )
+        
+        units_result = units_count.scalar()
+        relationships_result = relationships_count.scalar()
+        
+        logger.info(f"[INTEGRITY CHECK] Site {site_id}: {units_result} units, {relationships_result} relationships")
+        
+        # Additional integrity checks can be added here

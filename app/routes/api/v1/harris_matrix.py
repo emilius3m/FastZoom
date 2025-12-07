@@ -833,17 +833,17 @@ async def v1_bulk_create_harris_matrix(
             current_user_id=current_user_id
         )
         
-        # Convert result to response schema
+        # ===== CRITICAL FIX: Match response to frontend expectations =====
         response = HarrisMatrixBulkCreateResponse(
             success=True,
             message=f"Successfully created {result['created_units']} units and {result['created_relationships']} relationships",
             site_id=site_id,
-            created_units=result['created_units'],
-            created_relationships=result['created_relationships'],
-            unit_mapping=result['unit_mapping'],
-            relationship_mapping=result['relationship_mapping'],
-            units=result['units'],
-            relationships=result['relationships'],
+            created_units=result['created_units'],  # INT count
+            created_relationships=result['created_relationships'],  # INT count
+            unit_mapping=result['unit_mapping'],  # Frontend uses this CRITICAL
+            relationship_mapping=result.get('relationship_mapping', {}),
+            units=result['units'] if 'units' in result else result.get('created_units_list', []),  # UnitResponse data
+            relationships=result['relationships'] if 'relationships' in result else result.get('created_relationships_list', []),  # RelationshipResponse data
             validation_result=validation_result.get("pydantic_result")
         )
         
@@ -2021,3 +2021,42 @@ async def _fetch_unit_by_temp_id(db: AsyncSession, site_id: str, temp_id: str):
     except Exception as e:
         logger.error(f"Error fetching unit by temp_id {temp_id}: {str(e)}")
         return None
+# ===== COMPREHENSIVE VALIDATION AND ERROR HANDLING FIX #2 =====
+
+from app.core.exceptions import ValidationError
+
+async def harris_matrix_error_handler(func):
+    """Decorator for comprehensive error handling"""
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except ValidationError as e:
+            logger.error(f"[VALIDATION ERROR] {str(e)}")
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "error": "validation_failed",
+                    "message": str(e),
+                    "validation_errors": [HarrisMatrixValidationError(
+                        error_type="validation_error",
+                        field="request",
+                        message=str(e),
+                        severity="error"
+                    ).dict()]
+                }
+            )
+        except Exception as e:
+            logger.error(f"[HARRIS MATRIX ERROR] Unexpected error: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "internal_server_error",
+                    "message": "An unexpected error occurred while processing the Harris Matrix",
+                    "suggestions": [
+                        "Check your input data for invalid relationships",
+                        "Ensure all units have unique codes",
+                        "Try saving a smaller subset of changes"
+                    ]
+                }
+            )
+    return wrapper

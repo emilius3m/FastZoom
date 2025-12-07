@@ -384,6 +384,57 @@ class HarrisMatrixDeleteRequest(BaseModel):
         }
 
 
+class UnitResponse(BaseModel):
+    """Schema for individual unit responses."""
+    
+    id: str = Field(..., description="Database ID")
+    code: str = Field(..., description="Human readable code")
+    type: Optional[str] = Field(None, description="Unit type (us or usm)")
+    description: Optional[str] = Field(None, description="Unit definition/description")
+    
+    # ===== CRITICAL FIX: Include additional fields frontend needs =====
+    site_id: Optional[str] = Field(None, description="Site ID")
+    sequenzafisica: Optional[Dict[str, List[str]]] = Field(None, description="Sequenza fisica relationships")
+    data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional unit data")
+    position: Optional[Dict[str, float]] = Field(None, description="X,Y position coordinates")
+    
+    # Unit-specific fields
+    tipo: Optional[str] = Field(None, description="US type (positiva/negativa) for US units")
+    localita: Optional[str] = Field(None, description="Location")
+    datazione: Optional[str] = Field(None, description="Dating information")
+    periodo: Optional[str] = Field(None, description="Period")
+    fase: Optional[str] = Field(None, description="Phase")
+    affidabilita_stratigrafica: Optional[str] = Field(None, description="Stratigraphic reliability")
+    tecnica_costruttiva: Optional[str] = Field(None, description="Construction technique for USM units")
+    
+    # Metadata fields
+    created_by: Optional[str] = Field(None, description="User ID who created the unit")
+    updated_by: Optional[str] = Field(None, description="User ID who last updated the unit")
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+    temp_id: Optional[str] = Field(None, description="Temporary ID for frontend mapping")
+
+
+class RelationshipResponse(BaseModel):
+    """Schema for individual relationship responses."""
+    
+    id: str = Field(..., description="Relationship ID")
+    from_unit_id: str = Field(..., description="Source unit ID")
+    to_unit_id: str = Field(..., description="Target unit ID")
+    relationship_type: str = Field(..., description="Type of relationship")
+    resolved: bool = Field(default=False, description="Whether relationship is resolved")
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+    
+    # ===== CRITICAL FIX: Include fields frontend uses =====
+    from_tempid: Optional[str] = Field(None, description="For frontend mapping")
+    to_tempid: Optional[str] = Field(None, description="For frontend mapping")
+    tempid: Optional[str] = Field(None, description="For frontend mapping")
+    bidirectional: bool = Field(default=False, description="Whether relationship is bidirectional")
+    description: Optional[str] = Field(None, description="Relationship description")
+    label: Optional[str] = Field(None, description="Display label")
+
+
 class HarrisMatrixValidationResult(BaseModel):
     """Schema for validation results."""
     
@@ -415,8 +466,8 @@ class HarrisMatrixBulkCreateResponse(HarrisMatrixResponse):
     created_relationships: int = Field(..., description="Number of relationships created")
     unit_mapping: Dict[str, str] = Field(..., description="Mapping from temp_id to actual unit ID")
     relationship_mapping: Dict[str, str] = Field(..., description="Mapping from temp_id to relationship ID")
-    units: List[Dict[str, Any]] = Field(..., description="Created units data")
-    relationships: List[Dict[str, Any]] = Field(..., description="Created relationships data")
+    units: List[UnitResponse] = Field(..., description="Created units data")
+    relationships: List[RelationshipResponse] = Field(..., description="Created relationships data")
     validation_result: Optional[HarrisMatrixValidationResult] = Field(
         None, description="Validation results"
     )
@@ -429,6 +480,30 @@ class HarrisMatrixBulkCreateResponse(HarrisMatrixResponse):
     suggestions: List[str] = Field(
         default_factory=list, description="Suggestions for improvement"
     )
+    
+    # ===== CRITICAL FIX: Add compatibility aliases for frontend =====
+    # Frontend expects 'units' but backend returns 'created_units'
+    # Frontend expects 'relationships' but backend returns 'created_relationships'
+    
+    @property
+    def created_units_data(self) -> Optional[List[UnitResponse]]:
+        """Compatibility property for frontend - maps to units data"""
+        return self.units
+    
+    @property
+    def created_relationships_data(self) -> Optional[List[RelationshipResponse]]:
+        """Compatibility property for frontend - maps to relationships data"""
+        return self.relationships
+    
+    # Add serialization compatibility to ensure both formats work
+    def dict(self, **kwargs):
+        data = super().dict(**kwargs)
+        # Add aliases for frontend compatibility - ensure units field is always populated
+        if hasattr(self, 'units') and self.units:
+            data['created_units_data'] = [unit.dict() if hasattr(unit, 'dict') else unit for unit in self.units]
+        if hasattr(self, 'relationships') and self.relationships:
+            data['created_relationships_data'] = [rel.dict() if hasattr(rel, 'dict') else rel for rel in self.relationships]
+        return data
 
 
 class HarrisMatrixBulkUpdateResponse(HarrisMatrixResponse):
@@ -791,3 +866,61 @@ class AtomicSaveTransactionInfo(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+# ===== COMPREHENSIVE VALIDATION AND ERROR HANDLING FIX #1 =====
+
+class HarrisMatrixCreateRequest(BaseModel):
+    """Enhanced request schema with comprehensive validation"""
+    
+    site_id: str
+    units: List[Dict[str, Any]]
+    relationships: List[Dict[str, Any]]
+    
+    @validator('site_id')
+    def validate_site_id(cls, v):
+        if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', v):
+            raise ValueError('Invalid site_id format - must be UUID')
+        return v
+    
+    @validator('units')
+    def validate_units(cls, v):
+        if not v:
+            raise ValueError('At least one unit must be provided')
+        
+        # Check for duplicate codes
+        codes = []
+        for unit in v:
+            if 'code' not in unit:
+                raise ValueError('Each unit must have a code')
+            code = unit['code']
+            if code in codes:
+                raise ValueError(f'Duplicate unit code: {code}')
+            codes.append(code)
+        
+        return v
+    
+    @validator('relationships')
+    def validate_relationships(cls, v):
+        # Validate relationship types
+        valid_types = ['copre', 'copertoda', 'taglia', 'tagliatoda', 
+                      'riempie', 'riempitoda', 'siappoggiaa', 'glisiappoggia',
+                      'silegaa', 'ugualea']
+        
+        for rel in v:
+            if 'relationship_type' not in rel:
+                raise ValueError('Each relationship must have a relationship_type')
+            
+            rel_type = rel['relationship_type']
+            if rel_type not in valid_types:
+                raise ValueError(f'Invalid relationship_type: {rel_type}. Valid types: {valid_types}')
+        
+        return v
+
+
+class HarrisMatrixValidationError(BaseModel):
+    """Standardized validation error response"""
+    
+    error_type: str
+    field: Optional[str] = None
+    message: str
+    severity: str = "error"  # error, warning, info
+    suggestions: Optional[List[str]] = None
