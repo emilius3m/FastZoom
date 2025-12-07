@@ -605,3 +605,189 @@ class SequenzaFisicaBulkUpdateRequest(BaseModel):
                 }
             }
         }
+
+
+# ===== ATOMIC HARRIS MATRIX SAVE SCHEMAS =====
+
+class HarrisMatrixAtomicSaveRequest(BaseModel):
+    """Schema for atomic Harris Matrix save operation.
+    
+    This schema combines all Harris Matrix operations into a single atomic transaction
+    to ensure complete data consistency and prevent partial database states.
+    """
+    
+    new_units: Optional[HarrisMatrixBulkCreateRequest] = Field(
+        None,
+        description="New units and relationships to create (optional)"
+    )
+    
+    existing_units_updates: Optional[SequenzaFisicaBulkUpdateRequest] = Field(
+        None,
+        description="Updates to existing units' sequenzafisica (optional)"
+    )
+    
+    layout_positions: Optional[HarrisMatrixLayoutSaveRequest] = Field(
+        None,
+        description="Layout positions to save for all units (optional)"
+    )
+    
+    @validator('new_units')
+    def validate_new_units_section(cls, v):
+        if v and (not v.units or len(v.units) == 0):
+            raise ValueError("If new_units section is provided, it must contain at least one unit")
+        return v
+    
+    @validator('existing_units_updates')
+    def validate_existing_units_section(cls, v):
+        if v and (not v.updates or len(v.updates) == 0):
+            raise ValueError("If existing_units_updates section is provided, it must contain at least one update")
+        return v
+    
+    @validator('layout_positions')
+    def validate_layout_positions_section(cls, v):
+        if v and (not v.positions or len(v.positions) == 0):
+            raise ValueError("If layout_positions section is provided, it must contain at least one position")
+        return v
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "new_units": {
+                    "units": [
+                        {
+                            "temp_id": "temp_unit_1",
+                            "unit_type": "us",
+                            "definition": "New positive US unit",
+                            "tipo": "positiva"
+                        }
+                    ],
+                    "relationships": [
+                        {
+                            "temp_id": "temp_rel_1",
+                            "from_temp_id": "temp_unit_1",
+                            "to_temp_id": "temp_unit_2",
+                            "relation_type": "copre"
+                        }
+                    ]
+                },
+                "existing_units_updates": {
+                    "updates": {
+                        "550e8400-e29b-41d4-a716-446655440000": {
+                            "copre": ["US002", "US003"],
+                            "taglia": []
+                        }
+                    }
+                },
+                "layout_positions": {
+                    "positions": [
+                        {
+                            "unit_id": "US001",
+                            "unit_type": "us",
+                            "x": 150.5,
+                            "y": 200.0
+                        }
+                    ]
+                }
+            }
+        }
+
+
+class HarrisMatrixAtomicSaveResponse(BaseModel):
+    """Response schema for atomic Harris Matrix save operation."""
+    
+    success: bool = Field(..., description="Whether the atomic save was successful")
+    message: str = Field(..., description="Detailed message about the operation result")
+    site_id: UUID = Field(..., description="Site identifier")
+    operation_results: Dict[str, Any] = Field(..., description="Detailed results for each operation type")
+    unit_mapping: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping from temporary IDs to actual unit IDs (for new units)"
+    )
+    validation_performed: bool = Field(..., description="Whether comprehensive validation was performed")
+    transaction_rolled_back: bool = Field(..., description="Whether transaction was rolled back on failure")
+    processing_time_ms: Optional[float] = Field(
+        None,
+        description="Total processing time in milliseconds"
+    )
+    warnings: List[str] = Field(
+        default_factory=list,
+        description="Processing warnings"
+    )
+    
+    class Config:
+        json_encoders = {
+            UUID: str
+        }
+        schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Atomic save completed successfully: 2 new units, 1 updated units, 3 layout positions",
+                "site_id": "123e4567-e89b-12d3-a456-426614174000",
+                "operation_results": {
+                    "new_units_created": 2,
+                    "existing_units_updated": 1,
+                    "layout_positions_saved": 3,
+                    "relationships_processed": 1
+                },
+                "unit_mapping": {
+                    "temp_unit_1": "550e8400-e29b-41d4-a716-446655440001",
+                    "temp_unit_2": "550e8400-e29b-41d4-a716-446655440002"
+                },
+                "validation_performed": True,
+                "transaction_rolled_back": False,
+                "processing_time_ms": 245.7,
+                "warnings": []
+            }
+        }
+
+
+class AtomicSaveHealthCheckResult(BaseModel):
+    """Response schema for atomic save health check."""
+    
+    status: str = Field(..., description="Health status: 'healthy' or 'unhealthy'")
+    site_id: UUID = Field(..., description="Site identifier that was checked")
+    database_connection: str = Field(..., description="Database connection status")
+    transaction_support: str = Field(..., description="Transaction support status")
+    message: str = Field(..., description="Health check message")
+    error: Optional[str] = Field(None, description="Error details if unhealthy")
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        json_encoders = {
+            UUID: str,
+            datetime: lambda v: v.isoformat()
+        }
+
+
+# Error detail schemas for enhanced error responses
+
+class AtomicSaveErrorDetail(BaseModel):
+    """Detailed error information for atomic save failures."""
+    
+    step: str = Field(..., description="Which step failed")
+    operation_type: str = Field(..., description="Type of operation that failed")
+    error_type: str = Field(..., description="Category of error")
+    details: str = Field(..., description="Detailed error message")
+    suggestion: str = Field(..., description="Suggested resolution")
+    affected_items: Optional[List[str]] = Field(
+        None,
+        description="List of affected items (units, relationships, etc.)"
+    )
+    rollback_applied: bool = Field(True, description="Whether rollback was applied")
+
+
+class AtomicSaveTransactionInfo(BaseModel):
+    """Information about the atomic transaction."""
+    
+    transaction_id: Optional[str] = Field(None, description="Transaction identifier")
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = Field(None, description="Transaction completion time")
+    duration_ms: Optional[float] = Field(None, description="Transaction duration in milliseconds")
+    steps_completed: List[str] = Field(default_factory=list, description="Completed steps before failure")
+    failed_step: Optional[str] = Field(None, description="Step that caused failure")
+    rollback_successful: bool = Field(True, description="Whether rollback was successful")
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }

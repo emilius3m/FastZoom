@@ -1862,7 +1862,15 @@ function harrisMatrixEditor() {
             this.autoLayout();
         },
 
-        // Save matrix to database
+        // Retry configuration
+        retryConfig: {
+            maxRetries: 3,
+            baseDelay: 1000,      // 1 second base delay
+            maxDelay: 8000,       // 8 second max delay
+            backoffFactor: 2      // Exponential backoff
+        },
+
+        // Save matrix to database using atomic transaction with retry logic
         async saveMatrix() {
             if (this.nodes.length === 0) {
                 alert('No nodes to save!');
@@ -1874,11 +1882,13 @@ function harrisMatrixEditor() {
             }
 
             try {
-                // ===== STEP 1: Separare nodi nuovi vs esistenti =====
-                const newNodes = this.nodes.filter(n => !n.isExisting);
-                const existingNodes = this.nodes.filter(n => n.isExisting);
+                console.log('🔄 Starting atomic save operation...');
                 
-                console.log(`Save strategy: ${newNodes.length} new nodes, ${existingNodes.length} existing nodes`);
+                // Show loading state
+                const saveButton = document.querySelector('[@click="saveMatrix()"]');
+                const originalText = saveButton.innerHTML;
+                saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+                saveButton.disabled = true;
 
                 // ===== INVERSE RELATIONSHIP MAPPING =====
                 // Create mapping of relationship types to their inverses that matches the backend
@@ -1895,12 +1905,21 @@ function harrisMatrixEditor() {
                     'riempie': 'riempito_da',          // ✓
                     'riempito_da': 'riempie'           // ✓
                 };
+
+                // ===== STEP 1: Separare nodi nuovi vs esistenti =====
+                const newNodes = this.nodes.filter(n => !n.isExisting);
+                const existingNodes = this.nodes.filter(n => n.isExisting);
                 
-                // ===== STEP 2: Creare solo le unità NUOVE con bulk-create =====
+                console.log(`Save strategy: ${newNodes.length} new nodes, ${existingNodes.length} existing nodes`);
+
+                // ===== STEP 2: Prepare atomic save request =====
+                const atomicRequest = {};
+
+                // NEW UNITS: Prepare for bulk-create
                 if (newNodes.length > 0) {
                     const backendUnits = newNodes.map(node => ({
-                        tempid: node.tempid,
-                        unittype: node.unitType,
+                        temp_id: node.tempid,           // Use snake_case to match backend
+                        unit_type: node.unitType,       // Use snake_case to match backend
                         code: null,  // Let backend generate
                         definition: node.definition || "",
                         tipo: node.usType,
@@ -1916,44 +1935,21 @@ function harrisMatrixEditor() {
                     const backendRelationships = this.edges
                         .filter(edge => newTempIds.has(edge.from) || newTempIds.has(edge.to))
                         .map((edge, index) => ({
-                            tempid: `rel${index + 1}`,
-                            fromtempid: edge.from,
-                            totempid: edge.to,
-                            relationtype: edge.relationship
+                            temp_id: `rel${index + 1}`,         // Use snake_case
+                            from_temp_id: edge.from,            // Use snake_case
+                            to_temp_id: edge.to,                // Use snake_case
+                            relation_type: edge.relationship   // Use snake_case
                         }));
                     
-                    console.log(`Creating ${backendUnits.length} new units with ${backendRelationships.length} relationships`);
+                    atomicRequest.new_units = {
+                        units: backendUnits,
+                        relationships: backendRelationships
+                    };
                     
-                    const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-create`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            units: backendUnits,
-                            relationships: backendRelationships
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(JSON.stringify(error, null, 2));
-                    }
-                    
-                    const result = await response.json();
-                    
-                    // Aggiornare tempid -> dbId per i nodi nuovi
-                    const mapping = result.unit_mapping || result.unitmapping || {};
-                    this.nodes.forEach(node => {
-                        if (mapping[node.tempid]) {
-                            node.dbId = mapping[node.tempid];
-                            node.isExisting = true;
-                        }
-                    });
-                    
-                    console.log('New units created successfully');
+                    console.log(`Prepared ${backendUnits.length} new units with ${backendRelationships.length} relationships`);
                 }
-                
-                // ===== STEP 3: Aggiornare sequenza_fisica delle unità ESISTENTI =====
+
+                // EXISTING UNITS: Prepare sequenzafisica updates
                 if (existingNodes.length > 0) {
                     const sequenzaUpdates = {};
                     
@@ -2030,73 +2026,302 @@ function harrisMatrixEditor() {
                     }
                     
                     if (Object.keys(sequenzaUpdates).length > 0) {
-                        console.log(`Updating sequenzafisica for ${Object.keys(sequenzaUpdates).length} existing units`);
-                        
-                        const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-update-sequenza-fisica-units`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({
-                                updates: sequenzaUpdates
-                            })
-                        });
-                        
-                        if (!response.ok) {
-                            const error = await response.json();
-                            console.error('Failed to update sequenzafisica:', error);
-                            throw new Error(`Sequenzafisica update failed: ${error.detail || JSON.stringify(error)}`);
-                        }
-                        
-                        const result = await response.json();
-                        console.log('Sequenzafisica updated:', result);
+                        atomicRequest.existing_units_updates = {
+                            updates: sequenzaUpdates
+                        };
+                        console.log(`Prepared sequenzafisica updates for ${Object.keys(sequenzaUpdates).length} existing units`);
                     }
                 }
+
+                // LAYOUT POSITIONS: Prepare layout save
+                const positions = [];
+                this.cy.nodes().forEach(node => {
+                    const nodeData = this.nodes.find(n => n.tempid === node.id());
+                    const dbId = nodeData?.dbId;
+                    
+                    if (dbId) {
+                        positions.push({
+                            unit_id: dbId,                    // Use snake_case to match backend
+                            unit_type: nodeData.unitType || 'us',
+                            x: Math.round(node.position().x),
+                            y: Math.round(node.position().y)
+                        });
+                    }
+                });
                 
-                // ===== STEP 4: Salvare posizioni layout =====
-                try {
-                    const positions = [];
-                    this.cy.nodes().forEach(node => {
-                        const nodeData = this.nodes.find(n => n.tempid === node.id());
-                        const dbId = nodeData?.dbId;
-                        
-                        if (dbId) {
-                            positions.push({
-                                unitid: dbId,
-                                unittype: nodeData.unitType || 'us',
-                                x: Math.round(node.position().x),
-                                y: Math.round(node.position().y)
-                            });
+                if (positions.length > 0) {
+                    atomicRequest.layout_save = {
+                        positions: positions
+                    };
+                    console.log(`Prepared layout positions for ${positions.length} nodes`);
+                }
+
+                // ===== STEP 3: Execute ATOMIC SAVE =====
+                console.log('🚀 Executing atomic save request...');
+                const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/atomic-save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(atomicRequest)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('❌ Atomic save failed:', error);
+                    
+                    // Restore button state
+                    saveButton.innerHTML = originalText;
+                    saveButton.disabled = false;
+                    
+                    // Detailed error reporting
+                    let errorMessage = 'Atomic save transaction failed!\n\n';
+                    
+                    if (error.operation_results) {
+                        Object.entries(error.operation_results).forEach(([operation, result]) => {
+                            if (!result.success) {
+                                errorMessage += `❌ ${operation}: ${result.message}\n`;
+                            } else {
+                                errorMessage += `✅ ${operation}: ${result.message}\n`;
+                            }
+                        });
+                    }
+                    
+                    if (error.detail) {
+                        errorMessage += `\nTechnical details: ${error.detail}`;
+                    }
+                    
+                    if (error.validation_errors) {
+                        errorMessage += `\n\nValidation errors:\n${error.validation_errors.join('\n')}`;
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+
+                const result = await response.json();
+                console.log('✅ Atomic save completed successfully:', result);
+
+                // Update local data with any changes from backend
+                if (result.operation_results?.create_units?.data?.unit_mapping) {
+                    const mapping = result.operation_results.create_units.data.unit_mapping;
+                    this.nodes.forEach(node => {
+                        if (mapping[node.tempid]) {
+                            node.dbId = mapping[node.tempid];
+                            node.isExisting = true;
                         }
                     });
-                    
-                    if (positions.length > 0) {
-                        const layoutResponse = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/layout`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({ positions })
-                        });
-                        
-                        if (layoutResponse.ok) {
-                            console.log(`Layout saved: ${positions.length} positions`);
-                        } else {
-                            console.warn('Failed to save layout positions');
-                        }
-                    }
-                } catch (layoutError) {
-                    console.error('Error saving layout:', layoutError);
-                    // Don't fail the entire save if layout fails
                 }
-                
-                alert(`Harris Matrix saved successfully!\n- ${newNodes.length} new units created\n- ${existingNodes.length} existing units updated`);
+
+                // ===== STEP 4: Success feedback =====
+                const newUnitsCount = result.operation_results?.create_units?.data?.created_units || 0;
+                const updatedUnitsCount = result.operation_results?.update_units?.data?.updated_units || 0;
+                const savedPositionsCount = result.operation_results?.save_layout?.data?.saved_positions || 0;
+
+                let successMessage = `✅ Harris Matrix saved successfully with atomic transaction!\n\n`;
+                successMessage += `📊 Transaction Summary:\n`;
+                successMessage += `• ${newUnitsCount} new units created\n`;
+                successMessage += `• ${updatedUnitsCount} existing units updated\n`;
+                successMessage += `• ${savedPositionsCount} layout positions saved\n`;
+                successMessage += `• ${result.summary?.successful_operations || 0}/${result.summary?.total_operations || 0} operations successful\n`;
+                successMessage += `• Transaction consistency: ${result.summary?.transaction_consistent ? '✅ MAINTAINED' : '❌ COMPROMISED'}`;
+
+                // Restore button state
+                saveButton.innerHTML = originalText;
+                saveButton.disabled = false;
+
+                alert(successMessage);
                 
                 // Redirect to viewer
                 window.location.href = `/view/${this.siteId}/harris-matrix`;
                 
             } catch (error) {
-                console.error('Error saving matrix:', error);
-                alert(`Error during save:\n${error.message}`);
+                console.error('❌ Error in atomic save:', error);
+                
+                // Restore button state
+                const saveButton = document.querySelector('[@click="saveMatrix()"]');
+                saveButton.innerHTML = '<i class="fas fa-save mr-2"></i>Save Matrix';
+                saveButton.disabled = false;
+                
+                alert(`Error during atomic save:\n${error.message}`);
             }
+        },
+
+        // Execute atomic save with retry logic for transient failures
+        async executeAtomicSaveWithRetry(atomicRequest) {
+            let lastError = null;
+            
+            for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
+                try {
+                    if (attempt > 0) {
+                        const delay = Math.min(
+                            this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffFactor, attempt - 1),
+                            this.retryConfig.maxDelay
+                        );
+                        
+                        console.log(`⏳ Retry attempt ${attempt}/${this.retryConfig.maxRetries} after ${delay}ms delay...`);
+                        await this.sleep(delay);
+                    }
+
+                    console.log(`📡 Attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1}: Sending atomic save request...`);
+                    
+                    const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/atomic-save`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(atomicRequest)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        console.log(`✅ Atomic save succeeded on attempt ${attempt + 1}`);
+                        return result;
+                    }
+
+                    // Handle HTTP errors
+                    const error = await response.json();
+                    console.error(`❌ Atomic save failed on attempt ${attempt + 1}:`, error);
+                    
+                    // Check if this is a retryable error
+                    if (this.isRetryableError(response.status, error)) {
+                        lastError = error;
+                        if (attempt < this.retryConfig.maxRetries) {
+                            console.log(`🔄 Retryable error detected, will retry...`);
+                            continue;
+                        }
+                    }
+                    
+                    // Non-retryable error or max retries reached
+                    throw this.formatAtomicSaveError(error, attempt);
+
+                } catch (error) {
+                    console.error(`❌ Exception on attempt ${attempt + 1}:`, error);
+                    
+                    // Check if this is a network/retryable error
+                    if (this.isRetryableNetworkError(error) && attempt < this.retryConfig.maxRetries) {
+                        lastError = error;
+                        console.log(`🔄 Network error detected, will retry...`);
+                        continue;
+                    }
+                    
+                    // Non-retryable error or max retries reached
+                    throw this.formatAtomicSaveError(error, attempt);
+                }
+            }
+            
+            // This should not be reached, but just in case
+            throw this.formatAtomicSaveError(lastError, this.retryConfig.maxRetries);
+        },
+
+        // Check if HTTP error is retryable
+        isRetryableError(statusCode, error) {
+            // Retryable HTTP status codes
+            const retryableStatusCodes = [
+                408, // Request Timeout
+                429, // Too Many Requests
+                500, // Internal Server Error
+                502, // Bad Gateway
+                503, // Service Unavailable
+                504, // Gateway Timeout
+                507, // Insufficient Storage
+                509, // Bandwidth Limit Exceeded
+                520, // Unknown Error
+                521, // Web Server Is Down
+                522, // Connection Timed Out
+                523, // Origin Is Unreachable
+                524  // A Timeout Occurred
+            ];
+            
+            if (retryableStatusCodes.includes(statusCode)) {
+                return true;
+            }
+            
+            // Check for specific retryable error patterns
+            const retryablePatterns = [
+                /timeout/i,
+                /connection/i,
+                /network/i,
+                /temporary/i,
+                /service unavailable/i,
+                /database lock/i,
+                /transaction deadlock/i
+            ];
+            
+            const errorString = JSON.stringify(error).toLowerCase();
+            return retryablePatterns.some(pattern => pattern.test(errorString));
+        },
+
+        // Check if network error is retryable
+        isRetryableNetworkError(error) {
+            const retryablePatterns = [
+                /network/i,
+                /connection/i,
+                /timeout/i,
+                /fetch/i,
+                /cors/i,
+                /failed to fetch/i
+            ];
+            
+            const errorString = error.message?.toLowerCase() || error.toString().toLowerCase();
+            return retryablePatterns.some(pattern => pattern.test(errorString));
+        },
+
+        // Format atomic save error with retry context
+        formatAtomicSaveError(error, attempt) {
+            let errorMessage = '';
+            
+            if (typeof error === 'string') {
+                errorMessage = error;
+            } else if (error.message) {
+                errorMessage = error.message;
+            } else if (error.detail) {
+                errorMessage = error.detail;
+            } else {
+                errorMessage = JSON.stringify(error);
+            }
+            
+            // Add retry context
+            if (attempt > 0) {
+                errorMessage = `❌ Atomic save failed after ${attempt + 1} attempts!\n\n${errorMessage}`;
+            } else {
+                errorMessage = `❌ Atomic save transaction failed!\n\n${errorMessage}`;
+            }
+            
+            // Add operation results if available
+            if (error.operation_results) {
+                errorMessage += '\n\n📊 Operation Results:\n';
+                Object.entries(error.operation_results).forEach(([operation, result]) => {
+                    if (!result.success) {
+                        errorMessage += `❌ ${operation}: ${result.message}\n`;
+                    } else {
+                        errorMessage += `✅ ${operation}: ${result.message}\n`;
+                    }
+                });
+            }
+            
+            // Add technical details if available
+            if (error.detail) {
+                errorMessage += `\n\nTechnical details: ${error.detail}`;
+            }
+            
+            // Add validation errors if available
+            if (error.validation_errors) {
+                errorMessage += `\n\nValidation errors:\n${error.validation_errors.join('\n')}`;
+            }
+            
+            // Add retry suggestions
+            if (attempt > 0) {
+                errorMessage += `\n\n💡 Suggestions:\n`;
+                errorMessage += '• Check your network connection\n';
+                errorMessage += '• Try saving again in a few moments\n';
+                errorMessage += '• If the problem persists, contact support\n';
+                errorMessage += '• Consider saving smaller batches of changes';
+            }
+            
+            return new Error(errorMessage);
+        },
+
+        // Sleep utility for retry delays
+        sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
         },
 
         // Export matrix as image

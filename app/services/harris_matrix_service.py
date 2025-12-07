@@ -12,7 +12,7 @@ Enhanced with UnitResolver for intelligent unit code resolution and reference va
 import re
 import asyncio
 import math
-from typing import Dict, List, Any, Optional, Set, Tuple
+from typing import Dict, List, Any, Optional, Set, Tuple, Union
 from uuid import UUID, uuid4
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -1217,9 +1217,8 @@ class HarrisMatrixService:
         """
         Bulk update sequenzafisica field for multiple existing US/USM units.
         
-        This method performs the database operations for updating the
-        sequenzafisica field of multiple units. Transaction management
-        should be handled by the caller (API layer).
+        This method performs comprehensive validation including schema validation,
+        cycle detection, business rules validation, and proper transaction management.
         
         Args:
             site_id: UUID of the archaeological site
@@ -1227,68 +1226,371 @@ class HarrisMatrixService:
             
         Returns:
             Dictionary with update statistics and results
+            
+        Raises:
+            HarrisMatrixValidationError: If input validation fails
+            StratigraphicCycleDetected: If cycles are detected in relationships
+            InvalidStratigraphicRelation: If business rules are violated
+            HarrisMatrixServiceError: For service-level errors
         """
         try:
             logger.info(f"Bulk updating sequenzafisica for {len(updates)} units in site {site_id}")
             
-            updated_count = 0
-            errors = []
+            # 1. INPUT VALIDATION - Validate schema using existing Pydantic schema
+            await self._validate_bulk_update_input(updates)
+            
+            # 2. PRE-UPDATE VALIDATION - Validate units exist and collect data
+            validated_units = await self._validate_and_collect_units(site_id, updates)
+            
+            # 3. PERFORM UPDATES WITH OLD STATE COLLECTION
+            old_relationships = {}
+            updated_units = []
+            
+            for unit_id, (unit, unit_type, new_sequenza) in validated_units.items():
+                # CRITICAL FIX: Validate that unit is the actual object, not a coroutine
+                if hasattr(unit, '__await__'):
+                    logger.error(f"ERROR: unit is a coroutine object at line 1252: {unit}")
+                    unit = await unit  # Await the coroutine if needed
+                
+                # Additional validation to ensure unit is the correct type
+                if not isinstance(unit, (UnitaStratigrafica, UnitaStratigraficaMuraria)):
+                    logger.error(f"ERROR: unit is not a valid unit object at line 1252: {type(unit)} - {unit}")
+                    raise HarrisMatrixValidationError(f"Invalid unit object type for unit {unit_id}")
+                
+                # Store old relationships for validation and rollback info
+                old_relationships[unit_id] = {
+                    'old_sequenza_fisica': unit.sequenza_fisica.copy() if unit.sequenza_fisica else {},
+                    'unit_code': unit.us_code if hasattr(unit, 'us_code') else unit.usm_code,
+                    'unit_type': unit_type
+                }
+                
+                # Apply update
+                unit.sequenzafisica = new_sequenza
+                
+                # CRITICAL: Mark JSON field as modified for SQLAlchemy
+                flag_modified(unit, "sequenzafisica")
+                
+                updated_units.append({
+                    'id': unit_id,
+                    'unit': unit,
+                    'unit_type': unit_type,
+                    'unit_code': old_relationships[unit_id]['unit_code']
+                })
+                
+                logger.debug(f"Updated sequenzafisica for {unit_type} {old_relationships[unit_id]['unit_code']}")
+            
+            # 4. COMPREHENSIVE POST-UPDATE VALIDATION
+            await self._validate_bulk_update_comprehensive(site_id, updated_units, old_relationships)
+            
+            # 5. RETURN SUCCESSFUL RESULT
+            result = {
+                "success": True,
+                "updated_count": len(updated_units),
+                "total_requested": len(updates),
+                "updated_units": [
+                    {
+                        "unit_id": unit['id'],
+                        "unit_type": unit['unit_type'],
+                        "unit_code": unit['unit_code']
+                    } for unit in updated_units
+                ],
+                "validation_performed": True,
+                "errors": []
+            }
+            
+            logger.info(f"Bulk sequenzafisica update completed successfully: {len(updated_units)}/{len(updates)} units updated")
+            return result
+            
+        except (HarrisMatrixValidationError, StratigraphicCycleDetected, InvalidStratigraphicRelation) as e:
+            # These are expected validation errors - re-raise for rollback
+            logger.error(f"Bulk update validation failed: {str(e)}")
+            raise
+        except Exception as e:
+            # Unexpected error
+            logger.error(f"Error in bulk sequenzafisica update: {str(e)}", exc_info=True)
+            raise HarrisMatrixServiceError(str(e), "bulk_update_sequenza_fisica_units")
+    
+    async def _validate_bulk_update_input(self, updates: Dict[str, Dict[str, Any]]) -> None:
+        """
+        Validate input data structure and schema using Pydantic validation.
+        
+        Args:
+            updates: Dictionary mapping unit IDs to their new sequenzafisica
+            
+        Raises:
+            HarrisMatrixValidationError: If input validation fails
+        """
+        try:
+            logger.debug("Validating bulk update input structure")
+            
+            # Basic structure validation
+            if not isinstance(updates, dict):
+                raise HarrisMatrixValidationError("Updates must be a dictionary")
+            
+            if not updates:
+                raise HarrisMatrixValidationError("At least one unit update is required")
+            
+            if len(updates) > 100:
+                raise HarrisMatrixValidationError("Maximum 100 units can be updated in a single request")
+            
+            # Validate each unit update
+            for unit_id, sequenza_fisica in updates.items():
+                # Validate unit ID format (should be UUID string)
+                try:
+                    UUID(unit_id)
+                except ValueError:
+                    raise HarrisMatrixValidationError(f"Invalid unit ID format: {unit_id}")
+                
+                # Validate sequenza_fisica structure
+                if not isinstance(sequenza_fisica, dict):
+                    raise HarrisMatrixValidationError(f"sequenzafisica for unit {unit_id} must be a dictionary")
+                
+                # Validate relationship types and targets
+                for rel_type, targets in sequenza_fisica.items():
+                    # Check if relationship type is valid
+                    if rel_type not in VALID_RELATIONSHIP_TYPES:
+                        raise HarrisMatrixValidationError(
+                            f"Invalid relationship type '{rel_type}' for unit {unit_id}. "
+                            f"Valid types: {VALID_RELATIONSHIP_TYPES}"
+                        )
+                    
+                    # Validate targets structure
+                    if targets is None:
+                        continue  # Allow None (will be converted to empty list)
+                    elif not isinstance(targets, list):
+                        raise HarrisMatrixValidationError(
+                            f"Relationship targets for '{rel_type}' in unit {unit_id} must be a list or null"
+                        )
+                    
+                    # Validate each target string
+                    for target in targets:
+                        if not isinstance(target, str):
+                            raise HarrisMatrixValidationError(
+                                f"Relationship target '{target}' in unit {unit_id} must be a string"
+                            )
+                        
+                        if not target.strip():
+                            raise HarrisMatrixValidationError(
+                                f"Empty relationship target found in unit {unit_id}"
+                            )
+                
+                logger.debug(f"Input validation passed for unit {unit_id}")
+            
+            logger.debug("Bulk update input validation completed successfully")
+            
+        except HarrisMatrixValidationError:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during input validation: {str(e)}", exc_info=True)
+            raise HarrisMatrixValidationError(f"Input validation error: {str(e)}")
+    
+    async def _validate_and_collect_units(
+        self,
+        site_id: UUID,
+        updates: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, Tuple[Union[UnitaStratigrafica, UnitaStratigraficaMuraria], str, Dict[str, List[str]]]]:
+        """
+        Validate that all units exist and collect unit data for processing.
+        
+        Args:
+            site_id: UUID of the archaeological site
+            updates: Dictionary mapping unit IDs to their new sequenzafisica
+            
+        Returns:
+            Dictionary mapping unit_id to (unit_object, unit_type, new_sequenza_fisica)
+            
+        Raises:
+            HarrisMatrixValidationError: If any units don't exist or are invalid
+        """
+        try:
+            logger.debug("Validating unit existence and collecting unit data")
+            
+            validated_units = {}
+            missing_units = []
             
             for unit_id, new_sequenza in updates.items():
-                try:
-                    # Try US first
-                    query = select(UnitaStratigrafica).where(
+                unit = None
+                unit_type = None
+                
+                # Try US first
+                query = select(UnitaStratigrafica).where(
+                    and_(
+                        UnitaStratigrafica.id == unit_id,
+                        UnitaStratigrafica.site_id == str(site_id),
+                        UnitaStratigrafica.deleted_at.is_(None)
+                    )
+                )
+                result = await self.db.execute(query)
+                unit = result.scalar_one_or_none()
+                
+                if unit:
+                    unit_type = 'us'
+                else:
+                    # Try USM
+                    query = select(UnitaStratigraficaMuraria).where(
                         and_(
-                            UnitaStratigrafica.id == unit_id,
-                            UnitaStratigrafica.site_id == str(site_id),
-                            UnitaStratigrafica.deleted_at.is_(None)
+                            UnitaStratigraficaMuraria.id == unit_id,
+                            UnitaStratigraficaMuraria.site_id == str(site_id),
+                            UnitaStratigraficaMuraria.deleted_at.is_(None)
                         )
                     )
                     result = await self.db.execute(query)
                     unit = result.scalar_one_or_none()
                     
-                    # If not US, try USM
-                    if not unit:
-                        query = select(UnitaStratigraficaMuraria).where(
-                            and_(
-                                UnitaStratigraficaMuraria.id == unit_id,
-                                UnitaStratigraficaMuraria.site_id == str(site_id),
-                                UnitaStratigraficaMuraria.deleted_at.is_(None)
-                            )
-                        )
-                        result = await self.db.execute(query)
-                        unit = result.scalar_one_or_none()
-                    
-                    if not unit:
-                        errors.append(f"Unit {unit_id} not found")
-                        continue
-                    
-                    # Update sequenzafisica
-                    unit.sequenzafisica = new_sequenza
-                    
-                    # CRITICAL: Mark as modified for SQLAlchemy
-                    flag_modified(unit, "sequenzafisica")
-                    
-                    updated_count += 1
-                    logger.debug(f"Updated sequenzafisica for unit {unit_id}")
-                    
-                except Exception as e:
-                    logger.error(f"Error updating unit {unit_id}: {str(e)}")
-                    errors.append(f"Unit {unit_id}: {str(e)}")
+                    if unit:
+                        unit_type = 'usm'
+                
+                if not unit:
+                    missing_units.append(unit_id)
+                    continue
+                
+                # Normalize sequenza_fisica (convert None to empty lists)
+                normalized_sequenza = {}
+                for rel_type, targets in new_sequenza.items():
+                    if targets is None:
+                        normalized_sequenza[rel_type] = []
+                    else:
+                        normalized_sequenza[rel_type] = targets
+                
+                validated_units[unit_id] = (unit, unit_type, normalized_sequenza)
+                logger.debug(f"Validated {unit_type} unit {unit_id}")
             
-            result = {
-                "success": len(errors) == 0,
-                "updated_count": updated_count,
-                "total_requested": len(updates),
-                "errors": errors
-            }
+            if missing_units:
+                raise HarrisMatrixValidationError(
+                    f"The following units were not found or are deleted: {', '.join(missing_units)}"
+                )
             
-            logger.info(f"Bulk sequenzafisica update completed: {updated_count}/{len(updates)} successful")
-            return result
+            if not validated_units:
+                raise HarrisMatrixValidationError("No valid units found for updating")
             
+            logger.debug(f"Unit validation completed: {len(validated_units)} units validated")
+            return validated_units
+            
+        except HarrisMatrixValidationError:
+            raise
         except Exception as e:
-            logger.error(f"Error in bulk sequenzafisica update: {str(e)}", exc_info=True)
-            raise HarrisMatrixServiceError(str(e), "bulk_update_sequenza_fisica_units")
+            logger.error(f"Error during unit validation: {str(e)}", exc_info=True)
+            raise HarrisMatrixValidationError(f"Unit validation error: {str(e)}")
+    
+    async def _validate_bulk_update_comprehensive(
+        self,
+        site_id: UUID,
+        updated_units: List[Dict[str, Any]],
+        old_relationships: Dict[str, Dict[str, Any]]
+    ) -> None:
+        """
+        Perform comprehensive post-update validation including cycle detection and business rules.
+        
+        Args:
+            site_id: UUID of the archaeological site
+            updated_units: List of updated unit dictionaries
+            old_relationships: Dictionary of old relationships for context
+            
+        Raises:
+            StratigraphicCycleDetected: If cycles are detected in relationships
+            InvalidStratigraphicRelation: If business rules are violated
+            HarrisMatrixValidationError: For other validation errors
+        """
+        try:
+            logger.info("Starting comprehensive post-update validation")
+            
+            # 1. Get all units for the site to build complete graph
+            us_units, usm_units = await self.unit_lookup.get_units_by_site(site_id)
+            
+            # 2. Extract relationships from all units to build complete graph
+            all_relationships = await self._extract_relationships(us_units, usm_units)
+            
+            # 3. Build validation units list
+            validation_units = []
+            
+            # Add US units
+            for us in us_units:
+                validation_unit = {
+                    'id': str(us.id),
+                    'unit_type': 'us',
+                    'unit': us
+                }
+                validation_units.append(validation_unit)
+            
+            # Add USM units
+            for usm in usm_units:
+                validation_unit = {
+                    'id': str(usm.id),
+                    'unit_type': 'usm',
+                    'unit': usm
+                }
+                validation_units.append(validation_unit)
+            
+            # 4. Build validation relationships from current state
+            validation_relationships = await self._build_validation_relationships_from_units(validation_units)
+            
+            # 5. PERFORM CYCLE DETECTION
+            logger.debug("Performing cycle detection on updated graph")
+            graph = self.graph_builder.build_validation_graph(validation_units, validation_relationships)
+            cycles = CycleDetector.detect_cycles_in_graph(graph)
+            
+            if cycles:
+                logger.error(f"Stratigraphic cycles detected after bulk update: {cycles}")
+                
+                # Provide detailed cycle information
+                cycle_details = []
+                for cycle in cycles:
+                    cycle_str = " → ".join(cycle[:-1])  # Exclude the repeated last node
+                    cycle_details.append(f"Cycle: {cycle_str}")
+                
+                # Get affected units from our updates
+                affected_updated_units = []
+                for unit in updated_units:
+                    unit_code = unit['unit_code']
+                    for cycle in cycles:
+                        if f"{unit['unit_type'].upper()}{unit_code}" in cycle:
+                            affected_updated_units.append(f"{unit['unit_type'].upper()}{unit_code}")
+                            break
+                
+                raise StratigraphicCycleDetected(
+                    f"Bulk update created invalid stratigraphic cycles. "
+                    f"Detected cycles: {'; '.join(cycle_details)}. "
+                    f"Updated units involved: {', '.join(affected_updated_units) if affected_updated_units else 'None'}. "
+                    f"Transaction will be rolled back to maintain data integrity."
+                )
+            
+            # 6. VALIDATE BUSINESS RULES
+            logger.debug("Performing business rules validation")
+            try:
+                self.rules_validator.validate_business_rules(validation_units, validation_relationships)
+                logger.debug("Business rules validation passed")
+            except InvalidStratigraphicRelation as e:
+                logger.error(f"Business rules validation failed: {str(e)}")
+                
+                # Add contextual information about the bulk update
+                affected_updated_units = []
+                for unit in updated_units:
+                    unit_code = unit['unit_code']
+                    # Check if this unit's relationships are mentioned in the error
+                    if f"{unit['unit_type'].upper()}{unit_code}" in str(e):
+                        affected_updated_units.append(f"{unit['unit_type'].upper()}{unit_code}")
+                
+                raise InvalidStratigraphicRelation(
+                    f"Bulk update violated stratigraphic business rules. "
+                    f"Error: {str(e)}. "
+                    f"Updated units involved: {', '.join(affected_updated_units) if affected_updated_units else 'None'}. "
+                    f"Transaction will be rolled back to maintain data integrity."
+                )
+            
+            # 7. VALIDATE INDIVIDUAL RELATIONSHIPS IN UPDATED UNITS
+            logger.debug("Validating individual relationships in updated units")
+            for unit_data in updated_units:
+                await self._validate_unit_relationships(unit_data['unit'])
+            
+            logger.info("Comprehensive post-update validation completed successfully")
+            
+        except (StratigraphicCycleDetected, InvalidStratigraphicRelation) as e:
+            # These are expected validation errors - re-raise for rollback
+            raise
+        except Exception as e:
+            # Unexpected validation error
+            logger.error(f"Unexpected error during comprehensive validation: {str(e)}", exc_info=True)
+            raise HarrisMatrixValidationError(f"Validation system error: {str(e)}")
     
     async def delete_unit_with_cleanup(
         self,

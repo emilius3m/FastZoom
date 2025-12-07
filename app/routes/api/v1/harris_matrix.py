@@ -36,7 +36,9 @@ from app.schemas.harris_matrix_editor import (
     HarrisMatrixBulkCreateRelationship,
     HarrisMatrixLayoutSaveRequest,
     NodePosition,
-    SequenzaFisicaBulkUpdateRequest
+    SequenzaFisicaBulkUpdateRequest,
+    HarrisMatrixAtomicSaveRequest,
+    HarrisMatrixAtomicSaveResponse
 )
 from app.exceptions import (
     HarrisMatrixValidationError,
@@ -1764,6 +1766,216 @@ async def v1_bulk_update_sequenza_fisica_units(
     except Exception as e:
         logger.error(f"Error in bulk sequenzafisica update: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post(
+    "/sites/{site_id}/atomic-save",
+    summary="Atomic save for Harris Matrix with transaction consistency",
+    tags=["Harris Matrix Editor"]
+)
+async def v1_atomic_save_harris_matrix(
+    site_id: UUID,
+    request: HarrisMatrixAtomicSaveRequest,
+    db: AsyncSession = Depends(get_async_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+) -> HarrisMatrixAtomicSaveResponse:
+    """
+    Atomic save operation for Harris Matrix with transaction consistency.
+    
+    This endpoint handles all three operations in a single database transaction:
+    1. Create new units (if any)
+    2. Update existing units' relationships (if any)
+    3. Save layout positions (if any)
+    
+    If any operation fails, the entire transaction is rolled back, ensuring
+    database consistency and preventing partial states.
+    
+    Args:
+        site_id: UUID of the archaeological site
+        request: Atomic save request containing all operations
+        current_user_id: Current authenticated user ID
+        user_sites: User's accessible sites
+        
+    Returns:
+        Comprehensive result with success/failure status for each operation
+        
+    Raises:
+        HTTPException: With detailed error information if transaction fails
+    """
+    try:
+        logger.info(f"Starting atomic save for Harris Matrix site {site_id}")
+        
+        # Verify site access
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "Access denied to this site",
+                    "field": "site_id",
+                    "value": str(site_id),
+                    "suggestion": "Verify you have access to this site"
+                }
+            )
+        
+        # Initialize services
+        harris_service = HarrisMatrixService(db)
+        from app.services.harris_matrix_unit_resolver import UnitResolver
+        unit_resolver = UnitResolver(db)
+        
+        # Single atomic transaction for all operations
+        async with db.begin() as transaction:
+            try:
+                operation_results = {
+                    "create_units": {"success": True, "message": "No new units to create", "data": None},
+                    "update_units": {"success": True, "message": "No existing units to update", "data": None},
+                    "save_layout": {"success": True, "message": "No layout to save", "data": None}
+                }
+                
+                # STEP 1: Create new units (if any)
+                if request.new_units and request.new_units.units:
+                    logger.info(f"STEP 1: Creating {len(request.new_units.units)} new units")
+                    
+                    # Pre-validate new units
+                    validation_result = await _validate_bulk_create_request(
+                        request.new_units, site_id, unit_resolver, db
+                    )
+                    
+                    if not validation_result["is_valid"]:
+                        logger.error(f"New units validation failed: {validation_result['errors']}")
+                        raise HTTPException(
+                            status_code=422,
+                            detail={
+                                "error": "New units validation failed - transaction rolled back",
+                                "validation_errors": validation_result["errors"],
+                                "field_errors": validation_result.get("field_errors", {}),
+                                "operation": "create_units"
+                            }
+                        )
+                    
+                    # Convert units data with proper user attribution
+                    units_data = []
+                    for unit in request.new_units.units:
+                        unit_dict = unit.dict(exclude_none=True)
+                        unit_dict['created_by'] = str(current_user_id)
+                        unit_dict['updated_by'] = str(current_user_id)
+                        units_data.append(unit_dict)
+                    
+                    relationships_data = [rel.dict() for rel in request.new_units.relationships]
+                    
+                    # Create units and relationships
+                    create_result = await harris_service.bulk_create_units_with_relationships(
+                        site_id=site_id,
+                        units_data=units_data,
+                        relationships_data=relationships_data,
+                        current_user_id=current_user_id
+                    )
+                    
+                    operation_results["create_units"] = {
+                        "success": True,
+                        "message": f"Created {create_result['created_units']} units and {create_result['created_relationships']} relationships",
+                        "data": create_result
+                    }
+                    logger.info(f"STEP 1 completed: {operation_results['create_units']['message']}")
+                
+                # STEP 2: Update existing units' relationships (if any)
+                if request.existing_units_updates and request.existing_units_updates.updates:
+                    logger.info(f"STEP 2: Updating {len(request.existing_units_updates.updates)} existing units")
+                    
+                    update_result = await harris_service.bulk_update_sequenza_fisica_units(
+                        site_id=site_id,
+                        updates=request.existing_units_updates.updates
+                    )
+                    
+                    operation_results["update_units"] = {
+                        "success": True,
+                        "message": f"Updated sequenzafisica for {update_result['updated_units']} units",
+                        "data": update_result
+                    }
+                    logger.info(f"STEP 2 completed: {operation_results['update_units']['message']}")
+                
+                # STEP 3: Save layout positions (if any)
+                if request.layout_save and request.layout_save.positions:
+                    logger.info(f"STEP 3: Saving layout for {len(request.layout_save.positions)} positions")
+                    
+                    # Delete existing layout positions for this site
+                    await db.execute(
+                        delete(HarrisMatrixLayout).where(
+                            HarrisMatrixLayout.site_id == str(site_id)
+                        )
+                    )
+                    
+                    # Insert new layout positions
+                    saved_count = 0
+                    for pos in request.layout_save.positions:
+                        layout = HarrisMatrixLayout(
+                            site_id=str(site_id),
+                            unit_id=pos.unit_id,
+                            unit_type=pos.unit_type,
+                            x=pos.x,
+                            y=pos.y
+                        )
+                        db.add(layout)
+                        saved_count += 1
+                    
+                    operation_results["save_layout"] = {
+                        "success": True,
+                        "message": f"Saved {saved_count} node positions",
+                        "data": {"saved_positions": saved_count}
+                    }
+                    logger.info(f"STEP 3 completed: {operation_results['save_layout']['message']}")
+                
+                # Transaction will commit automatically if no exceptions were raised
+                logger.info(f"All atomic operations completed successfully for site {site_id}")
+                
+            except HTTPException:
+                # Re-raise HTTP exceptions - transaction will be rolled back automatically
+                raise
+            except Exception as e:
+                # Any other exception will cause transaction rollback
+                logger.error(f"Atomic save transaction failed for site {site_id}: {str(e)}", exc_info=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": "Atomic save transaction failed - all changes rolled back",
+                        "details": str(e),
+                        "suggestion": "Please try again or contact support if the issue persists"
+                    }
+                )
+        
+        # Build comprehensive response
+        success_count = sum(1 for op in operation_results.values() if op["success"])
+        total_operations = len(operation_results)
+        
+        response = HarrisMatrixAtomicSaveResponse(
+            success=success_count == total_operations,
+            message=f"Atomic save completed: {success_count}/{total_operations} operations successful",
+            site_id=site_id,
+            operation_results=operation_results,
+            summary={
+                "total_operations": total_operations,
+                "successful_operations": success_count,
+                "failed_operations": total_operations - success_count,
+                "transaction_consistent": True
+            }
+        )
+        
+        logger.info(f"Atomic save response: {response.message}")
+        return response
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in atomic save for site {site_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Internal server error during atomic save",
+                "details": str(e),
+                "suggestion": "Please try again or contact support if the issue persists"
+            }
+        )
 
 
 async def _fetch_unit_by_temp_id(db: AsyncSession, site_id: str, temp_id: str):
