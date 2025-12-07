@@ -1187,6 +1187,54 @@ function harrisMatrixEditor() {
         // Site ID from template
         siteId: '{{ site.id }}',
 
+        /**
+         * CRITICAL: ID standardization helper
+         * Ensures consistent ID mapping across frontend
+         */
+        getNodeIds(node) {
+            return {
+                tempid: node.tempid || node.id,  // Frontend temp ID (UUID or cy id)
+                dbId: node.dbId || node.id,      // Database ID from backend
+                cyId: node.id || node.tempid,    // Cytoscape internal ID
+                label: this.cy.$id(node.cyId)?.data('label') || 'Unknown',
+                code: this.cy.$id(node.cyId)?.data('label')?.replace(/^US(M)?/, '') || ''
+            };
+        },
+
+        /**
+         * CRITICAL: Build proper edge array for API
+         * Ensures relationship format matches backend expectations
+         */
+        buildEdgePayload(nodes, edges) {
+            const payload = [];
+            
+            for (const edge of edges) {
+                const sourceNode = nodes.find(n => n.tempid === edge.from);
+                const targetNode = nodes.find(n => n.tempid === edge.to);
+                
+                if (!sourceNode || !targetNode) {
+                    console.warn(`[EDGE SKIP] Missing nodes for edge ${edge.from} → ${edge.to}`);
+                    continue;
+                }
+                
+                // Determina se è nodo nuovo o esistente
+                const fromIsNew = !sourceNode.dbId;
+                const toIsNew = !targetNode.dbId;
+                
+                payload.push({
+                    tempid: `edge-${edge.from}-${edge.to}`,
+                    from_tempid: edge.from,
+                    to_tempid: edge.to,
+                    from_unit_id: fromIsNew ? null : sourceNode.dbId,  // dbId se esistente
+                    to_unit_id: toIsNew ? null : targetNode.dbId,
+                    relationship_type: edge.relationship,
+                    resolved: !fromIsNew && !toIsNew  // True se entrambi existenti
+                });
+            }
+            
+            return payload;
+        },
+
         // Initialize component
         async init() {
             this.initCytoscape();
@@ -1803,26 +1851,31 @@ function harrisMatrixEditor() {
         loadMatrixData(matrixData) {
             this.clearGraph();
 
+            // ===== CRITICAL FIX: Preserve ID and existing flag =====
             if (matrixData.nodes) {
                 matrixData.nodes.forEach(node => {
-                    const nodeLabel = node.label || node.code || `${node.type?.toUpperCase() || 'US'}${node.id?.slice(-3) || '???'}`;
+                    const nodeLabel = node.label || node.code || `???${node.id?.slice(-3)}`;
+                    
+                    // CRITICO: Preserva il dbId da backend
+                    const dbId = node.id;  // Backend ritorna node.id come database ID
                     
                     const nodeData = {
-                        tempid: node.id,
-                        dbId: node.id,  // ← ADD THIS: Store real DB ID
+                        tempid: node.id,           // Usa node.id come tempid
+                        dbId: dbId,                // ← CRITICAL: Store database ID
+                        isExisting: true,          // ← CRITICAL: Mark as existing
                         unitType: node.type,
                         usType: node.tipo,
-                        isExisting: true,  // ← ADD THIS: Mark as existing unit
-                        definition: node.data?.definition || '',
-                        periodo: node.data?.periodo || '',
-                        fase: node.data?.fase || '',
-                        datazione: node.data?.datazione || '',
-                        localita: node.data?.localita || '',
-                        note: node.data?.note || ''
+                        definition: node.data?.definition,
+                        periodo: node.data?.periodo,
+                        fase: node.data?.fase,
+                        datazione: node.data?.datazione,
+                        localita: node.data?.localita,
+                        note: node.data?.note
                     };
-
+                    
+                    console.log(`[LOAD NODE] id=${node.id} → tempid=${nodeData.tempid}, dbId=${nodeData.dbId}, existing=${nodeData.isExisting}`);
                     this.nodes.push(nodeData);
-
+                    
                     this.cy.add({
                         group: 'nodes',
                         data: {
@@ -1835,6 +1888,7 @@ function harrisMatrixEditor() {
                 });
             }
 
+            // Load edges with proper relationship mapping (keep existing edge loading logic but add debug)
             if (matrixData.edges) {
                 matrixData.edges.forEach(edge => {
                     const edgeData = {
@@ -1842,7 +1896,8 @@ function harrisMatrixEditor() {
                         to: edge.target || edge.to,
                         relationship: edge.type
                     };
-
+                    
+                    console.log(`[LOAD EDGE] ${edgeData.from} --${edgeData.relationship}--> ${edgeData.to}`);
                     this.edges.push(edgeData);
 
                     this.cy.add({
@@ -1851,7 +1906,7 @@ function harrisMatrixEditor() {
                             id: edge.id || `edge-${edgeData.from}-${edgeData.to}`,
                             source: edgeData.from,
                             target: edgeData.to,
-                            label: edge.label || edgeData.relationship.replace('_', ' '),
+                            label: edge.label || edgeData.relationship.replace(/_/g, ' '),
                             relationship: edgeData.relationship
                         }
                     });
@@ -1891,20 +1946,48 @@ function harrisMatrixEditor() {
                 saveButton.disabled = true;
 
                 // ===== INVERSE RELATIONSHIP MAPPING =====
-                // Create mapping of relationship types to their inverses that matches the backend
-                const inverseRelationships = {
-                    'uguale_a': 'uguale_a',           // self-inverse ✓
-                    'si_lega_a': 'gli_si_lega',       // FIXED: was 'gli_si_appoggia'
-                    'gli_si_lega': 'si_lega_a',       // ADDED: missing inverse
-                    'si_appoggia_a': 'gli_si_appoggia', // ✓
-                    'gli_si_appoggia': 'si_appoggia_a', // FIXED: was 'si_lega_a'
-                    'copre': 'coperto_da',             // ✓
-                    'coperto_da': 'copre',             // ✓
-                    'taglia': 'tagliato_da',           // ✓
-                    'tagliato_da': 'taglia',           // ✓
-                    'riempie': 'riempito_da',          // ✓
-                    'riempito_da': 'riempie'           // ✓
+                // ===== CRITICAL FIX: Complete inverse relationship mapping =====
+                // MUST match backend RELATIONSHIP_INVERSES in harris_matrix_service.py
+                const RELATIONSHIP_INVERSES = {
+                    // Standard bidirectional relationships
+                    'copre': 'copertoda',
+                    'copertoda': 'copre',
+                    
+                    'taglia': 'tagliatoda',
+                    'tagliatoda': 'taglia',
+                    
+                    'riempie': 'riempitoda',
+                    'riempitoda': 'riempie',
+                    
+                    'siappoggiaa': 'glisiappoggia',
+                    'glisiappoggia': 'siappoggiaa',
+                    
+                    // Self-inverse relationships
+                    'silegaa': 'silegaa',
+                    'ugualea': 'ugualea'
                 };
+
+                // Validate at startup
+                console.log('[INVERSE MAPPING] Initialized with relationships:', Object.keys(RELATIONSHIP_INVERSES).length);
+
+                // ===== CRITICAL FIX: Initialize proper ID tracking =====
+                // Build a map of tempid -> dbId BEFORE any processing
+                const tempIdToDbId = {};
+                const tempIdToNode = {};
+
+                for (const node of this.nodes) {
+                    tempIdToNode[node.tempid] = node;
+                    if (node.dbId) {
+                        tempIdToDbId[node.tempid] = node.dbId;
+                        console.log(`[ID MAPPING] tempid=${node.tempid} → dbId=${node.dbId}`);
+                    } else {
+                        // New node - will get dbId from backend response
+                        tempIdToDbId[node.tempid] = null;
+                        console.log(`[NEW NODE] tempid=${node.tempid} - awaiting dbId from backend`);
+                    }
+                }
+
+                console.log('[SAVE START] ID Mapping before save:', tempIdToDbId);
 
                 // ===== STEP 1: Separare nodi nuovi vs esistenti =====
                 const newNodes = this.nodes.filter(n => !n.isExisting);
@@ -1949,89 +2032,99 @@ function harrisMatrixEditor() {
                     console.log(`Prepared ${backendUnits.length} new units with ${backendRelationships.length} relationships`);
                 }
 
-                // EXISTING UNITS: Prepare sequenzafisica updates
+                // STEP 3: Aggiornare sequenzafisica delle unit ESISTENTI
+                // ===== CRITICAL FIX: Compute updates for BOTH directions =====
                 if (existingNodes.length > 0) {
                     const sequenzaUpdates = {};
+                    const inverseUpdates = {};  // Track inverse updates
                     
+                    // First pass: Build direct updates
                     for (const node of existingNodes) {
                         if (!node.dbId) {
-                            console.warn(`Skipping node ${node.tempid}: missing dbId`);
+                            console.warn(`[SKIP] Node ${node.tempid} missing dbId`);
                             continue;
                         }
                         
-                        // Costruisci sequenzafisica completa per questo nodo
+                        // Initialize sequenzafisica for this node
                         const sequenza = {
                             copre: [],
+                            copertoda: [],
                             taglia: [],
+                            tagliatoda: [],
                             riempie: [],
+                            riempitoda: [],
                             siappoggiaa: [],
+                            glisiappoggia: [],
                             ugualea: [],
                             silegaa: []
                         };
                         
-                        // Raccogli tutte le relazioni USCENTI da questo nodo
+                        // A. Raccogli relazioni USCENTI
                         const outgoing = this.edges.filter(e => e.from === node.tempid);
-                        
                         for (const edge of outgoing) {
                             const targetNode = this.nodes.find(n => n.tempid === edge.to);
                             if (!targetNode) continue;
                             
                             const relType = edge.relationship;
+                            const targetCode = this.cy.$id(edge.to)?.data('label') || edge.to;
                             
-                            // Trova il codice target (etichetta visibile nel grafo)
-                            const cyNode = this.cy.$id(targetNode.tempid);
-                            const targetCode = cyNode?.data('label') || targetNode.tempid;
-                            
-                            // Aggiungi a sequenzafisica
-                            if (sequenza[relType]) {
+                            if (!sequenza[relType]) sequenza[relType] = [];
+                            if (!sequenza[relType].includes(targetCode)) {
                                 sequenza[relType].push(targetCode);
                             }
                         }
-
-                        // ===== PROCESS INCOMING EDGES FOR INVERSE RELATIONSHIPS =====
-                        // Raccogli tutte le relazioni INCOMENTI verso questo nodo
-                        const incoming = this.edges.filter(e => e.to === node.tempid);
                         
+                        // B. Raccogli relazioni ENTRANTI (per inverse)
+                        const incoming = this.edges.filter(e => e.to === node.tempid);
                         for (const edge of incoming) {
                             const sourceNode = this.nodes.find(n => n.tempid === edge.from);
                             if (!sourceNode) continue;
                             
                             const relType = edge.relationship;
-                            const inverseRelType = inverseRelationships[relType];
+                            const inverseType = RELATIONSHIP_INVERSES[relType];
                             
-                            // Skip if no inverse mapping exists
-                            if (!inverseRelType) continue;
-                            
-                            // Trova il codice source (etichetta visibile nel grafo)
-                            const cyNode = this.cy.$id(sourceNode.tempid);
-                            const sourceCode = cyNode?.data('label') || sourceNode.tempid;
-                            
-                            // Aggiungi la relazione inversa a sequenzafisica
-                            if (sequenza[inverseRelType]) {
-                                // Evita duplicati: controlla se già presente
-                                if (!sequenza[inverseRelType].includes(sourceCode)) {
-                                    sequenza[inverseRelType].push(sourceCode);
+                            if (inverseType) {
+                                const sourceCode = this.cy.$id(edge.from)?.data('label') || edge.from;
+                                
+                                if (!sequenza[inverseType]) sequenza[inverseType] = [];
+                                if (!sequenza[inverseType].includes(sourceCode)) {
+                                    sequenza[inverseType].push(sourceCode);
                                 }
                             }
                         }
                         
                         // Pulisci array vuoti
                         Object.keys(sequenza).forEach(key => {
-                            if (sequenza[key].length === 0) {
-                                delete sequenza[key];
-                            }
+                            if (sequenza[key].length === 0) delete sequenza[key];
                         });
                         
                         sequenzaUpdates[node.dbId] = sequenza;
+                        
+                        console.log(`[UPDATE] Node ${node.dbId}: ${Object.keys(sequenza).length} relationship types`);
                     }
                     
+                    // Invia gli aggiornamenti al backend
                     if (Object.keys(sequenzaUpdates).length > 0) {
-                        atomicRequest.existing_units_updates = {
-                            updates: sequenzaUpdates
-                        };
-                        console.log(`Prepared sequenzafisica updates for ${Object.keys(sequenzaUpdates).length} existing units`);
+                        console.log(`Updating sequenzafisica for ${Object.keys(sequenzaUpdates).length} existing units`);
+                        
+                        const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-update-sequenza-fisica-units`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ updates: sequenzaUpdates })
+                        });
+                        
+                        if (!response.ok) {
+                            const error = await response.json();
+                            console.error('[ERROR] Failed to update sequenzafisica', error);
+                            throw new Error(`Sequenzafisica update failed: ${error.detail || JSON.stringify(error)}`);
+                        }
+                        
+                        const result = await response.json();
+                        console.log('[SUCCESS] Sequenzafisica updated', result);
                     }
                 }
+
 
                 // LAYOUT POSITIONS: Prepare layout save
                 const positions = [];
