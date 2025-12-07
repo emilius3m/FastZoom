@@ -867,6 +867,9 @@ class HarrisMatrixService:
         """
         Bulk update relationships for a specific unit.
         
+        This method performs the database operations for updating relationships.
+        Transaction management should be handled by the caller (API layer).
+        
         Args:
             site_id: UUID of the archaeological site
             unit_id: UUID of the unit to update
@@ -879,67 +882,147 @@ class HarrisMatrixService:
         try:
             logger.info(f"Bulk updating relationships for {unit_type} {unit_id} in site {site_id}")
             
-            async with self.db.begin():
-                # Get the unit
-                if unit_type == 'us':
+            # Get the unit
+            if unit_type == 'us':
+                query = select(UnitaStratigrafica).where(
+                    and_(
+                        UnitaStratigrafica.id == str(unit_id),
+                        UnitaStratigrafica.site_id == str(site_id),
+                        UnitaStratigrafica.deleted_at.is_(None)
+                    )
+                )
+            else:  # usm
+                query = select(UnitaStratigraficaMuraria).where(
+                    and_(
+                        UnitaStratigraficaMuraria.id == str(unit_id),
+                        UnitaStratigraficaMuraria.site_id == str(site_id),
+                        UnitaStratigraficaMuraria.deleted_at.is_(None)
+                    )
+                )
+            
+            result = await self.db.execute(query)
+            unit = result.scalar_one_or_none()
+            
+            if not unit:
+                raise HarrisMatrixValidationError(f"{unit_type.upper()} unit not found")
+            
+            # Store old relationships for validation
+            old_relationships = unit.sequenza_fisica.copy() if unit.sequenza_fisica else {}
+            
+            # Update relationships
+            if not unit.sequenza_fisica:
+                unit.sequenza_fisica = get_default_sequenza_fisica()
+            
+            # Apply updates
+            for rel_type, targets in relationships_update.items():
+                if rel_type in unit.sequenza_fisica:
+                    unit.sequenza_fisica[rel_type] = targets or []
+                    
+                    # CRITICAL: Mark JSON field as modified for SQLAlchemy
+                    flag_modified(unit, "sequenza_fisica")
+            
+            # Validate the updated relationships
+            # This would require more complex validation logic
+            # For now, we'll skip full validation in bulk updates
+            
+            result = {
+                'unit_id': str(unit_id),
+                'unit_type': unit_type,
+                'old_relationships': old_relationships,
+                'new_relationships': unit.sequenza_fisica,
+                'updated_relationships': len([
+                    k for k, v in old_relationships.items()
+                    if old_relationships.get(k) != unit.sequenza_fisica.get(k)
+                ])
+            }
+            
+            logger.info(f"Bulk relationship update completed: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in bulk relationship update for {unit_type} {unit_id}: {str(e)}")
+            raise HarrisMatrixServiceError(str(e), "bulk_update_relationships")
+    
+    async def bulk_update_sequenza_fisica_units(
+        self,
+        site_id: UUID,
+        updates: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Bulk update sequenzafisica field for multiple existing US/USM units.
+        
+        This method performs the database operations for updating the
+        sequenzafisica field of multiple units. Transaction management
+        should be handled by the caller (API layer).
+        
+        Args:
+            site_id: UUID of the archaeological site
+            updates: Dictionary mapping unit IDs to their new sequenzafisica
+            
+        Returns:
+            Dictionary with update statistics and results
+        """
+        try:
+            logger.info(f"Bulk updating sequenzafisica for {len(updates)} units in site {site_id}")
+            
+            updated_count = 0
+            errors = []
+            
+            for unit_id, new_sequenza in updates.items():
+                try:
+                    # Try US first
                     query = select(UnitaStratigrafica).where(
                         and_(
-                            UnitaStratigrafica.id == str(unit_id),
+                            UnitaStratigrafica.id == unit_id,
                             UnitaStratigrafica.site_id == str(site_id),
                             UnitaStratigrafica.deleted_at.is_(None)
                         )
                     )
-                else:  # usm
-                    query = select(UnitaStratigraficaMuraria).where(
-                        and_(
-                            UnitaStratigraficaMuraria.id == str(unit_id),
-                            UnitaStratigraficaMuraria.site_id == str(site_id),
-                            UnitaStratigraficaMuraria.deleted_at.is_(None)
+                    result = await self.db.execute(query)
+                    unit = result.scalar_one_or_none()
+                    
+                    # If not US, try USM
+                    if not unit:
+                        query = select(UnitaStratigraficaMuraria).where(
+                            and_(
+                                UnitaStratigraficaMuraria.id == unit_id,
+                                UnitaStratigraficaMuraria.site_id == str(site_id),
+                                UnitaStratigraficaMuraria.deleted_at.is_(None)
+                            )
                         )
-                    )
-                
-                result = await self.db.execute(query)
-                unit = result.scalar_one_or_none()
-                
-                if not unit:
-                    raise HarrisMatrixValidationError(f"{unit_type.upper()} unit not found")
-                
-                # Store old relationships for validation
-                old_relationships = unit.sequenza_fisica.copy() if unit.sequenza_fisica else {}
-                
-                # Update relationships
-                if not unit.sequenza_fisica:
-                    unit.sequenza_fisica = get_default_sequenza_fisica()
-                
-                # Apply updates
-                for rel_type, targets in relationships_update.items():
-                    if rel_type in unit.sequenza_fisica:
-                        unit.sequenza_fisica[rel_type] = targets or []
-                        
-                        # CRITICAL: Mark JSON field as modified for SQLAlchemy
-                        flag_modified(unit, "sequenza_fisica")
-                
-                # Validate the updated relationships
-                # This would require more complex validation logic
-                # For now, we'll skip full validation in bulk updates
-                
-                result = {
-                    'unit_id': str(unit_id),
-                    'unit_type': unit_type,
-                    'old_relationships': old_relationships,
-                    'new_relationships': unit.sequenza_fisica,
-                    'updated_relationships': len([
-                        k for k, v in old_relationships.items()
-                        if old_relationships.get(k) != unit.sequenza_fisica.get(k)
-                    ])
-                }
-                
-                logger.info(f"Bulk relationship update completed: {result}")
-                return result
-                
+                        result = await self.db.execute(query)
+                        unit = result.scalar_one_or_none()
+                    
+                    if not unit:
+                        errors.append(f"Unit {unit_id} not found")
+                        continue
+                    
+                    # Update sequenzafisica
+                    unit.sequenzafisica = new_sequenza
+                    
+                    # CRITICAL: Mark as modified for SQLAlchemy
+                    flag_modified(unit, "sequenzafisica")
+                    
+                    updated_count += 1
+                    logger.debug(f"Updated sequenzafisica for unit {unit_id}")
+                    
+                except Exception as e:
+                    logger.error(f"Error updating unit {unit_id}: {str(e)}")
+                    errors.append(f"Unit {unit_id}: {str(e)}")
+            
+            result = {
+                "success": len(errors) == 0,
+                "updated_count": updated_count,
+                "total_requested": len(updates),
+                "errors": errors
+            }
+            
+            logger.info(f"Bulk sequenzafisica update completed: {updated_count}/{len(updates)} successful")
+            return result
+            
         except Exception as e:
-            logger.error(f"Error in bulk relationship update for {unit_type} {unit_id}: {str(e)}")
-            raise HarrisMatrixServiceError(str(e), "bulk_update_relationships")
+            logger.error(f"Error in bulk sequenzafisica update: {str(e)}", exc_info=True)
+            raise HarrisMatrixServiceError(str(e), "bulk_update_sequenza_fisica_units")
     
     async def delete_unit_with_cleanup(
         self,
@@ -949,6 +1032,9 @@ class HarrisMatrixService:
     ) -> Dict[str, Any]:
         """
         Delete a unit with proper cleanup of relationships.
+        
+        This method performs the database operations for deleting a unit.
+        Transaction management should be handled by the caller (API layer).
         
         Args:
             site_id: UUID of the archaeological site
@@ -961,54 +1047,53 @@ class HarrisMatrixService:
         try:
             logger.info(f"Deleting {unit_type} unit {unit_id} from site {site_id}")
             
-            async with self.db.begin():
-                # Get the unit
-                if unit_type == 'us':
-                    query = select(UnitaStratigrafica).where(
-                        and_(
-                            UnitaStratigrafica.id == str(unit_id),
-                            UnitaStratigrafica.site_id == str(site_id),
-                            UnitaStratigrafica.deleted_at.is_(None)
-                        )
+            # Get the unit
+            if unit_type == 'us':
+                query = select(UnitaStratigrafica).where(
+                    and_(
+                        UnitaStratigrafica.id == str(unit_id),
+                        UnitaStratigrafica.site_id == str(site_id),
+                        UnitaStratigrafica.deleted_at.is_(None)
                     )
-                else:  # usm
-                    query = select(UnitaStratigraficaMuraria).where(
-                        and_(
-                            UnitaStratigraficaMuraria.id == str(unit_id),
-                            UnitaStratigraficaMuraria.site_id == str(site_id),
-                            UnitaStratigraficaMuraria.deleted_at.is_(None)
-                        )
+                )
+            else:  # usm
+                query = select(UnitaStratigraficaMuraria).where(
+                    and_(
+                        UnitaStratigraficaMuraria.id == str(unit_id),
+                        UnitaStratigraficaMuraria.site_id == str(site_id),
+                        UnitaStratigraficaMuraria.deleted_at.is_(None)
                     )
-                
-                result = await self.db.execute(query)
-                unit = result.scalar_one_or_none()
-                
-                if not unit:
-                    raise HarrisMatrixValidationError(f"{unit_type.upper()} unit not found")
-                
-                # Store unit info before deletion
-                unit_info = {
-                    'id': str(unit.id),
-                    'code': unit.us_code if hasattr(unit, 'us_code') else unit.usm_code,
-                    'unit_type': unit_type,
-                    'relationships': unit.sequenza_fisica.copy() if unit.sequenza_fisica else {}
-                }
-                
-                # Find and cleanup references from other units
-                await self._cleanup_unit_references(site_id, unit_info)
-                
-                # Soft delete the unit
-                unit.deleted_at = func.now()
-                
-                result = {
-                    'deleted_unit': unit_info,
-                    'cleaned_references': True,
-                    'success': True
-                }
-                
-                logger.info(f"Unit deletion completed: {result}")
-                return result
-                
+                )
+            
+            result = await self.db.execute(query)
+            unit = result.scalar_one_or_none()
+            
+            if not unit:
+                raise HarrisMatrixValidationError(f"{unit_type.upper()} unit not found")
+            
+            # Store unit info before deletion
+            unit_info = {
+                'id': str(unit.id),
+                'code': unit.us_code if hasattr(unit, 'us_code') else unit.usm_code,
+                'unit_type': unit_type,
+                'relationships': unit.sequenza_fisica.copy() if unit.sequenza_fisica else {}
+            }
+            
+            # Find and cleanup references from other units
+            await self._cleanup_unit_references(site_id, unit_info)
+            
+            # Soft delete the unit
+            unit.deleted_at = func.now()
+            
+            result = {
+                'deleted_unit': unit_info,
+                'cleaned_references': True,
+                'success': True
+            }
+            
+            logger.info(f"Unit deletion completed: {result}")
+            return result
+            
         except Exception as e:
             logger.error(f"Error deleting {unit_type} unit {unit_id}: {str(e)}")
             raise HarrisMatrixServiceError(str(e), "delete_unit_with_cleanup")
@@ -1325,6 +1410,9 @@ class HarrisMatrixService:
         """
         Context manager for database transactions with retry logic.
         
+        Note: This utility method should be used carefully. Transaction management
+        should ideally be handled at the API layer, not within service methods.
+        
         Args:
             max_retries: Maximum number of retry attempts
             
@@ -1336,6 +1424,7 @@ class HarrisMatrixService:
         
         while retry_count < max_retries:
             try:
+                # Note: This creates a nested transaction - use with caution
                 async with self.db.begin() as transaction:
                     yield transaction
                     return  # Success, exit the retry loop

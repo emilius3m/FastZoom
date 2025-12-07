@@ -1726,60 +1726,17 @@ async def v1_bulk_update_sequenza_fisica_units(
         if not await verify_site_access(site_id, user_sites):
             raise HTTPException(status_code=403, detail="Access denied to this site")
         
-        updated_count = 0
-        errors = []
+        # Initialize service
+        harris_service = HarrisMatrixService(db)
         
-        async with db.begin():
-            for unit_id, new_sequenza in request.updates.items():
-                try:
-                    # Try US first
-                    query = select(UnitaStratigrafica).where(
-                        and_(
-                            UnitaStratigrafica.id == unit_id,
-                            UnitaStratigrafica.site_id == str(site_id),
-                            UnitaStratigrafica.deleted_at.is_(None)
-                        )
-                    )
-                    result = await db.execute(query)
-                    unit = result.scalar_one_or_none()
-                    
-                    # If not US, try USM
-                    if not unit:
-                        query = select(UnitaStratigraficaMuraria).where(
-                            and_(
-                                UnitaStratigraficaMuraria.id == unit_id,
-                                UnitaStratigraficaMuraria.site_id == str(site_id),
-                                UnitaStratigraficaMuraria.deleted_at.is_(None)
-                            )
-                        )
-                        result = await db.execute(query)
-                        unit = result.scalar_one_or_none()
-                    
-                    if not unit:
-                        errors.append(f"Unit {unit_id} not found")
-                        continue
-                    
-                    # Update sequenzafisica
-                    unit.sequenzafisica = new_sequenza
-                    
-                    # CRITICAL: Mark as modified
-                    flag_modified(unit, "sequenzafisica")
-                    
-                    updated_count += 1
-                    logger.debug(f"Updated sequenzafisica for unit {unit_id}")
-                    
-                except Exception as e:
-                    logger.error(f"Error updating unit {unit_id}: {str(e)}")
-                    errors.append(f"Unit {unit_id}: {str(e)}")
+        # FastAPI dependency injection already handles the transaction
+        # No need for nested transaction - this fixes the "A transaction is already begun" error
+        result = await harris_service.bulk_update_sequenza_fisica_units(
+            site_id=site_id,
+            updates=request.updates
+        )
         
-        result = {
-            "success": len(errors) == 0,
-            "updated_count": updated_count,
-            "total_requested": len(request.updates),
-            "errors": errors
-        }
-        
-        logger.info(f"Bulk sequenzafisica update completed: {updated_count}/{len(request.updates)} successful")
+        logger.info(f"Bulk sequenzafisica update completed: {result}")
         
         return result
         
