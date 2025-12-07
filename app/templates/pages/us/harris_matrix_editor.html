@@ -1940,7 +1940,7 @@ function harrisMatrixEditor() {
                 console.log('🔄 Starting atomic save operation...');
                 
                 // Show loading state
-                const saveButton = document.querySelector('[@click="saveMatrix()"]');
+                const saveButton = document.querySelector('.editor-btn.save');
                 const originalText = saveButton.innerHTML;
                 saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
                 saveButton.disabled = true;
@@ -2230,7 +2230,7 @@ function harrisMatrixEditor() {
                 console.error('❌ Error in atomic save:', error);
                 
                 // Restore button state
-                const saveButton = document.querySelector('[@click="saveMatrix()"]');
+                const saveButton = document.querySelector('.editor-btn.save');
                 saveButton.innerHTML = '<i class="fas fa-save mr-2"></i>Save Matrix';
                 saveButton.disabled = false;
                 
