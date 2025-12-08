@@ -61,14 +61,14 @@ from app.utils.unit_id_normalizer import create_graph_node_id, normalize_unit_id
 # MUST match frontend RELATIONSHIP_INVERSES in harris_matrix_editor.html
 RELATIONSHIP_INVERSES = {
     # Standard bidirectional relationships
-    'copre': 'copertoda',
-    'copertoda': 'copre',
+    'copre': 'coperto_da',
+    'coperto_da': 'copre',
     
     'taglia': 'tagliatoda',
     'tagliatoda': 'taglia',
     
-    'riempie': 'riempitoda',
-    'riempitoda': 'riempie',
+    'riempie': 'riempito_da',
+    'riempito_da': 'riempie',
     
     'siappoggiaa': 'glisiappoggia',
     'glisiappoggia': 'siappoggiaa',
@@ -3131,9 +3131,9 @@ class HarrisMatrixService:
             if len(rel_types) > 1:
                 # Check for conflicting relationship types
                 conflicting_pairs = [
-                    ('copre', 'copertoda'),
+                    ('copre', 'coperto_da'),
                     ('taglia', 'tagliatoda'), 
-                    ('riempie', 'riempitoda')
+                    ('riempie', 'riempito_da')
                 ]
                 
                 for conflict_a, conflict_b in conflicting_pairs:

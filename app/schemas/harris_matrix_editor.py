@@ -901,8 +901,8 @@ class HarrisMatrixCreateRequest(BaseModel):
     @validator('relationships')
     def validate_relationships(cls, v):
         # Validate relationship types
-        valid_types = ['copre', 'copertoda', 'taglia', 'tagliatoda', 
-                      'riempie', 'riempitoda', 'siappoggiaa', 'glisiappoggia',
+        valid_types = ['copre', 'coperto_da', 'taglia', 'tagliatoda', 
+                      'riempie', 'riempito_da', 'siappoggiaa', 'glisiappoggia',
                       'silegaa', 'ugualea']
         
         for rel in v:
