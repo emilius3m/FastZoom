@@ -1485,9 +1485,9 @@ class HarrisMatrixService:
                     is_valid = True
                     logger.debug(f"Unit ID {unit_id} validated as UUID format")
                 except ValueError:
-                    # 2. Try unit code format resolution (USXXX, USMXXX, USUSXXX)
-                    unit_code_pattern = r'^[USM]{1,4}\d+$'
-                    if re.match(unit_code_pattern, unit_id):
+                    # 2. Try unit code format resolution (US001, USM001)
+                    unit_code_pattern = r'^(USM\d+|US\d+)$'
+                    if re.match(unit_code_pattern, unit_id, re.IGNORECASE):
                         is_valid = True
                         logger.info(f"Unit ID {unit_id} recognized as unit code format")
                         # NOTE: This will be resolved to UUID by the validation logic
@@ -1602,43 +1602,30 @@ class HarrisMatrixService:
                 
                 # If still not found and unit_id looks like a unit code, try code resolution
                 if not unit:
-                    unit_code_pattern = r'^[USM]{1,4}\d+$'
-                    if re.match(unit_code_pattern, unit_id):
+                    unit_code_pattern = r'^(USM\d+|US\d+)$'
+                    if re.match(unit_code_pattern, unit_id, re.IGNORECASE):
                         logger.info(f"Attempting to resolve unit code {unit_id} to UUID")
-                        # Use the unit resolver to find the unit by code
-                        # FIXED: Check USM before US to prevent short-circuit bug
-                        if unit_id.startswith('USM') or unit_id.startswith('US'):
-                            # Extract the code without prefix
-                            code_only = unit_id[3:] if unit_id.startswith('USM') else unit_id[2:] if unit_id.startswith('US') else unit_id
-                            unit_type = 'usm' if unit_id.startswith('USM') else 'us' if unit_id.startswith('US') else 'unknown'
+                        
+                        # Determine unit type from prefix - check USM first (longer prefix)
+                        if unit_id.upper().startswith('USM'):
+                            unit_type = 'usm'
+                        elif unit_id.upper().startswith('US'):
+                            unit_type = 'us'
+                        else:
+                            unit_type = None
+                        
+                        if unit_type:
+                            # Use UnitLookupService directly with the FULL unit code
+                            # The database stores full codes like US001, USM001, not just 001
+                            unit = await self.unit_lookup.get_unit_by_code(
+                                site_id=site_id,
+                                unit_code=unit_id,  # Pass full code like US001 or USM001
+                                unit_type=unit_type
+                            )
                             
-                            resolved_id = await self.unit_resolver.resolve_unit_code(code_only, unit_type)
-                            if resolved_id:
-                                # Fetch the resolved unit
-                                if unit_type == 'us':
-                                    query = select(UnitaStratigrafica).where(
-                                        and_(
-                                            UnitaStratigrafica.id == resolved_id,
-                                            UnitaStratigrafica.site_id == str(site_id),
-                                            UnitaStratigrafica.deleted_at.is_(None)
-                                        )
-                                    )
-                                    result = await self.db.execute(query)
-                                    unit = result.scalar_one_or_none()
-                                elif unit_type == 'usm':
-                                    query = select(UnitaStratigraficaMuraria).where(
-                                        and_(
-                                            UnitaStratigraficaMuraria.id == resolved_id,
-                                            UnitaStratigraficaMuraria.site_id == str(site_id),
-                                            UnitaStratigraficaMuraria.deleted_at.is_(None)
-                                        )
-                                    )
-                                    result = await self.db.execute(query)
-                                    unit = result.scalar_one_or_none()
-                                
-                                if unit:
-                                    logger.info(f"Successfully resolved unit code {unit_id} to UUID {unit.id}")
-                                    logger.debug(f"Resolved {unit_type} unit: {unit_id} -> {unit.id}")
+                            if unit:
+                                logger.info(f"Successfully resolved unit code {unit_id} to UUID {unit.id}")
+                                logger.debug(f"Resolved {unit_type} unit: {unit_id} -> {unit.id}")
                 
                 if not unit:
                     missing_units.append(unit_id)
