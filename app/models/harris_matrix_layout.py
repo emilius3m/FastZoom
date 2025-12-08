@@ -14,6 +14,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.models.base import Base, TimestampMixin
+from app.utils.unit_id_normalizer import create_unit_display_name
 
 
 class UnitTypeEnum(str, PyEnum):
@@ -102,8 +103,7 @@ class HarrisMatrixLayout(Base, TimestampMixin):
 
     def get_unit_display_name(self) -> str:
         """Nome display dell'unità con prefisso"""
-        prefix = "US" if self.is_us() else "USM"
-        return f"{prefix}{self.unit_id}"
+        return create_unit_display_name(self.unit_id, self.unit_type)
 
     def to_dict(self) -> dict:
         """Converte in dizionario per serializzazione JSON"""

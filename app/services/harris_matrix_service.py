@@ -50,6 +50,7 @@ from app.exceptions import (
     HarrisMatrixServiceError
 )
 from app.schemas.harris_matrix_editor import HarrisMatrixCreateRequest
+from app.utils.unit_id_normalizer import create_graph_node_id, normalize_unit_id
 
 
 # ============================================================================
@@ -337,18 +338,18 @@ class HarrisMatrixService:
                 # Determine relationship direction
                 if rel_config['bidirectional']:
                     # For bidirectional relationships, create edge from source to target
-                    from_node = f"{source_type.upper()}{source_code}"
-                    to_node = f"{target_type.upper()}{target_code}"
+                    from_node = create_graph_node_id(source_code, source_type)
+                    to_node = create_graph_node_id(target_code, target_type)
                     bidirectional = True
                 elif rel_type in ['coperto_da', 'tagliato_da', 'riempito_da']:
                     # These are "from target to source" relationships
-                    from_node = f"{target_type.upper()}{target_code}"
-                    to_node = f"{source_type.upper()}{source_code}"
+                    from_node = create_graph_node_id(target_code, target_type)
+                    to_node = create_graph_node_id(source_code, source_type)
                     bidirectional = False
                 else:
                     # These are "from source to target" relationships
-                    from_node = f"{source_type.upper()}{source_code}"
-                    to_node = f"{target_type.upper()}{target_code}"
+                    from_node = create_graph_node_id(source_code, source_type)
+                    to_node = create_graph_node_id(target_code, target_type)
                     bidirectional = False
                 
                 relationship = {
@@ -1605,10 +1606,11 @@ class HarrisMatrixService:
                     if re.match(unit_code_pattern, unit_id):
                         logger.info(f"Attempting to resolve unit code {unit_id} to UUID")
                         # Use the unit resolver to find the unit by code
-                        if unit_id.startswith('US') or unit_id.startswith('USM'):
+                        # FIXED: Check USM before US to prevent short-circuit bug
+                        if unit_id.startswith('USM') or unit_id.startswith('US'):
                             # Extract the code without prefix
-                            code_only = unit_id[2:] if unit_id.startswith('US') else unit_id[3:] if unit_id.startswith('USM') else unit_id
-                            unit_type = 'us' if unit_id.startswith('US') else 'usm' if unit_id.startswith('USM') else 'unknown'
+                            code_only = unit_id[3:] if unit_id.startswith('USM') else unit_id[2:] if unit_id.startswith('US') else unit_id
+                            unit_type = 'usm' if unit_id.startswith('USM') else 'us' if unit_id.startswith('US') else 'unknown'
                             
                             resolved_id = await self.unit_resolver.resolve_unit_code(code_only, unit_type)
                             if resolved_id:

@@ -33,6 +33,7 @@ from app.exceptions import (
     InvalidStratigraphicRelation,
     HarrisMatrixServiceError
 )
+from app.utils.unit_id_normalizer import create_graph_node_id
 
 
 # ============================================================================
@@ -381,12 +382,14 @@ class StratigraphicGraphBuilder:
             # Process US units
             for us in us_units:
                 if us.sequenza_fisica:
-                    self._process_unit_relationships(us.sequenza_fisica, f"US{us.us_code}", us_lookup, usm_lookup, graph)
+                    node_id = create_graph_node_id(us.us_code, "us")
+                    self._process_unit_relationships(us.sequenza_fisica, node_id, us_lookup, usm_lookup, graph)
             
             # Process USM units
             for usm in usm_units:
                 if usm.sequenza_fisica:
-                    self._process_unit_relationships(usm.sequenza_fisica, f"USM{usm.usm_code}", us_lookup, usm_lookup, graph)
+                    node_id = create_graph_node_id(usm.usm_code, "usm")
+                    self._process_unit_relationships(usm.sequenza_fisica, node_id, us_lookup, usm_lookup, graph)
             
             logger.info(f"Built directed graph with {len(graph)} nodes")
             return graph
@@ -431,8 +434,8 @@ class StratigraphicGraphBuilder:
                 if not target_exists:
                     continue
                 
-                # Create target node identifier
-                target_node = f"{target_type.upper()}{target_code}"
+                # Create target node identifier (normalized to prevent double prefixes)
+                target_node = create_graph_node_id(target_code, target_type)
                 
                 # Add directed edge based on relationship type
                 if rel_type in DIRECTED_RELATIONSHIPS:
@@ -1014,7 +1017,7 @@ def build_nodes_for_graph(
     # Add US nodes
     for us in us_units:
         node = {
-            'id': f"US{us.us_code}",
+            'id': create_graph_node_id(us.us_code, "us"),
             'type': 'us',
             'label': us.us_code,
             'definition': us.definizione or '',
@@ -1034,7 +1037,7 @@ def build_nodes_for_graph(
     # Add USM nodes
     for usm in usm_units:
         node = {
-            'id': f"USM{usm.usm_code}",
+            'id': create_graph_node_id(usm.usm_code, "usm"),
             'type': 'usm',
             'label': usm.usm_code,
             'definition': usm.definizione or '',
