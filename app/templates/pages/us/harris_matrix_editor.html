@@ -1739,23 +1739,25 @@
 
                             if (layoutResponse.ok) {
                                 const layoutData = await layoutResponse.json();
-                                const positionMap = {};
 
+                                // CRITICAL FIX: Build positionMap keyed by unitid (dbId) - NO fallbacks
+                                const positionMapByDbId = {};
                                 layoutData.positions?.forEach(pos => {
-                                    positionMap[pos.unit_id] = { x: pos.x, y: pos.y };
+                                    positionMapByDbId[pos.unit_id] = { x: pos.x, y: pos.y };
                                 });
 
-                                // Add positions to nodes
+                                // Apply positions using dbId (node.id) only
+                                let positionedCount = 0;
                                 matrixData.nodes?.forEach(node => {
-                                    const nodeId = node.label || node.code || node.id;
-                                    if (positionMap[nodeId]) {
-                                        node.position = positionMap[nodeId];
+                                    if (positionMapByDbId[node.id]) {
+                                        node.position = positionMapByDbId[node.id];
+                                        positionedCount++;
                                     }
                                 });
 
-                                hasPositions = true;
-                                loadedPositions = true;
-                                console.log(`Loaded ${layoutData.positions?.length || 0} saved positions`);
+                                hasPositions = positionedCount > 0;
+                                loadedPositions = hasPositions;
+                                console.debug(`[POSITION LOAD] Applied ${positionedCount} positions by dbId (${layoutData.positions?.length || 0} available)`);
                             } else {
                                 console.warn('No saved layout positions found');
                             }
@@ -1776,18 +1778,18 @@
 
                             if (fallbackResponse.ok) {
                                 const fallbackData = await fallbackResponse.json();
-                                const positionMap = {};
 
+                                // Build positionMap keyed by unitid (dbId) - NO fallbacks
+                                const positionMapByDbId = {};
                                 fallbackData.positions?.forEach(pos => {
-                                    positionMap[pos.unit_id] = { x: pos.x, y: pos.y };
+                                    positionMapByDbId[pos.unit_id] = { x: pos.x, y: pos.y };
                                 });
 
-                                // Add fallback positions to nodes
+                                // Apply fallback positions using dbId (node.id) only
                                 let positionedCount = 0;
                                 matrixData.nodes?.forEach(node => {
-                                    const nodeId = node.label || node.code || node.id;
-                                    if (positionMap[nodeId]) {
-                                        node.position = positionMap[nodeId];
+                                    if (positionMapByDbId[node.id]) {
+                                        node.position = positionMapByDbId[node.id];
                                         positionedCount++;
                                     }
                                 });
@@ -1931,29 +1933,29 @@
                     saveButton.disabled = true;
 
                     // ===== INVERSE RELATIONSHIP MAPPING =====
-                    // ===== CRITICAL FIX: Complete inverse relationship mapping =====
-                    // MUST match backend RELATIONSHIP_INVERSES in harris_matrix_service.py
+                    // ===== CRITICAL: MUST match app/utils/constants.py RELATIONSHIP_INVERSES =====
+                    // All keys use snake_case format
                     const RELATIONSHIP_INVERSES = {
                         // Standard bidirectional relationships
                         'copre': 'coperto_da',
                         'coperto_da': 'copre',
 
-                        'taglia': 'tagliatoda',
-                        'tagliatoda': 'taglia',
+                        'taglia': 'tagliato_da',
+                        'tagliato_da': 'taglia',
 
                         'riempie': 'riempito_da',
                         'riempito_da': 'riempie',
 
-                        'siappoggiaa': 'glisiappoggia',
-                        'glisiappoggia': 'siappoggiaa',
+                        'si_appoggia_a': 'gli_si_appoggia',
+                        'gli_si_appoggia': 'si_appoggia_a',
 
                         // Self-inverse relationships
-                        'silegaa': 'silegaa',
-                        'ugualea': 'ugualea'
+                        'si_lega_a': 'si_lega_a',
+                        'uguale_a': 'uguale_a'
                     };
 
                     // Validate at startup
-                    console.log('[INVERSE MAPPING] Initialized with relationships:', Object.keys(RELATIONSHIP_INVERSES).length);
+                    console.debug('[INVERSE MAPPING] Loaded (snake_case):', Object.keys(RELATIONSHIP_INVERSES).length, 'types');
 
                     // ===== CRITICAL FIX: Initialize proper ID tracking =====
                     // Build a map of tempid -> dbId BEFORE any processing
@@ -2031,17 +2033,18 @@
                             }
 
                             // Initialize sequenzafisica for this node
+                            // CRITICAL: Keys MUST match app/utils/constants.py RELATIONSHIP_INVERSES (snake_case)
                             const sequenza = {
                                 copre: [],
                                 coperto_da: [],
                                 taglia: [],
-                                tagliatoda: [],
+                                tagliato_da: [],
                                 riempie: [],
                                 riempito_da: [],
-                                siappoggiaa: [],
-                                glisiappoggia: [],
-                                ugualea: [],
-                                silegaa: []
+                                si_appoggia_a: [],
+                                gli_si_appoggia: [],
+                                uguale_a: [],
+                                si_lega_a: []
                             };
 
                             // A. Raccogli relazioni USCENTI
@@ -2179,14 +2182,20 @@
                     console.log('✅ Atomic save completed successfully:', result);
 
                     // Update local data with any changes from backend
-                    if (result.operation_results?.create_units?.data?.unit_mapping) {
-                        const mapping = result.operation_results.create_units.data.unit_mapping;
+                    // FE-6: Read mapping flat first, fallback to nested structure
+                    const mapping = result.unit_mapping
+                        || result.operation_results?.create_units?.data?.unit_mapping
+                        || {};
+
+                    if (Object.keys(mapping).length > 0) {
                         this.nodes.forEach(node => {
                             if (mapping[node.tempid]) {
                                 node.dbId = mapping[node.tempid];
                                 node.isExisting = true;
+                                console.debug(`[ID MAPPING APPLIED] tempid=${node.tempid} → dbId=${node.dbId}`);
                             }
                         });
+                        console.debug(`[UNIT_MAPPING] Applied ${Object.keys(mapping).length} mappings`);
                     }
 
                     // ===== STEP 4: Success feedback =====

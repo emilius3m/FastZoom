@@ -51,35 +51,11 @@ from app.exceptions import (
 )
 from app.schemas.harris_matrix_editor import HarrisMatrixCreateRequest
 from app.utils.unit_id_normalizer import create_graph_node_id, normalize_unit_id
+from app.utils.constants import RELATIONSHIP_INVERSES, get_inverse_relationship
 
-
-# ============================================================================
-# INVERSE RELATIONSHIP MAPPING FOR BIDIRECTIONAL CONSISTENCY
-# ============================================================================
-
-# ===== CRITICAL FIX: Complete inverse relationship mapping =====
-# MUST match frontend RELATIONSHIP_INVERSES in harris_matrix_editor.html
-RELATIONSHIP_INVERSES = {
-    # Standard bidirectional relationships
-    'copre': 'coperto_da',
-    'coperto_da': 'copre',
-    
-    'taglia': 'tagliatoda',
-    'tagliatoda': 'taglia',
-    
-    'riempie': 'riempito_da',
-    'riempito_da': 'riempie',
-    
-    'siappoggiaa': 'glisiappoggia',
-    'glisiappoggia': 'siappoggiaa',
-    
-    # Self-inverse relationships
-    'silegaa': 'silegaa',
-    'ugualea': 'ugualea'
-}
 
 # Log at startup for debugging
-logger.info(f"[RELATIONSHIP INVERSES] Initialized with {len(RELATIONSHIP_INVERSES)} relationship types")
+logger.info(f"[RELATIONSHIP INVERSES] Loaded from constants.py with {len(RELATIONSHIP_INVERSES)} relationship types")
 
 
 class HarrisMatrixService:
