@@ -1406,10 +1406,10 @@ class HarrisMatrixService:
                 }
                 
                 # Apply update
-                unit.sequenzafisica = new_sequenza
+                unit.sequenza_fisica = new_sequenza
                 
                 # CRITICAL: Mark JSON field as modified for SQLAlchemy
-                flag_modified(unit, "sequenzafisica")
+                flag_modified(unit, "sequenza_fisica")
                 
                 updated_units.append({
                     'id': unit_id,
