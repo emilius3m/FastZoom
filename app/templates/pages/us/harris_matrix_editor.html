@@ -2066,10 +2066,95 @@
                     console.log('🔍 Running debug analysis before save...');
                     this.debugSavePipeline(atomicRequest);
 
-                    // ===== STEP 4: Execute ATOMIC SAVE =====
+                    // ===== STEP 4: DETAILED LOGGING BEFORE ATOMIC SAVE =====
                     console.log('🚀 Executing atomic save request...');
                     console.log(`[DEBUG] Sending atomic request to: /api/v1/harris-matrix/sites/${this.siteId}/atomic-save`);
                     console.log(`[DEBUG] Request payload size: ${JSON.stringify(atomicRequest).length} characters`);
+                    
+                    // ===== DETAILED DATA LOGGING =====
+                    console.group('📋 DETAILED DATA BEING SENT TO BACKEND');
+                    
+                    // 1. Log new units data
+                    if (atomicRequest.new_units && atomicRequest.new_units.units) {
+                        console.group('🆕 NEW UNITS DATA');
+                        console.log(`Count: ${atomicRequest.new_units.units.length} new units`);
+                        atomicRequest.new_units.units.forEach((unit, index) => {
+                            console.log(`New Unit ${index + 1}:`, {
+                                temp_id: unit.temp_id,
+                                unit_type: unit.unit_type,
+                                code: unit.code,
+                                definition: unit.definition,
+                                tipo: unit.tipo,
+                                localita: unit.localita,
+                                datazione: unit.datazione,
+                                periodo: unit.periodo,
+                                fase: unit.fase,
+                                note: unit.note
+                            });
+                        });
+                        console.groupEnd();
+                    }
+                    
+                    // 2. Log relationships data
+                    if (atomicRequest.new_units && atomicRequest.new_units.relationships) {
+                        console.group('🔗 RELATIONSHIPS DATA');
+                        console.log(`Count: ${atomicRequest.new_units.relationships.length} relationships`);
+                        atomicRequest.new_units.relationships.forEach((rel, index) => {
+                            console.log(`Relationship ${index + 1}:`, {
+                                temp_id: rel.temp_id,
+                                from_temp_id: rel.from_temp_id,
+                                to_temp_id: rel.to_temp_id,
+                                relation_type: rel.relation_type
+                            });
+                        });
+                        console.groupEnd();
+                    }
+                    
+                    // 3. Log existing units updates (sequenza_fisica)
+                    if (atomicRequest.existing_units_updates && atomicRequest.existing_units_updates.updates) {
+                        console.group('🔄 EXISTING UNITS UPDATES (sequenza_fisica)');
+                        const updateCount = Object.keys(atomicRequest.existing_units_updates.updates).length;
+                        console.log(`Count: ${updateCount} existing units to update`);
+                        
+                        Object.entries(atomicRequest.existing_units_updates.updates).forEach(([dbId, updateData], index) => {
+                            console.log(`Existing Unit Update ${index + 1} (dbId: ${dbId}):`, {
+                                dbId: dbId,
+                                sequenza_fisica: updateData.sequenza_fisica
+                            });
+                            
+                            // Log each relationship type count for this unit
+                            if (updateData.sequenza_fisica) {
+                                Object.entries(updateData.sequenza_fisica).forEach(([relType, relArray]) => {
+                                    if (relArray && relArray.length > 0) {
+                                        console.log(`  └─ ${relType}: [${relArray.join(', ')}]`);
+                                    }
+                                });
+                            }
+                        });
+                        console.groupEnd();
+                    }
+                    
+                    // 4. Log layout positions
+                    if (atomicRequest.layout_positions && atomicRequest.layout_positions.positions) {
+                        console.group('📍 LAYOUT POSITIONS DATA');
+                        console.log(`Count: ${atomicRequest.layout_positions.positions.length} positions`);
+                        atomicRequest.layout_positions.positions.forEach((pos, index) => {
+                            console.log(`Position ${index + 1}:`, {
+                                unit_id: pos.unit_id,
+                                unit_type: pos.unit_type,
+                                x: pos.x,
+                                y: pos.y
+                            });
+                        });
+                        console.groupEnd();
+                    }
+                    
+                    // 5. Log complete atomic request structure
+                    console.group('🏗️ COMPLETE ATOMIC REQUEST STRUCTURE');
+                    console.log('Full atomicRequest object:', JSON.stringify(atomicRequest, null, 2));
+                    console.groupEnd();
+                    
+                    console.groupEnd(); // Close main detailed logging group
 
                     const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/atomic-save`, {
                         method: 'POST',
