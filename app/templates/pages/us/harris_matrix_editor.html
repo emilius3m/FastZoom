@@ -2019,100 +2019,29 @@
                         console.log(`Prepared ${backendUnits.length} new units with ${backendRelationships.length} relationships`);
                     }
 
-                    // STEP 3: Aggiornare sequenzafisica delle unit ESISTENTI
-                    // ===== CRITICAL FIX: Compute updates for BOTH directions =====
-                    if (existingNodes.length > 0) {
-                        const sequenzaUpdates = {};
-                        const inverseUpdates = {};  // Track inverse updates
+                    // ⚠️  REMOVED: Separate sequenzafisica update call - this is now handled by atomic-save endpoint
+                    console.log(`🔄 NOTE: sequenzafisica updates for ${existingNodes.length} existing units will be handled by atomic-save`);
 
-                        // First pass: Build direct updates
-                        for (const node of existingNodes) {
-                            if (!node.dbId) {
-                                console.warn(`[SKIP] Node ${node.tempid} missing dbId`);
-                                continue;
-                            }
-
-                            // Initialize sequenzafisica for this node
-                            // CRITICAL: Keys MUST match app/utils/constants.py RELATIONSHIP_INVERSES (snake_case)
-                            const sequenza = {
-                                copre: [],
-                                coperto_da: [],
-                                taglia: [],
-                                tagliato_da: [],
-                                riempie: [],
-                                riempito_da: [],
-                                si_appoggia_a: [],
-                                gli_si_appoggia: [],
-                                uguale_a: [],
-                                si_lega_a: []
+                    // ===== DEBUG: Prepare existing units updates for sequenza_fisica =====
+                    const existingUnitsUpdates = {};
+                    for (const node of existingNodes) {
+                        if (node.dbId) {
+                            // Calculate sequenza_fisica based on current graph layout
+                            const sequenzaFisica = this.calculateSequenzaFisicaForNode(node);
+                            existingUnitsUpdates[node.dbId] = {
+                                sequenza_fisica: sequenzaFisica
                             };
-
-                            // A. Raccogli relazioni USCENTI
-                            const outgoing = this.edges.filter(e => e.from === node.tempid);
-                            for (const edge of outgoing) {
-                                const targetNode = this.nodes.find(n => n.tempid === edge.to);
-                                if (!targetNode) continue;
-
-                                const relType = edge.relationship;
-                                const targetCode = this.cy.$id(edge.to)?.data('label') || edge.to;
-
-                                if (!sequenza[relType]) sequenza[relType] = [];
-                                if (!sequenza[relType].includes(targetCode)) {
-                                    sequenza[relType].push(targetCode);
-                                }
-                            }
-
-                            // B. Raccogli relazioni ENTRANTI (per inverse)
-                            const incoming = this.edges.filter(e => e.to === node.tempid);
-                            for (const edge of incoming) {
-                                const sourceNode = this.nodes.find(n => n.tempid === edge.from);
-                                if (!sourceNode) continue;
-
-                                const relType = edge.relationship;
-                                const inverseType = RELATIONSHIP_INVERSES[relType];
-
-                                if (inverseType) {
-                                    const sourceCode = this.cy.$id(edge.from)?.data('label') || edge.from;
-
-                                    if (!sequenza[inverseType]) sequenza[inverseType] = [];
-                                    if (!sequenza[inverseType].includes(sourceCode)) {
-                                        sequenza[inverseType].push(sourceCode);
-                                    }
-                                }
-                            }
-
-                            // Pulisci array vuoti
-                            Object.keys(sequenza).forEach(key => {
-                                if (sequenza[key].length === 0) delete sequenza[key];
-                            });
-
-                            sequenzaUpdates[node.dbId] = sequenza;
-
-                            console.log(`[UPDATE] Node ${node.dbId}: ${Object.keys(sequenza).length} relationship types`);
-                        }
-
-                        // Invia gli aggiornamenti al backend
-                        if (Object.keys(sequenzaUpdates).length > 0) {
-                            console.log(`Updating sequenzafisica for ${Object.keys(sequenzaUpdates).length} existing units`);
-
-                            const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/bulk-update-sequenza-fisica-units`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
-                                body: JSON.stringify({ updates: sequenzaUpdates })
-                            });
-
-                            if (!response.ok) {
-                                const error = await response.json();
-                                console.error('[ERROR] Failed to update sequenzafisica', error);
-                                throw new Error(`Sequenzafisica update failed: ${error.detail || JSON.stringify(error)}`);
-                            }
-
-                            const result = await response.json();
-                            console.log('[SUCCESS] Sequenzafisica updated', result);
+                            console.log(`[SEQUENZA PREP] dbId=${node.dbId} (${node.unitType}:${node.label}) → sequenza_fisica prepared with ${Object.keys(sequenzaFisica).length} relationship types`);
                         }
                     }
 
+                    // Add existing units updates to atomic request if we have any
+                    if (Object.keys(existingUnitsUpdates).length > 0) {
+                        atomicRequest.existing_units_updates = {
+                            updates: existingUnitsUpdates
+                        };
+                        console.log(`[DEBUG] Added sequenza_fisica updates for ${Object.keys(existingUnitsUpdates).length} existing units to atomic request`);
+                    }
 
                     // LAYOUT POSITIONS: Prepare layout save
                     const positions = [];
@@ -2131,14 +2060,21 @@
                     });
 
                     if (positions.length > 0) {
-                        atomicRequest.layout_save = {
+                        atomicRequest.layout_positions = {
                             positions: positions
                         };
                         console.log(`Prepared layout positions for ${positions.length} nodes`);
                     }
 
-                    // ===== STEP 3: Execute ATOMIC SAVE =====
+                    // ===== STEP 3: DEBUG ANALYSIS =====
+                    console.log('🔍 Running debug analysis before save...');
+                    this.debugSavePipeline(atomicRequest);
+
+                    // ===== STEP 4: Execute ATOMIC SAVE =====
                     console.log('🚀 Executing atomic save request...');
+                    console.log(`[DEBUG] Sending atomic request to: /api/v1/harris-matrix/sites/${this.siteId}/atomic-save`);
+                    console.log(`[DEBUG] Request payload size: ${JSON.stringify(atomicRequest).length} characters`);
+                    
                     const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/atomic-save`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -2146,9 +2082,21 @@
                         body: JSON.stringify(atomicRequest)
                     });
 
+                    console.log(`[DEBUG] Response status: ${response.status} ${response.statusText}`);
+
                     if (!response.ok) {
-                        const error = await response.json();
-                        console.error('❌ Atomic save failed:', error);
+                        const errorText = await response.text();
+                        console.error(`❌ Atomic save failed with status ${response.status}:`);
+                        console.error('Response text:', errorText);
+                        
+                        let error;
+                        try {
+                            error = JSON.parse(errorText);
+                        } catch (parseError) {
+                            error = { detail: errorText, raw_response: errorText };
+                        }
+                        
+                        console.error('Parsed error:', error);
 
                         // Restore button state
                         saveButton.innerHTML = originalText;
@@ -2178,7 +2126,18 @@
                         throw new Error(errorMessage);
                     }
 
-                    const result = await response.json();
+                    const responseText = await response.text();
+                    console.log(`[DEBUG] Response size: ${responseText.length} characters`);
+                    
+                    let result;
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('❌ Failed to parse response JSON:', parseError);
+                        console.error('Response text:', responseText);
+                        throw new Error('Invalid JSON response from server');
+                    }
+                    
                     console.log('✅ Atomic save completed successfully:', result);
 
                     // Update local data with any changes from backend
@@ -3222,6 +3181,149 @@
                     return true; // Copre un taglio
                 }
                 return false; // Riempie
+            },
+
+            /**
+             * DEBUG: Calculate sequenza_fisica for a single node based on current graph layout
+             * @param {Object} node - Node data with tempid, unitType, etc.
+             * @returns {Object} - sequenza_fisica relationships object
+             */
+            calculateSequenzaFisicaForNode(node) {
+                const cyNode = this.cy.$id(node.tempid);
+                if (!cyNode || cyNode.length === 0) {
+                    console.warn(`[SEQUENZA CALC] Node not found in graph: ${node.tempid}`);
+                    return {
+                        uguale_a: [],
+                        si_lega_a: [],
+                        gli_si_appoggia: [],
+                        si_appoggia_a: [],
+                        coperto_da: [],
+                        copre: [],
+                        tagliato_da: [],
+                        taglia: [],
+                        riempito_da: [],
+                        riempie: []
+                    };
+                }
+
+                const nodePos = cyNode.position();
+                const allNodes = this.cy.nodes().toArray();
+                const sequenzaFisica = {
+                    uguale_a: [],
+                    si_lega_a: [],
+                    gli_si_appoggia: [],
+                    si_appoggia_a: [],
+                    coperto_da: [],
+                    copre: [],
+                    tagliato_da: [],
+                    taglia: [],
+                    riempito_da: [],
+                    riempie: []
+                };
+
+                console.log(`[SEQUENZA CALC] Processing node ${node.label} at Y=${Math.round(nodePos.y)}`);
+
+                allNodes.forEach(otherNode => {
+                    if (otherNode.id() === node.tempid) return; // Skip self
+
+                    const otherPos = otherNode.position();
+                    const otherData = otherNode.data();
+                    const yDiff = otherPos.y - nodePos.y;
+
+                    // Node above (more recent) - covers/cuts current node
+                    if (yDiff < -10) { // Other node is significantly above
+                        if (otherData.unitType === 'us') {
+                            if (otherData.usType === 'positiva') {
+                                if (this.shouldCover(otherData, node)) {
+                                    sequenzaFisica.coperto_da.push(otherData.label);
+                                } else {
+                                    sequenzaFisica.riempito_da.push(otherData.label);
+                                }
+                            } else if (otherData.usType === 'negativa') {
+                                sequenzaFisica.tagliato_da.push(otherData.label);
+                            }
+                        } else if (otherData.unitType === 'usm') {
+                            sequenzaFisica.gli_si_appoggia.push(otherData.label);
+                        }
+                    }
+                    // Node below (older) - current node covers/cuts it
+                    else if (yDiff > 10) { // Other node is significantly below
+                        if (otherData.unitType === 'us') {
+                            if (node.unitType === 'us') {
+                                if (node.usType === 'positiva') {
+                                    if (this.shouldCover(node, otherData)) {
+                                        sequenzaFisica.copre.push(otherData.label);
+                                    } else {
+                                        sequenzaFisica.riempie.push(otherData.label);
+                                    }
+                                } else if (node.usType === 'negativa') {
+                                    sequenzaFisica.taglia.push(otherData.label);
+                                }
+                            }
+                        } else if (node.unitType === 'usm') {
+                            sequenzaFisica.si_appoggia_a.push(otherData.label);
+                        }
+                    }
+                    // Same level Y - could be equal or bonded
+                    else if (Math.abs(yDiff) <= 10) {
+                        if (node.unitType === otherData.unitType) {
+                            sequenzaFisica.uguale_a.push(otherData.label);
+                        } else {
+                            sequenzaFisica.si_lega_a.push(otherData.label);
+                        }
+                    }
+                });
+
+                // Log the calculated relationships
+                const relationshipCounts = Object.entries(sequenzaFisica)
+                    .filter(([key, value]) => value.length > 0)
+                    .map(([key, value]) => `${key}(${value.length})`);
+                
+                console.log(`[SEQUENZA CALC] ${node.label}: ${relationshipCounts.join(', ') || 'no relationships'}`);
+
+                return sequenzaFisica;
+            },
+
+            /**
+             * DEBUG: Enhanced save pipeline logging
+             */
+            debugSavePipeline(atomicRequest) {
+                console.group('🔍 DEBUG: Save Pipeline Analysis');
+                
+                console.log('📊 Nodes Analysis:');
+                console.log(`  Total nodes: ${this.nodes.length}`);
+                console.log(`  New nodes: ${this.nodes.filter(n => !n.isExisting).length}`);
+                console.log(`  Existing nodes: ${this.nodes.filter(n => n.isExisting).length}`);
+                
+                console.log('🔗 Edges Analysis:');
+                console.log(`  Total edges: ${this.edges.length}`);
+                this.edges.forEach((edge, index) => {
+                    console.log(`  Edge ${index + 1}: ${edge.from} --${edge.relationship}--> ${edge.to}`);
+                });
+
+                console.log('📋 Atomic Request Structure:');
+                if (atomicRequest.new_units) {
+                    console.log(`  New units: ${atomicRequest.new_units.units.length}`);
+                    console.log(`  New relationships: ${atomicRequest.new_units.relationships.length}`);
+                }
+                if (atomicRequest.existing_units_updates) {
+                    console.log(`  Existing units updates: ${Object.keys(atomicRequest.existing_units_updates).length}`);
+                    Object.entries(atomicRequest.existing_units_updates).forEach(([dbId, updates]) => {
+                        const relCount = Object.values(updates.sequenza_fisica).reduce((sum, arr) => sum + arr.length, 0);
+                        console.log(`    dbId=${dbId}: ${relCount} sequenza_fisica relationships`);
+                    });
+                }
+                if (atomicRequest.layout_save) {
+                    console.log(`  Layout positions: ${atomicRequest.layout_save.positions.length}`);
+                }
+
+                console.log('🎯 Graph Layout Validation:');
+                this.cy.nodes().forEach(node => {
+                    const pos = node.position();
+                    console.log(`  ${node.data('label')}: (${Math.round(pos.x)}, ${Math.round(pos.y)})`);
+                });
+
+                console.groupEnd();
             }
         };
     }

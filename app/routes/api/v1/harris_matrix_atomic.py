@@ -149,14 +149,30 @@ async def v1_atomic_save_harris_matrix(
                         )
                 
                 # STEP 2: Update existing units' relationships (if any)
-                if request.existing_units_updates and request.existing_units_updates.updates:
-                    logger.info(f"Updating relationships for {len(request.existing_units_updates.updates)} existing units")
+                if request.existing_units_updates:
+                    logger.info(f"Updating relationships for existing units")
+                    logger.debug(f"DEBUG: existing_units_updates structure: {request.existing_units_updates}")
                     
                     try:
+                        # Handle both schema formats: direct dict or with .updates wrapper
+                        updates_dict = {}
+                        if hasattr(request.existing_units_updates, 'updates'):
+                            # Schema format: {updates: {unit_id: {sequenza_fisica: {...}}}}
+                            for unit_id, update_data in request.existing_units_updates.updates.items():
+                                updates_dict[unit_id] = update_data
+                            logger.info(f"Processing {len(updates_dict)} updates from schema format")
+                        else:
+                            # Direct format: {unit_id: {sequenza_fisica: {...}}}
+                            for unit_id, update_data in request.existing_units_updates.items():
+                                updates_dict[unit_id] = update_data
+                            logger.info(f"Processing {len(updates_dict)} updates from direct format")
+                        
+                        logger.debug(f"DEBUG: Final updates for bulk_update_sequenza_fisica_units: {updates_dict}")
+                        
                         # Perform bulk update within the transaction
                         update_result = await harris_service.bulk_update_sequenza_fisica_units(
                             site_id=site_id,
-                            updates=request.existing_units_updates.updates
+                            updates=updates_dict
                         )
                         
                         operation_results["existing_units_updated"] = update_result.get('updated_count', 0)
@@ -177,8 +193,18 @@ async def v1_atomic_save_harris_matrix(
                         )
                 
                 # STEP 3: Save layout positions (if any)
-                if request.layout_positions and request.layout_positions.positions:
-                    logger.info(f"Saving {len(request.layout_positions.positions)} layout positions")
+                layout_positions = None
+                
+                # Handle both layout_save and layout_positions field names
+                if hasattr(request, 'layout_save') and request.layout_save and request.layout_save.positions:
+                    layout_positions = request.layout_save
+                    logger.info(f"Saving {len(layout_positions.positions)} layout positions from layout_save")
+                elif hasattr(request, 'layout_positions') and request.layout_positions and request.layout_positions.positions:
+                    layout_positions = request.layout_positions
+                    logger.info(f"Saving {len(layout_positions.positions)} layout positions from layout_positions")
+                
+                if layout_positions:
+                    logger.debug(f"DEBUG: layout structure: {layout_positions}")
                     
                     try:
                         # Delete existing layout positions for this site
@@ -189,7 +215,7 @@ async def v1_atomic_save_harris_matrix(
                         )
                         
                         # Insert new positions
-                        for pos in request.layout_positions.positions:
+                        for pos in layout_positions.positions:
                             layout = HarrisMatrixLayout(
                                 site_id=str(site_id),
                                 unit_id=pos.unit_id,
