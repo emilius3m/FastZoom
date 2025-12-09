@@ -1725,7 +1725,7 @@
 
                     const matrixData = await response.json();
 
-                    // Load layout positions if not included in matrix data
+                    // Load layout positions if not included in matrix data - REAL DATA ONLY
                     let hasPositions = matrixData.nodes?.some(n => n.position);
                     let loadedPositions = false;
 
@@ -1812,15 +1812,10 @@
                         }
                     }
 
-                    // 3. Final fallback: assign random positions if still no positions
+                    // 3. Final fallback: skip nodes without positions - let backend handle positioning
                     if (!hasPositions) {
-                        console.warn('No positions available, using random positioning');
-                        matrixData.nodes?.forEach((node, index) => {
-                            node.position = {
-                                x: 50 + (Math.random() * 300),
-                                y: 50 + (Math.random() * 200)
-                            };
-                        });
+                        console.warn('No positions available - nodes will be positioned by backend');
+                        // Do not assign random positions - let backend handle positioning
                     }
 
                     // Convert to editor format and load
@@ -1870,7 +1865,7 @@
                                 label: nodeLabel,
                                 ...nodeData
                             },
-                            position: node.position || { x: Math.random() * 400, y: Math.random() * 400 }
+                            position: node.position || { x: 0, y: 0 }  // No random fallback - let backend handle positioning
                         });
                     });
                 }
@@ -1985,7 +1980,7 @@
                     // ===== STEP 2: Prepare atomic save request =====
                     const atomicRequest = {};
 
-                    // NEW UNITS: Prepare for bulk-create
+                    // NEW UNITS: Prepare for bulk-create - REAL DATA ONLY
                     if (newNodes.length > 0) {
                         const backendUnits = newNodes.map(node => ({
                             temp_id: node.tempid,           // Use snake_case to match backend
@@ -2019,10 +2014,10 @@
                         console.log(`Prepared ${backendUnits.length} new units with ${backendRelationships.length} relationships`);
                     }
 
-                    // ⚠️  REMOVED: Separate sequenzafisica update call - this is now handled by atomic-save endpoint
+                    // ✅ CLEAN: sequenzafisica updates handled by atomic-save endpoint
                     console.log(`🔄 NOTE: sequenzafisica updates for ${existingNodes.length} existing units will be handled by atomic-save`);
 
-                    // ===== DEBUG: Prepare existing units updates for sequenza_fisica =====
+                    // ===== PREPARE: Existing units updates for sequenza_fisica =====
                     const existingUnitsUpdates = {};
                     for (const node of existingNodes) {
                         if (node.dbId) {
@@ -3184,7 +3179,7 @@
             },
 
             /**
-             * DEBUG: Calculate sequenza_fisica for a single node based on current graph layout
+             * Calculate sequenza_fisica for a single node based on current graph layout
              * @param {Object} node - Node data with tempid, unitType, etc.
              * @returns {Object} - sequenza_fisica relationships object
              */
@@ -3318,8 +3313,8 @@
                         }
                     });
                 }
-                if (atomicRequest.layout_save) {
-                    console.log(`  Layout positions: ${atomicRequest.layout_save.positions.length}`);
+                if (atomicRequest.layout_positions) {
+                    console.log(`  Layout positions: ${atomicRequest.layout_positions.positions.length}`);
                 }
 
                 console.log('🎯 Graph Layout Validation:');
