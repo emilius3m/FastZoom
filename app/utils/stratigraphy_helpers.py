@@ -824,14 +824,38 @@ class StratigraphicRulesValidator:
                     continue
                 
                 # Rule: Only negative US can cut (taglia/tagliato_da)
+                # DIAGNOSTIC LOGGING - ADD DEBUG INFO
+                logger.debug(f"VALIDATING RELATIONSHIP: {from_unit['code']} {relation_type} {to_unit['code']}")
+                logger.debug(f"FROM UNIT TYPE: {from_unit['type']}, TIPO: {from_unit.get('tipo', 'unknown')}")
+                logger.debug(f"TO UNIT TYPE: {to_unit['type']}, TIPO: {to_unit.get('tipo', 'unknown')}")
+                
                 if relation_type in ['taglia', 'tagliato_da']:
-                    if from_unit['type'] == 'us' and from_unit['tipo'] != 'negativa':
-                        raise InvalidStratigraphicRelation(
-                            relation_type,
-                            from_unit['code'],
-                            to_unit['code'],
-                            "Solo US negative possono tagliare altre unità"
-                        )
+                    # BUG IDENTIFIED: This logic incorrectly assumes from_unit is the cutter for both relation types
+                    # CORRECT LOGIC:
+                    # - For 'taglia': from_unit cuts to_unit (from_unit should be negative)
+                    # - For 'tagliato_da': from_unit is cut by to_unit (to_unit should be negative)
+                    
+                    if relation_type == 'taglia':
+                        # Direct: from_unit cuts to_unit
+                        if from_unit['type'] == 'us' and from_unit['tipo'] != 'negativa':
+                            logger.error(f"TAGLIA VALIDATION FAILED: {from_unit['code']} ({from_unit['tipo']}) cannot cut {to_unit['code']}")
+                            raise InvalidStratigraphicRelation(
+                                relation_type,
+                                from_unit['code'],
+                                to_unit['code'],
+                                "Solo US negative possono tagliare altre unità"
+                            )
+                    
+                    elif relation_type == 'tagliato_da':
+                        # Reverse: to_unit cuts from_unit
+                        if to_unit['type'] == 'us' and to_unit['tipo'] != 'negativa':
+                            logger.error(f"TAGLIATO_DA VALIDATION FAILED: {to_unit['code']} ({to_unit['tipo']}) cannot cut {from_unit['code']}")
+                            raise InvalidStratigraphicRelation(
+                                relation_type,
+                                from_unit['code'],
+                                to_unit['code'],
+                                f"Solo US negative possono tagliare altre unità ({to_unit['code']} non è negativa)"
+                            )
                 
                 # Rule: Positive US can cover/fill (copre/riempie)
                 if relation_type in ['copre', 'riempie']:

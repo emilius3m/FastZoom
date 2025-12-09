@@ -124,14 +124,50 @@ class HarrisMatrixService:
                 unpositioned_nodes = []
                 
                 for node in nodes:
-                    node_id = node.get("label") or node.get("id")
-                    if node_id in layouts:
-                        node["position"] = layouts[node_id]
-                        positioned_nodes += 1
-                    else:
+                    # CRITICAL FIX 2: Multi-format position lookup
+                    position_found = False
+                    
+                    # Try multiple ID formats for position lookup
+                    position_candidates = []
+                    
+                    # 1. Try node.label (e.g., "401")
+                    if node.get("label"):
+                        position_candidates.append(node["label"])
+                    
+                    # 2. Try node.id (e.g., "US401" or graph node ID)
+                    if node.get("id"):
+                        position_candidates.append(node["id"])
+                    
+                    # 3. Try unit code extraction from label if it's a graph node ID
+                    if node.get("label"):
+                        label = node["label"]
+                        # Extract raw code from graph node IDs like "US401" -> "401"
+                        if label.startswith("US"):
+                            position_candidates.append(label[2:])
+                        elif label.startswith("USM"):
+                            position_candidates.append(label[3:])
+                    
+                    # 4. Try prefixed versions (add US/USM prefix to raw codes)
+                    for candidate in list(position_candidates):  # Copy to avoid modification during iteration
+                        if candidate.isdigit():  # Raw numeric code
+                            position_candidates.append(f"US{candidate}")
+                            position_candidates.append(f"USM{candidate}")
+                    
+                    # Try each candidate for position lookup
+                    for candidate in position_candidates:
+                        if candidate in layouts:
+                            node["position"] = layouts[candidate]
+                            positioned_nodes += 1
+                            position_found = True
+                            logger.debug(f"Found position for node {node.get('id', node.get('label'))} using candidate '{candidate}'")
+                            break
+                    
+                    if not position_found:
                         # Default position if not saved
                         node["position"] = None
                         unpositioned_nodes.append(node)
+                        # Log all attempted candidates for debugging
+                        logger.debug(f"No position found for node {node.get('id', node.get('label'))}. Tried candidates: {position_candidates}")
 
                 logger.debug(f"Added {len(layouts)} saved positions to nodes")
                 
@@ -140,11 +176,47 @@ class HarrisMatrixService:
                     logger.info(f"No saved positions found, calculating fallback positions for {len(unpositioned_nodes)} nodes based on stratigraphic relationships")
                     fallback_positions = await self._calculate_fallback_positions(site_id, unpositioned_nodes, relationships)
                     
-                    # Applica le posizioni calcolate
+                    # Applica le posizioni calcolate con multi-format lookup
                     for node in unpositioned_nodes:
-                        node_id = node.get("label") or node.get("id")
-                        if node_id in fallback_positions:
-                            node["position"] = fallback_positions[node_id]
+                        position_found = False
+                        
+                        # Try multiple ID formats for fallback position lookup
+                        position_candidates = []
+                        
+                        # 1. Try node.label (e.g., "401")
+                        if node.get("label"):
+                            position_candidates.append(node["label"])
+                        
+                        # 2. Try node.id (e.g., "US401" or graph node ID)
+                        if node.get("id"):
+                            position_candidates.append(node["id"])
+                        
+                        # 3. Try unit code extraction from label if it's a graph node ID
+                        if node.get("label"):
+                            label = node["label"]
+                            # Extract raw code from graph node IDs like "US401" -> "401"
+                            if label.startswith("US"):
+                                position_candidates.append(label[2:])
+                            elif label.startswith("USM"):
+                                position_candidates.append(label[3:])
+                        
+                        # 4. Try prefixed versions (add US/USM prefix to raw codes)
+                        for candidate in list(position_candidates):  # Copy to avoid modification during iteration
+                            if candidate.isdigit():  # Raw numeric code
+                                position_candidates.append(f"US{candidate}")
+                                position_candidates.append(f"USM{candidate}")
+                        
+                        # Try each candidate for fallback position lookup
+                        for candidate in position_candidates:
+                            if candidate in fallback_positions:
+                                node["position"] = fallback_positions[candidate]
+                                position_found = True
+                                logger.debug(f"Found fallback position for node {node.get('id', node.get('label'))} using candidate '{candidate}'")
+                                break
+                        
+                        if not position_found:
+                            # Log all attempted candidates for debugging
+                            logger.debug(f"No fallback position found for node {node.get('id', node.get('label'))}. Tried candidates: {position_candidates}")
                     
                     logger.info(f"Generated fallback positions for {len(fallback_positions)} nodes")
 
@@ -156,9 +228,40 @@ class HarrisMatrixService:
                     fallback_positions = await self._calculate_fallback_positions(site_id, nodes, relationships)
                     
                     for node in nodes:
-                        node_id = node.get("label") or node.get("id")
-                        if node_id in fallback_positions:
-                            node["position"] = fallback_positions[node_id]
+                        # Try multi-format lookup for emergency fallback
+                        position_found = False
+                        position_candidates = []
+                        
+                        # 1. Try node.label
+                        if node.get("label"):
+                            position_candidates.append(node["label"])
+                        
+                        # 2. Try node.id
+                        if node.get("id"):
+                            position_candidates.append(node["id"])
+                        
+                        # 3. Try unit code extraction
+                        if node.get("label"):
+                            label = node["label"]
+                            if label.startswith("US"):
+                                position_candidates.append(label[2:])
+                            elif label.startswith("USM"):
+                                position_candidates.append(label[3:])
+                        
+                        # 4. Try prefixed versions
+                        for candidate in list(position_candidates):
+                            if candidate.isdigit():
+                                position_candidates.append(f"US{candidate}")
+                                position_candidates.append(f"USM{candidate}")
+                        
+                        for candidate in position_candidates:
+                            if candidate in fallback_positions:
+                                node["position"] = fallback_positions[candidate]
+                                position_found = True
+                                break
+                        
+                        if not position_found:
+                            logger.debug(f"Emergency fallback: No position found for node {node.get('id', node.get('label'))}. Tried: {position_candidates}")
                     
                     logger.info(f"Emergency fallback: Generated positions for {len(fallback_positions)} nodes")
                 except Exception as fallback_error:
@@ -287,29 +390,40 @@ class HarrisMatrixService:
                 
                 # Enhanced target validation using unit resolver
                 target_exists = False
+                resolution_method = 'traditional_lookup'
+                resolved_id = None
                 
                 # First, try traditional lookup for performance
                 if target_type == 'us' and target_code in us_lookup:
                     target_exists = True
+                    resolution_method = 'traditional_lookup'
                 elif target_type == 'usm' and target_code in usm_lookup:
                     target_exists = True
+                    resolution_method = 'traditional_lookup'
                 else:
                     # Use enhanced resolver for missing units
                     logger.debug(f"Traditional lookup failed for {target_type}{target_code}, trying enhanced resolution")
                     resolved_id = await self.unit_resolver.resolve_unit_code(target_code, target_type)
                     if resolved_id:
                         target_exists = True
+                        resolution_method = 'enhanced_resolver'
                         logger.info(f"Successfully resolved {target_type}{target_code} using enhanced resolver")
                     else:
+                        # CRITICAL FIX 1: Don't skip relationships with unresolved targets -
+                        # instead create them with resolved=False for better debugging
+                        logger.warning(f"Cannot resolve {target_type}{target_code} for relationship {rel_type} - creating unresolved edge")
+                        
                         # Check for specific known issues
                         if target_code in ['402', '412', 'US402', 'US412', 'USM402', 'USM402']:
                             logger.warning(
                                 f"Known problematic unit reference found: {target_type}{target_code}. "
                                 f"This unit may not exist in the database or has format issues."
                             )
-                        else:
-                            logger.warning(f"Cannot resolve {target_type}{target_code} for relationship {rel_type}")
-                        continue
+                        
+                        # Create relationship even with unresolved target for edge tracking
+                        target_exists = False
+                        resolution_method = 'failed_resolution'
+                        # Don't continue - process the relationship anyway
                 
                 # Determine relationship direction
                 if rel_config['bidirectional']:
@@ -336,8 +450,19 @@ class HarrisMatrixService:
                     'bidirectional': bidirectional,
                     'description': rel_config['description'],
                     'resolved': target_exists,
-                    'resolution_method': 'enhanced_resolver' if target_exists and target_type == 'us' and target_code not in us_lookup else 'direct_lookup'
+                    'resolution_method': resolution_method,
+                    'target_code': target_code,
+                    'target_type': target_type,
+                    'resolved_target_id': resolved_id if resolved_id else None,
+                    'source_reference': f"{source_code}({source_type})"
                 }
+                
+                # CRITICAL FIX 1: Always add relationship to edges, even if unresolved
+                # This ensures missing edges are tracked for debugging
+                if target_exists:
+                    logger.debug(f"Added resolved relationship: {source_type}{source_code} -> {target_type}{target_code} ({rel_type})")
+                else:
+                    logger.warning(f"Added unresolved relationship: {source_type}{source_code} -> {target_type}{target_code} ({rel_type})")
                 
                 relationships.append(relationship)
         
@@ -1754,141 +1879,6 @@ class HarrisMatrixService:
             # Unexpected validation error
             logger.error(f"Unexpected error during comprehensive validation: {str(e)}", exc_info=True)
             raise HarrisMatrixValidationError(f"Validation system error: {str(e)}")
-    async def bulk_update_sequenzafisica_units(
-        self,
-        site_id: UUID,
-        updates: Dict[str, Dict[str, Any]],
-        db: AsyncSession
-    ) -> Dict[str, Any]:
-        """Enhanced bulk update that properly handles bidirectional relationships"""
-        
-        logger.info(f"[BULK UPDATE] Starting sequenzafisica update for site {site_id} with {len(updates)} units")
-        
-        try:
-            # Phase 1: Load all units and relationships for the site
-            from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
-            
-            # Load all units for this site
-            us_query = select(UnitaStratigrafica).where(UnitaStratigrafica.site_id == str(site_id))
-            us_result = await db.execute(us_query)
-            us_units = us_result.scalars().all()
-            
-            usm_query = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.site_id == str(site_id))
-            usm_result = await db.execute(usm_query)
-            usm_units = usm_result.scalars().all()
-            
-            all_units = {}
-            for unit in us_units:
-                all_units[str(unit.id)] = unit
-            for unit in usm_units:
-                all_units[str(unit.id)] = unit
-            
-            # Load all relationships from sequenza_fisica for this site
-            all_relationships = []
-            unit_code_map = {}
-            
-            for unit in all_units.values():
-                unit_code = unit.us_code if hasattr(unit, 'us_code') else unit.usm_code
-                unit_code_map[str(unit.id)] = unit_code
-                
-                if unit.sequenza_fisica:
-                    for rel_type, targets in unit.sequenza_fisica.items():
-                        if targets:
-                            for target in targets:
-                                # Parse target reference
-                                target_code, target_type = parse_target_reference(target)
-                                
-                                # Find target unit
-                                target_unit = None
-                                for search_unit in all_units.values():
-                                    search_code = search_unit.us_code if hasattr(search_unit, 'us_code') else search_unit.usm_code
-                                    if search_code == target_code:
-                                        target_unit = search_unit
-                                        break
-                                
-                                if target_unit:
-                                    all_relationships.append({
-                                        'from_unit_id': str(unit.id),
-                                        'to_unit_id': str(target_unit.id),
-                                        'relationship_type': rel_type
-                                    })
-            
-            logger.info(f"[BULK UPDATE] Loaded {len(all_units)} units and {len(all_relationships)} relationships")
-            
-            # Phase 2: Build complete relationship map
-            relationship_map = {}
-            
-            for rel in all_relationships:
-                from_id = rel['from_unit_id']
-                to_id = rel['to_unit_id']
-                rel_type = rel['relationship_type']
-                inverse_type = RELATIONSHIP_INVERSES.get(rel_type)
-                
-                # Add outgoing relationship
-                if from_id not in relationship_map:
-                    relationship_map[from_id] = {}
-                if rel_type not in relationship_map[from_id]:
-                    relationship_map[from_id][rel_type] = []
-                if to_id not in relationship_map[from_id][rel_type]:
-                    relationship_map[from_id][rel_type].append(to_id)
-                
-                # Add inverse relationship
-                if inverse_type and to_id not in relationship_map:
-                    relationship_map[to_id] = {}
-                if inverse_type and to_id in relationship_map:
-                    if inverse_type not in relationship_map[to_id]:
-                        relationship_map[to_id][inverse_type] = []
-                    if from_id not in relationship_map[to_id][inverse_type]:
-                        relationship_map[to_id][inverse_type].append(from_id)
-            
-            # Phase 3: Apply updates while maintaining bidirectional consistency
-            updated_units = []
-            
-            for unit_id, new_sequenza in updates.items():
-                if unit_id not in all_units:
-                    logger.warning(f"[BULK UPDATE] Unit {unit_id} not found in site {site_id}")
-                    continue
-                
-                unit = all_units[unit_id]
-                
-                # Convert relationship IDs to codes using unit_code_map
-                sequenza_with_codes = {}
-                for rel_type, target_ids in new_sequenza.items():
-                    codes = []
-                    for target_id in target_ids:
-                        if target_id in unit_code_map:
-                            codes.append(unit_code_map[target_id])
-                        else:
-                            logger.warning(f"[BULK UPDATE] Target unit {target_id} not found for {unit_id}")
-                    if codes:
-                        sequenza_with_codes[rel_type] = codes
-                
-                # Update the unit
-                unit.sequenza_fisica = sequenza_with_codes
-                
-                # Mark JSON field as modified for SQLAlchemy
-                flag_modified(unit, "sequenza_fisica")
-                
-                updated_units.append(unit)
-                logger.debug(f"[BULK UPDATE] Updated sequenzafisica for unit {unit_code_map[unit_id]}")
-            
-            # Phase 4: Commit transaction
-            if updated_units:
-                await db.commit()
-                logger.info(f"[BULK UPDATE] Successfully updated sequenzafisica for {len(updated_units)} units")
-            else:
-                logger.warning(f"[BULK UPDATE] No units were updated")
-            
-            return {
-                "success": True,
-                "updated_units_count": len(updated_units),
-                "total_relationships_processed": len(all_relationships)
-            }
-            
-        except Exception as e:
-            await db.rollback()
-            logger.error(f"[BULK UPDATE ERROR] Failed to update sequenzafisica: {str(e)}", exc_info=True)
-            raise
 
     
     async def delete_unit_with_cleanup(
