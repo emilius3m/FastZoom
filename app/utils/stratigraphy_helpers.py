@@ -884,13 +884,23 @@ class StratigraphicRulesValidator:
 
         from_kind = cls._get_unit_kind(from_unit)
         to_kind = cls._get_unit_kind(to_unit)
+        
+        # Check if the relationship is a passive/reverse form
+        is_reverse = relation_type in ["tagliato_da", "coperto_da", "riempito_da"]
         rel = cls._normalize_relation_type(relation_type)
 
-        key = (from_kind, to_kind, rel)
+        # For reverse relationships, we check the active form:
+        # "A tagliato_da B" -> Check "B taglia A"
+        if is_reverse:
+            # Swap kinds for validation
+            key = (to_kind, from_kind, rel)
+        else:
+            key = (from_kind, to_kind, rel)
 
         if key not in cls.ALLOWED_RELATIONS:
             msg = (
-                f"Relationship not allowed: {from_kind} -> {to_kind} with '{rel}'. "
+                f"Relationship not allowed: {from_kind} -> {to_kind} with '{relation_type}' "
+                f"(Validates as: {key[0]} {key[2]} {key[1]}). "
                 "Check Harris/ICCD rules (es. US- può solo tagliare; "
                 "solo US+/USM possono coprire/riempire; solo USM può silega/siappoggia correttamente)."
             )

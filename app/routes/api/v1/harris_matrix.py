@@ -1804,6 +1804,50 @@ async def v1_atomic_save_harris_matrix(
         HTTPException: With detailed error information if transaction fails
     """
     try:
+        # Stampa in console dei dati ricevuti dall'endpoint
+        print(f"\n=== DEBUG: DATI RICEVUTI DA ATOMIC-SAVE ===")
+        print(f"Site ID: {site_id}")
+        print(f"User ID: {current_user_id}")
+        print(f"Request type: {type(request)}")
+        
+        # Stampa il contenuto completo della richiesta
+        if hasattr(request, 'dict'):
+            request_dict = request.dict()
+            print(f"Request keys: {list(request_dict.keys())}")
+            
+            # Stampa dettagli sui nuovi units se presenti
+            if 'new_units' in request_dict and request_dict['new_units']:
+                new_units = request_dict['new_units']
+                print(f"New units: {new_units}")
+                if hasattr(new_units, 'units') and new_units.units:
+                    print(f"Number of new units: {len(new_units.units)}")
+                    for i, unit in enumerate(new_units.units):
+                        print(f"  Unit {i+1}: {unit}")
+                if hasattr(new_units, 'relationships') and new_units.relationships:
+                    print(f"Number of new relationships: {len(new_units.relationships)}")
+                    for i, rel in enumerate(new_units.relationships):
+                        print(f"  Relationship {i+1}: {rel}")
+            
+            # Stampa dettagli sugli aggiornamenti se presenti
+            if 'existing_units_updates' in request_dict and request_dict['existing_units_updates']:
+                existing_updates = request_dict['existing_units_updates']
+                print(f"Existing units updates: {existing_updates}")
+                if hasattr(existing_updates, 'updates') and existing_updates.updates:
+                    print(f"Number of existing unit updates: {len(existing_updates.updates)}")
+                    for unit_id, update_data in existing_updates.updates.items():
+                        print(f"  Update for {unit_id}: {update_data}")
+            
+            # Stampa dettagli sul layout se presente
+            if 'layout_positions' in request_dict and request_dict['layout_positions']:
+                layout = request_dict['layout_positions']
+                print(f"Layout positions: {layout}")
+                if hasattr(layout, 'positions') and layout.positions:
+                    print(f"Number of layout positions: {len(layout.positions)}")
+                    for i, pos in enumerate(layout.positions):
+                        print(f"  Position {i+1}: unit_id={pos.unit_id}, x={pos.x}, y={pos.y}")
+        
+        print(f"=== FINE DEBUG DATI RICEVUTI ===\n")
+        
         logger.info(f"Starting atomic save for Harris Matrix site {site_id}")
         
         # Verify site access
