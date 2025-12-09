@@ -1035,3 +1035,554 @@ class HarrisMatrixValidationError(BaseModel):
     message: str
     severity: str = "error"  # error, warning, info
     suggestions: Optional[List[str]] = None
+
+
+# Enhanced error response schemas for duplicate detection validation
+
+class HarrisMatrixOperationError(BaseModel):
+    """Enhanced error response schema for Harris Matrix operations"""
+    
+    error_type: str = Field(..., description="Type of error: 'duplicate_codes', 'invalid_relations', 'cycle_detected'")
+    message: str = Field(..., description="Main error message")
+    details: Dict[str, Any] = Field(..., description="Detailed error information")
+    conflicts: Optional[List[Dict]] = Field(None, description="Specific conflict details")
+    recovery_suggestions: Optional[List[str]] = Field(None, description="Suggestions for recovery")
+    severity: str = Field(default="error", description="Error severity: 'error', 'warning', 'info'")
+    affected_items: Optional[List[str]] = Field(None, description="List of affected items")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "error_type": "duplicate_codes",
+                "message": "Duplicate unit codes detected",
+                "details": {
+                    "duplicates": ["US001", "US002"],
+                    "conflicts": {
+                        "US001": {
+                            "id": "550e8400-e29b-41d4-a716-446655440001",
+                            "unit_type": "UnitStratigrafica",
+                            "description": "Existing stratigraphic unit"
+                        }
+                    }
+                },
+                "conflicts": [
+                    {
+                        "code": "US001",
+                        "existing_id": "550e8400-e29b-41d4-a716-446655440001",
+                        "existing_type": "UnitStratigrafica"
+                    }
+                ],
+                "recovery_suggestions": [
+                    "Remove or rename duplicate codes: US001, US002",
+                    "Consider using unit codes with prefixes (e.g., US1001, US1002)"
+                ],
+                "severity": "error",
+                "affected_items": ["US001", "US002"]
+            }
+        }
+
+
+class DuplicateCodeConflict(BaseModel):
+    """Schema for duplicate unit code conflict information"""
+    
+    code: str = Field(..., description="The conflicting unit code")
+    existing_unit: Dict[str, Any] = Field(..., description="Information about existing unit")
+    suggestion: str = Field(..., description="Suggested resolution")
+    severity: str = Field(default="error", description="Conflict severity")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "code": "US001",
+                "existing_unit": {
+                    "id": "550e8400-e29b-41d4-a716-446655440001",
+                    "unit_type": "UnitStratigrafica",
+                    "description": "Excavation trench unit",
+                    "created_at": "2023-12-01T10:30:00Z"
+                },
+                "suggestion": "Use a different code like US1001 or modify the existing unit",
+                "severity": "error"
+            }
+        }
+
+
+class RelationshipValidationError(BaseModel):
+    """Schema for relationship validation errors"""
+    
+    relationship_index: int = Field(..., description="Index of the invalid relationship")
+    relationship_data: Dict[str, Any] = Field(..., description="The invalid relationship data")
+    issues: List[str] = Field(..., description="List of issues found")
+    missing_units: List[str] = Field(default_factory=list, description="Units that were not found")
+    invalid_types: List[str] = Field(default_factory=list, description="Invalid relationship types")
+    suggestions: List[str] = Field(default_factory=list, description="Suggestions for fixing the relationship")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "relationship_index": 0,
+                "relationship_data": {
+                    "from_temp_id": "temp_unit_1",
+                    "to_temp_id": "temp_unit_999",
+                    "relation_type": "copre"
+                },
+                "issues": ["Missing 'to_unit': temp_unit_999"],
+                "missing_units": ["temp_unit_999"],
+                "invalid_types": [],
+                "suggestions": [
+                    "Create the missing unit first: temp_unit_999",
+                    "Remove the reference to non-existent unit"
+                ]
+            }
+        }
+
+
+class CycleDetectionResult(BaseModel):
+    """Enhanced schema for cycle detection results"""
+    
+    has_cycles: bool = Field(..., description="Whether cycles were detected")
+    cycle_paths: List[List[str]] = Field(..., description="List of detected cycle paths")
+    affected_units: List[str] = Field(..., description="Units involved in cycles")
+    cycle_count: int = Field(..., description="Total number of cycles detected")
+    severity: str = Field(default="error", description="Cycle severity")
+    suggestions: List[str] = Field(..., description="Suggestions for resolving cycles")
+    analysis_time_ms: Optional[float] = Field(None, description="Time taken for cycle analysis")
+    
+    @validator('cycle_count')
+    def validate_cycle_count(cls, v, values):
+        if 'cycle_paths' in values and v != len(values['cycle_paths']):
+            raise ValueError("cycle_count must match length of cycle_paths")
+        return v
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "has_cycles": True,
+                "cycle_paths": [
+                    ["US001", "US002", "US003", "US001"],
+                    ["US004", "US005", "US004"]
+                ],
+                "affected_units": ["US001", "US002", "US003", "US004", "US005"],
+                "cycle_count": 2,
+                "severity": "error",
+                "suggestions": [
+                    "Review and remove cyclical relationships",
+                    "Verify that 'earlier than' relationships are correct",
+                    "Consider using 'equivalent to' relationships for units that represent the same context"
+                ],
+                "analysis_time_ms": 15.7
+            }
+        }
+
+
+class BulkValidationResult(BaseModel):
+    """Comprehensive validation result for bulk operations"""
+    
+    is_valid: bool = Field(..., description="Whether the bulk operation is valid")
+    validation_time: float = Field(..., description="Total validation time in seconds")
+    errors: List[Dict[str, Any]] = Field(default_factory=list, description="Validation errors")
+    warnings: List[Dict[str, Any]] = Field(default_factory=list, description="Validation warnings")
+    suggestions: List[str] = Field(default_factory=list, description="General suggestions")
+    
+    # Specific validation results
+    duplicate_code_validation: Optional[Dict[str, Any]] = Field(None, description="Duplicate code validation results")
+    relationship_validation: Optional[Dict[str, Any]] = Field(None, description="Relationship validation results")
+    cycle_validation: Optional[Dict[str, Any]] = Field(None, description="Cycle detection results")
+    
+    can_proceed: bool = Field(..., description="Whether the operation can proceed")
+    affected_items_count: int = Field(default=0, description="Number of items that would be affected")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "is_valid": False,
+                "validation_time": 0.045,
+                "errors": [
+                    {
+                        "type": "duplicate_codes",
+                        "message": "Duplicate unit codes detected",
+                        "details": {"duplicates": ["US001"]}
+                    }
+                ],
+                "warnings": [],
+                "suggestions": [
+                    "Remove or rename duplicate codes: US001",
+                    "Verify that the unit codes are correct for this site"
+                ],
+                "duplicate_code_validation": {
+                    "is_valid": False,
+                    "duplicates": ["US001"],
+                    "conflicts": {
+                        "US001": {
+                            "id": "550e8400-e29b-41d4-a716-446655440001",
+                            "unit_type": "UnitStratigrafica"
+                        }
+                    }
+                },
+                "relationship_validation": {"is_valid": True},
+                "cycle_validation": {"is_valid": True},
+                "can_proceed": False,
+                "affected_items_count": 5
+            }
+        }
+
+
+# ===== STALE REFERENCE VALIDATION SCHEMAS =====
+
+class StaleReferenceDetail(BaseModel):
+    """Schema for detailed stale reference information."""
+    
+    unit_id: str = Field(..., description="Unit ID with stale reference")
+    reason: str = Field(
+        ...,
+        description="Reason for stale reference",
+        pattern=r'^(not_found|soft_deleted|wrong_site|access_denied|invalid_format)$',
+        example="not_found"
+    )
+    recovery_suggestion: str = Field(..., description="Suggested recovery action")
+    additional_info: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Additional context information"
+    )
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "unit_id": "550e8400-e29b-41d4-a716-446655440001",
+                "reason": "not_found",
+                "recovery_suggestion": "Verify unit ID is correct and hasn't been deleted",
+                "additional_info": {
+                    "site_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "search_attempts": 3
+                }
+            }
+        }
+
+
+class StaleReferenceError(BaseModel):
+    """Enhanced error response schema for stale reference validation."""
+    
+    error_type: str = Field(default="stale_references", description="Type of error")
+    message: str = Field(..., description="Main error message")
+    missing_units: List[str] = Field(
+        default_factory=list,
+        description="List of unit IDs that don't exist"
+    )
+    soft_deleted_units: List[str] = Field(
+        default_factory=list,
+        description="List of soft-deleted unit IDs"
+    )
+    invalid_site_units: List[str] = Field(
+        default_factory=list,
+        description="List of units from wrong site"
+    )
+    details: List[StaleReferenceDetail] = Field(
+        default_factory=list,
+        description="Detailed breakdown of stale reference issues"
+    )
+    recovery_suggestions: List[str] = Field(
+        default_factory=list,
+        description="Suggestions for recovery"
+    )
+    validation_time: Optional[float] = Field(
+        None,
+        description="Time taken for validation in seconds"
+    )
+    affected_operations: List[str] = Field(
+        default_factory=list,
+        description="Operations affected by stale references"
+    )
+    
+    @validator('recovery_suggestions', always=True)
+    def generate_default_suggestions(cls, v, values):
+        if not v and any(values.get(key) for key in ['missing_units', 'soft_deleted_units', 'invalid_site_units']):
+            suggestions = []
+            
+            if values.get('missing_units'):
+                suggestions.extend([
+                    "Remove references to non-existent units",
+                    "Verify unit IDs are correct and haven't been deleted",
+                    f"Check units: {', '.join(values['missing_units'])}"
+                ])
+            
+            if values.get('soft_deleted_units'):
+                suggestions.extend([
+                    "Restore soft-deleted units if needed",
+                    "Or remove references to soft-deleted units",
+                    f"Soft-deleted units: {', '.join(values['soft_deleted_units'])}"
+                ])
+            
+            if values.get('invalid_site_units'):
+                suggestions.extend([
+                    "Verify units belong to the correct site",
+                    f"Wrong site units: {', '.join(values['invalid_site_units'])}"
+                ])
+            
+            return suggestions
+        
+        return v
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "error_type": "stale_references",
+                "message": "Some units cannot be updated due to stale references",
+                "missing_units": [
+                    "550e8400-e29b-41d4-a716-446655440001",
+                    "550e8400-e29b-41d4-a716-446655440002"
+                ],
+                "soft_deleted_units": [
+                    "550e8400-e29b-41d4-a716-446655440003"
+                ],
+                "invalid_site_units": [],
+                "details": [
+                    {
+                        "unit_id": "550e8400-e29b-41d4-a716-446655440001",
+                        "reason": "not_found",
+                        "recovery_suggestion": "Check if unit was deleted or ID is correct"
+                    },
+                    {
+                        "unit_id": "550e8400-e29b-41d4-a716-446655440003",
+                        "reason": "soft_deleted",
+                        "recovery_suggestion": "Restore unit or remove reference"
+                    }
+                ],
+                "recovery_suggestions": [
+                    "Remove references to non-existent units",
+                    "Restore soft-deleted units if needed",
+                    "Verify unit IDs are correct"
+                ],
+                "validation_time": 0.023,
+                "affected_operations": ["bulk_update", "relationship_validation"]
+            }
+        }
+
+
+class BulkUpdateResult(BaseModel):
+    """Enhanced result schema for bulk update operations."""
+    
+    success: bool = Field(..., description="Whether the bulk update was successful")
+    updated_count: int = Field(..., description="Number of units successfully updated", ge=0)
+    total_requested: int = Field(..., description="Total number of units requested for update", ge=0)
+    errors: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of errors encountered during update"
+    )
+    skipped_units: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Units that couldn't be updated with reasons"
+    )
+    validation_details: Dict[str, Any] = Field(
+        ...,
+        description="Detailed validation information from pre-update checks"
+    )
+    processing_time_ms: Optional[float] = Field(
+        None,
+        description="Total processing time in milliseconds"
+    )
+    operation_stats: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional operation statistics"
+    )
+    
+    @validator('updated_count')
+    def validate_updated_count(cls, v, values):
+        total_requested = values.get('total_requested', v)
+        if v > total_requested:
+            raise ValueError('updated_count cannot exceed total_requested')
+        return v
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "success": True,
+                "updated_count": 8,
+                "total_requested": 10,
+                "errors": [],
+                "skipped_units": [
+                    {
+                        "unit_id": "550e8400-e29b-41d4-a716-446655440009",
+                        "reason": "invalid_unit_object_type",
+                        "unit_type": "<class 'str'>"
+                    },
+                    {
+                        "unit_id": "550e8400-e29b-41d4-a716-446655440010",
+                        "reason": "update_failed",
+                        "error": "Database constraint violation"
+                    }
+                ],
+                "validation_details": {
+                    "stale_reference_validation": {
+                        "is_valid": True,
+                        "missing_ids": [],
+                        "soft_deleted_ids": [],
+                        "valid_ids": ["550e8400-e29b-41d4-a716-446655440001"],
+                        "can_proceed": True,
+                        "validation_time": 0.015
+                    },
+                    "integrity_validation": {
+                        "is_valid": True,
+                        "invalid_data": [],
+                        "relationship_issues": [],
+                        "can_proceed": True,
+                        "validation_time": 0.008
+                    }
+                },
+                "processing_time_ms": 245.7,
+                "operation_stats": {
+                    "validation_time_pct": 9.4,
+                    "update_time_pct": 87.2,
+                    "post_validation_time_pct": 3.4
+                }
+            }
+        }
+
+
+class BulkUpdateIntegrityResult(BaseModel):
+    """Schema for comprehensive bulk update integrity validation results."""
+    
+    is_valid: bool = Field(..., description="Whether the bulk update passed integrity validation")
+    missing_ids: List[str] = Field(
+        default_factory=list,
+        description="Unit IDs that don't exist"
+    )
+    soft_deleted_ids: List[str] = Field(
+        default_factory=list,
+        description="Soft-deleted unit IDs"
+    )
+    wrong_site_ids: List[str] = Field(
+        default_factory=list,
+        description="Units from wrong site"
+    )
+    valid_ids: List[str] = Field(
+        default_factory=list,
+        description="Valid unit IDs that can be updated"
+    )
+    invalid_data: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Units with invalid update data"
+    )
+    relationship_issues: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Issues in sequenza_fisica relationships"
+    )
+    can_proceed: bool = Field(..., description="Whether the operation can proceed")
+    suggestions: List[str] = Field(
+        default_factory=list,
+        description="Suggestions for fixing issues"
+    )
+    validation_time: float = Field(..., description="Validation time in seconds", ge=0)
+    
+    @validator('can_proceed')
+    def validate_can_proceed(cls, v, values):
+        should_proceed = (
+            len(values.get('missing_ids', [])) == 0 and
+            len(values.get('soft_deleted_ids', [])) == 0 and
+            len(values.get('wrong_site_ids', [])) == 0 and
+            len(values.get('invalid_data', [])) == 0 and
+            len(values.get('relationship_issues', [])) == 0
+        )
+        if v != should_proceed:
+            raise ValueError('can_proceed must match the absence of validation issues')
+        return v
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "is_valid": False,
+                "missing_ids": ["550e8400-e29b-41d4-a716-446655440999"],
+                "soft_deleted_ids": ["550e8400-e29b-41d4-a716-446655440888"],
+                "wrong_site_ids": [],
+                "valid_ids": ["550e8400-e29b-41d4-a716-446655440001"],
+                "invalid_data": [
+                    {
+                        "unit_id": "550e8400-e29b-41d4-a716-446655440002",
+                        "reason": "invalid_sequenza_format",
+                        "suggestion": "sequenza_fisica must be a dictionary"
+                    }
+                ],
+                "relationship_issues": [
+                    {
+                        "unit_id": "550e8400-e29b-41d4-a716-446655440003",
+                        "referenced_code": "US999",
+                        "relation_type": "copre",
+                        "reason": "referenced_unit_not_found",
+                        "suggestion": "Verify unit code 'US999' exists or remove reference"
+                    }
+                ],
+                "can_proceed": False,
+                "suggestions": [
+                    "Remove references to non-existent units: US999",
+                    "Fix invalid data format in sequenza_fisica updates"
+                ],
+                "validation_time": 0.042
+            }
+        }
+
+
+class StaleReferenceValidationError(BaseModel):
+    """Schema for stale reference validation errors in HTTP responses."""
+    
+    error_type: str = Field(default="stale_references", description="Error type identifier")
+    message: str = Field(..., description="Error message describing the stale reference issue")
+    missing_units: List[str] = Field(
+        default_factory=list,
+        description="List of missing unit IDs"
+    )
+    soft_deleted_units: List[str] = Field(
+        default_factory=list,
+        description="List of soft-deleted unit IDs"
+    )
+    invalid_site_units: List[str] = Field(
+        default_factory=list,
+        description="List of units from wrong site"
+    )
+    details: List[StaleReferenceDetail] = Field(
+        default_factory=list,
+        description="Detailed breakdown of issues"
+    )
+    recovery_suggestions: List[str] = Field(
+        default_factory=list,
+        description="Actionable suggestions for recovery"
+    )
+    validation_context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Context about the validation operation"
+    )
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    operation_id: Optional[str] = Field(
+        None,
+        description="Unique identifier for the operation that failed"
+    )
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+        schema_extra = {
+            "example": {
+                "error_type": "stale_references",
+                "message": "References to non-existent units detected in bulk update operation",
+                "missing_units": ["550e8400-e29b-41d4-a716-446655440999"],
+                "soft_deleted_units": [],
+                "invalid_site_units": [],
+                "details": [
+                    {
+                        "unit_id": "550e8400-e29b-41d4-a716-446655440999",
+                        "reason": "not_found",
+                        "recovery_suggestion": "Verify unit ID is correct and hasn't been deleted"
+                    }
+                ],
+                "recovery_suggestions": [
+                    "Remove references to non-existent units",
+                    "Verify unit IDs are correct",
+                    "Check if units were recently deleted"
+                ],
+                "validation_context": {
+                    "operation": "bulk_update_sequenza_fisica",
+                    "site_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "total_units_requested": 5
+                },
+                "timestamp": "2023-12-09T10:30:45.123Z",
+                "operation_id": "bulk-update-20231209103045"
+            }
+        }

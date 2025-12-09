@@ -21,6 +21,12 @@ from app.models.harris_matrix_mapping import (
     MappingStatusEnum
 )
 from app.exceptions import HarrisMatrixServiceError
+from app.services.harris_matrix_validation_service import HarrisMatrixValidationService
+from app.exceptions.harris_matrix import (
+    UnitCodeConflict,
+    InvalidStratigraphicRelation,
+    CycleDetectionError
+)
 
 
 class HarrisMatrixMappingService:
@@ -40,6 +46,7 @@ class HarrisMatrixMappingService:
             db: AsyncSession for database operations
         """
         self.db = db
+        self.validation_service = HarrisMatrixValidationService()
 
     async def create_mapping_session(
         self, 
@@ -81,16 +88,16 @@ class HarrisMatrixMappingService:
             raise HarrisMatrixServiceError(str(e), "create_mapping_session")
 
     async def save_temp_to_db_mapping(
-        self, 
-        site_id: UUID, 
-        session_id: str, 
-        temp_id: str, 
-        db_id: UUID, 
+        self,
+        site_id: UUID,
+        session_id: str,
+        temp_id: str,
+        db_id: UUID,
         unit_code: str,
         user_id: Optional[UUID] = None
     ) -> bool:
         """
-        Persist a temporary-to-database ID mapping.
+        Persist a temporary-to-database ID mapping with validation.
         
         Args:
             site_id: UUID of the archaeological site
@@ -105,9 +112,27 @@ class HarrisMatrixMappingService:
             
         Raises:
             HarrisMatrixServiceError: If mapping save fails
+            UnitCodeConflict: If duplicate unit code validation fails
         """
         try:
             logger.debug(f"Saving mapping: {temp_id} -> {db_id} ({unit_code})")
+            
+            # VALIDATION HOOK: Validate unit code doesn't conflict before saving mapping
+            validation_data = [{"us_code": unit_code, "temp_id": temp_id}]
+            duplicate_validation = await self.validation_service.validate_duplicate_unit_codes(
+                site_id=site_id,
+                units_data=validation_data,
+                db_session=self.db
+            )
+            
+            if not duplicate_validation["can_proceed"]:
+                logger.error(f"Duplicate unit code detected during mapping save: {unit_code}")
+                raise UnitCodeConflict(
+                    message=f"Duplicate unit code detected during mapping: {unit_code}",
+                    existing_codes=duplicate_validation["duplicates"],
+                    conflicts=duplicate_validation["conflicts"],
+                    suggestions=duplicate_validation["suggestions"]
+                )
             
             # Check if mapping already exists
             existing_query = select(HarrisMatrixMapping).where(

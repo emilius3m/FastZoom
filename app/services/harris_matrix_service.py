@@ -26,6 +26,7 @@ from loguru import logger
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
 from app.models.harris_matrix_layout import HarrisMatrixLayout
 from app.services.harris_matrix_unit_resolver import UnitResolver
+from app.services.harris_matrix_validation_service import HarrisMatrixValidationService
 from app.utils.stratigraphy_helpers import (
     UnitLookupService,
     StratigraphicGraphBuilder,
@@ -78,6 +79,7 @@ class HarrisMatrixService:
         self.unit_lookup = UnitLookupService(db)
         self.graph_builder = StratigraphicGraphBuilder(self.unit_lookup)
         self.rules_validator = StratigraphicRulesValidator()
+        self.validation_service = HarrisMatrixValidationService()
     
     async def generate_harris_matrix(self, site_id: UUID) -> Dict[str, Any]:
         """
@@ -608,11 +610,78 @@ class HarrisMatrixService:
             logger.debug(f"DEBUG: units_data sample: {units_data[:1] if units_data else 'None'}")
             logger.debug(f"DEBUG: relationships_data sample: {relationships_data[:1] if relationships_data else 'None'}")
             
-            # Check for code conflicts first
+            # STEP 1: Enhanced duplicate validation
+            logger.info("STEP 1: Performing enhanced duplicate validation")
+            duplicate_validation = await self.validation_service.validate_duplicate_unit_codes(
+                site_id=site_id,
+                units_data=units_data,
+                db_session=self.db
+            )
+            
+            if not duplicate_validation["can_proceed"]:
+                logger.error(f"Duplicate unit codes detected: {duplicate_validation['duplicates']}")
+                from app.exceptions.harris_matrix import UnitCodeConflict
+                raise UnitCodeConflict(
+                    message=f"Duplicate unit codes detected: {', '.join(duplicate_validation['duplicates'])}",
+                    existing_codes=duplicate_validation["duplicates"],
+                    conflicts=duplicate_validation["conflicts"],
+                    suggestions=duplicate_validation["suggestions"]
+                )
+            
+            logger.debug("STEP 1: Enhanced duplicate validation passed")
+            
+            # Check for code conflicts first (legacy validation)
             logger.debug("DEBUG: Checking code conflicts...")
             await self.unit_lookup.check_code_conflicts(site_id, units_data)
             logger.debug("DEBUG: Code conflicts check passed")
                 
+            # STEP 2: Validate relationship integrity if relationships exist
+            if relationships_data:
+                logger.info("STEP 2: Validating relationship integrity")
+                # Create units mapping for validation
+                temp_units_mapping = {}
+                for unit in units_data:
+                    if unit.get('code') and unit.get('temp_id'):
+                        temp_units_mapping[unit['code']] = unit['temp_id']
+                    elif unit.get('us_code') and unit.get('temp_id'):
+                        temp_units_mapping[unit['us_code']] = unit['temp_id']
+                
+                relation_validation = await self.validation_service.validate_relationship_integrity(
+                    site_id=site_id,
+                    relationships_data=relationships_data,
+                    units_mapping=temp_units_mapping,
+                    db_session=self.db
+                )
+                
+                if not relation_validation["can_proceed"]:
+                    logger.error(f"Invalid relationships detected: {relation_validation['missing_units']}")
+                    from app.exceptions.harris_matrix import InvalidStratigraphicRelation
+                    raise InvalidStratigraphicRelation(
+                        message=f"Invalid relationships detected: {', '.join(relation_validation['missing_units'])}",
+                        missing_units=relation_validation["missing_units"],
+                        invalid_relations=relation_validation["invalid_relations"]
+                    )
+                
+                logger.debug("STEP 2: Relationship integrity validation passed")
+                
+                # STEP 3: Detect potential cycles
+                logger.info("STEP 3: Detecting potential cycles in relationships")
+                cycle_validation = await self.validation_service.detect_potential_cycles(
+                    relationships=relationships_data,
+                    units_mapping=temp_units_mapping
+                )
+                
+                if not cycle_validation["can_proceed"]:
+                    logger.error(f"Potential cycles detected: {cycle_validation['cycle_paths']}")
+                    from app.exceptions.harris_matrix import CycleDetectionError
+                    raise CycleDetectionError(
+                        message=f"Potential cycles detected in relationships: {len(cycle_validation['cycle_paths'])} cycles",
+                        cycle_paths=cycle_validation["cycle_paths"],
+                        affected_units=cycle_validation["affected_units"]
+                    )
+                
+                logger.debug("STEP 3: Cycle detection validation passed")
+            
             # Generate sequential codes if not provided
             logger.debug("DEBUG: Generating sequential codes...")
             units_with_codes = await generate_sequential_codes(site_id, self.db, units_data)
@@ -1457,10 +1526,10 @@ class HarrisMatrixService:
         updates: Dict[str, Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
-        Bulk update sequenzafisica field for multiple existing US/USM units.
+        Enhanced bulk update sequenzafisica field for multiple existing US/USM units.
         
-        This method performs comprehensive validation including schema validation,
-        cycle detection, business rules validation, and proper transaction management.
+        This method performs comprehensive validation including stale reference detection,
+        schema validation, cycle detection, business rules validation, and proper transaction management.
         
         Args:
             site_id: UUID of the archaeological site
@@ -1473,20 +1542,69 @@ class HarrisMatrixService:
             HarrisMatrixValidationError: If input validation fails
             StratigraphicCycleDetected: If cycles are detected in relationships
             InvalidStratigraphicRelation: If business rules are violated
+            StaleReferenceError: If references to non-existent units are detected
             HarrisMatrixServiceError: For service-level errors
         """
         try:
             logger.info(f"Bulk updating sequenzafisica for {len(updates)} units in site {site_id}")
             
-            # 1. INPUT VALIDATION - Validate schema using existing Pydantic schema
+            # 1. STALE REFERENCE VALIDATION - Check all unit references exist
+            logger.info("STEP 1: Performing stale reference validation")
+            validation_result = await self.validation_service.validate_stale_references(
+                site_id=site_id,
+                updates=updates,
+                db_session=self.db
+            )
+            
+            if not validation_result["can_proceed"]:
+                logger.error(f"Stale references detected: {validation_result}")
+                from app.exceptions.harris_matrix import StaleReferenceError
+                raise StaleReferenceError(
+                    message="Some units cannot be updated due to stale references",
+                    missing_units=validation_result["missing_ids"],
+                    soft_deleted_units=validation_result["soft_deleted_ids"],
+                    wrong_site_units=validation_result["wrong_site_ids"]
+                )
+            
+            # 2. COMPREHENSIVE BULK UPDATE INTEGRITY VALIDATION
+            logger.info("STEP 2: Performing comprehensive bulk update integrity validation")
+            integrity_result = await self.validation_service.validate_bulk_update_integrity(
+                site_id=site_id,
+                updates=updates,
+                db_session=self.db
+            )
+            
+            if not integrity_result["can_proceed"]:
+                logger.error(f"Bulk update integrity validation failed: {integrity_result}")
+                # Collect all issues
+                all_issues = []
+                
+                if integrity_result["invalid_data"]:
+                    all_issues.extend([
+                        f"Invalid data: {issue['unit_id']} - {issue['reason']}"
+                        for issue in integrity_result["invalid_data"]
+                    ])
+                
+                if integrity_result["relationship_issues"]:
+                    all_issues.extend([
+                        f"Relationship issue: {issue['unit_id']} - {issue['reason']}"
+                        for issue in integrity_result["relationship_issues"]
+                    ])
+                
+                raise HarrisMatrixValidationError(
+                    f"Bulk update integrity validation failed: {'; '.join(all_issues)}"
+                )
+            
+            # 3. INPUT VALIDATION - Validate schema using existing Pydantic schema
             await self._validate_bulk_update_input(updates)
             
-            # 2. PRE-UPDATE VALIDATION - Validate units exist and collect data
+            # 4. PRE-UPDATE VALIDATION - Validate units exist and collect data
             validated_units = await self._validate_and_collect_units(site_id, updates)
             
-            # 3. PERFORM UPDATES WITH OLD STATE COLLECTION
+            # 5. PERFORM UPDATES WITH OLD STATE COLLECTION AND SKIP TRACKING
             old_relationships = {}
             updated_units = []
+            skipped_units = []
             
             for unit_id, (unit, unit_type, new_sequenza) in validated_units.items():
                 # CRITICAL FIX: Validate that unit is the actual object, not a coroutine
@@ -1497,7 +1615,12 @@ class HarrisMatrixService:
                 # Additional validation to ensure unit is the correct type
                 if not isinstance(unit, (UnitaStratigrafica, UnitaStratigraficaMuraria)):
                     logger.error(f"ERROR: unit is not a valid unit object at line 1252: {type(unit)} - {unit}")
-                    raise HarrisMatrixValidationError(f"Invalid unit object type for unit {unit_id}")
+                    skipped_units.append({
+                        "unit_id": unit_id,
+                        "reason": "invalid_unit_object_type",
+                        "unit_type": str(type(unit))
+                    })
+                    continue
                 
                 # Store old relationships for validation and rollback info
                 old_relationships[unit_id] = {
@@ -1506,25 +1629,34 @@ class HarrisMatrixService:
                     'unit_type': unit_type
                 }
                 
-                # Apply update
-                unit.sequenza_fisica = new_sequenza
-                
-                # CRITICAL: Mark JSON field as modified for SQLAlchemy
-                flag_modified(unit, "sequenza_fisica")
-                
-                updated_units.append({
-                    'id': unit_id,
-                    'unit': unit,
-                    'unit_type': unit_type,
-                    'unit_code': old_relationships[unit_id]['unit_code']
-                })
-                
-                logger.debug(f"Updated sequenzafisica for {unit_type} {old_relationships[unit_id]['unit_code']}")
+                try:
+                    # Apply update
+                    unit.sequenza_fisica = new_sequenza
+                    
+                    # CRITICAL: Mark JSON field as modified for SQLAlchemy
+                    flag_modified(unit, "sequenza_fisica")
+                    
+                    updated_units.append({
+                        'id': unit_id,
+                        'unit': unit,
+                        'unit_type': unit_type,
+                        'unit_code': old_relationships[unit_id]['unit_code']
+                    })
+                    
+                    logger.debug(f"Updated sequenzafisica for {unit_type} {old_relationships[unit_id]['unit_code']}")
+                    
+                except Exception as update_error:
+                    logger.error(f"Failed to update unit {unit_id}: {str(update_error)}")
+                    skipped_units.append({
+                        "unit_id": unit_id,
+                        "reason": "update_failed",
+                        "error": str(update_error)
+                    })
             
-            # 4. COMPREHENSIVE POST-UPDATE VALIDATION
+            # 6. COMPREHENSIVE POST-UPDATE VALIDATION
             await self._validate_bulk_update_comprehensive(site_id, updated_units, old_relationships)
             
-            # 5. RETURN SUCCESSFUL RESULT
+            # 7. RETURN ENHANCED RESULT WITH SKIP TRACKING
             result = {
                 "success": True,
                 "updated_count": len(updated_units),
@@ -1536,13 +1668,21 @@ class HarrisMatrixService:
                         "unit_code": unit['unit_code']
                     } for unit in updated_units
                 ],
+                "skipped_units": skipped_units,
                 "validation_performed": True,
+                "validation_details": {
+                    "stale_reference_validation": validation_result,
+                    "integrity_validation": integrity_result
+                },
                 "errors": []
             }
             
-            logger.info(f"Bulk sequenzafisica update completed successfully: {len(updated_units)}/{len(updates)} units updated")
+            logger.info(f"Bulk sequenzafisica update completed successfully: {len(updated_units)}/{len(updates)} units updated, {len(skipped_units)} skipped")
             return result
             
+        except StaleReferenceError:
+            # Re-raise stale reference errors as-is for proper handling
+            raise
         except (HarrisMatrixValidationError, StratigraphicCycleDetected, InvalidStratigraphicRelation) as e:
             # These are expected validation errors - re-raise for rollback
             logger.error(f"Bulk update validation failed: {str(e)}")

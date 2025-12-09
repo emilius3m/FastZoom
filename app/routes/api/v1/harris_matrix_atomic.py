@@ -17,6 +17,7 @@ from app.core.security import (
 from app.services.harris_matrix_service import HarrisMatrixService
 from app.services.harris_matrix_id_normalizer import UnitIDNormalizer, create_unit_id_normalizer
 from app.services.harris_matrix_mapping_service import HarrisMatrixMappingService
+from app.services.harris_matrix_validation_service import HarrisMatrixValidationService
 from app.models.harris_matrix_layout import HarrisMatrixLayout
 from app.schemas.harris_matrix_editor import (
     HarrisMatrixAtomicSaveRequest,
@@ -30,6 +31,7 @@ from app.exceptions import (
     HarrisMatrixServiceError,
     BusinessLogicError
 )
+from app.exceptions.harris_matrix import StaleReferenceError
 
 router = APIRouter()
 
@@ -98,6 +100,7 @@ async def v1_atomic_save_harris_matrix(
         harris_service = HarrisMatrixService(db)
         id_normalizer = create_unit_id_normalizer(db)
         mapping_service = HarrisMatrixMappingService(db)
+        validation_service = HarrisMatrixValidationService()
         
         # Create mapping session
         transaction_id = await mapping_service.create_mapping_session(
@@ -138,6 +141,77 @@ async def v1_atomic_save_harris_matrix(
                             units_data.append(unit_dict)
                         
                         relationships_data = [rel.dict() for rel in request.new_units.relationships]
+                        
+                        # STEP 1A: Pre-validation for duplicate detection
+                        logger.info("Performing pre-validation for duplicate unit codes")
+                        duplicate_validation = await validation_service.validate_duplicate_unit_codes(
+                            site_id=site_id,
+                            units_data=units_data,
+                            db_session=db
+                        )
+                        
+                        if not duplicate_validation["can_proceed"]:
+                            logger.error(f"Duplicate unit codes detected: {duplicate_validation['duplicates']}")
+                            raise HTTPException(
+                                status_code=422,
+                                detail={
+                                    "error": "Duplicate unit codes detected",
+                                    "type": "validation_error",
+                                    "error_type": "duplicate_codes",
+                                    "details": duplicate_validation,
+                                    "suggestions": duplicate_validation.get("suggestions", []),
+                                    "step": "pre_validation"
+                                }
+                            )
+                        
+                        # STEP 1B: Validate relationship integrity if relationships exist
+                        if relationships_data:
+                            units_mapping = {unit["code"]: unit.get("temp_id") for unit in units_data if unit.get("code")}
+                            logger.info("Validating relationship integrity")
+                            relation_validation = await validation_service.validate_relationship_integrity(
+                                site_id=site_id,
+                                relationships_data=relationships_data,
+                                units_mapping=units_mapping,
+                                db_session=db
+                            )
+                            
+                            if not relation_validation["can_proceed"]:
+                                logger.error(f"Invalid relationships detected: {relation_validation['missing_units']}")
+                                raise HTTPException(
+                                    status_code=422,
+                                    detail={
+                                        "error": "Invalid relationships detected",
+                                        "type": "validation_error",
+                                        "error_type": "invalid_relations",
+                                        "details": relation_validation,
+                                        "suggestions": relation_validation.get("suggestions", []),
+                                        "step": "relationship_validation"
+                                    }
+                                )
+                        
+                        # STEP 1C: Detect potential cycles
+                        if relationships_data:
+                            logger.info("Detecting potential cycles in relationships")
+                            cycle_validation = await validation_service.detect_potential_cycles(
+                                relationships=relationships_data,
+                                units_mapping=units_mapping
+                            )
+                            
+                            if not cycle_validation["can_proceed"]:
+                                logger.error(f"Potential cycles detected: {cycle_validation['cycle_paths']}")
+                                raise HTTPException(
+                                    status_code=422,
+                                    detail={
+                                        "error": "Potential cycles detected in relationships",
+                                        "type": "validation_error",
+                                        "error_type": "cycles_detected",
+                                        "details": cycle_validation,
+                                        "suggestions": cycle_validation.get("suggestions", []),
+                                        "step": "cycle_detection"
+                                    }
+                                )
+                        
+                        logger.info("Pre-validation passed, proceeding with bulk creation")
                         
                         # Perform bulk creation within the transaction
                         create_result = await harris_service.bulk_create_units_with_relationships(
@@ -212,7 +286,79 @@ async def v1_atomic_save_harris_matrix(
                         
                         logger.debug(f"DEBUG: Final updates for bulk_update_sequenza_fisica_units: {updates_dict}")
                         
-                        # Perform bulk update within the transaction
+                        # Enhanced stale reference validation before bulk update
+                        logger.info("STEP 2A: Performing stale reference validation")
+                        validation_result = await validation_service.validate_stale_references(
+                            site_id=site_id,
+                            updates=updates_dict,
+                            db_session=db
+                        )
+                        
+                        if not validation_result["can_proceed"]:
+                            logger.error(f"Stale references detected: {validation_result}")
+                            raise HTTPException(
+                                status_code=400,
+                                detail={
+                                    "error_type": "stale_references",
+                                    "message": "Some units cannot be updated due to stale references",
+                                    "missing_units": validation_result["missing_ids"],
+                                    "soft_deleted_units": validation_result["soft_deleted_ids"],
+                                    "invalid_site_units": validation_result["wrong_site_ids"],
+                                    "recovery_suggestions": [
+                                        "Remove references to non-existent units",
+                                        "Restore soft-deleted units if needed",
+                                        "Verify unit IDs are correct"
+                                    ],
+                                    "validation_time": validation_result.get("validation_time"),
+                                    "step": "stale_reference_validation"
+                                }
+                            )
+                        
+                        # Comprehensive bulk update integrity validation
+                        logger.info("STEP 2B: Performing comprehensive bulk update integrity validation")
+                        integrity_result = await validation_service.validate_bulk_update_integrity(
+                            site_id=site_id,
+                            updates=updates_dict,
+                            db_session=db
+                        )
+                        
+                        if not integrity_result["can_proceed"]:
+                            logger.error(f"Bulk update integrity validation failed: {integrity_result}")
+                            # Collect all issues for detailed error response
+                            all_issues = []
+                            
+                            if integrity_result["invalid_data"]:
+                                all_issues.extend([
+                                    f"Invalid data: {issue['unit_id']} - {issue['reason']}"
+                                    for issue in integrity_result["invalid_data"]
+                                ])
+                            
+                            if integrity_result["relationship_issues"]:
+                                all_issues.extend([
+                                    f"Relationship issue: {issue['unit_id']} - {issue['reason']}"
+                                    for issue in integrity_result["relationship_issues"]
+                                ])
+                            
+                            raise HTTPException(
+                                status_code=422,
+                                detail={
+                                    "error": "Bulk update integrity validation failed",
+                                    "type": "integrity_validation_error",
+                                    "details": {
+                                        "invalid_data": integrity_result["invalid_data"],
+                                        "relationship_issues": integrity_result["relationship_issues"],
+                                        "suggestions": integrity_result.get("suggestions", [])
+                                    },
+                                    "suggestions": [
+                                        "Fix invalid data format in sequenza_fisica updates",
+                                        "Fix references to non-existent unit codes"
+                                    ],
+                                    "step": "integrity_validation"
+                                }
+                            )
+                        
+                        # Perform enhanced bulk update within the transaction
+                        logger.info("STEP 2C: Performing enhanced bulk update")
                         update_result = await harris_service.bulk_update_sequenza_fisica_units(
                             site_id=site_id,
                             updates=updates_dict
@@ -220,8 +366,32 @@ async def v1_atomic_save_harris_matrix(
                         
                         operation_results["existing_units_updated"] = update_result.get('updated_count', 0)
                         
+                        # Include skipped units and validation details in response tracking
+                        if update_result.get('skipped_units'):
+                            operation_results["skipped_units"] = update_result['skipped_units']
+                            logger.warning(f"Skipped {len(update_result['skipped_units'])} units during bulk update")
+                        
+                        if update_result.get('validation_details'):
+                            operation_results["validation_details"] = update_result['validation_details']
+                            logger.info("Validation details included in operation results")
+                        
                         logger.info(f"Successfully updated relationships for {operation_results['existing_units_updated']} existing units")
                         
+                    except StaleReferenceError as e:
+                        # Handle specific stale reference errors from service
+                        logger.error(f"Stale reference error in bulk update: {e.message}")
+                        raise HTTPException(
+                            status_code=400,
+                            detail={
+                                "error_type": "stale_references",
+                                "message": e.message,
+                                "missing_units": e.missing_units,
+                                "soft_deleted_units": e.soft_deleted_units,
+                                "invalid_site_units": e.wrong_site_units,
+                                "recovery_suggestions": e.recovery_suggestions,
+                                "step": "bulk_update_stale_references"
+                            }
+                        )
                     except Exception as e:
                         logger.error(f"Failed to update existing units: {str(e)}")
                         raise HTTPException(

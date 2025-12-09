@@ -15,8 +15,26 @@ from .harris_matrix import (
     StaleReferenceError
 )
 
-# Import BusinessLogicError from the main exceptions module
-from ..exceptions import BusinessLogicError
+# Define BusinessLogicError directly to avoid circular import
+class BusinessLogicError(Exception):
+    """Exception for business logic errors."""
+    
+    def __init__(self, message: str, status_code: int = 400):
+        """
+        Initialize business logic error.
+        
+        Args:
+            message: Error message
+            status_code: HTTP status code (default: 400)
+        """
+        self.message = message
+        self.status_code = status_code
+        super().__init__(self.message)
+
+# Define aliases for commonly used exceptions to maintain compatibility
+HarrisMatrixValidationError = InvalidStratigraphicRelation
+StratigraphicCycleDetected = CycleDetectionError
+HarrisMatrixServiceError = HarrisMatrixException
 
 __all__ = [
     'HarrisMatrixException',
@@ -26,5 +44,8 @@ __all__ = [
     'BulkOperationError',
     'ValidationTimeoutError',
     'StaleReferenceError',
-    'BusinessLogicError'
+    'BusinessLogicError',
+    'HarrisMatrixValidationError',
+    'StratigraphicCycleDetected',
+    'HarrisMatrixServiceError'
 ]
