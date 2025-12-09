@@ -664,23 +664,70 @@ class HarrisMatrixLayoutResponse(BaseModel):
 
 class SequenzaFisicaBulkUpdateRequest(BaseModel):
     """Request model for bulk updating sequenzafisica of existing units."""
-    updates: Dict[str, Dict[str, List[str]]] = Field(
+    
+    updates: Dict[str, Dict[str, Any]] = Field(
         ...,
-        description="Map of unit_id -> sequenzafisica dictionary"
+        description="Map of unit_id -> sequenzafisica dictionary with relationship types as keys"
     )
     
+    @validator('updates')
+    def validate_sequenza_fisica_structure(cls, v):
+        """Validate that each sequenza_fisica has the correct structure."""
+        valid_relationship_keys = {
+            'uguale_a', 'si_lega_a', 'gli_si_appoggia', 'si_appoggia_a',
+            'coperto_da', 'copre', 'tagliato_da', 'taglia', 'riempito_da', 'riempie'
+        }
+        
+        for unit_id, unit_data in v.items():
+            if not isinstance(unit_data, dict):
+                raise ValueError(f"Data for unit {unit_id} must be a dictionary")
+            
+            # Check for sequenza_fisica key
+            if 'sequenza_fisica' not in unit_data:
+                raise ValueError(f"Missing 'sequenza_fisica' key for unit {unit_id}")
+            
+            sequenza_fisica = unit_data['sequenza_fisica']
+            if not isinstance(sequenza_fisica, dict):
+                raise ValueError(f"sequenza_fisica for unit {unit_id} must be a dictionary")
+            
+            # Check for invalid keys in sequenza_fisica
+            invalid_keys = set(sequenza_fisica.keys()) - valid_relationship_keys
+            if invalid_keys:
+                raise ValueError(f"Invalid relationship types for unit {unit_id}: {invalid_keys}. Valid types: {valid_relationship_keys}")
+            
+            # Validate that all values are lists of strings
+            for rel_type, targets in sequenza_fisica.items():
+                if targets is None:
+                    v[unit_id]['sequenza_fisica'][rel_type] = []
+                elif not isinstance(targets, list):
+                    raise ValueError(f"Relationship targets for {rel_type} in unit {unit_id} must be a list")
+                else:
+                    # Ensure all items in the list are strings
+                    for i, target in enumerate(targets):
+                        if not isinstance(target, str):
+                            raise ValueError(f"Target {i} for {rel_type} in unit {unit_id} must be a string")
+        
+        return v
+    
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "updates": {
                     "550e8400-e29b-41d4-a716-446655440000": {
+                        "uguale_a": [],
+                        "si_lega_a": [],
+                        "gli_si_appoggia": [],
+                        "si_appoggia_a": [],
+                        "coperto_da": [],
                         "copre": ["US002", "US003"],
-                        "taglia": ["US001usm"]
+                        "tagliato_da": [],
+                        "taglia": [],
+                        "riempito_da": [],
+                        "riempie": ["US001usm"]
                     }
                 }
             }
         }
-
 
 # ===== ATOMIC HARRIS MATRIX SAVE SCHEMAS =====
 
@@ -789,9 +836,67 @@ class HarrisMatrixAtomicSaveResponse(BaseModel):
         description="Processing warnings"
     )
     
+    # NEW: Metadata for recovery and mapping tracking
+    session_id: Optional[str] = Field(
+        default=None,
+        description="Session identifier for mapping tracking and recovery",
+        min_length=1,
+        max_length=255,
+        pattern=r'^[a-zA-Z0-9_-]+$',
+        example="atomic-save-20231209103000-user123"
+    )
+    transaction_id: Optional[str] = Field(
+        default=None,
+        description="Transaction identifier for audit trail",
+        min_length=1,
+        max_length=255,
+        pattern=r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$',
+        example="550e8400-e29b-41d4-a716-446655440000"
+    )
+    created_units_count: Optional[int] = Field(
+        default=0,
+        description="Number of units created in this operation",
+        ge=0,
+        example=5
+    )
+    checkpoint_time: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp when the operation completed",
+        example="2023-12-09T10:30:45.123Z"
+    )
+    mapping_status: Optional[str] = Field(
+        default="unknown",
+        description="Status of mapping operations (committed, partial, failed, unknown)",
+        pattern=r'^(committed|partial|failed|unknown)$',
+        example="committed"
+    )
+    
+    @validator('session_id')
+    def validate_session_id(cls, v):
+        if v and len(v.strip()) == 0:
+            raise ValueError('session_id cannot be empty if provided')
+        return v.strip() if v else v
+    
+    @validator('transaction_id')
+    def validate_transaction_id(cls, v):
+        if v:
+            v = v.strip().lower()
+            # Basic UUID format validation
+            import re
+            if not re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', v):
+                raise ValueError('transaction_id must be a valid UUID format')
+        return v
+    
+    @validator('checkpoint_time')
+    def validate_checkpoint_time(cls, v):
+        if v and v > datetime.utcnow():
+            raise ValueError('checkpoint_time cannot be in the future')
+        return v
+    
     class Config:
         json_encoders = {
-            UUID: str
+            UUID: str,
+            datetime: lambda v: v.isoformat() if v else None
         }
         schema_extra = {
             "example": {
@@ -811,7 +916,13 @@ class HarrisMatrixAtomicSaveResponse(BaseModel):
                 "validation_performed": True,
                 "transaction_rolled_back": False,
                 "processing_time_ms": 245.7,
-                "warnings": []
+                "warnings": [],
+                # NEW: Enhanced example with mapping metadata
+                "session_id": "atomic-save-20231209103000-user123",
+                "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
+                "created_units_count": 2,
+                "checkpoint_time": "2023-12-09T10:30:45.123Z",
+                "mapping_status": "committed"
             }
         }
 

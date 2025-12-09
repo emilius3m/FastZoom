@@ -1,11 +1,12 @@
 # app/routes/api/v1/harris_matrix_atomic.py - Atomic Harris Matrix operations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete
 from uuid import UUID
 from typing import Dict, Any, Optional, List
+from datetime import datetime
 from loguru import logger
 
 from app.database.db import get_async_session
@@ -14,6 +15,8 @@ from app.core.security import (
     get_current_user_sites_with_blacklist,
 )
 from app.services.harris_matrix_service import HarrisMatrixService
+from app.services.harris_matrix_id_normalizer import UnitIDNormalizer, create_unit_id_normalizer
+from app.services.harris_matrix_mapping_service import HarrisMatrixMappingService
 from app.models.harris_matrix_layout import HarrisMatrixLayout
 from app.schemas.harris_matrix_editor import (
     HarrisMatrixAtomicSaveRequest,
@@ -46,7 +49,8 @@ async def v1_atomic_save_harris_matrix(
     request: HarrisMatrixAtomicSaveRequest,
     db: AsyncSession = Depends(get_async_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: list = Depends(get_current_user_sites_with_blacklist)
+    user_sites: list = Depends(get_current_user_sites_with_blacklist),
+    x_session_id: Optional[str] = Header(None, description="Session identifier for mapping tracking")
 ) -> HarrisMatrixAtomicSaveResponse:
     """
     Atomically save Harris Matrix with complete transaction consistency.
@@ -87,8 +91,22 @@ async def v1_atomic_save_harris_matrix(
                 }
             )
         
-        # Initialize service
+        # Generate or extract session ID
+        session_id = x_session_id or f"atomic-save-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{str(current_user_id)[:8]}"
+        
+        # Initialize services
         harris_service = HarrisMatrixService(db)
+        id_normalizer = create_unit_id_normalizer(db)
+        mapping_service = HarrisMatrixMappingService(db)
+        
+        # Create mapping session
+        transaction_id = await mapping_service.create_mapping_session(
+            site_id=site_id,
+            session_id=session_id,
+            user_id=current_user_id
+        )
+        
+        logger.info(f"Created mapping session: {transaction_id} for session: {session_id}")
         
         # ATOMIC TRANSACTION: All operations must succeed or none
         async with db.begin() as transaction:
@@ -102,6 +120,8 @@ async def v1_atomic_save_harris_matrix(
                     "layout_positions_saved": 0,
                     "relationships_processed": 0
                 }
+                
+                # Initialize persistent unit mapping
                 unit_mapping = {}
                 
                 # STEP 1: Create new units (if any)
@@ -130,8 +150,31 @@ async def v1_atomic_save_harris_matrix(
                         operation_results["new_units_created"] = create_result['created_units']
                         operation_results["relationships_processed"] = create_result['created_relationships']
                         
+                        # Get in-memory mapping from service result
+                        temp_unit_mapping = create_result.get('unit_mapping', {})
+                        
+                        # Persist all mappings to database
+                        for temp_id, db_id_str in temp_unit_mapping.items():
+                            # Find the corresponding unit data to get the unit code
+                            unit_data = next((u for u in units_data if u.get('temp_id') == temp_id), None)
+                            if unit_data:
+                                unit_code = unit_data.get('code', 'UNKNOWN')
+                                db_id = UUID(db_id_str)
+                                
+                                # Save persistent mapping
+                                await mapping_service.save_temp_to_db_mapping(
+                                    site_id=site_id,
+                                    session_id=session_id,
+                                    temp_id=temp_id,
+                                    db_id=db_id,
+                                    unit_code=unit_code,
+                                    user_id=current_user_id
+                                )
+                        
                         # Store mapping for subsequent operations
-                        unit_mapping = create_result.get('unit_mapping', {})
+                        unit_mapping = temp_unit_mapping
+                        
+                        logger.info(f"Persisted {len(temp_unit_mapping)} unit mappings to database")
                         
                         logger.info(f"Successfully created {create_result['created_units']} new units")
                         
@@ -214,19 +257,32 @@ async def v1_atomic_save_harris_matrix(
                             )
                         )
                         
-                        # Insert new positions
+                        # Insert new positions with ID normalization
+                        normalized_positions_count = 0
                         for pos in layout_positions.positions:
-                            layout = HarrisMatrixLayout(
-                                site_id=str(site_id),
-                                unit_id=pos.unit_id,
-                                unit_type=pos.unit_type,
-                                x=pos.x,
-                                y=pos.y
+                            # Normalize the unit ID using the new normalizer
+                            normalized_unit_id = await id_normalizer.normalize_for_layout_lookup(
+                                pos.unit_id, pos.unit_type, db
                             )
-                            db.add(layout)
+                            
+                            if normalized_unit_id:
+                                layout = HarrisMatrixLayout(
+                                    site_id=str(site_id),
+                                    unit_id=normalized_unit_id,  # Use normalized ID
+                                    unit_type=pos.unit_type,
+                                    x=pos.x,
+                                    y=pos.y
+                                )
+                                db.add(layout)
+                                normalized_positions_count += 1
+                            else:
+                                logger.warning(f"Could not normalize unit ID: {pos.unit_id} (type: {pos.unit_type}) - skipping layout save")
                         
                         await db.flush()  # Ensure layout data is written
-                        operation_results["layout_positions_saved"] = len(request.layout_positions.positions)
+                        operation_results["layout_positions_saved"] = normalized_positions_count
+                        
+                        if normalized_positions_count != len(layout_positions.positions):
+                            logger.warning(f"Only {normalized_positions_count}/{len(layout_positions.positions)} layout positions normalized and saved")
                         
                         logger.info(f"Successfully saved {operation_results['layout_positions_saved']} layout positions")
                         
@@ -243,10 +299,19 @@ async def v1_atomic_save_harris_matrix(
                             }
                         )
                 
+                # Commit all mappings for the successful transaction
+                commit_result = await mapping_service.commit_mappings(
+                    site_id=site_id,
+                    session_id=session_id,
+                    transaction_id=transaction_id
+                )
+                
+                logger.info(f"Committed {commit_result['committed_count']} mappings")
+                
                 # All operations completed successfully - transaction will commit automatically
                 logger.info("Atomic transaction completed successfully")
                 
-                # Build comprehensive response
+                # Build comprehensive response with mapping metadata
                 response = HarrisMatrixAtomicSaveResponse(
                     success=True,
                     message=f"Atomic save completed successfully: {operation_results['new_units_created']} new units, {operation_results['existing_units_updated']} updated units, {operation_results['layout_positions_saved']} layout positions",
@@ -254,7 +319,13 @@ async def v1_atomic_save_harris_matrix(
                     operation_results=operation_results,
                     unit_mapping=unit_mapping,
                     validation_performed=True,
-                    transaction_rolled_back=False
+                    transaction_rolled_back=False,
+                    # NEW: Metadata for recovery
+                    session_id=session_id,
+                    transaction_id=transaction_id,
+                    created_units_count=operation_results["new_units_created"],
+                    checkpoint_time=datetime.utcnow(),
+                    mapping_status="committed"
                 )
                 
                 logger.info(f"Atomic Harris Matrix save completed successfully for site {site_id}: {operation_results}")
@@ -262,12 +333,26 @@ async def v1_atomic_save_harris_matrix(
                 
             except HTTPException:
                 # HTTPException should be re-raised for proper error responses
+                # Rollback mappings before re-raising
+                try:
+                    await mapping_service.rollback_mappings(site_id=site_id, session_id=session_id)
+                    logger.info(f"Rolled back mappings for session {session_id} due to HTTPException")
+                except Exception as rollback_error:
+                    logger.error(f"Failed to rollback mappings: {str(rollback_error)}")
                 # The transaction will be rolled back automatically due to the exception
                 raise
                 
             except Exception as e:
                 # Any other exception will cause automatic transaction rollback
                 logger.error(f"Unexpected error in atomic transaction: {str(e)}", exc_info=True)
+                
+                # Rollback mappings on failure
+                try:
+                    rollback_result = await mapping_service.rollback_mappings(site_id=site_id, session_id=session_id)
+                    logger.info(f"Rolled back {rollback_result['rolled_back_count']} mappings for session {session_id}")
+                except Exception as rollback_error:
+                    logger.error(f"Failed to rollback mappings: {str(rollback_error)}")
+                
                 raise HTTPException(
                     status_code=500,
                     detail={
@@ -275,6 +360,7 @@ async def v1_atomic_save_harris_matrix(
                         "type": "internal_error",
                         "details": str(e),
                         "transaction_rolled_back": True,
+                        "session_id": session_id,
                         "suggestion": "Please try again or contact support if the issue persists"
                     }
                 )

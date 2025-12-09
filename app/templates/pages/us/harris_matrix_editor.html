@@ -3309,8 +3309,13 @@
                 if (atomicRequest.existing_units_updates) {
                     console.log(`  Existing units updates: ${Object.keys(atomicRequest.existing_units_updates).length}`);
                     Object.entries(atomicRequest.existing_units_updates).forEach(([dbId, updates]) => {
-                        const relCount = Object.values(updates.sequenza_fisica).reduce((sum, arr) => sum + arr.length, 0);
-                        console.log(`    dbId=${dbId}: ${relCount} sequenza_fisica relationships`);
+                        // FIX: Add null/undefined checks before calling Object.values()
+                        if (updates && updates.sequenza_fisica) {
+                            const relCount = Object.values(updates.sequenza_fisica).reduce((sum, arr) => sum + (arr ? arr.length : 0), 0);
+                            console.log(`    dbId=${dbId}: ${relCount} sequenza_fisica relationships`);
+                        } else {
+                            console.log(`    dbId=${dbId}: No sequenza_fisica data available`);
+                        }
                     });
                 }
                 if (atomicRequest.layout_save) {
