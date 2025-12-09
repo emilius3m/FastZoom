@@ -1882,9 +1882,25 @@ async def v1_atomic_save_harris_matrix(
             if request.existing_units_updates and request.existing_units_updates.updates:
                 logger.info(f"STEP 2: Updating {len(request.existing_units_updates.updates)} existing units")
                 
+                # Pre-process updates to extract sequenza_fisica
+                clean_updates = {}
+                for uid, data in request.existing_units_updates.updates.items():
+                    # Extract sequenza_fisica from Pydantic model or dict
+                    sequenza = data
+                    if hasattr(data, 'sequenza_fisica'):
+                        sequenza = data.sequenza_fisica
+                    elif isinstance(data, dict) and 'sequenza_fisica' in data:
+                        sequenza = data['sequenza_fisica']
+                    
+                    # Ensure it is a dict
+                    if hasattr(sequenza, 'dict'):
+                        sequenza = sequenza.dict(exclude_none=True)
+                    
+                    clean_updates[uid] = sequenza
+
                 update_result = await harris_service.bulk_update_sequenza_fisica_units(
                     site_id=site_id,
-                    updates=request.existing_units_updates.updates
+                    updates=clean_updates
                 )
                 
                 operation_results["update_units"] = {
