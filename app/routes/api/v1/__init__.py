@@ -26,6 +26,7 @@ from app.routes.api.v1.admin import router as admin_router
 from app.routes.api.v1.unified import router as unified_router
 from app.routes.api.v1.us_files import router as us_files_router
 from app.routes.api.v1.harris_matrix import router as harris_matrix_router
+from app.routes.api.v1.harris_matrix_mapping import router as harris_matrix_mapping_router
 
 # Router principale API v1
 api_v1_router = APIRouter(
@@ -48,6 +49,7 @@ api_v1_router.include_router(documents_router, tags=["Documents"])
 api_v1_router.include_router(us_router, prefix="/us", tags=["US/USM Units"])
 api_v1_router.include_router(us_files_router, prefix="/us-files", tags=["US/USM Files"])
 api_v1_router.include_router(harris_matrix_router, prefix="/harris-matrix", tags=["Harris Matrix"])
+api_v1_router.include_router(harris_matrix_mapping_router, prefix="/harris-matrix", tags=["Harris Matrix Mapping"])
 api_v1_router.include_router(geographic_router, prefix="/geographic", tags=["Geographic Maps"])
 # api_v1_router.include_router(archaeological_router, prefix="/archaeological", tags=["Archaeological Plans"])
 api_v1_router.include_router(giornale_router, prefix="/giornale", tags=["Giornale di Cantiere"])

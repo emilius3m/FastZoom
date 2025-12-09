@@ -20,7 +20,8 @@ Struttura modelli:
 7. Configurations - Export, relazioni finali, elenchi
 8. UserActivity - Tracciamento attività utente
 9. TokenBlacklist - Gestione sicurezza JWT
-10. Archaeological Enums - Tutti gli enum archeologici
+10. Harris Matrix Mapping - Mappatura temporanea a database ID
+11. Archaeological Enums - Tutti gli enum archeologici
 """
 
 # ===== IMPORT BASE =====
@@ -118,6 +119,12 @@ from app.models.sites import (
     SiteStatusEnum,
     SiteTypeEnum,
     ResearchStatusEnum
+)
+
+# ===== IMPORT HARRIS MATRIX MAPPING =====
+from app.models.harris_matrix_mapping import (
+    HarrisMatrixMapping,
+    MappingStatusEnum
 )
 
 # ===== BACKWARD COMPATIBILITY ALIASES =====
@@ -373,11 +380,15 @@ __all__ = [
     'TEMPLATE_ELENCHI',
     
     # Cantiere
-    'Cantiere'
+    'Cantiere',
+    
+    # Harris Matrix Mapping
+    'HarrisMatrixMapping',
+    'MappingStatusEnum'
 ]
 
 # ===== METADATA INFO =====
-MODELS_VERSION = "2.3.0"  # Incrementato per archaeological enums
+MODELS_VERSION = "2.4.0"  # Incrementato per Harris Matrix Mapping
 MODELS_COUNT = len(__all__)
 
 def get_models_summary():
@@ -398,7 +409,7 @@ def get_models_summary():
         },
         'recent_fixes': [
             'RIPRISTINATO PermissionLevel enum',
-            'RIPRISTINATO UserActivity model', 
+            'RIPRISTINATO UserActivity model',
             'RIPRISTINATO TokenBlacklist model',
             'RIPRISTINATO PhotoType, MaterialType, ConservationStatus',
             'Aggiunti tutti gli enum archeologici mancanti',
@@ -406,6 +417,7 @@ def get_models_summary():
             'Aggiunti metodi di logging attività',
             'Sistema JWT logout sicuro',
             'Helper functions per gestione enum',
+            'Aggiunto HarrisMatrixMapping per mappatura ID persistenti',
             'Backward compatibility mantenuta',
             'Mantenuta compatibilità codice esistente'
         ],
@@ -421,11 +433,12 @@ def get_models_summary():
             'Gestione file integrata US/USM',
             'Standard MiC 2021 compliance',
             'ICCD schede supportate',
-            'Matrix Harris digitale',
+            'Matrix Harris digitale con mappatura ID persistenti',
             'Export automatizzato',
             'Giornali cantiere digitali',
             'Soft delete e versioning',
-            'Deep zoom integrazione'
+            'Deep zoom integrazione',
+            'Sistema di recupero per operazioni interrotte'
         ]
     }
 
