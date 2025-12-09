@@ -1886,417 +1886,421 @@ async def v1_atomic_save_harris_matrix(
         logger.info(f"Created mapping session: {transaction_id} for session: {session_id}")
         
         # ATOMIC TRANSACTION: All operations must succeed or none
-        async with db.begin() as transaction:
-            try:
-                logger.info("Starting atomic transaction for Harris Matrix save")
+        # Note: We use implicit transaction management here. The session already has
+        # an active transaction from the mapping service operations. Using explicit
+        # db.begin() would cause "A transaction is already begun on this Session" error.
+        try:
+            logger.info("Starting atomic transaction for Harris Matrix save")
+            
+            # Track results for each operation
+            operation_results = {
+                "new_units_created": 0,
+                "existing_units_updated": 0,
+                "layout_positions_saved": 0,
+                "relationships_processed": 0
+            }
+            
+            # Initialize persistent unit mapping
+            unit_mapping = {}
+            
+            # STEP 1: Create new units (if any)
+            if request.new_units and request.new_units.units:
+                logger.info(f"Creating {len(request.new_units.units)} new units")
                 
-                # Track results for each operation
-                operation_results = {
-                    "new_units_created": 0,
-                    "existing_units_updated": 0,
-                    "layout_positions_saved": 0,
-                    "relationships_processed": 0
-                }
-                
-                # Initialize persistent unit mapping
-                unit_mapping = {}
-                
-                # STEP 1: Create new units (if any)
-                if request.new_units and request.new_units.units:
-                    logger.info(f"Creating {len(request.new_units.units)} new units")
+                try:
+                    # Convert Pydantic models to dictionaries with user context
+                    units_data = []
+                    for unit in request.new_units.units:
+                        unit_dict = unit.dict(exclude_none=True)
+                        unit_dict['created_by'] = str(current_user_id)
+                        unit_dict['updated_by'] = str(current_user_id)
+                        units_data.append(unit_dict)
                     
-                    try:
-                        # Convert Pydantic models to dictionaries with user context
-                        units_data = []
-                        for unit in request.new_units.units:
-                            unit_dict = unit.dict(exclude_none=True)
-                            unit_dict['created_by'] = str(current_user_id)
-                            unit_dict['updated_by'] = str(current_user_id)
-                            units_data.append(unit_dict)
-                        
-                        relationships_data = [rel.dict() for rel in request.new_units.relationships]
-                        
-                        # STEP 1A: Pre-validation for duplicate detection
-                        logger.info("Performing pre-validation for duplicate unit codes")
-                        duplicate_validation = await validation_service.validate_duplicate_unit_codes(
-                            site_id=site_id,
-                            units_data=units_data,
-                            db_session=db
-                        )
-                        
-                        if not duplicate_validation["can_proceed"]:
-                            logger.error(f"Duplicate unit codes detected: {duplicate_validation['duplicates']}")
-                            raise HTTPException(
-                                status_code=422,
-                                detail={
-                                    "error": "Duplicate unit codes detected",
-                                    "type": "validation_error",
-                                    "error_type": "duplicate_codes",
-                                    "details": duplicate_validation,
-                                    "suggestions": duplicate_validation.get("suggestions", []),
-                                    "step": "pre_validation"
-                                }
-                            )
-                        
-                        # STEP 1B: Validate relationship integrity if relationships exist
-                        if relationships_data:
-                            units_mapping = {unit["code"]: unit.get("temp_id") for unit in units_data if unit.get("code")}
-                            logger.info("Validating relationship integrity")
-                            relation_validation = await validation_service.validate_relationship_integrity(
-                                site_id=site_id,
-                                relationships_data=relationships_data,
-                                units_mapping=units_mapping,
-                                db_session=db
-                            )
-                            
-                            if not relation_validation["can_proceed"]:
-                                logger.error(f"Invalid relationships detected: {relation_validation['missing_units']}")
-                                raise HTTPException(
-                                    status_code=422,
-                                    detail={
-                                        "error": "Invalid relationships detected",
-                                        "type": "validation_error",
-                                        "error_type": "invalid_relations",
-                                        "details": relation_validation,
-                                        "suggestions": relation_validation.get("suggestions", []),
-                                        "step": "relationship_validation"
-                                    }
-                                )
-                        
-                        # STEP 1C: Detect potential cycles
-                        if relationships_data:
-                            logger.info("Detecting potential cycles in relationships")
-                            cycle_validation = await validation_service.detect_potential_cycles(
-                                relationships=relationships_data,
-                                units_mapping=units_mapping
-                            )
-                            
-                            if not cycle_validation["can_proceed"]:
-                                logger.error(f"Potential cycles detected: {cycle_validation['cycle_paths']}")
-                                raise HTTPException(
-                                    status_code=422,
-                                    detail={
-                                        "error": "Potential cycles detected in relationships",
-                                        "type": "validation_error",
-                                        "error_type": "cycles_detected",
-                                        "details": cycle_validation,
-                                        "suggestions": cycle_validation.get("suggestions", []),
-                                        "step": "cycle_detection"
-                                    }
-                                )
-                        
-                        logger.info("Pre-validation passed, proceeding with bulk creation")
-                        
-                        # Perform bulk creation within the transaction
-                        create_result = await harris_service.bulk_create_units_with_relationships(
-                            site_id=site_id,
-                            units_data=units_data,
-                            relationships_data=relationships_data,
-                            current_user_id=current_user_id
-                        )
-                        
-                        operation_results["new_units_created"] = create_result['created_units']
-                        operation_results["relationships_processed"] = create_result['created_relationships']
-                        
-                        # Get in-memory mapping from service result
-                        temp_unit_mapping = create_result.get('unit_mapping', {})
-                        
-                        # Persist all mappings to database
-                        for temp_id, db_id_str in temp_unit_mapping.items():
-                            # Find the corresponding unit data to get the unit code
-                            unit_data = next((u for u in units_data if u.get('temp_id') == temp_id), None)
-                            if unit_data:
-                                unit_code = unit_data.get('code', 'UNKNOWN')
-                                db_id = UUID(db_id_str)
-                                
-                                # Save persistent mapping
-                                await mapping_service.save_temp_to_db_mapping(
-                                    site_id=site_id,
-                                    session_id=session_id,
-                                    temp_id=temp_id,
-                                    db_id=db_id,
-                                    unit_code=unit_code,
-                                    user_id=current_user_id
-                                )
-                        
-                        # Store mapping for subsequent operations
-                        unit_mapping = temp_unit_mapping
-                        
-                        logger.info(f"Persisted {len(temp_unit_mapping)} unit mappings to database")
-                        
-                        logger.info(f"Successfully created {create_result['created_units']} new units")
-                        
-                    except Exception as e:
-                        logger.error(f"Failed to create new units: {str(e)}")
+                    relationships_data = [rel.dict() for rel in request.new_units.relationships]
+                    
+                    # STEP 1A: Pre-validation for duplicate detection
+                    logger.info("Performing pre-validation for duplicate unit codes")
+                    duplicate_validation = await validation_service.validate_duplicate_unit_codes(
+                        site_id=site_id,
+                        units_data=units_data,
+                        db_session=db
+                    )
+                    
+                    if not duplicate_validation["can_proceed"]:
+                        logger.error(f"Duplicate unit codes detected: {duplicate_validation['duplicates']}")
                         raise HTTPException(
                             status_code=422,
                             detail={
-                                "error": "New units creation failed",
-                                "type": "unit_creation_error",
-                                "details": str(e),
-                                "suggestion": "Check unit data and relationships",
-                                "step": "new_units_creation"
+                                "error": "Duplicate unit codes detected",
+                                "type": "validation_error",
+                                "error_type": "duplicate_codes",
+                                "details": duplicate_validation,
+                                "suggestions": duplicate_validation.get("suggestions", []),
+                                "step": "pre_validation"
                             }
                         )
-                
-                # STEP 2: Update existing units' relationships (if any)
-                if request.existing_units_updates:
-                    logger.info(f"Updating relationships for existing units")
-                    logger.debug(f"DEBUG: existing_units_updates structure: {request.existing_units_updates}")
                     
-                    try:
-                        # Handle both schema formats: direct dict or with .updates wrapper
-                        updates_dict = {}
-                        if hasattr(request.existing_units_updates, 'updates'):
-                            # Schema format: {updates: {unit_id: {sequenza_fisica: {...}}}}
-                            for unit_id, update_data in request.existing_units_updates.updates.items():
-                                updates_dict[unit_id] = update_data
-                            logger.info(f"Processing {len(updates_dict)} updates from schema format")
-                        else:
-                            # Direct format: {unit_id: {sequenza_fisica: {...}}}
-                            for unit_id, update_data in request.existing_units_updates.items():
-                                updates_dict[unit_id] = update_data
-                            logger.info(f"Processing {len(updates_dict)} updates from direct format")
-                        
-                        logger.debug(f"DEBUG: Final updates for bulk_update_sequenza_fisica_units: {updates_dict}")
-                        
-                        # Enhanced stale reference validation before bulk update
-                        logger.info("STEP 2A: Performing stale reference validation")
-                        validation_result = await validation_service.validate_stale_references(
+                    # STEP 1B: Validate relationship integrity if relationships exist
+                    if relationships_data:
+                        units_mapping = {unit["code"]: unit.get("temp_id") for unit in units_data if unit.get("code")}
+                        logger.info("Validating relationship integrity")
+                        relation_validation = await validation_service.validate_relationship_integrity(
                             site_id=site_id,
-                            updates=updates_dict,
+                            relationships_data=relationships_data,
+                            units_mapping=units_mapping,
                             db_session=db
                         )
                         
-                        if not validation_result["can_proceed"]:
-                            logger.error(f"Stale references detected: {validation_result}")
-                            raise HTTPException(
-                                status_code=400,
-                                detail={
-                                    "error_type": "stale_references",
-                                    "message": "Some units cannot be updated due to stale references",
-                                    "missing_units": validation_result["missing_ids"],
-                                    "soft_deleted_units": validation_result["soft_deleted_ids"],
-                                    "invalid_site_units": validation_result["wrong_site_ids"],
-                                    "recovery_suggestions": [
-                                        "Remove references to non-existent units",
-                                        "Restore soft-deleted units if needed",
-                                        "Verify unit IDs are correct"
-                                    ],
-                                    "validation_time": validation_result.get("validation_time"),
-                                    "step": "stale_reference_validation"
-                                }
-                            )
-                        
-                        # Comprehensive bulk update integrity validation
-                        logger.info("STEP 2B: Performing comprehensive bulk update integrity validation")
-                        integrity_result = await validation_service.validate_bulk_update_integrity(
-                            site_id=site_id,
-                            updates=updates_dict,
-                            db_session=db
-                        )
-                        
-                        if not integrity_result["can_proceed"]:
-                            logger.error(f"Bulk update integrity validation failed: {integrity_result}")
-                            # Collect all issues for detailed error response
-                            all_issues = []
-                            
-                            if integrity_result["invalid_data"]:
-                                all_issues.extend([
-                                    f"Invalid data: {issue['unit_id']} - {issue['reason']}"
-                                    for issue in integrity_result["invalid_data"]
-                                ])
-                            
-                            if integrity_result["relationship_issues"]:
-                                all_issues.extend([
-                                    f"Relationship issue: {issue['unit_id']} - {issue['reason']}"
-                                    for issue in integrity_result["relationship_issues"]
-                                ])
-                            
+                        if not relation_validation["can_proceed"]:
+                            logger.error(f"Invalid relationships detected: {relation_validation['missing_units']}")
                             raise HTTPException(
                                 status_code=422,
                                 detail={
-                                    "error": "Bulk update integrity validation failed",
-                                    "type": "integrity_validation_error",
-                                    "details": {
-                                        "invalid_data": integrity_result["invalid_data"],
-                                        "relationship_issues": integrity_result["relationship_issues"],
-                                        "suggestions": integrity_result.get("suggestions", [])
-                                    },
-                                    "suggestions": [
-                                        "Fix invalid data format in sequenza_fisica updates",
-                                        "Fix references to non-existent unit codes"
-                                    ],
-                                    "step": "integrity_validation"
+                                    "error": "Invalid relationships detected",
+                                    "type": "validation_error",
+                                    "error_type": "invalid_relations",
+                                    "details": relation_validation,
+                                    "suggestions": relation_validation.get("suggestions", []),
+                                    "step": "relationship_validation"
                                 }
                             )
-                        
-                        # Perform enhanced bulk update within the transaction
-                        logger.info("STEP 2C: Performing enhanced bulk update")
-                        update_result = await harris_service.bulk_update_sequenza_fisica_units(
-                            site_id=site_id,
-                            updates=updates_dict
+                    
+                    # STEP 1C: Detect potential cycles
+                    if relationships_data:
+                        logger.info("Detecting potential cycles in relationships")
+                        cycle_validation = await validation_service.detect_potential_cycles(
+                            relationships=relationships_data,
+                            units_mapping=units_mapping
                         )
                         
-                        operation_results["existing_units_updated"] = update_result.get('updated_count', 0)
-                        
-                        # Include skipped units and validation details in response tracking
-                        if update_result.get('skipped_units'):
-                            operation_results["skipped_units"] = update_result['skipped_units']
-                            logger.warning(f"Skipped {len(update_result['skipped_units'])} units during bulk update")
-                        
-                        if update_result.get('validation_details'):
-                            operation_results["validation_details"] = update_result['validation_details']
-                            logger.info("Validation details included in operation results")
-                        
-                        logger.info(f"Successfully updated relationships for {operation_results['existing_units_updated']} existing units")
-                        
-                    except StaleReferenceError as e:
-                        # Handle specific stale reference errors from service
-                        logger.error(f"Stale reference error in bulk update: {e.message}")
+                        if not cycle_validation["can_proceed"]:
+                            logger.error(f"Potential cycles detected: {cycle_validation['cycle_paths']}")
+                            raise HTTPException(
+                                status_code=422,
+                                detail={
+                                    "error": "Potential cycles detected in relationships",
+                                    "type": "validation_error",
+                                    "error_type": "cycles_detected",
+                                    "details": cycle_validation,
+                                    "suggestions": cycle_validation.get("suggestions", []),
+                                    "step": "cycle_detection"
+                                }
+                            )
+                    
+                    logger.info("Pre-validation passed, proceeding with bulk creation")
+                    
+                    # Perform bulk creation within the transaction
+                    create_result = await harris_service.bulk_create_units_with_relationships(
+                        site_id=site_id,
+                        units_data=units_data,
+                        relationships_data=relationships_data,
+                        current_user_id=current_user_id
+                    )
+                    
+                    operation_results["new_units_created"] = create_result['created_units']
+                    operation_results["relationships_processed"] = create_result['created_relationships']
+                    
+                    # Get in-memory mapping from service result
+                    temp_unit_mapping = create_result.get('unit_mapping', {})
+                    
+                    # Persist all mappings to database
+                    for temp_id, db_id_str in temp_unit_mapping.items():
+                        # Find the corresponding unit data to get the unit code
+                        unit_data = next((u for u in units_data if u.get('temp_id') == temp_id), None)
+                        if unit_data:
+                            unit_code = unit_data.get('code', 'UNKNOWN')
+                            db_id = UUID(db_id_str)
+                            
+                            # Save persistent mapping
+                            await mapping_service.save_temp_to_db_mapping(
+                                site_id=site_id,
+                                session_id=session_id,
+                                temp_id=temp_id,
+                                db_id=db_id,
+                                unit_code=unit_code,
+                                user_id=current_user_id
+                            )
+                    
+                    # Store mapping for subsequent operations
+                    unit_mapping = temp_unit_mapping
+                    
+                    logger.info(f"Persisted {len(temp_unit_mapping)} unit mappings to database")
+                    
+                    logger.info(f"Successfully created {create_result['created_units']} new units")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to create new units: {str(e)}")
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "error": "New units creation failed",
+                            "type": "unit_creation_error",
+                            "details": str(e),
+                            "suggestion": "Check unit data and relationships",
+                            "step": "new_units_creation"
+                        }
+                    )
+            
+            # STEP 2: Update existing units' relationships (if any)
+            if request.existing_units_updates:
+                logger.info(f"Updating relationships for existing units")
+                logger.debug(f"DEBUG: existing_units_updates structure: {request.existing_units_updates}")
+                
+                try:
+                    # Handle both schema formats: direct dict or with .updates wrapper
+                    updates_dict = {}
+                    if hasattr(request.existing_units_updates, 'updates'):
+                        # Schema format: {updates: {unit_id: {sequenza_fisica: {...}}}}
+                        for unit_id, update_data in request.existing_units_updates.updates.items():
+                            updates_dict[unit_id] = update_data
+                        logger.info(f"Processing {len(updates_dict)} updates from schema format")
+                    else:
+                        # Direct format: {unit_id: {sequenza_fisica: {...}}}
+                        for unit_id, update_data in request.existing_units_updates.items():
+                            updates_dict[unit_id] = update_data
+                        logger.info(f"Processing {len(updates_dict)} updates from direct format")
+                    
+                    logger.debug(f"DEBUG: Final updates for bulk_update_sequenza_fisica_units: {updates_dict}")
+                    
+                    # Enhanced stale reference validation before bulk update
+                    logger.info("STEP 2A: Performing stale reference validation")
+                    validation_result = await validation_service.validate_stale_references(
+                        site_id=site_id,
+                        updates=updates_dict,
+                        db_session=db
+                    )
+                    
+                    if not validation_result["can_proceed"]:
+                        logger.error(f"Stale references detected: {validation_result}")
                         raise HTTPException(
                             status_code=400,
                             detail={
                                 "error_type": "stale_references",
-                                "message": e.message,
-                                "missing_units": e.missing_units,
-                                "soft_deleted_units": e.soft_deleted_units,
-                                "invalid_site_units": e.wrong_site_units,
-                                "recovery_suggestions": e.recovery_suggestions,
-                                "step": "bulk_update_stale_references"
+                                "message": "Some units cannot be updated due to stale references",
+                                "missing_units": validation_result["missing_ids"],
+                                "soft_deleted_units": validation_result["soft_deleted_ids"],
+                                "invalid_site_units": validation_result["wrong_site_ids"],
+                                "recovery_suggestions": [
+                                    "Remove references to non-existent units",
+                                    "Restore soft-deleted units if needed",
+                                    "Verify unit IDs are correct"
+                                ],
+                                "validation_time": validation_result.get("validation_time"),
+                                "step": "stale_reference_validation"
                             }
                         )
-                    except Exception as e:
-                        logger.error(f"Failed to update existing units: {str(e)}")
+                    
+                    # Comprehensive bulk update integrity validation
+                    logger.info("STEP 2B: Performing comprehensive bulk update integrity validation")
+                    integrity_result = await validation_service.validate_bulk_update_integrity(
+                        site_id=site_id,
+                        updates=updates_dict,
+                        db_session=db
+                    )
+                    
+                    if not integrity_result["can_proceed"]:
+                        logger.error(f"Bulk update integrity validation failed: {integrity_result}")
+                        # Collect all issues for detailed error response
+                        all_issues = []
+                        
+                        if integrity_result["invalid_data"]:
+                            all_issues.extend([
+                                f"Invalid data: {issue['unit_id']} - {issue['reason']}"
+                                for issue in integrity_result["invalid_data"]
+                            ])
+                        
+                        if integrity_result["relationship_issues"]:
+                            all_issues.extend([
+                                f"Relationship issue: {issue['unit_id']} - {issue['reason']}"
+                                for issue in integrity_result["relationship_issues"]
+                            ])
+                        
                         raise HTTPException(
                             status_code=422,
                             detail={
-                                "error": "Existing units update failed",
-                                "type": "units_update_error",
-                                "details": str(e),
-                                "suggestion": "Check relationship data and unit IDs",
-                                "step": "existing_units_update"
+                                "error": "Bulk update integrity validation failed",
+                                "type": "integrity_validation_error",
+                                "details": {
+                                    "invalid_data": integrity_result["invalid_data"],
+                                    "relationship_issues": integrity_result["relationship_issues"],
+                                    "suggestions": integrity_result.get("suggestions", [])
+                                },
+                                "suggestions": [
+                                    "Fix invalid data format in sequenza_fisica updates",
+                                    "Fix references to non-existent unit codes"
+                                ],
+                                "step": "integrity_validation"
                             }
                         )
-                
-                # STEP 3: Save layout positions (if any)
-                layout_positions = None
-                
-                # Handle both layout_save and layout_positions field names
-                if hasattr(request, 'layout_save') and request.layout_save and request.layout_save.positions:
-                    layout_positions = request.layout_save
-                    logger.info(f"Saving {len(layout_positions.positions)} layout positions from layout_save")
-                elif hasattr(request, 'layout_positions') and request.layout_positions and request.layout_positions.positions:
-                    layout_positions = request.layout_positions
-                    logger.info(f"Saving {len(layout_positions.positions)} layout positions from layout_positions")
-                
-                if layout_positions:
-                    logger.debug(f"DEBUG: layout structure: {layout_positions}")
                     
-                    try:
-                        # Delete existing layout positions for this site
-                        await db.execute(
-                            delete(HarrisMatrixLayout).where(
-                                HarrisMatrixLayout.site_id == str(site_id)
-                            )
-                        )
-                        
-                        # Insert new positions
-                        saved_count = 0
-                        for pos in layout_positions.positions:
-                            layout = HarrisMatrixLayout(
-                                site_id=str(site_id),
-                                unit_id=pos.unit_id,
-                                unit_type=pos.unit_type,
-                                x=pos.x,
-                                y=pos.y
-                            )
-                            db.add(layout)
-                            saved_count += 1
-                        
-                        await db.flush()  # Ensure layout data is written
-                        operation_results["layout_positions_saved"] = saved_count
-                        
-                        logger.info(f"Successfully saved {operation_results['layout_positions_saved']} layout positions")
-                        
-                    except Exception as e:
-                        logger.error(f"Failed to save layout positions: {str(e)}")
-                        raise HTTPException(
-                            status_code=500,
-                            detail={
-                                "error": "Layout positions save failed",
-                                "type": "layout_save_error",
-                                "details": str(e),
-                                "suggestion": "Check layout position data",
-                                "step": "layout_save"
-                            }
-                        )
+                    # Perform enhanced bulk update within the transaction
+                    logger.info("STEP 2C: Performing enhanced bulk update")
+                    update_result = await harris_service.bulk_update_sequenza_fisica_units(
+                        site_id=site_id,
+                        updates=updates_dict
+                    )
+                    
+                    operation_results["existing_units_updated"] = update_result.get('updated_count', 0)
+                    
+                    # Include skipped units and validation details in response tracking
+                    if update_result.get('skipped_units'):
+                        operation_results["skipped_units"] = update_result['skipped_units']
+                        logger.warning(f"Skipped {len(update_result['skipped_units'])} units during bulk update")
+                    
+                    if update_result.get('validation_details'):
+                        operation_results["validation_details"] = update_result['validation_details']
+                        logger.info("Validation details included in operation results")
+                    
+                    logger.info(f"Successfully updated relationships for {operation_results['existing_units_updated']} existing units")
+                    
+                except StaleReferenceError as e:
+                    # Handle specific stale reference errors from service
+                    logger.error(f"Stale reference error in bulk update: {e.message}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "error_type": "stale_references",
+                            "message": e.message,
+                            "missing_units": e.missing_units,
+                            "soft_deleted_units": e.soft_deleted_units,
+                            "invalid_site_units": e.wrong_site_units,
+                            "recovery_suggestions": e.recovery_suggestions,
+                            "step": "bulk_update_stale_references"
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to update existing units: {str(e)}")
+                    raise HTTPException(
+                        status_code=422,
+                        detail={
+                            "error": "Existing units update failed",
+                            "type": "units_update_error",
+                            "details": str(e),
+                            "suggestion": "Check relationship data and unit IDs",
+                            "step": "existing_units_update"
+                        }
+                    )
+            
+            # STEP 3: Save layout positions (if any)
+            layout_positions = None
+            
+            # Handle both layout_save and layout_positions field names
+            if hasattr(request, 'layout_save') and request.layout_save and request.layout_save.positions:
+                layout_positions = request.layout_save
+                logger.info(f"Saving {len(layout_positions.positions)} layout positions from layout_save")
+            elif hasattr(request, 'layout_positions') and request.layout_positions and request.layout_positions.positions:
+                layout_positions = request.layout_positions
+                logger.info(f"Saving {len(layout_positions.positions)} layout positions from layout_positions")
+            
+            if layout_positions:
+                logger.debug(f"DEBUG: layout structure: {layout_positions}")
                 
-                # Commit all mappings for the successful transaction
-                commit_result = await mapping_service.commit_mappings(
-                    site_id=site_id,
-                    session_id=session_id,
-                    transaction_id=transaction_id
-                )
-                
-                logger.info(f"Committed {commit_result['committed_count']} mappings")
-                
-                # All operations completed successfully - transaction will commit automatically
-                logger.info("Atomic transaction completed successfully")
-                
-                # Build comprehensive response with mapping metadata
-                response = HarrisMatrixAtomicSaveResponse(
-                    success=True,
-                    message=f"Atomic save completed successfully: {operation_results['new_units_created']} new units, {operation_results['existing_units_updated']} updated units, {operation_results['layout_positions_saved']} layout positions",
-                    site_id=site_id,
-                    operation_results=operation_results,
-                    unit_mapping=unit_mapping,
-                    validation_performed=True,
-                    transaction_rolled_back=False,
-                    # NEW: Metadata for recovery
-                    session_id=session_id,
-                    transaction_id=transaction_id,
-                    created_units_count=operation_results["new_units_created"],
-                    checkpoint_time=datetime.utcnow(),
-                    mapping_status="committed"
-                )
-                
-                logger.info(f"Atomic Harris Matrix save completed successfully for site {site_id}: {operation_results}")
-                return response
-                
-            except HTTPException:
-                # HTTPException should be re-raised for proper error responses
-                # Rollback mappings before re-raising
                 try:
-                    await mapping_service.rollback_mappings(site_id=site_id, session_id=session_id)
-                    logger.info(f"Rolled back mappings for session {session_id} due to HTTPException")
-                except Exception as rollback_error:
-                    logger.error(f"Failed to rollback mappings: {str(rollback_error)}")
-                # The transaction will be rolled back automatically due to the exception
-                raise
-                
-            except Exception as e:
-                # Any other exception will cause automatic transaction rollback
-                logger.error(f"Unexpected error in atomic transaction: {str(e)}", exc_info=True)
-                
-                # Rollback mappings on failure
-                try:
-                    rollback_result = await mapping_service.rollback_mappings(site_id=site_id, session_id=session_id)
-                    logger.info(f"Rolled back {rollback_result['rolled_back_count']} mappings for session {session_id}")
-                except Exception as rollback_error:
-                    logger.error(f"Failed to rollback mappings: {str(rollback_error)}")
-                
-                raise HTTPException(
-                    status_code=500,
-                    detail={
-                        "error": "Unexpected error during atomic save",
-                        "type": "internal_error",
-                        "details": str(e),
-                        "transaction_rolled_back": True,
-                        "session_id": session_id,
-                        "suggestion": "Please try again or contact support if the issue persists"
-                    }
-                )
+                    # Delete existing layout positions for this site
+                    await db.execute(
+                        delete(HarrisMatrixLayout).where(
+                            HarrisMatrixLayout.site_id == str(site_id)
+                        )
+                    )
+                    
+                    # Insert new positions
+                    saved_count = 0
+                    for pos in layout_positions.positions:
+                        layout = HarrisMatrixLayout(
+                            site_id=str(site_id),
+                            unit_id=pos.unit_id,
+                            unit_type=pos.unit_type,
+                            x=pos.x,
+                            y=pos.y
+                        )
+                        db.add(layout)
+                        saved_count += 1
+                    
+                    await db.flush()  # Ensure layout data is written
+                    operation_results["layout_positions_saved"] = saved_count
+                    
+                    logger.info(f"Successfully saved {operation_results['layout_positions_saved']} layout positions")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to save layout positions: {str(e)}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail={
+                            "error": "Layout positions save failed",
+                            "type": "layout_save_error",
+                            "details": str(e),
+                            "suggestion": "Check layout position data",
+                            "step": "layout_save"
+                        }
+                    )
+            
+            # Commit all mappings for the successful transaction
+            commit_result = await mapping_service.commit_mappings(
+                site_id=site_id,
+                session_id=session_id,
+                transaction_id=transaction_id
+            )
+            
+            logger.info(f"Committed {commit_result['committed_count']} mappings")
+            
+            # All operations completed successfully - commit the transaction explicitly
+            await db.commit()
+            logger.info("Atomic transaction committed successfully")
+            
+            # Build comprehensive response with mapping metadata
+            response = HarrisMatrixAtomicSaveResponse(
+                success=True,
+                message=f"Atomic save completed successfully: {operation_results['new_units_created']} new units, {operation_results['existing_units_updated']} updated units, {operation_results['layout_positions_saved']} layout positions",
+                site_id=site_id,
+                operation_results=operation_results,
+                unit_mapping=unit_mapping,
+                validation_performed=True,
+                transaction_rolled_back=False,
+                # NEW: Metadata for recovery
+                session_id=session_id,
+                transaction_id=transaction_id,
+                created_units_count=operation_results["new_units_created"],
+                checkpoint_time=datetime.utcnow(),
+                mapping_status="committed"
+            )
+            
+            logger.info(f"Atomic Harris Matrix save completed successfully for site {site_id}: {operation_results}")
+            return response
+            
+        except HTTPException:
+            # HTTPException should be re-raised for proper error responses
+            # Rollback transaction and mappings before re-raising
+            await db.rollback()
+            try:
+                await mapping_service.rollback_mappings(site_id=site_id, session_id=session_id)
+                logger.info(f"Rolled back mappings for session {session_id} due to HTTPException")
+            except Exception as rollback_error:
+                logger.error(f"Failed to rollback mappings: {str(rollback_error)}")
+            raise
+            
+        except Exception as e:
+            # Any other exception - rollback the transaction
+            await db.rollback()
+            logger.error(f"Unexpected error in atomic transaction: {str(e)}", exc_info=True)
+            
+            # Rollback mappings on failure
+            try:
+                rollback_result = await mapping_service.rollback_mappings(site_id=site_id, session_id=session_id)
+                logger.info(f"Rolled back {rollback_result['rolled_back_count']} mappings for session {session_id}")
+            except Exception as rollback_error:
+                logger.error(f"Failed to rollback mappings: {str(rollback_error)}")
+            
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "Unexpected error during atomic save",
+                    "type": "internal_error",
+                    "details": str(e),
+                    "transaction_rolled_back": True,
+                    "session_id": session_id,
+                    "suggestion": "Please try again or contact support if the issue persists"
+                }
+            )
     
     except HTTPException:
         # Re-raise HTTP exceptions (including our enhanced ones)
