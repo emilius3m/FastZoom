@@ -1844,7 +1844,7 @@
                         const nodeLabel = node.label || node.code || `???${node.id?.slice(-3)}`;
 
                         // CRITICO: Preserva il dbId da backend
-                        const dbId = node.id;  // Backend ritorna node.id come database ID
+                        const dbId = node.data?.id || node.id;  // Use real DB UUID from data if available, fallback to id
 
                         const nodeData = {
                             tempid: node.id,           // Usa node.id come tempid
@@ -2074,7 +2074,7 @@
                     console.log('🚀 Executing atomic save request...');
                     console.log(`[DEBUG] Sending atomic request to: /api/v1/harris-matrix/sites/${this.siteId}/atomic-save`);
                     console.log(`[DEBUG] Request payload size: ${JSON.stringify(atomicRequest).length} characters`);
-                    
+
                     const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/atomic-save`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -2088,14 +2088,14 @@
                         const errorText = await response.text();
                         console.error(`❌ Atomic save failed with status ${response.status}:`);
                         console.error('Response text:', errorText);
-                        
+
                         let error;
                         try {
                             error = JSON.parse(errorText);
                         } catch (parseError) {
                             error = { detail: errorText, raw_response: errorText };
                         }
-                        
+
                         console.error('Parsed error:', error);
 
                         // Restore button state
@@ -2128,7 +2128,7 @@
 
                     const responseText = await response.text();
                     console.log(`[DEBUG] Response size: ${responseText.length} characters`);
-                    
+
                     let result;
                     try {
                         result = JSON.parse(responseText);
@@ -2137,7 +2137,7 @@
                         console.error('Response text:', responseText);
                         throw new Error('Invalid JSON response from server');
                     }
-                    
+
                     console.log('✅ Atomic save completed successfully:', result);
 
                     // Update local data with any changes from backend
@@ -3278,7 +3278,7 @@
                 const relationshipCounts = Object.entries(sequenzaFisica)
                     .filter(([key, value]) => value.length > 0)
                     .map(([key, value]) => `${key}(${value.length})`);
-                
+
                 console.log(`[SEQUENZA CALC] ${node.label}: ${relationshipCounts.join(', ') || 'no relationships'}`);
 
                 return sequenzaFisica;
@@ -3289,12 +3289,12 @@
              */
             debugSavePipeline(atomicRequest) {
                 console.group('🔍 DEBUG: Save Pipeline Analysis');
-                
+
                 console.log('📊 Nodes Analysis:');
                 console.log(`  Total nodes: ${this.nodes.length}`);
                 console.log(`  New nodes: ${this.nodes.filter(n => !n.isExisting).length}`);
                 console.log(`  Existing nodes: ${this.nodes.filter(n => n.isExisting).length}`);
-                
+
                 console.log('🔗 Edges Analysis:');
                 console.log(`  Total edges: ${this.edges.length}`);
                 this.edges.forEach((edge, index) => {
