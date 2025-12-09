@@ -565,6 +565,8 @@ class HarrisMatrixValidationService:
                 "can_proceed": bool
             }
         """
+        from app.models.stratigraphy import UnitaStratigraficaMuraria
+        
         start_time = datetime.now()
         
         try:
@@ -592,22 +594,47 @@ class HarrisMatrixValidationService:
                     normalized_ids.append(unit_id)
             
             # Bulk check for existing units with performance optimization
-            existing_units_query = select(UnitaStratigrafica).where(
+            # 1. Check UnitaStratigrafica
+            existing_us_query = select(UnitaStratigrafica).where(
                 UnitaStratigrafica.id.in_(normalized_ids)
             )
-            existing_result = await db_session.execute(existing_units_query)
-            existing_units = existing_result.scalars().all()
+            existing_us_result = await db_session.execute(existing_us_query)
+            existing_us_units = existing_us_result.scalars().all()
             
-            # Build mapping of existing units
-            existing_unit_map = {
-                str(unit.id): {
+            # 2. Check UnitaStratigraficaMuraria (for any not found in US)
+            found_ids = {str(u.id) for u in existing_us_units}
+            remaining_ids = [nid for nid in normalized_ids if nid not in found_ids]
+            
+            existing_usm_units = []
+            if remaining_ids:
+                existing_usm_query = select(UnitaStratigraficaMuraria).where(
+                    UnitaStratigraficaMuraria.id.in_(remaining_ids)
+                )
+                existing_usm_result = await db_session.execute(existing_usm_query)
+                existing_usm_units = existing_usm_result.scalars().all()
+
+            # Build mapping of existing units (combining US and USM)
+            existing_unit_map = {}
+            
+            # Map US units
+            for unit in existing_us_units:
+                existing_unit_map[str(unit.id)] = {
                     "id": str(unit.id),
                     "site_id": str(unit.site_id),
                     "deleted_at": unit.deleted_at,
-                    "us_code": unit.us_code
+                    "us_code": unit.us_code,
+                    "type": "us"
                 }
-                for unit in existing_units
-            }
+
+            # Map USM units
+            for unit in existing_usm_units:
+                existing_unit_map[str(unit.id)] = {
+                    "id": str(unit.id),
+                    "site_id": str(unit.site_id),
+                    "deleted_at": unit.deleted_at,
+                    "us_code": unit.usm_code,  # USM has usm_code, mapping to us_code key for consistency
+                    "type": "usm"
+                }
             
             # Analyze each unit ID
             missing_ids = []
