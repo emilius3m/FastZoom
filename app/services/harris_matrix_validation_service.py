@@ -18,7 +18,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 
-from app.models.stratigraphy import UnitaStratigrafica
+from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
 from app.schemas.harris_matrix_editor import HarrisMatrixEdge
 from app.exceptions.harris_matrix import (
     UnitCodeConflict,
@@ -326,7 +326,7 @@ class HarrisMatrixValidationService:
         code: str, 
         db_session: AsyncSession
     ) -> bool:
-        """Check if a single unit exists in either table."""
+        """Check if a single unit exists in any unit table."""
         # Check UnitStratigrafica
         strat_query = select(UnitaStratigrafica).where(
             and_(
@@ -336,6 +336,17 @@ class HarrisMatrixValidationService:
         )
         strat_result = await db_session.execute(strat_query)
         if strat_result.scalar_one_or_none():
+            return True
+        
+        # Check UnitaStratigraficaMuraria
+        usm_query = select(UnitaStratigraficaMuraria).where(
+            and_(
+                UnitaStratigraficaMuraria.site_id == site_id,
+                UnitaStratigraficaMuraria.usm_code == code
+            )
+        )
+        usm_result = await db_session.execute(usm_query)
+        if usm_result.scalar_one_or_none():
             return True
         
         # Check HarrisMatrixMapping
@@ -765,13 +776,29 @@ class HarrisMatrixValidationService:
                     else:
                         normalized_valid_ids.append(unit_id)
                 
+                # Query US units
                 valid_units_query = select(UnitaStratigrafica).where(
                     UnitaStratigrafica.id.in_(normalized_valid_ids)
                 )
                 valid_result = await db_session.execute(valid_units_query)
                 valid_units = valid_result.scalars().all()
                 
+                # Query USM units for any missing in US results
+                found_us_ids = {str(u.id) for u in valid_units}
+                remaining_valid_ids = [nid for nid in normalized_valid_ids if nid not in found_us_ids]
+                
+                valid_usm_units = []
+                if remaining_valid_ids:
+                    valid_usm_query = select(UnitaStratigraficaMuraria).where(
+                        UnitaStratigraficaMuraria.id.in_(remaining_valid_ids)
+                    )
+                    valid_usm_result = await db_session.execute(valid_usm_query)
+                    valid_usm_units = valid_usm_result.scalars().all()
+                
                 valid_units_map = {str(unit.id): unit for unit in valid_units}
+                # Add USM units to map
+                for unit in valid_usm_units:
+                    valid_units_map[str(unit.id)] = unit
                 
                 for unit_id in valid_unit_ids:
                     update_data = updates[unit_id]
@@ -934,17 +961,33 @@ class HarrisMatrixValidationService:
         code: str,
         db_session: AsyncSession
     ) -> bool:
-        """Check if a unit with the given code exists in the site."""
+        """Check if a unit with the given code exists in the site (US or USM)."""
         try:
-            query = select(UnitaStratigrafica).where(
+            # Check UnitaStratigrafica
+            query_us = select(UnitaStratigrafica.id).where(
                 and_(
-                    UnitaStratigrafica.site_id == site_id,
+                    UnitaStratigrafica.site_id == str(site_id),
                     UnitaStratigrafica.us_code == code,
                     UnitaStratigrafica.deleted_at.is_(None)
                 )
             )
-            result = await db_session.execute(query)
-            return result.scalar_one_or_none() is not None
+            result_us = await db_session.execute(query_us)
+            if result_us.scalar_one_or_none():
+                return True
+            
+            # Check UnitaStratigraficaMuraria
+            query_usm = select(UnitaStratigraficaMuraria.id).where(
+                and_(
+                    UnitaStratigraficaMuraria.site_id == str(site_id),
+                    UnitaStratigraficaMuraria.usm_code == code,
+                    UnitaStratigraficaMuraria.deleted_at.is_(None)
+                )
+            )
+            result_usm = await db_session.execute(query_usm)
+            if result_usm.scalar_one_or_none():
+                return True
+                
+            return False
         except Exception as e:
             logger.error(f"Error checking unit code existence: {str(e)}", exc_info=True)
             return False

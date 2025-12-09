@@ -50,6 +50,7 @@ from app.exceptions import (
     InvalidStratigraphicRelation,
     HarrisMatrixServiceError
 )
+from app.exceptions.harris_matrix import StaleReferenceError
 from app.schemas.harris_matrix_editor import HarrisMatrixCreateRequest
 from app.utils.unit_id_normalizer import create_graph_node_id, normalize_unit_id
 from app.utils.constants import RELATIONSHIP_INVERSES, get_inverse_relationship
@@ -1558,7 +1559,6 @@ class HarrisMatrixService:
             
             if not validation_result["can_proceed"]:
                 logger.error(f"Stale references detected: {validation_result}")
-                from app.exceptions.harris_matrix import StaleReferenceError
                 raise StaleReferenceError(
                     message="Some units cannot be updated due to stale references",
                     missing_units=validation_result["missing_ids"],
