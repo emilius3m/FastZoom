@@ -1845,6 +1845,7 @@
                             tempid: node.id,           // Usa node.id come tempid
                             dbId: dbId,                // ← CRITICAL: Store database ID
                             isExisting: true,          // ← CRITICAL: Mark as existing
+                            label: nodeLabel,          // ← FIX: Store label for sequenza_fisica calculation
                             unitType: node.type,
                             usType: node.tipo,
                             definition: node.data?.definition,
