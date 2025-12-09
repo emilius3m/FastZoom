@@ -2201,32 +2201,21 @@ async def v1_atomic_save_harris_matrix(
                             )
                         )
                         
-                        # Insert new positions with ID normalization
-                        normalized_positions_count = 0
+                        # Insert new positions
+                        saved_count = 0
                         for pos in layout_positions.positions:
-                            # Normalize the unit ID using the new normalizer
-                            normalized_unit_id = await id_normalizer.normalize_for_layout_lookup(
-                                pos.unit_id, pos.unit_type, db
+                            layout = HarrisMatrixLayout(
+                                site_id=str(site_id),
+                                unit_id=pos.unit_id,
+                                unit_type=pos.unit_type,
+                                x=pos.x,
+                                y=pos.y
                             )
-                            
-                            if normalized_unit_id:
-                                layout = HarrisMatrixLayout(
-                                    site_id=str(site_id),
-                                    unit_id=normalized_unit_id,  # Use normalized ID
-                                    unit_type=pos.unit_type,
-                                    x=pos.x,
-                                    y=pos.y
-                                )
-                                db.add(layout)
-                                normalized_positions_count += 1
-                            else:
-                                logger.warning(f"Could not normalize unit ID: {pos.unit_id} (type: {pos.unit_type}) - skipping layout save")
+                            db.add(layout)
+                            saved_count += 1
                         
                         await db.flush()  # Ensure layout data is written
-                        operation_results["layout_positions_saved"] = normalized_positions_count
-                        
-                        if normalized_positions_count != len(layout_positions.positions):
-                            logger.warning(f"Only {normalized_positions_count}/{len(layout_positions.positions)} layout positions normalized and saved")
+                        operation_results["layout_positions_saved"] = saved_count
                         
                         logger.info(f"Successfully saved {operation_results['layout_positions_saved']} layout positions")
                         
