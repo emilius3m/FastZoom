@@ -734,6 +734,7 @@ class StratigraphicRulesValidator:
         # --- US POSITIVA come soggetto ---
         ("us_pos", "us_pos", "copre"),
         ("us_pos", "us_neg", "copre"),
+        ("us_pos", "usm",    "copre"),     # ADDED: US positive can cover USM (debris, abandonment layers covering walls)
         ("us_pos", "us_pos", "riempie"),
         ("us_pos", "us_neg", "riempie"),
         ("us_pos", "usm",    "riempie"),  # ADDED: US positive can fill USM (e.g., fill in wall cavity)

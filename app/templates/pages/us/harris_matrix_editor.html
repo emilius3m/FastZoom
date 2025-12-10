@@ -1746,12 +1746,22 @@
                                     positionMapByDbId[pos.unit_id] = { x: pos.x, y: pos.y };
                                 });
 
-                                // Apply positions using dbId (node.id) only
+                                // Apply positions using database UUID (node.data.id)
+                                // CRITICAL FIX: node.id is unit code like "US001", but positions are saved with dbId (UUID)
+                                // We must use node.data?.id which contains the actual database UUID
                                 let positionedCount = 0;
                                 matrixData.nodes?.forEach(node => {
-                                    if (positionMapByDbId[node.id]) {
+                                    // Try database UUID from node.data.id first (correct key for saved positions)
+                                    const dbId = node.data?.id;
+                                    if (dbId && positionMapByDbId[dbId]) {
+                                        node.position = positionMapByDbId[dbId];
+                                        positionedCount++;
+                                        console.debug(`[POSITION MATCH] ${node.id} matched using dbId: ${dbId}`);
+                                    } else if (positionMapByDbId[node.id]) {
+                                        // Fallback: try node.id (unit code) for backward compatibility
                                         node.position = positionMapByDbId[node.id];
                                         positionedCount++;
+                                        console.debug(`[POSITION MATCH] ${node.id} matched using node.id (fallback)`);
                                     }
                                 });
 
@@ -1785,10 +1795,16 @@
                                     positionMapByDbId[pos.unit_id] = { x: pos.x, y: pos.y };
                                 });
 
-                                // Apply fallback positions using dbId (node.id) only
+                                // Apply fallback positions using database UUID (node.data.id)
+                                // CRITICAL FIX: Use node.data?.id (UUID) for matching, not node.id (unit code)
                                 let positionedCount = 0;
                                 matrixData.nodes?.forEach(node => {
-                                    if (positionMapByDbId[node.id]) {
+                                    const dbId = node.data?.id;
+                                    if (dbId && positionMapByDbId[dbId]) {
+                                        node.position = positionMapByDbId[dbId];
+                                        positionedCount++;
+                                    } else if (positionMapByDbId[node.id]) {
+                                        // Fallback for backward compatibility
                                         node.position = positionMapByDbId[node.id];
                                         positionedCount++;
                                     }
@@ -3273,7 +3289,13 @@
             },
 
             /**
-             * Calculate sequenza_fisica for a single node based on current graph layout
+             * Calculate sequenza_fisica for a single node based on EXPLICIT EDGES ONLY
+             * 
+             * CRITICAL FIX: This function now uses ONLY the edges drawn by the user,
+             * NOT the Y position of nodes. Relationships are derived from:
+             * 1. Outgoing edges from this node (where this node is the source)
+             * 2. Incoming edges to this node (where this node is the target)
+             * 
              * @param {Object} node - Node data with tempid, unitType, etc.
              * @returns {Object} - sequenza_fisica relationships object
              */
@@ -3295,8 +3317,7 @@
                     };
                 }
 
-                const nodePos = cyNode.position();
-                const allNodes = this.cy.nodes().toArray();
+                // Initialize empty sequenza_fisica - ONLY explicit edges will populate this
                 const sequenzaFisica = {
                     uguale_a: [],
                     si_lega_a: [],
@@ -3310,55 +3331,64 @@
                     riempie: []
                 };
 
-                console.log(`[SEQUENZA CALC] Processing node ${node.label} at Y=${Math.round(nodePos.y)}`);
+                // CRITICAL: Inverse relationship mapping (must match backend constants.py)
+                const RELATIONSHIP_INVERSES = {
+                    'copre': 'coperto_da',
+                    'coperto_da': 'copre',
+                    'taglia': 'tagliato_da',
+                    'tagliato_da': 'taglia',
+                    'riempie': 'riempito_da',
+                    'riempito_da': 'riempie',
+                    'si_appoggia_a': 'gli_si_appoggia',
+                    'gli_si_appoggia': 'si_appoggia_a',
+                    'si_lega_a': 'si_lega_a',
+                    'uguale_a': 'uguale_a'
+                };
 
-                allNodes.forEach(otherNode => {
-                    if (otherNode.id() === node.tempid) return; // Skip self
+                console.log(`[SEQUENZA CALC] Processing node ${node.label} (tempid: ${node.tempid}) using EXPLICIT EDGES ONLY`);
 
-                    const otherPos = otherNode.position();
-                    const otherData = otherNode.data();
-                    const yDiff = otherPos.y - nodePos.y;
+                // Get all edges connected to this node from Cytoscape
+                const connectedEdges = cyNode.connectedEdges();
 
-                    // Node above (more recent) - covers/cuts current node
-                    if (yDiff < -10) { // Other node is significantly above
-                        if (otherData.unitType === 'us') {
-                            if (otherData.usType === 'positiva') {
-                                if (this.shouldCover(otherData, node)) {
-                                    sequenzaFisica.coperto_da.push(otherData.label);
-                                } else {
-                                    sequenzaFisica.riempito_da.push(otherData.label);
-                                }
-                            } else if (otherData.usType === 'negativa') {
-                                sequenzaFisica.tagliato_da.push(otherData.label);
+                connectedEdges.forEach(edge => {
+                    const edgeData = edge.data();
+                    const relationship = edgeData.relationship;
+                    const sourceId = edge.source().id();
+                    const targetId = edge.target().id();
+
+                    // Get the other node's label
+                    const otherNodeId = sourceId === node.tempid ? targetId : sourceId;
+                    const otherCyNode = this.cy.$id(otherNodeId);
+                    if (!otherCyNode || otherCyNode.length === 0) {
+                        console.warn(`[SEQUENZA CALC] Connected node not found: ${otherNodeId}`);
+                        return;
+                    }
+                    const otherLabel = otherCyNode.data().label;
+
+                    if (!relationship || !sequenzaFisica.hasOwnProperty(relationship) && !sequenzaFisica.hasOwnProperty(RELATIONSHIP_INVERSES[relationship])) {
+                        console.warn(`[SEQUENZA CALC] Unknown relationship type: ${relationship}`);
+                        return;
+                    }
+
+                    // Case 1: This node is the SOURCE of the edge
+                    // The edge relationship applies directly (e.g., this node "copre" the target)
+                    if (sourceId === node.tempid) {
+                        if (sequenzaFisica.hasOwnProperty(relationship)) {
+                            if (!sequenzaFisica[relationship].includes(otherLabel)) {
+                                sequenzaFisica[relationship].push(otherLabel);
+                                console.debug(`[SEQUENZA CALC]   → Outgoing edge: ${node.label} --${relationship}--> ${otherLabel}`);
                             }
-                        } else if (otherData.unitType === 'usm') {
-                            sequenzaFisica.gli_si_appoggia.push(otherData.label);
                         }
                     }
-                    // Node below (older) - current node covers/cuts it
-                    else if (yDiff > 10) { // Other node is significantly below
-                        if (otherData.unitType === 'us') {
-                            if (node.unitType === 'us') {
-                                if (node.usType === 'positiva') {
-                                    if (this.shouldCover(node, otherData)) {
-                                        sequenzaFisica.copre.push(otherData.label);
-                                    } else {
-                                        sequenzaFisica.riempie.push(otherData.label);
-                                    }
-                                } else if (node.usType === 'negativa') {
-                                    sequenzaFisica.taglia.push(otherData.label);
-                                }
+                    // Case 2: This node is the TARGET of the edge
+                    // The inverse relationship applies (e.g., if source "copre" this node, this node is "coperto_da" source)
+                    else if (targetId === node.tempid) {
+                        const inverseRelationship = RELATIONSHIP_INVERSES[relationship];
+                        if (inverseRelationship && sequenzaFisica.hasOwnProperty(inverseRelationship)) {
+                            if (!sequenzaFisica[inverseRelationship].includes(otherLabel)) {
+                                sequenzaFisica[inverseRelationship].push(otherLabel);
+                                console.debug(`[SEQUENZA CALC]   ← Incoming edge: ${otherLabel} --${relationship}--> ${node.label} (inverse: ${inverseRelationship})`);
                             }
-                        } else if (node.unitType === 'usm') {
-                            sequenzaFisica.si_appoggia_a.push(otherData.label);
-                        }
-                    }
-                    // Same level Y - could be equal or bonded
-                    else if (Math.abs(yDiff) <= 10) {
-                        if (node.unitType === otherData.unitType) {
-                            sequenzaFisica.uguale_a.push(otherData.label);
-                        } else {
-                            sequenzaFisica.si_lega_a.push(otherData.label);
                         }
                     }
                 });
@@ -3366,9 +3396,9 @@
                 // Log the calculated relationships
                 const relationshipCounts = Object.entries(sequenzaFisica)
                     .filter(([key, value]) => value.length > 0)
-                    .map(([key, value]) => `${key}(${value.length})`);
+                    .map(([key, value]) => `${key}(${value.length}): [${value.join(', ')}]`);
 
-                console.log(`[SEQUENZA CALC] ${node.label}: ${relationshipCounts.join(', ') || 'no relationships'}`);
+                console.log(`[SEQUENZA CALC] ${node.label}: ${relationshipCounts.join(', ') || 'no relationships (no edges connected)'}`);
 
                 return sequenzaFisica;
             },

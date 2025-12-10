@@ -41,9 +41,8 @@
       // Profile modal initialization function
       function initializeProfileModal() {
         try {
-          console.log('DEBUG: Initializing profile modal...');
-          
-          // Check if modal element exists first (before checking authentication)
+
+            // Check if modal element exists first (before checking authentication)
           const profileModal = document.getElementById('profile-modal');
           if (!profileModal) {
             console.log('DEBUG: Profile modal element not found in DOM, skipping initialization');
@@ -55,9 +54,7 @@
             console.log('DEBUG: User not authenticated, skipping modal initialization');
             return;
           }
-          
-          console.log('DEBUG: Profile modal element found:', profileModal);
-          
+
           // Initialize Flowbite modal if available
           if (typeof window.Modal !== 'undefined') {
             try {
@@ -69,8 +66,7 @@
                 hideOnEsc: true,
                 showOn: false
               });
-              console.log('DEBUG: Flowbite modal initialized successfully');
-              
+
               // Store modal instance for later use
               window.profileModalInstance = modal;
             } catch (error) {
@@ -99,7 +95,6 @@
           
           const profileModalTriggers = document.querySelectorAll('[data-modal-target="profile-modal"]');
           
-          console.log('DEBUG: Setting up event listeners...');
           console.log('DEBUG: Profile modal triggers found:', profileModalTriggers.length);
           
           if (profileModalTriggers.length === 0) {
@@ -110,7 +105,7 @@
           // Add click handlers to triggers
           profileModalTriggers.forEach(trigger => {
             trigger.addEventListener('click', function(e) {
-              console.log('DEBUG: Profile modal trigger clicked');
+
               e.preventDefault();
               
               // Try Flowbite modal first
@@ -129,7 +124,7 @@
                 try {
                   const modal = new window.Modal(profileModal);
                   modal.show();
-                  console.log('DEBUG: Flowbite modal opened with new instance');
+
                   return;
                 } catch (error) {
                   console.log('DEBUG: Flowbite modal failed, using fallback:', error);
@@ -139,7 +134,7 @@
               // Fallback to manual show/hide
               profileModal.classList.remove('hidden');
               profileModal.classList.add('flex');
-              console.log('DEBUG: Profile modal opened with fallback method');
+
             });
           });
           
