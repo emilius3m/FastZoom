@@ -2048,16 +2048,28 @@ async def v1_atomic_save_harris_matrix(
                 
                 try:
                     # Handle both schema formats: direct dict or with .updates wrapper
+                    # CRITICAL FIX: The service expects updates_dict[unit_id] to be the 
+                    # sequenza_fisica dict directly, not a wrapper containing 'sequenza_fisica' key
                     updates_dict = {}
                     if hasattr(request.existing_units_updates, 'updates'):
                         # Schema format: {updates: {unit_id: {sequenza_fisica: {...}}}}
                         for unit_id, update_data in request.existing_units_updates.updates.items():
-                            updates_dict[unit_id] = update_data
+                            # Unwrap the sequenza_fisica key if it exists
+                            if isinstance(update_data, dict) and 'sequenza_fisica' in update_data:
+                                updates_dict[unit_id] = update_data['sequenza_fisica']
+                            else:
+                                # Fallback: assume update_data is already the sequenza_fisica dict
+                                updates_dict[unit_id] = update_data
                         logger.info(f"Processing {len(updates_dict)} updates from schema format")
                     else:
                         # Direct format: {unit_id: {sequenza_fisica: {...}}}
                         for unit_id, update_data in request.existing_units_updates.items():
-                            updates_dict[unit_id] = update_data
+                            # Unwrap the sequenza_fisica key if it exists
+                            if isinstance(update_data, dict) and 'sequenza_fisica' in update_data:
+                                updates_dict[unit_id] = update_data['sequenza_fisica']
+                            else:
+                                # Fallback: assume update_data is already the sequenza_fisica dict
+                                updates_dict[unit_id] = update_data
                         logger.info(f"Processing {len(updates_dict)} updates from direct format")
                     
                     logger.debug(f"DEBUG: Final updates for bulk_update_sequenza_fisica_units: {updates_dict}")

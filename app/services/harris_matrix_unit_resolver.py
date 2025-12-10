@@ -255,7 +255,12 @@ class UnitResolver:
             return None
     
     async def _cross_type_lookup(self, code: str, unit_type: str) -> Optional[str]:
-        """Strategy 4: Cross-type lookup (US ↔ USM)."""
+        """Strategy 4: Cross-type lookup (US ↔ USM).
+        
+        This strategy handles cases where a unit code with a specific type prefix
+        (e.g., 'USM001') is being looked up with the wrong type parameter (e.g., 'us').
+        It checks both US and USM tables to find the unit regardless of the specified type.
+        """
         try:
             site_id = await self._get_current_site_id()
             if not site_id:
@@ -263,38 +268,66 @@ class UnitResolver:
             
             lookup_tables = await self.build_lookup_tables(site_id)
             
-            # Try to find the code in the opposite type first
-            opposite_type = 'usm' if unit_type == 'us' else 'us'
-            
-            if opposite_type == 'us':
-                for us_code, us_id in lookup_tables['us_exact'].items():
-                    if us_code.lower() == code.lower():
-                        # Found in US, but we need USM - this might indicate a reference error
-                        logger.debug(f"Found {code} in US table but looking for USM")
-                        return None
-            else:  # opposite_type == 'us'
-                for usm_code, usm_id in lookup_tables['usm_exact'].items():
-                    if usm_code.lower() == code.lower():
-                        # Found in USM, but we need US - might indicate reference error
-                        logger.debug(f"Found {code} in USM table but looking for US")
-                        return None
-            
-            # Also try with prefix variations
+            # First, try to find in the currently specified type (already tried in other strategies,
+            # but we might have different prefix variations here)
             code_variations = [
                 code,
                 f"US{code}",
                 f"USM{code}",
-                code.replace('US', ''),
-                code.replace('USM', '')
+                code.replace('US', '').replace('USM', ''),  # Remove all prefixes
             ]
             
+            # Handle case where code might have prefix but wrong type was specified
+            # E.g., code='USM001' with unit_type='us' should find in USM table
+            code_upper = code.upper()
+            
+            # Check if code has USM prefix but we're looking for US type
+            if code_upper.startswith('USM') and unit_type == 'us':
+                # Try to find in USM table instead
+                if code_upper in lookup_tables['usm_exact']:
+                    logger.info(f"Cross-type resolution: Found {code} in USM table (was looking for US type)")
+                    return lookup_tables['usm_exact'][code_upper]
+                # Also try case-insensitive
+                if code_upper.lower() in lookup_tables['usm_case_insensitive']:
+                    logger.info(f"Cross-type resolution: Found {code} in USM table (case-insensitive)")
+                    return lookup_tables['usm_case_insensitive'][code_upper.lower()]
+            
+            # Check if code has US prefix (but not USM) and we're looking for USM type
+            elif code_upper.startswith('US') and not code_upper.startswith('USM') and unit_type == 'usm':
+                # Try to find in US table instead
+                if code_upper in lookup_tables['us_exact']:
+                    logger.info(f"Cross-type resolution: Found {code} in US table (was looking for USM type)")
+                    return lookup_tables['us_exact'][code_upper]
+                # Also try case-insensitive
+                if code_upper.lower() in lookup_tables['us_case_insensitive']:
+                    logger.info(f"Cross-type resolution: Found {code} in US table (case-insensitive)")
+                    return lookup_tables['us_case_insensitive'][code_upper.lower()]
+            
+            # Try code variations in the opposite type table
+            opposite_type = 'usm' if unit_type == 'us' else 'us'
+            opposite_exact = f'{opposite_type}_exact'
+            opposite_ci = f'{opposite_type}_case_insensitive'
+            
             for variation in code_variations:
-                if unit_type == 'us':
-                    if variation in lookup_tables['us_exact']:
-                        return lookup_tables['us_exact'][variation]
-                else:  # usm
-                    if variation in lookup_tables['usm_exact']:
-                        return lookup_tables['usm_exact'][variation]
+                # Check exact match in opposite type
+                if variation in lookup_tables[opposite_exact]:
+                    logger.info(f"Cross-type resolution: Found {variation} (from {code}) in {opposite_type.upper()} table")
+                    return lookup_tables[opposite_exact][variation]
+                # Check case-insensitive match
+                if variation.lower() in lookup_tables[opposite_ci]:
+                    logger.info(f"Cross-type resolution: Found {variation} in {opposite_type.upper()} table (case-insensitive)")
+                    return lookup_tables[opposite_ci][variation.lower()]
+            
+            # Also try variations in the current type (as a fallback with different prefix handling)
+            current_exact = f'{unit_type}_exact'
+            current_ci = f'{unit_type}_case_insensitive'
+            
+            for variation in code_variations:
+                if variation != code:  # We already tried exact code in other strategies
+                    if variation in lookup_tables[current_exact]:
+                        return lookup_tables[current_exact][variation]
+                    if variation.lower() in lookup_tables[current_ci]:
+                        return lookup_tables[current_ci][variation.lower()]
                         
         except Exception as e:
             logger.error(f"Cross-type lookup failed for {code}: {str(e)}")

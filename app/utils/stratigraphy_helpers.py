@@ -774,12 +774,14 @@ class StratigraphicRulesValidator:
         - coperto_da -> copre
         - tagliato_da -> taglia
         - riempito_da -> riempie
+        - gli_si_appoggia -> si_appoggia_a
         Altri rimangono invariati.
         """
         mapping = {
             "coperto_da": "copre",
             "tagliato_da": "taglia",
             "riempito_da": "riempie",
+            "gli_si_appoggia": "si_appoggia_a",
         }
         return mapping.get(relation_type, relation_type)
     
@@ -886,7 +888,7 @@ class StratigraphicRulesValidator:
         to_kind = cls._get_unit_kind(to_unit)
         
         # Check if the relationship is a passive/reverse form
-        is_reverse = relation_type in ["tagliato_da", "coperto_da", "riempito_da"]
+        is_reverse = relation_type in ["tagliato_da", "coperto_da", "riempito_da", "gli_si_appoggia"]
         rel = cls._normalize_relation_type(relation_type)
 
         # For reverse relationships, we check the active form:
@@ -1021,15 +1023,26 @@ def parse_target_reference(target: str) -> Tuple[str, str]:
     Returns:
         Tuple of (code, type) where type is 'us' or 'usm'
     """
-    # Check for explicit type specification
+    # Check for explicit type specification like "US001(us)" or "174(usm)"
     match = re.match(r'^(\w+)\((usm?)\)$', target.lower())
     if match:
         code = match.group(1).upper()
         unit_type = match.group(2)
         return code, unit_type
     
-    # Default to US if no type specified
-    return target.upper(), 'us'
+    # Infer type from code prefix
+    target_upper = target.upper().strip()
+    
+    # Check for USM prefix first (must check before US since USM contains US)
+    if target_upper.startswith('USM'):
+        return target_upper, 'usm'
+    
+    # Check for US prefix
+    if target_upper.startswith('US'):
+        return target_upper, 'us'
+    
+    # Default to US if no recognizable prefix
+    return target_upper, 'us'
 
 
 def build_nodes_for_graph(
