@@ -2070,10 +2070,10 @@
                     console.log('🚀 Executing atomic save request...');
                     console.log(`[DEBUG] Sending atomic request to: /api/v1/harris-matrix/sites/${this.siteId}/atomic-save`);
                     console.log(`[DEBUG] Request payload size: ${JSON.stringify(atomicRequest).length} characters`);
-                    
+
                     // ===== DETAILED DATA LOGGING =====
                     console.group('📋 DETAILED DATA BEING SENT TO BACKEND');
-                    
+
                     // 1. Log new units data
                     if (atomicRequest.new_units && atomicRequest.new_units.units) {
                         console.group('🆕 NEW UNITS DATA');
@@ -2094,7 +2094,7 @@
                         });
                         console.groupEnd();
                     }
-                    
+
                     // 2. Log relationships data
                     if (atomicRequest.new_units && atomicRequest.new_units.relationships) {
                         console.group('🔗 RELATIONSHIPS DATA');
@@ -2109,19 +2109,19 @@
                         });
                         console.groupEnd();
                     }
-                    
+
                     // 3. Log existing units updates (sequenza_fisica)
                     if (atomicRequest.existing_units_updates && atomicRequest.existing_units_updates.updates) {
                         console.group('🔄 EXISTING UNITS UPDATES (sequenza_fisica)');
                         const updateCount = Object.keys(atomicRequest.existing_units_updates.updates).length;
                         console.log(`Count: ${updateCount} existing units to update`);
-                        
+
                         Object.entries(atomicRequest.existing_units_updates.updates).forEach(([dbId, updateData], index) => {
                             console.log(`Existing Unit Update ${index + 1} (dbId: ${dbId}):`, {
                                 dbId: dbId,
                                 sequenza_fisica: updateData.sequenza_fisica
                             });
-                            
+
                             // Log each relationship type count for this unit
                             if (updateData.sequenza_fisica) {
                                 Object.entries(updateData.sequenza_fisica).forEach(([relType, relArray]) => {
@@ -2133,7 +2133,7 @@
                         });
                         console.groupEnd();
                     }
-                    
+
                     // 4. Log layout positions
                     if (atomicRequest.layout_positions && atomicRequest.layout_positions.positions) {
                         console.group('📍 LAYOUT POSITIONS DATA');
@@ -2148,12 +2148,12 @@
                         });
                         console.groupEnd();
                     }
-                    
+
                     // 5. Log complete atomic request structure
                     console.group('🏗️ COMPLETE ATOMIC REQUEST STRUCTURE');
                     console.log('Full atomicRequest object:', JSON.stringify(atomicRequest, null, 2));
                     console.groupEnd();
-                    
+
                     console.groupEnd(); // Close main detailed logging group
 
                     const response = await fetch(`/api/v1/harris-matrix/sites/${this.siteId}/atomic-save`, {
@@ -2239,17 +2239,25 @@
                     }
 
                     // ===== STEP 4: Success feedback =====
-                    const newUnitsCount = result.operation_results?.create_units?.data?.created_units || 0;
-                    const updatedUnitsCount = result.operation_results?.update_units?.data?.updated_units || 0;
-                    const savedPositionsCount = result.operation_results?.save_layout?.data?.saved_positions || 0;
+                    // FIXED: Read from correct backend response structure
+                    // Backend returns: operation_results.new_units_created, existing_units_updated, layout_positions_saved
+                    const newUnitsCount = result.operation_results?.new_units_created || 0;
+                    const updatedUnitsCount = result.operation_results?.existing_units_updated || 0;
+                    const savedPositionsCount = result.operation_results?.layout_positions_saved || 0;
+                    const relationshipsProcessed = result.operation_results?.relationships_processed || 0;
+
+                    // Count total operations performed
+                    const totalOps = (newUnitsCount > 0 ? 1 : 0) + (updatedUnitsCount > 0 ? 1 : 0) + (savedPositionsCount > 0 ? 1 : 0);
+                    const successfulOps = result.success ? totalOps : 0;
 
                     let successMessage = `✅ Harris Matrix saved successfully with atomic transaction!\n\n`;
                     successMessage += `📊 Transaction Summary:\n`;
                     successMessage += `• ${newUnitsCount} new units created\n`;
                     successMessage += `• ${updatedUnitsCount} existing units updated\n`;
                     successMessage += `• ${savedPositionsCount} layout positions saved\n`;
-                    successMessage += `• ${result.summary?.successful_operations || 0}/${result.summary?.total_operations || 0} operations successful\n`;
-                    successMessage += `• Transaction consistency: ${result.summary?.transaction_consistent ? '✅ MAINTAINED' : '❌ COMPROMISED'}`;
+                    successMessage += `• ${relationshipsProcessed} relationships processed\n`;
+                    successMessage += `• ${successfulOps}/${totalOps} operations successful\n`;
+                    successMessage += `• Transaction consistency: ${result.success ? '✅ MAINTAINED' : '❌ COMPROMISED'}`;
 
                     // Restore button state
                     saveButton.innerHTML = originalText;
