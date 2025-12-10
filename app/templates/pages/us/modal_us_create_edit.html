@@ -1,32 +1,37 @@
 <!-- app/templates/pages/us/modal_us_create_edit.html -->
 <!-- Modal Creazione/Modifica Unità Stratigrafica (US) - Standard MiC 2021 -->
 
-<div x-show="showUSModal"
-      x-cloak
-      class="fixed inset-0 bg-black bg-opacity-50 z-50"
-      @click.self="closeUSModal()">
+<div x-show="showUSModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 z-50" @click.self="closeUSModal()">
 
-     <div class="bg-white dark:bg-gray-800 absolute inset-0 flex flex-col overflow-hidden shadow-2xl border-4 border-cyan-500">
+    <div
+        class="bg-white dark:bg-gray-800 absolute inset-0 flex flex-col overflow-hidden shadow-2xl border-4 border-cyan-500">
 
-         <!-- Header Modal -->
-         <div class="sticky top-0 bg-gradient-to-r from-orange-600 to-orange-500 px-6 py-4 flex justify-between items-center z-10">
-             <div>
-                 <h3 class="text-2xl font-bold text-gray-900 dark:text-white" x-text="viewingUS ? 'Visualizza US ' + editingUS.us_code : (editingUS ? 'Modifica US ' + editingUS.us_code : 'Nuova Unità Stratigrafica (US)')"></h3>
-                 <p class="text-orange-100 text-sm mt-1">Scheda standard MiC 2021</p>
-             </div>
-             <button @click="closeUSModal()" class="text-gray-900 dark:text-white hover:text-orange-800 dark:hover:text-orange-200 transition p-2 rounded-full hover:bg-orange-700">
-                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                 </svg>
-             </button>
-         </div>
+        <!-- Header Modal -->
+        <div
+            class="sticky top-0 bg-gradient-to-r from-orange-600 to-orange-500 px-6 py-4 flex justify-between items-center z-10">
+            <div>
+                <h3 class="text-2xl font-bold text-gray-900 dark:text-white"
+                    x-text="viewingUS ? 'Visualizza US ' + editingUS.us_code : (editingUS ? 'Modifica US ' + editingUS.us_code : 'Nuova Unità Stratigrafica (US)')">
+                </h3>
+                <p class="text-orange-100 text-sm mt-1">Scheda standard MiC 2021</p>
+            </div>
+            <button @click="closeUSModal()"
+                class="text-gray-900 dark:text-white hover:text-orange-800 dark:hover:text-orange-200 transition p-2 rounded-full hover:bg-orange-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                    </path>
+                </svg>
+            </button>
+        </div>
 
         <!-- Form Content -->
         <div class="flex-1 overflow-y-auto dark:bg-gray-800">
             <form @submit.prevent="!viewingUS && saveUS()" class="p-6 dark:bg-gray-800">
 
                 <!-- Alert Errori -->
-                <div x-show="usErrorMessage" class="bg-red-50 dark:bg-red-900 dark:text-red-100 border-l-4 border-red-500 dark:border-red-600 p-4 mb-6 rounded">
+                <div x-show="usErrorMessage"
+                    class="bg-red-50 dark:bg-red-900 dark:text-red-100 border-l-4 border-red-500 dark:border-red-600 p-4 mb-6 rounded">
                     <div class="flex items-center">
                         <i class="fas fa-exclamation-triangle text-red-500 dark:text-red-400 mr-3"></i>
                         <p class="text-red-700 dark:text-red-200 font-medium" x-text="usErrorMessage"></p>
@@ -34,7 +39,8 @@
                 </div>
 
                 <!-- ========== SEZIONE 1: INTESTAZIONE E IDENTIFICAZIONE ========== -->
-                <div class="bg-orange-50 dark:bg-gray-700 border-l-4 border-orange-500 dark:border-orange-600 p-6 mb-6 rounded-lg">
+                <div
+                    class="bg-orange-50 dark:bg-gray-700 border-l-4 border-orange-500 dark:border-orange-600 p-6 mb-6 rounded-lg">
                     <h4 class="text-xl font-bold text-orange-900 dark:text-orange-100 mb-4 flex items-center">
                         <i class="fas fa-id-card mr-3"></i>
                         Intestazione e Identificazione
@@ -46,15 +52,10 @@
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 Numero US <span class="text-red-500">*</span>
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.us_code"
-                                   x-bind:disabled="viewingUS"
-                                   x-bind:readonly="viewingUS"
-                                   required
-                                   pattern="^US\d{3,4}$"
-                                   placeholder="US001"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.us_code" x-bind:disabled="viewingUS"
+                                x-bind:readonly="viewingUS" required pattern="^US\d{3,4}$" placeholder="US001"
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Formato: US001, US002...</p>
                         </div>
 
@@ -66,50 +67,49 @@
                             <div class="grid grid-cols-2 gap-3">
                                 <!-- Radio button US Positiva -->
                                 <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all"
-                                       :class="usFormData.tipo === 'positiva'
+                                    :class="usFormData.tipo === 'positiva'
                                            ? 'border-blue-500 bg-blue-50'
                                            : 'border-gray-300 hover:border-blue-300'">
-                                    <input type="radio"
-                                           x-model="usFormData.tipo"
-                                           value="positiva"
-                                           x-bind:disabled="viewingUS"
-                                           class="mr-3 w-4 h-4 text-blue-600">
+                                    <input type="radio" x-model="usFormData.tipo" value="positiva"
+                                        x-bind:disabled="viewingUS" class="mr-3 w-4 h-4 text-blue-600">
                                     <div class="flex-1">
                                         <div class="font-medium text-gray-900">US Positiva</div>
                                         <div class="text-xs text-gray-500">Accumulo/costruzione</div>
                                     </div>
                                     <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                                        <path
+                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
                                     </svg>
                                 </label>
 
                                 <!-- Radio button US Negativa -->
                                 <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all"
-                                       :class="usFormData.tipo === 'negativa'
+                                    :class="usFormData.tipo === 'negativa'
                                            ? 'border-red-500 bg-red-50'
                                            : 'border-gray-300 hover:border-red-300'">
-                                    <input type="radio"
-                                           x-model="usFormData.tipo"
-                                           value="negativa"
-                                           x-bind:disabled="viewingUS"
-                                           class="mr-3 w-4 h-4 text-red-600">
+                                    <input type="radio" x-model="usFormData.tipo" value="negativa"
+                                        x-bind:disabled="viewingUS" class="mr-3 w-4 h-4 text-red-600">
                                     <div class="flex-1">
                                         <div class="font-medium text-gray-900">US Negativa</div>
                                         <div class="text-xs text-gray-500">Taglio/fossa/usura</div>
                                     </div>
                                     <svg class="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                        <path fill-rule="evenodd"
+                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                            clip-rule="evenodd" />
                                     </svg>
                                 </label>
                             </div>
 
                             <!-- Help text dinamico -->
-                            <div x-show="usFormData.tipo === 'negativa'"
-                                 x-transition
-                                 class="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <div x-show="usFormData.tipo === 'negativa'" x-transition
+                                class="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                                 <div class="flex items-start">
-                                    <svg class="w-5 h-5 text-amber-600 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                                    <svg class="w-5 h-5 text-amber-600 mr-2 mt-0.5" fill="currentColor"
+                                        viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd" />
                                     </svg>
                                     <div class="text-sm text-amber-800">
                                         <strong>US Negativa:</strong> Interfaccia di asporto (fossa, taglio, rasatura).
@@ -121,56 +121,52 @@
 
                         <!-- Ente Responsabile -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ente Responsabile</label>
-                            <input type="text"
-                                   x-model="usFormData.ente_responsabile"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Soprintendenza..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ente
+                                Responsabile</label>
+                            <input type="text" x-model="usFormData.ente_responsabile" x-bind:readonly="viewingUS"
+                                placeholder="Soprintendenza..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Anno -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Anno</label>
-                            <input type="number"
-                                   x-model="usFormData.anno"
-                                   x-bind:readonly="viewingUS"
-                                   min="1900"
-                                   :max="new Date().getFullYear()"
-                                   placeholder="2025"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Anno</label>
+                            <input type="number" x-model="usFormData.anno" x-bind:readonly="viewingUS" min="1900"
+                                :max="new Date().getFullYear()" placeholder="2025"
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <!-- Ufficio MiC -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ufficio MiC Competente per Tutela</label>
-                            <input type="text"
-                                   x-model="usFormData.ufficio_mic"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Ufficio competente..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ufficio MiC
+                                Competente per Tutela</label>
+                            <input type="text" x-model="usFormData.ufficio_mic" x-bind:readonly="viewingUS"
+                                placeholder="Ufficio competente..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Identificativo Saggio -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Identificativo Saggio/Edificio/Struttura</label>
-                            <input type="text"
-                                   x-model="usFormData.identificativo_rif"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Saggio A, Edificio 1..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Identificativo
+                                Saggio/Edificio/Struttura</label>
+                            <input type="text" x-model="usFormData.identificativo_rif" x-bind:readonly="viewingUS"
+                                placeholder="Saggio A, Edificio 1..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
                 </div>
 
                 <!-- ========== SEZIONE 2: LOCALIZZAZIONE ========== -->
-                <div class="bg-blue-50 dark:bg-gray-800 border-l-4 border-blue-500 dark:border-blue-400 p-6 mb-6 rounded-lg">
+                <div
+                    class="bg-blue-50 dark:bg-gray-800 border-l-4 border-blue-500 dark:border-blue-400 p-6 mb-6 rounded-lg">
                     <h4 class="text-xl font-bold text-blue-900 dark:text-blue-100 mb-4 flex items-center">
                         <i class="fas fa-map-marked-alt mr-3 text-blue-600 dark:text-blue-400"></i>
                         Localizzazione
@@ -178,101 +174,94 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Località</label>
-                            <input type="text"
-                                   x-model="usFormData.localita"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Località..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Località</label>
+                            <input type="text" x-model="usFormData.localita" x-bind:readonly="viewingUS"
+                                placeholder="Località..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Area/Edificio/Struttura</label>
-                            <input type="text"
-                                   x-model="usFormData.area_struttura"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Area A, Edificio B..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Area/Edificio/Struttura</label>
+                            <input type="text" x-model="usFormData.area_struttura" x-bind:readonly="viewingUS"
+                                placeholder="Area A, Edificio B..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Saggio</label>
-                            <input type="text"
-                                   x-model="usFormData.saggio"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Saggio 1..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Saggio</label>
+                            <input type="text" x-model="usFormData.saggio" x-bind:readonly="viewingUS"
+                                placeholder="Saggio 1..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Ambiente/Unità Funzionale</label>
-                            <input type="text"
-                                   x-model="usFormData.ambiente_unita_funzione"
-                                   x-bind:readonly="viewingUS"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Ambiente/Unità
+                                Funzionale</label>
+                            <input type="text" x-model="usFormData.ambiente_unita_funzione" x-bind:readonly="viewingUS"
+                                class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Posizione</label>
-                            <input type="text"
-                                   x-model="usFormData.posizione"
-                                   x-bind:readonly="viewingUS"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Posizione</label>
+                            <input type="text" x-model="usFormData.posizione" x-bind:readonly="viewingUS"
+                                class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Settore/i</label>
-                            <input type="text"
-                                   x-model="usFormData.settori"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="A1, A2, B1..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Settore/i</label>
+                            <input type="text" x-model="usFormData.settori" x-bind:readonly="viewingUS"
+                                placeholder="A1, A2, B1..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Piante</label>
-                            <input type="text"
-                                   x-model="usFormData.piante_riferimenti"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="P1, P2..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Piante</label>
+                            <input type="text" x-model="usFormData.piante_riferimenti" x-bind:readonly="viewingUS"
+                                placeholder="P1, P2..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
-    
+
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Prospetti</label>
-                            <input type="text"
-                                   x-model="usFormData.prospetti_riferimenti"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="PR1, PR2..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Prospetti</label>
+                            <input type="text" x-model="usFormData.prospetti_riferimenti" x-bind:readonly="viewingUS"
+                                placeholder="PR1, PR2..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
-    
+
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Sezioni</label>
-                            <input type="text"
-                                   x-model="usFormData.sezioni_riferimenti"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="S1, S2..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">Sezioni</label>
+                            <input type="text" x-model="usFormData.sezioni_riferimenti" x-bind:readonly="viewingUS"
+                                placeholder="S1, S2..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-500 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
                 </div>
 
                 <!-- ========== SEZIONE 3: DEFINIZIONE E CARATTERIZZAZIONE ========== -->
-                <div class="bg-green-50 dark:bg-gray-700 border-l-4 border-green-500 dark:border-green-600 p-6 mb-6 rounded-lg">
+                <div
+                    class="bg-green-50 dark:bg-gray-700 border-l-4 border-green-500 dark:border-green-600 p-6 mb-6 rounded-lg">
                     <h4 class="text-xl font-bold text-green-900 dark:text-green-100 mb-4 flex items-center">
                         <i class="fas fa-clipboard-list mr-3"></i>
                         Definizione e Caratterizzazione
@@ -283,16 +272,16 @@
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 Definizione
-                                <span class="text-gray-500 dark:text-gray-400 font-normal">(es: strato, interfaccia, riempimento...)</span>
+                                <span class="text-gray-500 dark:text-gray-400 font-normal">(es: strato, interfaccia,
+                                    riempimento...)</span>
                             </label>
-                            
+
                             <!-- Select per definizioni predefinite basate sul tipo US -->
-                            <select x-model="usFormData.definizione"
-                                    x-bind:disabled="viewingUS"
-                                    class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 mb-2"
-                                    x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <select x-model="usFormData.definizione" x-bind:disabled="viewingUS"
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 mb-2"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                                 <option value="">Seleziona definizione...</option>
-                                
+
                                 <!-- Opzioni per US POSITIVE -->
                                 <template x-if="usFormData.tipo === 'positiva'">
                                     <optgroup label="US Positive">
@@ -305,7 +294,7 @@
                                         <option value="struttura">Struttura</option>
                                     </optgroup>
                                 </template>
-                                
+
                                 <!-- Opzioni per US NEGATIVE -->
                                 <template x-if="usFormData.tipo === 'negativa'">
                                     <optgroup label="US Negative">
@@ -320,45 +309,42 @@
                                     </optgroup>
                                 </template>
                             </select>
-                            
+
                             <!-- Campo testo per definizioni personalizzate -->
-                            <input type="text"
-                                   x-model="usFormData.definizione"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Definizione personalizzata..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.definizione" x-bind:readonly="viewingUS"
+                                placeholder="Definizione personalizzata..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Criteri Distinzione -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Criteri di Distinzione</label>
-                            <textarea x-model="usFormData.criteri_distinzione"
-                                      x-bind:readonly="viewingUS"
-                                      rows="2"
-                                      placeholder="Criteri utilizzati per distinguere questa US..."
-                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                                      x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Criteri di
+                                Distinzione</label>
+                            <textarea x-model="usFormData.criteri_distinzione" x-bind:readonly="viewingUS" rows="2"
+                                placeholder="Criteri utilizzati per distinguere questa US..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                         </div>
 
                         <!-- Modo Formazione -->
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 Modo di Formazione
-                                <span class="text-gray-500 dark:text-gray-400 font-normal">(naturale, antropico...)</span>
+                                <span class="text-gray-500 dark:text-gray-400 font-normal">(naturale,
+                                    antropico...)</span>
                             </label>
-                            <textarea x-model="usFormData.modo_formazione"
-                                      x-bind:readonly="viewingUS"
-                                      rows="2"
-                                      placeholder="Processo di formazione dell'US..."
-                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-                                      x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                            <textarea x-model="usFormData.modo_formazione" x-bind:readonly="viewingUS" rows="2"
+                                placeholder="Processo di formazione dell'US..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                         </div>
                     </div>
                 </div>
 
                 <!-- ========== SEZIONE 4: COMPONENTI E PROPRIETÀ FISICHE ========== -->
-                <div class="bg-purple-50 dark:bg-gray-700 border-l-4 border-purple-500 dark:border-purple-600 p-6 mb-6 rounded-lg">
+                <div
+                    class="bg-purple-50 dark:bg-gray-700 border-l-4 border-purple-500 dark:border-purple-600 p-6 mb-6 rounded-lg">
                     <h4 class="text-xl font-bold text-purple-900 dark:text-purple-100 mb-4 flex items-center">
                         <i class="fas fa-microscope mr-3"></i>
                         Componenti e Proprietà Fisiche
@@ -367,35 +353,33 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <!-- Componenti Inorganici -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Componenti Inorganici</label>
-                            <textarea x-model="usFormData.componenti_inorganici"
-                                      x-bind:readonly="viewingUS"
-                                      rows="3"
-                                      placeholder="Sabbia, argilla, ciottoli..."
-                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                      x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Componenti
+                                Inorganici</label>
+                            <textarea x-model="usFormData.componenti_inorganici" x-bind:readonly="viewingUS" rows="3"
+                                placeholder="Sabbia, argilla, ciottoli..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                         </div>
 
                         <!-- Componenti Organici -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Componenti Organici</label>
-                            <textarea x-model="usFormData.componenti_organici"
-                                      x-bind:readonly="viewingUS"
-                                      rows="3"
-                                      placeholder="Carbone, resti vegetali, ossei..."
-                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                      x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Componenti
+                                Organici</label>
+                            <textarea x-model="usFormData.componenti_organici" x-bind:readonly="viewingUS" rows="3"
+                                placeholder="Carbone, resti vegetali, ossei..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <!-- Consistenza -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Consistenza</label>
-                            <select x-model="usFormData.consistenza"
-                                    x-bind:disabled="viewingUS"
-                                    class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Consistenza</label>
+                            <select x-model="usFormData.consistenza" x-bind:disabled="viewingUS"
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                                 <option value="">Seleziona...</option>
                                 <option value="compatta">Compatta</option>
                                 <option value="media">Media</option>
@@ -408,45 +392,43 @@
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 Colore
-                                <span class="text-gray-500 dark:text-gray-400 font-normal text-xs">(Munsell o descrittivo)</span>
+                                <span class="text-gray-500 dark:text-gray-400 font-normal text-xs">(Munsell o
+                                    descrittivo)</span>
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.colore"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="10YR 5/3 o Marrone chiaro"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.colore" x-bind:readonly="viewingUS"
+                                placeholder="10YR 5/3 o Marrone chiaro"
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Misure -->
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 Misure
-                                <span class="text-gray-500 dark:text-gray-400 font-normal text-xs">(lungh./largh./spess.)</span>
+                                <span
+                                    class="text-gray-500 dark:text-gray-400 font-normal text-xs">(lungh./largh./spess.)</span>
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.misure"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="5x3x0.20 m"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.misure" x-bind:readonly="viewingUS"
+                                placeholder="5x3x0.20 m"
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
 
                     <!-- Stato Conservazione -->
                     <div class="mt-4">
-                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Stato di Conservazione</label>
-                        <textarea x-model="usFormData.stato_conservazione"
-                                  x-bind:readonly="viewingUS"
-                                  rows="2"
-                                  placeholder="Buono, mediocre, pessimo... descrizione..."
-                                  class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                  x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Stato di
+                            Conservazione</label>
+                        <textarea x-model="usFormData.stato_conservazione" x-bind:readonly="viewingUS" rows="2"
+                            placeholder="Buono, mediocre, pessimo... descrizione..."
+                            class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                     </div>
                 </div>
 
                 <!-- ========== SEZIONE 5: SEQUENZA FISICA (Matrix Harris) ========== -->
-                <div class="bg-yellow-50 dark:bg-gray-700 border-l-4 border-yellow-500 dark:border-yellow-600 p-6 mb-6 rounded-lg">
+                <div
+                    class="bg-yellow-50 dark:bg-gray-700 border-l-4 border-yellow-500 dark:border-yellow-600 p-6 mb-6 rounded-lg">
                     <h4 class="text-xl font-bold text-yellow-900 dark:text-yellow-100 mb-4 flex items-center">
                         <i class="fas fa-project-diagram mr-3"></i>
                         Sequenza Fisica (Matrix Harris)
@@ -463,12 +445,10 @@
                                 <i class="fas fa-equals text-gray-500 mr-1"></i>
                                 Uguale a
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_uguale_a"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US002, US003..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_uguale_a" x-bind:readonly="viewingUS"
+                                placeholder="US002, US003..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Si lega a -->
@@ -477,12 +457,10 @@
                                 <i class="fas fa-link text-gray-500 mr-1"></i>
                                 Si lega a
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_si_lega_a"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US004, US005..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_si_lega_a" x-bind:readonly="viewingUS"
+                                placeholder="US004, US005..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Gli si appoggia -->
@@ -491,12 +469,10 @@
                                 <i class="fas fa-arrow-down text-blue-500 mr-1"></i>
                                 Gli si appoggia
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_gli_si_appoggia"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US006..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_gli_si_appoggia" x-bind:readonly="viewingUS"
+                                placeholder="US006..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Si appoggia a -->
@@ -505,12 +481,10 @@
                                 <i class="fas fa-arrow-up text-green-500 mr-1"></i>
                                 Si appoggia a
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_si_appoggia_a"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US007..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_si_appoggia_a" x-bind:readonly="viewingUS"
+                                placeholder="US007..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Coperto da -->
@@ -519,12 +493,10 @@
                                 <i class="fas fa-layer-group text-purple-500 mr-1"></i>
                                 Coperto da
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_coperto_da"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US008..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_coperto_da" x-bind:readonly="viewingUS"
+                                placeholder="US008..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Copre -->
@@ -533,12 +505,10 @@
                                 <i class="fas fa-layer-group text-orange-500 mr-1"></i>
                                 Copre
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_copre"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US009..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_copre" x-bind:readonly="viewingUS"
+                                placeholder="US009..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Tagliato da -->
@@ -547,12 +517,10 @@
                                 <i class="fas fa-cut text-red-500 mr-1"></i>
                                 Tagliato da
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_tagliato_da"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US010..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_tagliato_da" x-bind:readonly="viewingUS"
+                                placeholder="US010..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Taglia -->
@@ -561,12 +529,10 @@
                                 <i class="fas fa-cut text-red-700 mr-1"></i>
                                 Taglia
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_taglia"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US011..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_taglia" x-bind:readonly="viewingUS"
+                                placeholder="US011..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Riempito da -->
@@ -575,12 +541,10 @@
                                 <i class="fas fa-fill text-teal-500 mr-1"></i>
                                 Riempito da
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_riempito_da"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US012..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_riempito_da" x-bind:readonly="viewingUS"
+                                placeholder="US012..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Riempie -->
@@ -589,18 +553,79 @@
                                 <i class="fas fa-fill-drip text-teal-700 mr-1"></i>
                                 Riempie
                             </label>
-                            <input type="text"
-                                   x-model="usFormData.seq_riempie"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="US013..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <input type="text" x-model="usFormData.seq_riempie" x-bind:readonly="viewingUS"
+                                placeholder="US013..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SEZIONE 5B: SEQUENZA STRATIGRAFICA (ICCD) ========== -->
+                <div
+                    class="bg-amber-50 dark:bg-gray-700 border-l-4 border-amber-600 dark:border-amber-500 p-6 mb-6 rounded-lg">
+                    <h4 class="text-xl font-bold text-amber-900 dark:text-amber-100 mb-4 flex items-center">
+                        <i class="fas fa-clock mr-3"></i>
+                        Sequenza Stratigrafica (Cronologia)
+                    </h4>
+
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 italic">
+                        Relazioni cronologiche ICCD - Inserisci i codici US separati da virgole
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Posteriore a -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-arrow-up text-amber-600 mr-1"></i>
+                                Posteriore a
+                                <span class="text-gray-500 dark:text-gray-400 font-normal text-xs ml-1">(questa US è più
+                                    recente di...)</span>
+                            </label>
+                            <input type="text" x-model="usFormData.seq_posteriore_a" x-bind:readonly="viewingUS"
+                                placeholder="US014, US015..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                L'US corrente si è formata <strong>dopo</strong> quelle indicate
+                            </p>
+                        </div>
+
+                        <!-- Anteriore a -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                <i class="fas fa-arrow-down text-amber-700 mr-1"></i>
+                                Anteriore a
+                                <span class="text-gray-500 dark:text-gray-400 font-normal text-xs ml-1">(questa US è più
+                                    antica di...)</span>
+                            </label>
+                            <input type="text" x-model="usFormData.seq_anteriore_a" x-bind:readonly="viewingUS"
+                                placeholder="US016, US017..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                L'US corrente si è formata <strong>prima</strong> di quelle indicate
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Info box -->
+                    <div
+                        class="mt-4 p-3 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg">
+                        <div class="flex items-start">
+                            <i class="fas fa-info-circle text-amber-600 dark:text-amber-400 mr-2 mt-0.5"></i>
+                            <div class="text-sm text-amber-800 dark:text-amber-200">
+                                <strong>Nota ICCD:</strong> La Sequenza Stratigrafica esprime rapporti cronologici
+                                (anteriorità/posteriorità) che possono essere dedotti dalla Sequenza Fisica
+                                ma qui possono essere esplicitati per chiarezza documentativa.
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- ========== SEZIONE 6: DESCRIZIONE E INTERPRETAZIONE ========== -->
-                <div class="bg-indigo-50 dark:bg-gray-700 border-l-4 border-indigo-500 dark:border-indigo-600 p-6 mb-6 rounded-lg">
+                <div
+                    class="bg-indigo-50 dark:bg-gray-700 border-l-4 border-indigo-500 dark:border-indigo-600 p-6 mb-6 rounded-lg">
                     <h4 class="text-xl font-bold text-indigo-900 dark:text-indigo-100 mb-4 flex items-center">
                         <i class="fas fa-pen mr-3"></i>
                         Descrizione e Interpretazione
@@ -609,41 +634,40 @@
                     <div class="space-y-4">
                         <!-- Descrizione -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Descrizione Dettagliata</label>
-                            <textarea x-model="usFormData.descrizione"
-                                      x-bind:readonly="viewingUS"
-                                      rows="4"
-                                      placeholder="Descrizione completa dell'unità stratigrafica..."
-                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                      x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Descrizione
+                                Dettagliata</label>
+                            <textarea x-model="usFormData.descrizione" x-bind:readonly="viewingUS" rows="4"
+                                placeholder="Descrizione completa dell'unità stratigrafica..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                         </div>
 
                         <!-- Osservazioni -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Osservazioni</label>
-                            <textarea x-model="usFormData.osservazioni"
-                                      x-bind:readonly="viewingUS"
-                                      rows="3"
-                                      placeholder="Osservazioni e note aggiuntive..."
-                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                      x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Osservazioni</label>
+                            <textarea x-model="usFormData.osservazioni" x-bind:readonly="viewingUS" rows="3"
+                                placeholder="Osservazioni e note aggiuntive..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                         </div>
 
                         <!-- Interpretazione -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Interpretazione Archeologica</label>
-                            <textarea x-model="usFormData.interpretazione"
-                                      x-bind:readonly="viewingUS"
-                                      rows="4"
-                                      placeholder="Interpretazione funzionale e cronologica..."
-                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                      x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Interpretazione
+                                Archeologica</label>
+                            <textarea x-model="usFormData.interpretazione" x-bind:readonly="viewingUS" rows="4"
+                                placeholder="Interpretazione funzionale e cronologica..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                         </div>
                     </div>
                 </div>
 
                 <!-- ========== SEZIONE 7: DATAZIONE E REPERTI ========== -->
-                <div class="bg-pink-50 dark:bg-gray-700 border-l-4 border-pink-500 dark:border-pink-600 p-6 mb-6 rounded-lg">
+                <div
+                    class="bg-pink-50 dark:bg-gray-700 border-l-4 border-pink-500 dark:border-pink-600 p-6 mb-6 rounded-lg">
                     <h4 class="text-xl font-bold text-pink-900 dark:text-pink-100 mb-4 flex items-center">
                         <i class="fas fa-calendar-alt mr-3"></i>
                         Datazione e Reperti
@@ -652,65 +676,61 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <!-- Datazione -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Datazione</label>
-                            <input type="text"
-                                   x-model="usFormData.datazione"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="I sec. a.C. - I sec. d.C."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Datazione</label>
+                            <input type="text" x-model="usFormData.datazione" x-bind:readonly="viewingUS"
+                                placeholder="I sec. a.C. - I sec. d.C."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Periodo -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Periodo</label>
-                            <input type="text"
-                                   x-model="usFormData.periodo"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Romano imperiale..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Periodo</label>
+                            <input type="text" x-model="usFormData.periodo" x-bind:readonly="viewingUS"
+                                placeholder="Romano imperiale..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Fase -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Fase</label>
-                            <input type="text"
-                                   x-model="usFormData.fase"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Fase 2, III..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Fase</label>
+                            <input type="text" x-model="usFormData.fase" x-bind:readonly="viewingUS"
+                                placeholder="Fase 2, III..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
 
                     <div class="space-y-4">
                         <!-- Elementi Datanti -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Elementi Datanti</label>
-                            <textarea x-model="usFormData.elementi_datanti"
-                                      x-bind:readonly="viewingUS"
-                                      rows="2"
-                                      placeholder="Monete, ceramica sigillata, materiali diagnostici..."
-                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                                      x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Elementi
+                                Datanti</label>
+                            <textarea x-model="usFormData.elementi_datanti" x-bind:readonly="viewingUS" rows="2"
+                                placeholder="Monete, ceramica sigillata, materiali diagnostici..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                         </div>
 
                         <!-- Dati Quantitativi Reperti -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Dati Quantitativi dei Reperti</label>
-                            <textarea x-model="usFormData.dati_quantitativi_reperti"
-                                      x-bind:readonly="viewingUS"
-                                      rows="2"
-                                      placeholder="Frr. ceramici: 150, ossa animali: 20..."
-                                      class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
-                                      x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Dati
+                                Quantitativi dei Reperti</label>
+                            <textarea x-model="usFormData.dati_quantitativi_reperti" x-bind:readonly="viewingUS"
+                                rows="2" placeholder="Frr. ceramici: 150, ossa animali: 20..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''"></textarea>
                         </div>
                     </div>
                 </div>
 
                 <!-- ========== SEZIONE 8: CAMPIONATURE ========== -->
-                <div class="bg-teal-50 dark:bg-gray-700 border-l-4 border-teal-500 dark:border-teal-600 p-6 mb-6 rounded-lg">
+                <div
+                    class="bg-teal-50 dark:bg-gray-700 border-l-4 border-teal-500 dark:border-teal-600 p-6 mb-6 rounded-lg">
                     <h4 class="text-xl font-bold text-teal-900 dark:text-teal-100 mb-4 flex items-center">
                         <i class="fas fa-vial mr-3"></i>
                         Campionature
@@ -718,12 +738,11 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Flottazione -->
-                        <div class="flex items-center p-4 bg-white dark:bg-gray-700 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-teal-400 transition">
-                            <input type="checkbox"
-                                   x-model="usFormData.camp_flottazione"
-                                   x-bind:disabled="viewingUS"
-                                   class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
-                                   x-bind:class="viewingUS ? 'cursor-not-allowed opacity-50' : ''">
+                        <div
+                            class="flex items-center p-4 bg-white dark:bg-gray-700 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-teal-400 transition">
+                            <input type="checkbox" x-model="usFormData.camp_flottazione" x-bind:disabled="viewingUS"
+                                class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
+                                x-bind:class="viewingUS ? 'cursor-not-allowed opacity-50' : ''">
                             <label class="ml-3 text-sm font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
                                 <i class="fas fa-water mr-2 text-teal-500"></i>
                                 Campionatura per Flottazione
@@ -731,12 +750,11 @@
                         </div>
 
                         <!-- Setacciatura -->
-                        <div class="flex items-center p-4 bg-white dark:bg-gray-700 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-teal-400 transition">
-                            <input type="checkbox"
-                                   x-model="usFormData.camp_setacciatura"
-                                   x-bind:disabled="viewingUS"
-                                   class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
-                                   x-bind:class="viewingUS ? 'cursor-not-allowed opacity-50' : ''">
+                        <div
+                            class="flex items-center p-4 bg-white dark:bg-gray-700 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-teal-400 transition">
+                            <input type="checkbox" x-model="usFormData.camp_setacciatura" x-bind:disabled="viewingUS"
+                                class="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
+                                x-bind:class="viewingUS ? 'cursor-not-allowed opacity-50' : ''">
                             <label class="ml-3 text-sm font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
                                 <i class="fas fa-filter mr-2 text-teal-500"></i>
                                 Campionatura per Setacciatura
@@ -746,7 +764,8 @@
                 </div>
 
                 <!-- ========== SEZIONE 9: AFFIDABILITÀ E RESPONSABILITÀ ========== -->
-                <div class="bg-gray-100 dark:bg-gray-700 border-l-4 border-gray-500 dark:border-gray-600 p-6 mb-6 rounded-lg">
+                <div
+                    class="bg-gray-100 dark:bg-gray-700 border-l-4 border-gray-500 dark:border-gray-600 p-6 mb-6 rounded-lg">
                     <h4 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
                         <i class="fas fa-user-check mr-3"></i>
                         Affidabilità e Responsabilità
@@ -755,11 +774,12 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <!-- Affidabilità Stratigrafica -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Affidabilità Stratigrafica</label>
-                            <select x-model="usFormData.affidabilita_stratigrafica"
-                                    x-bind:disabled="viewingUS"
-                                    class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                                    x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Affidabilità
+                                Stratigrafica</label>
+                            <select x-model="usFormData.affidabilita_stratigrafica" x-bind:disabled="viewingUS"
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                                 <option value="">Seleziona...</option>
                                 <option value="alta">Alta</option>
                                 <option value="media">Media</option>
@@ -769,59 +789,57 @@
 
                         <!-- Responsabile Scientifico -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Responsabile Scientifico Indagini</label>
-                            <input type="text"
-                                   x-model="usFormData.responsabile_scientifico"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Nome cognome..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Responsabile
+                                Scientifico Indagini</label>
+                            <input type="text" x-model="usFormData.responsabile_scientifico" x-bind:readonly="viewingUS"
+                                placeholder="Nome cognome..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <!-- Data Rilevamento -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Data Rilevamento sul Campo</label>
-                            <input type="date"
-                                   x-model="usFormData.data_rilevamento"
-                                   x-bind:readonly="viewingUS"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Data
+                                Rilevamento sul Campo</label>
+                            <input type="date" x-model="usFormData.data_rilevamento" x-bind:readonly="viewingUS"
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Responsabile Compilazione -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Responsabile Compilazione sul Campo</label>
-                            <input type="text"
-                                   x-model="usFormData.responsabile_compilazione"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Nome cognome..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Responsabile
+                                Compilazione sul Campo</label>
+                            <input type="text" x-model="usFormData.responsabile_compilazione"
+                                x-bind:readonly="viewingUS" placeholder="Nome cognome..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Data Rielaborazione -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Data Rielaborazione</label>
-                            <input type="date"
-                                   x-model="usFormData.data_rielaborazione"
-                                   x-bind:readonly="viewingUS"
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Data
+                                Rielaborazione</label>
+                            <input type="date" x-model="usFormData.data_rielaborazione" x-bind:readonly="viewingUS"
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
 
                         <!-- Responsabile Rielaborazione -->
                         <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Responsabile Rielaborazione</label>
-                            <input type="text"
-                                   x-model="usFormData.responsabile_rielaborazione"
-                                   x-bind:readonly="viewingUS"
-                                   placeholder="Nome cognome..."
-                                   class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                                   x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
+                            <label
+                                class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Responsabile
+                                Rielaborazione</label>
+                            <input type="text" x-model="usFormData.responsabile_rielaborazione"
+                                x-bind:readonly="viewingUS" placeholder="Nome cognome..."
+                                class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                x-bind:class="viewingUS ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed' : ''">
                         </div>
                     </div>
                 </div>
@@ -833,37 +851,28 @@
         </div>
 
         <!-- Footer with Actions -->
-        <div class="sticky bottom-0 bg-white dark:bg-gray-800 border-t-2 border-gray-200 dark:border-gray-600 px-6 py-4 flex justify-end space-x-4">
-            <button x-show="!viewingUS"
-                    type="button"
-                    @click="closeUSModal()"
-                    :disabled="usSaving"
-                    class="px-8 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition">
+        <div
+            class="sticky bottom-0 bg-white dark:bg-gray-800 border-t-2 border-gray-200 dark:border-gray-600 px-6 py-4 flex justify-end space-x-4">
+            <button x-show="!viewingUS" type="button" @click="closeUSModal()" :disabled="usSaving"
+                class="px-8 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 transition">
                 <i class="fas fa-times mr-2"></i>
                 Annulla
             </button>
 
-            <button x-show="!viewingUS"
-                    type="submit"
-                    @click="!viewingUS && saveUS()"
-                    :disabled="usSaving"
-                    class="px-8 py-3 border-2 border-orange-500 dark:border-orange-600 rounded-lg text-orange-700 dark:text-orange-300 font-semibold hover:bg-orange-50 dark:hover:bg-orange-900 disabled:opacity-50 transition">
+            <button x-show="!viewingUS" type="submit" @click="!viewingUS && saveUS()" :disabled="usSaving"
+                class="px-8 py-3 border-2 border-orange-500 dark:border-orange-600 rounded-lg text-orange-700 dark:text-orange-300 font-semibold hover:bg-orange-50 dark:hover:bg-orange-900 disabled:opacity-50 transition">
                 <i :class="usSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'" class="mr-2"></i>
                 <span x-text="usSaving ? 'Salvataggio...' : (editingUS ? 'Salva Modifiche' : 'Crea US')"></span>
             </button>
 
-            <button x-show="viewingUS"
-                    @click="exportUSWord()"
-                    :disabled="exportingWord"
-                    class="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 transition shadow-lg">
+            <button x-show="viewingUS" @click="exportUSWord()" :disabled="exportingWord"
+                class="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 dark:hover:bg-blue-500 disabled:opacity-50 transition shadow-lg">
                 <i :class="exportingWord ? 'fas fa-spinner fa-spin' : 'fas fa-file-word'" class="mr-2"></i>
                 <span x-text="exportingWord ? 'Generando...' : 'Scarica US Word'"></span>
             </button>
 
-            <button x-show="viewingUS"
-                    type="button"
-                    @click="closeUSModal()"
-                    class="px-8 py-3 bg-gradient-to-r from-gray-600 to-gray-500 text-white rounded-lg font-semibold hover:from-gray-700 hover:to-gray-600 transition shadow-lg">
+            <button x-show="viewingUS" type="button" @click="closeUSModal()"
+                class="px-8 py-3 bg-gradient-to-r from-gray-600 to-gray-500 text-white rounded-lg font-semibold hover:from-gray-700 hover:to-gray-600 transition shadow-lg">
                 <i class="fas fa-times mr-2"></i>
                 Chiudi
             </button>
@@ -872,7 +881,15 @@
 </div>
 
 <style>
-[x-cloak] { display: none !important; }
-.max-h-95vh { max-height: 95vh; }
-.max-h-80vh { max-height: 80vh; }
+    [x-cloak] {
+        display: none !important;
+    }
+
+    .max-h-95vh {
+        max-height: 95vh;
+    }
+
+    .max-h-80vh {
+        max-height: 80vh;
+    }
 </style>

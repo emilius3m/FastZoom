@@ -31,20 +31,27 @@ RELATIONSHIP_INVERSES: Dict[str, str] = {
     
     # Self-inverse relationships (symmetrical)
     'si_lega_a': 'si_lega_a',
-    'uguale_a': 'uguale_a'
+    'uguale_a': 'uguale_a',
+    
+    # ICCD Chronological relationships (SEQUENZA STRATIGRAFICA)
+    'posteriore_a': 'anteriore_a',  # If A is more recent than B, then B is older than A
+    'anteriore_a': 'posteriore_a'   # If A is older than B, then B is more recent than A
 }
 
 # Valid relationship types for validation
 VALID_STRATIGRAPHIC_RELATIONS = list(RELATIONSHIP_INVERSES.keys())
 
 # Directed relationships (have a from->to direction)
-DIRECTED_RELATIONSHIPS = {'copre', 'taglia', 'si_appoggia_a', 'riempie'}
+DIRECTED_RELATIONSHIPS = {'copre', 'taglia', 'si_appoggia_a', 'riempie', 'posteriore_a'}
 
 # Reverse directed relationships (the inverse of directed)
-REVERSE_DIRECTED_RELATIONSHIPS = {'coperto_da', 'tagliato_da', 'gli_si_appoggia', 'riempito_da'}
+REVERSE_DIRECTED_RELATIONSHIPS = {'coperto_da', 'tagliato_da', 'gli_si_appoggia', 'riempito_da', 'anteriore_a'}
 
 # Bidirectional/Self-inverse relationships
 BIDIRECTIONAL_RELATIONSHIPS = {'uguale_a', 'si_lega_a'}
+
+# ICCD Chronological relationships (for separate handling in exports)
+CHRONOLOGICAL_RELATIONSHIPS = {'posteriore_a', 'anteriore_a'}
 
 
 def get_inverse_relationship(relationship_type: str) -> str:

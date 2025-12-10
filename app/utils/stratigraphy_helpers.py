@@ -90,12 +90,25 @@ RELATIONSHIP_TYPES = {
         'label': 'riempie',
         'bidirectional': False,
         'description': 'Fills'
+    },
+    # SEQUENZA STRATIGRAFICA (ICCD - Relazioni cronologiche)
+    'posteriore_a': {
+        'label': 'posteriore a',
+        'bidirectional': False,
+        'description': 'More recent than (formed after)'
+    },
+    'anteriore_a': {
+        'label': 'anteriore a',
+        'bidirectional': False,
+        'description': 'Older than (formed before)'
     }
 }
 
-DIRECTED_RELATIONSHIPS = {'copre', 'taglia', 'si_appoggia_a', 'riempie'}
-REVERSE_DIRECTED_RELATIONSHIPS = {'coperto_da', 'tagliato_da', 'riempito_da'}
+DIRECTED_RELATIONSHIPS = {'copre', 'taglia', 'si_appoggia_a', 'riempie', 'posteriore_a'}
+REVERSE_DIRECTED_RELATIONSHIPS = {'coperto_da', 'tagliato_da', 'riempito_da', 'anteriore_a'}
 BIDIRECTIONAL_RELATIONSHIPS = {'uguale_a', 'si_lega_a', 'gli_si_lega', 'gli_si_appoggia'}
+# ICCD Chronological relationships (for export and separate handling)
+CHRONOLOGICAL_RELATIONSHIPS = {'posteriore_a', 'anteriore_a'}
 VALID_RELATIONSHIP_TYPES = list(RELATIONSHIP_TYPES.keys())
 
 
@@ -1000,9 +1013,11 @@ def get_default_sequenza_fisica() -> Dict[str, List[str]]:
     Get default sequenza_fisica structure.
     
     Returns:
-        Dictionary with empty relationship lists
+        Dictionary with empty relationship lists for both
+        SEQUENZA FISICA and SEQUENZA STRATIGRAFICA (ICCD compliant)
     """
     return {
+        # SEQUENZA FISICA (Matrix Harris)
         "uguale_a": [],
         "si_lega_a": [],
         "gli_si_appoggia": [],
@@ -1012,7 +1027,10 @@ def get_default_sequenza_fisica() -> Dict[str, List[str]]:
         "tagliato_da": [],
         "taglia": [],
         "riempito_da": [],
-        "riempie": []
+        "riempie": [],
+        # SEQUENZA STRATIGRAFICA (ICCD - Cronologia)
+        "posteriore_a": [],  # Questa US è più recente di...
+        "anteriore_a": []    # Questa US è più antica di...
     }
 
 
