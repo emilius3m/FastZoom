@@ -736,6 +736,7 @@ class StratigraphicRulesValidator:
         ("us_pos", "us_neg", "copre"),
         ("us_pos", "us_pos", "riempie"),
         ("us_pos", "us_neg", "riempie"),
+        ("us_pos", "usm",    "riempie"),  # ADDED: US positive can fill USM (e.g., fill in wall cavity)
         ("us_pos", "usm",    "si_appoggia_a"),
         ("us_pos", "us_pos", "uguale_a"),  # ADDED: US positive uguale_a US positive
         ("us_pos", "us_neg", "uguale_a"),  # ADDED: US positive uguale_a US negative
@@ -744,6 +745,7 @@ class StratigraphicRulesValidator:
         ("usm", "usm",    "si_lega_a"),
         ("usm", "usm",    "si_appoggia_a"),
         ("usm", "us_pos", "si_appoggia_a"),
+        ("usm", "us_neg", "si_appoggia_a"),  # ADDED: USM can also lean against negative US (cuts)
         ("usm", "us_pos", "copre"),
         ("usm", "us_neg", "copre"),
         ("usm", "us_neg", "riempie"),
