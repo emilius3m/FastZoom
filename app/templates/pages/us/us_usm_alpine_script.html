@@ -75,6 +75,9 @@
                 seq_taglia: '',
                 seq_riempito_da: '',
                 seq_riempie: '',
+                // Sequenza stratigrafica (ICCD)
+                seq_posteriore_a: '',
+                seq_anteriore_a: '',
                 descrizione: '',
                 osservazioni: '',
                 interpretazione: '',
@@ -163,6 +166,9 @@
                 seq_taglia: '',
                 seq_riempito_da: '',
                 seq_riempie: '',
+                // Sequenza stratigrafica (ICCD)
+                seq_posteriore_a: '',
+                seq_anteriore_a: '',
                 descrizione: '',
                 osservazioni: '',
                 interpretazione: '',
@@ -195,7 +201,7 @@
             uploadingFile: false,
             showFileUploadModal: false,
             currentFileType: '',
-            
+
             // Modern drag & drop upload state
             dragOver: false,
             filePreviews: [],
@@ -205,7 +211,7 @@
                 message: '',
                 type: 'info'
             },
-            
+
             fileUploadMetadata: {
                 title: '',
                 description: '',
@@ -334,6 +340,9 @@
                                 seq_taglia: this.sequenzaToString(usData.sequenza_fisica?.taglia),
                                 seq_riempito_da: this.sequenzaToString(usData.sequenza_fisica?.riempito_da),
                                 seq_riempie: this.sequenzaToString(usData.sequenza_fisica?.riempie),
+                                // Sequenza stratigrafica (ICCD)
+                                seq_posteriore_a: this.sequenzaToString(usData.sequenza_fisica?.posteriore_a),
+                                seq_anteriore_a: this.sequenzaToString(usData.sequenza_fisica?.anteriore_a),
                                 descrizione: usData.descrizione || '',
                                 osservazioni: usData.osservazioni || '',
                                 interpretazione: usData.interpretazione || '',
@@ -427,7 +436,10 @@
                             tagliato_da: this.stringToSequenza(this.usFormData.seq_tagliato_da),
                             taglia: this.stringToSequenza(this.usFormData.seq_taglia),
                             riempito_da: this.stringToSequenza(this.usFormData.seq_riempito_da),
-                            riempie: this.stringToSequenza(this.usFormData.seq_riempie)
+                            riempie: this.stringToSequenza(this.usFormData.seq_riempie),
+                            // Sequenza stratigrafica (ICCD)
+                            posteriore_a: this.stringToSequenza(this.usFormData.seq_posteriore_a),
+                            anteriore_a: this.stringToSequenza(this.usFormData.seq_anteriore_a)
                         },
                         campionature: {
                             flottazione: this.usFormData.camp_flottazione,
@@ -449,6 +461,8 @@
                     delete payload.seq_taglia;
                     delete payload.seq_riempito_da;
                     delete payload.seq_riempie;
+                    delete payload.seq_posteriore_a;
+                    delete payload.seq_anteriore_a;
                     delete payload.camp_flottazione;
                     delete payload.camp_setacciatura;
 
@@ -588,6 +602,9 @@
                     seq_taglia: '',
                     seq_riempito_da: '',
                     seq_riempie: '',
+                    // Sequenza stratigrafica (ICCD)
+                    seq_posteriore_a: '',
+                    seq_anteriore_a: '',
                     descrizione: '',
                     osservazioni: '',
                     interpretazione: '',
@@ -724,6 +741,9 @@
                                 seq_taglia: this.sequenzaToString(usmData.sequenza_fisica?.taglia),
                                 seq_riempito_da: this.sequenzaToString(usmData.sequenza_fisica?.riempito_da),
                                 seq_riempie: this.sequenzaToString(usmData.sequenza_fisica?.riempie),
+                                // Sequenza stratigrafica (ICCD)
+                                seq_posteriore_a: this.sequenzaToString(usmData.sequenza_fisica?.posteriore_a),
+                                seq_anteriore_a: this.sequenzaToString(usmData.sequenza_fisica?.anteriore_a),
                                 descrizione: usmData.descrizione || '',
                                 osservazioni: usmData.osservazioni || '',
                                 interpretazione: usmData.interpretazione || '',
@@ -854,7 +874,10 @@
                             tagliato_da: this.stringToSequenza(this.usmFormData.seq_tagliato_da),
                             taglia: this.stringToSequenza(this.usmFormData.seq_taglia),
                             riempito_da: this.stringToSequenza(this.usmFormData.seq_riempito_da),
-                            riempie: this.stringToSequenza(this.usmFormData.seq_riempie)
+                            riempie: this.stringToSequenza(this.usmFormData.seq_riempie),
+                            // Sequenza stratigrafica (ICCD)
+                            posteriore_a: this.stringToSequenza(this.usmFormData.seq_posteriore_a),
+                            anteriore_a: this.stringToSequenza(this.usmFormData.seq_anteriore_a)
                         },
                         campionature: {
                             elementi_litici: this.usmFormData.camp_elementi_litici,
@@ -877,7 +900,7 @@
                         'legante_tipo', 'legante_consistenza',
                         'seq_uguale_a', 'seq_si_lega_a', 'seq_gli_si_appoggia', 'seq_si_appoggia_a',
                         'seq_coperto_da', 'seq_copre', 'seq_tagliato_da', 'seq_taglia',
-                        'seq_riempito_da', 'seq_riempie',
+                        'seq_riempito_da', 'seq_riempie', 'seq_posteriore_a', 'seq_anteriore_a',
                         'camp_elementi_litici', 'camp_laterizi', 'camp_malta'
                     ];
 
@@ -1097,14 +1120,14 @@
             showUploadModal(fileType) {
                 this.currentFileType = fileType;
                 this.showFileUploadModal = true;
-                
+
                 // Reset modern upload state
                 this.filePreviews = [];
                 this.uploadProgress = 0;
                 this.filesCompleted = 0;
                 this.dragOver = false;
                 this.notification.message = '';
-                
+
                 this.fileUploadMetadata = {
                     title: '',
                     description: '',
@@ -1132,10 +1155,10 @@
             handleFiles(evt) {
                 evt.preventDefault();
                 const newFiles = evt.target.files || evt.dataTransfer.files;
-                
+
                 for (const file of newFiles) {
                     if (!this.validateFile(file)) continue;
-                    
+
                     // Generate preview for the file
                     this.generatePreview(file).then(preview => {
                         this.filePreviews.push({
@@ -1155,7 +1178,7 @@
                         });
                     });
                 }
-                
+
                 // Clear the input
                 if (evt.target.files) {
                     evt.target.value = '';
@@ -1187,7 +1210,7 @@
                     isImage: file.type.startsWith('image/'),
                     src: null
                 };
-                
+
                 // Generate image preview if it's an image
                 if (preview.isImage) {
                     try {
@@ -1196,7 +1219,7 @@
                         console.warn('Failed to generate image preview:', error);
                     }
                 }
-                
+
                 return preview;
             },
 
@@ -1217,24 +1240,24 @@
                 // File size validation
                 const maxSizeMB = 50;
                 const maxSizeBytes = maxSizeMB * 1024 * 1024;
-                
+
                 if (file.size > maxSizeBytes) {
                     this.notify(`File "${file.name}" troppo grande (max ${maxSizeMB}MB)`, 'error');
                     return false;
                 }
-                
+
                 // File type validation
                 const allowedTypes = [
                     'image/jpeg', 'image/png', 'image/tiff', 'image/webp',
                     'application/pdf', 'application/msword',
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                 ];
-                
+
                 if (!allowedTypes.includes(file.type)) {
                     this.notify(`Formato non supportato: ${file.type}`, 'error');
                     return false;
                 }
-                
+
                 return true;
             },
 
@@ -1243,30 +1266,30 @@
                     this.notify('Nessun file selezionato', 'warning');
                     return;
                 }
-                
+
                 // Check if US/USM is saved first
                 const entityId = this.editingUS?.id || this.editingUSM?.id;
                 if (!entityId) {
                     this.notify('Devi prima salvare la US/USM prima di poter caricare file', 'error');
                     return;
                 }
-                
+
                 this.uploadingFile = true;
                 this.uploadProgress = 0;
                 this.filesCompleted = 0;
-                
+
                 try {
                     // Upload files sequentially for better progress tracking
                     for (let i = 0; i < this.filePreviews.length; i++) {
                         const preview = this.filePreviews[i];
                         await this.uploadSingleFile(preview.file, preview.name);
-                        
+
                         this.filesCompleted++;
                         this.uploadProgress = Math.round((this.filesCompleted / this.filePreviews.length) * 100);
                     }
-                    
+
                     this.notify('Upload completato con successo!', 'success');
-                    
+
                     // Reset and close modal
                     setTimeout(() => {
                         this.closeUploadModal();
@@ -1277,7 +1300,7 @@
                             this.loadUSMFiles(this.editingUSM.id);
                         }
                     }, 1500);
-                    
+
                 } catch (error) {
                     console.error('Upload error:', error);
                     this.notify(`Errore upload: ${error.message}`, 'error');
@@ -1291,7 +1314,7 @@
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('file_type', this.currentFileType);
-                
+
                 // Add metadata
                 if (this.fileUploadMetadata.title) {
                     formData.append('title', this.fileUploadMetadata.title);
@@ -1311,23 +1334,23 @@
                 if (this.fileUploadMetadata.photo_date) {
                     formData.append('photo_date', this.fileUploadMetadata.photo_date);
                 }
-                
+
                 const entityId = this.editingUS?.id || this.editingUSM?.id;
                 const endpoint = this.editingUS ? 'us' : 'usm';
-                
+
                 let uploadUrl, response;
-                
+
                 // Handle photo uploads with new API endpoint
                 if (this.currentFileType === 'fotografia') {
                     // Use new photo upload API
                     uploadUrl = `/api/v1/sites/${this.currentSiteId}/photos/upload`;
-                    
+
                     // Prepare form data for new endpoint
                     formData = new FormData();
-                    
+
                     // New endpoint expects photos as an array
                     formData.append('photos', file);
-                    
+
                     // Map existing metadata to new archaeological metadata format
                     const usCode = this.editingUS?.us_code || this.editingUSM?.usm_code || '';
                     formData.append('inventory_number', usCode);
@@ -1358,7 +1381,7 @@
                     // Use existing endpoint for non-photo files
                     uploadUrl = `/api/v1/us-files/${endpoint}/${entityId}/upload/${this.currentFileType}`;
                 }
-                
+
                 response = await fetch(uploadUrl, {
                     method: 'POST',
                     body: formData,
@@ -1367,17 +1390,17 @@
                         'Accept': 'application/json'
                     }
                 });
-                
+
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error(`Upload failed: ${response.status} ${errorText}`);
                 }
-                
+
                 const result = await response.json();
                 if (!result.valid && result.errors) {
                     throw new Error(result.errors.join(', '));
                 }
-                
+
                 return result;
             },
 
@@ -1392,7 +1415,7 @@
 
             notify(message, type = 'info') {
                 this.notification = { message, type };
-                
+
                 // Auto-hide success messages
                 if (type === 'success') {
                     setTimeout(() => {

@@ -23,19 +23,19 @@ class ICCDRecordService:
         from app.models.sites import ArchaeologicalSite
         from app.models import UserSitePermission
         
-        # Check site existence
-        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == site_id)
+        # Check site existence - Convert UUID to string for DB comparison
+        site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
         site_result = await self.db_session.execute(site_query)
         site = site_result.scalar_one_or_none()
         
         if not site:
             raise BusinessLogicError("Sito archeologico non trovato", 404)
         
-        # Check user permissions
+        # Check user permissions - Convert UUIDs to strings for DB comparison
         permission_query = select(UserSitePermission).where(
             and_(
-                UserSitePermission.user_id == current_user_id,
-                UserSitePermission.site_id == site_id,
+                UserSitePermission.user_id == str(current_user_id),
+                UserSitePermission.site_id == str(site_id),
                 UserSitePermission.is_active == True,
                 or_(
                     UserSitePermission.expires_at.is_(None),

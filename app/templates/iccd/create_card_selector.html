@@ -14,8 +14,9 @@
             <h3 class="text-sm font-medium text-blue-900 mb-2">Stato Gerarchia Sito</h3>
             <div class="grid grid-cols-4 gap-4 text-sm">
                 <div class="text-center">
-                    <div class="text-lg font-bold" :class="hierarchyStatus.record_counts?.SI > 0 ? 'text-green-600' : 'text-red-600'"
-                         x-text="hierarchyStatus.record_counts?.SI || 0"></div>
+                    <div class="text-lg font-bold"
+                        :class="hierarchyStatus.record_counts?.SI > 0 ? 'text-green-600' : 'text-red-600'"
+                        x-text="hierarchyStatus.record_counts?.SI || 0"></div>
                     <div class="text-gray-600">Scheda SI</div>
                 </div>
                 <div class="text-center">
@@ -23,11 +24,13 @@
                     <div class="text-gray-600">Schede CA</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-lg font-bold text-purple-600" x-text="hierarchyStatus.record_counts?.MA || 0"></div>
+                    <div class="text-lg font-bold text-purple-600" x-text="hierarchyStatus.record_counts?.MA || 0">
+                    </div>
                     <div class="text-gray-600">Schede MA</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-lg font-bold text-orange-600" x-text="hierarchyStatus.record_counts?.RA || 0"></div>
+                    <div class="text-lg font-bold text-orange-600" x-text="hierarchyStatus.record_counts?.RA || 0">
+                    </div>
                     <div class="text-gray-600">Schede RA</div>
                 </div>
             </div>
@@ -52,7 +55,7 @@
     <!-- Creation Options -->
     <div x-show="creationOptions" class="mb-6">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Tipi di Scheda Disponibili</h3>
-        
+
         <!-- Recommendations -->
         <div x-show="creationOptions.recommendations && creationOptions.recommendations.length > 0" class="mb-4">
             <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -72,13 +75,14 @@
         <div class="grid gap-4" x-show="creationOptions.available_types && creationOptions.available_types.length > 0">
             <template x-for="cardType in creationOptions.available_types">
                 <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 cursor-pointer transition-colors"
-                     :class="selectedCardType === cardType.type ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'"
-                     @click="selectCardType(cardType)">
+                    :class="selectedCardType === cardType.type ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'"
+                    @click="selectCardType(cardType)">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center mb-2">
-                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-medium mr-3"
-                                      :class="getCardTypeColor(cardType.type)" x-text="cardType.type"></span>
+                                <span
+                                    class="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-medium mr-3"
+                                    :class="getCardTypeColor(cardType.type)" x-text="cardType.type"></span>
                                 <div>
                                     <h4 class="text-md font-medium text-gray-900" x-text="cardType.name"></h4>
                                     <p class="text-sm text-gray-600" x-text="cardType.description"></p>
@@ -87,36 +91,41 @@
                             <div class="text-xs text-gray-500" x-text="cardType.constraint"></div>
                         </div>
                         <div class="ml-4">
-                            <input type="radio" :value="cardType.type" x-model="selectedCardType" 
-                                   class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                            <input type="radio" :value="cardType.type" x-model="selectedCardType"
+                                class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
                         </div>
                     </div>
-                    
+
                     <!-- Parent Selection for RA -->
                     <div x-show="selectedCardType === cardType.type && cardType.requires_parent"
-                         class="mt-4 border-t border-gray-200 pt-4">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Seleziona Padre</label>
-                        
+                        class="mt-4 border-t border-gray-200 pt-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Seleziona
+                            Padre</label>
+
                         <!-- Always show select, but show loading if no parents -->
                         <template x-if="possibleParents.length > 0">
                             <div @click.stop>
                                 <select x-model="selectedParentId"
-                                        @change="console.log('Parent selected (change event):', selectedParentId); $nextTick(() => console.log('After tick:', selectedParentId))"
-                                        @click.stop
-                                        class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    @change="console.log('Parent selected (change event):', selectedParentId); $nextTick(() => console.log('After tick:', selectedParentId))"
+                                    @click.stop
+                                    class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                                     <option value="">-- Seleziona un padre --</option>
                                     <template x-for="parent in possibleParents" :key="parent.id">
-                                        <option :value="parent.id" x-text="`${parent.schema_type} - ${parent.nct} - ${parent.object_name}`"></option>
+                                        <option :value="parent.id"
+                                            x-text="`${parent.schema_type} - ${parent.nct} - ${parent.object_name}`">
+                                        </option>
                                     </template>
                                 </select>
-                                <p x-show="selectedParentId && selectedParentId !== ''" class="text-xs text-green-600 dark:text-green-400 mt-1">
+                                <p x-show="selectedParentId && selectedParentId !== ''"
+                                    class="text-xs text-green-600 dark:text-green-400 mt-1">
                                     ✓ Padre selezionato: <span x-text="selectedParentId"></span>
                                 </p>
                             </div>
                         </template>
-                        
+
                         <template x-if="possibleParents.length === 0">
-                            <div class="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded">
+                            <div
+                                class="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded">
                                 ⏳ Caricamento padri disponibili...
                             </div>
                         </template>
@@ -126,8 +135,8 @@
         </div>
 
         <!-- No Available Types -->
-        <div x-show="!creationOptions.available_types || creationOptions.available_types.length === 0" 
-             class="text-center py-8 text-gray-500">
+        <div x-show="!creationOptions.available_types || creationOptions.available_types.length === 0"
+            class="text-center py-8 text-gray-500">
             <div class="text-4xl mb-2">🚫</div>
             <p>Nessun tipo di scheda disponibile al momento</p>
             <p class="text-sm mt-1">Verificare lo stato della gerarchia del sito</p>
@@ -136,15 +145,15 @@
 
     <!-- Action Buttons -->
     <div class="flex justify-between items-center pt-6 border-t border-gray-200">
-        <button @click="$dispatch('close-modal')" 
-                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+        <button @click="$dispatch('close-modal')"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
             Annulla
         </button>
-        
-        <button @click="proceedToFormCreation()" 
-                :disabled="!selectedCardType || (selectedCardRequiresParent && !selectedParentId)"
-                :class="canProceed ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'"
-                class="px-6 py-2 text-sm font-medium rounded-md transition-colors">
+
+        <button @click="proceedToFormCreation()"
+            :disabled="!selectedCardType || (selectedCardRequiresParent && !selectedParentId)"
+            :class="canProceed ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'"
+            class="px-6 py-2 text-sm font-medium rounded-md transition-colors">
             Continua con <span x-text="selectedCardType || 'Selezione'"></span>
         </button>
     </div>
@@ -159,161 +168,161 @@
 </div>
 
 <script>
-function iccdCardSelector() {
-    return {
-        loading: true,
-        hierarchyStatus: null,
-        creationOptions: null,
-        selectedCardType: null,
-        selectedParentId: null,
-        possibleParents: [],
-        
-        get selectedCardRequiresParent() {
-            if (!this.selectedCardType || !this.creationOptions) return false;
-            const cardType = this.creationOptions.available_types.find(t => t.type === this.selectedCardType);
-            const requiresParent = cardType?.requires_parent || false;
-            console.log('selectedCardRequiresParent:', requiresParent, 'cardType:', cardType);
-            return requiresParent;
-        },
-        
-        get canProceed() {
-            const hasCardType = !!this.selectedCardType;
-            const requiresParent = this.selectedCardRequiresParent;
-            const hasParent = !!this.selectedParentId && this.selectedParentId !== '';
-            
-            console.log('canProceed check:', {
-                hasCardType,
-                requiresParent,
-                hasParent,
-                selectedParentId: this.selectedParentId,
-                result: hasCardType && (!requiresParent || hasParent)
-            });
-            
-            if (!hasCardType) return false;
-            if (requiresParent && !hasParent) return false;
-            return true;
-        },
+    function iccdCardSelector() {
+        return {
+            loading: true,
+            hierarchyStatus: null,
+            creationOptions: null,
+            selectedCardType: null,
+            selectedParentId: null,
+            possibleParents: [],
 
-        async init() {
-            await this.loadHierarchyStatus();
-            await this.loadCreationOptions();
-            this.loading = false;
-        },
+            get selectedCardRequiresParent() {
+                if (!this.selectedCardType || !this.creationOptions) return false;
+                const cardType = this.creationOptions.available_types.find(t => t.type === this.selectedCardType);
+                const requiresParent = cardType?.requires_parent || false;
+                console.log('selectedCardRequiresParent:', requiresParent, 'cardType:', cardType);
+                return requiresParent;
+            },
 
-        async loadHierarchyStatus() {
-            try {
-                const response = await fetch(`/api/iccd/sites/${window.currentSiteId}/hierarchy/validation`);
-                if (response.ok) {
-                    this.hierarchyStatus = await response.json();
-                }
-            } catch (error) {
-                console.error('Error loading hierarchy status:', error);
-            }
-        },
+            get canProceed() {
+                const hasCardType = !!this.selectedCardType;
+                const requiresParent = this.selectedCardRequiresParent;
+                const hasParent = !!this.selectedParentId && this.selectedParentId !== '';
 
-        async loadCreationOptions() {
-            try {
-                const response = await fetch(`/api/iccd/sites/${window.currentSiteId}/hierarchy/creation-options`);
-                if (response.ok) {
-                    this.creationOptions = await response.json();
-                    
-                    // Load possible parents for RA if available
-                    if (this.creationOptions.possible_parents) {
-                        this.possibleParents = this.creationOptions.possible_parents;
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading creation options:', error);
-            }
-        },
+                console.log('canProceed check:', {
+                    hasCardType,
+                    requiresParent,
+                    hasParent,
+                    selectedParentId: this.selectedParentId,
+                    result: hasCardType && (!requiresParent || hasParent)
+                });
 
-        async selectCardType(cardType) {
-            // Only reset parent if changing to a different card type
-            const changingType = this.selectedCardType !== cardType.type;
-            
-            this.selectedCardType = cardType.type;
-            
-            // Only reset parent if we're changing card type, not re-selecting same type
-            if (changingType) {
-                this.selectedParentId = null;
-            }
-            
-            console.log('selectCardType called:', {
-                cardType: cardType.type,
-                changingType,
-                selectedParentId: this.selectedParentId
-            });
-            
-            // Load possible parents for this card type (only if changing or if not loaded yet)
-            if (cardType.requires_parent && (changingType || this.possibleParents.length === 0)) {
+                if (!hasCardType) return false;
+                if (requiresParent && !hasParent) return false;
+                return true;
+            },
+
+            async init() {
+                await this.loadHierarchyStatus();
+                await this.loadCreationOptions();
+                this.loading = false;
+            },
+
+            async loadHierarchyStatus() {
                 try {
-                    const response = await fetch(`/api/iccd/sites/${window.currentSiteId}/hierarchy/possible-parents/${cardType.type}`);
+                    const response = await fetch(`/api/v1/iccd/site/${window.currentSiteId}/hierarchy/validation`);
                     if (response.ok) {
-                        const data = await response.json();
-                        this.possibleParents = data.possible_parents || [];
-                        console.log('Loaded possible parents:', this.possibleParents);
+                        this.hierarchyStatus = await response.json();
                     }
                 } catch (error) {
-                    console.error('Error loading possible parents:', error);
+                    console.error('Error loading hierarchy status:', error);
+                }
+            },
+
+            async loadCreationOptions() {
+                try {
+                    const response = await fetch(`/api/v1/iccd/site/${window.currentSiteId}/hierarchy/creation-options`);
+                    if (response.ok) {
+                        this.creationOptions = await response.json();
+
+                        // Load possible parents for RA if available
+                        if (this.creationOptions.possible_parents) {
+                            this.possibleParents = this.creationOptions.possible_parents;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading creation options:', error);
+                }
+            },
+
+            async selectCardType(cardType) {
+                // Only reset parent if changing to a different card type
+                const changingType = this.selectedCardType !== cardType.type;
+
+                this.selectedCardType = cardType.type;
+
+                // Only reset parent if we're changing card type, not re-selecting same type
+                if (changingType) {
+                    this.selectedParentId = null;
+                }
+
+                console.log('selectCardType called:', {
+                    cardType: cardType.type,
+                    changingType,
+                    selectedParentId: this.selectedParentId
+                });
+
+                // Load possible parents for this card type (only if changing or if not loaded yet)
+                if (cardType.requires_parent && (changingType || this.possibleParents.length === 0)) {
+                    try {
+                        const response = await fetch(`/api/v1/iccd/site/${window.currentSiteId}/hierarchy/possible-parents/${cardType.type}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.possibleParents = data.possible_parents || [];
+                            console.log('Loaded possible parents:', this.possibleParents);
+                        }
+                    } catch (error) {
+                        console.error('Error loading possible parents:', error);
+                        this.possibleParents = [];
+                    }
+                } else if (!cardType.requires_parent) {
                     this.possibleParents = [];
                 }
-            } else if (!cardType.requires_parent) {
-                this.possibleParents = [];
-            }
-        },
+            },
 
-        getCardTypeColor(type) {
-            const colors = {
-                'SI': 'bg-green-600',
-                'CA': 'bg-blue-600',
-                'MA': 'bg-purple-600',
-                'RA': 'bg-orange-600',
-                'F': 'bg-pink-600',
-                'SAS': 'bg-gray-600',
-                'NU': 'bg-yellow-600',
-                'TMA': 'bg-red-600',
-                'AT': 'bg-indigo-600'
-            };
-            return colors[type] || 'bg-gray-600';
-        },
-
-        async proceedToFormCreation() {
-            if (!this.canProceed) return;
-            
-            // Validate creation one more time
-            try {
-                const validationData = {
-                    schema_type: this.selectedCardType,
-                    parent_id: this.selectedParentId || null
+            getCardTypeColor(type) {
+                const colors = {
+                    'SI': 'bg-green-600',
+                    'CA': 'bg-blue-600',
+                    'MA': 'bg-purple-600',
+                    'RA': 'bg-orange-600',
+                    'F': 'bg-pink-600',
+                    'SAS': 'bg-gray-600',
+                    'NU': 'bg-yellow-600',
+                    'TMA': 'bg-red-600',
+                    'AT': 'bg-indigo-600'
                 };
-                
-                const response = await fetch(`/api/iccd/sites/${window.currentSiteId}/hierarchy/validate-creation`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(validationData)
-                });
-                
-                if (response.ok) {
-                    const validation = await response.json();
-                    if (validation.is_valid) {
-                        // Proceed to form creation
-                        this.$dispatch('create-iccd-card', {
-                            schema_type: this.selectedCardType,
-                            parent_id: this.selectedParentId
-                        });
+                return colors[type] || 'bg-gray-600';
+            },
+
+            async proceedToFormCreation() {
+                if (!this.canProceed) return;
+
+                // Validate creation one more time
+                try {
+                    const validationData = {
+                        schema_type: this.selectedCardType,
+                        parent_id: this.selectedParentId || null
+                    };
+
+                    const response = await fetch(`/api/v1/iccd/site/${window.currentSiteId}/hierarchy/validate-creation`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(validationData)
+                    });
+
+                    if (response.ok) {
+                        const validation = await response.json();
+                        if (validation.is_valid) {
+                            // Proceed to form creation
+                            this.$dispatch('create-iccd-card', {
+                                schema_type: this.selectedCardType,
+                                parent_id: this.selectedParentId
+                            });
+                        } else {
+                            alert('Errore validazione: ' + validation.error_message);
+                        }
                     } else {
-                        alert('Errore validazione: ' + validation.error_message);
+                        alert('Errore durante la validazione');
                     }
-                } else {
+                } catch (error) {
+                    console.error('Error validating creation:', error);
                     alert('Errore durante la validazione');
                 }
-            } catch (error) {
-                console.error('Error validating creation:', error);
-                alert('Errore durante la validazione');
             }
         }
     }
-}
 </script>
