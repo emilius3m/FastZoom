@@ -108,7 +108,59 @@ class HarrisMatrixService:
             
             # Build graph data structures using centralized utilities
             nodes = build_nodes_for_graph(us_units, usm_units)
-            edges = build_edges_from_relationships(relationships)
+            raw_edges = build_edges_from_relationships(relationships)
+            
+            # ===== CRITICAL FIX: Deduplicate edges to prevent duplicate IDs =====
+            # The sequenza_fisica is bidirectional, so both US003.copre:[US002] and 
+            # US002.coperto_da:[US003] create the same edge (with reversed direction already handled).
+            # We need to deduplicate based on the normalized (from, to, active_type) tuple.
+            
+            # Map passive types to their active equivalents for deduplication
+            PASSIVE_TO_ACTIVE = {
+                'coperto_da': 'copre',
+                'tagliato_da': 'taglia',
+                'riempito_da': 'riempie',
+                'gli_si_appoggia': 'si_appoggia_a',
+            }
+            
+            seen_edge_keys = set()
+            edges = []
+            
+            for edge in raw_edges:
+                from_node = edge['from']
+                to_node = edge['to']
+                rel_type = edge['type']
+                
+                # Normalize relationship type to its "active" form for consistent deduplication
+                # Note: _extract_unit_relationships already reverses the direction for passive types,
+                # so from/to are already in the correct order. We just need to normalize the type.
+                normalized_type = PASSIVE_TO_ACTIVE.get(rel_type, rel_type)
+                
+                # Create canonical edge key using normalized type
+                edge_key = (from_node, to_node, normalized_type)
+                
+                if edge_key not in seen_edge_keys:
+                    seen_edge_keys.add(edge_key)
+                    # Keep the original type in the edge for display, but the edge is deduplicated
+                    edges.append(edge)
+                else:
+                    logger.debug(f"[DEDUP] Skipping duplicate edge: {from_node} --{rel_type}--> {to_node} (normalized: {normalized_type})")
+            
+            logger.info(f"[EDGES] Raw edges: {len(raw_edges)}, After deduplication: {len(edges)}")
+            
+            # ===== DEBUG: Log the JSON being sent to frontend =====
+            logger.info("=" * 80)
+            logger.info("DEBUG: HARRIS MATRIX JSON FOR FRONTEND")
+            logger.info("=" * 80)
+            logger.info(f"Nodes count: {len(nodes)}")
+            logger.info(f"Edges count: {len(edges)}")
+            
+            # Log each edge with its expected Cytoscape ID
+            for i, edge in enumerate(edges):
+                cytoscape_id = f"edge-{edge['from']}-{edge['to']}"
+                logger.info(f"  Edge {i+1}: id='{cytoscape_id}' | {edge['from']} --{edge['type']}--> {edge['to']}")
+            
+            logger.info("=" * 80)
 
             # Fetch saved positions for nodes
             try:
