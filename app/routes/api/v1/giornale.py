@@ -185,7 +185,7 @@ async def _get_enhanced_operator_data(db: AsyncSession, giornale_id: str, operat
                 )
             )
         )
-        association_data = await association_result.first()
+        association_data = association_result.first()
         
         operator_dict = {
             "id": str(op.id),
