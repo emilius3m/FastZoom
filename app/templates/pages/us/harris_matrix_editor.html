@@ -177,24 +177,15 @@
     }
 
     .node-properties-panel {
-        position: fixed;
-        right: 0;
-        top: 100px;
         width: 320px;
         background: white;
         border: 1px solid #d1d5db;
         border-radius: 0.5rem;
         padding: 1.5rem;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-        max-height: 600px;
+        max-height: calc(100vh - 300px);
         overflow-y: auto;
-        transform: translateX(100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 1000;
-    }
-
-    .node-properties-panel.show {
-        transform: translateX(-20px);
+        flex-shrink: 0;
     }
 
     .form-group {
@@ -1009,100 +1000,101 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Properties Panel (slide from right) -->
-        <div class="node-properties-panel" :class="{'show': selectedNode !== null}">
-            <template x-if="selectedNode">
-                <div>
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-lg text-gray-900 dark:text-white">
-                            <span x-text="selectedNode.label"></span>
-                            <span class="text-sm text-gray-500 ml-2"
-                                x-text="'(' + selectedNode.unitType.toUpperCase() + ')'"></span>
-                        </h3>
-                        <button @click="selectedNode = null; updateNodeStyle()"
-                            class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
+            <!-- Properties Panel (fixed right sidebar) -->
+            <div x-show="selectedNode !== null" x-cloak class="node-properties-panel">
+                <template x-if="selectedNode">
+                    <div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-lg text-gray-900 dark:text-white">
+                                <span x-text="selectedNode.label"></span>
+                                <span class="text-sm text-gray-500 ml-2"
+                                    x-text="'(' + selectedNode.unitType.toUpperCase() + ')'"></span>
+                            </h3>
+                            <button @click="selectedNode = null; updateNodeStyle()"
+                                class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
 
-                    <!-- Basic Properties -->
-                    <div class="form-group">
-                        <label>Node Type</label>
-                        <input type="text" :value="selectedNode.unitType.toUpperCase()" disabled
-                            class="bg-gray-100 dark:bg-gray-700">
-                    </div>
+                        <!-- Basic Properties -->
+                        <div class="form-group">
+                            <label>Node Type</label>
+                            <input type="text" :value="selectedNode.unitType.toUpperCase()" disabled
+                                class="bg-gray-100 dark:bg-gray-700">
+                        </div>
 
-                    <!-- Code/Label - Editable only for new nodes -->
-                    <div class="form-group">
-                        <label>
-                            Code
-                            <span x-show="selectedNode.isExisting" class="text-xs text-gray-500 ml-1">(read-only)</span>
-                            <span x-show="!selectedNode.isExisting"
-                                class="text-xs text-green-500 ml-1">(editable)</span>
-                        </label>
-                        <input type="text" x-model="selectedNode.label" @input="updateNodeLabel()"
-                            :disabled="selectedNode.isExisting"
-                            :class="selectedNode.isExisting ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed' : ''"
-                            placeholder="e.g., US001, USM005...">
-                    </div>
+                        <!-- Code/Label - Editable only for new nodes -->
+                        <div class="form-group">
+                            <label>
+                                Code
+                                <span x-show="selectedNode.isExisting"
+                                    class="text-xs text-gray-500 ml-1">(read-only)</span>
+                                <span x-show="!selectedNode.isExisting"
+                                    class="text-xs text-green-500 ml-1">(editable)</span>
+                            </label>
+                            <input type="text" x-model="selectedNode.label" @input="updateNodeLabel()"
+                                :disabled="selectedNode.isExisting"
+                                :class="selectedNode.isExisting ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed' : ''"
+                                placeholder="e.g., US001, USM005...">
+                        </div>
 
-                    <div class="form-group" x-show="selectedNode.unitType === 'us'">
-                        <label>US Type</label>
-                        <select x-model="selectedNode.usType" @change="updateNodeStyle()">
-                            <option value="positiva">Positiva (+)</option>
-                            <option value="negativa">Negativa (-)</option>
-                        </select>
-                    </div>
+                        <div class="form-group" x-show="selectedNode.unitType === 'us'">
+                            <label>US Type</label>
+                            <select x-model="selectedNode.usType" @change="updateNodeStyle()">
+                                <option value="positiva">Positiva (+)</option>
+                                <option value="negativa">Negativa (-)</option>
+                            </select>
+                        </div>
 
-                    <!-- Stratigraphic Information -->
-                    <div class="form-group">
-                        <label>Definition</label>
-                        <textarea x-model="selectedNode.definition" rows="3"
-                            placeholder="Describe the stratigraphic unit..."></textarea>
-                    </div>
+                        <!-- Stratigraphic Information -->
+                        <div class="form-group">
+                            <label>Definition</label>
+                            <textarea x-model="selectedNode.definition" rows="3"
+                                placeholder="Describe the stratigraphic unit..."></textarea>
+                        </div>
 
-                    <div class="form-group">
-                        <label>Period</label>
-                        <input type="text" x-model="selectedNode.periodo" placeholder="e.g., Romano, Medievale...">
-                    </div>
+                        <div class="form-group">
+                            <label>Period</label>
+                            <input type="text" x-model="selectedNode.periodo" placeholder="e.g., Romano, Medievale...">
+                        </div>
 
-                    <div class="form-group">
-                        <label>Phase</label>
-                        <input type="text" x-model="selectedNode.fase" placeholder="e.g., Fase I, Fase II...">
-                    </div>
+                        <div class="form-group">
+                            <label>Phase</label>
+                            <input type="text" x-model="selectedNode.fase" placeholder="e.g., Fase I, Fase II...">
+                        </div>
 
-                    <div class="form-group">
-                        <label>Dating</label>
-                        <input type="text" x-model="selectedNode.datazione" placeholder="e.g., I-II secolo d.C.">
-                    </div>
+                        <div class="form-group">
+                            <label>Dating</label>
+                            <input type="text" x-model="selectedNode.datazione" placeholder="e.g., I-II secolo d.C.">
+                        </div>
 
-                    <div class="form-group">
-                        <label>Location</label>
-                        <input type="text" x-model="selectedNode.localita"
-                            placeholder="Specific location within site...">
-                    </div>
+                        <div class="form-group">
+                            <label>Location</label>
+                            <input type="text" x-model="selectedNode.localita"
+                                placeholder="Specific location within site...">
+                        </div>
 
-                    <!-- Technical Properties -->
-                    <div class="form-group">
-                        <label>Notes</label>
-                        <textarea x-model="selectedNode.note" rows="2" placeholder="Additional notes..."></textarea>
-                    </div>
+                        <!-- Technical Properties -->
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <textarea x-model="selectedNode.note" rows="2" placeholder="Additional notes..."></textarea>
+                        </div>
 
-                    <!-- Action Buttons -->
-                    <div class="space-y-2 mt-4">
-                        <button @click="duplicateSelected()"
-                            class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-                            <i class="fas fa-copy mr-2"></i>Duplicate Node
-                        </button>
-                        <button @click="deleteSelected()"
-                            class="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">
-                            <i class="fas fa-trash mr-2"></i>Delete Node
-                        </button>
+                        <!-- Action Buttons -->
+                        <div class="space-y-2 mt-4">
+                            <button @click="duplicateSelected()"
+                                class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                                <i class="fas fa-copy mr-2"></i>Duplicate Node
+                            </button>
+                            <button @click="deleteSelected()"
+                                class="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">
+                                <i class="fas fa-trash mr-2"></i>Delete Node
+                            </button>
+                        </div>
                     </div>
-                </div>
-            </template>
+                </template>
+            </div>
         </div>
 
         <!-- Modal per selezionare tipo relazione -->
