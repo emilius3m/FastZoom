@@ -185,23 +185,23 @@ class HarrisMatrixValidationService:
                 "created_at": getattr(unit, 'created_at', None)
             }
         
-        # Check HarrisMatrixUnit table
-        harris_units_query = select(HarrisMatrixUnit).where(
+        # Also check UnitaStratigraficaMuraria table
+        usm_units_query = select(UnitaStratigraficaMuraria).where(
             and_(
-                HarrisMatrixUnit.site_id == site_id,
-                HarrisMatrixUnit.unit_code.in_(codes)
+                UnitaStratigraficaMuraria.site_id == site_id,
+                UnitaStratigraficaMuraria.usm_code.in_(codes)
             )
         )
         
-        harris_result = await db_session.execute(harris_units_query)
-        harris_units = harris_result.scalars().all()
+        usm_result = await db_session.execute(usm_units_query)
+        usm_units = usm_result.scalars().all()
         
-        for unit in harris_units:
-            existing_units[unit.unit_code] = {
+        for unit in usm_units:
+            existing_units[unit.usm_code] = {
                 "id": unit.id,
-                "type": "HarrisMatrixUnit",
-                "description": unit.description or '',
-                "created_at": unit.created_at
+                "type": "UnitaStratigraficaMuraria",
+                "description": getattr(unit, 'definizione', ''),
+                "created_at": getattr(unit, 'created_at', None)
             }
         
         return existing_units

@@ -828,7 +828,8 @@ class HarrisMatrixService:
                     'temp_id': temp_id,
                     'id': str(unit.id),
                     'code': unit_data['code'],
-                    'type': unit_type,
+                    'type': unit_type,  # Keep for backward compatibility
+                    'unit_type': unit_type,  # Add for _bulk_create_relationships lookup
                     'site_id': str(site_id),
                     'description': unit_data.get('definition', ''),
                     'sequenzafisica': unit.sequenza_fisica or {},
