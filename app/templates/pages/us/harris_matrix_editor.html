@@ -32,6 +32,69 @@
         bottom: 0;
     }
 
+    /* Visual Grid Overlay */
+    .grid-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 200%;
+        height: 200%;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        transform-origin: 0 0;
+    }
+
+    .grid-overlay.visible {
+        opacity: 1;
+    }
+
+    .grid-overlay-inner {
+        width: 100%;
+        height: 100%;
+    }
+
+    .dark .grid-overlay-inner {
+        /* Dark mode colors will be applied via inline style */
+    }
+
+    /* Grid Status Indicator */
+    .grid-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .grid-status-badge.active {
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .grid-status-badge.inactive {
+        background: rgba(107, 114, 128, 0.1);
+        color: #6b7280;
+        border: 1px solid rgba(107, 114, 128, 0.2);
+    }
+
+    .dark .grid-status-badge.active {
+        background: rgba(96, 165, 250, 0.15);
+        color: #60a5fa;
+        border-color: rgba(96, 165, 250, 0.3);
+    }
+
+    .dark .grid-status-badge.inactive {
+        background: rgba(156, 163, 175, 0.1);
+        color: #9ca3af;
+        border-color: rgba(156, 163, 175, 0.2);
+    }
+
     .editor-container {
         position: relative;
         flex: 1;
@@ -579,25 +642,45 @@
 
                 <!-- Grid Snap -->
                 <div class="space-y-2">
-                    <label class="flex items-center">
+                    <label class="flex items-center cursor-pointer">
                         <input type="checkbox" x-model="settings.gridSnap" class="mr-2">
                         <span class="text-sm text-gray-700 dark:text-gray-300">
-                            <i class="fas fa-th mr-2 text-gray-500"></i>
+                            <i class="fas fa-th mr-2"
+                                :class="settings.gridSnap ? 'text-blue-500' : 'text-gray-500'"></i>
                             Enable Grid Snap
+                        </span>
+                        <span class="grid-status-badge ml-2" :class="settings.gridSnap ? 'active' : 'inactive'">
+                            <span x-text="settings.gridSnap ? 'ON' : 'OFF'"></span>
                         </span>
                     </label>
 
-                    <!-- Magnetic Snap Toggle -->
+                    <!-- Grid Size Selector -->
+                    <div class="pl-6 space-y-2" x-show="settings.gridSnap" x-cloak>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs font-medium text-gray-600 dark:text-gray-400 w-24">
+                                Dimensione Griglia
+                            </label>
+                            <select x-model.number="settings.gridSize"
+                                class="flex-1 text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                                <option value="10">10px (Fine)</option>
+                                <option value="20">20px (Standard)</option>
+                                <option value="40">40px (Media)</option>
+                                <option value="50">50px (Grande)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Magnetic Snap Orizzontale Toggle -->
                     <label class="flex items-center">
                         <input type="checkbox" x-model="settings.magneticSnap" class="mr-2">
                         <span class="text-sm text-gray-700 dark:text-gray-300">
-                            <i class="fas fa-magnet mr-2 text-purple-500"></i>
-                            Magnetic Snap Orizzontale
+                            <i class="fas fa-arrows-alt-h mr-2 text-purple-500"></i>
+                            Snap Orizzontale (righe)
                         </span>
                     </label>
 
-                    <!-- Magnetic Snap Distance Slider -->
-                    <div class="pl-6 space-y-2" x-show="settings.magneticSnap" x-cloak>
+                    <!-- Horizontal Snap Distance Slider -->
+                    <div class="pl-6" x-show="settings.magneticSnap" x-cloak>
                         <div class="flex items-center gap-2">
                             <label class="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">
                                 Distanza Y
@@ -607,18 +690,20 @@
                                 class="flex-1 h-2 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer">
                             <span class="snap-distance-indicator" x-text="settings.magneticSnapDistance + 'px'"></span>
                         </div>
+                    </div>
 
-                        <!-- Vertical Snap Toggle -->
-                        <label class="flex items-center">
-                            <input type="checkbox" x-model="settings.magneticSnapVertical" class="mr-2">
-                            <span class="text-xs text-gray-600 dark:text-gray-400">
-                                <i class="fas fa-arrows-alt-v mr-1 text-green-500"></i>
-                                Anche verticale (colonne)
-                            </span>
-                        </label>
+                    <!-- Magnetic Snap Verticale Toggle (INDEPENDENT) -->
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="settings.magneticSnapVertical" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">
+                            <i class="fas fa-arrows-alt-v mr-2 text-green-500"></i>
+                            Snap Verticale (colonne)
+                        </span>
+                    </label>
 
-                        <!-- Vertical Snap Distance -->
-                        <div class="flex items-center gap-2" x-show="settings.magneticSnapVertical">
+                    <!-- Vertical Snap Distance Slider -->
+                    <div class="pl-6" x-show="settings.magneticSnapVertical" x-cloak>
+                        <div class="flex items-center gap-2">
                             <label class="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">
                                 Distanza X
                             </label>
@@ -628,16 +713,19 @@
                             <span class="snap-distance-indicator"
                                 x-text="settings.magneticSnapVerticalDistance + 'px'"></span>
                         </div>
+                    </div>
 
-                        <!-- Show Alignment Guides -->
-                        <label class="flex items-center">
+                    <!-- Show Alignment Guides (visible when any snap is enabled) -->
+                    <div x-show="settings.magneticSnap || settings.magneticSnapVertical" x-cloak>
+                        <label class="flex items-center pl-6">
                             <input type="checkbox" x-model="settings.showAlignmentGuides" class="mr-2">
                             <span class="text-xs text-gray-600 dark:text-gray-400">
-                                <i class="fas fa-ruler-horizontal mr-1 text-blue-500"></i>
+                                <i class="fas fa-ruler-combined mr-1 text-blue-500"></i>
                                 Mostra linee guida
                             </span>
                         </label>
                     </div>
+
 
                     <label class="flex items-center">
                         <input type="checkbox" x-model="settings.showLabels" @change="updateNodeStyles()" class="mr-2">
@@ -705,11 +793,6 @@
                     <span>Select</span>
                 </button>
 
-                <button @click="setMode('move')" :class="{'active': editMode === 'move'}" class="editor-btn"
-                    title="Move Nodes">
-                    <i class="fas fa-arrows-alt"></i>
-                    <span>Move</span>
-                </button>
 
                 <!-- Separator -->
                 <div class="border-l border-gray-300 mx-2"></div>
@@ -776,8 +859,7 @@
                         <div class="w-3 h-3 rounded-full" :class="{
                                  'bg-blue-500': editMode.startsWith('add-'),
                                  'bg-green-500': editMode === 'add-edge',
-                                 'bg-gray-500': editMode === 'select',
-                                 'bg-purple-500': editMode === 'move'
+                                 'bg-gray-500': editMode === 'select'
                              }"></div>
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
                             <span x-text="getModeLabel()"></span>
@@ -789,12 +871,29 @@
                     </div>
                 </div>
 
+                <!-- Visual Grid Overlay -->
+                <div class="grid-overlay" :class="{'visible': settings.gridSnap}"
+                    :style="`transform: translate(${gridViewport.panX}px, ${gridViewport.panY}px) scale(${gridViewport.zoom}); transform-origin: 0 0;`">
+                    <div class="grid-overlay-inner" :style="`
+                            background-image:
+                                linear-gradient(to right, rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+                                linear-gradient(to bottom, rgba(59, 130, 246, 0.08) 1px, transparent 1px),
+                                linear-gradient(to right, rgba(59, 130, 246, 0.18) 1px, transparent 1px),
+                                linear-gradient(to bottom, rgba(59, 130, 246, 0.18) 1px, transparent 1px);
+                            background-size:
+                                ${settings.gridSize}px ${settings.gridSize}px,
+                                ${settings.gridSize}px ${settings.gridSize}px,
+                                ${settings.gridSize * 5}px ${settings.gridSize * 5}px,
+                                ${settings.gridSize * 5}px ${settings.gridSize * 5}px;
+                         `"></div>
+                </div>
+
                 <!-- Cytoscape Canvas -->
                 <div id="cy"></div>
 
-                <!-- Empty State -->
-                <div x-show="nodes.length === 0"
-                    class="absolute inset-0 flex items-center justify-center bg-white/90 dark:bg-gray-800/90">
+                <!-- Empty State - pointer-events: none to allow clicking through -->
+                <div x-show="nodes.length === 0 && editMode === 'select'"
+                    class="absolute inset-0 flex items-center justify-center bg-white/90 dark:bg-gray-800/90 pointer-events-none">
                     <div class="text-center max-w-md px-6">
                         <i class="fas fa-edit text-6xl text-gray-300 dark:text-gray-600 mb-4"></i>
                         <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Start Building Your Matrix
@@ -804,7 +903,7 @@
                         <div class="space-y-2">
                             <div class="text-sm text-gray-500 dark:text-gray-400">
                                 <i class="fas fa-info-circle mr-2"></i>
-                                Click on the canvas to add nodes, or select a tool from the toolbar
+                                Click US+, US-, or USM then click on the canvas to add nodes
                             </div>
                         </div>
                     </div>
@@ -925,7 +1024,7 @@
                 <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Controls</h4>
                 <div class="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                     <div><i class="fas fa-mouse-pointer mr-2"></i><strong>Click:</strong> Select node</div>
-                    <div><i class="fas fa-hand-paper mr-2"></i><strong>Drag:</strong> Move node (Move mode)</div>
+                    <div><i class="fas fa-hand-paper mr-2"></i><strong>Drag:</strong> Move node</div>
                     <div><i class="fas fa-search-plus mr-2"></i><strong>Scroll:</strong> Zoom in/out</div>
                     <div><i class="fas fa-crosshairs mr-2"></i><strong>Canvas click:</strong> Add node</div>
                     <div><i class="fas fa-link mr-2"></i><strong>Double click:</strong> Create edge</div>
@@ -1137,6 +1236,7 @@
                 nodeSize: 'medium',
                 layout: 'none',
                 gridSnap: false,
+                gridSize: 20,                  // Dimensione griglia in pixel (10, 20, 40, 50)
                 showLabels: true,
                 animateLayout: true,
                 validateRelationships: true,
@@ -1157,6 +1257,13 @@
                 snapTargetNode: null,
                 snapAxis: null,  // 'horizontal', 'vertical', 'both'
                 originalY: null,
+            },
+
+            // Stato della viewport per la griglia
+            gridViewport: {
+                zoom: 1,
+                panX: 0,
+                panY: 0
             },
 
             // Confirmation dialog state
@@ -1309,35 +1416,29 @@
                 // DRAG HANDLING - ENHANCED WITH MAGNETIC SNAP
                 // ========================================
 
-                // Inizio drag
+                // Inizio drag - funziona in qualsiasi modalità
                 this.cy.on('grab', 'node', (evt) => {
-                    if (this.editMode !== 'move') return;
-
-                    this.isDragging = true;  // <-- ADD THIS
+                    // Attiva il drag in qualsiasi modalità (non solo 'move')
+                    this.isDragging = true;
                     const node = evt.target;
                     this.snapState.originalY = node.position('y');
-                    console.log(`🎯 Drag started: ${node.data('label')}`);
+                    console.log(`🎯 Drag started: ${node.data('label')} (mode: ${this.editMode})`);
                 });
 
                 // Durante il drag - usa 'position' event che viene chiamato DOPO l'update
                 this.cy.on('position', 'node', (evt) => {
-                    if (this.editMode !== 'move') return;
+                    // Funziona in qualsiasi modalità, basta che il drag sia attivo
                     if (!this.isDragging) return; // Solo durante drag attivo
 
                     const movedNode = evt.target;
                     const currentPos = movedNode.position();
 
-                    // Grid snap se abilitato
+                    // Durante il drag: solo Magnetic Snap (NON grid snap - per movimento fluido)
+                    // Grid snap verrà applicato al rilascio del nodo
                     let targetPos = { x: currentPos.x, y: currentPos.y };
 
-                    if (this.settings.gridSnap) {
-                        const gridSize = 20;
-                        targetPos.x = Math.round(targetPos.x / gridSize) * gridSize;
-                        targetPos.y = Math.round(targetPos.y / gridSize) * gridSize;
-                    }
-
-                    // Magnetic snap se abilitato
-                    if (this.settings.magneticSnap) {
+                    // Magnetic snap durante il drag per mostrare allineamento
+                    if (this.settings.magneticSnap || this.settings.magneticSnapVertical) {
                         const snappedPos = this.magneticSnapNode(movedNode, targetPos);
                         targetPos = snappedPos;
                     }
@@ -1348,13 +1449,28 @@
                     }
                 });
 
-                // Fine drag
+                // Fine drag - funziona in qualsiasi modalità
                 this.cy.on('free', 'node', (evt) => {
-                    this.isDragging = false;  // <-- ADD THIS
+                    const wasDragging = this.isDragging;
+                    this.isDragging = false;
 
-                    if (this.editMode !== 'move') return;
+                    // Esegui cleanup solo se stava effettivamente trascinando
+                    if (!wasDragging) return;
 
                     const node = evt.target;
+                    let finalPos = node.position();
+
+                    // Applica Grid Snap AL RILASCIO (per movimento fluido durante il drag)
+                    if (this.settings.gridSnap) {
+                        const gridSize = this.settings.gridSize;
+                        const snappedPos = {
+                            x: Math.round(finalPos.x / gridSize) * gridSize,
+                            y: Math.round(finalPos.y / gridSize) * gridSize
+                        };
+                        node.position(snappedPos);
+                        finalPos = snappedPos;
+                        console.log(`📐 Grid snap applied: (${snappedPos.x}, ${snappedPos.y})`);
+                    }
 
                     // Pulisci tutti gli highlights e guide
                     this.resetAllNodeStyles();
@@ -1366,7 +1482,6 @@
                     this.snapState.snapTargetNode = null;
 
                     // Log posizione finale
-                    const finalPos = node.position();
                     console.log(`✅ Drag ended: ${node.data('label')} at (${Math.round(finalPos.x)}, ${Math.round(finalPos.y)})`);
 
                     // Trova e logga nodi allineati
@@ -1383,20 +1498,85 @@
                         this.selectedNode = null;
                     }
                 });
+
+                // ========================================
+                // VIEWPORT TRACKING FOR GRID OVERLAY
+                // ========================================
+
+                // Update grid on zoom
+                this.cy.on('zoom', () => {
+                    this.updateGridViewport();
+                });
+
+                // Update grid on pan
+                this.cy.on('pan', () => {
+                    this.updateGridViewport();
+                });
+
+                // Update grid on viewport changes (covers render, resize, etc.)
+                this.cy.on('viewport', () => {
+                    this.updateGridViewport();
+                });
+
+                // Initial grid viewport update
+                this.$nextTick(() => {
+                    this.updateGridViewport();
+                });
+            },
+
+            // Update grid viewport to match Cytoscape canvas
+            updateGridViewport() {
+                if (!this.cy) return;
+
+                const zoom = this.cy.zoom();
+                const pan = this.cy.pan();
+
+                this.gridViewport = {
+                    zoom: zoom,
+                    panX: pan.x,
+                    panY: pan.y
+                };
             },
 
             // Handle canvas click for adding nodes
             handleCanvasClick(evt) {
-                if (this.editMode === 'select' || this.editMode === 'move') return;
+                console.log(`📍 Canvas click - editMode: ${this.editMode}`);
+
+                // Skip if in select mode
+                if (this.editMode === 'select') return;
 
                 if (this.editMode.startsWith('add-us') || this.editMode === 'add-usm') {
-                    let pos = evt.position;
+                    // Get position from the event - need to use renderedPosition and convert
+                    let pos;
+                    if (evt.position) {
+                        pos = evt.position;
+                    } else if (evt.renderedPosition) {
+                        // Convert rendered position to model position
+                        const pan = this.cy.pan();
+                        const zoom = this.cy.zoom();
+                        pos = {
+                            x: (evt.renderedPosition.x - pan.x) / zoom,
+                            y: (evt.renderedPosition.y - pan.y) / zoom
+                        };
+                    } else {
+                        // Fallback: use center of viewport
+                        console.warn('⚠️ No position in event, using viewport center');
+                        const extent = this.cy.extent();
+                        pos = {
+                            x: (extent.x1 + extent.x2) / 2,
+                            y: (extent.y1 + extent.y2) / 2
+                        };
+                    }
+
+                    console.log(`📍 Click position: (${Math.round(pos.x)}, ${Math.round(pos.y)})`);
+
                     if (this.settings.gridSnap) {
-                        const gridSize = 20;
+                        const gridSize = this.settings.gridSize;
                         pos = {
                             x: Math.round(pos.x / gridSize) * gridSize,
                             y: Math.round(pos.y / gridSize) * gridSize
                         };
+                        console.log(`📍 Snapped position: (${pos.x}, ${pos.y})`);
                     }
                     this.addNodeAtPosition(pos);
                 }
@@ -1428,6 +1608,8 @@
 
             // Add node at specific position
             addNodeAtPosition(pos) {
+                console.log(`➕ addNodeAtPosition called - editMode: ${this.editMode}, pos: (${Math.round(pos.x)}, ${Math.round(pos.y)})`);
+
                 const tempId = `temp_${++this.tempIdCounter}`;
                 let type, tipo, label, icon;
 
@@ -1446,7 +1628,12 @@
                     tipo = null;
                     label = `USM${this.tempIdCounter}`;
                     icon = 'M';
+                } else {
+                    console.warn(`⚠️ Unknown editMode: ${this.editMode}`);
+                    return;
                 }
+
+                console.log(`➕ Creating node: ${label} (${type}, ${tipo || 'n/a'})`);
 
                 const nodeData = {
                     tempid: tempId,
@@ -1475,6 +1662,8 @@
                     position: pos,
                     classes: 'node-temporary'
                 });
+
+                console.log(`✅ Node created: ${label} with id ${tempId}`);
 
                 this.cy.style(this.getCytoscapeStyles());
 
@@ -2549,7 +2738,6 @@
             getModeLabel() {
                 const labels = {
                     'select': 'Selection Mode',
-                    'move': 'Move Nodes',
                     'add-us-positive': 'Add US Positive (+)',
                     'add-us-negative': 'Add US Negative (-)',
                     'add-usm': 'Add USM',
@@ -2611,34 +2799,52 @@
                 let minYDistance = Infinity;
                 let minXDistance = Infinity;
 
+                // Check if any snap is enabled
+                const horizontalSnapEnabled = this.settings.magneticSnap;
+                const verticalSnapEnabled = this.settings.magneticSnapVertical;
+
+                // Early return if no snap is enabled
+                if (!horizontalSnapEnabled && !verticalSnapEnabled) {
+                    return position;
+                }
+
+                // DEBUG: Log che la funzione viene chiamata
+                console.log(`🧲 magneticSnapNode - H:${horizontalSnapEnabled} V:${verticalSnapEnabled}, pos: (${Math.round(position.x)}, ${Math.round(position.y)})`);
+
                 // Resetta stato precedente
                 this.clearSnapHighlights();
+
+                // Conta nodi disponibili per snap
+                let candidateCount = 0;
 
                 // Itera su tutti i nodi per trovare candidati di snap
                 allNodes.forEach(node => {
                     // Salta il nodo che stai trascinando
                     if (node.id() === movedNode.id()) return;
 
+                    candidateCount++;
                     const otherPos = node.position();
                     const yDistance = Math.abs(otherPos.y - position.y);
                     const xDistance = Math.abs(otherPos.x - position.x);
 
-                    // SNAP ORIZZONTALE (stessa riga Y)
-                    if (yDistance < thresholdY && yDistance < minYDistance) {
+                    // SNAP ORIZZONTALE (stessa riga Y) - solo se abilitato
+                    if (horizontalSnapEnabled && yDistance < thresholdY && yDistance < minYDistance) {
                         minYDistance = yDistance;
                         snappedPos.y = otherPos.y;
                         snapTargetH = node;
+                        console.log(`  → Snap H: ${node.data('label')} at Y=${otherPos.y}, dist=${Math.round(yDistance)}px`);
                     }
 
-                    // SNAP VERTICALE (stessa colonna X) - se abilitato
-                    if (this.settings.magneticSnapVertical) {
-                        if (xDistance < thresholdX && xDistance < minXDistance) {
-                            minXDistance = xDistance;
-                            snappedPos.x = otherPos.x;
-                            snapTargetV = node;
-                        }
+                    // SNAP VERTICALE (stessa colonna X) - solo se abilitato
+                    if (verticalSnapEnabled && xDistance < thresholdX && xDistance < minXDistance) {
+                        minXDistance = xDistance;
+                        snappedPos.x = otherPos.x;
+                        snapTargetV = node;
+                        console.log(`  → Snap V: ${node.data('label')} at X=${otherPos.x}, dist=${Math.round(xDistance)}px`);
                     }
                 });
+
+                console.log(`  📊 Checked ${candidateCount} nodes, snapH: ${snapTargetH ? snapTargetH.data('label') : 'none'}, snapV: ${snapTargetV ? snapTargetV.data('label') : 'none'}`);
 
                 // Applica feedback visivo
                 this.applySnapFeedback(movedNode, snapTargetH, snapTargetV, snappedPos);

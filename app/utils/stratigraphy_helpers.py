@@ -737,33 +737,71 @@ class StratigraphicRulesValidator:
     # Relazioni logiche consentite (soggetto -> oggetto)
     # Chiave: (from_kind, to_kind, relation_type)
     # from_kind / to_kind in: 'us_pos', 'us_neg', 'usm'
+    # REGOLE FLESSIBILI: Qualsiasi unità può usare qualsiasi relazione
     ALLOWED_RELATIONS = {
-        # --- US NEGATIVA (taglio) come soggetto ---
+        # --- TAGLIA: qualsiasi unità può tagliare qualsiasi altra ---
         ("us_neg", "us_pos", "taglia"),
         ("us_neg", "us_neg", "taglia"),
-        ("us_neg", "us_pos", "uguale_a"),
-        ("us_neg", "us_neg", "uguale_a"),
+        ("us_neg", "usm",    "taglia"),
+        ("us_pos", "us_pos", "taglia"),
+        ("us_pos", "us_neg", "taglia"),
+        ("us_pos", "usm",    "taglia"),
+        ("usm",    "us_pos", "taglia"),
+        ("usm",    "us_neg", "taglia"),
+        ("usm",    "usm",    "taglia"),
 
-        # --- US POSITIVA come soggetto ---
+        # --- COPRE: qualsiasi unità può coprire qualsiasi altra ---
         ("us_pos", "us_pos", "copre"),
         ("us_pos", "us_neg", "copre"),
-        ("us_pos", "usm",    "copre"),     # ADDED: US positive can cover USM (debris, abandonment layers covering walls)
+        ("us_pos", "usm",    "copre"),
+        ("us_neg", "us_pos", "copre"),
+        ("us_neg", "us_neg", "copre"),
+        ("us_neg", "usm",    "copre"),
+        ("usm",    "us_pos", "copre"),
+        ("usm",    "us_neg", "copre"),
+        ("usm",    "usm",    "copre"),
+
+        # --- RIEMPIE: qualsiasi unità può riempire qualsiasi altra ---
         ("us_pos", "us_pos", "riempie"),
         ("us_pos", "us_neg", "riempie"),
-        ("us_pos", "usm",    "riempie"),  # ADDED: US positive can fill USM (e.g., fill in wall cavity)
-        ("us_pos", "usm",    "si_appoggia_a"),
-        ("us_pos", "us_pos", "uguale_a"),  # ADDED: US positive uguale_a US positive
-        ("us_pos", "us_neg", "uguale_a"),  # ADDED: US positive uguale_a US negative
+        ("us_pos", "usm",    "riempie"),
+        ("us_neg", "us_pos", "riempie"),
+        ("us_neg", "us_neg", "riempie"),
+        ("us_neg", "usm",    "riempie"),
+        ("usm",    "us_pos", "riempie"),
+        ("usm",    "us_neg", "riempie"),
+        ("usm",    "usm",    "riempie"),
 
-        # --- USM come soggetto (muri/strutture) ---
-        ("usm", "usm",    "si_lega_a"),
-        ("usm", "usm",    "si_appoggia_a"),
-        ("usm", "us_pos", "si_appoggia_a"),
-        ("usm", "us_neg", "si_appoggia_a"),  # ADDED: USM can also lean against negative US (cuts)
-        ("usm", "us_pos", "copre"),
-        ("usm", "us_neg", "copre"),
-        ("usm", "us_neg", "riempie"),
-        ("usm", "usm",    "uguale_a"),        # ADDED: USM uguale_a USM
+        # --- SI APPOGGIA A: qualsiasi unità può appoggiarsi a qualsiasi altra ---
+        ("us_pos", "us_pos", "si_appoggia_a"),
+        ("us_pos", "us_neg", "si_appoggia_a"),
+        ("us_pos", "usm",    "si_appoggia_a"),
+        ("us_neg", "us_pos", "si_appoggia_a"),
+        ("us_neg", "us_neg", "si_appoggia_a"),
+        ("us_neg", "usm",    "si_appoggia_a"),
+        ("usm",    "us_pos", "si_appoggia_a"),
+        ("usm",    "us_neg", "si_appoggia_a"),
+        ("usm",    "usm",    "si_appoggia_a"),
+
+        # --- SI LEGA A: relazione tra strutture murarie (e US) ---
+        ("usm",    "usm",    "si_lega_a"),
+        ("usm",    "us_pos", "si_lega_a"),
+        ("usm",    "us_neg", "si_lega_a"),
+        ("us_pos", "usm",    "si_lega_a"),
+        ("us_neg", "usm",    "si_lega_a"),
+        ("us_pos", "us_pos", "si_lega_a"),
+        ("us_neg", "us_neg", "si_lega_a"),
+
+        # --- UGUALE A: qualsiasi unità può essere uguale a qualsiasi altra ---
+        ("us_pos", "us_pos", "uguale_a"),
+        ("us_pos", "us_neg", "uguale_a"),
+        ("us_pos", "usm",    "uguale_a"),
+        ("us_neg", "us_pos", "uguale_a"),
+        ("us_neg", "us_neg", "uguale_a"),
+        ("us_neg", "usm",    "uguale_a"),
+        ("usm",    "us_pos", "uguale_a"),
+        ("usm",    "us_neg", "uguale_a"),
+        ("usm",    "usm",    "uguale_a"),
     }
     
     @staticmethod
@@ -847,43 +885,9 @@ class StratigraphicRulesValidator:
                 logger.debug(f"FROM UNIT TYPE: {from_unit['type']}, TIPO: {from_unit.get('tipo', 'unknown')}")
                 logger.debug(f"TO UNIT TYPE: {to_unit['type']}, TIPO: {to_unit.get('tipo', 'unknown')}")
                 
-                if relation_type in ['taglia', 'tagliato_da']:
-                    # BUG IDENTIFIED: This logic incorrectly assumes from_unit is the cutter for both relation types
-                    # CORRECT LOGIC:
-                    # - For 'taglia': from_unit cuts to_unit (from_unit should be negative)
-                    # - For 'tagliato_da': from_unit is cut by to_unit (to_unit should be negative)
-                    
-                    if relation_type == 'taglia':
-                        # Direct: from_unit cuts to_unit
-                        if from_unit['type'] == 'us' and from_unit['tipo'] != 'negativa':
-                            logger.error(f"TAGLIA VALIDATION FAILED: {from_unit['code']} ({from_unit['tipo']}) cannot cut {to_unit['code']}")
-                            raise InvalidStratigraphicRelation(
-                                relation_type,
-                                from_unit['code'],
-                                to_unit['code'],
-                                "Solo US negative possono tagliare altre unità"
-                            )
-                    
-                    elif relation_type == 'tagliato_da':
-                        # Reverse: to_unit cuts from_unit
-                        if to_unit['type'] == 'us' and to_unit['tipo'] != 'negativa':
-                            logger.error(f"TAGLIATO_DA VALIDATION FAILED: {to_unit['code']} ({to_unit['tipo']}) cannot cut {from_unit['code']}")
-                            raise InvalidStratigraphicRelation(
-                                relation_type,
-                                from_unit['code'],
-                                to_unit['code'],
-                                f"Solo US negative possono tagliare altre unità ({to_unit['code']} non è negativa)"
-                            )
-                
-                # Rule: Positive US can cover/fill (copre/riempie)
-                if relation_type in ['copre', 'riempie']:
-                    if from_unit['type'] == 'us' and from_unit['tipo'] != 'positiva':
-                        raise InvalidStratigraphicRelation(
-                            relation_type,
-                            from_unit['code'],
-                            to_unit['code'],
-                            "Solo US positive possono coprire o riempire altre unità"
-                        )
+                # REGOLE FLESSIBILI: Non ci sono restrizioni basate sul tipo di unità
+                # Tutte le relazioni sono permesse tra qualsiasi tipo di unità
+                # La validazione avviene solo tramite ALLOWED_RELATIONS in validate_single_relationship
             
         except Exception as e:
             logger.error(f"Error validating business rules: {str(e)}")
@@ -941,10 +945,7 @@ class StratigraphicRulesValidator:
         # Check if relation type is valid
         if relation_type not in VALID_RELATIONSHIP_TYPES:
             raise InvalidStratigraphicRelation(
-                relation_type,
-                get_unit_code(from_unit),
-                get_unit_code(to_unit),
-                f"Tipo di relazione non valido. Valori validi: {VALID_RELATIONSHIP_TYPES}"
+                f"Invalid relationship type '{relation_type}' from {get_unit_code(from_unit)} to {get_unit_code(to_unit)}: Tipo di relazione non valido. Valori validi: {VALID_RELATIONSHIP_TYPES}"
             )
         
         # Validate self-relationships (allowed only for self-inverse relationships)
@@ -952,10 +953,7 @@ class StratigraphicRulesValidator:
             # Allow self-relationships only for self-inverse types like 'uguale_a'
             if relation_type != 'uguale_a':
                 raise InvalidStratigraphicRelation(
-                    relation_type,
-                    get_unit_code(from_unit),
-                    get_unit_code(to_unit),
-                    "Un'unità non può avere relazioni con se stessa (solo 'uguale_a' è consentito)"
+                    f"Invalid relationship '{relation_type}' from {get_unit_code(from_unit)} to {get_unit_code(to_unit)}: Un'unità non può avere relazioni con se stessa (solo 'uguale_a' è consentito)"
                 )
     
     @staticmethod
@@ -971,10 +969,7 @@ class StratigraphicRulesValidator:
         """
         if relation_type not in VALID_RELATIONSHIP_TYPES:
             raise InvalidStratigraphicRelation(
-                relation_type,
-                'unknown',
-                'unknown',
-                f"Tipo di relazione non valido. Valori validi: {VALID_RELATIONSHIP_TYPES}"
+                f"Invalid relationship type '{relation_type}': Tipo di relazione non valido. Valori validi: {VALID_RELATIONSHIP_TYPES}"
             )
     
     @staticmethod

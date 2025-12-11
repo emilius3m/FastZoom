@@ -138,13 +138,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Close dropdown when clicking outside
-        document.addEventListener('click', function(e) {
+        /*document.addEventListener('click', function(e) {
             if (!dropdownButton.contains(e.target) && !dropdownMenu.contains(e.target)) {
                 dropdownMenu.classList.add('hidden');
                 dropdownMenu.classList.remove('block');
                 console.log('DEBUG: Dropdown closed (outside click)');
             }
-        });
+        });*/
     } else {
         console.error('DEBUG: Dropdown elements not found');
         console.log('DEBUG: sites_count variable:', '{{ sites_count }}');
