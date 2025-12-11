@@ -237,9 +237,19 @@ async def v1_get_us(
 @router.get("/sites/{site_id}/us", response_model=List[USOut], summary="List US for site", tags=["US/USM Units"])
 async def v1_list_us(
     site_id: UUID,
-    search: Optional[str] = Query(None),
-    da: Optional[str] = Query(None),
-    a: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, description="Ricerca testuale generica"),
+    da: Optional[str] = Query(None, description="Data rilevamento DA (YYYY-MM-DD)"),
+    a: Optional[str] = Query(None, description="Data rilevamento A (YYYY-MM-DD)"),
+    # Advanced filters
+    us_code: Optional[str] = Query(None, description="Codice US (es: US001)"),
+    tipo: Optional[str] = Query(None, description="Tipo US: positiva o negativa"),
+    periodo: Optional[str] = Query(None, description="Periodo cronologico"),
+    fase: Optional[str] = Query(None, description="Fase stratigrafica"),
+    definizione: Optional[str] = Query(None, description="Definizione US"),
+    localita: Optional[str] = Query(None, description="Località"),
+    area_struttura: Optional[str] = Query(None, description="Area/Struttura"),
+    affidabilita: Optional[str] = Query(None, description="Affidabilità stratigrafica"),
+    responsabile: Optional[str] = Query(None, description="Responsabile compilazione"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_async_session),
@@ -249,13 +259,80 @@ async def v1_list_us(
     List US units for the specified site with optional filtering.
     
     Endpoint: /api/v1/us/sites/{site_id}/us
+    
+    Advanced filters:
+    - us_code: Filter by US code (partial match)
+    - tipo: Filter by type (positiva/negativa)
+    - periodo: Filter by period (partial match)
+    - fase: Filter by phase (partial match)
+    - definizione: Filter by definition (partial match)
+    - localita: Filter by locality (partial match)
+    - area_struttura: Filter by area/structure (partial match)
+    - affidabilita: Filter by reliability (exact match)
+    - responsabile: Filter by responsible person (partial match)
+    - da/a: Filter by survey date range
     """
     if not await verify_site_access(site_id, user_sites):
         raise HTTPException(status_code=403, detail="Accesso negato al sito")
+    
     q = select(UnitaStratigrafica).where(UnitaStratigrafica.site_id == str(site_id))
+    
+    # Generic text search (searches in descrizione, us_code, definizione)
     if search:
         like = f"%{search}%"
-        q = q.where(UnitaStratigrafica.descrizione.ilike(like))
+        from sqlalchemy import or_
+        q = q.where(or_(
+            UnitaStratigrafica.descrizione.ilike(like),
+            UnitaStratigrafica.us_code.ilike(like),
+            UnitaStratigrafica.definizione.ilike(like),
+            UnitaStratigrafica.localita.ilike(like)
+        ))
+    
+    # Advanced filters
+    if us_code:
+        q = q.where(UnitaStratigrafica.us_code.ilike(f"%{us_code}%"))
+    
+    if tipo:
+        q = q.where(UnitaStratigrafica.tipo == tipo)
+    
+    if periodo:
+        q = q.where(UnitaStratigrafica.periodo.ilike(f"%{periodo}%"))
+    
+    if fase:
+        q = q.where(UnitaStratigrafica.fase.ilike(f"%{fase}%"))
+    
+    if definizione:
+        q = q.where(UnitaStratigrafica.definizione.ilike(f"%{definizione}%"))
+    
+    if localita:
+        q = q.where(UnitaStratigrafica.localita.ilike(f"%{localita}%"))
+    
+    if area_struttura:
+        q = q.where(UnitaStratigrafica.area_struttura.ilike(f"%{area_struttura}%"))
+    
+    if affidabilita:
+        q = q.where(UnitaStratigrafica.affidabilita_stratigrafica == affidabilita)
+    
+    if responsabile:
+        q = q.where(UnitaStratigrafica.responsabile_compilazione.ilike(f"%{responsabile}%"))
+    
+    # Date range filter
+    if da:
+        try:
+            from datetime import datetime
+            date_from = datetime.strptime(da, "%Y-%m-%d").date()
+            q = q.where(UnitaStratigrafica.data_rilevamento >= date_from)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+    
+    if a:
+        try:
+            from datetime import datetime
+            date_to = datetime.strptime(a, "%Y-%m-%d").date()
+            q = q.where(UnitaStratigrafica.data_rilevamento <= date_to)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+    
     q = q.order_by(desc(UnitaStratigrafica.created_at)).offset(skip).limit(limit)
     rows = (await db.execute(q)).scalars().all()
     return rows
@@ -589,7 +666,19 @@ async def v1_get_usm(
 @router.get("/sites/{site_id}/usm", response_model=List[USMOut], summary="List USM for site", tags=["US/USM Units"])
 async def v1_list_usm(
     site_id: UUID,
-    search: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, description="Ricerca testuale generica"),
+    # Advanced filters
+    usm_code: Optional[str] = Query(None, description="Codice USM (es: USM001)"),
+    periodo: Optional[str] = Query(None, description="Periodo cronologico"),
+    fase: Optional[str] = Query(None, description="Fase stratigrafica"),
+    definizione: Optional[str] = Query(None, description="Definizione USM"),
+    localita: Optional[str] = Query(None, description="Località"),
+    area_struttura: Optional[str] = Query(None, description="Area/Struttura"),
+    tecnica_costruttiva: Optional[str] = Query(None, description="Tecnica costruttiva"),
+    affidabilita: Optional[str] = Query(None, description="Affidabilità stratigrafica"),
+    responsabile: Optional[str] = Query(None, description="Responsabile compilazione"),
+    da: Optional[str] = Query(None, description="Data rilevamento DA (YYYY-MM-DD)"),
+    a: Optional[str] = Query(None, description="Data rilevamento A (YYYY-MM-DD)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_async_session),
@@ -599,13 +688,80 @@ async def v1_list_usm(
     List USM units for the specified site with optional filtering.
     
     Endpoint: /api/v1/us/sites/{site_id}/usm
+    
+    Advanced filters:
+    - usm_code: Filter by USM code (partial match)
+    - periodo: Filter by period (partial match)
+    - fase: Filter by phase (partial match)
+    - definizione: Filter by definition (partial match)
+    - localita: Filter by locality (partial match)
+    - area_struttura: Filter by area/structure (partial match)
+    - tecnica_costruttiva: Filter by construction technique (partial match)
+    - affidabilita: Filter by reliability (exact match)
+    - responsabile: Filter by responsible person (partial match)
+    - da/a: Filter by survey date range
     """
     if not await verify_site_access(site_id, user_sites):
         raise HTTPException(status_code=403, detail="Accesso negato al sito")
+    
     q = select(UnitaStratigraficaMuraria).where(UnitaStratigraficaMuraria.site_id == str(site_id))
+    
+    # Generic text search (searches in descrizione, usm_code, definizione)
     if search:
         like = f"%{search}%"
-        q = q.where(UnitaStratigraficaMuraria.descrizione.ilike(like))
+        from sqlalchemy import or_
+        q = q.where(or_(
+            UnitaStratigraficaMuraria.descrizione.ilike(like),
+            UnitaStratigraficaMuraria.usm_code.ilike(like),
+            UnitaStratigraficaMuraria.definizione.ilike(like),
+            UnitaStratigraficaMuraria.localita.ilike(like)
+        ))
+    
+    # Advanced filters
+    if usm_code:
+        q = q.where(UnitaStratigraficaMuraria.usm_code.ilike(f"%{usm_code}%"))
+    
+    if periodo:
+        q = q.where(UnitaStratigraficaMuraria.periodo.ilike(f"%{periodo}%"))
+    
+    if fase:
+        q = q.where(UnitaStratigraficaMuraria.fase.ilike(f"%{fase}%"))
+    
+    if definizione:
+        q = q.where(UnitaStratigraficaMuraria.definizione.ilike(f"%{definizione}%"))
+    
+    if localita:
+        q = q.where(UnitaStratigraficaMuraria.localita.ilike(f"%{localita}%"))
+    
+    if area_struttura:
+        q = q.where(UnitaStratigraficaMuraria.area_struttura.ilike(f"%{area_struttura}%"))
+    
+    if tecnica_costruttiva:
+        q = q.where(UnitaStratigraficaMuraria.tecnica_costruttiva.ilike(f"%{tecnica_costruttiva}%"))
+    
+    if affidabilita:
+        q = q.where(UnitaStratigraficaMuraria.affidabilita_stratigrafica == affidabilita)
+    
+    if responsabile:
+        q = q.where(UnitaStratigraficaMuraria.responsabile_compilazione.ilike(f"%{responsabile}%"))
+    
+    # Date range filter
+    if da:
+        try:
+            from datetime import datetime
+            date_from = datetime.strptime(da, "%Y-%m-%d").date()
+            q = q.where(UnitaStratigraficaMuraria.data_rilevamento >= date_from)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+    
+    if a:
+        try:
+            from datetime import datetime
+            date_to = datetime.strptime(a, "%Y-%m-%d").date()
+            q = q.where(UnitaStratigraficaMuraria.data_rilevamento <= date_to)
+        except ValueError:
+            pass  # Invalid date format, skip filter
+    
     q = q.order_by(desc(UnitaStratigraficaMuraria.created_at)).offset(skip).limit(limit)
     rows = (await db.execute(q)).scalars().all()
     return rows

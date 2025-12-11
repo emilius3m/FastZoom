@@ -27,8 +27,21 @@
                 search: '',
                 dateFrom: '',
                 dateTo: '',
-                affidabilita: ''
+                affidabilita: '',
+                // Advanced filters
+                code: '',           // US/USM code
+                tipo: '',           // positiva/negativa
+                periodo: '',        // period filter
+                fase: '',           // phase filter
+                definizione: '',    // definition filter
+                localita: '',       // locality filter
+                area_struttura: '', // area/structure filter
+                responsabile: '',   // responsible person
+                tecnica_costruttiva: '' // USM construction technique
             },
+
+            // Advanced search toggle
+            showAdvancedSearch: false,
 
             // Pagination
             pagination: {
@@ -254,6 +267,55 @@
                 }
             },
 
+            // ===== FILTER HELPER FUNCTIONS =====
+
+            // Load both US and USM lists when filters change
+            async loadAllLists() {
+                await this.loadUSList();
+                await this.loadUSMList();
+            },
+
+            // Count active filters for UI badge
+            getActiveFiltersCount() {
+                let count = 0;
+                if (this.filters.search) count++;
+                if (this.filters.dateFrom) count++;
+                if (this.filters.dateTo) count++;
+                if (this.filters.affidabilita) count++;
+                if (this.filters.code) count++;
+                if (this.filters.tipo) count++;
+                if (this.filters.periodo) count++;
+                if (this.filters.fase) count++;
+                if (this.filters.definizione) count++;
+                if (this.filters.localita) count++;
+                if (this.filters.area_struttura) count++;
+                if (this.filters.responsabile) count++;
+                if (this.filters.tecnica_costruttiva) count++;
+                return count;
+            },
+
+            // Reset all filters
+            resetAllFilters() {
+                this.filters = {
+                    search: '',
+                    dateFrom: '',
+                    dateTo: '',
+                    affidabilita: '',
+                    code: '',
+                    tipo: '',
+                    periodo: '',
+                    fase: '',
+                    definizione: '',
+                    localita: '',
+                    area_struttura: '',
+                    responsabile: '',
+                    tecnica_costruttiva: ''
+                };
+                this.showAdvancedSearch = false;
+                this.pagination.currentPage = 1;
+                this.loadAllLists();
+            },
+
             // ===== US CRUD OPERATIONS =====
 
             async loadUSList() {
@@ -263,9 +325,21 @@
                         limit: this.pagination.itemsPerPage
                     });
 
+                    // Basic filters
                     if (this.filters.search) queryParams.append('search', this.filters.search);
                     if (this.filters.dateFrom) queryParams.append('da', this.filters.dateFrom);
                     if (this.filters.dateTo) queryParams.append('a', this.filters.dateTo);
+
+                    // Advanced filters
+                    if (this.filters.code) queryParams.append('us_code', this.filters.code);
+                    if (this.filters.tipo) queryParams.append('tipo', this.filters.tipo);
+                    if (this.filters.periodo) queryParams.append('periodo', this.filters.periodo);
+                    if (this.filters.fase) queryParams.append('fase', this.filters.fase);
+                    if (this.filters.definizione) queryParams.append('definizione', this.filters.definizione);
+                    if (this.filters.localita) queryParams.append('localita', this.filters.localita);
+                    if (this.filters.area_struttura) queryParams.append('area_struttura', this.filters.area_struttura);
+                    if (this.filters.affidabilita) queryParams.append('affidabilita', this.filters.affidabilita);
+                    if (this.filters.responsabile) queryParams.append('responsabile', this.filters.responsabile);
 
                     const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us?${queryParams}`, {
                         headers: {
@@ -633,7 +707,21 @@
                         limit: this.pagination.itemsPerPage
                     });
 
+                    // Basic filters
                     if (this.filters.search) queryParams.append('search', this.filters.search);
+                    if (this.filters.dateFrom) queryParams.append('da', this.filters.dateFrom);
+                    if (this.filters.dateTo) queryParams.append('a', this.filters.dateTo);
+
+                    // Advanced filters
+                    if (this.filters.code) queryParams.append('usm_code', this.filters.code);
+                    if (this.filters.periodo) queryParams.append('periodo', this.filters.periodo);
+                    if (this.filters.fase) queryParams.append('fase', this.filters.fase);
+                    if (this.filters.definizione) queryParams.append('definizione', this.filters.definizione);
+                    if (this.filters.localita) queryParams.append('localita', this.filters.localita);
+                    if (this.filters.area_struttura) queryParams.append('area_struttura', this.filters.area_struttura);
+                    if (this.filters.tecnica_costruttiva) queryParams.append('tecnica_costruttiva', this.filters.tecnica_costruttiva);
+                    if (this.filters.affidabilita) queryParams.append('affidabilita', this.filters.affidabilita);
+                    if (this.filters.responsabile) queryParams.append('responsabile', this.filters.responsabile);
 
                     const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/usm?${queryParams}`, {
                         headers: {
