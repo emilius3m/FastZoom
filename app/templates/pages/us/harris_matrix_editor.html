@@ -787,48 +787,8 @@
                     <span>Connect</span>
                 </button>
 
-                <button @click="setMode('select')" :class="{'active': editMode === 'select'}" class="editor-btn"
-                    title="Select/Edit Nodes">
-                    <i class="fas fa-mouse-pointer"></i>
-                    <span>Select</span>
-                </button>
-
-
                 <!-- Separator -->
                 <div class="border-l border-gray-300 mx-2"></div>
-
-                <!-- Alignment Tools -->
-                <button @click="alignSelectedNodesHorizontally()" class="editor-btn"
-                    :disabled="cy?.nodes(':selected').length < 2"
-                    :class="{'opacity-50 cursor-not-allowed': cy?.nodes(':selected').length < 2}"
-                    title="Allinea nodi selezionati orizzontalmente">
-                    <i class="fas fa-align-center text-purple-500"></i>
-                    <span>Align H</span>
-                </button>
-
-                <button @click="distributeSelectedNodesHorizontally()" class="editor-btn"
-                    :disabled="cy?.nodes(':selected').length < 3"
-                    :class="{'opacity-50 cursor-not-allowed': cy?.nodes(':selected').length < 3}"
-                    title="Distribuisci nodi selezionati uniformemente">
-                    <i class="fas fa-arrows-alt-h text-green-500"></i>
-                    <span>Distribute</span>
-                </button>
-
-                <!-- Separator -->
-                <div class="border-l border-gray-300 mx-2"></div>
-
-                <!-- Action Buttons -->
-                <button @click="duplicateSelected()" class="editor-btn" :disabled="!selectedNode"
-                    :class="{'opacity-50 cursor-not-allowed': !selectedNode}" title="Duplicate Selected Node">
-                    <i class="fas fa-copy"></i>
-                    <span>Duplicate</span>
-                </button>
-
-                <button @click="deleteSelected()" class="editor-btn danger" :disabled="!selectedNode"
-                    :class="{'opacity-50 cursor-not-allowed': !selectedNode}" title="Delete Selected Node">
-                    <i class="fas fa-trash"></i>
-                    <span>Delete</span>
-                </button>
 
                 <!-- Spacer -->
                 <div style="flex-grow: 1;"></div>
@@ -1243,7 +1203,7 @@
                 preventCycles: true,
                 edgeCurveStyle: 'taxi',
                 // Magnetic Snap Settings - ENHANCED
-                magneticSnap: true,
+                magneticSnap: false,
                 magneticSnapDistance: 30,      // Distanza soglia per snap orizzontale (Y)
                 magneticSnapVertical: false,   // Abilita anche snap verticale (X)
                 magneticSnapVerticalDistance: 50, // Distanza soglia per snap verticale
@@ -1358,13 +1318,36 @@
             setupEventHandlers() {
                 // Canvas click
                 this.cy.on('tap', (evt) => {
-                    if (evt.target === this.cy) {
+                    const target = evt.target;
+
+                    // Determine target type - if it has no isNode() or isEdge() methods, it's the canvas
+                    const isNode = typeof target.isNode === 'function' && target.isNode();
+                    const isEdge = typeof target.isEdge === 'function' && target.isEdge();
+                    const isCanvas = !isNode && !isEdge;
+
+                    let targetType = isCanvas ? 'CANVAS' : (isNode ? 'NODE' : 'EDGE');
+                    console.log(`🖱️ TAP - target: ${targetType}, editMode: ${this.editMode}`);
+
+                    // Handle canvas click (background)
+                    if (isCanvas) {
                         this.handleCanvasClick(evt);
+                    }
+                    // Handle edge clicks in add mode
+                    else if (isEdge && (this.editMode.startsWith('add-us') || this.editMode === 'add-usm')) {
+                        console.log(`📍 Edge clicked in add mode - adding node nearby`);
+                        const sourcePos = target.source().position();
+                        const targetPos2 = target.target().position();
+                        const midPos = {
+                            x: (sourcePos.x + targetPos2.x) / 2 + 50,
+                            y: (sourcePos.y + targetPos2.y) / 2
+                        };
+                        this.addNodeAtPosition(midPos);
                     }
                 });
 
                 // Node interactions
                 this.cy.on('tap', 'node', (evt) => {
+                    console.log(`🔘 Node TAP handler - calling handleNodeClick for: ${evt.target.data('label')}`);
                     this.handleNodeClick(evt.target);
                 });
 
@@ -1540,10 +1523,19 @@
 
             // Handle canvas click for adding nodes
             handleCanvasClick(evt) {
-                console.log(`📍 Canvas click - editMode: ${this.editMode}`);
+                console.log(`📍 Canvas click - editMode: ${this.editMode}, isDragging: ${this.isDragging}`);
+
+                // Safety: reset isDragging on canvas click (shouldn't be true when clicking on background)
+                if (this.isDragging) {
+                    console.warn('⚠️ isDragging was true on canvas click - resetting');
+                    this.isDragging = false;
+                }
 
                 // Skip if in select mode
-                if (this.editMode === 'select') return;
+                if (this.editMode === 'select') {
+                    console.log('📍 In select mode - skipping node creation');
+                    return;
+                }
 
                 if (this.editMode.startsWith('add-us') || this.editMode === 'add-usm') {
                     // Get position from the event - need to use renderedPosition and convert
@@ -1584,6 +1576,8 @@
 
             // Handle node click
             handleNodeClick(node) {
+                console.log(`👆 Node click - editMode: ${this.editMode}, node: ${node.data('label')}`);
+
                 if (this.editMode === 'select') {
                     this.selectedNode = node.data();
                     return;
@@ -1591,6 +1585,19 @@
 
                 if (this.editMode === 'move') {
                     // Allow dragging in move mode
+                    return;
+                }
+
+                // Handle ADD modes - create new node near the clicked node
+                if (this.editMode.startsWith('add-us') || this.editMode === 'add-usm') {
+                    const nodePos = node.position();
+                    // Offset the new node to the right and below
+                    const newPos = {
+                        x: nodePos.x + 120,
+                        y: nodePos.y + 80
+                    };
+                    console.log(`📍 Adding node near existing node at (${newPos.x}, ${newPos.y})`);
+                    this.addNodeAtPosition(newPos);
                     return;
                 }
 
@@ -2703,6 +2710,7 @@
 
             // Set editing mode
             setMode(mode) {
+                console.log(`🔧 setMode called: ${this.editMode} → ${mode}`);
                 this.editMode = mode;
                 this.edgeSourceNode = null;
                 this.edgeTargetNode = null;
@@ -2718,6 +2726,19 @@
                     cy_el.style.cursor = 'crosshair';
                 } else if (mode === 'add-edge') {
                     cy_el.style.cursor = 'pointer';
+                }
+
+                // Enable/disable node grabbing based on mode
+                // In add modes, we don't want grabbing to interfere with tap events
+                if (this.cy) {
+                    const isAddMode = mode.startsWith('add-') || mode === 'add-edge';
+                    this.cy.nodes().forEach(node => {
+                        node.ungrabify();  // First ungrabify all
+                        if (!isAddMode) {
+                            node.grabify();  // Re-enable grabbing if not in add mode
+                        }
+                    });
+                    console.log(`🔧 Node grabbing ${isAddMode ? 'DISABLED' : 'ENABLED'}`);
                 }
             },
 
