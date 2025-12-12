@@ -53,9 +53,9 @@ class ICCDHierarchyService:
             if schema_type == 'SI':
                 return await self._validate_si_creation(site_id)
             
-            # Rule 2: CA and MA require an existing SI
+            # Rule 2: CA and MA require an existing SI as parent
             elif schema_type in ['CA', 'MA']:
-                return await self._validate_ca_ma_creation(site_id)
+                return await self._validate_ca_ma_creation(site_id, parent_id)
             
             # Rule 3: RA must have a parent (SI, CA, or MA)
             elif schema_type == 'RA':
@@ -88,22 +88,35 @@ class ICCDHierarchyService:
         
         return True, ""
     
-    async def _validate_ca_ma_creation(self, site_id: UUID) -> Tuple[bool, str]:
-        """Validate CA/MA card creation - requires existing SI."""
+    async def _validate_ca_ma_creation(self, site_id: UUID, parent_id: Optional[UUID]) -> Tuple[bool, str]:
+        """Validate CA/MA card creation - requires existing SI as parent."""
         
-        # Check if SI exists for this site
-        query = select(func.count(ICCDBaseRecord.id)).where(
+        # CA and MA must have a parent (SI)
+        if not parent_id:
+            return False, "Le schede CA/MA devono avere la scheda SI come padre"
+        
+        # Check if parent exists and is SI
+        # Normalize parent_id for UUID comparison
+        parent_id_str = str(parent_id)
+        parent_id_no_dashes = parent_id_str.replace('-', '')
+        
+        from sqlalchemy import or_
+        query = select(ICCDBaseRecord).where(
             and_(
+                or_(
+                    ICCDBaseRecord.id == parent_id_str,
+                    ICCDBaseRecord.id == parent_id_no_dashes
+                ),
                 ICCDBaseRecord.site_id == str(site_id),
                 ICCDBaseRecord.schema_type == 'SI'
             )
         )
         
         result = await self.db_session.execute(query)
-        si_count = result.scalar()
+        parent = result.scalar_one_or_none()
         
-        if si_count == 0:
-            return False, "È necessario creare prima la Scheda SI (Sito Archeologico)"
+        if not parent:
+            return False, "Padre non valido. Le schede CA/MA devono avere la scheda SI come padre"
         
         return True, ""
     
@@ -423,15 +436,15 @@ class ICCDHierarchyService:
                         "type": "CA",
                         "name": "Scheda Complesso Archeologico",
                         "description": "Per complessi archeologici multi-unitari",
-                        "requires_parent": False,
-                        "constraint": "Richiede scheda SI esistente"
+                        "requires_parent": True,
+                        "constraint": "Seleziona la scheda SI come padre"
                     },
                     {
                         "type": "MA",
                         "name": "Scheda Monumento Archeologico",
                         "description": "Per singoli monumenti architettonici",
-                        "requires_parent": False,
-                        "constraint": "Richiede scheda SI esistente"
+                        "requires_parent": True,
+                        "constraint": "Seleziona la scheda SI come padre"
                     },
                     {
                         "type": "RA",
@@ -449,12 +462,11 @@ class ICCDHierarchyService:
                     }
                 ])
                 
-                # Get possible parents for RA
-                possible_parents = await self.get_possible_parents(site_id, "RA")
-                if possible_parents:
-                    options["possible_parents"] = possible_parents
-                    # Non mostrare raccomandazione se ci sono padri disponibili
-                # La raccomandazione "nessun padre" viene gestita dal frontend quando l'utente seleziona RA
+                # Get possible parents (all valid parent types for the site)
+                # This will be filtered by card type in the frontend
+                all_possible_parents = await self.get_possible_parents(site_id, "RA")  # RA has broadest parent options
+                if all_possible_parents:
+                    options["possible_parents"] = all_possible_parents
                     
             else:
                 # Multiple SI - error state
