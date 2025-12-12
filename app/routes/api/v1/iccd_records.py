@@ -568,3 +568,120 @@ async def validate_card_creation(
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore validazione creazione: {str(e)}")
+
+
+# === AUTHORITY FILES ===
+
+@iccd_router.get("/site/{site_id}/authority-files")
+async def get_authority_files(
+    site_id: UUID,
+    authority_type: Optional[str] = Query(None, description="Filtro per tipo authority (DSC, RCG, BIB, AUT)"),
+    current_user_id: UUID = Depends(get_current_user_id),
+    iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
+):
+    """Recupera authority files per un sito."""
+    try:
+        # Check site access
+        site, permission = await iccd_service.check_site_access(site_id, current_user_id)
+        
+        if not permission.can_read():
+            raise BusinessLogicError("Permessi di lettura richiesti", 403)
+        
+        from sqlalchemy import select
+        from app.models.iccd_records import ICCDAuthorityFile
+        
+        query = select(ICCDAuthorityFile).where(ICCDAuthorityFile.site_id == str(site_id))
+        
+        if authority_type:
+            query = query.where(ICCDAuthorityFile.authority_type == authority_type)
+        
+        query = query.order_by(ICCDAuthorityFile.authority_type, ICCDAuthorityFile.name)
+        
+        result = await iccd_service.db_session.execute(query)
+        authority_files = result.scalars().all()
+        
+        organized = {
+            "excavations": [],  # DSC
+            "surveys": [],      # RCG
+            "bibliography": [], # BIB
+            "authors": []       # AUT
+        }
+        
+        for af in authority_files:
+            af_data = {
+                "id": str(af.id),
+                "authority_type": af.authority_type,
+                "authority_code": af.authority_code,
+                "name": af.name,
+                "description": af.description,
+                "authority_data": af.authority_data
+            }
+            
+            if af.authority_type == 'DSC':
+                organized["excavations"].append(af_data)
+            elif af.authority_type == 'RCG':
+                organized["surveys"].append(af_data)
+            elif af.authority_type == 'BIB':
+                organized["bibliography"].append(af_data)
+            elif af.authority_type == 'AUT':
+                organized["authors"].append(af_data)
+        
+        return JSONResponse(organized)
+        
+    except BusinessLogicError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore recupero authority files: {str(e)}")
+
+
+@iccd_router.post("/site/{site_id}/authority-files")
+async def create_authority_file(
+    site_id: UUID,
+    authority_data: Dict[str, Any] = Body(...),
+    current_user_id: UUID = Depends(get_current_user_id),
+    iccd_service: ICCDRecordService = Depends(get_iccd_record_service)
+):
+    """Crea nuovo authority file."""
+    try:
+        # Check site access
+        site, permission = await iccd_service.check_site_access(site_id, current_user_id)
+        
+        if not permission.can_write():
+            raise BusinessLogicError("Permessi di scrittura richiesti", 403)
+        
+        # Validate required fields
+        required_fields = ['authority_type', 'name']
+        for field in required_fields:
+            if field not in authority_data:
+                raise BusinessLogicError(f"Campo obbligatorio mancante: {field}", 400)
+        
+        from app.models.iccd_records import ICCDAuthorityFile
+        
+        # Generate authority code
+        authority_code = f"{authority_data['authority_type']}-{datetime.utcnow().year}-{datetime.utcnow().microsecond % 1000:03d}"
+        
+        db_authority = ICCDAuthorityFile(
+            authority_type=authority_data['authority_type'],
+            authority_code=authority_code,
+            name=authority_data['name'],
+            description=authority_data.get('description'),
+            authority_data=authority_data.get('data', {}),
+            site_id=str(site_id),
+            created_by=str(current_user_id)
+        )
+        
+        iccd_service.db_session.add(db_authority)
+        await iccd_service.db_session.commit()
+        await iccd_service.db_session.refresh(db_authority)
+        
+        return JSONResponse({
+            "id": str(db_authority.id),
+            "authority_code": db_authority.authority_code,
+            "message": f"Authority File {db_authority.authority_type} creato"
+        })
+        
+    except BusinessLogicError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        await iccd_service.db_session.rollback()
+        raise HTTPException(status_code=500, detail=f"Errore creazione authority file: {str(e)}")
