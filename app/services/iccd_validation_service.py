@@ -266,37 +266,58 @@ class ICCDValidator:
                     self.add_error("DT.DTM", "Anni devono essere valori numerici")
     
     def _validate_mt_section(self, mt_data: Dict[str, Any], schema_type: str, level: str):
-        """Validazione sezione MT - DATI TECNICI."""
+        """Validazione sezione MT - DATI TECNICI.
         
-        if "MTC" not in mt_data:
-            self.add_error("MT.MTC", "Sottosezione materia e tecnica MTC obbligatoria")
-            return
+        Per RA: MT contiene MTC (materia e tecnica) e MIS (misure)
+        Per CA/MA/SI: MT contiene MIS (misure del complesso/monumento/sito)
+        """
         
-        mtc = mt_data["MTC"]
-        
-        # MTCM - Materia (obbligatorio)
-        if "MTCM" not in mtc:
-            self.add_error("MT.MTC.MTCM", "Materia obbligatoria")
-        else:
-            materials = mtc["MTCM"]
-            valid_materials = [
-                "ceramica", "terracotta", "argilla", "bronzo", "ferro", "piombo", 
-                "oro", "argento", "marmo", "travertino", "tufo", "legno", "osso", 
-                "avorio", "vetro", "ambra", "pasta vitrea", "pietra", "calcare"
-            ]
+        # Per schede RA, MTC (materia e tecnica) è obbligatorio
+        if schema_type == "RA":
+            if "MTC" not in mt_data:
+                self.add_error("MT.MTC", "Sottosezione materia e tecnica MTC obbligatoria per schede RA")
+                return
             
-            if isinstance(materials, list):
-                for material in materials:
-                    if material.lower() not in valid_materials:
-                        logger.warning(f"Materiale '{material}' non in terminologia controllata standard")
-            elif isinstance(materials, str):
-                if materials.lower() not in valid_materials:
-                    logger.warning(f"Materiale '{materials}' non in terminologia controllata standard")
+            mtc = mt_data["MTC"]
+            
+            # MTCM - Materia (obbligatorio per RA)
+            if "MTCM" not in mtc:
+                self.add_error("MT.MTC.MTCM", "Materia obbligatoria")
+            else:
+                materials = mtc["MTCM"]
+                valid_materials = [
+                    "ceramica", "terracotta", "argilla", "bronzo", "ferro", "piombo", 
+                    "oro", "argento", "marmo", "travertino", "tufo", "legno", "osso", 
+                    "avorio", "vetro", "ambra", "pasta vitrea", "pietra", "calcare"
+                ]
+                
+                if isinstance(materials, list):
+                    for material in materials:
+                        if material.lower() not in valid_materials:
+                            logger.warning(f"Materiale '{material}' non in terminologia controllata standard")
+                elif isinstance(materials, str):
+                    if materials.lower() not in valid_materials:
+                        logger.warning(f"Materiale '{materials}' non in terminologia controllata standard")
         
-        # Validazione misure se presenti
+        # Per schede CA/MA/SI, MIS (misure) è obbligatorio
+        elif schema_type in ["CA", "MA", "SI"]:
+            if "MIS" not in mt_data:
+                self.add_error("MT.MIS", "Sottosezione misure MIS obbligatoria per schede CA/MA/SI")
+                return
+            
+            mis = mt_data["MIS"]
+            
+            # Almeno una misura deve essere presente
+            numeric_fields = ["MISL", "MISP", "MISA"]  # Lunghezza, Larghezza, Superficie
+            has_at_least_one = any(field in mis and mis[field] is not None for field in numeric_fields)
+            
+            if not has_at_least_one:
+                self.add_error("MT.MIS", "Almeno una misura (lunghezza, larghezza o superficie) è obbligatoria")
+        
+        # Validazione misure se presenti (comune a tutti gli schemi)
         if "MIS" in mt_data:
             mis = mt_data["MIS"]
-            numeric_fields = ["MISA", "MISL", "MISP", "MISD"]  # Altezza, Larghezza, Profondità, Diametro
+            numeric_fields = ["MISA", "MISL", "MISP", "MISD"]  # Altezza/Superficie, Lunghezza, Larghezza/Profondità, Diametro
             
             for field in numeric_fields:
                 if field in mis and mis[field] is not None:
@@ -304,13 +325,18 @@ class ICCDValidator:
                         value = float(mis[field])
                         if value < 0:
                             self.add_error(f"MT.MIS.{field}", "Misura non può essere negativa")
-                        elif value > 10000:  # 100 metri sembra un limite ragionevole per reperti archeologici
+                        elif schema_type == "RA" and value > 10000:  # 100 metri limite per reperti
                             self.add_error(f"MT.MIS.{field}", "Misura eccessivamente grande per un reperto")
+                        # Per CA/MA il limite è più alto (complessi possono essere molto grandi)
                     except (ValueError, TypeError):
                         self.add_error(f"MT.MIS.{field}", "Misura deve essere un valore numerico")
     
     def _validate_da_section(self, da_data: Dict[str, Any], schema_type: str, level: str):
-        """Validazione sezione DA - DATI ANALITICI."""
+        """Validazione sezione DA - DATI ANALITICI.
+        
+        Per RA: DES.DESA (descrizione reperto)
+        Per CA/MA/SI: DES.DESO (descrizione complesso/monumento/sito)
+        """
         
         # DES - Descrizione (obbligatoria)
         if "DES" not in da_data:
@@ -318,13 +344,24 @@ class ICCDValidator:
         else:
             des = da_data["DES"]
             
-            # DESO - Descrizione oggetto
-            if "DESA" not in des:
-                self.add_error("DA.DES.DESA", "Descrizione oggetto obbligatoria")
-            elif len(des["DESA"].strip()) < 10:
-                self.add_error("DA.DES.DESA", "Descrizione oggetto troppo breve (minimo 10 caratteri)")
+            # Campo di descrizione varia in base al tipo di scheda
+            if schema_type == "RA":
+                # Per RA: DESA (Descrizione oggetto)
+                desc_field = "DESA"
+                desc_name = "Descrizione oggetto"
+            else:
+                # Per CA/MA/SI: DESO (Descrizione)
+                desc_field = "DESO"
+                desc_name = "Descrizione"
+            
+            if desc_field not in des:
+                self.add_error(f"DA.DES.{desc_field}", f"{desc_name} obbligatoria")
+            elif not isinstance(des[desc_field], str):
+                self.add_error(f"DA.DES.{desc_field}", f"{desc_name} deve essere testo")
+            elif len(des[desc_field].strip()) < 10:
+                self.add_error(f"DA.DES.{desc_field}", f"{desc_name} troppo breve (minimo 10 caratteri)")
         
-        # STC - Stato di conservazione (obbligatorio)
+        # STC - Stato di conservazione (opzionale, commentato)
         #if "STC" not in da_data:
         #    self.add_error("CO.STC", "Stato di conservazione STC obbligatorio")
         #else:
