@@ -128,7 +128,17 @@ class ICCDRecordService:
             hierarchy_service = ICCDHierarchyService(self.db_session)
             
             schema_type = record_data['schema_type']
-            parent_id = record_data.get('parent_id')
+            parent_id_str = record_data.get('parent_id')
+            
+            # Convert parent_id to UUID if provided
+            parent_id = None
+            if parent_id_str:
+                try:
+                    parent_id = UUID(parent_id_str)
+                    logger.info(f"Parent ID parsed: {parent_id}")
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid parent_id format: {parent_id_str}, error: {e}")
+                    raise BusinessLogicError(f"Formato parent_id non valido: {parent_id_str}", 400)
             
             is_valid, error_message = await hierarchy_service.validate_card_creation(
                 site_id, schema_type, parent_id

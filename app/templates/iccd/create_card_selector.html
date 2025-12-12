@@ -1,37 +1,40 @@
 <!-- ICCD Card Creation Selector with Hierarchy Validation -->
-<div id="iccd-card-selector" x-data="iccdCardSelector()" class="bg-white rounded-lg shadow-lg p-6">
+<div id="iccd-card-selector" x-data="iccdCardSelector()" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
     <!-- Header -->
-    <div class="border-b border-gray-200 pb-4 mb-6">
-        <h2 class="text-xl font-semibold text-gray-900">Crea Nuova Scheda ICCD</h2>
-        <p class="text-sm text-gray-600 mt-1">
+    <div class="border-b border-gray-200 dark:border-gray-700 pb-4 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Crea Nuova Scheda ICCD</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Seleziona il tipo di scheda da creare secondo le regole gerarchiche ICCD
         </p>
     </div>
 
     <!-- Hierarchy Status -->
     <div x-show="hierarchyStatus" class="mb-6">
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 class="text-sm font-medium text-blue-900 mb-2">Stato Gerarchia Sito</h3>
+        <div class="dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h3 class="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">Stato Gerarchia Sito</h3>
             <div class="grid grid-cols-4 gap-4 text-sm">
                 <div class="text-center">
                     <div class="text-lg font-bold"
-                        :class="hierarchyStatus?.record_counts?.SI > 0 ? 'text-green-600' : 'text-red-600'"
+                        :class="hierarchyStatus?.record_counts?.SI > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
                         x-text="hierarchyStatus?.record_counts?.SI || 0"></div>
-                    <div class="text-gray-600">Scheda SI</div>
+                    <div class="text-gray-600 dark:text-gray-400">Scheda SI</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-lg font-bold text-blue-600" x-text="hierarchyStatus?.record_counts?.CA || 0"></div>
-                    <div class="text-gray-600">Schede CA</div>
+                    <div class="text-lg font-bold text-blue-600 dark:text-blue-400"
+                        x-text="hierarchyStatus?.record_counts?.CA || 0"></div>
+                    <div class="text-gray-600 dark:text-gray-400">Schede CA</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-lg font-bold text-purple-600" x-text="hierarchyStatus?.record_counts?.MA || 0">
+                    <div class="text-lg font-bold text-purple-600 dark:text-purple-400"
+                        x-text="hierarchyStatus?.record_counts?.MA || 0">
                     </div>
-                    <div class="text-gray-600">Schede MA</div>
+                    <div class="text-gray-600 dark:text-gray-400">Schede MA</div>
                 </div>
                 <div class="text-center">
-                    <div class="text-lg font-bold text-orange-600" x-text="hierarchyStatus?.record_counts?.RA || 0">
+                    <div class="text-lg font-bold text-orange-600 dark:text-orange-400"
+                        x-text="hierarchyStatus?.record_counts?.RA || 0">
                     </div>
-                    <div class="text-gray-600">Schede RA</div>
+                    <div class="text-gray-600 dark:text-gray-400">Schede RA</div>
                 </div>
             </div>
         </div>
@@ -39,12 +42,12 @@
 
     <!-- Validation Issues -->
     <div x-show="hierarchyStatus && hierarchyStatus.issues && hierarchyStatus.issues.length > 0" class="mb-6">
-        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <h3 class="text-sm font-medium text-red-900 mb-2">⚠️ Problemi Gerarchia</h3>
-            <ul class="text-sm text-red-700 space-y-1">
+        <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <h3 class="text-sm font-medium text-red-900 dark:text-red-200 mb-2">⚠️ Problemi Gerarchia</h3>
+            <ul class="text-sm text-red-700 dark:text-red-300 space-y-1">
                 <template x-for="issue in (hierarchyStatus?.issues || [])">
                     <li class="flex items-start">
-                        <span class="text-red-500 mr-2">•</span>
+                        <span class="text-red-500 dark:text-red-400 mr-2">•</span>
                         <span x-text="issue"></span>
                     </li>
                 </template>
@@ -54,16 +57,17 @@
 
     <!-- Creation Options -->
     <div x-show="creationOptions" class="mb-6">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Tipi di Scheda Disponibili</h3>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Tipi di Scheda Disponibili</h3>
 
         <!-- Recommendations -->
         <div x-show="creationOptions?.recommendations && creationOptions.recommendations.length > 0" class="mb-4">
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h4 class="text-sm font-medium text-yellow-900 mb-2">💡 Raccomandazioni</h4>
-                <ul class="text-sm text-yellow-700 space-y-1">
+            <div
+                class="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-yellow-900 dark:text-yellow-200 mb-2">💡 Raccomandazioni</h4>
+                <ul class="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
                     <template x-for="rec in (creationOptions?.recommendations || [])">
                         <li class="flex items-start">
-                            <span class="text-yellow-500 mr-2">•</span>
+                            <span class="text-yellow-500 dark:text-yellow-400 mr-2">•</span>
                             <span x-text="rec"></span>
                         </li>
                     </template>
@@ -74,8 +78,8 @@
         <!-- Available Card Types -->
         <div class="grid gap-4" x-show="creationOptions?.available_types && creationOptions.available_types.length > 0">
             <template x-for="cardType in (creationOptions?.available_types || [])">
-                <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 cursor-pointer transition-colors"
-                    :class="selectedCardType === cardType.type ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'"
+                <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer transition-colors"
+                    :class="selectedCardType === cardType.type ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'"
                     @click="selectCardType(cardType)">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
@@ -84,21 +88,23 @@
                                     class="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-medium mr-3"
                                     :class="getCardTypeColor(cardType.type)" x-text="cardType.type"></span>
                                 <div>
-                                    <h4 class="text-md font-medium text-gray-900" x-text="cardType.name"></h4>
-                                    <p class="text-sm text-gray-600" x-text="cardType.description"></p>
+                                    <h4 class="text-md font-medium text-gray-900 dark:text-white"
+                                        x-text="cardType.name"></h4>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400" x-text="cardType.description">
+                                    </p>
                                 </div>
                             </div>
-                            <div class="text-xs text-gray-500" x-text="cardType.constraint"></div>
+                            <div class="text-xs text-gray-500 dark:text-gray-500" x-text="cardType.constraint"></div>
                         </div>
                         <div class="ml-4">
                             <input type="radio" :value="cardType.type" x-model="selectedCardType"
-                                class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                                class="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 focus:ring-blue-500 dark:bg-gray-700">
                         </div>
                     </div>
 
                     <!-- Parent Selection for RA -->
                     <div x-show="selectedCardType === cardType.type && cardType.requires_parent"
-                        class="mt-4 border-t border-gray-200 pt-4">
+                        class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Seleziona
                             Padre</label>
 
@@ -136,7 +142,7 @@
 
         <!-- No Available Types -->
         <div x-show="creationOptions && (!creationOptions.available_types || creationOptions.available_types.length === 0)"
-            class="text-center py-8 text-gray-500">
+            class="text-center py-8 text-gray-500 dark:text-gray-400">
             <div class="text-4xl mb-2">🚫</div>
             <p>Nessun tipo di scheda disponibile al momento</p>
             <p class="text-sm mt-1">Verificare lo stato della gerarchia del sito</p>
@@ -144,25 +150,27 @@
     </div>
 
     <!-- Action Buttons -->
-    <div class="flex justify-between items-center pt-6 border-t border-gray-200">
+    <div class="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
         <button @click="$dispatch('close-modal')"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+            class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600">
             Annulla
         </button>
 
         <button @click="proceedToFormCreation()"
             :disabled="!selectedCardType || (selectedCardRequiresParent && !selectedParentId)"
-            :class="canProceed ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'"
+            :class="canProceed ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'"
             class="px-6 py-2 text-sm font-medium rounded-md transition-colors">
             Continua con <span x-text="selectedCardType || 'Selezione'"></span>
         </button>
     </div>
 
     <!-- Loading States -->
-    <div x-show="loading" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
+    <div x-show="loading"
+        class="absolute inset-0 bg-white dark:bg-gray-800 bg-opacity-75 dark:bg-opacity-75 flex items-center justify-center rounded-lg">
         <div class="text-center">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p class="text-sm text-gray-600 mt-2">Caricamento...</p>
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400 mx-auto">
+            </div>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Caricamento...</p>
         </div>
     </div>
 </div>

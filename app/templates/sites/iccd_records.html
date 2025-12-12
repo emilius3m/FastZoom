@@ -156,7 +156,7 @@
 
         <!-- Cards schede -->
         <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6" x-show="records.length > 0">
-            <template x-for="record in records" :key="record.id">
+            <template x-for="(record, index) in records" :key="record.id + '-' + index">
                 <div
                     class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <!-- Header con NCT e azioni -->

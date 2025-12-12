@@ -75,7 +75,7 @@ class ICCDHierarchyService:
         # Check if SI already exists for this site
         query = select(func.count(ICCDBaseRecord.id)).where(
             and_(
-                ICCDBaseRecord.site_id == site_id,
+                ICCDBaseRecord.site_id == str(site_id),
                 ICCDBaseRecord.schema_type == 'SI'
             )
         )
@@ -94,7 +94,7 @@ class ICCDHierarchyService:
         # Check if SI exists for this site
         query = select(func.count(ICCDBaseRecord.id)).where(
             and_(
-                ICCDBaseRecord.site_id == site_id,
+                ICCDBaseRecord.site_id == str(site_id),
                 ICCDBaseRecord.schema_type == 'SI'
             )
         )
@@ -114,10 +114,18 @@ class ICCDHierarchyService:
             return False, "Le schede RA (Reperti Archeologici) devono avere un padre (SI, CA o MA)"
         
         # Check if parent exists and is valid type
+        # Normalize parent_id for UUID comparison
+        parent_id_str = str(parent_id)
+        parent_id_no_dashes = parent_id_str.replace('-', '')
+        
+        from sqlalchemy import or_
         query = select(ICCDBaseRecord).where(
             and_(
-                ICCDBaseRecord.id == parent_id,
-                ICCDBaseRecord.site_id == site_id,
+                or_(
+                    ICCDBaseRecord.id == parent_id_str,
+                    ICCDBaseRecord.id == parent_id_no_dashes
+                ),
+                ICCDBaseRecord.site_id == str(site_id),
                 ICCDBaseRecord.schema_type.in_(['SI', 'CA', 'MA'])
             )
         )
@@ -140,10 +148,18 @@ class ICCDHierarchyService:
         
         # For other schemas types, if parent_id is provided, validate it exists
         if parent_id:
+            # Normalize parent_id for UUID comparison
+            parent_id_str = str(parent_id)
+            parent_id_no_dashes = parent_id_str.replace('-', '')
+            
+            from sqlalchemy import or_
             query = select(ICCDBaseRecord).where(
                 and_(
-                    ICCDBaseRecord.id == parent_id,
-                    ICCDBaseRecord.site_id == site_id
+                    or_(
+                        ICCDBaseRecord.id == parent_id_str,
+                        ICCDBaseRecord.id == parent_id_no_dashes
+                    ),
+                    ICCDBaseRecord.site_id == str(site_id)
                 )
             )
             
@@ -176,7 +192,7 @@ class ICCDHierarchyService:
                 # But we return SI for reference
                 query = select(ICCDBaseRecord).where(
                     and_(
-                        ICCDBaseRecord.site_id == site_id,
+                        ICCDBaseRecord.site_id == str(site_id),
                         ICCDBaseRecord.schema_type == 'SI'
                     )
                 )
@@ -185,7 +201,7 @@ class ICCDHierarchyService:
                 # RA can have SI, CA, or MA as parent
                 query = select(ICCDBaseRecord).where(
                     and_(
-                        ICCDBaseRecord.site_id == site_id,
+                        ICCDBaseRecord.site_id == str(site_id),
                         ICCDBaseRecord.schema_type.in_(['SI', 'CA', 'MA'])
                     )
                 )
@@ -193,7 +209,7 @@ class ICCDHierarchyService:
             else:
                 # Other types can have any existing card as parent
                 query = select(ICCDBaseRecord).where(
-                    ICCDBaseRecord.site_id == site_id
+                    ICCDBaseRecord.site_id == str(site_id)
                 )
             
             result = await self.db_session.execute(query)
@@ -228,7 +244,7 @@ class ICCDHierarchyService:
         try:
             # Get all records for the site
             query = select(ICCDBaseRecord).where(
-                ICCDBaseRecord.site_id == site_id
+                ICCDBaseRecord.site_id == str(site_id)
             ).order_by(ICCDBaseRecord.created_at)
             
             result = await self.db_session.execute(query)
@@ -298,7 +314,7 @@ class ICCDHierarchyService:
             
             # Get all records for the site
             query = select(ICCDBaseRecord).where(
-                ICCDBaseRecord.site_id == site_id
+                ICCDBaseRecord.site_id == str(site_id)
             )
             
             result = await self.db_session.execute(query)

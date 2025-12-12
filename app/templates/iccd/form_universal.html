@@ -336,6 +336,7 @@
                 // Config - will be initialized from data attributes
                 schemaType: '',
                 siteId: '',
+                parentId: null,  // Parent ID for hierarchical cards (RA needs parent)
                 existingRecord: null,
                 editMode: false,
 
@@ -365,6 +366,13 @@
                     this.siteId = container.dataset.siteId;
                     this.editMode = container.dataset.editMode === 'true';
 
+                    // Leggi parent_id dalla query string (per schede RA che richiedono un padre)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    this.parentId = urlParams.get('parent_id') || null;
+                    if (this.parentId) {
+                        console.log('📎 Parent ID trovato nella URL:', this.parentId);
+                    }
+
                     // Parse del record esistente se presente (da script tag)
                     const recordScript = document.getElementById('record-data');
                     if (recordScript) {
@@ -382,6 +390,7 @@
                     console.log('📊 Configurazione:', {
                         schemaType: this.schemaType,
                         siteId: this.siteId,
+                        parentId: this.parentId,
                         editMode: this.editMode,
                         hasExistingRecord: !!this.existingRecord
                     });
@@ -1583,6 +1592,12 @@
                             level: 'C',
                             iccd_data: this.formData
                         };
+
+                        // Aggiungi parent_id se presente (richiesto per schede RA)
+                        if (this.parentId) {
+                            requestData.parent_id = this.parentId;
+                            console.log('📎 Includendo parent_id nella richiesta:', this.parentId);
+                        }
 
                         // Aggiungi cataloging_institution se disponibile
                         if (this.formData.CD?.ESC) {

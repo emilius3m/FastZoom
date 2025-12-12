@@ -67,12 +67,19 @@ class ICCDRecordRepository:
 
     async def get_record_by_id(self, record_id: UUID, site_id: UUID) -> Optional[ICCDRecord]:
         """Get a specific ICCD record by ID and site ID."""
+        # Normalize record_id - try both with and without dashes
+        record_id_str = str(record_id)
+        record_id_no_dashes = record_id_str.replace("-", "")
+        
         query = select(ICCDRecord).options(
             joinedload(ICCDRecord.creator).joinedload(User.profile),
             joinedload(ICCDRecord.validator).joinedload(User.profile)
         ).where(
             and_(
-                ICCDRecord.id == record_id,
+                or_(
+                    ICCDRecord.id == record_id_str,
+                    ICCDRecord.id == record_id_no_dashes
+                ),
                 ICCDRecord.site_id == str(site_id)
             )
         )
