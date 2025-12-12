@@ -8,7 +8,13 @@ function iccdHierarchicalSystem() {
         // Stato del sistema
         currentLevel: 'site', // site -> complex -> monument -> artifact
         selectedRecord: null,
-        hierarchyTree: {},
+        hierarchyTree: {
+            organized: {
+                level1: { SI: null },
+                level2: { CA: [], MA: [], SAS: [] },
+                level3: { RA: [], NU: [], TMA: [], AT: [] }
+            }
+        },
 
         // Workflow ICCD
         iccdWorkflow: {
