@@ -58,3 +58,4 @@ piexif
 jsonschema
 python-docx
 psutil
+pdf2image

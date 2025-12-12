@@ -1,0 +1,649 @@
+# app/routes/api/v1/ocr_us_import.py
+"""
+API v1 - OCR Import US Sheets
+Endpoints per importazione schede US da PDF tramite Chandra OCR
+"""
+
+from typing import List, Dict, Any, Optional
+from uuid import UUID
+from datetime import datetime
+
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    HTTPException, 
+    UploadFile, 
+    File,
+    Form,
+    BackgroundTasks,
+    Query,
+    status
+)
+from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from pydantic import BaseModel, Field
+from loguru import logger
+
+from app.database.db import get_async_session
+from app.core.security import (
+    get_current_user_id_with_blacklist,
+    get_current_user_sites_with_blacklist,
+)
+from app.models.stratigraphy import UnitaStratigrafica
+from app.services.chandra_us_service import (
+    get_chandra_us_service, 
+    is_chandra_available,
+    ChandraUSService
+)
+
+
+router = APIRouter()
+
+
+# ===== PYDANTIC MODELS =====
+
+class OCRStatusResponse(BaseModel):
+    """Stato del servizio OCR"""
+    available: bool
+    chandra_installed: bool
+    pdf2image_installed: bool
+    gpu_enabled: bool
+    message: str
+
+
+class OCRExtractionResult(BaseModel):
+    """Risultato estrazione singola pagina"""
+    us_code: str
+    page_number: int
+    confidence: float
+    is_valid: bool
+    issues: List[str] = []
+    warnings: List[str] = []
+    extracted_fields_count: int
+    data: Dict[str, Any]
+
+
+class OCRBatchResult(BaseModel):
+    """Risultato estrazione batch"""
+    filename: str
+    total_pages: int
+    successful_extractions: int
+    failed_extractions: int
+    results: List[OCRExtractionResult]
+    processing_time_seconds: float
+
+
+class USImportPreviewItem(BaseModel):
+    """Anteprima singola US da importare"""
+    us_code: str
+    tipo: str
+    confidence: float
+    is_valid: bool
+    issues: List[str]
+    warnings: List[str]
+    preview_data: Dict[str, Any]
+
+
+class USImportPreviewResponse(BaseModel):
+    """Risposta anteprima importazione"""
+    filename: str
+    site_id: str
+    total_sheets: int
+    valid_sheets: int
+    invalid_sheets: int
+    items: List[USImportPreviewItem]
+
+
+class USImportConfirmRequest(BaseModel):
+    """Richiesta conferma importazione"""
+    items_to_import: List[str] = Field(
+        ..., 
+        description="Lista di us_code da importare"
+    )
+    overwrite_existing: bool = Field(
+        False,
+        description="Sovrascrivi US esistenti con stesso codice"
+    )
+
+
+class USImportConfirmResponse(BaseModel):
+    """Risposta conferma importazione"""
+    imported_count: int
+    skipped_count: int
+    error_count: int
+    imported_us: List[str]
+    skipped_us: List[str]
+    errors: List[Dict[str, str]]
+
+
+# ===== HELPER FUNCTIONS =====
+
+def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]):
+    """Verifica accesso al sito"""
+    site_id_str = str(site_id)
+    
+    # Check using 'site_id' key (standard for user_sites from auth service)
+    for site in user_sites:
+        user_site_id = str(site.get('site_id', ''))
+        if user_site_id == site_id_str:
+            return True
+    
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Non hai accesso al sito {site_id}"
+    )
+
+
+# ===== ENDPOINTS =====
+
+@router.get(
+    "/ocr/status",
+    response_model=OCRStatusResponse,
+    summary="Stato servizio OCR",
+    description="Verifica disponibilità del servizio OCR Chandra"
+)
+async def get_ocr_status():
+    """
+    Verifica lo stato del servizio OCR per l'importazione PDF.
+    
+    Controlla:
+    - Installazione Chandra OCR
+    - Installazione pdf2image e Poppler
+    - Disponibilità GPU
+    """
+    try:
+        service = get_chandra_us_service(use_gpu=True)
+        
+        from app.services.chandra_us_service import CHANDRA_AVAILABLE, PDF2IMAGE_AVAILABLE
+        
+        available = CHANDRA_AVAILABLE and PDF2IMAGE_AVAILABLE
+        
+        if available:
+            message = "Servizio OCR disponibile"
+        elif not CHANDRA_AVAILABLE:
+            message = "Chandra OCR non installato. Installa con: pip install chandra-ocr"
+        elif not PDF2IMAGE_AVAILABLE:
+            message = "pdf2image non installato. Installa con: pip install pdf2image"
+        else:
+            message = "Servizio OCR non disponibile"
+        
+        return OCRStatusResponse(
+            available=available,
+            chandra_installed=CHANDRA_AVAILABLE,
+            pdf2image_installed=PDF2IMAGE_AVAILABLE,
+            gpu_enabled=service.use_gpu,
+            message=message
+        )
+    
+    except Exception as e:
+        logger.error(f"Error checking OCR status: {e}")
+        return OCRStatusResponse(
+            available=False,
+            chandra_installed=False,
+            pdf2image_installed=False,
+            gpu_enabled=False,
+            message=f"Errore verifica servizio: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/ocr/extract",
+    response_model=OCRBatchResult,
+    summary="Estrai schede US da PDF",
+    description="Estrae schede US da un PDF utilizzando OCR Chandra"
+)
+async def extract_us_from_pdf(
+    site_id: UUID,
+    file: UploadFile = File(..., description="File PDF da processare"),
+    use_gpu: bool = Query(True, description="Utilizza GPU se disponibile"),
+    db: AsyncSession = Depends(get_async_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """
+    Estrae schede US da un file PDF utilizzando il servizio OCR Chandra.
+    
+    Il PDF viene analizzato pagina per pagina e per ogni pagina viene 
+    tentata l'estrazione di una scheda US secondo standard MiC 2021.
+    
+    Returns:
+        OCRBatchResult con i risultati dell'estrazione
+    """
+    import time
+    start_time = time.time()
+    
+    # Verifica accesso al sito
+    verify_site_access(site_id, user_sites)
+    
+    # Verifica disponibilità OCR
+    if not is_chandra_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Servizio OCR non disponibile. Assicurati che Chandra e pdf2image siano installati."
+        )
+    
+    # Verifica tipo file
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Il file deve essere in formato PDF"
+        )
+    
+    try:
+        # Leggi contenuto PDF
+        pdf_bytes = await file.read()
+        
+        if len(pdf_bytes) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Il file PDF è vuoto"
+            )
+        
+        if len(pdf_bytes) > 50 * 1024 * 1024:  # 50MB limit
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Il file PDF è troppo grande (max 50MB)"
+            )
+        
+        logger.info(f"Processing PDF {file.filename} ({len(pdf_bytes)} bytes) for site {site_id}")
+        
+        # Inizializza servizio OCR
+        service = get_chandra_us_service(use_gpu=use_gpu)
+        
+        # Estrai schede
+        extracted_sheets = await service.extract_from_pdf(
+            pdf_bytes=pdf_bytes,
+            filename=file.filename,
+            site_id=str(site_id)
+        )
+        
+        # Costruisci risultati
+        results = []
+        for sheet in extracted_sheets:
+            validation = service.validate_extraction_result(sheet)
+            
+            results.append(OCRExtractionResult(
+                us_code=validation['us_code'] or 'UNKNOWN',
+                page_number=sheet.get('_page_number', 0),
+                confidence=validation['confidence'],
+                is_valid=validation['is_valid'],
+                issues=validation['issues'],
+                warnings=validation['warnings'],
+                extracted_fields_count=validation['extracted_fields_count'],
+                data=sheet
+            ))
+        
+        processing_time = time.time() - start_time
+        
+        # Conta pagine totali (approssimazione)
+        from pdf2image import pdfinfo_from_bytes
+        try:
+            pdf_info = pdfinfo_from_bytes(pdf_bytes)
+            total_pages = pdf_info.get('Pages', len(results))
+        except:
+            total_pages = len(results)
+        
+        return OCRBatchResult(
+            filename=file.filename,
+            total_pages=total_pages,
+            successful_extractions=len([r for r in results if r.is_valid]),
+            failed_extractions=len([r for r in results if not r.is_valid]),
+            results=results,
+            processing_time_seconds=round(processing_time, 2)
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error extracting US from PDF: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore durante l'estrazione: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/ocr/preview",
+    response_model=USImportPreviewResponse,
+    summary="Anteprima importazione US da PDF",
+    description="Analizza PDF e mostra anteprima delle schede US da importare"
+)
+async def preview_us_import(
+    site_id: UUID,
+    file: UploadFile = File(..., description="File PDF da analizzare"),
+    use_gpu: bool = Query(True, description="Utilizza GPU se disponibile"),
+    db: AsyncSession = Depends(get_async_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """
+    Analizza un PDF e restituisce un'anteprima delle schede US estratte.
+    
+    L'anteprima include:
+    - Validazione preliminare
+    - Verifica duplicati nel database
+    - Dati estratti con confidence
+    
+    Utile per revisione prima dell'importazione effettiva.
+    """
+    # Verifica accesso al sito
+    verify_site_access(site_id, user_sites)
+    
+    if not is_chandra_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Servizio OCR non disponibile"
+        )
+    
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Il file deve essere in formato PDF"
+        )
+    
+    try:
+        pdf_bytes = await file.read()
+        
+        service = get_chandra_us_service(use_gpu=use_gpu)
+        extracted_sheets = await service.extract_from_pdf(
+            pdf_bytes=pdf_bytes,
+            filename=file.filename,
+            site_id=str(site_id)
+        )
+        
+        # Verifica US esistenti nel sito
+        existing_us_codes = set()
+        result = await db.execute(
+            select(UnitaStratigrafica.us_code)
+            .where(UnitaStratigrafica.site_id == str(site_id))
+        )
+        existing_us_codes = {row[0] for row in result.fetchall()}
+        
+        items = []
+        for sheet in extracted_sheets:
+            validation = service.validate_extraction_result(sheet)
+            us_code = sheet.get('us_code', 'UNKNOWN')
+            
+            # Aggiungi warning per duplicati
+            if us_code in existing_us_codes:
+                validation['warnings'].append(
+                    f"US {us_code} già esistente nel sito"
+                )
+            
+            # Crea anteprima con campi principali
+            preview_data = {
+                'us_code': us_code,
+                'tipo': sheet.get('tipo'),
+                'definizione': sheet.get('definizione', '')[:200] if sheet.get('definizione') else None,
+                'localita': sheet.get('localita'),
+                'datazione': sheet.get('datazione'),
+                'responsabile_scientifico': sheet.get('responsabile_scientifico'),
+                'sequenza_fisica_count': sum(
+                    len(v) for v in sheet.get('sequenza_fisica', {}).values() if v
+                )
+            }
+            
+            items.append(USImportPreviewItem(
+                us_code=us_code,
+                tipo=sheet.get('tipo', 'positiva'),
+                confidence=validation['confidence'],
+                is_valid=validation['is_valid'],
+                issues=validation['issues'],
+                warnings=validation['warnings'],
+                preview_data=preview_data
+            ))
+        
+        valid_count = len([i for i in items if i.is_valid])
+        
+        return USImportPreviewResponse(
+            filename=file.filename,
+            site_id=str(site_id),
+            total_sheets=len(items),
+            valid_sheets=valid_count,
+            invalid_sheets=len(items) - valid_count,
+            items=items
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in preview import: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore durante l'anteprima: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/ocr/import",
+    response_model=USImportConfirmResponse,
+    summary="Importa schede US da dati OCR",
+    description="Importa schede US precedentemente estratte da PDF"
+)
+async def import_us_from_ocr(
+    site_id: UUID,
+    file: UploadFile = File(..., description="File PDF da importare"),
+    items_to_import: str = Form(
+        default="all",
+        description="Lista US da importare (JSON array) o 'all' per tutte"
+    ),
+    overwrite_existing: bool = Form(
+        default=False,
+        description="Sovrascrivi US esistenti"
+    ),
+    use_gpu: bool = Query(True, description="Utilizza GPU"),
+    db: AsyncSession = Depends(get_async_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """
+    Importa schede US estratte da PDF nel database.
+    
+    Workflow:
+    1. Estrae schede dal PDF
+    2. Valida ogni scheda
+    3. Importa solo quelle specificate (o tutte se 'all')
+    4. Opzionalmente sovrascrive US esistenti
+    """
+    import json
+    
+    verify_site_access(site_id, user_sites)
+    
+    if not is_chandra_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Servizio OCR non disponibile"
+        )
+    
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Il file deve essere in formato PDF"
+        )
+    
+    try:
+        pdf_bytes = await file.read()
+        
+        service = get_chandra_us_service(use_gpu=use_gpu)
+        extracted_sheets = await service.extract_from_pdf(
+            pdf_bytes=pdf_bytes,
+            filename=file.filename,
+            site_id=str(site_id)
+        )
+        
+        # Parse items to import
+        if items_to_import == "all":
+            codes_to_import = None  # Import all valid
+        else:
+            try:
+                codes_to_import = set(json.loads(items_to_import))
+            except json.JSONDecodeError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="items_to_import deve essere 'all' o un JSON array valido"
+                )
+        
+        # Get existing US
+        result = await db.execute(
+            select(UnitaStratigrafica)
+            .where(UnitaStratigrafica.site_id == str(site_id))
+        )
+        existing_us = {us.us_code: us for us in result.scalars().all()}
+        
+        imported_us = []
+        skipped_us = []
+        errors = []
+        
+        for sheet in extracted_sheets:
+            us_code = sheet.get('us_code')
+            
+            # Skip if not in import list
+            if codes_to_import is not None and us_code not in codes_to_import:
+                skipped_us.append(us_code)
+                continue
+            
+            # Validate
+            validation = service.validate_extraction_result(sheet)
+            if not validation['is_valid']:
+                errors.append({
+                    'us_code': us_code,
+                    'error': '; '.join(validation['issues'])
+                })
+                continue
+            
+            try:
+                # Check if exists
+                if us_code in existing_us:
+                    if overwrite_existing:
+                        # Update existing
+                        existing = existing_us[us_code]
+                        for key, value in sheet.items():
+                            if not key.startswith('_') and hasattr(existing, key):
+                                setattr(existing, key, value)
+                        imported_us.append(us_code)
+                    else:
+                        skipped_us.append(us_code)
+                else:
+                    # Create new
+                    # Remove internal fields
+                    us_data = {
+                        k: v for k, v in sheet.items() 
+                        if not k.startswith('_')
+                    }
+                    
+                    new_us = UnitaStratigrafica(**us_data)
+                    db.add(new_us)
+                    imported_us.append(us_code)
+            
+            except Exception as e:
+                errors.append({
+                    'us_code': us_code,
+                    'error': str(e)
+                })
+        
+        await db.commit()
+        
+        logger.info(
+            f"OCR Import completed for site {site_id}: "
+            f"imported={len(imported_us)}, skipped={len(skipped_us)}, errors={len(errors)}"
+        )
+        
+        return USImportConfirmResponse(
+            imported_count=len(imported_us),
+            skipped_count=len(skipped_us),
+            error_count=len(errors),
+            imported_us=imported_us,
+            skipped_us=skipped_us,
+            errors=errors
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error importing US from OCR: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore durante l'importazione: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/ocr/extract-image",
+    response_model=OCRExtractionResult,
+    summary="Estrai scheda US da immagine singola",
+    description="Estrae una scheda US da un'immagine (JPG, PNG, TIFF)"
+)
+async def extract_us_from_image(
+    site_id: UUID,
+    file: UploadFile = File(..., description="File immagine da processare"),
+    use_gpu: bool = Query(True, description="Utilizza GPU se disponibile"),
+    db: AsyncSession = Depends(get_async_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """
+    Estrae una scheda US da un'immagine singola (scan, foto).
+    
+    Formati supportati: JPG, PNG, TIFF, BMP
+    """
+    verify_site_access(site_id, user_sites)
+    
+    if not is_chandra_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Servizio OCR non disponibile"
+        )
+    
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp'}
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nome file mancante"
+        )
+    
+    ext = '.' + file.filename.lower().split('.')[-1] if '.' in file.filename else ''
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato non supportato. Usa: {', '.join(allowed_extensions)}"
+        )
+    
+    try:
+        image_bytes = await file.read()
+        
+        service = get_chandra_us_service(use_gpu=use_gpu)
+        extracted_data = await service.extract_from_image(
+            image_bytes=image_bytes,
+            filename=file.filename,
+            site_id=str(site_id)
+        )
+        
+        if not extracted_data:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Nessuna scheda US rilevata nell'immagine"
+            )
+        
+        validation = service.validate_extraction_result(extracted_data)
+        
+        return OCRExtractionResult(
+            us_code=validation['us_code'] or 'UNKNOWN',
+            page_number=1,
+            confidence=validation['confidence'],
+            is_valid=validation['is_valid'],
+            issues=validation['issues'],
+            warnings=validation['warnings'],
+            extracted_fields_count=validation['extracted_fields_count'],
+            data=extracted_data
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error extracting from image: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore durante l'estrazione: {str(e)}"
+        )

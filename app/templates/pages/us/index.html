@@ -50,6 +50,178 @@
                         </svg>
                         Esporta Dati
                     </button>
+                    <!-- PDF Import Button -->
+                    <button @click="$refs.pdfImportInput.click()" :disabled="pdfImporting"
+                        class="inline-flex items-center px-4 py-2 bg-purple-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:focus:ring-offset-gray-800 disabled:opacity-50">
+                        <svg x-show="!pdfImporting" class="w-4 h-4 mr-2" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                            </path>
+                        </svg>
+                        <svg x-show="pdfImporting" class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <span x-text="pdfImporting ? 'Elaborazione...' : 'Importa da PDF'"></span>
+                    </button>
+                    <input type="file" x-ref="pdfImportInput" @change="handlePDFImport($event)" accept=".pdf"
+                        class="hidden">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Import Results Modal -->
+    <div x-show="showPdfImportModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
+        x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showPdfImportModal = false"></div>
+            <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+                x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100">
+
+                <!-- Modal Header -->
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        <i class="fas fa-file-pdf text-red-500 mr-2"></i>
+                        Risultati Importazione OCR
+                    </h3>
+                    <button @click="showPdfImportModal = false"
+                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 overflow-y-auto max-h-[60vh]">
+                    <!-- Error State -->
+                    <template x-if="pdfImportError">
+                        <div
+                            class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span class="text-red-700 dark:text-red-300" x-text="pdfImportError"></span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Success State with Results -->
+                    <template
+                        x-if="pdfImportResults && pdfImportResults.results && pdfImportResults.results.length > 0">
+                        <div>
+                            <!-- Stats -->
+                            <div class="grid grid-cols-3 gap-4 mb-6">
+                                <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4 text-center">
+                                    <div class="text-2xl font-bold text-blue-600 dark:text-blue-400"
+                                        x-text="pdfImportResults.total_pages"></div>
+                                    <div class="text-sm text-blue-700 dark:text-blue-300">Pagine Analizzate</div>
+                                </div>
+                                <div class="bg-green-50 dark:bg-green-900/30 rounded-lg p-4 text-center">
+                                    <div class="text-2xl font-bold text-green-600 dark:text-green-400"
+                                        x-text="pdfImportResults.successful_extractions"></div>
+                                    <div class="text-sm text-green-700 dark:text-green-300">US Estratte</div>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                                    <div class="text-2xl font-bold text-gray-600 dark:text-gray-300"
+                                        x-text="pdfImportResults.processing_time_seconds + 's'"></div>
+                                    <div class="text-sm text-gray-500 dark:text-gray-400">Tempo Elaborazione</div>
+                                </div>
+                            </div>
+
+                            <!-- Results List -->
+                            <div class="space-y-4">
+                                <template x-for="(result, index) in pdfImportResults.results" :key="index">
+                                    <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-4"
+                                        :class="result.is_valid ? 'bg-green-50 dark:bg-green-900/20' : 'bg-yellow-50 dark:bg-yellow-900/20'">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div class="flex items-center">
+                                                <span class="text-lg font-bold" x-text="result.us_code"></span>
+                                                <span class="ml-2 px-2 py-1 text-xs rounded-full"
+                                                    :class="result.is_valid ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'"
+                                                    x-text="result.is_valid ? 'Valido' : 'Incompleto'"></span>
+                                                <span class="ml-2 text-sm text-gray-500"
+                                                    x-text="'Pagina ' + result.page_number"></span>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-sm text-gray-500">Confidence:</span>
+                                                <span class="font-semibold"
+                                                    :class="result.confidence > 0.8 ? 'text-green-600' : 'text-yellow-600'"
+                                                    x-text="(result.confidence * 100).toFixed(0) + '%'"></span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Extracted Data Preview -->
+                                        <div class="grid grid-cols-2 gap-2 text-sm">
+                                            <div x-show="result.data.tipo"><strong>Tipo:</strong> <span
+                                                    x-text="result.data.tipo"></span></div>
+                                            <div x-show="result.data.definizione"><strong>Definizione:</strong> <span
+                                                    x-text="(result.data.definizione || '').substring(0, 50) + '...'"></span>
+                                            </div>
+                                            <div x-show="result.data.localita"><strong>Località:</strong> <span
+                                                    x-text="result.data.localita"></span></div>
+                                            <div x-show="result.data.datazione"><strong>Datazione:</strong> <span
+                                                    x-text="result.data.datazione"></span></div>
+                                            <div x-show="result.data.responsabile_scientifico">
+                                                <strong>Responsabile:</strong> <span
+                                                    x-text="result.data.responsabile_scientifico"></span></div>
+                                            <div><strong>Campi estratti:</strong> <span
+                                                    x-text="result.extracted_fields_count"></span></div>
+                                        </div>
+
+                                        <!-- Warnings -->
+                                        <template x-if="result.warnings && result.warnings.length > 0">
+                                            <div class="mt-2 text-xs text-yellow-700 dark:text-yellow-400">
+                                                <template x-for="warn in result.warnings" :key="warn">
+                                                    <div class="flex items-center"><span class="mr-1">⚠️</span><span
+                                                            x-text="warn"></span></div>
+                                                </template>
+                                            </div>
+                                        </template>
+
+                                        <!-- Import Button -->
+                                        <div class="mt-3 flex justify-end">
+                                            <button @click="createUSFromOCR(result.data)" :disabled="!result.is_valid"
+                                                class="px-4 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <i class="fas fa-plus mr-1"></i> Crea US
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- No Results -->
+                    <template
+                        x-if="pdfImportResults && (!pdfImportResults.results || pdfImportResults.results.length === 0) && !pdfImportError">
+                        <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                            <i class="fas fa-search text-4xl mb-4"></i>
+                            <p>Nessuna scheda US trovata nel PDF.</p>
+                            <p class="text-sm mt-2">Assicurati che il PDF contenga schede US nel formato standard MiC
+                                2021.</p>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                    <button @click="showPdfImportModal = false"
+                        class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                        Chiudi
+                    </button>
                 </div>
             </div>
         </div>

@@ -27,6 +27,7 @@ from app.routes.api.v1.unified import router as unified_router
 from app.routes.api.v1.us_files import router as us_files_router
 from app.routes.api.v1.harris_matrix import router as harris_matrix_router
 from app.routes.api.v1.harris_matrix_mapping import router as harris_matrix_mapping_router
+from app.routes.api.v1.ocr_us_import import router as ocr_us_import_router
 
 # Router principale API v1
 api_v1_router = APIRouter(
@@ -59,6 +60,7 @@ api_v1_router.include_router(teams_router, prefix="/teams", tags=["Team Manageme
 # api_v1_router.include_router(monitoring_router, prefix="/monitoring", tags=["System Monitoring"])
 api_v1_router.include_router(admin_router, prefix="/admin", tags=["Administration"])
 api_v1_router.include_router(unified_router, prefix="/unified", tags=["Unified Dashboard"])
+api_v1_router.include_router(ocr_us_import_router, prefix="/ocr", tags=["OCR US Import"])
 
 # Moved routers from V0
 from app.routes.api.v1.form_schemas import form_schemas_router

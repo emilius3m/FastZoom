@@ -243,6 +243,12 @@
             selectedUS: [],
             formType: 'us',  // 'us' or 'usm'
 
+            // PDF Import state (OCR)
+            pdfImporting: false,
+            showPdfImportModal: false,
+            pdfImportResults: null,
+            pdfImportError: null,
+
             // ===== INITIALIZATION =====
             async init() {
                 console.log('US/USM Manager inizializzato per sito:', this.currentSiteId);
@@ -1973,6 +1979,140 @@
                 link.click();
 
                 this.showNotification('Dati US/USM esportati con successo', 'success');
+            },
+
+            // ===== PDF IMPORT (OCR) METHODS =====
+
+            async handlePDFImport(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                // Reset file input
+                event.target.value = '';
+
+                // Validate file type
+                if (!file.name.toLowerCase().endsWith('.pdf')) {
+                    this.showNotification('Seleziona un file PDF valido', 'error');
+                    return;
+                }
+
+                // Validate file size (50MB max)
+                if (file.size > 50 * 1024 * 1024) {
+                    this.showNotification('Il file è troppo grande (max 50MB)', 'error');
+                    return;
+                }
+
+                this.pdfImporting = true;
+                this.pdfImportError = null;
+                this.pdfImportResults = null;
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    console.log('Uploading PDF for OCR extraction:', file.name);
+
+                    const response = await fetch(`/api/v1/ocr/sites/${this.currentSiteId}/ocr/extract`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': this.getCSRFToken()
+                        },
+                        body: formData,
+                        credentials: 'include'
+                    });
+
+                    if (response.ok) {
+                        const results = await response.json();
+                        console.log('OCR extraction results:', results);
+                        this.pdfImportResults = results;
+                        this.showPdfImportModal = true;
+
+                        if (results.results && results.results.length > 0) {
+                            this.showNotification(
+                                `Estratte ${results.successful_extractions} schede US dal PDF`,
+                                'success'
+                            );
+                        } else {
+                            this.pdfImportError = 'Nessuna scheda US trovata nel PDF';
+                            this.showPdfImportModal = true;
+                        }
+                    } else {
+                        const error = await response.json();
+                        console.error('OCR API error:', error);
+
+                        let errorMessage = 'Errore durante l\'estrazione OCR';
+                        if (error.detail) {
+                            errorMessage = typeof error.detail === 'string'
+                                ? error.detail
+                                : JSON.stringify(error.detail);
+                        }
+
+                        this.pdfImportError = errorMessage;
+                        this.showPdfImportModal = true;
+                    }
+                } catch (error) {
+                    console.error('PDF import error:', error);
+                    this.pdfImportError = 'Errore di connessione durante l\'elaborazione del PDF';
+                    this.showPdfImportModal = true;
+                } finally {
+                    this.pdfImporting = false;
+                }
+            },
+
+            async createUSFromOCR(usData) {
+                try {
+                    // Remove internal OCR fields
+                    const cleanData = { ...usData };
+                    delete cleanData._raw_ocr_text;
+                    delete cleanData._extraction_confidence;
+                    delete cleanData._pdf_source;
+                    delete cleanData._page_number;
+
+                    // Ensure site_id is set correctly
+                    cleanData.site_id = this.currentSiteId;
+
+                    console.log('Creating US from OCR data:', cleanData);
+
+                    const response = await fetch(`/api/v1/us/sites/${this.currentSiteId}/us`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
+                        },
+                        body: JSON.stringify(cleanData),
+                        credentials: 'include'
+                    });
+
+                    if (response.ok) {
+                        const createdUS = await response.json();
+                        console.log('US created from OCR:', createdUS);
+
+                        this.showNotification(`US ${createdUS.us_code} creata con successo`, 'success');
+
+                        // Reload US list to show new entry
+                        await this.loadUSList();
+
+                        // Close modal and reset
+                        this.showPdfImportModal = false;
+                        this.pdfImportResults = null;
+
+                    } else {
+                        const error = await response.json();
+                        console.error('Error creating US from OCR:', error);
+
+                        let errorMessage = 'Errore nella creazione della US';
+                        if (error.detail) {
+                            errorMessage = typeof error.detail === 'string'
+                                ? error.detail
+                                : JSON.stringify(error.detail);
+                        }
+
+                        this.showNotification(errorMessage, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error in createUSFromOCR:', error);
+                    this.showNotification('Errore durante la creazione della US', 'error');
+                }
             }
         }
     }
