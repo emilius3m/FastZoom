@@ -83,7 +83,7 @@ class ICCDRecordRepository:
         )
         
         result = await self.db_session.execute(query)
-        return result.scalar_one_or_none()
+        return result.unique().scalar_one_or_none()
 
     async def create_record(self, record_data: Dict[str, Any]) -> ICCDRecord:
         """Create a new ICCD record."""
