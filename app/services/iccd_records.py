@@ -414,10 +414,10 @@ class ICCDRecordService:
                                  schema_type: Optional[str] = None,
                                  category: Optional[str] = None) -> Dict[str, Any]:
         """Get available ICCD schemas templates from Python code."""
-        # Verify user exists
+        # Verify user exists - convert UUID to string for DB comparison
         from sqlalchemy import select
         from app.models import User
-        user_query = select(User).where(User.id == current_user_id)
+        user_query = select(User).where(User.id == str(current_user_id))
         user_result = await self.db_session.execute(user_query)
         user = user_result.scalar_one_or_none()
         
@@ -456,10 +456,10 @@ class ICCDRecordService:
 
     async def get_schema_template_by_type(self, current_user_id: UUID, schema_type: str) -> Dict[str, Any]:
         """Get a specific ICCD schemas template by type from Python code."""
-        # Verify user exists
+        # Verify user exists - convert UUID to string for DB comparison
         from sqlalchemy import select
         from app.models import User
-        user_query = select(User).where(User.id == current_user_id)
+        user_query = select(User).where(User.id == str(current_user_id))
         user_result = await self.db_session.execute(user_query)
         user = user_result.scalar_one_or_none()
         

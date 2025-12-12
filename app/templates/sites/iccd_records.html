@@ -556,16 +556,14 @@
     handleCreateCard(cardData) {
         this.showCardSelector = false;
 
-        // Naviga al form di creazione con i parametri della gerarchia
-        const params = new URLSearchParams({
-            schema_type: cardData.schema_type
-        });
+        // Naviga al form di creazione con path parameter per schema_type
+        let url = `/sites/{{ site.id }}/iccd/new/${cardData.schema_type}`;
 
         if (cardData.parent_id) {
-            params.append('parent_id', cardData.parent_id);
+            url += `?parent_id=${cardData.parent_id}`;
         }
 
-        window.location.href = `/sites/{{ site.id }}/iccd/new?${params}`;
+        window.location.href = url;
     }
     }));
 });

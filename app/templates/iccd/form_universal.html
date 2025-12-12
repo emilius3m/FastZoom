@@ -10,28 +10,36 @@
     .iccd-section {
         @apply border-l-4 border-blue-500 dark:border-blue-400 bg-white dark:bg-gray-800 rounded-r-lg shadow-sm mb-6 transition-all;
     }
+
     .iccd-section-required {
         @apply border-l-red-500 dark:border-red-400;
     }
+
     .iccd-section-complete {
         @apply border-l-green-500 dark:border-green-400;
     }
+
     .iccd-section-error {
         @apply border-l-red-600 dark:border-red-400 bg-red-50 dark:bg-red-900/20;
     }
+
     .iccd-field-required label::after {
         content: " *";
         @apply text-red-600 dark:text-red-400 font-bold;
     }
+
     .iccd-field-error {
         @apply border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/20;
     }
+
     .error-message {
         @apply text-red-600 dark:text-red-400 text-sm mt-1;
     }
+
     .completion-bar {
         background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
     }
+
     .dark .completion-bar {
         background: linear-gradient(90deg, #60a5fa 0%, #34d399 100%);
     }
@@ -40,28 +48,30 @@
 
 {% block content %}
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
-    <div class="container mx-auto px-4 py-6"
-         x-data="iccdFormUniversal()"
-         data-schema-type="{{ schema_type }}"
-         data-site-id="{{ site.id }}"
-         data-edit-mode="{{ edit_mode|tojson if edit_mode else 'false' }}">
-         
-    <!-- Record data in a hidden script tag to avoid attribute parsing issues -->
-    {% if record %}
-    <script type="application/json" id="record-data">{{ record|tojson }}</script>
-    {% endif %}
+    <div class="container mx-auto px-4 py-6" x-data="iccdFormUniversal()" data-schema-type="{{ schema_type }}"
+        data-site-id="{{ site.id }}" data-edit-mode="{{ edit_mode|tojson if edit_mode else 'false' }}">
+
+        <!-- Record data in a hidden script tag to avoid attribute parsing issues -->
+        {% if record %}
+        <script type="application/json" id="record-data">{{ record|tojson }}</script>
+        {% endif %}
 
         <!-- Header -->
         <div class="mb-6">
             <!-- Breadcrumb -->
             <nav class="flex mb-4 text-sm" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1">
-                    <li><a href="/sites/{{ site.id }}/dashboard" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">Dashboard</a></li>
+                    <li><a href="/sites/{{ site.id }}/dashboard"
+                            class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">Dashboard</a>
+                    </li>
                     <li><span class="mx-2 text-gray-400 dark:text-gray-500">/</span></li>
-                    <li><a href="/sites/{{ site.id }}/iccd" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">{{ site.name }}</a></li>
+                    <li><a href="/sites/{{ site.id }}/iccd"
+                            class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400">{{
+                            site.name }}</a></li>
                     <li><span class="mx-2 text-gray-400 dark:text-gray-500">/</span></li>
                     <li class="text-gray-900 dark:text-white font-medium">
-                        <span x-text="editMode ? 'Modifica' : 'Nuova'"></span> Scheda ICCD <span x-text="schemaType"></span> 3.00
+                        <span x-text="editMode ? 'Modifica' : 'Nuova'"></span> Scheda ICCD <span
+                            x-text="schemaType"></span> 3.00
                     </li>
                 </ol>
             </nav>
@@ -71,18 +81,24 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
-                            <svg class="w-8 h-8 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                            <svg class="w-8 h-8 text-blue-600 dark:text-blue-400" fill="currentColor"
+                                viewBox="0 0 20 20">
                                 <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
-                                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+                                <path fill-rule="evenodd"
+                                    d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z"
+                                    clip-rule="evenodd"></path>
                             </svg>
                         </div>
                         <div>
                             <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-                                <span x-text="editMode ? 'Modifica' : 'Nuova'"></span> Scheda <span x-text="schemaType"></span> 3.00
+                                <span x-text="editMode ? 'Modifica' : 'Nuova'"></span> Scheda <span
+                                    x-text="schemaType"></span> 3.00
                             </h1>
                             <p class="text-gray-600 dark:text-gray-400 mt-1">
-                                <span x-text="schemaInfo.description || 'Catalogazione Archeologica Standard ICCD'"></span>
-                                <span x-show="editMode && existingRecord" class="ml-2 text-sm font-medium text-blue-600 dark:text-blue-400">
+                                <span
+                                    x-text="schemaInfo.description || 'Catalogazione Archeologica Standard ICCD'"></span>
+                                <span x-show="editMode && existingRecord"
+                                    class="ml-2 text-sm font-medium text-blue-600 dark:text-blue-400">
                                     NCT: <span x-text="existingRecord?.nct || 'N/A'"></span>
                                 </span>
                             </p>
@@ -95,9 +111,10 @@
                         <div class="flex items-center gap-3">
                             <div class="w-48 h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                 <div class="h-full completion-bar transition-all duration-300"
-                                     :style="`width: ${completionPercentage}%`"></div>
+                                    :style="`width: ${completionPercentage}%`"></div>
                             </div>
-                            <span class="text-2xl font-bold text-blue-600 dark:text-blue-400" x-text="completionPercentage + '%'"></span>
+                            <span class="text-2xl font-bold text-blue-600 dark:text-blue-400"
+                                x-text="completionPercentage + '%'"></span>
                         </div>
                         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             <span x-text="filledFields"></span>/<span x-text="totalFields"></span> campi
@@ -108,24 +125,25 @@
         </div>
 
         <!-- Alert with Flowbite styling -->
-        <div x-show="alert.show"
-             x-transition:enter="transition ease-out duration-300"
-             x-transition:enter-start="opacity-0 transform -translate-y-2"
-             x-transition:enter-end="opacity-100 transform translate-y-0"
-             :class="{
+        <div x-show="alert.show" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 transform -translate-y-2"
+            x-transition:enter-end="opacity-100 transform translate-y-0" :class="{
                  'text-green-800 border-green-300 bg-green-50 dark:text-green-400 dark:bg-gray-800 dark:border-green-800': alert.type === 'success',
                  'text-red-800 border-red-300 bg-red-50 dark:text-red-400 dark:bg-gray-800 dark:border-red-800': alert.type === 'error',
                  'text-yellow-800 border-yellow-300 bg-yellow-50 dark:text-yellow-300 dark:bg-gray-800 dark:border-yellow-800': alert.type === 'warning',
                  'text-blue-800 border-blue-300 bg-blue-50 dark:text-blue-400 dark:bg-gray-800 dark:border-blue-800': alert.type === 'info'
-             }"
-             class="flex items-center p-4 mb-4 text-sm border rounded-lg" role="alert">
+             }" class="flex items-center p-4 mb-4 text-sm border rounded-lg" role="alert">
             <div class="flex-1">
                 <div class="flex items-center">
-                    <svg x-show="alert.type === 'success'" class="flex-shrink-0 w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
+                    <svg x-show="alert.type === 'success'" class="flex-shrink-0 w-4 h-4 me-3" aria-hidden="true"
+                        xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                            d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
                     </svg>
-                    <svg x-show="alert.type === 'error'" class="flex-shrink-0 w-4 h-4 me-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
+                    <svg x-show="alert.type === 'error'" class="flex-shrink-0 w-4 h-4 me-3" aria-hidden="true"
+                        xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                        <path
+                            d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z" />
                     </svg>
                     <span class="font-medium" x-text="alert.title"></span>
                 </div>
@@ -137,45 +155,53 @@
                     </ul>
                 </div>
             </div>
-            <button @click="alert.show = false" class="ms-auto -mx-1.5 -my-1.5 rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 inline-flex items-center justify-center h-8 w-8" type="button">
+            <button @click="alert.show = false"
+                class="ms-auto -mx-1.5 -my-1.5 rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 inline-flex items-center justify-center h-8 w-8"
+                type="button">
                 <span class="sr-only">Chiudi</span>
-                <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 14 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6" />
                 </svg>
             </button>
         </div>
 
         <!-- Loading with Flowbite Spinner -->
         <div x-show="loading" class="flex flex-col items-center justify-center py-12">
-            <svg aria-hidden="true" class="w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
-                <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
+            <svg aria-hidden="true" class="w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
+                viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+                    fill="currentColor" />
+                <path
+                    d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                    fill="currentFill" />
             </svg>
             <span class="ml-3 text-gray-600 dark:text-gray-400 mt-3">Caricamento schema ICCD...</span>
         </div>
 
         <!-- Section Tabs with Flowbite styling -->
         <div x-show="!loading" class="mb-6">
-            <div class="text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700">
+            <div
+                class="text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700">
                 <ul class="flex flex-wrap -mb-px overflow-x-auto">
                     <template x-for="section in sections" :key="section.id">
                         <li class="me-2">
-                            <button @click="currentSection = section.id"
-                                    :class="{
+                            <button @click="currentSection = section.id" :class="{
                                         'text-blue-600 border-blue-600 dark:text-blue-500 dark:border-blue-500': currentSection === section.id,
                                         'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300': currentSection !== section.id
-                                    }"
-                                    class="inline-block p-4 border-b-2 rounded-t-lg relative transition-colors">
+                                    }" class="inline-block p-4 border-b-2 rounded-t-lg relative transition-colors">
                                 <span x-text="section.id"></span>
                                 <span x-show="section.required" class="text-red-500 dark:text-red-400 ml-1">*</span>
                                 <!-- Completion indicator -->
                                 <span x-show="isSectionComplete(section.id)"
-                                      class="absolute -top-1 -right-1 bg-green-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                                    class="absolute -top-1 -right-1 bg-green-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
                                     ✓
                                 </span>
                                 <!-- Error indicator -->
                                 <span x-show="validationErrors[section.id] && validationErrors[section.id].length > 0"
-                                      class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                                    class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
                                     !
                                 </span>
                             </button>
@@ -185,529 +211,525 @@
             </div>
         </div>
 
-    <!-- Form -->
-    <form x-show="!loading" @submit.prevent="saveForm" novalidate class="space-y-6">
-        <template x-for="section in sections" :key="section.id">
-            <div x-show="currentSection === section.id"
-                 x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0 translate-x-4"
-                 x-transition:enter-end="opacity-100 translate-x-0"
-                 :class="{
+        <!-- Form -->
+        <form x-show="!loading" @submit.prevent="saveForm" novalidate class="space-y-6">
+            <template x-for="section in sections" :key="section.id">
+                <div x-show="currentSection === section.id" x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 translate-x-4"
+                    x-transition:enter-end="opacity-100 translate-x-0" :class="{
                      'iccd-section-required': section.required,
                      'iccd-section-complete': isSectionComplete(section.id)
-                 }"
-                 class="iccd-section p-6">
+                 }" class="iccd-section p-6">
 
-                <!-- Header sezione -->
-                <div class="mb-6 pb-4 border-b border-gray-200">
-                    <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <span x-text="section.id"></span>
-                        <span class="text-gray-400">-</span>
-                        <span x-text="section.title"></span>
-                        <span x-show="section.required" class="text-red-600 text-sm">(Obbligatorio)</span>
-                    </h2>
-                    <p x-show="section.description" x-text="section.description" class="text-gray-600 mt-2"></p>
-                </div>
+                    <!-- Header sezione -->
+                    <div class="mb-6 pb-4 border-b border-gray-200">
+                        <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                            <span x-text="section.id"></span>
+                            <span class="text-gray-400">-</span>
+                            <span x-text="section.title"></span>
+                            <span x-show="section.required" class="text-red-600 text-sm">(Obbligatorio)</span>
+                        </h2>
+                        <p x-show="section.description" x-text="section.description" class="text-gray-600 mt-2"></p>
+                    </div>
 
-                <!-- Campi dinamici -->
-                <div x-html="renderSectionFields(section)"></div>
+                    <!-- Campi dinamici -->
+                    <div x-html="renderSectionFields(section)"></div>
 
-                <!-- Navigazione -->
-                <div class="mt-8 pt-6 border-t border-gray-200 flex justify-between">
-                    <button type="button" @click="previousSection()"
-                            x-show="!isFirstSection()"
+                    <!-- Navigazione -->
+                    <div class="mt-8 pt-6 border-t border-gray-200 flex justify-between">
+                        <button type="button" @click="previousSection()" x-show="!isFirstSection()"
                             class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                        ← Precedente
-                    </button>
+                            ← Precedente
+                        </button>
 
-                    <div class="flex gap-3">
-                        <button type="button" @click="validateCurrentSection()"
+                        <div class="flex gap-3">
+                            <button type="button" @click="validateCurrentSection()"
                                 class="px-6 py-3 border border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50">
-                            🔍 Valida
-                        </button>
+                                🔍 Valida
+                            </button>
 
-                        <button type="button" @click="nextSection()"
-                                x-show="!isLastSection()"
+                            <button type="button" @click="nextSection()" x-show="!isLastSection()"
                                 class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                            Successiva →
-                        </button>
+                                Successiva →
+                            </button>
 
-                        <button type="submit" x-show="isLastSection()"
-                                :disabled="saving"
+                            <button type="submit" x-show="isLastSection()" :disabled="saving"
                                 class="px-8 py-3 rounded-lg text-white font-semibold"
                                 :class="saving ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'">
-                            <span x-text="saving ? 'Salvataggio...' : '💾 Salva Scheda'"></span>
-                        </button>
+                                <span x-text="saving ? 'Salvataggio...' : '💾 Salva Scheda'"></span>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </template>
-    </form>
+            </template>
+        </form>
 
-    <!-- Sidebar riepilogo -->
-    <div class="fixed right-0 top-20 w-80 bg-white shadow-xl rounded-l-xl z-50 transform transition-transform"
-         :class="showSidebar ? 'translate-x-0' : 'translate-x-full'">
-        <div class="p-4 border-b bg-blue-600 text-white rounded-tl-xl flex justify-between items-center">
-            <h3 class="font-semibold">📊 Riepilogo</h3>
-            <button @click="showSidebar = false" class="hover:text-gray-200">✕</button>
-        </div>
-
-        <div class="p-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-            <!-- Progresso -->
-            <div class="mb-4">
-                <div class="flex justify-between text-sm mb-2">
-                    <span>Progresso</span>
-                    <span class="font-bold text-blue-600" x-text="completionPercentage + '%'"></span>
-                </div>
-                <div class="w-full h-2 bg-gray-200 rounded-full">
-                    <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full"
-                         :style="`width: ${completionPercentage}%`"></div>
-                </div>
+        <!-- Sidebar riepilogo -->
+        <div class="fixed right-0 top-20 w-80 bg-white shadow-xl rounded-l-xl z-50 transform transition-transform"
+            :class="showSidebar ? 'translate-x-0' : 'translate-x-full'">
+            <div class="p-4 border-b bg-blue-600 text-white rounded-tl-xl flex justify-between items-center">
+                <h3 class="font-semibold">📊 Riepilogo</h3>
+                <button @click="showSidebar = false" class="hover:text-gray-200">✕</button>
             </div>
 
-            <!-- Lista sezioni -->
-            <div class="space-y-2">
-                <template x-for="section in sections" :key="section.id">
-                    <button @click="currentSection = section.id; showSidebar = false"
+            <div class="p-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                <!-- Progresso -->
+                <div class="mb-4">
+                    <div class="flex justify-between text-sm mb-2">
+                        <span>Progresso</span>
+                        <span class="font-bold text-blue-600" x-text="completionPercentage + '%'"></span>
+                    </div>
+                    <div class="w-full h-2 bg-gray-200 rounded-full">
+                        <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full"
+                            :style="`width: ${completionPercentage}%`"></div>
+                    </div>
+                </div>
+
+                <!-- Lista sezioni -->
+                <div class="space-y-2">
+                    <template x-for="section in sections" :key="section.id">
+                        <button @click="currentSection = section.id; showSidebar = false"
                             class="w-full p-3 rounded-lg text-left transition-colors"
                             :class="isSectionComplete(section.id) ? 'bg-green-50 hover:bg-green-100' : 'bg-gray-50 hover:bg-gray-100'">
-                        <div class="flex justify-between items-center">
-                            <span class="font-medium text-sm" x-text="section.id"></span>
-                            <div class="flex items-center gap-2">
-                                <span x-show="section.required" class="text-red-500 text-xs">⚠️</span>
-                                <span x-show="isSectionComplete(section.id)" class="text-green-600">✓</span>
+                            <div class="flex justify-between items-center">
+                                <span class="font-medium text-sm" x-text="section.id"></span>
+                                <div class="flex items-center gap-2">
+                                    <span x-show="section.required" class="text-red-500 text-xs">⚠️</span>
+                                    <span x-show="isSectionComplete(section.id)" class="text-green-600">✓</span>
+                                </div>
                             </div>
-                        </div>
-                    </button>
-                </template>
-            </div>
+                        </button>
+                    </template>
+                </div>
 
-            <!-- Azioni -->
-            <div class="mt-6 pt-4 border-t space-y-2">
-                <button @click="validateAll()"
+                <!-- Azioni -->
+                <div class="mt-6 pt-4 border-t space-y-2">
+                    <button @click="validateAll()"
                         class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-                    🔍 Valida Tutto
-                </button>
-                <button @click="saveAsDraft()"
+                        🔍 Valida Tutto
+                    </button>
+                    <button @click="saveAsDraft()"
                         class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">
-                    💾 Salva Bozza
-                </button>
+                        💾 Salva Bozza
+                    </button>
+                </div>
             </div>
         </div>
+
+        <!-- Toggle sidebar -->
+        <button @click="showSidebar = !showSidebar" x-show="!showSidebar"
+            class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 z-40">
+            📊
+        </button>
     </div>
 
-    <!-- Toggle sidebar -->
-    <button @click="showSidebar = !showSidebar" x-show="!showSidebar"
-            class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 z-40">
-        📊
-    </button>
-</div>
-
-<script>
-function iccdFormUniversal() {
-    return {
-        // Config - will be initialized from data attributes
-        schemaType: '',
-        siteId: '',
-        existingRecord: null,
-        editMode: false,
-
-        // Data
-        schema: null,
-        schemaInfo: {},
-        formData: {},
-        sections: [],
-        currentSection: 'CD',
-
-        // UI State
-        loading: true,
-        saving: false,
-        showSidebar: true,
-        alert: { show: false, type: 'info', message: '' },
-
-        // Stats e validazione
-        totalFields: 0,
-        filledFields: 0,
-        validationErrors: {},
-        sectionCompleteness: {},
-
-        async init() {
-            // Leggi i parametri dai data attributes
-            const container = this.$el;
-            this.schemaType = container.dataset.schemaType || 'RA';
-            this.siteId = container.dataset.siteId;
-            this.editMode = container.dataset.editMode === 'true';
-            
-            // Parse del record esistente se presente (da script tag)
-            const recordScript = document.getElementById('record-data');
-            if (recordScript) {
-                try {
-                    this.existingRecord = JSON.parse(recordScript.textContent);
-                    console.log('✅ Record esistente caricato correttamente:', this.existingRecord.id || 'N/A');
-                } catch (error) {
-                    console.warn('Errore parsing record esistente:', error);
-                    console.warn('Contenuto script:', recordScript.textContent);
-                    this.existingRecord = null;
-                }
-            }
-            
-            console.log('🚀 Inizializzazione form ICCD universale per schema:', this.schemaType);
-            console.log('📊 Configurazione:', {
-                schemaType: this.schemaType,
-                siteId: this.siteId,
-                editMode: this.editMode,
-                hasExistingRecord: !!this.existingRecord
-            });
-            
-            await this.loadSchema();
-            this.initializeFormData();
-            this.parseSections();
-            this.calculateStats();
-            this.updateSectionCompleteness();
-            this.loading = false;
-            console.log('✅ Form ICCD caricato con successo');
-        },
-
-        async loadSchema() {
-            try {
-                console.log('📥 Caricamento schema ICCD per tipo:', this.schemaType);
-                const response = await fetch(`/api/iccd/schema-templates/${this.schemaType}`);
-                if (!response.ok) throw new Error('Schema non trovato');
-
-                const data = await response.json();
-                console.log('📋 Response data:', data);
-                
-                // Il schemas è dentro json_schema, non schemas
-                this.schema = data.json_schema || data.schema;
-                this.schemaInfo = {
-                    name: data.name || `Schema ${this.schemaType}`,
-                    description: data.description || `Scheda ICCD ${this.schemaType} 3.00`,
-                    version: data.version || '3.00'
-                };
-                console.log('✅ Schema caricato:', this.schemaInfo);
-                console.log('🔍 Schema properties:', Object.keys(this.schema?.properties || {}));
-            } catch (error) {
-                console.error('❌ Errore caricamento schema:', error);
-                this.showAlert('error', 'Errore caricamento schema ICCD. Verifica la connessione.');
-                
-                // Fallback con schemas di base per sviluppo
-                this.schema = this.getFallbackSchema();
-                this.schemaInfo = {
-                    name: `Schema ${this.schemaType} (Fallback)`,
-                    description: `Scheda ICCD ${this.schemaType} 3.00 - Modalità offline`,
-                    version: '3.00'
-                };
-            }
-        },
-
-        getFallbackSchema() {
-            console.log('⚙️ Utilizzo schema fallback per sviluppo');
+    <script>
+        function iccdFormUniversal() {
             return {
-                type: 'object',
-                required: ['CD'],
-                properties: {
-                    CD: {
-                        title: 'CODICI',
-                        description: 'Paragrafo contenente i codici identificativi della scheda',
-                        type: 'object',
-                        required: ['TSK', 'LIR', 'NCT'],
-                        properties: {
-                            TSK: {
-                                title: 'Tipo scheda',
-                                type: 'string',
-                                enum: ['RA', 'CA', 'SI', 'MA'],
-                                description: 'Tipo di scheda ICCD'
-                            },
-                            LIR: {
-                                title: 'Livello ricerca',
-                                type: 'string',
-                                enum: ['P', 'C', 'A'],
-                                enumNames: ['Precatalogazione', 'Catalogazione', 'Approfondimento'],
-                                description: 'Livello di catalogazione'
-                            },
-                            NCT: {
-                                title: 'Codice univoco',
-                                type: 'object',
-                                required: ['NCTR', 'NCTN'],
-                                properties: {
-                                    NCTR: {
-                                        title: 'Codice regione',
-                                        type: 'string',
-                                        pattern: '^[0-9]{2}$',
-                                        description: 'Codice ISTAT regione (2 cifre)'
-                                    },
-                                    NCTN: {
-                                        title: 'Numero catalogo',
-                                        type: 'string',
-                                        pattern: '^[0-9]{8}$',
-                                        description: 'Numero progressivo (8 cifre)'
-                                    },
-                                    NCTS: {
-                                        title: 'Suffisso',
-                                        type: 'string',
-                                        pattern: '^[A-Z]{0,2}$',
-                                        description: 'Suffisso opzionale (1-2 lettere)'
-                                    }
-                                }
-                            },
-                            ESC: {
-                                title: 'Ente schedatore',
-                                type: 'string',
-                                description: 'Denominazione ente schedatore'
-                            },
-                            ECP: {
-                                title: 'Ente competente',
-                                type: 'string',
-                                description: 'Ente competente per tutela'
-                            }
-                        }
-                    },
-                    OG: {
-                        title: 'OGGETTO',
-                        description: 'Paragrafo contenente la definizione dell\'oggetto',
-                        type: 'object',
-                        properties: {
-                            OGT: {
-                                title: 'Oggetto',
-                                type: 'object',
-                                properties: {
-                                    OGTD: {
-                                        title: 'Definizione',
-                                        type: 'string',
-                                        description: 'Definizione dell\'oggetto'
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    LC: {
-                        title: 'LOCALIZZAZIONE',
-                        description: 'Paragrafo contenente la localizzazione geografica',
-                        type: 'object',
-                        properties: {
-                            PVC: {
-                                title: 'Localizzazione geografica',
-                                type: 'object',
-                                properties: {
-                                    PVCS: {
-                                        title: 'Stato',
-                                        type: 'string',
-                                        description: 'Denominazione dello stato'
-                                    },
-                                    PVCR: {
-                                        title: 'Regione',
-                                        type: 'string',
-                                        description: 'Denominazione della regione'
-                                    },
-                                    PVCP: {
-                                        title: 'Provincia',
-                                        type: 'string',
-                                        description: 'Sigla della provincia'
-                                    },
-                                    PVCC: {
-                                        title: 'Comune',
-                                        type: 'string',
-                                        description: 'Denominazione del comune'
-                                    }
-                                }
-                            }
+                // Config - will be initialized from data attributes
+                schemaType: '',
+                siteId: '',
+                existingRecord: null,
+                editMode: false,
+
+                // Data
+                schema: null,
+                schemaInfo: {},
+                formData: {},
+                sections: [],
+                currentSection: 'CD',
+
+                // UI State
+                loading: true,
+                saving: false,
+                showSidebar: true,
+                alert: { show: false, type: 'info', message: '' },
+
+                // Stats e validazione
+                totalFields: 0,
+                filledFields: 0,
+                validationErrors: {},
+                sectionCompleteness: {},
+
+                async init() {
+                    // Leggi i parametri dai data attributes
+                    const container = this.$el;
+                    this.schemaType = container.dataset.schemaType || 'RA';
+                    this.siteId = container.dataset.siteId;
+                    this.editMode = container.dataset.editMode === 'true';
+
+                    // Parse del record esistente se presente (da script tag)
+                    const recordScript = document.getElementById('record-data');
+                    if (recordScript) {
+                        try {
+                            this.existingRecord = JSON.parse(recordScript.textContent);
+                            console.log('✅ Record esistente caricato correttamente:', this.existingRecord.id || 'N/A');
+                        } catch (error) {
+                            console.warn('Errore parsing record esistente:', error);
+                            console.warn('Contenuto script:', recordScript.textContent);
+                            this.existingRecord = null;
                         }
                     }
-                }
-            };
-        },
 
-        initializeFormData() {
-            console.log('📝 Inizializzazione dati form', this.editMode ? 'con dati esistenti' : 'con valori predefiniti');
-            
-            if (this.editMode && this.existingRecord) {
-                console.log('🔄 Caricamento dati esistenti:', this.existingRecord);
-                // Usa i dati esistenti se in modalità modifica
-                this.formData = this.existingRecord.iccd_data || {};
-                
-                // Assicurati che le sezioni base esistano
-                if (!this.formData.CD) {
-                    this.formData.CD = {
-                        TSK: this.schemaType,
-                        LIR: 'C',
-                        NCT: {
-                            NCTR: '12',
-                            NCTN: this.generateNCTN(),
-                            NCTS: ''
-                        },
-                        ESC: '',
-                        ECP: ''
+                    console.log('🚀 Inizializzazione form ICCD universale per schema:', this.schemaType);
+                    console.log('📊 Configurazione:', {
+                        schemaType: this.schemaType,
+                        siteId: this.siteId,
+                        editMode: this.editMode,
+                        hasExistingRecord: !!this.existingRecord
+                    });
+
+                    await this.loadSchema();
+                    this.initializeFormData();
+                    this.parseSections();
+                    this.calculateStats();
+                    this.updateSectionCompleteness();
+                    this.loading = false;
+                    console.log('✅ Form ICCD caricato con successo');
+                },
+
+                async loadSchema() {
+                    try {
+                        console.log('📥 Caricamento schema ICCD per tipo:', this.schemaType);
+                        const response = await fetch(`/api/v1/iccd/schema-templates/${this.schemaType}`, {
+                            credentials: 'include'
+                        });
+                        if (!response.ok) throw new Error('Schema non trovato');
+
+                        const data = await response.json();
+                        console.log('📋 Response data:', data);
+
+                        // Il schemas è dentro json_schema, non schemas
+                        this.schema = data.json_schema || data.schema;
+                        this.schemaInfo = {
+                            name: data.name || `Schema ${this.schemaType}`,
+                            description: data.description || `Scheda ICCD ${this.schemaType} 3.00`,
+                            version: data.version || '3.00'
+                        };
+                        console.log('✅ Schema caricato:', this.schemaInfo);
+                        console.log('🔍 Schema properties:', Object.keys(this.schema?.properties || {}));
+                    } catch (error) {
+                        console.error('❌ Errore caricamento schema:', error);
+                        this.showAlert('error', 'Errore caricamento schema ICCD. Verifica la connessione.');
+
+                        // Fallback con schemas di base per sviluppo
+                        this.schema = this.getFallbackSchema();
+                        this.schemaInfo = {
+                            name: `Schema ${this.schemaType} (Fallback)`,
+                            description: `Scheda ICCD ${this.schemaType} 3.00 - Modalità offline`,
+                            version: '3.00'
+                        };
+                    }
+                },
+
+                getFallbackSchema() {
+                    console.log('⚙️ Utilizzo schema fallback per sviluppo');
+                    return {
+                        type: 'object',
+                        required: ['CD'],
+                        properties: {
+                            CD: {
+                                title: 'CODICI',
+                                description: 'Paragrafo contenente i codici identificativi della scheda',
+                                type: 'object',
+                                required: ['TSK', 'LIR', 'NCT'],
+                                properties: {
+                                    TSK: {
+                                        title: 'Tipo scheda',
+                                        type: 'string',
+                                        enum: ['RA', 'CA', 'SI', 'MA'],
+                                        description: 'Tipo di scheda ICCD'
+                                    },
+                                    LIR: {
+                                        title: 'Livello ricerca',
+                                        type: 'string',
+                                        enum: ['P', 'C', 'A'],
+                                        enumNames: ['Precatalogazione', 'Catalogazione', 'Approfondimento'],
+                                        description: 'Livello di catalogazione'
+                                    },
+                                    NCT: {
+                                        title: 'Codice univoco',
+                                        type: 'object',
+                                        required: ['NCTR', 'NCTN'],
+                                        properties: {
+                                            NCTR: {
+                                                title: 'Codice regione',
+                                                type: 'string',
+                                                pattern: '^[0-9]{2}$',
+                                                description: 'Codice ISTAT regione (2 cifre)'
+                                            },
+                                            NCTN: {
+                                                title: 'Numero catalogo',
+                                                type: 'string',
+                                                pattern: '^[0-9]{8}$',
+                                                description: 'Numero progressivo (8 cifre)'
+                                            },
+                                            NCTS: {
+                                                title: 'Suffisso',
+                                                type: 'string',
+                                                pattern: '^[A-Z]{0,2}$',
+                                                description: 'Suffisso opzionale (1-2 lettere)'
+                                            }
+                                        }
+                                    },
+                                    ESC: {
+                                        title: 'Ente schedatore',
+                                        type: 'string',
+                                        description: 'Denominazione ente schedatore'
+                                    },
+                                    ECP: {
+                                        title: 'Ente competente',
+                                        type: 'string',
+                                        description: 'Ente competente per tutela'
+                                    }
+                                }
+                            },
+                            OG: {
+                                title: 'OGGETTO',
+                                description: 'Paragrafo contenente la definizione dell\'oggetto',
+                                type: 'object',
+                                properties: {
+                                    OGT: {
+                                        title: 'Oggetto',
+                                        type: 'object',
+                                        properties: {
+                                            OGTD: {
+                                                title: 'Definizione',
+                                                type: 'string',
+                                                description: 'Definizione dell\'oggetto'
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            LC: {
+                                title: 'LOCALIZZAZIONE',
+                                description: 'Paragrafo contenente la localizzazione geografica',
+                                type: 'object',
+                                properties: {
+                                    PVC: {
+                                        title: 'Localizzazione geografica',
+                                        type: 'object',
+                                        properties: {
+                                            PVCS: {
+                                                title: 'Stato',
+                                                type: 'string',
+                                                description: 'Denominazione dello stato'
+                                            },
+                                            PVCR: {
+                                                title: 'Regione',
+                                                type: 'string',
+                                                description: 'Denominazione della regione'
+                                            },
+                                            PVCP: {
+                                                title: 'Provincia',
+                                                type: 'string',
+                                                description: 'Sigla della provincia'
+                                            },
+                                            PVCC: {
+                                                title: 'Comune',
+                                                type: 'string',
+                                                description: 'Denominazione del comune'
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     };
-                }
-            } else {
-                console.log('🆕 Creazione nuova scheda con valori predefiniti');
-                // Inizializza CD di default con tutti i campi obbligatori
-                this.formData = {
-                    CD: {
-                        TSK: this.schemaType,
-                        LIR: 'C', // Livello Catalogazione
-                        NCT: {
-                            NCTR: '12', // Codice regione Lazio
-                            NCTN: this.generateNCTN(),
-                            NCTS: ''
-                        },
-                        ESC: '', // Ente schedatore
-                        ECP: ''  // Ente competente per tutela
-                    }
-                };
-            }
-            
-            // Inizializza altre sezioni vuote per evitare errori di binding
-            this.initializeEmptySections();
-        },
+                },
 
-        initializeEmptySections() {
-            // Funzione helper per inizializzare sezioni vuote basandosi completamente sullo schemas
-            if (this.sections && this.sections.length > 0) {
-                this.sections.forEach(section => {
-                    // Crea la sezione se non esiste
-                    if (!this.formData[section.id]) {
-                        this.formData[section.id] = {};
+                initializeFormData() {
+                    console.log('📝 Inizializzazione dati form', this.editMode ? 'con dati esistenti' : 'con valori predefiniti');
+
+                    if (this.editMode && this.existingRecord) {
+                        console.log('🔄 Caricamento dati esistenti:', this.existingRecord);
+                        // Usa i dati esistenti se in modalità modifica
+                        this.formData = this.existingRecord.iccd_data || {};
+
+                        // Assicurati che le sezioni base esistano
+                        if (!this.formData.CD) {
+                            this.formData.CD = {
+                                TSK: this.schemaType,
+                                LIR: 'C',
+                                NCT: {
+                                    NCTR: '12',
+                                    NCTN: this.generateNCTN(),
+                                    NCTS: ''
+                                },
+                                ESC: '',
+                                ECP: ''
+                            };
+                        }
+                    } else {
+                        console.log('🆕 Creazione nuova scheda con valori predefiniti');
+                        // Inizializza CD di default con tutti i campi obbligatori
+                        this.formData = {
+                            CD: {
+                                TSK: this.schemaType,
+                                LIR: 'C', // Livello Catalogazione
+                                NCT: {
+                                    NCTR: '12', // Codice regione Lazio
+                                    NCTN: this.generateNCTN(),
+                                    NCTS: ''
+                                },
+                                ESC: '', // Ente schedatore
+                                ECP: ''  // Ente competente per tutela
+                            }
+                        };
                     }
-                    
-                    // Inizializza ricorsivamente TUTTI i sottocampi basandosi sullo schemas
-                    // Nessuna inizializzazione manuale hardcoded - tutto schemas-driven
-                    if (section.properties) {
-                        this.initializeNestedObjects(section.id, section.properties);
+
+                    // Inizializza altre sezioni vuote per evitare errori di binding
+                    this.initializeEmptySections();
+                },
+
+                initializeEmptySections() {
+                    // Funzione helper per inizializzare sezioni vuote basandosi completamente sullo schemas
+                    if (this.sections && this.sections.length > 0) {
+                        this.sections.forEach(section => {
+                            // Crea la sezione se non esiste
+                            if (!this.formData[section.id]) {
+                                this.formData[section.id] = {};
+                            }
+
+                            // Inizializza ricorsivamente TUTTI i sottocampi basandosi sullo schemas
+                            // Nessuna inizializzazione manuale hardcoded - tutto schemas-driven
+                            if (section.properties) {
+                                this.initializeNestedObjects(section.id, section.properties);
+                            }
+                        });
                     }
-                });
-            }
-        },
-        
-        initializeNestedObjects(basePath, properties) {
-            // Inizializza ricorsivamente tutti gli oggetti nested per evitare errori undefined
-            Object.entries(properties).forEach(([key, field]) => {
-                if (field.type === 'object' && field.properties) {
-                    // Assicura che il path esista
-                    const pathParts = basePath.split('.');
+                },
+
+                initializeNestedObjects(basePath, properties) {
+                    // Inizializza ricorsivamente tutti gli oggetti nested per evitare errori undefined
+                    Object.entries(properties).forEach(([key, field]) => {
+                        if (field.type === 'object' && field.properties) {
+                            // Assicura che il path esista
+                            const pathParts = basePath.split('.');
+                            let current = this.formData;
+
+                            for (const part of pathParts) {
+                                if (!current[part]) current[part] = {};
+                                current = current[part];
+                            }
+
+                            if (!current[key]) {
+                                current[key] = {};
+                            }
+
+                            // Ricorsione per oggetti nested
+                            this.initializeNestedObjects(`${basePath}.${key}`, field.properties);
+                        } else if (field.type === 'array') {
+                            // Inizializza array vuoti
+                            const pathParts = basePath.split('.');
+                            let current = this.formData;
+
+                            for (const part of pathParts) {
+                                if (!current[part]) current[part] = {};
+                                current = current[part];
+                            }
+
+                            if (!current[key]) {
+                                current[key] = [];
+                            }
+                        }
+                    });
+                },
+
+                // Funzione helper per assicurare che i path annidati esistano
+                ensureNestedObject(path) {
+                    const keys = path.split('.');
                     let current = this.formData;
-                    
-                    for (const part of pathParts) {
-                        if (!current[part]) current[part] = {};
-                        current = current[part];
+
+                    for (let i = 0; i < keys.length; i++) {
+                        const key = keys[i];
+                        if (!current[key]) {
+                            current[key] = {};
+                        }
+                        current = current[key];
                     }
-                    
-                    if (!current[key]) {
-                        current[key] = {};
+
+                    return current;
+                },
+
+                parseSections() {
+                    try {
+                        if (!this.schema || !this.schema.properties) return;
+
+                        const properties = this.schema.properties;
+                        const required = this.schema.required || [];
+
+                        this.sections = Object.keys(properties).map(key => ({
+                            id: key,
+                            title: properties[key].title || key,
+                            description: properties[key].description,
+                            required: required.includes(key),
+                            properties: properties[key].properties || {}
+                        }));
+
+                        this.currentSection = this.sections[0]?.id || 'CD';
+
+                        // Inizializza sezioni vuote dopo aver parsato le sezioni
+                        this.initializeEmptySections();
+
+                    } catch (error) {
+                        console.error('Errore parsing sezioni:', error);
+                        this.sections = [];
                     }
-                    
-                    // Ricorsione per oggetti nested
-                    this.initializeNestedObjects(`${basePath}.${key}`, field.properties);
-                } else if (field.type === 'array') {
-                    // Inizializza array vuoti
-                    const pathParts = basePath.split('.');
-                    let current = this.formData;
-                    
-                    for (const part of pathParts) {
-                        if (!current[part]) current[part] = {};
-                        current = current[part];
+                },
+
+                renderSectionFields(section) {
+                    if (!section.properties || Object.keys(section.properties).length === 0) {
+                        return '<p class="text-gray-500">Nessun campo in questa sezione</p>';
                     }
-                    
-                    if (!current[key]) {
-                        current[key] = [];
+
+                    let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
+
+                    for (const [key, field] of Object.entries(section.properties)) {
+                        const path = `${section.id}.${key}`;
+                        html += this.renderField(path, field, key);
                     }
-                }
-            });
-        },
 
-        // Funzione helper per assicurare che i path annidati esistano
-        ensureNestedObject(path) {
-            const keys = path.split('.');
-            let current = this.formData;
-            
-            for (let i = 0; i < keys.length; i++) {
-                const key = keys[i];
-                if (!current[key]) {
-                    current[key] = {};
-                }
-                current = current[key];
-            }
-            
-            return current;
-        },
+                    html += '</div>';
+                    return html;
+                },
 
-        parseSections() {
-            try {
-                if (!this.schema || !this.schema.properties) return;
+                renderField(path, field, fieldKey) {
+                    // Campo oggetto con sottocampi
+                    if (field.type === 'object' && field.properties) {
+                        return this.renderObjectField(path, field, fieldKey);
+                    }
 
-                const properties = this.schema.properties;
-                const required = this.schema.required || [];
+                    // Campo array
+                    if (field.type === 'array') {
+                        return this.renderArrayField(path, field, fieldKey);
+                    }
 
-                this.sections = Object.keys(properties).map(key => ({
-                    id: key,
-                    title: properties[key].title || key,
-                    description: properties[key].description,
-                    required: required.includes(key),
-                    properties: properties[key].properties || {}
-                }));
+                    // Select enum
+                    if (field.enum) {
+                        return this.renderSelectField(path, field);
+                    }
 
-                this.currentSection = this.sections[0]?.id || 'CD';
-                
-                // Inizializza sezioni vuote dopo aver parsato le sezioni
-                this.initializeEmptySections();
-                
-            } catch (error) {
-                console.error('Errore parsing sezioni:', error);
-                this.sections = [];
-            }
-        },
+                    // Textarea
+                    if (field.minLength > 100) {
+                        return this.renderTextareaField(path, field);
+                    }
 
-        renderSectionFields(section) {
-            if (!section.properties || Object.keys(section.properties).length === 0) {
-                return '<p class="text-gray-500">Nessun campo in questa sezione</p>';
-            }
+                    // Number
+                    if (field.type === 'number' || field.type === 'integer') {
+                        return this.renderNumberField(path, field);
+                    }
 
-            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
+                    // Text input default
+                    return this.renderTextField(path, field);
+                },
 
-            for (const [key, field] of Object.entries(section.properties)) {
-                const path = `${section.id}.${key}`;
-                html += this.renderField(path, field, key);
-            }
-
-            html += '</div>';
-            return html;
-        },
-
-        renderField(path, field, fieldKey) {
-            // Campo oggetto con sottocampi
-            if (field.type === 'object' && field.properties) {
-                return this.renderObjectField(path, field, fieldKey);
-            }
-
-            // Campo array
-            if (field.type === 'array') {
-                return this.renderArrayField(path, field, fieldKey);
-            }
-
-            // Select enum
-            if (field.enum) {
-                return this.renderSelectField(path, field);
-            }
-
-            // Textarea
-            if (field.minLength > 100) {
-                return this.renderTextareaField(path, field);
-            }
-
-            // Number
-            if (field.type === 'number' || field.type === 'integer') {
-                return this.renderNumberField(path, field);
-            }
-
-            // Text input default
-            return this.renderTextField(path, field);
-        },
-
-        renderTextField(path, field) {
-            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
-            const fieldId = `field_${path.replace(/\./g, '_')}`;
-            const hasError = this.hasFieldError(path);
-            return `
+                renderTextField(path, field) {
+                    const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+                    const fieldId = `field_${path.replace(/\./g, '_')}`;
+                    const hasError = this.hasFieldError(path);
+                    return `
                 <div class="${isRequired ? 'iccd-field-required' : ''}">
                     <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || path}
@@ -725,18 +747,18 @@ function iccdFormUniversal() {
                     ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
-        },
+                },
 
-        renderSelectField(path, field) {
-            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
-            const fieldId = `field_${path.replace(/\./g, '_')}`;
-            const hasError = this.hasFieldError(path);
-            let options = field.enum.map((val, idx) => {
-                const label = field.enumNames ? field.enumNames[idx] : val;
-                return `<option value="${val}">${label}</option>`;
-            }).join('');
+                renderSelectField(path, field) {
+                    const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+                    const fieldId = `field_${path.replace(/\./g, '_')}`;
+                    const hasError = this.hasFieldError(path);
+                    let options = field.enum.map((val, idx) => {
+                        const label = field.enumNames ? field.enumNames[idx] : val;
+                        return `<option value="${val}">${label}</option>`;
+                    }).join('');
 
-            return `
+                    return `
                 <div class="${isRequired ? 'iccd-field-required' : ''}">
                     <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || path}
@@ -755,13 +777,13 @@ function iccdFormUniversal() {
                     ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
-        },
+                },
 
-        renderTextareaField(path, field) {
-            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
-            const fieldId = `field_${path.replace(/\./g, '_')}`;
-            const hasError = this.hasFieldError(path);
-            return `
+                renderTextareaField(path, field) {
+                    const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+                    const fieldId = `field_${path.replace(/\./g, '_')}`;
+                    const hasError = this.hasFieldError(path);
+                    return `
                 <div class="md:col-span-2 ${isRequired ? 'iccd-field-required' : ''}">
                     <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || path}
@@ -779,13 +801,13 @@ function iccdFormUniversal() {
                     ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
-        },
+                },
 
-        renderNumberField(path, field) {
-            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
-            const fieldId = `field_${path.replace(/\./g, '_')}`;
-            const hasError = this.hasFieldError(path);
-            return `
+                renderNumberField(path, field) {
+                    const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+                    const fieldId = `field_${path.replace(/\./g, '_')}`;
+                    const hasError = this.hasFieldError(path);
+                    return `
                 <div class="${isRequired ? 'iccd-field-required' : ''}">
                     <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || path}
@@ -804,56 +826,56 @@ function iccdFormUniversal() {
                     ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
-        },
+                },
 
-        renderObjectField(path, field, fieldKey) {
-            const fieldId = `field_${path.replace(/\./g, '_')}`;
-            let html = `<div class="md:col-span-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                renderObjectField(path, field, fieldKey) {
+                    const fieldId = `field_${path.replace(/\./g, '_')}`;
+                    let html = `<div class="md:col-span-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <h4 id="${fieldId}_title" class="text-lg font-semibold mb-4">${field.title || fieldKey}</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
 
-            for (const [subKey, subField] of Object.entries(field.properties)) {
-                const subPath = `${path}.${subKey}`;
-                html += this.renderField(subPath, subField, subKey);
-            }
+                    for (const [subKey, subField] of Object.entries(field.properties)) {
+                        const subPath = `${path}.${subKey}`;
+                        html += this.renderField(subPath, subField, subKey);
+                    }
 
-            html += '</div></div>';
-            return html;
-        },
+                    html += '</div></div>';
+                    return html;
+                },
 
-        renderArrayField(path, field, fieldKey) {
-            // Handle different types of array fields
-            
-            // 1. Array di enum (checkboxes multipli)
-            if (field.items && field.items.enum) {
-                return this.renderEnumArrayField(path, field, fieldKey);
-            }
-            
-            // 2. Array di stringhe semplici
-            if (field.items && field.items.type === 'string') {
-                return this.renderStringArrayField(path, field, fieldKey);
-            }
-            
-            // 3. Array di oggetti
-            if (field.items && field.items.type === 'object') {
-                return this.renderObjectArrayField(path, field, fieldKey);
-            }
-            
-            // 4. Array di numeri
-            if (field.items && (field.items.type === 'number' || field.items.type === 'integer')) {
-                return this.renderNumberArrayField(path, field, fieldKey);
-            }
-            
-            // 5. Array generico (default a stringhe)
-            return this.renderStringArrayField(path, field, fieldKey);
-        },
-        
-        renderStringArrayField(path, field, fieldKey) {
-            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
-            const fieldId = `field_${path.replace(/\./g, '_')}`;
-            const hasError = this.hasFieldError(path);
-            
-            return `
+                renderArrayField(path, field, fieldKey) {
+                    // Handle different types of array fields
+
+                    // 1. Array di enum (checkboxes multipli)
+                    if (field.items && field.items.enum) {
+                        return this.renderEnumArrayField(path, field, fieldKey);
+                    }
+
+                    // 2. Array di stringhe semplici
+                    if (field.items && field.items.type === 'string') {
+                        return this.renderStringArrayField(path, field, fieldKey);
+                    }
+
+                    // 3. Array di oggetti
+                    if (field.items && field.items.type === 'object') {
+                        return this.renderObjectArrayField(path, field, fieldKey);
+                    }
+
+                    // 4. Array di numeri
+                    if (field.items && (field.items.type === 'number' || field.items.type === 'integer')) {
+                        return this.renderNumberArrayField(path, field, fieldKey);
+                    }
+
+                    // 5. Array generico (default a stringhe)
+                    return this.renderStringArrayField(path, field, fieldKey);
+                },
+
+                renderStringArrayField(path, field, fieldKey) {
+                    const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+                    const fieldId = `field_${path.replace(/\./g, '_')}`;
+                    const hasError = this.hasFieldError(path);
+
+                    return `
                 <div class="md:col-span-2 ${isRequired ? 'iccd-field-required' : ''}">
                     <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || fieldKey}
@@ -901,14 +923,14 @@ function iccdFormUniversal() {
                     ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
-        },
-        
-        renderNumberArrayField(path, field, fieldKey) {
-            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
-            const fieldId = `field_${path.replace(/\./g, '_')}`;
-            const hasError = this.hasFieldError(path);
-            
-            return `
+                },
+
+                renderNumberArrayField(path, field, fieldKey) {
+                    const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+                    const fieldId = `field_${path.replace(/\./g, '_')}`;
+                    const hasError = this.hasFieldError(path);
+
+                    return `
                 <div class="md:col-span-2 ${isRequired ? 'iccd-field-required' : ''}">
                     <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || fieldKey}
@@ -956,14 +978,14 @@ function iccdFormUniversal() {
                     ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
-        },
-        
-        renderObjectArrayField(path, field, fieldKey) {
-            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
-            const fieldId = `field_${path.replace(/\./g, '_')}`;
-            const hasError = this.hasFieldError(path);
-            
-            return `
+                },
+
+                renderObjectArrayField(path, field, fieldKey) {
+                    const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+                    const fieldId = `field_${path.replace(/\./g, '_')}`;
+                    const hasError = this.hasFieldError(path);
+
+                    return `
                 <div class="md:col-span-2 ${isRequired ? 'iccd-field-required' : ''}">
                     <label for="${fieldId}" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || fieldKey}
@@ -1008,20 +1030,20 @@ function iccdFormUniversal() {
                     ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>
             `;
-        },
-        
-        renderObjectFields(objectSchema, basePath) {
-            if (!objectSchema.properties) {
-                return '<p class="text-gray-500 dark:text-gray-400 text-sm">Nessun campo definito</p>';
-            }
-            
-            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
-            
-            Object.entries(objectSchema.properties).forEach(([key, field]) => {
-                const fieldPath = `${basePath}.${key}`;
-                
-                if (field.type === 'string') {
-                    html += `
+                },
+
+                renderObjectFields(objectSchema, basePath) {
+                    if (!objectSchema.properties) {
+                        return '<p class="text-gray-500 dark:text-gray-400 text-sm">Nessun campo definito</p>';
+                    }
+
+                    let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+
+                    Object.entries(objectSchema.properties).forEach(([key, field]) => {
+                        const fieldPath = `${basePath}.${key}`;
+
+                        if (field.type === 'string') {
+                            html += `
                         <div>
                             <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">${field.title || key}</label>
                             <input type="text"
@@ -1031,8 +1053,8 @@ function iccdFormUniversal() {
                                    placeholder="${field.description || ''}">
                         </div>
                     `;
-                } else if (field.type === 'number' || field.type === 'integer') {
-                    html += `
+                        } else if (field.type === 'number' || field.type === 'integer') {
+                            html += `
                         <div>
                             <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">${field.title || key}</label>
                             <input type="number"
@@ -1043,13 +1065,13 @@ function iccdFormUniversal() {
                                    ${field.maximum !== undefined ? `max="${field.maximum}"` : ''}>
                         </div>
                     `;
-                } else if (field.enum) {
-                    const options = field.enum.map((val, idx) => {
-                        const label = field.enumNames ? field.enumNames[idx] : val;
-                        return `<option value="${val}">${label}</option>`;
-                    }).join('');
-                    
-                    html += `
+                        } else if (field.enum) {
+                            const options = field.enum.map((val, idx) => {
+                                const label = field.enumNames ? field.enumNames[idx] : val;
+                                return `<option value="${val}">${label}</option>`;
+                            }).join('');
+
+                            html += `
                         <div>
                             <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">${field.title || key}</label>
                             <select x-model="item.${key}"
@@ -1060,24 +1082,24 @@ function iccdFormUniversal() {
                             </select>
                         </div>
                     `;
-                }
-            });
-            
-            html += '</div>';
-            return html;
-        },
-        
-        renderEnumArrayField(path, field, fieldKey) {
-            const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
-            const fieldId = `field_${path.replace(/\./g, '_')}`;
-            const items = field.items;
-            
-            let options = '';
-            if (items.enum) {
-                items.enum.forEach((val, idx) => {
-                    const label = items.enumNames ? items.enumNames[idx] : val;
-                    const optionId = `${fieldId}_${val}`;
-                    options += `
+                        }
+                    });
+
+                    html += '</div>';
+                    return html;
+                },
+
+                renderEnumArrayField(path, field, fieldKey) {
+                    const isRequired = field.required || this.isFieldRequired(path.split('.')[0], path.split('.')[1]) || false;
+                    const fieldId = `field_${path.replace(/\./g, '_')}`;
+                    const items = field.items;
+
+                    let options = '';
+                    if (items.enum) {
+                        items.enum.forEach((val, idx) => {
+                            const label = items.enumNames ? items.enumNames[idx] : val;
+                            const optionId = `${fieldId}_${val}`;
+                            options += `
                         <div class="flex items-center">
                             <input type="checkbox"
                                    id="${optionId}"
@@ -1087,10 +1109,10 @@ function iccdFormUniversal() {
                                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
                             <label for="${optionId}" class="ms-2 text-sm font-medium text-gray-900">${label}</label>
                         </div>`;
-                });
-            }
-            
-            return `
+                        });
+                    }
+
+                    return `
                 <div class="${isRequired ? 'iccd-field-required' : ''}">
                     <label class="block mb-2 text-sm font-medium text-gray-900">
                         ${field.title || path}
@@ -1101,654 +1123,653 @@ function iccdFormUniversal() {
                     </div>
                     ${field.description ? `<p class="mt-1 text-xs text-gray-500">${field.description}</p>` : ''}
                 </div>`;
-        },
+                },
 
-        isSectionComplete(sectionId) {
-            return this.sectionCompleteness[sectionId] || false;
-        },
+                isSectionComplete(sectionId) {
+                    return this.sectionCompleteness[sectionId] || false;
+                },
 
-        updateSectionCompleteness() {
-            // Controllo sicurezza: evita errori se sections non è ancora inizializzato
-            if (!this.sections || this.sections.length === 0) {
-                return;
-            }
-            
-            this.sections.forEach(section => {
-                try {
-                    const completeness = this.calculateSectionCompleteness(section);
-                    this.sectionCompleteness[section.id] = completeness;
-                } catch (error) {
-                    console.warn(`Errore calcolo completezza sezione ${section.id}:`, error);
-                    this.sectionCompleteness[section.id] = false;
-                }
-            });
-        },
-
-        calculateSectionCompleteness(section) {
-            try {
-                if (!section || !section.properties || Object.keys(section.properties).length === 0) {
-                    return true; // Sezione vuota considerata completa
-                }
-
-                // Assicurati che la sezione esista nei dati del form
-                if (!this.formData[section.id]) {
-                    this.formData[section.id] = {};
-                }
-
-                const sectionData = this.formData[section.id];
-                const requiredFields = this.getRequiredFields(section);
-                const totalFields = Object.keys(section.properties).length;
-                const filledFields = this.countFilledFields(sectionData, section.properties);
-
-                // Se è una sezione obbligatoria, controlla che tutti i campi required siano compilati
-                if (section.required) {
-                    const allRequiredFilled = requiredFields.every(field => {
-                        const value = this.getFieldValue(sectionData, field);
-                        return this.isFieldFilled(value);
-                    });
-                    // Per sezioni obbligatorie: deve avere almeno il 70% dei campi compilati E tutti i required
-                    return allRequiredFilled && (filledFields / totalFields) >= 0.7;
-                }
-
-                // Per sezioni opzionali: almeno il 30% dei campi compilati
-                return (filledFields / totalFields) >= 0.3;
-            } catch (error) {
-                console.warn('Errore in calculateSectionCompleteness:', error);
-                return false;
-            }
-        },
-
-        getRequiredFields(section) {
-            const required = [];
-            if (section.properties) {
-                Object.entries(section.properties).forEach(([key, field]) => {
-                    if (field.required || this.isFieldRequired(section.id, key)) {
-                        required.push(key);
+                updateSectionCompleteness() {
+                    // Controllo sicurezza: evita errori se sections non è ancora inizializzato
+                    if (!this.sections || this.sections.length === 0) {
+                        return;
                     }
-                });
-            }
-            return required;
-        },
 
-        isFieldRequired(sectionId, fieldKey) {
-            // Definizione campi obbligatori per sezione secondo standard ICCD
-            const requiredFieldsBySection = {
-                'CD': ['TSK', 'LIR', 'NCT', 'ESC'],
-                'OG': ['OGT'],
-                'LC': ['PVC'],
-                'DT': ['DTS', 'DTM'], // Almeno uno dei due
-                'MT': ['MTC'],
-                'DA': ['DES', 'STC']
-            };
-            
-            return requiredFieldsBySection[sectionId]?.includes(fieldKey) || false;
-        },
-
-        countFilledFields(sectionData, properties) {
-            try {
-                if (!sectionData || !properties) {
-                    return 0;
-                }
-                
-                let count = 0;
-                Object.entries(properties).forEach(([key, field]) => {
-                    try {
-                        const value = this.getFieldValue(sectionData, key);
-                        if (this.isFieldFilled(value)) {
-                            count++;
+                    this.sections.forEach(section => {
+                        try {
+                            const completeness = this.calculateSectionCompleteness(section);
+                            this.sectionCompleteness[section.id] = completeness;
+                        } catch (error) {
+                            console.warn(`Errore calcolo completezza sezione ${section.id}:`, error);
+                            this.sectionCompleteness[section.id] = false;
                         }
+                    });
+                },
+
+                calculateSectionCompleteness(section) {
+                    try {
+                        if (!section || !section.properties || Object.keys(section.properties).length === 0) {
+                            return true; // Sezione vuota considerata completa
+                        }
+
+                        // Assicurati che la sezione esista nei dati del form
+                        if (!this.formData[section.id]) {
+                            this.formData[section.id] = {};
+                        }
+
+                        const sectionData = this.formData[section.id];
+                        const requiredFields = this.getRequiredFields(section);
+                        const totalFields = Object.keys(section.properties).length;
+                        const filledFields = this.countFilledFields(sectionData, section.properties);
+
+                        // Se è una sezione obbligatoria, controlla che tutti i campi required siano compilati
+                        if (section.required) {
+                            const allRequiredFilled = requiredFields.every(field => {
+                                const value = this.getFieldValue(sectionData, field);
+                                return this.isFieldFilled(value);
+                            });
+                            // Per sezioni obbligatorie: deve avere almeno il 70% dei campi compilati E tutti i required
+                            return allRequiredFilled && (filledFields / totalFields) >= 0.7;
+                        }
+
+                        // Per sezioni opzionali: almeno il 30% dei campi compilati
+                        return (filledFields / totalFields) >= 0.3;
                     } catch (error) {
-                        console.warn(`Errore verifica campo ${key}:`, error);
+                        console.warn('Errore in calculateSectionCompleteness:', error);
+                        return false;
                     }
-                });
-                return count;
-            } catch (error) {
-                console.warn('Errore in countFilledFields:', error);
-                return 0;
-            }
-        },
+                },
 
-        getFieldValue(sectionData, fieldKey) {
-            try {
-                if (!sectionData || !fieldKey) {
-                    return null;
-                }
-                return sectionData[fieldKey] || null;
-            } catch (error) {
-                console.warn(`Errore accesso campo ${fieldKey}:`, error);
-                return null;
-            }
-        },
-
-        isFieldFilled(value) {
-            if (value === null || value === undefined) return false;
-            if (typeof value === 'string') return value.trim().length > 0;
-            if (typeof value === 'object' && value !== null) {
-                // Per oggetti (come NCT), controlla se ha almeno un campo compilato
-                return Object.values(value).some(v => this.isFieldFilled(v));
-            }
-            if (Array.isArray(value)) return value.length > 0;
-            return true;
-        },
-
-        // Funzione specifica per gestire il valore di array
-        getArrayFieldValue(sectionData, fieldKey) {
-            try {
-                if (!sectionData || !fieldKey) {
-                    return [];
-                }
-                const value = sectionData[fieldKey] || [];
-                return Array.isArray(value) ? value : [];
-            } catch (error) {
-                console.warn(`Errore accesso campo array ${fieldKey}:`, error);
-                return [];
-            }
-        },
-
-        isFirstSection() {
-            return this.sections[0]?.id === this.currentSection;
-        },
-
-        isLastSection() {
-            return this.sections[this.sections.length - 1]?.id === this.currentSection;
-        },
-
-        previousSection() {
-            const idx = this.sections.findIndex(s => s.id === this.currentSection);
-            if (idx > 0) this.currentSection = this.sections[idx - 1].id;
-        },
-
-        nextSection() {
-            const idx = this.sections.findIndex(s => s.id === this.currentSection);
-            if (idx < this.sections.length - 1) this.currentSection = this.sections[idx + 1].id;
-        },
-
-        async validateCurrentSection() {
-            console.log('🔍 Validazione sezione corrente:', this.currentSection);
-            this.showAlert('info', 'Validazione in corso...');
-            
-            try {
-                const section = this.sections.find(s => s.id === this.currentSection);
-                if (!section) {
-                    this.showAlert('error', 'Sezione non trovata');
-                    return;
-                }
-
-                const sectionData = this.formData[this.currentSection] || {};
-                
-                // Validazione lato client
-                const clientErrors = this.validateSectionData(section, sectionData);
-                
-                // Validazione lato server
-                const serverErrors = await this.validateWithServer(this.currentSection, sectionData);
-                
-                const allErrors = [...clientErrors, ...serverErrors];
-                
-                if (allErrors.length === 0) {
-                    this.showAlert('success', `✅ Sezione ${this.currentSection} validata correttamente`);
-                    this.validationErrors[this.currentSection] = [];
-                } else {
-                    this.validationErrors[this.currentSection] = allErrors;
-                    
-                    // Mostra errori specifici all'utente
-                    const errorDetails = allErrors.map(error => {
-                        const fieldName = this.getFieldDisplayName(error.field || error.field_path);
-                        return `${fieldName}: ${error.message}`;
-                    });
-                    
-                    this.showAlert('error',
-                        `❌ Trovati ${allErrors.length} errori nella sezione ${this.currentSection}:`,
-                        errorDetails
-                    );
-                    console.warn('Errori validazione:', allErrors);
-                }
-                
-                this.updateSectionCompleteness();
-                
-            } catch (error) {
-                console.error('Errore durante validazione:', error);
-                this.showAlert('error', 'Errore durante la validazione');
-            }
-        },
-
-        async validateAll() {
-            console.log('🔍 Validazione completa di tutte le sezioni');
-            this.showAlert('info', 'Validazione completa in corso...');
-            
-            try {
-                let totalErrors = 0;
-                
-                // Valida ogni sezione
-                for (const section of this.sections) {
-                    const sectionData = this.formData[section.id] || {};
-                    const clientErrors = this.validateSectionData(section, sectionData);
-                    const serverErrors = await this.validateWithServer(section.id, sectionData);
-                    
-                    const sectionErrors = [...clientErrors, ...serverErrors];
-                    this.validationErrors[section.id] = sectionErrors;
-                    totalErrors += sectionErrors.length;
-                }
-                
-                // Validazione strutturale completa
-                const structuralErrors = await this.validateCompleteRecord();
-                totalErrors += structuralErrors.length;
-                
-                if (totalErrors === 0) {
-                    this.showAlert('success', '✅ Tutte le sezioni validate correttamente');
-                } else {
-                    // Mostra errori specifici di tutte le sezioni all'utente
-                    const allErrorDetails = [];
-                    Object.entries(this.validationErrors).forEach(([sectionId, errors]) => {
-                        errors.forEach(error => {
-                            const fieldName = this.getFieldDisplayName(error.field || error.field_path);
-                            allErrorDetails.push(`${sectionId} - ${fieldName}: ${error.message}`);
+                getRequiredFields(section) {
+                    const required = [];
+                    if (section.properties) {
+                        Object.entries(section.properties).forEach(([key, field]) => {
+                            if (field.required || this.isFieldRequired(section.id, key)) {
+                                required.push(key);
+                            }
                         });
-                    });
-                    
-                    this.showAlert('error',
-                        `❌ Trovati ${totalErrors} errori totali nella scheda:`,
-                        allErrorDetails.slice(0, 10) // Mostra massimo 10 errori
-                    );
-                }
-                
-                this.updateSectionCompleteness();
-                
-            } catch (error) {
-                console.error('Errore durante validazione completa:', error);
-                this.showAlert('error', 'Errore durante la validazione completa');
-            }
-        },
+                    }
+                    return required;
+                },
 
-        validateSectionData(section, sectionData) {
-            const errors = [];
-            
-            // Validazione campi obbligatori
-            const requiredFields = this.getRequiredFields(section);
-            requiredFields.forEach(fieldKey => {
-                const value = this.getFieldValue(sectionData, fieldKey);
-                if (!this.isFieldFilled(value)) {
-                    errors.push({
-                        field: `${section.id}.${fieldKey}`,
-                        message: `Campo ${fieldKey} obbligatorio`,
-                        severity: 'error'
-                    });
-                }
-            });
-            
-            // Validazioni specifiche per sezione
-            if (section.id === 'CD') {
-                errors.push(...this.validateCDSection(sectionData));
-            } else if (section.id === 'LC') {
-                errors.push(...this.validateLCSection(sectionData));
-            } else if (section.id === 'DT') {
-                errors.push(...this.validateDTSection(sectionData));
-            }
-            
-            return errors;
-        },
+                isFieldRequired(sectionId, fieldKey) {
+                    // Definizione campi obbligatori per sezione secondo standard ICCD
+                    const requiredFieldsBySection = {
+                        'CD': ['TSK', 'LIR', 'NCT', 'ESC'],
+                        'OG': ['OGT'],
+                        'LC': ['PVC'],
+                        'DT': ['DTS', 'DTM'], // Almeno uno dei due
+                        'MT': ['MTC'],
+                        'DA': ['DES', 'STC']
+                    };
 
-        validateCDSection(cdData) {
-            const errors = [];
-            
-            // Validazione NCT
-            if (cdData.NCT) {
-                const nct = cdData.NCT;
-                if (nct.NCTR && !/^\d{2}$/.test(nct.NCTR)) {
-                    errors.push({
-                        field: 'CD.NCT.NCTR',
-                        message: 'Codice regione deve essere 2 cifre',
-                        severity: 'error'
-                    });
-                }
-                if (nct.NCTN && !/^\d{8}$/.test(nct.NCTN)) {
-                    errors.push({
-                        field: 'CD.NCT.NCTN',
-                        message: 'Numero catalogo deve essere 8 cifre',
-                        severity: 'error'
-                    });
-                }
-                if (nct.NCTS && !/^[A-Z]{1,2}$/.test(nct.NCTS)) {
-                    errors.push({
-                        field: 'CD.NCT.NCTS',
-                        message: 'Suffisso deve essere 1-2 lettere maiuscole',
-                        severity: 'error'
-                    });
-                }
-            }
-            
-            return errors;
-        },
+                    return requiredFieldsBySection[sectionId]?.includes(fieldKey) || false;
+                },
 
-        validateLCSection(lcData) {
-            const errors = [];
-            
-            // Validazione PVC (localizzazione geografica)
-            if (lcData.PVC) {
-                const requiredPVCFields = ['PVCS', 'PVCR', 'PVCP', 'PVCC'];
-                requiredPVCFields.forEach(field => {
-                    if (!lcData.PVC[field] || !lcData.PVC[field].trim()) {
+                countFilledFields(sectionData, properties) {
+                    try {
+                        if (!sectionData || !properties) {
+                            return 0;
+                        }
+
+                        let count = 0;
+                        Object.entries(properties).forEach(([key, field]) => {
+                            try {
+                                const value = this.getFieldValue(sectionData, key);
+                                if (this.isFieldFilled(value)) {
+                                    count++;
+                                }
+                            } catch (error) {
+                                console.warn(`Errore verifica campo ${key}:`, error);
+                            }
+                        });
+                        return count;
+                    } catch (error) {
+                        console.warn('Errore in countFilledFields:', error);
+                        return 0;
+                    }
+                },
+
+                getFieldValue(sectionData, fieldKey) {
+                    try {
+                        if (!sectionData || !fieldKey) {
+                            return null;
+                        }
+                        return sectionData[fieldKey] || null;
+                    } catch (error) {
+                        console.warn(`Errore accesso campo ${fieldKey}:`, error);
+                        return null;
+                    }
+                },
+
+                isFieldFilled(value) {
+                    if (value === null || value === undefined) return false;
+                    if (typeof value === 'string') return value.trim().length > 0;
+                    if (typeof value === 'object' && value !== null) {
+                        // Per oggetti (come NCT), controlla se ha almeno un campo compilato
+                        return Object.values(value).some(v => this.isFieldFilled(v));
+                    }
+                    if (Array.isArray(value)) return value.length > 0;
+                    return true;
+                },
+
+                // Funzione specifica per gestire il valore di array
+                getArrayFieldValue(sectionData, fieldKey) {
+                    try {
+                        if (!sectionData || !fieldKey) {
+                            return [];
+                        }
+                        const value = sectionData[fieldKey] || [];
+                        return Array.isArray(value) ? value : [];
+                    } catch (error) {
+                        console.warn(`Errore accesso campo array ${fieldKey}:`, error);
+                        return [];
+                    }
+                },
+
+                isFirstSection() {
+                    return this.sections[0]?.id === this.currentSection;
+                },
+
+                isLastSection() {
+                    return this.sections[this.sections.length - 1]?.id === this.currentSection;
+                },
+
+                previousSection() {
+                    const idx = this.sections.findIndex(s => s.id === this.currentSection);
+                    if (idx > 0) this.currentSection = this.sections[idx - 1].id;
+                },
+
+                nextSection() {
+                    const idx = this.sections.findIndex(s => s.id === this.currentSection);
+                    if (idx < this.sections.length - 1) this.currentSection = this.sections[idx + 1].id;
+                },
+
+                async validateCurrentSection() {
+                    console.log('🔍 Validazione sezione corrente:', this.currentSection);
+                    this.showAlert('info', 'Validazione in corso...');
+
+                    try {
+                        const section = this.sections.find(s => s.id === this.currentSection);
+                        if (!section) {
+                            this.showAlert('error', 'Sezione non trovata');
+                            return;
+                        }
+
+                        const sectionData = this.formData[this.currentSection] || {};
+
+                        // Validazione lato client
+                        const clientErrors = this.validateSectionData(section, sectionData);
+
+                        // Validazione lato server
+                        const serverErrors = await this.validateWithServer(this.currentSection, sectionData);
+
+                        const allErrors = [...clientErrors, ...serverErrors];
+
+                        if (allErrors.length === 0) {
+                            this.showAlert('success', `✅ Sezione ${this.currentSection} validata correttamente`);
+                            this.validationErrors[this.currentSection] = [];
+                        } else {
+                            this.validationErrors[this.currentSection] = allErrors;
+
+                            // Mostra errori specifici all'utente
+                            const errorDetails = allErrors.map(error => {
+                                const fieldName = this.getFieldDisplayName(error.field || error.field_path);
+                                return `${fieldName}: ${error.message}`;
+                            });
+
+                            this.showAlert('error',
+                                `❌ Trovati ${allErrors.length} errori nella sezione ${this.currentSection}:`,
+                                errorDetails
+                            );
+                            console.warn('Errori validazione:', allErrors);
+                        }
+
+                        this.updateSectionCompleteness();
+
+                    } catch (error) {
+                        console.error('Errore durante validazione:', error);
+                        this.showAlert('error', 'Errore durante la validazione');
+                    }
+                },
+
+                async validateAll() {
+                    console.log('🔍 Validazione completa di tutte le sezioni');
+                    this.showAlert('info', 'Validazione completa in corso...');
+
+                    try {
+                        let totalErrors = 0;
+
+                        // Valida ogni sezione
+                        for (const section of this.sections) {
+                            const sectionData = this.formData[section.id] || {};
+                            const clientErrors = this.validateSectionData(section, sectionData);
+                            const serverErrors = await this.validateWithServer(section.id, sectionData);
+
+                            const sectionErrors = [...clientErrors, ...serverErrors];
+                            this.validationErrors[section.id] = sectionErrors;
+                            totalErrors += sectionErrors.length;
+                        }
+
+                        // Validazione strutturale completa
+                        const structuralErrors = await this.validateCompleteRecord();
+                        totalErrors += structuralErrors.length;
+
+                        if (totalErrors === 0) {
+                            this.showAlert('success', '✅ Tutte le sezioni validate correttamente');
+                        } else {
+                            // Mostra errori specifici di tutte le sezioni all'utente
+                            const allErrorDetails = [];
+                            Object.entries(this.validationErrors).forEach(([sectionId, errors]) => {
+                                errors.forEach(error => {
+                                    const fieldName = this.getFieldDisplayName(error.field || error.field_path);
+                                    allErrorDetails.push(`${sectionId} - ${fieldName}: ${error.message}`);
+                                });
+                            });
+
+                            this.showAlert('error',
+                                `❌ Trovati ${totalErrors} errori totali nella scheda:`,
+                                allErrorDetails.slice(0, 10) // Mostra massimo 10 errori
+                            );
+                        }
+
+                        this.updateSectionCompleteness();
+
+                    } catch (error) {
+                        console.error('Errore durante validazione completa:', error);
+                        this.showAlert('error', 'Errore durante la validazione completa');
+                    }
+                },
+
+                validateSectionData(section, sectionData) {
+                    const errors = [];
+
+                    // Validazione campi obbligatori
+                    const requiredFields = this.getRequiredFields(section);
+                    requiredFields.forEach(fieldKey => {
+                        const value = this.getFieldValue(sectionData, fieldKey);
+                        if (!this.isFieldFilled(value)) {
+                            errors.push({
+                                field: `${section.id}.${fieldKey}`,
+                                message: `Campo ${fieldKey} obbligatorio`,
+                                severity: 'error'
+                            });
+                        }
+                    });
+
+                    // Validazioni specifiche per sezione
+                    if (section.id === 'CD') {
+                        errors.push(...this.validateCDSection(sectionData));
+                    } else if (section.id === 'LC') {
+                        errors.push(...this.validateLCSection(sectionData));
+                    } else if (section.id === 'DT') {
+                        errors.push(...this.validateDTSection(sectionData));
+                    }
+
+                    return errors;
+                },
+
+                validateCDSection(cdData) {
+                    const errors = [];
+
+                    // Validazione NCT
+                    if (cdData.NCT) {
+                        const nct = cdData.NCT;
+                        if (nct.NCTR && !/^\d{2}$/.test(nct.NCTR)) {
+                            errors.push({
+                                field: 'CD.NCT.NCTR',
+                                message: 'Codice regione deve essere 2 cifre',
+                                severity: 'error'
+                            });
+                        }
+                        if (nct.NCTN && !/^\d{8}$/.test(nct.NCTN)) {
+                            errors.push({
+                                field: 'CD.NCT.NCTN',
+                                message: 'Numero catalogo deve essere 8 cifre',
+                                severity: 'error'
+                            });
+                        }
+                        if (nct.NCTS && !/^[A-Z]{1,2}$/.test(nct.NCTS)) {
+                            errors.push({
+                                field: 'CD.NCT.NCTS',
+                                message: 'Suffisso deve essere 1-2 lettere maiuscole',
+                                severity: 'error'
+                            });
+                        }
+                    }
+
+                    return errors;
+                },
+
+                validateLCSection(lcData) {
+                    const errors = [];
+
+                    // Validazione PVC (localizzazione geografica)
+                    if (lcData.PVC) {
+                        const requiredPVCFields = ['PVCS', 'PVCR', 'PVCP', 'PVCC'];
+                        requiredPVCFields.forEach(field => {
+                            if (!lcData.PVC[field] || !lcData.PVC[field].trim()) {
+                                errors.push({
+                                    field: `LC.PVC.${field}`,
+                                    message: `Campo ${field} obbligatorio nella localizzazione`,
+                                    severity: 'error'
+                                });
+                            }
+                        });
+                    }
+
+                    return errors;
+                },
+
+                validateDTSection(dtData) {
+                    const errors = [];
+
+                    // Almeno una datazione deve essere presente
+                    const hasDTS = dtData.DTS && Object.keys(dtData.DTS).length > 0;
+                    const hasDTM = dtData.DTM && Object.keys(dtData.DTM).length > 0;
+
+                    if (!hasDTS && !hasDTM) {
                         errors.push({
-                            field: `LC.PVC.${field}`,
-                            message: `Campo ${field} obbligatorio nella localizzazione`,
+                            field: 'DT',
+                            message: 'Almeno una datazione (DTS o DTM) è obbligatoria',
                             severity: 'error'
                         });
                     }
-                });
-            }
-            
-            return errors;
-        },
 
-        validateDTSection(dtData) {
-            const errors = [];
-            
-            // Almeno una datazione deve essere presente
-            const hasDTS = dtData.DTS && Object.keys(dtData.DTS).length > 0;
-            const hasDTM = dtData.DTM && Object.keys(dtData.DTM).length > 0;
-            
-            if (!hasDTS && !hasDTM) {
-                errors.push({
-                    field: 'DT',
-                    message: 'Almeno una datazione (DTS o DTM) è obbligatoria',
-                    severity: 'error'
-                });
-            }
-            
-            return errors;
-        },
+                    return errors;
+                },
 
-        async validateWithServer(sectionId, sectionData) {
-            try {
-                // Per validazione sezione singola, inviamo tutti i dati del form
-                // ma filtriamo gli errori solo per la sezione richiesta
-                const response = await fetch('/api/iccd/validate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        schema_type: this.schemaType,
-                        level: 'C',
-                        iccd_data: this.formData  // Invia tutti i dati invece che solo la sezione
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.valid) {
-                    return [];
-                } else {
-                    // Filtra solo gli errori relativi alla sezione corrente
-                    const sectionErrors = (result.errors || []).filter(error =>
-                        error.field_path && error.field_path.startsWith(sectionId + '.')
-                    );
-                    console.log(`Errori sezione ${sectionId}:`, sectionErrors);
-                    return sectionErrors;
-                }
-                
-            } catch (error) {
-                console.warn('Errore validazione server:', error);
-                return []; // Fallback graceful
-            }
-        },
+                async validateWithServer(sectionId, sectionData) {
+                    try {
+                        // Per validazione sezione singola, inviamo tutti i dati del form
+                        // ma filtriamo gli errori solo per la sezione richiesta
+                        const response = await fetch('/api/v1/iccd/validate', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                schema_type: this.schemaType,
+                                level: 'C',
+                                iccd_data: this.formData  // Invia tutti i dati invece che solo la sezione
+                            })
+                        });
 
-        async validateCompleteRecord() {
-            try {
-                const response = await fetch('/api/iccd/validate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        schema_type: this.schemaType,
-                        level: 'C',
-                        iccd_data: this.formData,
-                        cataloging_institution: this.formData.CD?.ESC || 'Ente schedatore'
-                    })
-                });
-                
-                const result = await response.json();
-                return result.errors || [];
-                
-            } catch (error) {
-                console.warn('Errore validazione completa server:', error);
-                return [];
-            }
-        },
+                        const result = await response.json();
 
-        async saveForm() {
-            console.log('💾 Inizio salvataggio scheda ICCD');
-            this.saving = true;
+                        if (result.valid) {
+                            return [];
+                        } else {
+                            // Filtra solo gli errori relativi alla sezione corrente
+                            const sectionErrors = (result.errors || []).filter(error =>
+                                error.field_path && error.field_path.startsWith(sectionId + '.')
+                            );
+                            console.log(`Errori sezione ${sectionId}:`, sectionErrors);
+                            return sectionErrors;
+                        }
 
-            try {
-                // Rimuovi attributi required dai campi hidden per evitare errori di validazione HTML5
-                this.removeRequiredFromHiddenFields();
-                
-                // VALIDAZIONE COMPLETA OBBLIGATORIA prima del salvataggio
-                this.showAlert('info', 'Validazione completa scheda in corso...', []);
-                await this.validateAll();
-                
-                // Controlla se ci sono errori critici
-                const allErrors = [];
-                Object.entries(this.validationErrors).forEach(([sectionId, errors]) => {
-                    errors.forEach(error => {
-                        if (error.severity === 'error') {
-                            const fieldName = this.getFieldDisplayName(error.field || error.field_path);
-                            allErrors.push(`${sectionId} - ${fieldName}: ${error.message}`);
+                    } catch (error) {
+                        console.warn('Errore validazione server:', error);
+                        return []; // Fallback graceful
+                    }
+                },
+
+                async validateCompleteRecord() {
+                    try {
+                        const response = await fetch('/api/v1/iccd/validate', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                schema_type: this.schemaType,
+                                level: 'C',
+                                iccd_data: this.formData,
+                                cataloging_institution: this.formData.CD?.ESC || 'Ente schedatore'
+                            })
+                        });
+
+                        const result = await response.json();
+                        return result.errors || [];
+
+                    } catch (error) {
+                        console.warn('Errore validazione completa server:', error);
+                        return [];
+                    }
+                },
+
+                async saveForm() {
+                    console.log('💾 Inizio salvataggio scheda ICCD');
+                    this.saving = true;
+
+                    try {
+                        // Rimuovi attributi required dai campi hidden per evitare errori di validazione HTML5
+                        this.removeRequiredFromHiddenFields();
+
+                        // VALIDAZIONE COMPLETA OBBLIGATORIA prima del salvataggio
+                        this.showAlert('info', 'Validazione completa scheda in corso...', []);
+                        await this.validateAll();
+
+                        // Controlla se ci sono errori critici
+                        const allErrors = [];
+                        Object.entries(this.validationErrors).forEach(([sectionId, errors]) => {
+                            errors.forEach(error => {
+                                if (error.severity === 'error') {
+                                    const fieldName = this.getFieldDisplayName(error.field || error.field_path);
+                                    allErrors.push(`${sectionId} - ${fieldName}: ${error.message}`);
+                                }
+                            });
+                        });
+
+                        if (allErrors.length > 0) {
+                            this.showAlert('error',
+                                `❌ Impossibile salvare: ${allErrors.length} errori da correggere:`,
+                                allErrors.slice(0, 10) // Mostra massimo 10 errori
+                            );
+                            this.saving = false;
+                            return; // Blocca il salvataggio se ci sono errori
+                        }
+
+                        // Procedi con il salvataggio solo se non ci sono errori
+                        const requestData = {
+                            schema_type: this.schemaType,
+                            level: 'C',
+                            iccd_data: this.formData
+                        };
+
+                        // Aggiungi cataloging_institution se disponibile
+                        if (this.formData.CD?.ESC) {
+                            requestData.cataloging_institution = this.formData.CD.ESC;
+                        }
+
+                        const url = this.editMode && this.existingRecord
+                            ? `/api/v1/iccd/site/${this.siteId}/records/${this.existingRecord.id}`
+                            : `/api/v1/iccd/site/${this.siteId}/records`;
+
+                        const method = this.editMode && this.existingRecord ? 'PUT' : 'POST';
+
+                        const response = await fetch(url, {
+                            method: method,
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(requestData)
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.detail || 'Errore salvataggio');
+                        }
+
+                        const result = await response.json();
+                        const action = this.editMode ? 'aggiornata' : 'salvata';
+                        this.showAlert('success', `✅ Scheda ${result.nct_complete || 'ICCD'} ${action} con successo!`, []);
+
+                        console.log(`✅ Scheda ${action}:`, result);
+
+                        // Reindirizza dopo un breve delay
+                        setTimeout(() => {
+                            window.location.href = `/sites/${this.siteId}/iccd/`;
+                        }, 2000);
+
+                    } catch (error) {
+                        console.error('❌ Errore salvataggio:', error);
+                        this.showAlert('error', `❌ Errore durante il salvataggio: ${error.message}`, []);
+                    } finally {
+                        this.saving = false;
+                    }
+                },
+
+                removeRequiredFromHiddenFields() {
+                    // Rimuove l'attributo required dai campi che non sono nella sezione corrente
+                    // per evitare errori di validazione HTML5 sui campi hidden
+                    this.sections.forEach(section => {
+                        if (section.id !== this.currentSection) {
+                            const sectionElement = document.querySelector(`[x-show="currentSection === '${section.id}'"]`);
+                            if (sectionElement && sectionElement.style.display === 'none') {
+                                const requiredFields = sectionElement.querySelectorAll('[required]');
+                                requiredFields.forEach(field => {
+                                    field.removeAttribute('required');
+                                    field.setAttribute('data-was-required', 'true');
+                                });
+                            }
                         }
                     });
-                });
-                
-                if (allErrors.length > 0) {
-                    this.showAlert('error',
-                        `❌ Impossibile salvare: ${allErrors.length} errori da correggere:`,
-                        allErrors.slice(0, 10) // Mostra massimo 10 errori
-                    );
-                    this.saving = false;
-                    return; // Blocca il salvataggio se ci sono errori
-                }
+                },
 
-                // Procedi con il salvataggio solo se non ci sono errori
-                const requestData = {
-                    schema_type: this.schemaType,
-                    level: 'C',
-                    iccd_data: this.formData
-                };
-                
-                // Aggiungi cataloging_institution se disponibile
-                if (this.formData.CD?.ESC) {
-                    requestData.cataloging_institution = this.formData.CD.ESC;
-                }
-                
-                // Determina URL e metodo in base alla modalità
-                const url = this.editMode && this.existingRecord
-                    ? `/api/iccd/sites/${this.siteId}/records/${this.existingRecord.id}`
-                    : `/api/iccd/sites/${this.siteId}/records`;
-                    
-                const method = this.editMode && this.existingRecord ? 'PUT' : 'POST';
-                
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestData)
-                });
+                restoreRequiredFields() {
+                    // Ripristina l'attributo required sui campi che lo avevano
+                    document.querySelectorAll('[data-was-required="true"]').forEach(field => {
+                        field.setAttribute('required', 'required');
+                        field.removeAttribute('data-was-required');
+                    });
+                },
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Errore salvataggio');
-                }
+                async saveAsDraft() {
+                    console.log('📝 Salvataggio come bozza');
+                    // Imposta status come draft nei dati
+                    this.formData.status = 'draft';
+                    await this.saveForm();
+                },
 
-                const result = await response.json();
-                const action = this.editMode ? 'aggiornata' : 'salvata';
-                this.showAlert('success', `✅ Scheda ${result.nct_complete || 'ICCD'} ${action} con successo!`, []);
-
-                console.log(`✅ Scheda ${action}:`, result);
-                
-                // Reindirizza dopo un breve delay
-                setTimeout(() => {
-                    window.location.href = `/sites/${this.siteId}/iccd/`;
-                }, 2000);
-                
-            } catch (error) {
-                console.error('❌ Errore salvataggio:', error);
-                this.showAlert('error', `❌ Errore durante il salvataggio: ${error.message}`, []);
-            } finally {
-                this.saving = false;
-            }
-        },
-
-        removeRequiredFromHiddenFields() {
-            // Rimuove l'attributo required dai campi che non sono nella sezione corrente
-            // per evitare errori di validazione HTML5 sui campi hidden
-            this.sections.forEach(section => {
-                if (section.id !== this.currentSection) {
-                    const sectionElement = document.querySelector(`[x-show="currentSection === '${section.id}'"]`);
-                    if (sectionElement && sectionElement.style.display === 'none') {
-                        const requiredFields = sectionElement.querySelectorAll('[required]');
-                        requiredFields.forEach(field => {
-                            field.removeAttribute('required');
-                            field.setAttribute('data-was-required', 'true');
-                        });
-                    }
-                }
-            });
-        },
-
-        restoreRequiredFields() {
-            // Ripristina l'attributo required sui campi che lo avevano
-            document.querySelectorAll('[data-was-required="true"]').forEach(field => {
-                field.setAttribute('required', 'required');
-                field.removeAttribute('data-was-required');
-            });
-        },
-
-        async saveAsDraft() {
-            console.log('📝 Salvataggio come bozza');
-            // Imposta status come draft nei dati
-            this.formData.status = 'draft';
-            await this.saveForm();
-        },
-
-        calculateStats() {
-            try {
-                // Controllo sicurezza: evita errori se sections non è inizializzato
-                if (!this.sections || this.sections.length === 0) {
-                    this.totalFields = 0;
-                    this.filledFields = 0;
-                    return;
-                }
-                
-                let totalFields = 0;
-                let filledFields = 0;
-                
-                this.sections.forEach(section => {
+                calculateStats() {
                     try {
-                        if (section && section.properties) {
-                            const sectionFieldCount = Object.keys(section.properties).length;
-                            totalFields += sectionFieldCount;
-                            
-                            // Assicurati che la sezione esista nei formData
-                            if (!this.formData[section.id]) {
-                                this.formData[section.id] = {};
-                            }
-                            
-                            const sectionData = this.formData[section.id];
-                            const sectionFilledCount = this.countFilledFields(sectionData, section.properties);
-                            filledFields += sectionFilledCount;
+                        // Controllo sicurezza: evita errori se sections non è inizializzato
+                        if (!this.sections || this.sections.length === 0) {
+                            this.totalFields = 0;
+                            this.filledFields = 0;
+                            return;
                         }
+
+                        let totalFields = 0;
+                        let filledFields = 0;
+
+                        this.sections.forEach(section => {
+                            try {
+                                if (section && section.properties) {
+                                    const sectionFieldCount = Object.keys(section.properties).length;
+                                    totalFields += sectionFieldCount;
+
+                                    // Assicurati che la sezione esista nei formData
+                                    if (!this.formData[section.id]) {
+                                        this.formData[section.id] = {};
+                                    }
+
+                                    const sectionData = this.formData[section.id];
+                                    const sectionFilledCount = this.countFilledFields(sectionData, section.properties);
+                                    filledFields += sectionFilledCount;
+                                }
+                            } catch (error) {
+                                console.warn(`Errore calcolo stats sezione ${section.id}:`, error);
+                            }
+                        });
+
+                        this.totalFields = totalFields;
+                        this.filledFields = filledFields;
+
                     } catch (error) {
-                        console.warn(`Errore calcolo stats sezione ${section.id}:`, error);
+                        console.error('Errore in calculateStats:', error);
+                        this.totalFields = 0;
+                        this.filledFields = 0;
                     }
-                });
-                
-                this.totalFields = totalFields;
-                this.filledFields = filledFields;
-                
-            } catch (error) {
-                console.error('Errore in calculateStats:', error);
-                this.totalFields = 0;
-                this.filledFields = 0;
-            }
-        },
+                },
 
-        generateNCTN() {
-            return String(Date.now()).slice(-8);
-        },
+                generateNCTN() {
+                    return String(Date.now()).slice(-8);
+                },
 
-        showAlert(type, title, details = []) {
-            this.alert = {
-                show: true,
-                type,
-                title,
-                details: Array.isArray(details) ? details : []
+                showAlert(type, title, details = []) {
+                    this.alert = {
+                        show: true,
+                        type,
+                        title,
+                        details: Array.isArray(details) ? details : []
+                    };
+
+                    // Alert più lunghi per errori con dettagli
+                    const timeout = details.length > 0 ? 10000 : 5000;
+                    setTimeout(() => this.alert.show = false, timeout);
+                },
+
+                getFieldDisplayName(fieldPath) {
+                    if (!fieldPath) return 'Campo sconosciuto';
+
+                    // Mappa i percorsi dei campi ai nomi user-friendly
+                    const fieldNames = {
+                        'CD.TSK': 'Tipo scheda',
+                        'CD.LIR': 'Livello ricerca',
+                        'CD.NCT.NCTR': 'Codice regione',
+                        'CD.NCT.NCTN': 'Numero catalogo',
+                        'CD.NCT.NCTS': 'Suffisso catalogo',
+                        'CD.ESC': 'Ente schedatore',
+                        'CD.ECP': 'Ente competente',
+                        'OG.OGT.OGTD': 'Definizione oggetto',
+                        'LC.PVC.PVCS': 'Stato',
+                        'LC.PVC.PVCR': 'Regione',
+                        'LC.PVC.PVCP': 'Provincia',
+                        'LC.PVC.PVCC': 'Comune',
+                        'MT.MTC.MTCM': 'Materia',
+                        'MT.MIS.MISA': 'Altezza',
+                        'MT.MIS.MISL': 'Larghezza',
+                        'MT.MIS.MISP': 'Profondità',
+                        'MT.MIS.MISD': 'Diametro',
+                        'DA.DES.DESO': 'Descrizione oggetto',
+                        'DA.STC.STCC': 'Stato di conservazione'
+                    };
+
+                    return fieldNames[fieldPath] || fieldPath.split('.').pop();
+                },
+
+                get completionPercentage() {
+                    return this.totalFields > 0 ? Math.round((this.filledFields / this.totalFields) * 100) : 0;
+                },
+
+                hasFieldError(fieldPath) {
+                    // Verifica se un campo specifico ha errori di validazione
+                    const parts = fieldPath.split('.');
+                    const sectionId = parts[0];
+
+                    if (!this.validationErrors[sectionId]) return false;
+
+                    return this.validationErrors[sectionId].some(error =>
+                        error.field === fieldPath || error.field_path === fieldPath
+                    );
+                },
+
+                getFieldError(fieldPath) {
+                    // Restituisce il messaggio di errore per un campo specifico
+                    const parts = fieldPath.split('.');
+                    const sectionId = parts[0];
+
+                    if (!this.validationErrors[sectionId]) return '';
+
+                    const error = this.validationErrors[sectionId].find(error =>
+                        error.field === fieldPath || error.field_path === fieldPath
+                    );
+
+                    return error ? error.message : '';
+                }
             };
-            
-            // Alert più lunghi per errori con dettagli
-            const timeout = details.length > 0 ? 10000 : 5000;
-            setTimeout(() => this.alert.show = false, timeout);
-        },
-
-        getFieldDisplayName(fieldPath) {
-            if (!fieldPath) return 'Campo sconosciuto';
-            
-            // Mappa i percorsi dei campi ai nomi user-friendly
-            const fieldNames = {
-                'CD.TSK': 'Tipo scheda',
-                'CD.LIR': 'Livello ricerca',
-                'CD.NCT.NCTR': 'Codice regione',
-                'CD.NCT.NCTN': 'Numero catalogo',
-                'CD.NCT.NCTS': 'Suffisso catalogo',
-                'CD.ESC': 'Ente schedatore',
-                'CD.ECP': 'Ente competente',
-                'OG.OGT.OGTD': 'Definizione oggetto',
-                'LC.PVC.PVCS': 'Stato',
-                'LC.PVC.PVCR': 'Regione',
-                'LC.PVC.PVCP': 'Provincia',
-                'LC.PVC.PVCC': 'Comune',
-                'MT.MTC.MTCM': 'Materia',
-                'MT.MIS.MISA': 'Altezza',
-                'MT.MIS.MISL': 'Larghezza',
-                'MT.MIS.MISP': 'Profondità',
-                'MT.MIS.MISD': 'Diametro',
-                'DA.DES.DESO': 'Descrizione oggetto',
-                'DA.STC.STCC': 'Stato di conservazione'
-            };
-            
-            return fieldNames[fieldPath] || fieldPath.split('.').pop();
-        },
-
-        get completionPercentage() {
-            return this.totalFields > 0 ? Math.round((this.filledFields / this.totalFields) * 100) : 0;
-        },
-
-        hasFieldError(fieldPath) {
-            // Verifica se un campo specifico ha errori di validazione
-            const parts = fieldPath.split('.');
-            const sectionId = parts[0];
-            
-            if (!this.validationErrors[sectionId]) return false;
-            
-            return this.validationErrors[sectionId].some(error =>
-                error.field === fieldPath || error.field_path === fieldPath
-            );
-        },
-
-        getFieldError(fieldPath) {
-            // Restituisce il messaggio di errore per un campo specifico
-            const parts = fieldPath.split('.');
-            const sectionId = parts[0];
-            
-            if (!this.validationErrors[sectionId]) return '';
-            
-            const error = this.validationErrors[sectionId].find(error =>
-                error.field === fieldPath || error.field_path === fieldPath
-            );
-            
-            return error ? error.message : '';
         }
-    };
-}
-</script>
-{% endblock %}
+    </script>
+    {% endblock %}

@@ -9,7 +9,7 @@ function iccdHierarchicalSystem() {
         currentLevel: 'site', // site -> complex -> monument -> artifact
         selectedRecord: null,
         hierarchyTree: {},
-        
+
         // Workflow ICCD
         iccdWorkflow: {
             'SI': { level: 1, name: 'Sito Archeologico', children: ['CA', 'SAS', 'MA'] },
@@ -21,7 +21,7 @@ function iccdHierarchicalSystem() {
             'TMA': { level: 3, name: 'Tabella Materiali', children: [] },
             'AT': { level: 3, name: 'Antropologia Fisica', children: [] }
         },
-        
+
         // Authority files
         authorityFiles: {
             excavations: [], // DSC
@@ -29,17 +29,17 @@ function iccdHierarchicalSystem() {
             bibliography: [], // BIB
             authors: []      // AUT
         },
-        
+
         // Moduli speciali
         activeModules: [],
-        
+
         // UI State
         loading: false,
         showAlert: false,
         alertMessage: '',
         alertType: 'info',
         breadcrumb: [],
-        
+
         async init() {
             this.loading = true;
             try {
@@ -53,10 +53,10 @@ function iccdHierarchicalSystem() {
                 this.loading = false;
             }
         },
-        
+
         async loadSiteHierarchy() {
             try {
-                const response = await fetch(`/api/${window.siteId}/iccd/hierarchy`);
+                const response = await fetch(`/api/v1/iccd/site/${window.siteId}/hierarchy/tree`);
                 if (response.ok) {
                     this.hierarchyTree = await response.json();
                     this.buildHierarchicalView();
@@ -68,17 +68,17 @@ function iccdHierarchicalSystem() {
                 throw error;
             }
         },
-        
+
         buildHierarchicalView() {
             // Costruisce la vista ad albero gerarchico
             const siteRecord = this.hierarchyTree.site;
-            
+
             if (siteRecord) {
                 // Organizza secondo schemas ICCD
                 this.organizeByICCDLevel(this.hierarchyTree);
             }
         },
-        
+
         organizeByICCDLevel(tree) {
             const organized = {
                 level1: { // CONTENITORE TERRITORIALE
@@ -96,32 +96,32 @@ function iccdHierarchicalSystem() {
                     AT: tree.anthropology || []
                 }
             };
-            
+
             this.hierarchyTree.organized = organized;
         },
-        
+
         async createICCDRecord(schemaType, parentId = null) {
             // For SI records, redirect to the form instead of creating directly
             if (schemaType === 'SI') {
-                window.location.href = `/sites/${window.siteId}/iccd/new?schema_type=SI`;
+                window.location.href = `/sites/${window.siteId}/iccd/new/SI`;
                 return;
             }
-            
+
             // For other schemas types, check if SI exists first
             if (!this.hierarchyTree.organized?.level1?.SI && schemaType !== 'SI') {
                 this.showAlertMessage('È necessario creare prima la Scheda SI (Sito Archeologico)', 'warning');
                 return;
             }
-            
+
             const recordData = this.initializeSchemaData(schemaType);
-            
+
             // Assegna gerarchia
             if (parentId) {
                 recordData.parent_id = parentId;
             }
-            
+
             try {
-                const response = await fetch(`/sites/${window.siteId}/api/iccd/records`, {
+                const response = await fetch(`/api/v1/iccd/site/${window.siteId}/records`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -134,7 +134,7 @@ function iccdHierarchicalSystem() {
                         data: recordData
                     })
                 });
-                
+
                 if (response.ok) {
                     const result = await response.json();
                     await this.loadSiteHierarchy(); // Ricarica gerarchia
@@ -148,7 +148,7 @@ function iccdHierarchicalSystem() {
                 this.showAlertMessage(error.message || 'Errore creazione scheda', 'error');
             }
         },
-        
+
         initializeSchemaData(schemaType) {
             const baseData = {
                 CD: {
@@ -162,7 +162,7 @@ function iccdHierarchicalSystem() {
                     ESC: 'SSABAP-RM'
                 }
             };
-            
+
             // Aggiungi sezioni specifiche per tipo
             switch (schemaType) {
                 case 'SI':
@@ -185,7 +185,7 @@ function iccdHierarchicalSystem() {
                     return baseData;
             }
         },
-        
+
         initializeSiteSchema(baseData) {
             return {
                 ...baseData,
@@ -207,7 +207,7 @@ function iccdHierarchicalSystem() {
                 }
             };
         },
-        
+
         initializeComplexSchema(baseData) {
             return {
                 ...baseData,
@@ -229,7 +229,7 @@ function iccdHierarchicalSystem() {
                 }
             };
         },
-        
+
         initializeMonumentSchema(baseData) {
             return {
                 ...baseData,
@@ -251,7 +251,7 @@ function iccdHierarchicalSystem() {
                 }
             };
         },
-        
+
         initializeArtifactSchema(baseData) {
             return {
                 ...baseData,
@@ -273,7 +273,7 @@ function iccdHierarchicalSystem() {
                 }
             };
         },
-        
+
         initializeNumismaticSchema(baseData) {
             return {
                 ...baseData,
@@ -284,7 +284,7 @@ function iccdHierarchicalSystem() {
                 }
             };
         },
-        
+
         initializeMaterialTableSchema(baseData) {
             return {
                 ...baseData,
@@ -295,7 +295,7 @@ function iccdHierarchicalSystem() {
                 }
             };
         },
-        
+
         initializeAnthropologySchema(baseData) {
             return {
                 ...baseData,
@@ -306,7 +306,7 @@ function iccdHierarchicalSystem() {
                 }
             };
         },
-        
+
         initializeStratigraphicSchema(baseData) {
             return {
                 ...baseData,
@@ -317,10 +317,10 @@ function iccdHierarchicalSystem() {
                 }
             };
         },
-        
+
         async createRelation(sourceId, targetId, relationType, level = '1') {
             try {
-                const response = await fetch(`/sites/${window.siteId}/api/iccd/relations`, {
+                const response = await fetch(`/api/v1/iccd/site/${window.siteId}/relations`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -333,7 +333,7 @@ function iccdHierarchicalSystem() {
                         relation_level: level
                     })
                 });
-                
+
                 if (response.ok) {
                     await this.loadSiteHierarchy();
                     this.showAlertMessage('Relazione creata con successo', 'success');
@@ -346,10 +346,10 @@ function iccdHierarchicalSystem() {
                 this.showAlertMessage(error.message || 'Errore creazione relazione', 'error');
             }
         },
-        
+
         async loadAuthorityFiles() {
             try {
-                const response = await fetch(`/sites/${window.siteId}/api/iccd/authority-files`);
+                const response = await fetch(`/api/v1/iccd/site/${window.siteId}/authority-files`);
                 if (response.ok) {
                     this.authorityFiles = await response.json();
                 } else {
@@ -360,10 +360,10 @@ function iccdHierarchicalSystem() {
                 // Non bloccare l'inizializzazione per questo errore
             }
         },
-        
+
         async createAuthorityFile(type, data) {
             try {
-                const response = await fetch(`/sites/${window.siteId}/api/iccd/authority-files`, {
+                const response = await fetch(`/api/v1/iccd/site/${window.siteId}/authority-files`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -377,7 +377,7 @@ function iccdHierarchicalSystem() {
                         data: data.data || {}
                     })
                 });
-                
+
                 if (response.ok) {
                     await this.loadAuthorityFiles();
                     this.showAlertMessage(`Authority File ${type} creato`, 'success');
@@ -390,14 +390,14 @@ function iccdHierarchicalSystem() {
                 this.showAlertMessage(error.message || 'Errore creazione authority file', 'error');
             }
         },
-        
+
         generateNCTNumber() {
             const now = new Date();
             const year = now.getFullYear().toString().slice(-2);
             const timestamp = now.getTime().toString().slice(-6);
             return year + timestamp;
         },
-        
+
         // Navigazione gerarchica
         navigateToLevel(level, record = null) {
             if (level === 'detail' && record) {
@@ -405,15 +405,15 @@ function iccdHierarchicalSystem() {
                 window.location.href = `/sites/${window.siteId}/iccd/${record.id}`;
                 return;
             }
-            
+
             this.currentLevel = level;
             this.selectedRecord = record;
             this.updateBreadcrumb();
         },
-        
+
         updateBreadcrumb() {
             const breadcrumb = [];
-            
+
             if (this.selectedRecord) {
                 // Costruisce breadcrumb dalla gerarchia
                 let current = this.selectedRecord;
@@ -425,26 +425,26 @@ function iccdHierarchicalSystem() {
                     current = current.parent;
                 }
             }
-            
+
             this.breadcrumb = breadcrumb;
         },
-        
+
         // Sistema di notifiche
         showAlertMessage(message, type = 'info') {
             this.alertMessage = message;
             this.alertType = type;
             this.showAlert = true;
-            
+
             // Auto-hide dopo 5 secondi
             setTimeout(() => {
                 this.showAlert = false;
             }, 5000);
         },
-        
+
         hideAlert() {
             this.showAlert = false;
         },
-        
+
         // Utility
         getSchemaIcon(schemaType) {
             const icons = {
@@ -459,11 +459,11 @@ function iccdHierarchicalSystem() {
             };
             return icons[schemaType] || '📋';
         },
-        
+
         getSchemaName(schemaType) {
             return this.iccdWorkflow[schemaType]?.name || schemaType;
         },
-        
+
         initializeWorkflow() {
             // Inizializzazione workflow specifiche se necessarie
             console.log('Sistema Gerarchico ICCD inizializzato');

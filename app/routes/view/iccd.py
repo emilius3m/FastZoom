@@ -14,22 +14,22 @@ from app.models import UserSitePermission
 from app.models import User
 from app.templates import templates
 
-iccd_router = APIRouter(prefix="/view", tags=["iccd"])
+iccd_router = APIRouter(tags=["iccd"])
 
-@iccd_router.get("/{site_id}/iccd")
+@iccd_router.get("/sites/{site_id}/iccd")
 async def site_iccd_redirect(site_id: UUID):
     """Redirect to hierarchical ICCD system."""
-    return RedirectResponse(url=f"/site/{site_id}/iccd/hierarchy", status_code=302)
+    return RedirectResponse(url=f"/sites/{site_id}/iccd/hierarchy", status_code=302)
 
 
 async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
     """Recupera informazioni utente corrente"""
-    user_query = select(User).where(User.id == current_user_id)
+    user_query = select(User).where(User.id == str(current_user_id))
     user = await db.execute(user_query)
     return user.scalar_one_or_none()
 
 
-@iccd_router.get("/{site_id}/iccd/hierarchy", response_class=HTMLResponse)
+@iccd_router.get("/sites/{site_id}/iccd/hierarchy", response_class=HTMLResponse)
 async def site_iccd_hierarchy(
         request: Request,
         site_id: UUID,
@@ -78,7 +78,7 @@ async def site_iccd_hierarchy(
         "can_read": permission.can_read(),
         "can_write": permission.can_write(),
         "can_admin": permission.can_admin(),
-        "can_delete": permission.can_delete(),
+        "can_delete": permission.can_admin(),  # Only admins can delete
         "sites": user_sites,
         "sites_count": len(user_sites),
         "current_site_name": site.name if site else None,
@@ -94,7 +94,7 @@ async def site_iccd_hierarchy(
     return templates.TemplateResponse("sites/iccd_hierarchy.html", context)
 
 
-@iccd_router.get("/{site_id}/iccd/records", response_class=HTMLResponse)
+@iccd_router.get("/sites/{site_id}/iccd/records", response_class=HTMLResponse)
 async def site_iccd_records_list(
         request: Request,
         site_id: UUID,
@@ -154,11 +154,11 @@ async def site_iccd_records_list(
     return templates.TemplateResponse("sites/iccd_records.html", context)
 
 
-@iccd_router.get("/{site_id}/iccd/new", response_class=HTMLResponse)
+@iccd_router.get("/sites/{site_id}/iccd/new/{schema_type}", response_class=HTMLResponse)
 async def new_iccd_record(
         request: Request,
         site_id: UUID,
-        schema_type: str = "RA",
+        schema_type: str,
         current_user_id: UUID = Depends(get_current_user_id),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
@@ -244,7 +244,7 @@ async def new_iccd_record(
     return templates.TemplateResponse("iccd/form_universal.html", context)
 
 
-@iccd_router.get("/{site_id}/iccd/{record_id}", response_class=HTMLResponse)
+@iccd_router.get("/sites/{site_id}/iccd/{record_id}", response_class=HTMLResponse)
 async def view_iccd_record(
         request: Request,
         site_id: UUID,
@@ -343,7 +343,7 @@ async def view_iccd_record(
     return templates.TemplateResponse("sites/iccd_view.html", context)
 
 
-@iccd_router.get("/{site_id}/iccd/{record_id}/edit", response_class=HTMLResponse)
+@iccd_router.get("/sites/{site_id}/iccd/{record_id}/edit", response_class=HTMLResponse)
 async def edit_iccd_record(
         request: Request,
         site_id: UUID,
@@ -433,7 +433,7 @@ async def edit_iccd_record(
         "can_read": permission.can_read(),
         "can_write": permission.can_write(),
         "can_admin": permission.can_admin(),
-        "can_delete": permission.can_delete(),
+        "can_delete": permission.can_admin(),  # Only admins can delete
         "sites": user_sites,
         "sites_count": len(user_sites),
         "current_site_name": site.name if site else None,

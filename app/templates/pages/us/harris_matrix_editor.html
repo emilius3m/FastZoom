@@ -98,7 +98,8 @@
     .editor-container {
         position: relative;
         flex: 1;
-        min-height: 600px;
+        height: calc(100vh - 250px);
+        min-height: 500px;
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         border-radius: 0.75rem;
         overflow: hidden;
@@ -178,14 +179,15 @@
 
     .node-properties-panel {
         width: 320px;
+        height: calc(100vh - 200px);
         background: white;
         border: 1px solid #d1d5db;
         border-radius: 0.5rem;
         padding: 1.5rem;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-        max-height: calc(100vh - 300px);
         overflow-y: auto;
         flex-shrink: 0;
+        align-self: flex-start;
     }
 
     .form-group {
@@ -571,7 +573,7 @@
         </div>
 
         <!-- Main Content Area -->
-        <div class="flex gap-6 min-h-screen">
+        <div class="flex gap-6 flex-1" style="height: calc(100vh - 200px);">
 
             <!-- Left Sidebar - Editor Settings -->
             <div x-show="showSettings" x-cloak
@@ -878,7 +880,9 @@
             </div>
 
             <!-- Right Sidebar - Legend and Controls -->
-            <div x-show="showLegend" x-cloak class="w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
+            <div x-show="showLegend" x-cloak
+                class="w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 overflow-y-auto"
+                style="height: calc(100vh - 200px);">
                 <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Legend & Help</h3>
 
                 <!-- Legend for Node Types -->

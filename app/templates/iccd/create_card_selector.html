@@ -43,7 +43,7 @@
             <h3 class="text-sm font-medium text-red-900 mb-2">⚠️ Problemi Gerarchia</h3>
             <ul class="text-sm text-red-700 space-y-1">
                 <template x-for="issue in (hierarchyStatus?.issues || [])">
-                    <li x-text="issue" class="flex items-start">
+                    <li class="flex items-start">
                         <span class="text-red-500 mr-2">•</span>
                         <span x-text="issue"></span>
                     </li>
