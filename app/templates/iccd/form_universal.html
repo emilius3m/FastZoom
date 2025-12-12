@@ -222,29 +222,31 @@
                  }" class="iccd-section p-6">
 
                     <!-- Header sezione -->
-                    <div class="mb-6 pb-4 border-b border-gray-200">
-                        <h2 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <div class="mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <span x-text="section.id"></span>
-                            <span class="text-gray-400">-</span>
+                            <span class="text-gray-400 dark:text-gray-500">-</span>
                             <span x-text="section.title"></span>
-                            <span x-show="section.required" class="text-red-600 text-sm">(Obbligatorio)</span>
+                            <span x-show="section.required"
+                                class="text-red-600 dark:text-red-400 text-sm">(Obbligatorio)</span>
                         </h2>
-                        <p x-show="section.description" x-text="section.description" class="text-gray-600 mt-2"></p>
+                        <p x-show="section.description" x-text="section.description"
+                            class="text-gray-600 dark:text-gray-400 mt-2"></p>
                     </div>
 
                     <!-- Campi dinamici -->
                     <div x-html="renderSectionFields(section)"></div>
 
                     <!-- Navigazione -->
-                    <div class="mt-8 pt-6 border-t border-gray-200 flex justify-between">
+                    <div class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 flex justify-between">
                         <button type="button" @click="previousSection()" x-show="!isFirstSection()"
-                            class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                            class="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                             ← Precedente
                         </button>
 
                         <div class="flex gap-3">
                             <button type="button" @click="validateCurrentSection()"
-                                class="px-6 py-3 border border-blue-600 rounded-lg text-blue-600 hover:bg-blue-50">
+                                class="px-6 py-3 border border-blue-600 dark:border-blue-400 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30">
                                 🔍 Valida
                             </button>
 
@@ -265,9 +267,10 @@
         </form>
 
         <!-- Sidebar riepilogo -->
-        <div class="fixed right-0 top-20 w-80 bg-white shadow-xl rounded-l-xl z-50 transform transition-transform"
+        <div class="fixed right-0 top-20 w-80 bg-white dark:bg-gray-800 shadow-xl rounded-l-xl z-50 transform transition-transform"
             :class="showSidebar ? 'translate-x-0' : 'translate-x-full'">
-            <div class="p-4 border-b bg-blue-600 text-white rounded-tl-xl flex justify-between items-center">
+            <div
+                class="p-4 border-b border-gray-200 dark:border-gray-700 bg-blue-600 dark:bg-blue-700 text-white rounded-tl-xl flex justify-between items-center">
                 <h3 class="font-semibold">📊 Riepilogo</h3>
                 <button @click="showSidebar = false" class="hover:text-gray-200">✕</button>
             </div>
@@ -276,11 +279,12 @@
                 <!-- Progresso -->
                 <div class="mb-4">
                     <div class="flex justify-between text-sm mb-2">
-                        <span>Progresso</span>
-                        <span class="font-bold text-blue-600" x-text="completionPercentage + '%'"></span>
+                        <span class="text-gray-700 dark:text-gray-300">Progresso</span>
+                        <span class="font-bold text-blue-600 dark:text-blue-400"
+                            x-text="completionPercentage + '%'"></span>
                     </div>
-                    <div class="w-full h-2 bg-gray-200 rounded-full">
-                        <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full"
+                    <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+                        <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 dark:from-blue-400 dark:to-green-400 rounded-full"
                             :style="`width: ${completionPercentage}%`"></div>
                     </div>
                 </div>
@@ -290,12 +294,15 @@
                     <template x-for="section in sections" :key="section.id">
                         <button @click="currentSection = section.id; showSidebar = false"
                             class="w-full p-3 rounded-lg text-left transition-colors"
-                            :class="isSectionComplete(section.id) ? 'bg-green-50 hover:bg-green-100' : 'bg-gray-50 hover:bg-gray-100'">
+                            :class="isSectionComplete(section.id) ? 'bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50' : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'">
                             <div class="flex justify-between items-center">
-                                <span class="font-medium text-sm" x-text="section.id"></span>
+                                <span class="font-medium text-sm text-gray-900 dark:text-white"
+                                    x-text="section.id"></span>
                                 <div class="flex items-center gap-2">
-                                    <span x-show="section.required" class="text-red-500 text-xs">⚠️</span>
-                                    <span x-show="isSectionComplete(section.id)" class="text-green-600">✓</span>
+                                    <span x-show="section.required"
+                                        class="text-red-500 dark:text-red-400 text-xs">⚠️</span>
+                                    <span x-show="isSectionComplete(section.id)"
+                                        class="text-green-600 dark:text-green-400">✓</span>
                                 </div>
                             </div>
                         </button>
@@ -303,13 +310,13 @@
                 </div>
 
                 <!-- Azioni -->
-                <div class="mt-6 pt-4 border-t space-y-2">
+                <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
                     <button @click="validateAll()"
-                        class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                        class="w-full px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 text-sm">
                         🔍 Valida Tutto
                     </button>
                     <button @click="saveAsDraft()"
-                        class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">
+                        class="w-full px-4 py-2 bg-gray-600 dark:bg-gray-500 text-white rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 text-sm">
                         💾 Salva Bozza
                     </button>
                 </div>
@@ -318,7 +325,7 @@
 
         <!-- Toggle sidebar -->
         <button @click="showSidebar = !showSidebar" x-show="!showSidebar"
-            class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 z-40">
+            class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 dark:bg-blue-500 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 dark:hover:bg-blue-600 z-40">
             📊
         </button>
     </div>
@@ -830,8 +837,8 @@
 
                 renderObjectField(path, field, fieldKey) {
                     const fieldId = `field_${path.replace(/\./g, '_')}`;
-                    let html = `<div class="md:col-span-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h4 id="${fieldId}_title" class="text-lg font-semibold mb-4">${field.title || fieldKey}</h4>
+                    let html = `<div class="md:col-span-2 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm dark:shadow-gray-900/20">
+                <h4 id="${fieldId}_title" class="text-lg font-semibold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">${field.title || fieldKey}</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
 
                     for (const [subKey, subField] of Object.entries(field.properties)) {
@@ -1106,22 +1113,22 @@
                                    x-model="formData.${path}"
                                    value="${val}"
                                    @change="calculateStats(); updateSectionCompleteness()"
-                                   class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
-                            <label for="${optionId}" class="ms-2 text-sm font-medium text-gray-900">${label}</label>
+                                   class="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-gray-600 border-gray-300 dark:border-gray-500 rounded focus:ring-blue-500 dark:focus:ring-blue-400">
+                            <label for="${optionId}" class="ms-2 text-sm font-medium text-gray-900 dark:text-white">${label}</label>
                         </div>`;
                         });
                     }
 
                     return `
                 <div class="${isRequired ? 'iccd-field-required' : ''}">
-                    <label class="block mb-2 text-sm font-medium text-gray-900">
+                    <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                         ${field.title || path}
-                        ${isRequired ? ' <span class="text-red-600">*</span>' : ''}
+                        ${isRequired ? ' <span class="text-red-600 dark:text-red-400">*</span>' : ''}
                     </label>
-                    <div class="grid grid-cols-2 gap-2 p-3 bg-white border border-gray-300 rounded-lg">
+                    <div class="grid grid-cols-2 gap-2 p-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
                         ${options}
                     </div>
-                    ${field.description ? `<p class="mt-1 text-xs text-gray-500">${field.description}</p>` : ''}
+                    ${field.description ? `<p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${field.description}</p>` : ''}
                 </div>`;
                 },
 

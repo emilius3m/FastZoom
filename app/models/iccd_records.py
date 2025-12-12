@@ -3,9 +3,8 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Index, UniqueConstraint, Integer
-from sqlalchemy.dialects.postgresql import UUID, JSON
-from sqlalchemy.orm import relationship, mapped_column, Mapped
+from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Index, UniqueConstraint, Integer, JSON
+from sqlalchemy.orm import relationship
 from app.database.base import Base
 
 
@@ -14,31 +13,31 @@ class ICCDBaseRecord(Base):
     
     __tablename__ = "iccd_base_records"
     
-    # Chiave primaria
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    # Chiave primaria - usa String(36) per compatibilità SQLite
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
     
     # Codice Univoco Nazionale ICCD
-    nct_region: Mapped[str] = mapped_column(String(2), nullable=False, default='12')  # NCTR - Lazio
-    nct_number: Mapped[str] = mapped_column(String(8), nullable=False)               # NCTN
-    nct_suffix: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)      # NCTS
+    nct_region = Column(String(2), nullable=False, default='12')  # NCTR - Lazio
+    nct_number = Column(String(8), nullable=False)               # NCTN
+    nct_suffix = Column(String(2), nullable=True)      # NCTS
     
     # Metadati scheda
-    schema_type: Mapped[str] = mapped_column(String(5), nullable=False)  # SI, CA, MA, SAS, RA, NU, TMA, AT
-    schema_version: Mapped[str] = mapped_column(String(10), default='3.00')
-    level: Mapped[str] = mapped_column(String(1), nullable=False, default='C')  # P, C, A
+    schema_type = Column(String(5), nullable=False)  # SI, CA, MA, SAS, RA, NU, TMA, AT
+    schema_version = Column(String(10), default='3.00')
+    level = Column(String(1), nullable=False, default='C')  # P, C, A
     
     # Dati JSON della scheda
-    iccd_data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    iccd_data = Column(JSON, nullable=False)
     
-    # Relazioni gerarchiche
-    parent_id: Mapped[Optional[UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("iccd_base_records.id"), nullable=True)
-    site_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"))
+    # Relazioni gerarchiche - usa String(36) per compatibilità SQLite
+    parent_id = Column(String(36), ForeignKey("iccd_base_records.id"), nullable=True)
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
     
     # Metadati gestione
-    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    status: Mapped[str] = mapped_column(String(20), default='draft')  # draft, validated, published
+    created_by = Column(String(36), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    status = Column(String(20), default='draft')  # draft, validated, published
     
     # Relazioni
     parent = relationship("ICCDBaseRecord", remote_side=[id])
@@ -74,14 +73,19 @@ class ICCDRecord(ICCDBaseRecord):
     
     # Campi aggiuntivi per compatibilità
     @property
+    def safe_iccd_data(self) -> dict:
+        """Accesso sicuro a iccd_data, restituisce dict vuoto se None."""
+        return self.iccd_data if isinstance(self.iccd_data, dict) else {}
+    
+    @property
     def cataloging_institution(self) -> str:
         """Ente schedatore estratto dai dati ICCD."""
-        return self.iccd_data.get('CD', {}).get('ESC', 'SSABAP-RM')
+        return self.safe_iccd_data.get('CD', {}).get('ESC', 'SSABAP-RM')
     
     @property
     def cataloger_name(self) -> Optional[str]:
         """Nome catalogatore estratto dai dati ICCD."""
-        return self.iccd_data.get('CD', {}).get('RCG', {}).get('RCGR', None)
+        return self.safe_iccd_data.get('CD', {}).get('RCG', {}).get('RCGR', None)
     
     @property
     def is_validated(self) -> bool:
@@ -96,12 +100,12 @@ class ICCDRecord(ICCDBaseRecord):
     @property
     def validation_notes(self) -> Optional[str]:
         """Note validazione."""
-        return self.iccd_data.get('CD', {}).get('RCG', {}).get('RCGN', None)
+        return self.safe_iccd_data.get('CD', {}).get('RCG', {}).get('RCGN', None)
     
     @property
     def survey_date(self) -> Optional[datetime]:
         """Data rilevamento."""
-        survey_str = self.iccd_data.get('CD', {}).get('RCG', {}).get('RCGD', None)
+        survey_str = self.safe_iccd_data.get('CD', {}).get('RCG', {}).get('RCGD', None)
         if survey_str:
             try:
                 return datetime.fromisoformat(survey_str)
@@ -115,7 +119,7 @@ class ICCDRecord(ICCDBaseRecord):
         return self.created_at
     
     @property
-    def validated_by(self) -> Optional[UUID]:
+    def validated_by(self) -> Optional[str]:
         """ID validatore."""
         return self.created_by if self.is_validated else None
     
@@ -132,28 +136,28 @@ class ICCDRecord(ICCDBaseRecord):
     def get_object_name(self) -> str:
         """Estrae il nome dell'oggetto dai dati ICCD."""
         try:
-            return self.iccd_data.get("OG", {}).get("OGT", {}).get("OGTD", "Oggetto sconosciuto")
+            return self.safe_iccd_data.get("OG", {}).get("OGT", {}).get("OGTD", "Oggetto sconosciuto")
         except (AttributeError, KeyError):
             return "Oggetto sconosciuto"
     
     def get_cultural_context(self) -> str:
         """Estrae l'ambito culturale dai dati ICCD."""
         try:
-            return self.iccd_data.get("AU", {}).get("AUT", {}).get("AUTM", "Non specificato")
+            return self.safe_iccd_data.get("AU", {}).get("AUT", {}).get("AUTM", "Non specificato")
         except (AttributeError, KeyError):
             return "Non specificato"
     
     def get_chronology(self) -> str:
         """Estrae la cronologia dai dati ICCD."""
         try:
-            dt_data = self.iccd_data.get("DT", {})
+            dt_data = self.safe_iccd_data.get("DT", {})
             if "DTS" in dt_data:
                 dts = dt_data["DTS"]
                 start = dts.get("DTSI", "")
                 end = dts.get("DTSF", "")
                 if start == end:
-                    return start
-                return f"{start} - {end}" if start and end else start or end
+                    return str(start) if start else "Non specificato"
+                return f"{start} - {end}" if start and end else str(start or end or "Non specificato")
             return "Non specificato"
         except (AttributeError, KeyError):
             return "Non specificato"
@@ -161,16 +165,16 @@ class ICCDRecord(ICCDBaseRecord):
     def get_conservation_status(self) -> str:
         """Estrae lo stato di conservazione dai dati ICCD."""
         try:
-            return self.iccd_data.get("DA", {}).get("STC", {}).get("STCC", "Non specificato")
+            return self.safe_iccd_data.get("DA", {}).get("STC", {}).get("STCC", "Non specificato")
         except (AttributeError, KeyError):
             return "Non specificato"
     
     def get_material(self) -> str:
         """Estrae il materiale principale dai dati ICCD."""
         try:
-            materials = self.iccd_data.get("MT", {}).get("MTC", {}).get("MTCM", [])
+            materials = self.safe_iccd_data.get("MT", {}).get("MTC", {}).get("MTCM", [])
             if isinstance(materials, list) and materials:
-                return ", ".join(materials)
+                return ", ".join(str(m) for m in materials)
             elif isinstance(materials, str):
                 return materials
             return "Non specificato"
@@ -180,7 +184,7 @@ class ICCDRecord(ICCDBaseRecord):
     def get_location_name(self) -> str:
         """Estrae la denominazione del luogo dai dati ICCD."""
         try:
-            return self.iccd_data.get("LC", {}).get("PVL", {}).get("PVLN", "Non specificato")
+            return self.safe_iccd_data.get("LC", {}).get("PVL", {}).get("PVLN", "Non specificato")
         except (AttributeError, KeyError):
             return "Non specificato"
     
@@ -194,9 +198,10 @@ class ICCDRecord(ICCDBaseRecord):
         
         required = required_sections.get(self.level, [])
         missing = []
+        data = self.safe_iccd_data
         
         for section in required:
-            if section not in self.iccd_data or not self.iccd_data[section]:
+            if section not in data or not data[section]:
                 missing.append(section)
         
         return len(missing) == 0, missing
@@ -264,20 +269,21 @@ class ICCDAuthorityFile(Base):
     
     __tablename__ = "iccd_authority_files"
     
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Usa String(36) per compatibilità SQLite
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     
-    authority_type: Mapped[str] = mapped_column(String(10), nullable=False)  # DSC, RCG, BIB, AUT
-    authority_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    authority_type = Column(String(10), nullable=False)  # DSC, RCG, BIB, AUT
+    authority_code = Column(String(20), unique=True, nullable=False)
     
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
     
     # Dati specifici authority
-    authority_data: Mapped[dict] = mapped_column(JSON)
+    authority_data = Column(JSON, nullable=True)
     
-    site_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("archaeological_sites.id"))
-    created_by: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id"), nullable=False)
+    created_by = Column(String(36), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relazioni
     site = relationship("ArchaeologicalSite")
@@ -289,28 +295,28 @@ class ICCDSchemaTemplate(Base):
     
     __tablename__ = "iccd_schema_templates"
     
-    # Chiave primaria
-    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Chiave primaria - usa String(36) per compatibilità SQLite
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     
     # Identificativo schemas
-    schema_type: Mapped[str] = mapped_column(String(5), nullable=False, unique=True, index=True)  # RA, CA, SI, etc.
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=True)
-    version: Mapped[str] = mapped_column(String(10), default="4.00")  # Versione standard ICCD
+    schema_type = Column(String(5), nullable=False, unique=True, index=True)  # RA, CA, SI, etc.
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    version = Column(String(10), default="4.00")  # Versione standard ICCD
     
     # Schema JSON completo
-    json_schema: Mapped[dict] = mapped_column(JSON, nullable=False)
-    ui_schema: Mapped[dict] = mapped_column(JSON, nullable=True)  # Configurazione UI per form
+    json_schema = Column(JSON, nullable=False)
+    ui_schema = Column(JSON, nullable=True)  # Configurazione UI per form
     
     # Metadati template
-    category: Mapped[str] = mapped_column(String(50), nullable=False)  # artifact, architecture, site, etc.
-    icon: Mapped[str] = mapped_column(String(10), default="🏺")
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    standard_compliant: Mapped[bool] = mapped_column(Boolean, default=True)  # Conforme agli standard ICCD
+    category = Column(String(50), nullable=False)  # artifact, architecture, site, etc.
+    icon = Column(String(10), default="🏺")
+    is_active = Column(Boolean, default=True)
+    standard_compliant = Column(Boolean, default=True)  # Conforme agli standard ICCD
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     def __repr__(self):
         return f"<ICCDSchemaTemplate(type='{self.schema_type}', name='{self.name}')>"

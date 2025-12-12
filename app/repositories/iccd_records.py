@@ -30,7 +30,7 @@ class ICCDRecordRepository:
         query = select(ICCDRecord).options(
             joinedload(ICCDRecord.creator).joinedload(User.profile),
             joinedload(ICCDRecord.validator).joinedload(User.profile)
-        ).where(ICCDRecord.site_id == site_id)
+        ).where(ICCDRecord.site_id == str(site_id))
         
         # Apply filters
         if schema_type:
@@ -43,7 +43,7 @@ class ICCDRecordRepository:
             query = query.where(ICCDRecord.is_validated == is_validated)
         
         # Count total records
-        count_query = select(func.count(ICCDRecord.id)).where(ICCDRecord.site_id == site_id)
+        count_query = select(func.count(ICCDRecord.id)).where(ICCDRecord.site_id == str(site_id))
         if schema_type:
             count_query = count_query.where(ICCDRecord.schema_type == schema_type)
         if level:
@@ -73,7 +73,7 @@ class ICCDRecordRepository:
         ).where(
             and_(
                 ICCDRecord.id == record_id,
-                ICCDRecord.site_id == site_id
+                ICCDRecord.site_id == str(site_id)
             )
         )
         
@@ -82,9 +82,40 @@ class ICCDRecordRepository:
 
     async def create_record(self, record_data: Dict[str, Any]) -> ICCDRecord:
         """Create a new ICCD record."""
-        record = ICCDRecord(**record_data)
-        self.db_session.add(record)
-        await self.db_session.flush()  # Flush to get ID without committing
+        from loguru import logger
+        
+        try:
+            logger.info("Repository: Creating ICCDRecord object...")
+            record = ICCDRecord(**record_data)
+            logger.info(f"Repository: ICCDRecord object created with id: {record.id}")
+        except Exception as e:
+            logger.error(f"Repository: Error creating ICCDRecord object: {e}", exc_info=True)
+            raise
+        
+        try:
+            logger.info("Repository: Adding record to session...")
+            self.db_session.add(record)
+            logger.info("Repository: Record added to session")
+        except Exception as e:
+            logger.error(f"Repository: Error adding to session: {e}", exc_info=True)
+            raise
+        
+        try:
+            logger.info("Repository: Flushing session...")
+            await self.db_session.flush()
+            logger.info(f"Repository: Flush completed, id: {record.id}")
+        except Exception as e:
+            logger.error(f"Repository: Error flushing: {e}", exc_info=True)
+            raise
+        
+        try:
+            logger.info("Repository: Refreshing record...")
+            await self.db_session.refresh(record)
+            logger.info("Repository: Refresh completed")
+        except Exception as e:
+            logger.error(f"Repository: Error refreshing: {e}", exc_info=True)
+            raise
+        
         return record
 
     async def update_record(self, record: ICCDRecord, record_data: Dict[str, Any]) -> ICCDRecord:
@@ -153,14 +184,14 @@ class ICCDRecordRepository:
         """Get statistics for ICCD records in a site."""
         # Total records
         total_result = await self.db_session.execute(
-            select(func.count(ICCDRecord.id)).where(ICCDRecord.site_id == site_id)
+            select(func.count(ICCDRecord.id)).where(ICCDRecord.site_id == str(site_id))
         )
         total_records = total_result.scalar() or 0
         
         # By schemas type
         by_schema_result = await self.db_session.execute(
             select(ICCDRecord.schema_type, func.count(ICCDRecord.id))
-            .where(ICCDRecord.site_id == site_id)
+            .where(ICCDRecord.site_id == str(site_id))
             .group_by(ICCDRecord.schema_type)
         )
         by_schema = {row[0]: row[1] for row in by_schema_result.fetchall()}
@@ -168,7 +199,7 @@ class ICCDRecordRepository:
         # By level
         by_level_result = await self.db_session.execute(
             select(ICCDRecord.level, func.count(ICCDRecord.id))
-            .where(ICCDRecord.site_id == site_id)
+            .where(ICCDRecord.site_id == str(site_id))
             .group_by(ICCDRecord.level)
         )
         by_level = {row[0]: row[1] for row in by_level_result.fetchall()}
@@ -176,7 +207,7 @@ class ICCDRecordRepository:
         # By status
         by_status_result = await self.db_session.execute(
             select(ICCDRecord.status, func.count(ICCDRecord.id))
-            .where(ICCDRecord.site_id == site_id)
+            .where(ICCDRecord.site_id == str(site_id))
             .group_by(ICCDRecord.status)
         )
         by_status = {row[0]: row[1] for row in by_status_result.fetchall()}
@@ -184,7 +215,7 @@ class ICCDRecordRepository:
         # Validated records
         validated_result = await self.db_session.execute(
             select(func.count(ICCDRecord.id))
-            .where(and_(ICCDRecord.site_id == site_id, ICCDRecord.status.in_(['validated', 'published'])))
+            .where(and_(ICCDRecord.site_id == str(site_id), ICCDRecord.status.in_(['validated', 'published'])))
         )
         validated_count = validated_result.scalar() or 0
         

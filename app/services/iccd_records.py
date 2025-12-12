@@ -198,7 +198,7 @@ class ICCDRecordService:
                     else:
                         iccd_data['CD']['RCG']['RCGD'] = survey_date.isoformat()
             
-            # Prepare record data for creation
+            # Prepare record data for creation - convert UUIDs to strings for SQLite compatibility
             record = {
                 "nct_region": nct_data['NCTR'],
                 "nct_number": nct_data['NCTN'],
@@ -206,21 +206,48 @@ class ICCDRecordService:
                 "schema_type": record_data['schema_type'],
                 "level": record_data['level'],
                 "iccd_data": iccd_data,
-                "site_id": site_id,
-                "created_by": current_user_id,
-                "parent_id": parent_id  # Add parent_id to the record
+                "site_id": str(site_id),
+                "created_by": str(current_user_id),
+                "parent_id": str(parent_id) if parent_id else None
             }
             
-            new_record = await self.repository.create_record(record)
-            await self.db_session.commit()
+            logger.info(f"Step 1: Prepared record data: {record.keys()}")
             
-            logger.info(f"ICCD record created: {new_record.get_nct()} for site {site_id}")
+            try:
+                new_record = await self.repository.create_record(record)
+                logger.info(f"Step 2: Record created in repository, id: {new_record.id}")
+            except Exception as repo_err:
+                logger.error(f"Error in repository.create_record: {repo_err}", exc_info=True)
+                raise
+            
+            try:
+                await self.db_session.commit()
+                logger.info(f"Step 3: Session committed successfully")
+            except Exception as commit_err:
+                logger.error(f"Error in session.commit: {commit_err}", exc_info=True)
+                raise
+            
+            try:
+                nct_str = new_record.get_nct()
+                logger.info(f"Step 4: Got NCT: {nct_str}")
+            except Exception as nct_err:
+                logger.error(f"Error getting NCT: {nct_err}", exc_info=True)
+                nct_str = "ERROR"
+            
+            logger.info(f"ICCD record created: {nct_str} for site {site_id}")
+            
+            try:
+                record_dict = new_record.to_dict()
+                logger.info(f"Step 5: to_dict() successful")
+            except Exception as dict_err:
+                logger.error(f"Error in to_dict(): {dict_err}", exc_info=True)
+                raise
             
             return {
                 "message": "Scheda ICCD creata con successo",
                 "record_id": str(new_record.id),
-                "nct": new_record.get_nct(),
-                "record": new_record.to_dict()
+                "nct": nct_str,
+                "record": record_dict
             }
             
         except BusinessLogicError:
