@@ -28,8 +28,7 @@ class ICCDRecordRepository:
     ) -> tuple[List[ICCDRecord], int]:
         """Get ICCD records for a site with optional filters and pagination."""
         query = select(ICCDRecord).options(
-            joinedload(ICCDRecord.creator).joinedload(User.profile),
-            joinedload(ICCDRecord.validator).joinedload(User.profile)
+            joinedload(ICCDRecord.creator).joinedload(User.profile)
         ).where(ICCDRecord.site_id == str(site_id))
         
         # Apply filters
@@ -61,7 +60,7 @@ class ICCDRecordRepository:
         query = query.offset(skip).limit(limit)
         
         result = await self.db_session.execute(query)
-        records = result.scalars().all()
+        records = result.unique().scalars().all()
         
         return records, total
 
@@ -72,8 +71,7 @@ class ICCDRecordRepository:
         record_id_no_dashes = record_id_str.replace("-", "")
         
         query = select(ICCDRecord).options(
-            joinedload(ICCDRecord.creator).joinedload(User.profile),
-            joinedload(ICCDRecord.validator).joinedload(User.profile)
+            joinedload(ICCDRecord.creator).joinedload(User.profile)
         ).where(
             and_(
                 or_(

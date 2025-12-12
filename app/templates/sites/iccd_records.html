@@ -375,7 +375,9 @@
         try {
             const response = await fetch(`/api/v1/iccd/site/{{ site.id }}/statistics`);
             if(response.ok) {
-        this.statistics = await response.json();
+        const data = await response.json();
+        // L'API restituisce { site_id, statistics: {...} }
+        this.statistics = data.statistics || data;
     }
             } catch (error) {
         console.error('Errore caricamento statistiche:', error);

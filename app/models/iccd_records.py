@@ -123,8 +123,6 @@ class ICCDRecord(ICCDBaseRecord):
         """ID validatore."""
         return self.created_by if self.is_validated else None
     
-    validator = relationship("User", viewonly=True)
-    
     def __repr__(self):
         return f"<ICCDRecord(nct='{self.get_nct()}', type='{self.schema_type}', level='{self.level}')>"
     

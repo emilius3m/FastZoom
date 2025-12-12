@@ -47,9 +47,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
-    <div class="container mx-auto px-4 py-6" x-data="iccdFormUniversal()" data-schema-type="{{ schema_type }}"
-        data-site-id="{{ site.id }}" data-edit-mode="{{ edit_mode|tojson if edit_mode else 'false' }}">
+<div class="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors" x-data="iccdFormUniversal()"
+    data-schema-type="{{ schema_type }}" data-site-id="{{ site.id }}"
+    data-edit-mode="{{ edit_mode|tojson if edit_mode else 'false' }}">
+    <div class="container mx-auto px-4 py-6">
 
         <!-- Record data in a hidden script tag to avoid attribute parsing issues -->
         {% if record %}
@@ -249,6 +250,15 @@
                                 class="px-6 py-3 border border-blue-600 dark:border-blue-400 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30">
                                 🔍 Valida
                             </button>
+                            <button type="button" @click="validateAll()"
+                                class="px-6 py-3 border border-blue-600 dark:border-blue-400 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30">
+                                🔍 Valida Tutto
+                            </button>
+
+                            <button type="button" @click="saveAsDraft()"
+                                class="px-6 py-3 bg-gray-600 dark:bg-gray-500 text-white rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600">
+                                💾 Salva Bozza
+                            </button>
 
                             <button type="button" @click="nextSection()" x-show="!isLastSection()"
                                 class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
@@ -266,69 +276,55 @@
             </template>
         </form>
 
-        <!-- Sidebar riepilogo -->
-        <div class="fixed right-0 top-20 w-80 bg-white dark:bg-gray-800 shadow-xl rounded-l-xl z-50 transform transition-transform"
-            :class="showSidebar ? 'translate-x-0' : 'translate-x-full'">
-            <div
-                class="p-4 border-b border-gray-200 dark:border-gray-700 bg-blue-600 dark:bg-blue-700 text-white rounded-tl-xl flex justify-between items-center">
-                <h3 class="font-semibold">📊 Riepilogo</h3>
-                <button @click="showSidebar = false" class="hover:text-gray-200">✕</button>
-            </div>
+    </div>
 
-            <div class="p-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-                <!-- Progresso -->
-                <div class="mb-4">
-                    <div class="flex justify-between text-sm mb-2">
-                        <span class="text-gray-700 dark:text-gray-300">Progresso</span>
-                        <span class="font-bold text-blue-600 dark:text-blue-400"
-                            x-text="completionPercentage + '%'"></span>
-                    </div>
-                    <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
-                        <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 dark:from-blue-400 dark:to-green-400 rounded-full"
-                            :style="`width: ${completionPercentage}%`"></div>
-                    </div>
-                </div>
-
-                <!-- Lista sezioni -->
-                <div class="space-y-2">
-                    <template x-for="section in sections" :key="section.id">
-                        <button @click="currentSection = section.id; showSidebar = false"
-                            class="w-full p-3 rounded-lg text-left transition-colors"
-                            :class="isSectionComplete(section.id) ? 'bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50' : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'">
-                            <div class="flex justify-between items-center">
-                                <span class="font-medium text-sm text-gray-900 dark:text-white"
-                                    x-text="section.id"></span>
-                                <div class="flex items-center gap-2">
-                                    <span x-show="section.required"
-                                        class="text-red-500 dark:text-red-400 text-xs">⚠️</span>
-                                    <span x-show="isSectionComplete(section.id)"
-                                        class="text-green-600 dark:text-green-400">✓</span>
-                                </div>
-                            </div>
-                        </button>
-                    </template>
-                </div>
-
-                <!-- Azioni -->
-                <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-                    <button @click="validateAll()"
-                        class="w-full px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 text-sm">
-                        🔍 Valida Tutto
-                    </button>
-                    <button @click="saveAsDraft()"
-                        class="w-full px-4 py-2 bg-gray-600 dark:bg-gray-500 text-white rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 text-sm">
-                        💾 Salva Bozza
-                    </button>
-                </div>
-            </div>
+    <!-- Sidebar riepilogo - positioned outside container for proper fixed positioning -->
+    <div class="fixed right-0 top-20 w-80 max-h-[calc(100vh-5rem)] bg-white dark:bg-gray-800 shadow-xl rounded-l-xl z-[60] transform transition-transform flex flex-col"
+        :class="showSidebar ? 'translate-x-0' : 'translate-x-full'">
+        <div
+            class="p-4 border-b border-gray-200 dark:border-gray-700 bg-blue-600 dark:bg-blue-700 text-white rounded-tl-xl flex justify-between items-center">
+            <h3 class="font-semibold">📊 Riepilogo</h3>
+            <button @click="showSidebar = false" class="hover:text-gray-200">✕</button>
         </div>
 
-        <!-- Toggle sidebar -->
-        <button @click="showSidebar = !showSidebar" x-show="!showSidebar"
-            class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 dark:bg-blue-500 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 dark:hover:bg-blue-600 z-40">
-            📊
-        </button>
+        <div class="p-4 flex-1 overflow-y-auto">
+            <!-- Progresso -->
+            <div class="mb-4">
+                <div class="flex justify-between text-sm mb-2">
+                    <span class="text-gray-700 dark:text-gray-300">Progresso</span>
+                    <span class="font-bold text-blue-600 dark:text-blue-400" x-text="completionPercentage + '%'"></span>
+                </div>
+                <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+                    <div class="h-full bg-gradient-to-r from-blue-500 to-green-500 dark:from-blue-400 dark:to-green-400 rounded-full"
+                        :style="`width: ${completionPercentage}%`"></div>
+                </div>
+            </div>
+
+            <!-- Lista sezioni -->
+            <div class="space-y-2">
+                <template x-for="section in sections" :key="section.id">
+                    <button @click="currentSection = section.id; showSidebar = false"
+                        class="w-full p-3 rounded-lg text-left transition-colors"
+                        :class="isSectionComplete(section.id) ? 'bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50' : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-sm text-gray-900 dark:text-white" x-text="section.id"></span>
+                            <div class="flex items-center gap-2">
+                                <span x-show="section.required" class="text-red-500 dark:text-red-400 text-xs">⚠️</span>
+                                <span x-show="isSectionComplete(section.id)"
+                                    class="text-green-600 dark:text-green-400">✓</span>
+                            </div>
+                        </div>
+                    </button>
+                </template>
+            </div>
+        </div>
     </div>
+
+    <!-- Toggle sidebar -->
+    <button @click="showSidebar = !showSidebar" x-show="!showSidebar"
+        class="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 dark:bg-blue-500 text-white p-3 rounded-l-lg shadow-lg hover:bg-blue-700 dark:hover:bg-blue-600 z-[55]">
+        📊
+    </button>
 
     <script>
         function iccdFormUniversal() {
