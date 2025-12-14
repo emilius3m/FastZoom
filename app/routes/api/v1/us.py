@@ -24,6 +24,7 @@ from app.schemas.us import (
     USCreate, USUpdate, USOut,
     USMCreate, USMUpdate, USMOut
 )
+from app.routes.api.v1.ocr_us_import import router as ocr_us_import_router
 
 router = APIRouter()
 
@@ -1137,3 +1138,6 @@ async def bulk_create_from_matrix(
             status_code=500,
             detail=f"Errore durante la creazione: {str(e)}"
         )
+
+# Include OCR router for US-related OCR functionality
+router.include_router(ocr_us_import_router, prefix="/ocr", tags=["OCR US Import"])

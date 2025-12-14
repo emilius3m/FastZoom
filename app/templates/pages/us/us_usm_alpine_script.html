@@ -249,6 +249,100 @@
             pdfImportResults: null,
             pdfImportError: null,
 
+            // ===== CANVAS HELPER FUNCTIONS FOR OCR DEBUG VIEWER =====
+            initCanvas(canvas, img, page, hoveredBoxIdx) {
+                if (!canvas || !img) return;
+                // Set canvas size to match image display size
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                // Store page reference for hit testing
+                canvas._pageData = page;
+                canvas._imgScale = img.width / (img.naturalWidth || img.width);
+                this.drawBoxes(canvas, page, hoveredBoxIdx);
+            },
+
+            drawBoxes(canvas, page, hoveredBoxIdx) {
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const boxes = page?.bounding_boxes || [];
+
+                boxes.forEach((box, idx) => {
+                    if (!box.polygon || box.polygon.length < 3) return;
+
+                    const isHovered = hoveredBoxIdx === idx;
+
+                    // Draw polygon
+                    ctx.beginPath();
+                    ctx.moveTo(box.polygon[0][0], box.polygon[0][1]);
+                    for (let i = 1; i < box.polygon.length; i++) {
+                        ctx.lineTo(box.polygon[i][0], box.polygon[i][1]);
+                    }
+                    ctx.closePath();
+
+                    // Fill
+                    ctx.fillStyle = isHovered ? 'rgba(255, 200, 0, 0.4)' : 'rgba(0, 255, 0, 0.15)';
+                    ctx.fill();
+
+                    // Stroke
+                    ctx.strokeStyle = isHovered ? '#ff6600' : '#00aa00';
+                    ctx.lineWidth = isHovered ? 3 : 2;
+                    ctx.stroke();
+
+                    // Draw index number
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillStyle = isHovered ? '#ff6600' : '#00aa00';
+                    ctx.fillText((idx + 1).toString(), box.polygon[0][0] + 4, box.polygon[0][1] - 6);
+                });
+            },
+
+            handleCanvasHover(event, canvas, page) {
+                if (!canvas || !page) return;
+
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+
+                const x = (event.clientX - rect.left) * scaleX;
+                const y = (event.clientY - rect.top) * scaleY;
+
+                const boxes = page?.bounding_boxes || [];
+                let foundIdx = null;
+
+                // Check each box polygon for hit
+                for (let idx = 0; idx < boxes.length; idx++) {
+                    const box = boxes[idx];
+                    if (!box.polygon || box.polygon.length < 3) continue;
+
+                    if (this.pointInPolygon(x, y, box.polygon)) {
+                        foundIdx = idx;
+                        break;
+                    }
+                }
+
+                this.hoveredBoxIdx = foundIdx;
+            },
+
+            pointInPolygon(x, y, polygon) {
+                let inside = false;
+                for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                    const xi = polygon[i][0], yi = polygon[i][1];
+                    const xj = polygon[j][0], yj = polygon[j][1];
+
+                    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+                        inside = !inside;
+                    }
+                }
+                return inside;
+            },
+
+            // Variable to track hovered box index for canvas-based rendering
+            hoveredBoxIdx: null,
+
             // ===== INITIALIZATION =====
             async init() {
                 console.log('US/USM Manager inizializzato per sito:', this.currentSiteId);

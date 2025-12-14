@@ -1,7 +1,7 @@
 # app/routes/api/v1/ocr_us_import.py
 """
 API v1 - OCR Import US Sheets
-Endpoints per importazione schede US da PDF tramite Chandra OCR
+Endpoints per importazione schede US da PDF tramite PaddleOCR
 """
 
 from typing import List, Dict, Any, Optional
@@ -31,10 +31,10 @@ from app.core.security import (
     get_current_user_sites_with_blacklist,
 )
 from app.models.stratigraphy import UnitaStratigrafica
-from app.services.chandra_us_service import (
-    get_chandra_us_service, 
-    is_chandra_available,
-    ChandraUSService
+from app.services.paddle_ocr_service import (
+    get_paddle_ocr_service, 
+    is_paddle_ocr_available,
+    PaddleOCRService
 )
 
 
@@ -46,7 +46,7 @@ router = APIRouter()
 class OCRStatusResponse(BaseModel):
     """Stato del servizio OCR"""
     available: bool
-    chandra_installed: bool
+    paddle_ocr_installed: bool
     pdf2image_installed: bool
     gpu_enabled: bool
     message: str
@@ -64,6 +64,16 @@ class OCRExtractionResult(BaseModel):
     data: Dict[str, Any]
 
 
+class OCRPageDebug(BaseModel):
+    """Debug data per singola pagina OCR"""
+    page_number: int
+    image_base64: Optional[str] = None
+    text_lines: List[str] = []
+    bounding_boxes: List[Dict[str, Any]] = []
+    word_count: int = 0
+    avg_confidence: float = 0.0
+
+
 class OCRBatchResult(BaseModel):
     """Risultato estrazione batch"""
     filename: str
@@ -72,6 +82,9 @@ class OCRBatchResult(BaseModel):
     failed_extractions: int
     results: List[OCRExtractionResult]
     processing_time_seconds: float
+    # Debug data for visualization
+    debug_pages: Optional[List[OCRPageDebug]] = None
+    combined_text: Optional[str] = None
 
 
 class USImportPreviewItem(BaseModel):
@@ -138,39 +151,39 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]):
 # ===== ENDPOINTS =====
 
 @router.get(
-    "/ocr/status",
+    "/status",
     response_model=OCRStatusResponse,
     summary="Stato servizio OCR",
-    description="Verifica disponibilità del servizio OCR Chandra"
+    description="Verifica disponibilità del servizio OCR PaddleOCR"
 )
 async def get_ocr_status():
     """
     Verifica lo stato del servizio OCR per l'importazione PDF.
     
     Controlla:
-    - Installazione Chandra OCR
-    - Installazione pdf2image e Poppler
+    - Installazione PaddleOCR
+    - Installazione PyMuPDF
     - Disponibilità GPU
     """
     try:
-        service = get_chandra_us_service(use_gpu=True)
+        service = get_paddle_ocr_service(use_gpu=False)
         
-        from app.services.chandra_us_service import CHANDRA_AVAILABLE, PDF2IMAGE_AVAILABLE
+        from app.services.paddle_ocr_service import PADDLE_OCR_AVAILABLE, PDF2IMAGE_AVAILABLE
         
-        available = CHANDRA_AVAILABLE and PDF2IMAGE_AVAILABLE
+        available = PADDLE_OCR_AVAILABLE and PDF2IMAGE_AVAILABLE
         
         if available:
             message = "Servizio OCR disponibile"
-        elif not CHANDRA_AVAILABLE:
-            message = "Chandra OCR non installato. Installa con: pip install chandra-ocr"
+        elif not PADDLE_OCR_AVAILABLE:
+            message = "PaddleOCR non installato. Installa con: pip install paddleocr"
         elif not PDF2IMAGE_AVAILABLE:
-            message = "pdf2image non installato. Installa con: pip install pdf2image"
+            message = "PyMuPDF non installato. Installa con: pip install pymupdf"
         else:
             message = "Servizio OCR non disponibile"
         
         return OCRStatusResponse(
             available=available,
-            chandra_installed=CHANDRA_AVAILABLE,
+            paddle_ocr_installed=PADDLE_OCR_AVAILABLE,
             pdf2image_installed=PDF2IMAGE_AVAILABLE,
             gpu_enabled=service.use_gpu,
             message=message
@@ -180,7 +193,7 @@ async def get_ocr_status():
         logger.error(f"Error checking OCR status: {e}")
         return OCRStatusResponse(
             available=False,
-            chandra_installed=False,
+            paddle_ocr_installed=False,
             pdf2image_installed=False,
             gpu_enabled=False,
             message=f"Errore verifica servizio: {str(e)}"
@@ -191,7 +204,7 @@ async def get_ocr_status():
     "/sites/{site_id}/ocr/extract",
     response_model=OCRBatchResult,
     summary="Estrai schede US da PDF",
-    description="Estrae schede US da un PDF utilizzando OCR Chandra"
+    description="Estrae schede US da un PDF utilizzando PaddleOCR"
 )
 async def extract_us_from_pdf(
     site_id: UUID,
@@ -202,7 +215,7 @@ async def extract_us_from_pdf(
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
-    Estrae schede US da un file PDF utilizzando il servizio OCR Chandra.
+    Estrae schede US da un file PDF utilizzando il servizio PaddleOCR.
     
     Il PDF viene analizzato pagina per pagina e per ogni pagina viene 
     tentata l'estrazione di una scheda US secondo standard MiC 2021.
@@ -217,10 +230,10 @@ async def extract_us_from_pdf(
     verify_site_access(site_id, user_sites)
     
     # Verifica disponibilità OCR
-    if not is_chandra_available():
+    if not is_paddle_ocr_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Servizio OCR non disponibile. Assicurati che Chandra e pdf2image siano installati."
+            detail="Servizio OCR non disponibile. Assicurati che PaddleOCR e PyMuPDF siano installati."
         )
     
     # Verifica tipo file
@@ -249,48 +262,59 @@ async def extract_us_from_pdf(
         logger.info(f"Processing PDF {file.filename} ({len(pdf_bytes)} bytes) for site {site_id}")
         
         # Inizializza servizio OCR
-        service = get_chandra_us_service(use_gpu=use_gpu)
+        service = get_paddle_ocr_service(use_gpu=use_gpu)
         
-        # Estrai schede
-        extracted_sheets = await service.extract_from_pdf(
+        # Estrai singola US da PDF combinando tutte le pagine + debug data
+        extraction_result = await service.extract_from_pdf_combined(
             pdf_bytes=pdf_bytes,
             filename=file.filename,
-            site_id=str(site_id)
+            site_id=str(site_id),
+            include_debug=True
         )
         
-        # Costruisci risultati
+        # Build result
         results = []
-        for sheet in extracted_sheets:
-            validation = service.validate_extraction_result(sheet)
-            
+        debug_pages = []
+        
+        us_data = extraction_result.get('us_data')
+        debug_info = extraction_result.get('debug', {})
+        
+        if us_data:
+            validation = service.validate_extraction_result(us_data)
             results.append(OCRExtractionResult(
                 us_code=validation['us_code'] or 'UNKNOWN',
-                page_number=sheet.get('_page_number', 0),
+                page_number=1,  # Single combined result
                 confidence=validation['confidence'],
                 is_valid=validation['is_valid'],
                 issues=validation['issues'],
                 warnings=validation['warnings'],
                 extracted_fields_count=validation['extracted_fields_count'],
-                data=sheet
+                data=us_data
+            ))
+        
+        # Build debug pages
+        for page_data in debug_info.get('pages', []):
+            debug_pages.append(OCRPageDebug(
+                page_number=page_data.get('page_number', 0),
+                image_base64=page_data.get('image_base64'),
+                text_lines=page_data.get('text_lines', []),
+                bounding_boxes=page_data.get('bounding_boxes', []),
+                word_count=page_data.get('word_count', 0),
+                avg_confidence=page_data.get('avg_confidence', 0.0)
             ))
         
         processing_time = time.time() - start_time
-        
-        # Conta pagine totali (approssimazione)
-        from pdf2image import pdfinfo_from_bytes
-        try:
-            pdf_info = pdfinfo_from_bytes(pdf_bytes)
-            total_pages = pdf_info.get('Pages', len(results))
-        except:
-            total_pages = len(results)
+        total_pages = len(debug_pages) if debug_pages else 1
         
         return OCRBatchResult(
             filename=file.filename,
             total_pages=total_pages,
-            successful_extractions=len([r for r in results if r.is_valid]),
-            failed_extractions=len([r for r in results if not r.is_valid]),
+            successful_extractions=1 if us_data else 0,
+            failed_extractions=0 if us_data else 1,
             results=results,
-            processing_time_seconds=round(processing_time, 2)
+            processing_time_seconds=round(processing_time, 2),
+            debug_pages=debug_pages,
+            combined_text=debug_info.get('combined_text', '')
         )
     
     except HTTPException:
@@ -330,7 +354,7 @@ async def preview_us_import(
     # Verifica accesso al sito
     verify_site_access(site_id, user_sites)
     
-    if not is_chandra_available():
+    if not is_paddle_ocr_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Servizio OCR non disponibile"
@@ -345,7 +369,7 @@ async def preview_us_import(
     try:
         pdf_bytes = await file.read()
         
-        service = get_chandra_us_service(use_gpu=use_gpu)
+        service = get_paddle_ocr_service(use_gpu=use_gpu)
         extracted_sheets = await service.extract_from_pdf(
             pdf_bytes=pdf_bytes,
             filename=file.filename,
@@ -450,7 +474,7 @@ async def import_us_from_ocr(
     
     verify_site_access(site_id, user_sites)
     
-    if not is_chandra_available():
+    if not is_paddle_ocr_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Servizio OCR non disponibile"
@@ -465,7 +489,7 @@ async def import_us_from_ocr(
     try:
         pdf_bytes = await file.read()
         
-        service = get_chandra_us_service(use_gpu=use_gpu)
+        service = get_paddle_ocr_service(use_gpu=use_gpu)
         extracted_sheets = await service.extract_from_pdf(
             pdf_bytes=pdf_bytes,
             filename=file.filename,
@@ -590,7 +614,7 @@ async def extract_us_from_image(
     """
     verify_site_access(site_id, user_sites)
     
-    if not is_chandra_available():
+    if not is_paddle_ocr_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Servizio OCR non disponibile"
@@ -613,7 +637,7 @@ async def extract_us_from_image(
     try:
         image_bytes = await file.read()
         
-        service = get_chandra_us_service(use_gpu=use_gpu)
+        service = get_paddle_ocr_service(use_gpu=use_gpu)
         extracted_data = await service.extract_from_image(
             image_bytes=image_bytes,
             filename=file.filename,
