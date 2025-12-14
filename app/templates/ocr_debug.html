@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaddleOCR Debug Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: white;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(45deg, #e94560, #f39c12);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .upload-area {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex: 1;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #e94560, #f39c12);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(233, 69, 96, 0.4);
+        }
+
+        .upload-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #fileName {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .status {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .status.loading {
+            background: #f39c12;
+            color: #1a1a2e;
+        }
+
+        .status.error {
+            background: #e74c3c;
+        }
+
+        .status.success {
+            background: #27ae60;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - 80px);
+        }
+
+        .panel {
+            background: #16213e;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel-header {
+            background: #0f3460;
+            padding: 15px 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-badge {
+            background: #e94560;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow: auto;
+            padding: 15px;
+        }
+
+        .image-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100%;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .text-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .section {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .section-title {
+            color: #f39c12;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .raw-text {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            color: #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .json-content {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            color: #7bed9f;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .boxes-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .box-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+        }
+
+        .box-num {
+            background: #e94560;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .box-text {
+            flex: 1;
+            color: #fff;
+        }
+
+        .box-conf {
+            color: #27ae60;
+            font-size: 0.8rem;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            text-align: center;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: #e94560;
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🔍 PaddleOCR Debug Viewer</h1>
+        <div class="upload-area">
+            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff">
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                📁 Scegli File
+            </button>
+            <span id="fileName">Nessun file selezionato</span>
+            <button class="upload-btn" id="processBtn" onclick="processFile()" disabled>
+                ⚡ Elabora
+            </button>
+        </div>
+        <span id="status"></span>
+    </div>
+
+    <div class="main-content">
+        <!-- Left Panel: Image -->
+        <div class="panel">
+            <div class="panel-header">
+                📷 Immagine con Bounding Boxes
+            </div>
+            <div class="panel-content">
+                <div class="image-container" id="imageContainer">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5-7l-3 3.72L9 13l-3 4h12l-4-5z" />
+                        </svg>
+                        <p>Carica un file PDF o immagine</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Text & Data -->
+        <div class="panel">
+            <div class="panel-header">
+                📝 Dati Estratti
+                <span class="panel-badge" id="wordCount">0 parole</span>
+            </div>
+            <div class="panel-content">
+                <div class="text-content" id="textContent">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                        </svg>
+                        <p>I dati estratti appariranno qui</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFile = null;
+
+        document.getElementById('fileInput').addEventListener('change', function (e) {
+            if (e.target.files.length > 0) {
+                currentFile = e.target.files[0];
+                document.getElementById('fileName').textContent = currentFile.name;
+                document.getElementById('processBtn').disabled = false;
+            }
+        });
+
+        async function processFile() {
+            if (!currentFile) return;
+
+            const status = document.getElementById('status');
+            const processBtn = document.getElementById('processBtn');
+
+            status.textContent = '⏳ Elaborazione in corso...';
+            status.className = 'status loading';
+            processBtn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', currentFile);
+
+                const response = await fetch('/api/v1/ocr/debug', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResults(data);
+                    status.textContent = '✓ Completato';
+                    status.className = 'status success';
+                } else {
+                    throw new Error(data.error || 'Errore sconosciuto');
+                }
+
+            } catch (err) {
+                status.textContent = '✗ ' + err.message;
+                status.className = 'status error';
+            } finally {
+                processBtn.disabled = false;
+            }
+        }
+
+        function displayResults(data) {
+            // Image
+            const imageContainer = document.getElementById('imageContainer');
+            imageContainer.innerHTML = `<img src="${data.image_base64}" alt="OCR Result">`;
+
+            // Word count
+            document.getElementById('wordCount').textContent = `${data.text_lines.length} parole`;
+
+            // Text content
+            const textContent = document.getElementById('textContent');
+            textContent.innerHTML = `
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab('raw')">Testo Raw</button>
+                    <button class="tab" onclick="showTab('boxes')">Bounding Boxes</button>
+                    <button class="tab" onclick="showTab('parsed')">Dati US Parsati</button>
+                </div>
+
+                <div class="tab-content active" id="tab-raw">
+                    <div class="section">
+                        <div class="section-title">Testo Estratto</div>
+                        <div class="raw-text">${escapeHtml(data.raw_text)}</div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-boxes">
+                    <div class="section">
+                        <div class="section-title">Bounding Boxes (${data.bounding_boxes.length})</div>
+                        <div class="boxes-list">
+                            ${data.bounding_boxes.map((box, i) => `
+                                <div class="box-item">
+                                    <span class="box-num">${i + 1}</span>
+                                    <span class="box-text">${escapeHtml(box.text)}</span>
+                                    <span class="box-conf">${(box.confidence * 100).toFixed(1)}%</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-parsed">
+                    <div class="section">
+                        <div class="section-title">Dati US Parsati</div>
+                        <div class="json-content">${data.parsed_data ? JSON.stringify(data.parsed_data, null, 2) : 'Nessun dato US trovato'}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+
+</html>

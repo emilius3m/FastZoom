@@ -1,0 +1,1288 @@
+# app/services/paddle_ocr_service.py
+"""
+Servizio OCR con PaddleOCR per importazione PDF schede US
+Integrazione con modello UnitaStratigrafica esistente (MiC 2021)
+
+Sostituisce Chandra OCR con PaddleOCR per maggiore compatibilità e supporto multilingua
+"""
+
+import asyncio
+import logging
+import re
+import io
+from pathlib import Path
+from typing import Optional, Dict, List, Any
+from datetime import datetime, date
+
+import cv2
+import numpy as np
+from PIL import Image
+from loguru import logger
+
+# Import condizionali per PaddleOCR
+try:
+    from paddleocr import PaddleOCR
+    PADDLE_OCR_AVAILABLE = True
+except ImportError:
+    PADDLE_OCR_AVAILABLE = False
+    logger.warning("PaddleOCR non disponibile. Installa con: pip install paddleocr")
+
+# Import PyMuPDF per conversione PDF
+try:
+    import fitz  # PyMuPDF
+    PDF2IMAGE_AVAILABLE = True
+except ImportError:
+    PDF2IMAGE_AVAILABLE = False
+    logger.warning("PyMuPDF non disponibile. Installa con: pip install pymupdf")
+
+from app.models.stratigraphy import TipoUSEnum, ConsistenzaEnum, AffidabilitaEnum
+from app.services.us_parser import get_us_parser
+
+
+class PaddleOCRService:
+    """Servizio OCR per schede US con PaddleOCR - integrato con FastZoom"""
+    
+    def __init__(self, use_gpu: bool = False, languages: List[str] = None):
+        """
+        Inizializza il servizio OCR
+        
+        Args:
+            use_gpu: Utilizzare GPU (se disponibile)
+            languages: Lingue da supportare (default: italiano + inglese)
+        """
+        self.languages = languages or ['it', 'en']
+        self.use_gpu = use_gpu
+        
+        # Inizializza il modello PaddleOCR (lazy loading)
+        self.ocr_model = None
+        self._model_loaded = False
+        
+        device_name = "GPU" if self.use_gpu else "CPU"
+        logger.info(f"PaddleOCRService initialized (Device: {device_name}, Languages: {self.languages})")
+    
+    @property
+    def is_available(self) -> bool:
+        """Verifica se il servizio è disponibile"""
+        return PADDLE_OCR_AVAILABLE and PDF2IMAGE_AVAILABLE
+    
+    def _ensure_model_loaded(self):
+        """Carica il modello al primo utilizzo (lazy loading)"""
+        if not PADDLE_OCR_AVAILABLE:
+            raise RuntimeError(
+                "PaddleOCR non installato. "
+                "Installa con: pip install paddleocr paddlepaddle"
+            )
+        
+        if self.ocr_model is None:
+            logger.info("Loading PaddleOCR model...")
+            
+            # PaddleOCR 3.x official API
+            # Parametri come da documentazione ufficiale
+            self.ocr_model = PaddleOCR(
+                use_doc_orientation_classify=False,  # No preprocessing for orientation
+                use_doc_unwarping=False,             # No unwarping 
+                use_textline_orientation=False       # No textline orientation
+            )
+            self._model_loaded = True
+            logger.info("PaddleOCR model loaded successfully")
+    
+    def preprocess_image(self, image: Image.Image) -> np.ndarray:
+        """
+        Preprocessa l'immagine per migliorare l'OCR
+        
+        Passi:
+        - Conversione a scala di grigi
+        - Ridimensionamento (evita problemi di memoria)
+        - Miglioramento contrasto con CLAHE
+        - Riduzione rumore con bilateral filter
+        
+        Args:
+            image: PIL Image
+            
+        Returns:
+            numpy array preprocessato (BGR per compatibilità OpenCV)
+        """
+        # Converti PIL a OpenCV (BGR)
+        cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        
+        # Scala di grigi
+        gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+        
+        # Ridimensiona se troppo grande (max 4096px di larghezza)
+        height, width = gray.shape
+        if width > 4096:
+            scale = 4096 / width
+            new_height = int(height * scale)
+            gray = cv2.resize(gray, (4096, new_height), interpolation=cv2.INTER_AREA)
+        
+        # Migliora contrasto con CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        gray = clahe.apply(gray)
+        
+        # Riduzione rumore (bilateral filter preserva i bordi)
+        denoised = cv2.bilateralFilter(gray, 9, 75, 75)
+        
+        # Converti di nuovo a BGR per PaddleOCR
+        bgr_image = cv2.cvtColor(denoised, cv2.COLOR_GRAY2BGR)
+        
+        return bgr_image
+    
+    async def _run_ocr(self, image: np.ndarray) -> List:
+        """
+        Esegue OCR in background thread per non bloccare l'event loop
+        
+        Args:
+            image: numpy array BGR
+            
+        Returns:
+            Risultati OCR raw
+        """
+        loop = asyncio.get_event_loop()
+        # PaddleOCR 3.x: usa .predict() invece di .ocr()
+        results = await loop.run_in_executor(
+            None,
+            lambda: self.ocr_model.predict(image)
+        )
+        return results
+    
+    def _extract_text_from_results(self, results: List, save_debug: bool = True, page_num: int = 0) -> Dict:
+        """
+        Estrae testo e confidenza dai risultati PaddleOCR 3.x
+        
+        PaddleOCR 3.x restituisce una lista di OCRResult objects con:
+        - rec_texts: lista di testi riconosciuti
+        - rec_scores: lista di confidenze
+        - rec_boxes: lista di bounding boxes (opzionale)
+        
+        Args:
+            results: output raw da PaddleOCR.predict()
+            save_debug: salva output OCR in file markdown per debug
+            page_num: numero pagina per naming file debug
+            
+        Returns:
+            Dict con text, confidence, bounding_boxes
+        """
+        extracted_text = []
+        confidences = []
+        bounding_boxes = []
+        
+        try:
+            if results and len(results) > 0:
+                ocr_result = results[0]  # OCRResult object
+                
+                # PaddleOCR 3.x: OCRResult è un dict-like object
+                if hasattr(ocr_result, 'get') or hasattr(ocr_result, 'keys'):
+                    # Nuova API PaddleOCR 3.x
+                    rec_texts = ocr_result.get('rec_texts', None)
+                    rec_scores = ocr_result.get('rec_scores', None)
+                    rec_boxes = ocr_result.get('rec_boxes', None)
+                    
+                    # Converti a lista Python se necessario
+                    if rec_texts is not None:
+                        if hasattr(rec_texts, 'tolist'):
+                            rec_texts = rec_texts.tolist()
+                        elif not isinstance(rec_texts, list):
+                            rec_texts = list(rec_texts)
+                    else:
+                        rec_texts = []
+                    
+                    if rec_scores is not None:
+                        if hasattr(rec_scores, 'tolist'):
+                            rec_scores = rec_scores.tolist()
+                        elif not isinstance(rec_scores, list):
+                            rec_scores = list(rec_scores)
+                    else:
+                        rec_scores = []
+                    
+                    logger.debug(f"OCRResult 3.x format: {len(rec_texts)} texts, {len(rec_scores)} scores")
+                    
+                    # Estrai testi
+                    for i, text_val in enumerate(rec_texts):
+                        # Converti a stringa
+                        if text_val is None:
+                            continue
+                        text_str = str(text_val).strip()
+                        if not text_str:
+                            continue
+                        
+                        extracted_text.append(text_str)
+                        
+                        # Confidence
+                        if i < len(rec_scores):
+                            try:
+                                score_val = rec_scores[i]
+                                if hasattr(score_val, 'item'):
+                                    conf = float(score_val.item())
+                                elif score_val is not None:
+                                    conf = float(score_val)
+                                else:
+                                    conf = 0.9
+                                confidences.append(conf)
+                            except:
+                                confidences.append(0.9)
+                        else:
+                            confidences.append(0.9)
+                        
+                        # Bounding box
+                        bbox = []
+                        if rec_boxes is not None and i < len(rec_boxes):
+                            try:
+                                box_val = rec_boxes[i]
+                                if box_val is not None:
+                                    if hasattr(box_val, 'tolist'):
+                                        box_val = box_val.tolist()
+                                    if len(box_val) > 0:
+                                        bbox = [[float(x), float(y)] for x, y in box_val]
+                            except:
+                                pass
+                        
+                        bounding_boxes.append({
+                            'text': text_str,
+                            'confidence': confidences[-1] if confidences else 0.0,
+                            'bbox': bbox
+                        })
+                
+                # Fallback: vecchio formato lista di liste
+                elif isinstance(ocr_result, list):
+                    for line in ocr_result:
+                        if len(line) >= 2:
+                            bbox = line[0]
+                            text_info = line[1]
+                            
+                            if isinstance(text_info, tuple) and len(text_info) >= 2:
+                                text = str(text_info[0])
+                                confidence = float(text_info[1])
+                                
+                                extracted_text.append(text)
+                                confidences.append(confidence)
+                                bounding_boxes.append({
+                                    'text': text,
+                                    'confidence': confidence,
+                                    'bbox': [[float(x), float(y)] for x, y in bbox] if bbox else []
+                                })
+        except Exception as e:
+            logger.error(f"Error extracting text from OCR results: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
+        # Costruisci testo completo mettendo ogni elemento su riga separata (come nella scheda)
+        full_text = '\n'.join(extracted_text)
+        avg_confidence = float(np.mean(confidences)) if confidences else 0.0
+        
+        # SALVA DEBUG IN MARKDOWN
+        if save_debug and extracted_text:
+            self._save_debug_markdown(extracted_text, confidences, page_num)
+        
+        return {
+            'text': full_text,
+            'confidence': avg_confidence,
+            'bounding_boxes': bounding_boxes,
+            'word_count': len(extracted_text)
+        }
+    
+    def _save_debug_markdown(self, texts: List[str], confidences: List[float], page_num: int):
+        """Salva output OCR in file markdown per debug"""
+        import os
+        from datetime import datetime
+        
+        # Crea cartella debug se non esiste
+        debug_dir = Path("ocr_debug_output")
+        debug_dir.mkdir(exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = debug_dir / f"ocr_page_{page_num}_{timestamp}.md"
+        
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(f"# OCR Output - Page {page_num}\n\n")
+            f.write(f"**Timestamp:** {datetime.now().isoformat()}\n\n")
+            f.write(f"**Total words extracted:** {len(texts)}\n\n")
+            f.write(f"**Average confidence:** {np.mean(confidences) if confidences else 0:.2f}\n\n")
+            f.write("---\n\n")
+            f.write("## Raw Text (line by line)\n\n")
+            f.write("```\n")
+            for i, (text, conf) in enumerate(zip(texts, confidences)):
+                f.write(f"{text}\n")
+            f.write("```\n\n")
+            f.write("---\n\n")
+            f.write("## Text with Confidence\n\n")
+            f.write("| # | Text | Confidence |\n")
+            f.write("|---|------|------------|\n")
+            for i, (text, conf) in enumerate(zip(texts, confidences)):
+                f.write(f"| {i+1} | {text[:50]}{'...' if len(text)>50 else ''} | {conf:.2f} |\n")
+        
+        logger.info(f"OCR debug saved to: {filename}")
+    
+    async def extract_from_pdf(
+        self, 
+        pdf_bytes: bytes, 
+        filename: str,
+        site_id: str
+    ) -> List[Dict]:
+        """
+        Estrae schede US da PDF con PaddleOCR
+        Ritorna dict pronti per il modello UnitaStratigrafica
+        
+        Args:
+            pdf_bytes: Contenuto PDF
+            filename: Nome file
+            site_id: ID del cantiere archeologico
+            
+        Returns:
+            Lista di dict mappati su UnitaStratigrafica
+        """
+        if not PDF2IMAGE_AVAILABLE:
+            raise RuntimeError(
+                "PyMuPDF non installato. "
+                "Installa con: pip install pymupdf"
+            )
+        
+        self._ensure_model_loaded()
+        
+        try:
+            logger.info(f"Converting PDF {filename} to images using PyMuPDF...")
+            
+            # Use PyMuPDF to convert PDF pages to images
+            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+            images = []
+            
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                # Render page at ~288 DPI for good quality OCR
+                zoom = 4.0
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat)
+                
+                # Convert to PIL Image
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                images.append(img)
+            
+            pdf_document.close()
+            logger.info(f"Found {len(images)} pages in PDF")
+            
+            sheets = []
+            
+            for page_num, image in enumerate(images, 1):
+                logger.info(f"Processing page {page_num}/{len(images)}...")
+                
+                try:
+                    # SALVA IMMAGINE ORIGINALE PER DEBUG
+                    debug_dir = Path("ocr_debug_output")
+                    debug_dir.mkdir(exist_ok=True)
+                    from datetime import datetime
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    
+                    # Salva immagine originale (dal PDF)
+                    orig_path = debug_dir / f"page_{page_num}_original_{timestamp}.png"
+                    image.save(orig_path)
+                    logger.info(f"Saved original image: {orig_path}")
+                    
+                    # Preprocessa immagine
+                    processed_image = self.preprocess_image(image)
+                    logger.debug(f"Page {page_num}: Image preprocessed, shape={processed_image.shape}")
+                    
+                    # Salva immagine preprocessata
+                    processed_path = debug_dir / f"page_{page_num}_preprocessed_{timestamp}.png"
+                    cv2.imwrite(str(processed_path), processed_image)
+                    logger.info(f"Saved preprocessed image: {processed_path}")
+                    
+                    # Esegui OCR
+                    results = await self._run_ocr(processed_image)
+                    
+                    # DEBUG: Log raw results structure
+                    logger.info(f"Page {page_num} - RAW OCR results type: {type(results)}")
+                    if results:
+                        logger.info(f"Page {page_num} - Results length: {len(results)}")
+                        if results[0]:
+                            ocr_obj = results[0]
+                            logger.info(f"Page {page_num} - First result type: {type(ocr_obj)}")
+                            # Per OCRResult 3.x, mostra le chiavi disponibili
+                            if hasattr(ocr_obj, 'keys'):
+                                keys_list = list(ocr_obj.keys())
+                                logger.info(f"Page {page_num} - OCRResult keys: {keys_list}")
+                                rec_texts = ocr_obj.get('rec_texts', [])
+                                logger.info(f"Page {page_num} - rec_texts count: {len(rec_texts) if rec_texts else 0}")
+                                if rec_texts:
+                                    logger.info(f"Page {page_num} - First 3 texts: {rec_texts[:3]}")
+                            elif isinstance(ocr_obj, list):
+                                logger.info(f"Page {page_num} - List items count: {len(ocr_obj)}")
+                    else:
+                        logger.warning(f"Page {page_num} - OCR returned empty/None results")
+                    
+                    # Estrai testo (salva debug markdown)
+                    ocr_result = self._extract_text_from_results(results, save_debug=True, page_num=page_num)
+                    
+                    # DEBUG: Log extracted text
+                    logger.info(f"Page {page_num} - Extracted text (first 500 chars): {ocr_result['text'][:500] if ocr_result['text'] else 'EMPTY'}")
+                    logger.info(f"Page {page_num} - Word count: {ocr_result['word_count']}, Confidence: {ocr_result['confidence']:.2f}")
+                    
+                    # Prepara dati per mapping
+                    paddle_data = {
+                        'page_number': page_num,
+                        'text': ocr_result['text'],
+                        'markdown': ocr_result['text'],  # PaddleOCR non genera markdown
+                        'confidence': ocr_result['confidence']
+                    }
+                    
+                    # Mappa su modello UnitaStratigrafica usando il parser avanzato
+                    us_parser = get_us_parser()
+                    us_data = us_parser.parse_us_sheet(
+                        text=ocr_result['text'],
+                        site_id=site_id,
+                        filename=filename
+                    )
+                    
+                    # DEBUG: Stampa output JSON del parser
+                    import json
+                    logger.info(f"Page {page_num} - parse_us_sheet output:")
+                    if us_data:
+                        # Crea copia per log (rimuovi campi troppo lunghi)
+                        log_data = {k: v for k, v in us_data.items() if k != '_raw_ocr_text'}
+                        logger.info(f"\n{json.dumps(log_data, indent=2, ensure_ascii=False, default=str)}")
+                        
+                        # Salva anche in file JSON per debug
+                        debug_dir = Path("ocr_debug_output")
+                        debug_dir.mkdir(exist_ok=True)
+                        json_path = debug_dir / f"page_{page_num}_parsed_data.json"
+                        with open(json_path, 'w', encoding='utf-8') as f:
+                            json.dump(us_data, f, indent=2, ensure_ascii=False, default=str)
+                        logger.info(f"Saved parsed data to: {json_path}")
+                    else:
+                        logger.warning(f"Page {page_num} - parse_us_sheet returned None")
+                    
+                    # Aggiungi metadata OCR
+                    if us_data:
+                        us_data['_extraction_confidence'] = ocr_result['confidence']
+                        us_data['_page_number'] = page_num
+                    
+                    if us_data:
+                        sheets.append(us_data)
+                        logger.info(f"✓ Extracted US {us_data.get('us_code')} from page {page_num}")
+                    else:
+                        logger.warning(f"No valid US data on page {page_num} - Could not match US pattern in text")
+                
+                except Exception as e:
+                    logger.error(f"Error processing page {page_num}: {e}")
+                    continue
+            
+            return sheets
+        
+        except Exception as e:
+            logger.error(f"Error in extract_from_pdf: {e}")
+            raise
+    
+    async def extract_from_pdf_combined(
+        self, 
+        pdf_bytes: bytes, 
+        filename: str,
+        site_id: str,
+        include_debug: bool = True
+    ) -> Dict:
+        """
+        Estrae UNA singola US da PDF multi-pagina (tutte le pagine = 1 US)
+        Include dati debug per visualizzazione
+        
+        Args:
+            pdf_bytes: Contenuto PDF
+            filename: Nome file
+            site_id: ID del cantiere
+            include_debug: Se includere immagini/boxes per debug
+            
+        Returns:
+            Dict con:
+            - us_data: dati US parsati (o None)
+            - debug: {pages: [{image_base64, text_lines, bounding_boxes}...]}
+        """
+        import base64
+        
+        if not PDF2IMAGE_AVAILABLE:
+            raise RuntimeError("PyMuPDF non installato")
+        
+        self._ensure_model_loaded()
+        
+        result = {
+            'us_data': None,
+            'debug': {
+                'pages': [],
+                'combined_text': '',
+                'total_words': 0
+            }
+        }
+        
+        try:
+            logger.info(f"Converting PDF {filename} to images (combined mode)...")
+            
+            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+            all_page_texts = []
+            
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                zoom = 2.5  # Lower for faster processing
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat)
+                
+                pil_image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                
+                # Preprocess
+                processed_cv = self.preprocess_image(pil_image)
+                
+                # OCR
+                results = await self._run_ocr(processed_cv)
+                
+                # Extract text and boxes
+                page_texts = []
+                page_boxes = []
+                page_confidences = []
+                
+                if results and len(results) > 0:
+                    ocr_result = results[0]
+                    
+                    if hasattr(ocr_result, 'get'):
+                        rec_texts = ocr_result.get('rec_texts', None)
+                        rec_scores = ocr_result.get('rec_scores', None)
+                        rec_polys = ocr_result.get('rec_polys', None)
+                        
+                        # Convert to lists
+                        if rec_texts is not None:
+                            if hasattr(rec_texts, 'tolist'):
+                                rec_texts = rec_texts.tolist()
+                            elif not isinstance(rec_texts, list):
+                                rec_texts = list(rec_texts)
+                        else:
+                            rec_texts = []
+                        
+                        if rec_scores is not None:
+                            if hasattr(rec_scores, 'tolist'):
+                                rec_scores = rec_scores.tolist()
+                            elif not isinstance(rec_scores, list):
+                                rec_scores = list(rec_scores)
+                        else:
+                            rec_scores = []
+                        
+                        if rec_polys is not None:
+                            if hasattr(rec_polys, 'tolist'):
+                                rec_polys = rec_polys.tolist()
+                            elif not isinstance(rec_polys, list):
+                                rec_polys = list(rec_polys)
+                        else:
+                            rec_polys = []
+                        
+                        for i, text_val in enumerate(rec_texts):
+                            if text_val is None:
+                                continue
+                            text_str = str(text_val).strip()
+                            if not text_str:
+                                continue
+                            
+                            page_texts.append(text_str)
+                            
+                            conf = 0.9
+                            if i < len(rec_scores):
+                                try:
+                                    sv = rec_scores[i]
+                                    if hasattr(sv, 'item'):
+                                        conf = float(sv.item())
+                                    elif sv is not None:
+                                        conf = float(sv)
+                                except:
+                                    pass
+                            page_confidences.append(conf)
+                            
+                            poly = []
+                            if i < len(rec_polys) and rec_polys[i] is not None:
+                                try:
+                                    p = rec_polys[i]
+                                    if hasattr(p, 'tolist'):
+                                        p = p.tolist()
+                                    poly = [[float(pt[0]), float(pt[1])] for pt in p]
+                                except:
+                                    pass
+                            
+                            page_boxes.append({
+                                'text': text_str,
+                                'confidence': conf,
+                                'polygon': poly
+                            })
+                
+                all_page_texts.extend(page_texts)
+                
+                # Include debug data with CLEAN image (boxes rendered as SVG overlay in frontend)
+                if include_debug:
+                    # Convert clean image to base64 (no boxes drawn - interactive SVG overlay in frontend)
+                    _, buffer = cv2.imencode('.png', processed_cv)
+                    img_b64 = base64.b64encode(buffer).decode('utf-8')
+                    
+                result['debug']['pages'].append({
+                        'page_number': page_num + 1,
+                        'image_base64': f"data:image/png;base64,{img_b64}",
+                        'text_lines': page_texts,
+                        'bounding_boxes': page_boxes,
+                        'word_count': len(page_texts),
+                        'avg_confidence': sum(page_confidences)/len(page_confidences) if page_confidences else 0,
+                        'page_size': (pix.width, pix.height)  # Store page size for layout parser
+                    })
+                
+                logger.info(f"Page {page_num + 1}: extracted {len(page_texts)} text blocks")
+            
+            pdf_document.close()
+            
+            # Combine all text and parse as single US
+            combined_text = '\n'.join(all_page_texts)
+            result['debug']['combined_text'] = combined_text
+            result['debug']['total_words'] = len(all_page_texts)
+            
+            logger.info(f"Combined text from {len(result['debug']['pages'])} pages: {len(all_page_texts)} words")
+            
+            # --- LAYOUT-AWARE PARSING ---
+            # Combine all bounding boxes from all pages (with y-offset for multi-page)
+            from app.services.us_layout_parser import get_us_layout_parser
+            
+            all_boxes = []
+            y_offset = 0
+            total_height = 0
+            max_width = 0
+            
+            for page_info in result['debug']['pages']:
+                page_w, page_h = page_info.get('page_size', (1000, 1400))
+                max_width = max(max_width, page_w)
+                
+                for box in page_info.get('bounding_boxes', []):
+                    # Adjust y coordinates for page offset
+                    adjusted_box = {
+                        'text': box['text'],
+                        'confidence': box['confidence'],
+                        'polygon': []
+                    }
+                    if box.get('polygon'):
+                        adjusted_box['polygon'] = [
+                            [pt[0], pt[1] + y_offset] for pt in box['polygon']
+                        ]
+                    all_boxes.append(adjusted_box)
+                
+                y_offset += page_h
+                total_height += page_h
+            
+            # Use layout parser for core fields
+            layout_parser = get_us_layout_parser()
+            us_data = layout_parser.parse_core(
+                all_boxes,
+                site_id=site_id,
+                page_size=(max_width, total_height)
+            )
+            
+            # Fallback to text parser if layout parser didn't find us_code
+            if not us_data.get('us_code'):
+                logger.info("Layout parser didn't find US code, trying text parser...")
+                text_parser = get_us_parser()
+                text_data = text_parser.parse_us_sheet(
+                    text=combined_text,
+                    site_id=site_id,
+                    filename=filename
+                )
+                if text_data:
+                    # Merge text parser results (don't overwrite layout results)
+                    for key, value in text_data.items():
+                        if key not in us_data or not us_data[key]:
+                            us_data[key] = value
+            
+            if us_data and us_data.get('us_code'):
+                us_data['_pdf_source'] = filename
+                us_data['_total_pages'] = len(result['debug']['pages'])
+                result['us_data'] = us_data
+                logger.info(f"✓ Parsed US: {us_data.get('us_code', 'unknown')} via layout parser")
+            else:
+                logger.warning("No US data could be parsed from combined pages")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in extract_from_pdf_combined: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            raise
+    
+    async def extract_from_image(
+        self,
+        image_bytes: bytes,
+        filename: str,
+        site_id: str
+    ) -> Optional[Dict]:
+        """
+        Estrae scheda US da singola immagine
+        
+        Args:
+            image_bytes: Contenuto immagine
+            filename: Nome file
+            site_id: ID del cantiere
+            
+        Returns:
+            Dict mappato su UnitaStratigrafica o None
+        """
+        self._ensure_model_loaded()
+        
+        try:
+            # Carica immagine
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            # Preprocessa
+            processed_image = self.preprocess_image(image)
+            
+            # Esegui OCR
+            results = await self._run_ocr(processed_image)
+            
+            # Estrai testo
+            ocr_result = self._extract_text_from_results(results)
+            
+            # DEBUG: Log extracted text
+            logger.info(f"Image OCR - Extracted text (first 500 chars): {ocr_result['text'][:500] if ocr_result['text'] else 'EMPTY'}")
+            logger.info(f"Image OCR - Word count: {ocr_result['word_count']}, Confidence: {ocr_result['confidence']:.2f}")
+            
+            # Usa il parser avanzato per schede US MiC
+            us_parser = get_us_parser()
+            us_data = us_parser.parse_us_sheet(
+                text=ocr_result['text'],
+                site_id=site_id,
+                filename=filename
+            )
+            
+            # Aggiungi metadata OCR
+            if us_data:
+                us_data['_extraction_confidence'] = ocr_result['confidence']
+                us_data['_page_number'] = 1
+            
+            return us_data
+            
+        except Exception as e:
+            logger.error(f"Error extracting from image: {e}")
+            raise
+    
+    def _map_to_unita_stratigrafica(
+        self, 
+        ocr_data: Dict,
+        site_id: str,
+        filename: str
+    ) -> Optional[Dict]:
+        """
+        Mappa output OCR al modello UnitaStratigrafica
+        Rispetta struttura scheda US-3.doc standard MiC 2021
+        
+        Returns:
+            Dict pronto per creare UnitaStratigrafica o None
+        """
+        text = ocr_data.get('text', '')
+        
+        # ===== IDENTIFICAZIONE US (OBBLIGATORIO) =====
+        us_match = re.search(
+            r'(?:US|U\.S\.|Unità\s+Stratigrafic[oa])[\s:]*(\\d+)',
+            text,
+            re.IGNORECASE
+        )
+        if not us_match:
+            return None
+        
+        us_code = f"US{us_match.group(1).zfill(3)}"  # US003
+        
+        # Inizializza dict mappato
+        us_data: Dict[str, Any] = {
+            'site_id': site_id,
+            'us_code': us_code,
+        }
+        
+        # ===== TIPOLOGIA US =====
+        tipo = TipoUSEnum.POSITIVA.value  # Default
+        tipo_patterns = {
+            TipoUSEnum.NEGATIVA.value: r'\b(?:negativa|taglio|asporto|fossa)\b',
+            TipoUSEnum.POSITIVA.value: r'\b(?:positiva|accumulo|deposito|strato)\b'
+        }
+        for tipo_val, pattern in tipo_patterns.items():
+            if re.search(pattern, text, re.IGNORECASE):
+                tipo = tipo_val
+                break
+        us_data['tipo'] = tipo
+        
+        # ===== INTESTAZIONE =====
+        # Ente responsabile
+        ente_match = re.search(
+            r'(?:ente|responsabile|soprintendenza)[\s:]*([^\n]{10,200})',
+            text,
+            re.IGNORECASE
+        )
+        if ente_match:
+            us_data['ente_responsabile'] = ente_match.group(1).strip()
+        
+        # Anno
+        anno_match = re.search(r'(?:anno|year)[\s:]*(\d{4})', text, re.IGNORECASE)
+        if anno_match:
+            us_data['anno'] = int(anno_match.group(1))
+        
+        # Ufficio MiC
+        ufficio_match = re.search(
+            r'(?:ufficio\s+mic|ufficio)[\s:]*([^\n]{5,200})',
+            text,
+            re.IGNORECASE
+        )
+        if ufficio_match:
+            us_data['ufficio_mic'] = ufficio_match.group(1).strip()
+        
+        # Identificativo riferimento
+        rif_match = re.search(
+            r'(?:identificativo|riferimento|id)[\s:]*([^\n]{5,200})',
+            text,
+            re.IGNORECASE
+        )
+        if rif_match:
+            us_data['identificativo_rif'] = rif_match.group(1).strip()
+        
+        # ===== LOCALIZZAZIONE =====
+        # Località
+        loc_patterns = [
+            r'(?:località|localita|location)[\s:]*([^\n]{5,200})',
+            r'(?:comune|municipality)[\s:]*([^\n]{5,200})'
+        ]
+        for pattern in loc_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                us_data['localita'] = match.group(1).strip()
+                break
+        
+        # Area/Struttura
+        area_match = re.search(
+            r'(?:area|struttura|settore)[\s:]*([^\n]{5,200})',
+            text,
+            re.IGNORECASE
+        )
+        if area_match:
+            us_data['area_struttura'] = area_match.group(1).strip()
+        
+        # Saggio
+        saggio_match = re.search(r'(?:saggio|trench)[\s:]*([^\n]{3,100})', text, re.IGNORECASE)
+        if saggio_match:
+            us_data['saggio'] = saggio_match.group(1).strip()
+        
+        # Ambiente/Unità/Funzione
+        amb_match = re.search(
+            r'(?:ambiente|unità|funzione)[\s:]*([^\n]{5,200})',
+            text,
+            re.IGNORECASE
+        )
+        if amb_match:
+            us_data['ambiente_unita_funzione'] = amb_match.group(1).strip()
+        
+        # Posizione
+        pos_match = re.search(r'(?:posizione|position)[\s:]*([^\n]{5,200})', text, re.IGNORECASE)
+        if pos_match:
+            us_data['posizione'] = pos_match.group(1).strip()
+        
+        # Settori
+        settori_match = re.search(
+            r'(?:settori?|grid)[\s:]*([A-Z0-9, -]+)',
+            text,
+            re.IGNORECASE
+        )
+        if settori_match:
+            us_data['settori'] = settori_match.group(1).strip()
+        
+        # ===== DOCUMENTAZIONE (riferimenti testuali) =====
+        # Piante
+        piante_match = re.search(
+            r'(?:piante?|plan)[\s:]*(?:TAV\.?\s*)?([0-9, -]+)',
+            text,
+            re.IGNORECASE
+        )
+        if piante_match:
+            us_data['piante_riferimenti'] = f"TAV. {piante_match.group(1)}"
+        
+        # Sezioni
+        sezioni_match = re.search(
+            r'(?:sezioni?|section)[\s:]*(?:TAV\.?\s*)?([0-9, -]+)',
+            text,
+            re.IGNORECASE
+        )
+        if sezioni_match:
+            us_data['sezioni_riferimenti'] = f"TAV. {sezioni_match.group(1)}"
+        
+        # Prospetti
+        prospetti_match = re.search(
+            r'(?:prospetti?|elevation)[\s:]*(?:TAV\.?\s*)?([0-9, -]+)',
+            text,
+            re.IGNORECASE
+        )
+        if prospetti_match:
+            us_data['prospetti_riferimenti'] = f"TAV. {prospetti_match.group(1)}"
+        
+        # ===== DEFINIZIONE E CARATTERIZZAZIONE =====
+        # Definizione
+        def_patterns = [
+            r'(?:definizione|definition)[\s:]*([^\n]{20,500})',
+            r'(?:tipo\s+di\s+us|us\s+type)[\s:]*([^\n]{20,500})'
+        ]
+        for pattern in def_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                us_data['definizione'] = match.group(1).strip()
+                break
+        
+        # Criteri di distinzione
+        criteri_match = re.search(
+            r'(?:criteri?\s+di\s+distinzione|criteria)[\s:]*([^\n]{20,500})',
+            text,
+            re.IGNORECASE
+        )
+        if criteri_match:
+            us_data['criteri_distinzione'] = criteri_match.group(1).strip()
+        
+        # Modo di formazione
+        formazione_match = re.search(
+            r'(?:modo\s+di\s+formazione|formation)[\s:]*([^\n]{20,500})',
+            text,
+            re.IGNORECASE
+        )
+        if formazione_match:
+            us_data['modo_formazione'] = formazione_match.group(1).strip()
+        
+        # ===== COMPONENTI =====
+        # Componenti inorganici
+        inorg_patterns = [
+            r'(?:componenti?\s+inorganic[oi]|elementi?\s+fittil[oi]|elementi?\s+lapide[oi])[\s:]*([^\n]{20,500})',
+            r'(?:materiale?\s+ceramic[oa]|framment[oi]\s+ceramic[oi])[\s:]*([^\n]{20,500})'
+        ]
+        for pattern in inorg_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                us_data['componenti_inorganici'] = match.group(1).strip()
+                break
+        
+        # Componenti organici
+        org_match = re.search(
+            r'(?:componenti?\s+organic[oi]|ossa|ossei)[\s:]*([^\n]{20,500})',
+            text,
+            re.IGNORECASE
+        )
+        if org_match:
+            us_data['componenti_organici'] = org_match.group(1).strip()
+        
+        # ===== PROPRIETÀ FISICHE =====
+        # Consistenza (Enum)
+        consistenza_map = {
+            ConsistenzaEnum.COMPATTA.value: r'\bcompatt[oa]\b',
+            ConsistenzaEnum.MEDIA.value: r'\bmedi[oa]\b',
+            ConsistenzaEnum.FRIABILE.value: r'\bfriabile\b',
+            ConsistenzaEnum.MOLTO_FRIABILE.value: r'\bmolto\s+friabile\b',
+            ConsistenzaEnum.SCIOLTA.value: r'\bscioltt?[oa]\b'
+        }
+        for cons_val, pattern in consistenza_map.items():
+            if re.search(pattern, text, re.IGNORECASE):
+                us_data['consistenza'] = cons_val
+                break
+        
+        # Colore
+        colori = [
+            'grigio', 'marrone', 'bruno', 'rosso', 'nero', 'giallo',
+            'arancione', 'bianco', 'beige', 'rossastro', 'grigiastro',
+            'scuro', 'chiaro'
+        ]
+        colore_text = []
+        for colore in colori:
+            if re.search(rf'\b{colore}\b', text, re.IGNORECASE):
+                colore_text.append(colore)
+        if colore_text:
+            us_data['colore'] = ' '.join(colore_text[:3])  # Max 3 colori
+        
+        # Misure
+        misure_patterns = [
+            r'(?:misure|dimensioni|dimensions)[\s:]*([0-9x,. m]+)',
+            r'(\d+(?:\.\d+)?\s*x\s*\d+(?:\.\d+)?(?:\s*x\s*\d+(?:\.\d+)?)?\s*m)'
+        ]
+        for pattern in misure_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                us_data['misure'] = match.group(1).strip()
+                break
+        
+        # Stato di conservazione
+        cons_patterns = [
+            r'(?:stato\s+di\s+conservazione|conservation)[\s:]*([^\n]{10,200})',
+            r'(?:conservazione)[\s:]*([^\n]{10,200})'
+        ]
+        for pattern in cons_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                us_data['stato_conservazione'] = match.group(1).strip()
+                break
+        
+        # ===== SEQUENZA FISICA (MATRIX HARRIS) =====
+        sequenza_fisica: Dict[str, List[str]] = {
+            "uguale_a": [],
+            "si_lega_a": [],
+            "gli_si_appoggia": [],
+            "si_appoggia_a": [],
+            "coperto_da": [],
+            "copre": [],
+            "tagliato_da": [],
+            "taglia": [],
+            "riempito_da": [],
+            "riempie": []
+        }
+        
+        # Estrai relazioni
+        relations_map = {
+            "copre": [
+                r'(?:copre|covers|sta\s+sopra\s+a)[\s:]*(?:US\s*)?([0-9, ]+)',
+                r'(?:above)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ],
+            "coperto_da": [
+                r'(?:coperto\s+da|covered\s+by|è\s+sotto\s+a)[\s:]*(?:US\s*)?([0-9, ]+)',
+                r'(?:below)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ],
+            "taglia": [
+                r'(?:taglia|cuts)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ],
+            "tagliato_da": [
+                r'(?:tagliato\s+da|cut\s+by)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ],
+            "riempie": [
+                r'(?:riempie|fills)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ],
+            "riempito_da": [
+                r'(?:riempito\s+da|filled\s+by)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ],
+            "uguale_a": [
+                r'(?:uguale\s+a|equals|same\s+as)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ],
+            "si_lega_a": [
+                r'(?:si\s+lega\s+a|bonds\s+to)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ],
+            "si_appoggia_a": [
+                r'(?:si\s+appoggia\s+a|leans\s+on)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ],
+            "gli_si_appoggia": [
+                r'(?:gli\s+si\s+appoggia|is\s+leaned\s+on\s+by)[\s:]*(?:US\s*)?([0-9, ]+)'
+            ]
+        }
+        
+        for rel_type, patterns in relations_map.items():
+            for pattern in patterns:
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    # Estrai numeri US
+                    us_numbers = re.findall(r'\d+', match)
+                    for num in us_numbers:
+                        us_ref = f"US{num.zfill(3)}"
+                        if us_ref not in sequenza_fisica[rel_type]:
+                            sequenza_fisica[rel_type].append(us_ref)
+        
+        us_data['sequenza_fisica'] = sequenza_fisica
+        
+        # ===== DESCRIZIONE E INTERPRETAZIONE =====
+        # Descrizione completa
+        desc_patterns = [
+            r'(?:descrizione|description)[\s:]*([^\n]{50,2000})',
+            r'(?:caratteristiche)[\s:]*([^\n]{50,2000})'
+        ]
+        for pattern in desc_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                us_data['descrizione'] = match.group(1).strip()
+                break
+        
+        # Osservazioni
+        oss_match = re.search(
+            r'(?:osservazioni|observations|note)[\s:]*([^\n]{20,1000})',
+            text,
+            re.IGNORECASE
+        )
+        if oss_match:
+            us_data['osservazioni'] = oss_match.group(1).strip()
+        
+        # Interpretazione
+        interp_match = re.search(
+            r'(?:interpretazione|interpretation)[\s:]*([^\n]{20,1000})',
+            text,
+            re.IGNORECASE
+        )
+        if interp_match:
+            us_data['interpretazione'] = interp_match.group(1).strip()
+        
+        # ===== DATAZIONE E REPERTI =====
+        # Datazione
+        dat_patterns = [
+            r'(?:datazione|dating|cronologia)[\s:]*([^\n]{10,200})',
+            r'(?:secolo|century)\s+([IVX]+(?:\s*[-–]\s*[IVX]+)?)',
+            r'(\d{1,4}\s*[aA]\.?[cC]\.?\s*[-–]\s*\d{1,4}\s*[dD]\.?[cC]\.?)',
+            r'(\d{1,4}\s*[aA]\.?[cC]\.?|\d{1,4}\s*[dD]\.?[cC]\.?)'
+        ]
+        for pattern in dat_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                us_data['datazione'] = match.group(1).strip()
+                break
+        
+        # Periodo
+        periodo_match = re.search(
+            r'(?:periodo|period)[\s:]*([^\n]{5,100})',
+            text,
+            re.IGNORECASE
+        )
+        if periodo_match:
+            us_data['periodo'] = periodo_match.group(1).strip()
+        
+        # Fase
+        fase_match = re.search(r'(?:fase|phase)[\s:]*([^\n]{3,50})', text, re.IGNORECASE)
+        if fase_match:
+            us_data['fase'] = fase_match.group(1).strip()
+        
+        # Elementi datanti
+        elem_match = re.search(
+            r'(?:elementi?\s+datant[ei]|dating\s+elements?)[\s:]*([^\n]{10,500})',
+            text,
+            re.IGNORECASE
+        )
+        if elem_match:
+            us_data['elementi_datanti'] = elem_match.group(1).strip()
+        
+        # Dati quantitativi reperti
+        reperti_patterns = [
+            r'(?:reperti|finds)[\s:]*([^\n]{10,500})',
+            r'(\d+\s+(?:frammenti?|fragments?).*?(?:ceramic[ao]|pottery))',
+            r'(\d+\s+(?:ossa|bones?))'
+        ]
+        reperti_text = []
+        for pattern in reperti_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            reperti_text.extend(matches)
+        if reperti_text:
+            us_data['dati_quantitativi_reperti'] = '; '.join(reperti_text[:5])
+        
+        # ===== CAMPIONATURE =====
+        campionature = {
+            "flottazione": bool(re.search(r'\bflottazione\b', text, re.IGNORECASE)),
+            "setacciatura": bool(re.search(r'\bsetacciatur[ao]\b', text, re.IGNORECASE))
+        }
+        us_data['campionature'] = campionature
+        
+        # ===== AFFIDABILITÀ E RESPONSABILITÀ =====
+        # Affidabilità
+        aff_map = {
+            AffidabilitaEnum.ALTA.value: r'\balta\b',
+            AffidabilitaEnum.MEDIA.value: r'\bmedi[ao]\b',
+            AffidabilitaEnum.BASSA.value: r'\bbassa\b'
+        }
+        for aff_val, pattern in aff_map.items():
+            if re.search(pattern, text, re.IGNORECASE):
+                us_data['affidabilita_stratigrafica'] = aff_val
+                break
+        
+        # Responsabile scientifico
+        resp_sci_match = re.search(
+            r'(?:responsabile\s+scientifico|director)[\s:]*([^\n]{5,200})',
+            text,
+            re.IGNORECASE
+        )
+        if resp_sci_match:
+            us_data['responsabile_scientifico'] = resp_sci_match.group(1).strip()
+        
+        # Data rilevamento
+        data_ril_match = re.search(
+            r'(?:data\s+rilevamento)[\s:]*(\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4})',
+            text,
+            re.IGNORECASE
+        )
+        if data_ril_match:
+            try:
+                date_str = data_ril_match.group(1)
+                parsed = self._parse_date(date_str)
+                if parsed:
+                    us_data['data_rilevamento'] = parsed.isoformat()
+            except Exception:
+                pass
+        
+        # Responsabile compilazione
+        resp_comp_match = re.search(
+            r'(?:responsabile\s+compilazione|compiled\s+by)[\s:]*([^\n]{5,200})',
+            text,
+            re.IGNORECASE
+        )
+        if resp_comp_match:
+            us_data['responsabile_compilazione'] = resp_comp_match.group(1).strip()
+        
+        # Store raw OCR text for reference
+        us_data['_raw_ocr_text'] = text[:2000]  # First 2000 chars
+        us_data['_extraction_confidence'] = ocr_data.get('confidence', 0.0)
+        us_data['_pdf_source'] = filename
+        us_data['_page_number'] = ocr_data.get('page_number', 1)
+        
+        return us_data
+    
+    def _parse_date(self, date_str: str) -> Optional[date]:
+        """Parse date from various formats"""
+        formats = ['%d/%m/%Y', '%d-%m-%Y', '%d/%m/%y', '%d-%m-%y']
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except Exception:
+                continue
+        return None
+    
+    def validate_extraction_result(self, us_data: Dict) -> Dict[str, Any]:
+        """
+        Valida il risultato dell'estrazione OCR
+        
+        Returns:
+            Dict con info di validazione
+        """
+        issues = []
+        warnings = []
+        
+        # Campo obbligatorio
+        if not us_data.get('us_code'):
+            issues.append("Codice US mancante")
+        
+        # Campi raccomandati
+        recommended_fields = [
+            'definizione', 'descrizione', 'datazione', 
+            'responsabile_scientifico', 'data_rilevamento'
+        ]
+        for field in recommended_fields:
+            if not us_data.get(field):
+                warnings.append(f"Campo raccomandato mancante: {field}")
+        
+        # Sequenza fisica
+        sequenza = us_data.get('sequenza_fisica', {})
+        has_relations = any(v for v in sequenza.values() if v)
+        if not has_relations:
+            warnings.append("Nessuna relazione stratigrafica rilevata")
+        
+        # Confidence
+        confidence = us_data.get('_extraction_confidence', 0)
+        if confidence < 0.7:
+            warnings.append(f"Confidence OCR bassa: {confidence:.1%}")
+        
+        return {
+            'is_valid': len(issues) == 0,
+            'issues': issues,
+            'warnings': warnings,
+            'confidence': confidence,
+            'us_code': us_data.get('us_code'),
+            'extracted_fields_count': len([k for k, v in us_data.items() if v and not k.startswith('_')])
+        }
+
+
+# Singleton
+_paddle_ocr_service: Optional[PaddleOCRService] = None
+
+
+def get_paddle_ocr_service(use_gpu: bool = False) -> PaddleOCRService:
+    """
+    Factory per servizio PaddleOCR US
+    
+    Args:
+        use_gpu: True=forza GPU, False=forza CPU (default CPU per compatibilità)
+    """
+    global _paddle_ocr_service
+    if _paddle_ocr_service is None:
+        _paddle_ocr_service = PaddleOCRService(use_gpu=use_gpu)
+    return _paddle_ocr_service
+
+
+def is_paddle_ocr_available() -> bool:
+    """Verifica se PaddleOCR è disponibile"""
+    return PADDLE_OCR_AVAILABLE and PDF2IMAGE_AVAILABLE
