@@ -10,6 +10,7 @@ import asyncio
 import logging
 import re
 import io
+import os
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 from datetime import datetime, date
@@ -18,6 +19,15 @@ import cv2
 import numpy as np
 from PIL import Image
 from loguru import logger
+
+# GPU mode is now enabled by default since CUDA is properly configured
+# Set FASTZOOM_OCR_USE_GPU=0 to force CPU mode if needed
+_GPU_MODE_ENABLED = os.environ.get('FASTZOOM_OCR_USE_GPU', '1') == '1'
+if not _GPU_MODE_ENABLED:
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    logger.info("PaddleOCR: CUDA disabled (CPU mode forced via FASTZOOM_OCR_USE_GPU=0)")
+else:
+    logger.info("PaddleOCR: GPU mode enabled")
 
 # Import condizionali per PaddleOCR
 try:
@@ -74,17 +84,22 @@ class PaddleOCRService:
             )
         
         if self.ocr_model is None:
-            logger.info("Loading PaddleOCR model...")
+            # Note: GPU mode is controlled at module import time via FASTZOOM_OCR_USE_GPU env var
+            # Once the module is loaded, the device is fixed (CUDA disabled = CPU only)
+            device_mode = "GPU (if available)" if _GPU_MODE_ENABLED else "CPU"
+            logger.info(f"Loading PaddleOCR model ({device_mode})...")
             
-            # PaddleOCR 3.x official API
-            # Parametri come da documentazione ufficiale
-            self.ocr_model = PaddleOCR(
-                use_doc_orientation_classify=False,  # No preprocessing for orientation
-                use_doc_unwarping=False,             # No unwarping 
-                use_textline_orientation=False       # No textline orientation
-            )
-            self._model_loaded = True
-            logger.info("PaddleOCR model loaded successfully")
+            try:
+                self.ocr_model = PaddleOCR(
+                    use_doc_orientation_classify=False,
+                    use_doc_unwarping=False,
+                    use_textline_orientation=False
+                )
+                self._model_loaded = True
+                logger.info(f"PaddleOCR model loaded successfully ({device_mode})")
+            except Exception as e:
+                logger.error(f"Error loading PaddleOCR model: {e}")
+                raise
     
     def preprocess_image(self, image: Image.Image) -> np.ndarray:
         """
@@ -319,8 +334,15 @@ class PaddleOCRService:
         site_id: str
     ) -> List[Dict]:
         """
-        Estrae schede US da PDF con PaddleOCR
-        Ritorna dict pronti per il modello UnitaStratigrafica
+        Estrae UNA sola US da un PDF multi-pagina (scheda completa).
+        Compatibile con la firma precedente (ritorna List[Dict]).
+        
+        Un PDF multi-pagina (es. scheda US a 2 pagine) produce UN SOLO record.
+        Usa extract_from_pdf_combined() internamente per:
+        - OCR di tutte le pagine
+        - Merge bounding boxes con y-offset
+        - Layout parser per campi core/checkbox
+        - Text parser per campi aggiuntivi
         
         Args:
             pdf_bytes: Contenuto PDF
@@ -328,147 +350,16 @@ class PaddleOCRService:
             site_id: ID del cantiere archeologico
             
         Returns:
-            Lista di dict mappati su UnitaStratigrafica
+            Lista con UN SOLO dict mappato su UnitaStratigrafica (o lista vuota)
         """
-        if not PDF2IMAGE_AVAILABLE:
-            raise RuntimeError(
-                "PyMuPDF non installato. "
-                "Installa con: pip install pymupdf"
-            )
-        
-        self._ensure_model_loaded()
-        
-        try:
-            logger.info(f"Converting PDF {filename} to images using PyMuPDF...")
-            
-            # Use PyMuPDF to convert PDF pages to images
-            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
-            images = []
-            
-            for page_num in range(len(pdf_document)):
-                page = pdf_document[page_num]
-                # Render page at ~288 DPI for good quality OCR
-                zoom = 4.0
-                mat = fitz.Matrix(zoom, zoom)
-                pix = page.get_pixmap(matrix=mat)
-                
-                # Convert to PIL Image
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                images.append(img)
-            
-            pdf_document.close()
-            logger.info(f"Found {len(images)} pages in PDF")
-            
-            sheets = []
-            
-            for page_num, image in enumerate(images, 1):
-                logger.info(f"Processing page {page_num}/{len(images)}...")
-                
-                try:
-                    # SALVA IMMAGINE ORIGINALE PER DEBUG
-                    debug_dir = Path("ocr_debug_output")
-                    debug_dir.mkdir(exist_ok=True)
-                    from datetime import datetime
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    
-                    # Salva immagine originale (dal PDF)
-                    orig_path = debug_dir / f"page_{page_num}_original_{timestamp}.png"
-                    image.save(orig_path)
-                    logger.info(f"Saved original image: {orig_path}")
-                    
-                    # Preprocessa immagine
-                    processed_image = self.preprocess_image(image)
-                    logger.debug(f"Page {page_num}: Image preprocessed, shape={processed_image.shape}")
-                    
-                    # Salva immagine preprocessata
-                    processed_path = debug_dir / f"page_{page_num}_preprocessed_{timestamp}.png"
-                    cv2.imwrite(str(processed_path), processed_image)
-                    logger.info(f"Saved preprocessed image: {processed_path}")
-                    
-                    # Esegui OCR
-                    results = await self._run_ocr(processed_image)
-                    
-                    # DEBUG: Log raw results structure
-                    logger.info(f"Page {page_num} - RAW OCR results type: {type(results)}")
-                    if results:
-                        logger.info(f"Page {page_num} - Results length: {len(results)}")
-                        if results[0]:
-                            ocr_obj = results[0]
-                            logger.info(f"Page {page_num} - First result type: {type(ocr_obj)}")
-                            # Per OCRResult 3.x, mostra le chiavi disponibili
-                            if hasattr(ocr_obj, 'keys'):
-                                keys_list = list(ocr_obj.keys())
-                                logger.info(f"Page {page_num} - OCRResult keys: {keys_list}")
-                                rec_texts = ocr_obj.get('rec_texts', [])
-                                logger.info(f"Page {page_num} - rec_texts count: {len(rec_texts) if rec_texts else 0}")
-                                if rec_texts:
-                                    logger.info(f"Page {page_num} - First 3 texts: {rec_texts[:3]}")
-                            elif isinstance(ocr_obj, list):
-                                logger.info(f"Page {page_num} - List items count: {len(ocr_obj)}")
-                    else:
-                        logger.warning(f"Page {page_num} - OCR returned empty/None results")
-                    
-                    # Estrai testo (salva debug markdown)
-                    ocr_result = self._extract_text_from_results(results, save_debug=True, page_num=page_num)
-                    
-                    # DEBUG: Log extracted text
-                    logger.info(f"Page {page_num} - Extracted text (first 500 chars): {ocr_result['text'][:500] if ocr_result['text'] else 'EMPTY'}")
-                    logger.info(f"Page {page_num} - Word count: {ocr_result['word_count']}, Confidence: {ocr_result['confidence']:.2f}")
-                    
-                    # Prepara dati per mapping
-                    paddle_data = {
-                        'page_number': page_num,
-                        'text': ocr_result['text'],
-                        'markdown': ocr_result['text'],  # PaddleOCR non genera markdown
-                        'confidence': ocr_result['confidence']
-                    }
-                    
-                    # Mappa su modello UnitaStratigrafica usando il parser avanzato
-                    us_parser = get_us_parser()
-                    us_data = us_parser.parse_us_sheet(
-                        text=ocr_result['text'],
-                        site_id=site_id,
-                        filename=filename
-                    )
-                    
-                    # DEBUG: Stampa output JSON del parser
-                    import json
-                    logger.info(f"Page {page_num} - parse_us_sheet output:")
-                    if us_data:
-                        # Crea copia per log (rimuovi campi troppo lunghi)
-                        log_data = {k: v for k, v in us_data.items() if k != '_raw_ocr_text'}
-                        logger.info(f"\n{json.dumps(log_data, indent=2, ensure_ascii=False, default=str)}")
-                        
-                        # Salva anche in file JSON per debug
-                        debug_dir = Path("ocr_debug_output")
-                        debug_dir.mkdir(exist_ok=True)
-                        json_path = debug_dir / f"page_{page_num}_parsed_data.json"
-                        with open(json_path, 'w', encoding='utf-8') as f:
-                            json.dump(us_data, f, indent=2, ensure_ascii=False, default=str)
-                        logger.info(f"Saved parsed data to: {json_path}")
-                    else:
-                        logger.warning(f"Page {page_num} - parse_us_sheet returned None")
-                    
-                    # Aggiungi metadata OCR
-                    if us_data:
-                        us_data['_extraction_confidence'] = ocr_result['confidence']
-                        us_data['_page_number'] = page_num
-                    
-                    if us_data:
-                        sheets.append(us_data)
-                        logger.info(f"✓ Extracted US {us_data.get('us_code')} from page {page_num}")
-                    else:
-                        logger.warning(f"No valid US data on page {page_num} - Could not match US pattern in text")
-                
-                except Exception as e:
-                    logger.error(f"Error processing page {page_num}: {e}")
-                    continue
-            
-            return sheets
-        
-        except Exception as e:
-            logger.error(f"Error in extract_from_pdf: {e}")
-            raise
+        combined = await self.extract_from_pdf_combined(
+            pdf_bytes=pdf_bytes,
+            filename=filename,
+            site_id=site_id,
+            include_debug=False,
+        )
+        us_data = combined.get("us_data")
+        return [us_data] if us_data else []
     
     async def extract_from_pdf_combined(
         self, 
@@ -635,11 +526,13 @@ class PaddleOCRService:
             # --- LAYOUT-AWARE PARSING ---
             # Combine all bounding boxes from all pages (with y-offset for multi-page)
             from app.services.us_layout_parser import get_us_layout_parser
+            from app.services.table_grid_detector import get_table_grid_detector
             
             all_boxes = []
             y_offset = 0
             total_height = 0
             max_width = 0
+            all_cells = []  # Grid cells from all pages
             
             for page_info in result['debug']['pages']:
                 page_w, page_h = page_info.get('page_size', (1000, 1400))
@@ -661,7 +554,49 @@ class PaddleOCRService:
                 y_offset += page_h
                 total_height += page_h
             
-            # Use layout parser for core fields
+            # --- TABLE GRID DETECTION ---
+            # Rileva la griglia della tabella dalla prima pagina per migliorare l'estrazione
+            grid_detector = get_table_grid_detector()
+            detected_cells = []
+            
+            try:
+                if result['debug']['pages']:
+                    # Usa la prima pagina per rilevare la struttura della tabella
+                    first_page = result['debug']['pages'][0]
+                    first_page_img_b64 = first_page.get('image_base64', '')
+                    
+                    if first_page_img_b64:
+                        # Decodifica l'immagine base64
+                        import base64
+                        img_data = first_page_img_b64.split(',')[1] if ',' in first_page_img_b64 else first_page_img_b64
+                        img_bytes = base64.b64decode(img_data)
+                        img_array = np.frombuffer(img_bytes, np.uint8)
+                        page_image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                        
+                        if page_image is not None:
+                            detected_cells, debug_grid_img = grid_detector.detect_grid(page_image, debug=include_debug)
+                            logger.info(f"Grid detection: found {len(detected_cells)} cells")
+                            
+                            # Associa il testo OCR alle celle rilevate
+                            if detected_cells:
+                                first_page_boxes = first_page.get('bounding_boxes', [])
+                                cell_contents = grid_detector.associate_text_to_cells(detected_cells, first_page_boxes)
+                                
+                                # Aggiungi info celle al debug
+                                result['debug']['grid_cells'] = [
+                                    {
+                                        'row': c.row, 'col': c.col,
+                                        'x1': c.x1, 'y1': c.y1, 'x2': c.x2, 'y2': c.y2,
+                                        'text': grid_detector.get_cell_text(cell_contents, i)
+                                    }
+                                    for i, c in enumerate(detected_cells)
+                                ]
+                                logger.info(f"Associated text to {sum(1 for c in cell_contents.values() if c)} cells")
+            except Exception as e:
+                logger.warning(f"Grid detection failed (falling back to label-based): {e}")
+                detected_cells = []
+            
+            # Use layout parser for core fields (with optional cell grid info)
             layout_parser = get_us_layout_parser()
             us_data = layout_parser.parse_core(
                 all_boxes,
@@ -669,26 +604,30 @@ class PaddleOCRService:
                 page_size=(max_width, total_height)
             )
             
-            # Fallback to text parser if layout parser didn't find us_code
-            if not us_data.get('us_code'):
-                logger.info("Layout parser didn't find US code, trying text parser...")
-                text_parser = get_us_parser()
-                text_data = text_parser.parse_us_sheet(
-                    text=combined_text,
-                    site_id=site_id,
-                    filename=filename
-                )
-                if text_data:
-                    # Merge text parser results (don't overwrite layout results)
-                    for key, value in text_data.items():
-                        if key not in us_data or not us_data[key]:
-                            us_data[key] = value
+            # Always run text parser to fill non-core fields
+            # Layout parser handles: us_code, area_edificio, ambiente, quote, tipo (checkbox)
+            # Text parser fills: descrizione, osservazioni, interpretazione, datazione, reperti, etc.
+            text_parser = get_us_parser()
+            text_data = text_parser.parse_us_sheet(
+                text=combined_text,
+                site_id=site_id,
+                filename=filename
+            )
+            
+            # Merge: layout parser "wins" on core fields, text parser fills the rest
+            if text_data:
+                for key, value in text_data.items():
+                    # Don't overwrite existing values from layout parser
+                    if key not in us_data or not us_data.get(key):
+                        us_data[key] = value
+                logger.info(f"Merged {len(text_data)} fields from text parser")
             
             if us_data and us_data.get('us_code'):
                 us_data['_pdf_source'] = filename
                 us_data['_total_pages'] = len(result['debug']['pages'])
+                us_data['_raw_ocr_text'] = combined_text  # Keep for debug/QA
                 result['us_data'] = us_data
-                logger.info(f"✓ Parsed US: {us_data.get('us_code', 'unknown')} via layout parser")
+                logger.info(f"✓ Parsed US: {us_data.get('us_code', 'unknown')} (layout parser + text parser merge)")
             else:
                 logger.warning("No US data could be parsed from combined pages")
             
@@ -1267,7 +1206,9 @@ class PaddleOCRService:
 
 
 # Singleton
-_paddle_ocr_service: Optional[PaddleOCRService] = None
+# Separate singletons for CPU and GPU modes
+_paddle_ocr_service_cpu: Optional[PaddleOCRService] = None
+_paddle_ocr_service_gpu: Optional[PaddleOCRService] = None
 
 
 def get_paddle_ocr_service(use_gpu: bool = False) -> PaddleOCRService:
@@ -1276,11 +1217,20 @@ def get_paddle_ocr_service(use_gpu: bool = False) -> PaddleOCRService:
     
     Args:
         use_gpu: True=forza GPU, False=forza CPU (default CPU per compatibilità)
+    
+    Returns:
+        PaddleOCRService instance (cached per mode)
     """
-    global _paddle_ocr_service
-    if _paddle_ocr_service is None:
-        _paddle_ocr_service = PaddleOCRService(use_gpu=use_gpu)
-    return _paddle_ocr_service
+    global _paddle_ocr_service_cpu, _paddle_ocr_service_gpu
+    
+    if use_gpu:
+        if _paddle_ocr_service_gpu is None:
+            _paddle_ocr_service_gpu = PaddleOCRService(use_gpu=True)
+        return _paddle_ocr_service_gpu
+    else:
+        if _paddle_ocr_service_cpu is None:
+            _paddle_ocr_service_cpu = PaddleOCRService(use_gpu=False)
+        return _paddle_ocr_service_cpu
 
 
 def is_paddle_ocr_available() -> bool:

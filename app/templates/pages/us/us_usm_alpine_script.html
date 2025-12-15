@@ -340,6 +340,98 @@
                 return inside;
             },
 
+            // ===== NEW: getElementById-based canvas functions =====
+            initCanvasById(canvasId, img, page) {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas || !img) return;
+                // Set canvas size to match image natural size
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                // Store page data on canvas for later use
+                canvas._pageData = page;
+                // Initial draw with no hover
+                this.redrawCanvasById(canvasId, page, null);
+            },
+
+            redrawCanvasById(canvasId, page, hoveredIdx) {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                const boxes = page?.bounding_boxes || [];
+
+                boxes.forEach((box, idx) => {
+                    if (!box.polygon || box.polygon.length < 3) return;
+
+                    const isHovered = hoveredIdx === idx;
+
+                    // Draw polygon fill
+                    ctx.beginPath();
+                    ctx.moveTo(box.polygon[0][0], box.polygon[0][1]);
+                    for (let i = 1; i < box.polygon.length; i++) {
+                        ctx.lineTo(box.polygon[i][0], box.polygon[i][1]);
+                    }
+                    ctx.closePath();
+
+                    // Fill style based on hover
+                    ctx.fillStyle = isHovered ? 'rgba(255, 165, 0, 0.5)' : 'rgba(0, 200, 0, 0.2)';
+                    ctx.fill();
+
+                    // Stroke style based on hover
+                    ctx.strokeStyle = isHovered ? '#ff6600' : '#00cc00';
+                    ctx.lineWidth = isHovered ? 4 : 2;
+                    ctx.stroke();
+
+                    // Draw index number with background for visibility
+                    const numX = box.polygon[0][0] + 4;
+                    const numY = box.polygon[0][1] - 8;
+                    ctx.font = 'bold 14px Arial';
+                    // Background for text
+                    ctx.fillStyle = isHovered ? '#ff6600' : '#00aa00';
+                    const textWidth = ctx.measureText((idx + 1).toString()).width;
+                    ctx.fillRect(numX - 2, numY - 12, textWidth + 4, 16);
+                    // Text
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText((idx + 1).toString(), numX, numY);
+                });
+            },
+
+            handleCanvasHoverById(event, canvasId, page) {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas || !page) return;
+
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+
+                const x = (event.clientX - rect.left) * scaleX;
+                const y = (event.clientY - rect.top) * scaleY;
+
+                const boxes = page?.bounding_boxes || [];
+                let foundIdx = null;
+
+                // Check each box polygon for hit
+                for (let idx = 0; idx < boxes.length; idx++) {
+                    const box = boxes[idx];
+                    if (!box.polygon || box.polygon.length < 3) continue;
+
+                    if (this.pointInPolygon(x, y, box.polygon)) {
+                        foundIdx = idx;
+                        break;
+                    }
+                }
+
+                // Only update if changed
+                if (this.hoveredBoxIdx !== foundIdx) {
+                    this.hoveredBoxIdx = foundIdx;
+                    this.redrawCanvasById(canvasId, page, foundIdx);
+                }
+            },
+
             // Variable to track hovered box index for canvas-based rendering
             hoveredBoxIdx: null,
 
@@ -2077,7 +2169,7 @@
 
             // ===== PDF IMPORT (OCR) METHODS =====
 
-            async handlePDFImport(event) {
+            async handlePDFImport(event, useGpu = false) {
                 const file = event.target.files[0];
                 if (!file) return;
 
@@ -2100,13 +2192,19 @@
                 this.pdfImportError = null;
                 this.pdfImportResults = null;
 
+                const deviceMode = useGpu ? 'GPU' : 'CPU';
+                this.showNotification(`Elaborazione OCR in corso (${deviceMode})...`, 'info');
+
                 try {
                     const formData = new FormData();
                     formData.append('file', file);
 
-                    console.log('Uploading PDF for OCR extraction:', file.name);
+                    console.log(`Uploading PDF for OCR extraction (${deviceMode}):`, file.name);
 
-                    const response = await fetch(`/api/v1/ocr/sites/${this.currentSiteId}/ocr/extract`, {
+                    // Add use_gpu query parameter
+                    const apiUrl = `/api/v1/ocr/sites/${this.currentSiteId}/ocr/extract?use_gpu=${useGpu}`;
+
+                    const response = await fetch(apiUrl, {
                         method: 'POST',
                         headers: {
                             'X-CSRFToken': this.getCSRFToken()
@@ -2120,6 +2218,14 @@
                         console.log('OCR extraction results:', results);
                         this.pdfImportResults = results;
                         this.showPdfImportModal = true;
+
+                        // Save to localStorage for debug modal experimentation
+                        try {
+                            localStorage.setItem('ocrDebugResults', JSON.stringify(results));
+                            console.log('OCR results saved to localStorage');
+                        } catch (e) {
+                            console.warn('Could not save OCR results to localStorage:', e);
+                        }
 
                         if (results.results && results.results.length > 0) {
                             this.showNotification(
@@ -2150,6 +2256,29 @@
                     this.showPdfImportModal = true;
                 } finally {
                     this.pdfImporting = false;
+                }
+            },
+
+            // DEBUG: Load OCR results from localStorage (bypasses OCR processing)
+            loadOCRFromLocalStorage() {
+                try {
+                    const savedData = localStorage.getItem('ocrDebugResults');
+                    if (!savedData) {
+                        this.showNotification('Nessun risultato OCR salvato in localStorage', 'warning');
+                        return;
+                    }
+
+                    const results = JSON.parse(savedData);
+                    console.log('Loaded OCR results from localStorage:', results);
+
+                    this.pdfImportResults = results;
+                    this.pdfImportError = null;
+                    this.showPdfImportModal = true;
+
+                    this.showNotification('Caricati risultati OCR da localStorage', 'success');
+                } catch (e) {
+                    console.error('Error loading from localStorage:', e);
+                    this.showNotification('Errore nel caricamento da localStorage', 'error');
                 }
             },
 
