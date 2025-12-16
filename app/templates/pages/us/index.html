@@ -121,8 +121,6 @@
                 x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
                 x-transition:enter-end="opacity-100 scale-100">
 
-
-
                 <!-- Modal Header -->
                 <div
                     class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gradient-to-r from-purple-600 to-indigo-600">
@@ -143,8 +141,7 @@
                 </div>
 
                 <!-- Tab Navigation -->
-                <div class="px-6 pt-4 border-b border-gray-200 dark:border-gray-700">
-
+                <div class="px-6 pt-4 border-b border-gray-200 dark:border-gray-700" x-data="{ocrDebugTab: 'result'}">
                     <div class="flex space-x-4">
                         <button @click="ocrDebugTab = 'result'"
                             :class="ocrDebugTab === 'result' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
@@ -178,904 +175,699 @@
                             </svg>
                             Template Overlay
                         </button>
-                        <button
-                            @click="ocrDebugTab = 'ppstructure'; console.log('PPStructure tab clicked, ocrDebugTab=', ocrDebugTab)"
-                            :class="ocrDebugTab === 'ppstructure' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                            class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z">
-                                </path>
-                            </svg>
-                            PPStructure
-                            <span x-show="pdfImportResults?.debug_pages?.[0]?.layout_json?.tables?.length"
-                                class="ml-1 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full"
-                                x-text="pdfImportResults?.debug_pages?.reduce((sum, p) => sum + (p.layout_json?.tables?.length || 0), 0) + ' tables'"></span>
-                        </button>
                     </div>
-                </div>
 
-                <!-- Modal Body -->
-                <div class="p-6 overflow-y-auto max-h-[65vh]">
-
-                    <!-- Error State -->
-                    <template x-if="pdfImportError">
-                        <div
-                            class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4">
-                            <div class="flex items-center">
-                                <svg class="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                <span class="text-red-700 dark:text-red-300" x-text="pdfImportError"></span>
-                            </div>
-                        </div>
-                    </template>
-
-                    <!-- TAB: Risultato US -->
-                    <div x-show="ocrDebugTab === 'result'" x-transition>
-                        <template
-                            x-if="pdfImportResults && pdfImportResults.results && pdfImportResults.results.length > 0">
-                            <div>
-                                <!-- Stats -->
-                                <div class="grid grid-cols-4 gap-4 mb-6">
-                                    <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4 text-center">
-                                        <div class="text-2xl font-bold text-blue-600 dark:text-blue-400"
-                                            x-text="pdfImportResults.total_pages"></div>
-                                        <div class="text-sm text-blue-700 dark:text-blue-300">Pagine</div>
-                                    </div>
-                                    <div class="bg-green-50 dark:bg-green-900/30 rounded-lg p-4 text-center">
-                                        <div class="text-2xl font-bold text-green-600 dark:text-green-400"
-                                            x-text="pdfImportResults.successful_extractions"></div>
-                                        <div class="text-sm text-green-700 dark:text-green-300">US Estratte</div>
-                                    </div>
-                                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
-                                        <div class="text-2xl font-bold text-gray-600 dark:text-gray-300"
-                                            x-text="pdfImportResults.processing_time_seconds + 's'"></div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400">Tempo</div>
-                                    </div>
-                                    <div class="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4 text-center">
-                                        <div class="text-2xl font-bold text-purple-600 dark:text-purple-400"
-                                            x-text="pdfImportResults.debug_pages?.reduce((sum, p) => sum + p.word_count, 0) || 0">
-                                        </div>
-                                        <div class="text-sm text-purple-700 dark:text-purple-300">Parole</div>
-                                    </div>
+                    <!-- Modal Body -->
+                    <div class="p-6 overflow-y-auto max-h-[65vh]">
+                        <!-- Error State -->
+                        <template x-if="pdfImportError">
+                            <div
+                                class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                                <div class="flex items-center">
+                                    <svg class="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="text-red-700 dark:text-red-300" x-text="pdfImportError"></span>
                                 </div>
+                            </div>
+                        </template>
 
-                                <!-- US Result Card -->
-                                <template x-for="(result, index) in pdfImportResults.results" :key="index">
-                                    <div class="border-2 border-gray-200 dark:border-gray-600 rounded-xl p-5"
-                                        :class="result.is_valid ? ' dark:bg-green-900/20 border-green-300' : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300'">
-                                        <div class="flex justify-between items-start mb-4">
-                                            <div class="flex items-center">
-                                                <span class="text-2xl font-bold text-gray-900 dark:text-white"
-                                                    x-text="result.us_code"></span>
-                                                <span class="ml-3 px-3 py-1 text-sm rounded-full font-medium"
-                                                    :class="result.is_valid ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'"
-                                                    x-text="result.is_valid ? '✓ Valido' : '⚠ Incompleto'"></span>
-                                            </div>
-                                            <div class="text-right">
-                                                <div class="text-sm text-gray-500">Confidence</div>
-                                                <div class="text-xl font-bold"
-                                                    :class="result.confidence > 0.8 ? 'text-green-600' : 'text-yellow-600'"
-                                                    x-text="(result.confidence * 100).toFixed(0) + '%'"></div>
-                                            </div>
+                        <!-- TAB: Risultato US -->
+                        <div x-show="ocrDebugTab === 'result'" x-transition>
+                            <template
+                                x-if="pdfImportResults && pdfImportResults.results && pdfImportResults.results.length > 0">
+                                <div>
+                                    <!-- Stats -->
+                                    <div class="grid grid-cols-4 gap-4 mb-6">
+                                        <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4 text-center">
+                                            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400"
+                                                x-text="pdfImportResults.total_pages"></div>
+                                            <div class="text-sm text-blue-700 dark:text-blue-300">Pagine</div>
                                         </div>
-
-                                        <!-- Extracted Fields Grid -->
-                                        <div class="grid grid-cols-3 gap-4 text-sm mb-4">
-                                            <div x-show="result.data.tipo"><strong>Tipo:</strong> <span
-                                                    x-text="result.data.tipo"></span></div>
-                                            <div x-show="result.data.definizione"><strong>Definizione:</strong>
-                                                <span x-text="(result.data.definizione || '').substring(0, 40)"></span>
-                                            </div>
-                                            <div x-show="result.data.localita"><strong>Località:</strong> <span
-                                                    x-text="result.data.localita"></span></div>
-                                            <div x-show="result.data.area_struttura"><strong>Area:</strong> <span
-                                                    x-text="result.data.area_struttura"></span></div>
-                                            <div x-show="result.data.datazione"><strong>Datazione:</strong> <span
-                                                    x-text="result.data.datazione"></span></div>
-                                            <div x-show="result.data.responsabile_scientifico">
-                                                <strong>Resp:</strong> <span
-                                                    x-text="result.data.responsabile_scientifico"></span>
-                                            </div>
-                                            <div><strong>Campi estratti:</strong> <span
-                                                    x-text="result.extracted_fields_count"></span></div>
+                                        <div class="bg-green-50 dark:bg-green-900/30 rounded-lg p-4 text-center">
+                                            <div class="text-2xl font-bold text-green-600 dark:text-green-400"
+                                                x-text="pdfImportResults.successful_extractions"></div>
+                                            <div class="text-sm text-green-700 dark:text-green-300">US Estratte</div>
                                         </div>
-
-                                        <!-- Warnings -->
-                                        <template x-if="result.warnings && result.warnings.length > 0">
-                                            <div class="mt-3 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                                                <div
-                                                    class="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-1">
-                                                    Avvisi:</div>
-                                                <template x-for="warn in result.warnings" :key="warn">
-                                                    <div
-                                                        class="text-xs text-yellow-700 dark:text-yellow-400 flex items-center">
-                                                        <span class="mr-1">⚠️</span><span x-text="warn"></span>
-                                                    </div>
-                                                </template>
+                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                                            <div class="text-2xl font-bold text-gray-600 dark:text-gray-300"
+                                                x-text="pdfImportResults.processing_time_seconds + 's'"></div>
+                                            <div class="text-sm text-gray-500 dark:text-gray-400">Tempo</div>
+                                        </div>
+                                        <div class="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4 text-center">
+                                            <div class="text-2xl font-bold text-purple-600 dark:text-purple-400"
+                                                x-text="pdfImportResults.debug_pages?.reduce((sum, p) => sum + p.word_count, 0) || 0">
                                             </div>
-                                        </template>
-
-                                        <!-- Action Button -->
-                                        <div class="mt-4 flex justify-end">
-                                            <button @click="createUSFromOCR(result.data)" :disabled="!result.is_valid"
-                                                class="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
-                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                                </svg>
-                                                Crea US nel Database
-                                            </button>
+                                            <div class="text-sm text-purple-700 dark:text-purple-300">Parole</div>
                                         </div>
                                     </div>
-                                </template>
-                            </div>
-                        </template>
 
-                        <!-- No Results -->
-                        <template
-                            x-if="pdfImportResults && (!pdfImportResults.results || pdfImportResults.results.length === 0) && !pdfImportError">
-                            <div class="text-center py-12 text-gray-500 dark:text-gray-400">
-                                <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
-                                    </path>
-                                </svg>
-                                <p class="text-lg font-medium">Nessuna scheda US trovata nel PDF</p>
-                                <p class="text-sm mt-2">Controlla la tab "Pagine OCR" per vedere il testo estratto
-                                </p>
-                            </div>
-                        </template>
-                    </div>
-
-                    <!-- TAB: Pagine OCR con Immagini INTERATTIVE -->
-                    <div x-show="ocrDebugTab === 'pages'" x-transition>
-                        <template x-if="pdfImportResults?.debug_pages && pdfImportResults.debug_pages.length > 0">
-                            <div class="space-y-6">
-                                <template x-for="(page, pageIdx) in pdfImportResults.debug_pages" :key="pageIdx">
-                                    <div class="border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
-                                        <!-- Page Header -->
-                                        <div
-                                            class="bg-gray-100 dark:bg-gray-700 px-4 py-3 flex items-center justify-between">
-                                            <div class="flex items-center">
-                                                <span
-                                                    class="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3"
-                                                    x-text="page.page_number"></span>
-                                                <span class="font-medium">Pagina <span
-                                                        x-text="page.page_number"></span></span>
-                                            </div>
-                                            <div class="flex items-center space-x-4 text-sm text-gray-500">
-                                                <span><strong x-text="page.word_count"></strong> parole</span>
-                                                <span>Conf: <strong
-                                                        x-text="(page.avg_confidence * 100).toFixed(0) + '%'"></strong></span>
-                                            </div>
-                                        </div>
-
-                                        <!-- Page Content: Interactive Image + Text -->
-                                        <div class="grid md:grid-cols-2 gap-4 p-4">
-                                            <!-- Image with Canvas Overlay for interactive boxes -->
-                                            <div
-                                                class="bg-gray-100 dark:bg-gray-900 rounded-lg p-2 overflow-auto max-h-[600px] relative">
-                                                <div class="relative inline-block">
-                                                    <!-- Base image -->
-                                                    <img :src="page.image_base64"
-                                                        class="max-w-full h-auto rounded shadow-lg block"
-                                                        :alt="'Pagina ' + page.page_number" :id="'ocr_img_' + pageIdx"
-                                                        @load="initCanvasById('ocr_canvas_' + pageIdx, $el, page)">
-
-                                                    <!-- Canvas overlay for bounding boxes -->
-                                                    <canvas :id="'ocr_canvas_' + pageIdx"
-                                                        class="absolute inset-0 w-full h-full cursor-crosshair"
-                                                        @mousemove="handleCanvasHoverById($event, 'ocr_canvas_' + pageIdx, page)"
-                                                        @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)"></canvas>
+                                    <!-- US Result Card -->
+                                    <template x-for="(result, index) in pdfImportResults.results" :key="index">
+                                        <div class="border-2 border-gray-200 dark:border-gray-600 rounded-xl p-5"
+                                            :class="result.is_valid ? ' dark:bg-green-900/20 border-green-300' : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300'">
+                                            <div class="flex justify-between items-start mb-4">
+                                                <div class="flex items-center">
+                                                    <span class="text-2xl font-bold text-gray-900 dark:text-white"
+                                                        x-text="result.us_code"></span>
+                                                    <span class="ml-3 px-3 py-1 text-sm rounded-full font-medium"
+                                                        :class="result.is_valid ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'"
+                                                        x-text="result.is_valid ? '✓ Valido' : '⚠ Incompleto'"></span>
+                                                </div>
+                                                <div class="text-right">
+                                                    <div class="text-sm text-gray-500">Confidence</div>
+                                                    <div class="text-xl font-bold"
+                                                        :class="result.confidence > 0.8 ? 'text-green-600' : 'text-yellow-600'"
+                                                        x-text="(result.confidence * 100).toFixed(0) + '%'"></div>
                                                 </div>
                                             </div>
 
-                                            <!-- Extracted Text Lines with hover sync -->
+                                            <!-- Extracted Fields Grid -->
+                                            <div class="grid grid-cols-3 gap-4 text-sm mb-4">
+                                                <div x-show="result.data.tipo"><strong>Tipo:</strong> <span
+                                                        x-text="result.data.tipo"></span></div>
+                                                <div x-show="result.data.definizione"><strong>Definizione:</strong>
+                                                    <span
+                                                        x-text="(result.data.definizione || '').substring(0, 40)"></span>
+                                                </div>
+                                                <div x-show="result.data.localita"><strong>Località:</strong> <span
+                                                        x-text="result.data.localita"></span></div>
+                                                <div x-show="result.data.area_struttura"><strong>Area:</strong> <span
+                                                        x-text="result.data.area_struttura"></span></div>
+                                                <div x-show="result.data.datazione"><strong>Datazione:</strong> <span
+                                                        x-text="result.data.datazione"></span></div>
+                                                <div x-show="result.data.responsabile_scientifico">
+                                                    <strong>Resp:</strong> <span
+                                                        x-text="result.data.responsabile_scientifico"></span>
+                                                </div>
+                                                <div><strong>Campi estratti:</strong> <span
+                                                        x-text="result.extracted_fields_count"></span></div>
+                                            </div>
+
+                                            <!-- Warnings -->
+                                            <template x-if="result.warnings && result.warnings.length > 0">
+                                                <div class="mt-3 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                                                    <div
+                                                        class="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-1">
+                                                        Avvisi:</div>
+                                                    <template x-for="warn in result.warnings" :key="warn">
+                                                        <div
+                                                            class="text-xs text-yellow-700 dark:text-yellow-400 flex items-center">
+                                                            <span class="mr-1">⚠️</span><span x-text="warn"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+
+                                            <!-- Action Button -->
+                                            <div class="mt-4 flex justify-end">
+                                                <button @click="createUSFromOCR(result.data)"
+                                                    :disabled="!result.is_valid"
+                                                    class="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                                    </svg>
+                                                    Crea US nel Database
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <!-- No Results -->
+                            <template
+                                x-if="pdfImportResults && (!pdfImportResults.results || pdfImportResults.results.length === 0) && !pdfImportError">
+                                <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                    <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                                        </path>
+                                    </svg>
+                                    <p class="text-lg font-medium">Nessuna scheda US trovata nel PDF</p>
+                                    <p class="text-sm mt-2">Controlla la tab "Pagine OCR" per vedere il testo estratto
+                                    </p>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- TAB: Pagine OCR con Immagini INTERATTIVE -->
+                        <div x-show="ocrDebugTab === 'pages'" x-transition>
+                            <template x-if="pdfImportResults?.debug_pages && pdfImportResults.debug_pages.length > 0">
+                                <div class="space-y-6">
+                                    <template x-for="(page, pageIdx) in pdfImportResults.debug_pages" :key="pageIdx">
+                                        <div
+                                            class="border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
+                                            <!-- Page Header -->
                                             <div
-                                                class="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 overflow-auto max-h-[600px]">
-                                                <div class="text-xs font-mono space-y-1">
-                                                    <template x-for="(box, idx) in page.bounding_boxes" :key="idx">
-                                                        <div class="flex px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150"
-                                                            :class="{
+                                                class="bg-gray-100 dark:bg-gray-700 px-4 py-3 flex items-center justify-between">
+                                                <div class="flex items-center">
+                                                    <span
+                                                        class="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3"
+                                                        x-text="page.page_number"></span>
+                                                    <span class="font-medium">Pagina <span
+                                                            x-text="page.page_number"></span></span>
+                                                </div>
+                                                <div class="flex items-center space-x-4 text-sm text-gray-500">
+                                                    <span><strong x-text="page.word_count"></strong> parole</span>
+                                                    <span>Conf: <strong
+                                                            x-text="(page.avg_confidence * 100).toFixed(0) + '%'"></strong></span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Page Content: Interactive Image + Text -->
+                                            <div class="grid md:grid-cols-2 gap-4 p-4">
+                                                <!-- Image with Canvas Overlay for interactive boxes -->
+                                                <div
+                                                    class="bg-gray-100 dark:bg-gray-900 rounded-lg p-2 overflow-auto max-h-[600px] relative">
+                                                    <div class="relative inline-block">
+                                                        <!-- Base image -->
+                                                        <img :src="page.image_base64"
+                                                            class="max-w-full h-auto rounded shadow-lg block"
+                                                            :alt="'Pagina ' + page.page_number"
+                                                            :id="'ocr_img_' + pageIdx"
+                                                            @load="initCanvasById('ocr_canvas_' + pageIdx, $el, page)">
+
+                                                        <!-- Canvas overlay for bounding boxes -->
+                                                        <canvas :id="'ocr_canvas_' + pageIdx"
+                                                            class="absolute inset-0 w-full h-full cursor-crosshair"
+                                                            @mousemove="handleCanvasHoverById($event, 'ocr_canvas_' + pageIdx, page)"
+                                                            @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)"></canvas>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Extracted Text Lines with hover sync -->
+                                                <div
+                                                    class="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 overflow-auto max-h-[600px]">
+                                                    <div class="text-xs font-mono space-y-1">
+                                                        <template x-for="(box, idx) in page.bounding_boxes" :key="idx">
+                                                            <div class="flex px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150"
+                                                                :class="{
                                                                      'bg-yellow-400 dark:bg-yellow-500 ring-2 ring-orange-500 shadow-md': hoveredBoxIdx === idx,
                                                                      'hover:bg-gray-200 dark:hover:bg-gray-700': hoveredBoxIdx !== idx
                                                                  }"
-                                                            @mouseenter="hoveredBoxIdx = idx; redrawCanvasById('ocr_canvas_' + pageIdx, page, idx)"
-                                                            @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)">
-                                                            <span class="w-8 flex-shrink-0 font-bold"
-                                                                :class="hoveredBoxIdx === idx ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'"
-                                                                x-text="(idx + 1) + '.'"></span>
-                                                            <span class="flex-1"
-                                                                :class="hoveredBoxIdx === idx ? 'text-gray-900 dark:text-gray-900 font-semibold' : 'text-gray-700 dark:text-gray-300'"
-                                                                x-text="box.text"></span>
-                                                            <span class="ml-2 text-xs px-1.5 py-0.5 rounded" :class="{
+                                                                @mouseenter="hoveredBoxIdx = idx; redrawCanvasById('ocr_canvas_' + pageIdx, page, idx)"
+                                                                @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)">
+                                                                <span class="w-8 flex-shrink-0 font-bold"
+                                                                    :class="hoveredBoxIdx === idx ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'"
+                                                                    x-text="(idx + 1) + '.'"></span>
+                                                                <span class="flex-1"
+                                                                    :class="hoveredBoxIdx === idx ? 'text-gray-900 dark:text-gray-900 font-semibold' : 'text-gray-700 dark:text-gray-300'"
+                                                                    x-text="box.text"></span>
+                                                                <span class="ml-2 text-xs px-1.5 py-0.5 rounded" :class="{
                                                                           'bg-green-200 text-green-800 dark:bg-green-700 dark:text-green-100': box.confidence > 0.9,
                                                                           'bg-yellow-200 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100': box.confidence > 0.7 && box.confidence <= 0.9,
                                                                           'bg-red-200 text-red-800 dark:bg-red-700 dark:text-red-100': box.confidence <= 0.7
                                                                       }"
-                                                                x-text="Math.round(box.confidence * 100) + '%'"></span>
-                                                        </div>
-                                                    </template>
+                                                                    x-text="Math.round(box.confidence * 100) + '%'"></span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        <!-- Legend -->
-                                        <div
-                                            class="bg-gray-50 dark:bg-gray-800 px-4 py-2 text-xs text-gray-500 flex items-center justify-center space-x-4 border-t border-gray-200 dark:border-gray-700">
-                                            <span>💡 Passa il mouse su un box o sul testo per evidenziare la
-                                                corrispondenza</span>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                        <template x-if="!pdfImportResults?.debug_pages || pdfImportResults.debug_pages.length === 0">
-                            <div class="text-center py-12 text-gray-500">
-                                <p>Nessun dato di debug disponibile</p>
-                            </div>
-                        </template>
-                    </div>
-
-                    <!-- TAB: Template Overlay -->
-                    <div x-show="ocrDebugTab === 'template'" x-transition>
-                        <template x-if="pdfImportResults?.results && pdfImportResults.results.length > 0">
-                            <div class="space-y-4 text-gray-800 text-sm">
-
-                                <!-- PAGINA 1: IDENTIFICAZIONE -->
-                                <div class="border-2 border-gray-400 rounded-lg overflow-hidden bg-white">
-                                    <div
-                                        class="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-4 py-2 font-bold flex items-center">
-                                        <span class="text-2xl mr-3">📄</span>
-                                        SCHEDA US - Pagina 1: Identificazione e Caratterizzazione
-                                    </div>
-
-                                    <!-- Header: US, ENTE, ANNO -->
-                                    <div class="grid grid-cols-12 border-b-2 border-gray-400">
-                                        <div class="col-span-2 border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">US</div>
-                                            <div class="text-3xl font-black text-blue-700 text-center"
-                                                x-text="pdfImportResults.results[0]?.data?.us_code || '-'"></div>
-                                        </div>
-                                        <div class="col-span-8 border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">ENTE RESPONSABILE</div>
-                                            <div class="bg-blue-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.ente_responsabile || '-'">
+                                            <!-- Legend -->
+                                            <div
+                                                class="bg-gray-50 dark:bg-gray-800 px-4 py-2 text-xs text-gray-500 flex items-center justify-center space-x-4 border-t border-gray-200 dark:border-gray-700">
+                                                <span>💡 Passa il mouse su un box o sul testo per evidenziare la
+                                                    corrispondenza</span>
                                             </div>
                                         </div>
-                                        <div class="col-span-2 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">ANNO</div>
-                                            <div class="bg-green-50 px-2 py-1 rounded text-center font-bold"
-                                                x-text="pdfImportResults.results[0]?.data?.anno || '-'"></div>
-                                        </div>
-                                    </div>
-
-                                    <!-- UFFICIO MIC -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">UFFICIO MiC COMPETENTE PER
-                                            TUTELA</div>
-                                        <div class="bg-blue-50 px-2 py-1 rounded"
-                                            x-text="pdfImportResults.results[0]?.data?.ufficio_mic || '-'"></div>
-                                    </div>
-
-                                    <!-- IDENTIFICATIVO -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">IDENTIFICATIVO
-                                            SAGGIO/EDIFICIO/STRUTTURA</div>
-                                        <div class="bg-blue-50 px-2 py-1 rounded"
-                                            x-text="pdfImportResults.results[0]?.data?.identificativo_rif || '-'">
-                                        </div>
-                                    </div>
-
-                                    <!-- LOCALITA -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">LOCALITÀ</div>
-                                        <div class="bg-orange-50 px-2 py-1 rounded"
-                                            x-text="pdfImportResults.results[0]?.data?.localita || '-'"></div>
-                                    </div>
-
-                                    <!-- AREA, SAGGIO -->
-                                    <div class="grid grid-cols-12 border-b border-gray-300">
-                                        <div class="col-span-8 border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">AREA/EDIFICIO/STRUTTURA
-                                            </div>
-                                            <div class="bg-orange-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.area_struttura || '-'">
-                                            </div>
-                                        </div>
-                                        <div class="col-span-4 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">SAGGIO</div>
-                                            <div class="bg-orange-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.saggio || '-'"></div>
-                                        </div>
-                                    </div>
-
-                                    <!-- AMBIENTE, QUOTE, TIPO -->
-                                    <div class="grid grid-cols-12 border-b border-gray-300">
-                                        <div class="col-span-4 border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">AMBIENTE/UNITÀ FUNZIONALE
-                                            </div>
-                                            <div class="bg-purple-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.ambiente_unita_funzione || '-'">
-                                            </div>
-                                        </div>
-                                        <div class="col-span-4 border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">QUOTE</div>
-                                            <div class="bg-cyan-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.quote || '-'"></div>
-                                        </div>
-                                        <div class="col-span-4 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">TIPO US</div>
-                                            <div class="px-3 py-2 rounded text-center font-bold text-sm"
-                                                :class="pdfImportResults.results[0]?.data?.tipo === 'positiva' ? 'bg-green-300 text-green-800' : (pdfImportResults.results[0]?.data?.tipo === 'negativa' ? 'bg-red-300 text-red-800' : 'bg-gray-200')"
-                                                x-text="(pdfImportResults.results[0]?.data?.tipo || 'N/D').toUpperCase()">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- DOCUMENTAZIONE -->
-                                    <div class="grid grid-cols-12 border-b border-gray-300">
-                                        <div class="col-span-3 border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">📐 PIANTE</div>
-                                            <div class="bg-pink-50 px-2 py-1 rounded text-xs"
-                                                x-text="pdfImportResults.results[0]?.data?.piante_riferimenti || '-'">
-                                            </div>
-                                        </div>
-                                        <div class="col-span-3 border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">📐 SEZIONI</div>
-                                            <div class="bg-pink-50 px-2 py-1 rounded text-xs"
-                                                x-text="pdfImportResults.results[0]?.data?.sezioni_riferimenti || '-'">
-                                            </div>
-                                        </div>
-                                        <div class="col-span-3 border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">📷 FOTOGRAFIE</div>
-                                            <div class="bg-pink-50 px-2 py-1 rounded text-xs"
-                                                x-text="pdfImportResults.results[0]?.data?.fotografie || '-'"></div>
-                                        </div>
-                                        <div class="col-span-3 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">📦 RIF. MATERIALI</div>
-                                            <div class="bg-pink-50 px-2 py-1 rounded text-xs"
-                                                x-text="pdfImportResults.results[0]?.data?.riferimenti_tabelle_materiali || '-'">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- DEFINIZIONE -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">DEFINIZIONE</div>
-                                        <div class="bg-indigo-50 px-2 py-1 rounded min-h-[40px]"
-                                            x-text="pdfImportResults.results[0]?.data?.definizione || '-'"></div>
-                                    </div>
-
-                                    <!-- CRITERI DI DISTINZIONE -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">CRITERI DI DISTINZIONE</div>
-                                        <div class="bg-indigo-50 px-2 py-1 rounded min-h-[40px]"
-                                            x-text="pdfImportResults.results[0]?.data?.criteri_distinzione || '-'">
-                                        </div>
-                                    </div>
-
-                                    <!-- MODO DI FORMAZIONE -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">MODO DI FORMAZIONE</div>
-                                        <div class="bg-indigo-50 px-2 py-1 rounded"
-                                            x-text="pdfImportResults.results[0]?.data?.modo_formazione || '-'">
-                                        </div>
-                                    </div>
-
-                                    <!-- COMPONENTI -->
-                                    <div class="grid grid-cols-2 border-b border-gray-300">
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">COMPONENTI INORGANICI</div>
-                                            <div class="bg-amber-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.componenti_inorganici || '-'">
-                                            </div>
-                                        </div>
-                                        <div class="p-2">
-                                            <div class="text-xs text-gray-500 font-bold">COMPONENTI ORGANICI</div>
-                                            <div class="bg-amber-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.componenti_organici || '-'">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- CONSISTENZA, COLORE, MISURE -->
-                                    <div class="grid grid-cols-3 border-b border-gray-300">
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">CONSISTENZA</div>
-                                            <div class="bg-teal-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.consistenza || '-'">
-                                            </div>
-                                        </div>
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">COLORE</div>
-                                            <div class="bg-teal-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.colore || '-'"></div>
-                                        </div>
-                                        <div class="p-2">
-                                            <div class="text-xs text-gray-500 font-bold">MISURE</div>
-                                            <div class="bg-teal-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.misure || '-'"></div>
-                                        </div>
-                                    </div>
-
-                                    <!-- STATO CONSERVAZIONE -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">STATO DI CONSERVAZIONE</div>
-                                        <div class="bg-teal-50 px-2 py-1 rounded"
-                                            x-text="pdfImportResults.results[0]?.data?.stato_conservazione || '-'">
-                                        </div>
-                                    </div>
-
-                                    <!-- SEQUENZA FISICA + STRATIGRAFICA -->
-                                    <div class="grid grid-cols-2 border-b border-gray-300">
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold mb-2">🔗 SEQUENZA FISICA
-                                            </div>
-                                            <div class="grid grid-cols-2 gap-1 text-xs">
-                                                <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.uguale_a">
-                                                    <span class="font-bold">UGUALE A:</span>
-                                                    <span x-text="pdfImportResults.results[0]?.data?.uguale_a"></span>
-                                                </div>
-                                                <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.si_lega_a">
-                                                    <span class="font-bold">SI LEGA A:</span>
-                                                    <span x-text="pdfImportResults.results[0]?.data?.si_lega_a"></span>
-                                                </div>
-                                                <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.copre">
-                                                    <span class="font-bold">COPRE:</span>
-                                                    <span x-text="pdfImportResults.results[0]?.data?.copre"></span>
-                                                </div>
-                                                <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.coperto_da">
-                                                    <span class="font-bold">COPERTO DA:</span>
-                                                    <span x-text="pdfImportResults.results[0]?.data?.coperto_da"></span>
-                                                </div>
-                                                <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.taglia">
-                                                    <span class="font-bold">TAGLIA:</span>
-                                                    <span x-text="pdfImportResults.results[0]?.data?.taglia"></span>
-                                                </div>
-                                                <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.tagliato_da">
-                                                    <span class="font-bold">TAGLIATO DA:</span>
-                                                    <span
-                                                        x-text="pdfImportResults.results[0]?.data?.tagliato_da"></span>
-                                                </div>
-                                                <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.riempie">
-                                                    <span class="font-bold">RIEMPIE:</span>
-                                                    <span x-text="pdfImportResults.results[0]?.data?.riempie"></span>
-                                                </div>
-                                                <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.riempito_da">
-                                                    <span class="font-bold">RIEMPITO DA:</span>
-                                                    <span
-                                                        x-text="pdfImportResults.results[0]?.data?.riempito_da"></span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="p-2">
-                                            <div class="text-xs text-gray-500 font-bold mb-2">📋 SEQUENZA
-                                                STRATIGRAFICA</div>
-                                            <div class="grid grid-cols-1 gap-1 text-xs">
-                                                <div class="bg-violet-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.posteriore_a">
-                                                    <span class="font-bold">POSTERIORE A:</span>
-                                                    <span
-                                                        x-text="pdfImportResults.results[0]?.data?.posteriore_a"></span>
-                                                </div>
-                                                <div class="bg-violet-100 px-2 py-1 rounded flex justify-between"
-                                                    x-show="pdfImportResults.results[0]?.data?.anteriore_a">
-                                                    <span class="font-bold">ANTERIORE A:</span>
-                                                    <span
-                                                        x-text="pdfImportResults.results[0]?.data?.anteriore_a"></span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    </template>
                                 </div>
+                            </template>
+                            <template
+                                x-if="!pdfImportResults?.debug_pages || pdfImportResults.debug_pages.length === 0">
+                                <div class="text-center py-12 text-gray-500">
+                                    <p>Nessun dato di debug disponibile</p>
+                                </div>
+                            </template>
+                        </div>
 
-                                <!-- PAGINA 2: DESCRIZIONE E DATAZIONE -->
-                                <div class="border-2 border-gray-400 rounded-lg overflow-hidden bg-white">
-                                    <div
-                                        class="bg-gradient-to-r from-green-600 to-green-800 text-white px-4 py-2 font-bold flex items-center">
-                                        <span class="text-2xl mr-3">📄</span>
-                                        SCHEDA US - Pagina 2: Descrizione e Datazione
-                                    </div>
+                        <!-- TAB: Template Overlay -->
+                        <div x-show="ocrDebugTab === 'template'" x-transition>
+                            <template x-if="pdfImportResults?.results && pdfImportResults.results.length > 0">
+                                <div class="space-y-4 text-gray-800 text-sm">
 
-                                    <!-- DESCRIZIONE -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">DESCRIZIONE</div>
-                                        <div class="bg-blue-50 px-2 py-1 rounded min-h-[80px]"
-                                            x-text="pdfImportResults.results[0]?.data?.descrizione || '-'"></div>
-                                    </div>
+                                    <!-- PAGINA 1: IDENTIFICAZIONE -->
+                                    <div class="border-2 border-gray-400 rounded-lg overflow-hidden bg-white">
+                                        <div
+                                            class="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-4 py-2 font-bold flex items-center">
+                                            <span class="text-2xl mr-3">📄</span>
+                                            SCHEDA US - Pagina 1: Identificazione e Caratterizzazione
+                                        </div>
 
-                                    <!-- OSSERVAZIONI -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">OSSERVAZIONI</div>
-                                        <div class="bg-green-50 px-2 py-1 rounded min-h-[40px]"
-                                            x-text="pdfImportResults.results[0]?.data?.osservazioni || '-'"></div>
-                                    </div>
-
-                                    <!-- INTERPRETAZIONE -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">INTERPRETAZIONE</div>
-                                        <div class="bg-purple-50 px-2 py-1 rounded min-h-[40px]"
-                                            x-text="pdfImportResults.results[0]?.data?.interpretazione || '-'">
-                                        </div>
-                                    </div>
-
-                                    <!-- DATAZIONE, PERIODO, FASE, ATTIVITA -->
-                                    <div class="grid grid-cols-4 border-b border-gray-300">
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">DATAZIONE</div>
-                                            <div class="bg-orange-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.datazione || '-'"></div>
-                                        </div>
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">PERIODO</div>
-                                            <div class="bg-orange-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.periodo || '-'"></div>
-                                        </div>
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">FASE</div>
-                                            <div class="bg-orange-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.fase || '-'"></div>
-                                        </div>
-                                        <div class="p-2">
-                                            <div class="text-xs text-gray-500 font-bold">ATTIVITÀ</div>
-                                            <div class="bg-orange-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.attivita || '-'"></div>
-                                        </div>
-                                    </div>
-
-                                    <!-- ELEMENTI DATANTI -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">ELEMENTI DATANTI</div>
-                                        <div class="bg-yellow-50 px-2 py-1 rounded"
-                                            x-text="pdfImportResults.results[0]?.data?.elementi_datanti || '-'">
-                                        </div>
-                                    </div>
-
-                                    <!-- DATI QUANTITATIVI REPERTI -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">DATI QUANTITATIVI DEI REPERTI
-                                        </div>
-                                        <div class="bg-amber-50 px-2 py-1 rounded"
-                                            x-text="pdfImportResults.results[0]?.data?.dati_quantitativi_reperti || '-'">
-                                        </div>
-                                    </div>
-
-                                    <!-- CAMPIONATURE, FLOTTAZIONE, SETACCIATURA -->
-                                    <div class="grid grid-cols-3 border-b border-gray-300">
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">🧪 CAMPIONATURE</div>
-                                            <div class="bg-teal-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.campionature || '-'">
+                                        <!-- Header: US, ENTE, ANNO -->
+                                        <div class="grid grid-cols-12 border-b-2 border-gray-400">
+                                            <div class="col-span-2 border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">US</div>
+                                                <div class="text-3xl font-black text-blue-700 text-center"
+                                                    x-text="pdfImportResults.results[0]?.data?.us_code || '-'"></div>
+                                            </div>
+                                            <div class="col-span-8 border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">ENTE RESPONSABILE</div>
+                                                <div class="bg-blue-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.ente_responsabile || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="col-span-2 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">ANNO</div>
+                                                <div class="bg-green-50 px-2 py-1 rounded text-center font-bold"
+                                                    x-text="pdfImportResults.results[0]?.data?.anno || '-'"></div>
                                             </div>
                                         </div>
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">🌊 FLOTTAZIONE</div>
-                                            <div class="bg-teal-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.flottazione || '-'">
+
+                                        <!-- UFFICIO MIC -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">UFFICIO MiC COMPETENTE PER
+                                                TUTELA</div>
+                                            <div class="bg-blue-50 px-2 py-1 rounded"
+                                                x-text="pdfImportResults.results[0]?.data?.ufficio_mic || '-'"></div>
+                                        </div>
+
+                                        <!-- IDENTIFICATIVO -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">IDENTIFICATIVO
+                                                SAGGIO/EDIFICIO/STRUTTURA</div>
+                                            <div class="bg-blue-50 px-2 py-1 rounded"
+                                                x-text="pdfImportResults.results[0]?.data?.identificativo_rif || '-'">
                                             </div>
                                         </div>
-                                        <div class="p-2">
-                                            <div class="text-xs text-gray-500 font-bold">🔬 SETACCIATURA</div>
+
+                                        <!-- LOCALITA -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">LOCALITÀ</div>
+                                            <div class="bg-orange-50 px-2 py-1 rounded"
+                                                x-text="pdfImportResults.results[0]?.data?.localita || '-'"></div>
+                                        </div>
+
+                                        <!-- AREA, SAGGIO -->
+                                        <div class="grid grid-cols-12 border-b border-gray-300">
+                                            <div class="col-span-8 border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">AREA/EDIFICIO/STRUTTURA
+                                                </div>
+                                                <div class="bg-orange-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.area_struttura || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="col-span-4 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">SAGGIO</div>
+                                                <div class="bg-orange-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.saggio || '-'"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- AMBIENTE, QUOTE, TIPO -->
+                                        <div class="grid grid-cols-12 border-b border-gray-300">
+                                            <div class="col-span-4 border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">AMBIENTE/UNITÀ FUNZIONALE
+                                                </div>
+                                                <div class="bg-purple-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.ambiente_unita_funzione || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="col-span-4 border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">QUOTE</div>
+                                                <div class="bg-cyan-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.quote || '-'"></div>
+                                            </div>
+                                            <div class="col-span-4 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">TIPO US</div>
+                                                <div class="px-3 py-2 rounded text-center font-bold text-sm"
+                                                    :class="pdfImportResults.results[0]?.data?.tipo === 'positiva' ? 'bg-green-300 text-green-800' : (pdfImportResults.results[0]?.data?.tipo === 'negativa' ? 'bg-red-300 text-red-800' : 'bg-gray-200')"
+                                                    x-text="(pdfImportResults.results[0]?.data?.tipo || 'N/D').toUpperCase()">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- DOCUMENTAZIONE -->
+                                        <div class="grid grid-cols-12 border-b border-gray-300">
+                                            <div class="col-span-3 border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">📐 PIANTE</div>
+                                                <div class="bg-pink-50 px-2 py-1 rounded text-xs"
+                                                    x-text="pdfImportResults.results[0]?.data?.piante_riferimenti || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="col-span-3 border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">📐 SEZIONI</div>
+                                                <div class="bg-pink-50 px-2 py-1 rounded text-xs"
+                                                    x-text="pdfImportResults.results[0]?.data?.sezioni_riferimenti || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="col-span-3 border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">📷 FOTOGRAFIE</div>
+                                                <div class="bg-pink-50 px-2 py-1 rounded text-xs"
+                                                    x-text="pdfImportResults.results[0]?.data?.fotografie || '-'"></div>
+                                            </div>
+                                            <div class="col-span-3 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">📦 RIF. MATERIALI</div>
+                                                <div class="bg-pink-50 px-2 py-1 rounded text-xs"
+                                                    x-text="pdfImportResults.results[0]?.data?.riferimenti_tabelle_materiali || '-'">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- DEFINIZIONE -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">DEFINIZIONE</div>
+                                            <div class="bg-indigo-50 px-2 py-1 rounded min-h-[40px]"
+                                                x-text="pdfImportResults.results[0]?.data?.definizione || '-'"></div>
+                                        </div>
+
+                                        <!-- CRITERI DI DISTINZIONE -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">CRITERI DI DISTINZIONE</div>
+                                            <div class="bg-indigo-50 px-2 py-1 rounded min-h-[40px]"
+                                                x-text="pdfImportResults.results[0]?.data?.criteri_distinzione || '-'">
+                                            </div>
+                                        </div>
+
+                                        <!-- MODO DI FORMAZIONE -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">MODO DI FORMAZIONE</div>
+                                            <div class="bg-indigo-50 px-2 py-1 rounded"
+                                                x-text="pdfImportResults.results[0]?.data?.modo_formazione || '-'">
+                                            </div>
+                                        </div>
+
+                                        <!-- COMPONENTI -->
+                                        <div class="grid grid-cols-2 border-b border-gray-300">
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">COMPONENTI INORGANICI</div>
+                                                <div class="bg-amber-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.componenti_inorganici || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="p-2">
+                                                <div class="text-xs text-gray-500 font-bold">COMPONENTI ORGANICI</div>
+                                                <div class="bg-amber-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.componenti_organici || '-'">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- CONSISTENZA, COLORE, MISURE -->
+                                        <div class="grid grid-cols-3 border-b border-gray-300">
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">CONSISTENZA</div>
+                                                <div class="bg-teal-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.consistenza || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">COLORE</div>
+                                                <div class="bg-teal-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.colore || '-'"></div>
+                                            </div>
+                                            <div class="p-2">
+                                                <div class="text-xs text-gray-500 font-bold">MISURE</div>
+                                                <div class="bg-teal-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.misure || '-'"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- STATO CONSERVAZIONE -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">STATO DI CONSERVAZIONE</div>
                                             <div class="bg-teal-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.setacciatura || '-'">
+                                                x-text="pdfImportResults.results[0]?.data?.stato_conservazione || '-'">
+                                            </div>
+                                        </div>
+
+                                        <!-- SEQUENZA FISICA + STRATIGRAFICA -->
+                                        <div class="grid grid-cols-2 border-b border-gray-300">
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold mb-2">🔗 SEQUENZA FISICA
+                                                </div>
+                                                <div class="grid grid-cols-2 gap-1 text-xs">
+                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.uguale_a">
+                                                        <span class="font-bold">UGUALE A:</span>
+                                                        <span
+                                                            x-text="pdfImportResults.results[0]?.data?.uguale_a"></span>
+                                                    </div>
+                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.si_lega_a">
+                                                        <span class="font-bold">SI LEGA A:</span>
+                                                        <span
+                                                            x-text="pdfImportResults.results[0]?.data?.si_lega_a"></span>
+                                                    </div>
+                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.copre">
+                                                        <span class="font-bold">COPRE:</span>
+                                                        <span x-text="pdfImportResults.results[0]?.data?.copre"></span>
+                                                    </div>
+                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.coperto_da">
+                                                        <span class="font-bold">COPERTO DA:</span>
+                                                        <span
+                                                            x-text="pdfImportResults.results[0]?.data?.coperto_da"></span>
+                                                    </div>
+                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.taglia">
+                                                        <span class="font-bold">TAGLIA:</span>
+                                                        <span x-text="pdfImportResults.results[0]?.data?.taglia"></span>
+                                                    </div>
+                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.tagliato_da">
+                                                        <span class="font-bold">TAGLIATO DA:</span>
+                                                        <span
+                                                            x-text="pdfImportResults.results[0]?.data?.tagliato_da"></span>
+                                                    </div>
+                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.riempie">
+                                                        <span class="font-bold">RIEMPIE:</span>
+                                                        <span
+                                                            x-text="pdfImportResults.results[0]?.data?.riempie"></span>
+                                                    </div>
+                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.riempito_da">
+                                                        <span class="font-bold">RIEMPITO DA:</span>
+                                                        <span
+                                                            x-text="pdfImportResults.results[0]?.data?.riempito_da"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="p-2">
+                                                <div class="text-xs text-gray-500 font-bold mb-2">📋 SEQUENZA
+                                                    STRATIGRAFICA</div>
+                                                <div class="grid grid-cols-1 gap-1 text-xs">
+                                                    <div class="bg-violet-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.posteriore_a">
+                                                        <span class="font-bold">POSTERIORE A:</span>
+                                                        <span
+                                                            x-text="pdfImportResults.results[0]?.data?.posteriore_a"></span>
+                                                    </div>
+                                                    <div class="bg-violet-100 px-2 py-1 rounded flex justify-between"
+                                                        x-show="pdfImportResults.results[0]?.data?.anteriore_a">
+                                                        <span class="font-bold">ANTERIORE A:</span>
+                                                        <span
+                                                            x-text="pdfImportResults.results[0]?.data?.anteriore_a"></span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- AFFIDABILITA STRATIGRAFICA -->
-                                    <div class="border-b border-gray-300 p-2">
-                                        <div class="text-xs text-gray-500 font-bold">AFFIDABILITÀ STRATIGRAFICA
+                                    <!-- PAGINA 2: DESCRIZIONE E DATAZIONE -->
+                                    <div class="border-2 border-gray-400 rounded-lg overflow-hidden bg-white">
+                                        <div
+                                            class="bg-gradient-to-r from-green-600 to-green-800 text-white px-4 py-2 font-bold flex items-center">
+                                            <span class="text-2xl mr-3">📄</span>
+                                            SCHEDA US - Pagina 2: Descrizione e Datazione
                                         </div>
-                                        <div class="px-3 py-2 rounded font-bold text-center" :class="{
+
+                                        <!-- DESCRIZIONE -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">DESCRIZIONE</div>
+                                            <div class="bg-blue-50 px-2 py-1 rounded min-h-[80px]"
+                                                x-text="pdfImportResults.results[0]?.data?.descrizione || '-'"></div>
+                                        </div>
+
+                                        <!-- OSSERVAZIONI -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">OSSERVAZIONI</div>
+                                            <div class="bg-green-50 px-2 py-1 rounded min-h-[40px]"
+                                                x-text="pdfImportResults.results[0]?.data?.osservazioni || '-'"></div>
+                                        </div>
+
+                                        <!-- INTERPRETAZIONE -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">INTERPRETAZIONE</div>
+                                            <div class="bg-purple-50 px-2 py-1 rounded min-h-[40px]"
+                                                x-text="pdfImportResults.results[0]?.data?.interpretazione || '-'">
+                                            </div>
+                                        </div>
+
+                                        <!-- DATAZIONE, PERIODO, FASE, ATTIVITA -->
+                                        <div class="grid grid-cols-4 border-b border-gray-300">
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">DATAZIONE</div>
+                                                <div class="bg-orange-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.datazione || '-'"></div>
+                                            </div>
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">PERIODO</div>
+                                                <div class="bg-orange-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.periodo || '-'"></div>
+                                            </div>
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">FASE</div>
+                                                <div class="bg-orange-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.fase || '-'"></div>
+                                            </div>
+                                            <div class="p-2">
+                                                <div class="text-xs text-gray-500 font-bold">ATTIVITÀ</div>
+                                                <div class="bg-orange-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.attivita || '-'"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- ELEMENTI DATANTI -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">ELEMENTI DATANTI</div>
+                                            <div class="bg-yellow-50 px-2 py-1 rounded"
+                                                x-text="pdfImportResults.results[0]?.data?.elementi_datanti || '-'">
+                                            </div>
+                                        </div>
+
+                                        <!-- DATI QUANTITATIVI REPERTI -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">DATI QUANTITATIVI DEI REPERTI
+                                            </div>
+                                            <div class="bg-amber-50 px-2 py-1 rounded"
+                                                x-text="pdfImportResults.results[0]?.data?.dati_quantitativi_reperti || '-'">
+                                            </div>
+                                        </div>
+
+                                        <!-- CAMPIONATURE, FLOTTAZIONE, SETACCIATURA -->
+                                        <div class="grid grid-cols-3 border-b border-gray-300">
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">🧪 CAMPIONATURE</div>
+                                                <div class="bg-teal-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.campionature || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">🌊 FLOTTAZIONE</div>
+                                                <div class="bg-teal-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.flottazione || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="p-2">
+                                                <div class="text-xs text-gray-500 font-bold">🔬 SETACCIATURA</div>
+                                                <div class="bg-teal-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.setacciatura || '-'">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- AFFIDABILITA STRATIGRAFICA -->
+                                        <div class="border-b border-gray-300 p-2">
+                                            <div class="text-xs text-gray-500 font-bold">AFFIDABILITÀ STRATIGRAFICA
+                                            </div>
+                                            <div class="px-3 py-2 rounded font-bold text-center" :class="{
                                                      'bg-green-300 text-green-800': pdfImportResults.results[0]?.data?.affidabilita_stratigrafica === 'alta',
                                                      'bg-yellow-300 text-yellow-800': pdfImportResults.results[0]?.data?.affidabilita_stratigrafica === 'media',
                                                      'bg-red-300 text-red-800': pdfImportResults.results[0]?.data?.affidabilita_stratigrafica === 'bassa',
                                                      'bg-gray-200': !pdfImportResults.results[0]?.data?.affidabilita_stratigrafica
                                                  }"
-                                            x-text="(pdfImportResults.results[0]?.data?.affidabilita_stratigrafica || 'N/D').toUpperCase()">
+                                                x-text="(pdfImportResults.results[0]?.data?.affidabilita_stratigrafica || 'N/D').toUpperCase()">
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <!-- RESPONSABILI -->
-                                    <div class="grid grid-cols-2 border-b border-gray-300">
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">👤 RESPONSABILE SCIENTIFICO
+                                        <!-- RESPONSABILI -->
+                                        <div class="grid grid-cols-2 border-b border-gray-300">
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">👤 RESPONSABILE SCIENTIFICO
+                                                </div>
+                                                <div class="bg-indigo-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.responsabile_scientifico || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="p-2">
+                                                <div class="text-xs text-gray-500 font-bold">📅 DATA RILEVAMENTO</div>
+                                                <div class="bg-indigo-50 px-2 py-1 rounded font-mono"
+                                                    x-text="pdfImportResults.results[0]?.data?.data_rilevamento || '-'">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid grid-cols-2 border-b border-gray-300">
+                                            <div class="border-r border-gray-300 p-2">
+                                                <div class="text-xs text-gray-500 font-bold">✍️ RESPONSABILE
+                                                    COMPILAZIONE</div>
+                                                <div class="bg-indigo-50 px-2 py-1 rounded"
+                                                    x-text="pdfImportResults.results[0]?.data?.responsabile_compilazione || '-'">
+                                                </div>
+                                            </div>
+                                            <div class="p-2">
+                                                <div class="text-xs text-gray-500 font-bold">📅 DATA RIELABORAZIONE
+                                                </div>
+                                                <div class="bg-indigo-50 px-2 py-1 rounded font-mono"
+                                                    x-text="pdfImportResults.results[0]?.data?.data_rielaborazione || '-'">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="p-2">
+                                            <div class="text-xs text-gray-500 font-bold">🔄 RESPONSABILE RIELABORAZIONE
                                             </div>
                                             <div class="bg-indigo-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.responsabile_scientifico || '-'">
+                                                x-text="pdfImportResults.results[0]?.data?.responsabile_rielaborazione || '-'">
                                             </div>
-                                        </div>
-                                        <div class="p-2">
-                                            <div class="text-xs text-gray-500 font-bold">📅 DATA RILEVAMENTO</div>
-                                            <div class="bg-indigo-50 px-2 py-1 rounded font-mono"
-                                                x-text="pdfImportResults.results[0]?.data?.data_rilevamento || '-'">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="grid grid-cols-2 border-b border-gray-300">
-                                        <div class="border-r border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">✍️ RESPONSABILE
-                                                COMPILAZIONE</div>
-                                            <div class="bg-indigo-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.responsabile_compilazione || '-'">
-                                            </div>
-                                        </div>
-                                        <div class="p-2">
-                                            <div class="text-xs text-gray-500 font-bold">📅 DATA RIELABORAZIONE
-                                            </div>
-                                            <div class="bg-indigo-50 px-2 py-1 rounded font-mono"
-                                                x-text="pdfImportResults.results[0]?.data?.data_rielaborazione || '-'">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="p-2">
-                                        <div class="text-xs text-gray-500 font-bold">🔄 RESPONSABILE RIELABORAZIONE
-                                        </div>
-                                        <div class="bg-indigo-50 px-2 py-1 rounded"
-                                            x-text="pdfImportResults.results[0]?.data?.responsabile_rielaborazione || '-'">
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                    </div>
-
-                    <!-- TAB: PPStructure Output -->
-                    <div x-show="ocrDebugTab === 'ppstructure'" x-transition>
-                        <!-- Debug info -->
-                        <div class="mb-4 p-3 bg-yellow-100 text-yellow-800 rounded-lg text-sm">
-                            <strong>🔍 Debug PPStructure:</strong>
-                            Pages: <span x-text="pdfImportResults?.debug_pages?.length || 0"></span> |
-                            First page layout_json: <span
-                                x-text="pdfImportResults?.debug_pages?.[0]?.layout_json ? 'YES' : 'NO'"></span> |
-                            Tables count: <span
-                                x-text="pdfImportResults?.debug_pages?.reduce((sum, p) => sum + (p.layout_json?.tables?.length || 0), 0) || 0"></span>
                         </div>
-
-                        <template x-if="pdfImportResults?.debug_pages && pdfImportResults.debug_pages.length > 0">
-                            <div class="space-y-6">
-
-                                <template x-for="(page, pageIdx) in pdfImportResults.debug_pages" :key="pageIdx">
-                                    <div class="border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
-                                        <!-- Page Header -->
-                                        <div
-                                            class="bg-gradient-to-r from-green-600 to-teal-600 px-4 py-3 flex items-center justify-between text-white">
-                                            <div class="flex items-center">
-                                                <span
-                                                    class="bg-white text-green-700 w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3"
-                                                    x-text="page.page_number"></span>
-                                                <span class="font-medium">Pagina <span x-text="page.page_number"></span>
-                                                    - PPStructure
-                                                    Analysis</span>
-                                            </div>
-                                            <div class="flex items-center space-x-4 text-sm">
-                                                <span class="bg-green-500 px-2 py-1 rounded">
-                                                    <strong
-                                                        x-text="page.layout_json?.parsing_res_list?.length || 0"></strong>
-                                                    blocchi
-                                                </span>
-                                                <span class="bg-teal-500 px-2 py-1 rounded">
-                                                    <strong x-text="page.layout_json?.tables?.length || 0"></strong>
-                                                    tabelle
-                                                </span>
-                                                <span class="bg-blue-500 px-2 py-1 rounded">
-                                                    <strong
-                                                        x-text="page.layout_json?.overall_ocr_res?.rec_texts?.length || 0"></strong>
-                                                    testi OCR
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <!-- Content Grid -->
-                                        <div class="grid md:grid-cols-2 gap-4 p-4">
-                                            <!-- LEFT: Layout Blocks -->
-                                            <div
-                                                class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 overflow-auto max-h-[400px]">
-                                                <h4 class="font-bold text-sm mb-3 flex items-center">
-                                                    <span class="text-lg mr-2">📐</span>
-                                                    Layout Blocks (parsing_res_list)
-                                                </h4>
-                                                <template x-if="page.layout_json?.parsing_res_list?.length > 0">
-                                                    <div class="space-y-2">
-                                                        <template
-                                                            x-for="(block, idx) in page.layout_json.parsing_res_list"
-                                                            :key="idx">
-                                                            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm border-l-4"
-                                                                :class="{
-                                                                        'border-blue-500': block.block_label === 'text',
-                                                                        'border-green-500': block.block_label === 'table',
-                                                                        'border-yellow-500': block.block_label === 'title',
-                                                                        'border-purple-500': block.block_label === 'figure',
-                                                                        'border-gray-400': !['text', 'table', 'title', 'figure'].includes(block.block_label)
-                                                                    }">
-                                                                <div class="flex justify-between items-center mb-1">
-                                                                    <span
-                                                                        class="text-xs font-bold uppercase px-2 py-0.5 rounded"
-                                                                        :class="{
-                                                                                'bg-blue-100 text-blue-700': block.block_label === 'text',
-                                                                                'bg-green-100 text-green-700': block.block_label === 'table',
-                                                                                'bg-yellow-100 text-yellow-700': block.block_label === 'title',
-                                                                                'bg-purple-100 text-purple-700': block.block_label === 'figure',
-                                                                                'bg-gray-100 text-gray-700': !['text', 'table', 'title', 'figure'].includes(block.block_label)
-                                                                            }"
-                                                                        x-text="block.block_label || 'unknown'"></span>
-                                                                    <span class="text-xs text-gray-500"
-                                                                        x-text="'#' + block.block_id"></span>
-                                                                </div>
-                                                                <p class="text-xs text-gray-600 dark:text-gray-400 line-clamp-3"
-                                                                    x-text="(block.block_content || '').substring(0, 150) + ((block.block_content || '').length > 150 ? '...' : '')">
-                                                                </p>
-                                                            </div>
-                                                        </template>
-                                                    </div>
-                                                </template>
-                                                <template x-if="!page.layout_json?.parsing_res_list?.length">
-                                                    <div class="text-center text-gray-400 py-8">
-                                                        <span class="text-2xl">📭</span>
-                                                        <p class="mt-2">Nessun blocco layout trovato</p>
-                                                    </div>
-                                                </template>
-                                            </div>
-
-                                            <!-- RIGHT: Tables -->
-                                            <div
-                                                class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 overflow-auto max-h-[400px]">
-                                                <h4 class="font-bold text-sm mb-3 flex items-center">
-                                                    <span class="text-lg mr-2">📊</span>
-                                                    Tabelle Rilevate
-                                                </h4>
-                                                <template x-if="page.layout_json?.tables?.length > 0">
-                                                    <div class="space-y-4">
-                                                        <template x-for="(table, tIdx) in page.layout_json.tables"
-                                                            :key="tIdx">
-                                                            <div
-                                                                class="bg-white dark:bg-gray-800 rounded-lg p-3 shadow-sm">
-                                                                <div class="flex justify-between items-center mb-2">
-                                                                    <span class="font-bold text-sm">Tabella <span
-                                                                            x-text="tIdx + 1"></span></span>
-                                                                    <div class="flex space-x-2 text-xs">
-                                                                        <span
-                                                                            class="bg-green-100 text-green-700 px-2 py-0.5 rounded"
-                                                                            x-text="(table.cell_box_list?.length || 0) + ' celle'"></span>
-                                                                        <span
-                                                                            class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded"
-                                                                            x-text="(table.table_ocr_pred?.rec_texts?.length || 0) + ' testi'"></span>
-                                                                    </div>
-                                                                </div>
-
-                                                                <!-- HTML Preview -->
-                                                                <template x-if="table.pred_html">
-                                                                    <div class="mt-2">
-                                                                        <div
-                                                                            class="text-xs text-gray-500 mb-1 flex justify-between">
-                                                                            <span>HTML Preview:</span>
-                                                                            <span
-                                                                                x-text="table.pred_html?.length + ' chars'"></span>
-                                                                        </div>
-                                                                        <div class="bg-gray-100 dark:bg-gray-900 rounded p-2 overflow-auto max-h-[150px] text-xs table-preview"
-                                                                            x-html="table.pred_html"></div>
-                                                                    </div>
-                                                                </template>
-
-                                                                <!-- OCR Texts -->
-                                                                <template
-                                                                    x-if="table.table_ocr_pred?.rec_texts?.length > 0">
-                                                                    <div class="mt-2">
-                                                                        <div class="text-xs text-gray-500 mb-1">
-                                                                            Testi OCR celle:</div>
-                                                                        <div class="flex flex-wrap gap-1">
-                                                                            <template
-                                                                                x-for="(txt, i) in table.table_ocr_pred.rec_texts.slice(0, 10)"
-                                                                                :key="i">
-                                                                                <span
-                                                                                    class="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded"
-                                                                                    x-text="txt.substring(0, 20) + (txt.length > 20 ? '...' : '')"></span>
-                                                                            </template>
-                                                                            <span
-                                                                                x-show="table.table_ocr_pred.rec_texts.length > 10"
-                                                                                class="text-xs text-gray-500"
-                                                                                x-text="'... +' + (table.table_ocr_pred.rec_texts.length - 10) + ' altri'"></span>
-                                                                        </div>
-                                                                    </div>
-                                                                </template>
-                                                            </div>
-                                                        </template>
-                                                    </div>
-                                                </template>
-                                                <template x-if="!page.layout_json?.tables?.length">
-                                                    <div class="text-center text-gray-400 py-8">
-                                                        <span class="text-2xl">📭</span>
-                                                        <p class="mt-2">Nessuna tabella trovata</p>
-                                                    </div>
-                                                </template>
-                                            </div>
-                                        </div>
-
-                                        <!-- Footer: Raw JSON Preview -->
-                                        <div
-                                            class="bg-gray-100 dark:bg-gray-800 px-4 py-2 border-t border-gray-200 dark:border-gray-700">
-                                            <details class="text-xs">
-                                                <summary
-                                                    class="cursor-pointer text-gray-600 dark:text-gray-400 hover:text-gray-900">
-                                                    📋 Raw JSON (click to expand)
-                                                </summary>
-                                                <pre class="mt-2 p-2 bg-gray-900 text-green-400 rounded overflow-auto max-h-[200px] text-xs"
-                                                    x-text="JSON.stringify(page.layout_json, null, 2)"></pre>
-                                            </details>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                        <template x-if="!pdfImportResults?.debug_pages || pdfImportResults.debug_pages.length === 0">
-                            <div class="text-center py-12 text-gray-500">
-                                <span class="text-4xl">📭</span>
-                                <p class="mt-2">Nessun dato PPStructure disponibile</p>
-                                <p class="text-sm mt-1">Esegui l'OCR di un PDF per vedere i dati di analisi layout
-                                </p>
-                            </div>
-                        </template>
                     </div>
+                </div>
+            </div>
 
+            <!-- Legend -->
+            <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <h4 class="font-medium mb-2">🎨 Legenda Colori</h4>
+                <div class="grid grid-cols-4 gap-2 text-xs">
+                    <div class="flex items-center"><span class="w-4 h-4 bg-yellow-200 rounded mr-2"></span>US Code</div>
+                    <div class="flex items-center"><span
+                            class="w-4 h-4 bg-orange-100 rounded mr-2"></span>Localizzazione
+                    </div>
+                    <div class="flex items-center"><span
+                            class="w-4 h-4 bg-purple-100 rounded mr-2"></span>Posizionamento
+                    </div>
+                    <div class="flex items-center"><span class="w-4 h-4 bg-indigo-100 rounded mr-2"></span>Definizione
+                    </div>
+                    <div class="flex items-center"><span class="w-4 h-4 bg-teal-100 rounded mr-2"></span>Proprietà
+                        fisiche
+                    </div>
+                    <div class="flex items-center"><span class="w-4 h-4 bg-rose-100 rounded mr-2"></span>Sequenza fisica
+                    </div>
+                    <div class="flex items-center"><span class="w-4 h-4 bg-pink-100 rounded mr-2"></span>Documentazione
+                    </div>
+                    <div class="flex items-center"><span class="w-4 h-4 bg-violet-100 rounded mr-2"></span>Cronologia
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
+        </template>
 
-    <!-- Legend -->
-
-    <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-        <h4 class="font-medium mb-2">🎨 Legenda Colori</h4>
-        <div class="grid grid-cols-4 gap-2 text-xs">
-            <div class="flex items-center"><span class="w-4 h-4 bg-yellow-200 rounded mr-2"></span>US Code</div>
-            <div class="flex items-center"><span class="w-4 h-4 bg-orange-100 rounded mr-2"></span>Localizzazione
+        <template x-if="!pdfImportResults?.results || pdfImportResults.results.length === 0">
+            <div class="text-center py-12 text-gray-500">
+                <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                    </path>
+                </svg>
+                <p>Nessun risultato OCR disponibile</p>
+                <p class="text-sm mt-2">Carica un PDF per vedere l'overlay</p>
             </div>
-            <div class="flex items-center"><span class="w-4 h-4 bg-purple-100 rounded mr-2"></span>Posizionamento
-            </div>
-            <div class="flex items-center"><span class="w-4 h-4 bg-indigo-100 rounded mr-2"></span>Definizione
-            </div>
-            <div class="flex items-center"><span class="w-4 h-4 bg-teal-100 rounded mr-2"></span>Proprietà
-                fisiche
-            </div>
-            <div class="flex items-center"><span class="w-4 h-4 bg-rose-100 rounded mr-2"></span>Sequenza fisica
-            </div>
-            <div class="flex items-center"><span class="w-4 h-4 bg-pink-100 rounded mr-2"></span>Documentazione
-            </div>
-            <div class="flex items-center"><span class="w-4 h-4 bg-violet-100 rounded mr-2"></span>Cronologia
-            </div>
-        </div>
+        </template>
     </div>
-</div>
-</template>
-
-<template x-if="!pdfImportResults?.results || pdfImportResults.results.length === 0">
-    <div class="text-center py-12 text-gray-500">
-        <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-            </path>
-        </svg>
-        <p>Nessun risultato OCR disponibile</p>
-        <p class="text-sm mt-2">Carica un PDF per vedere l'overlay</p>
-    </div>
-</template>
-</div>
 
 </div>
 </div>
