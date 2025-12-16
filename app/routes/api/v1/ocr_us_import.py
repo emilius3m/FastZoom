@@ -72,6 +72,9 @@ class OCRPageDebug(BaseModel):
     bounding_boxes: List[Dict[str, Any]] = []
     word_count: int = 0
     avg_confidence: float = 0.0
+    page_size: Optional[tuple] = None
+    # PPStructureV3 layout analysis output
+    layout_json: Optional[Dict[str, Any]] = None
 
 
 class OCRBatchResult(BaseModel):
@@ -173,7 +176,7 @@ async def get_ocr_status():
         available = PADDLE_OCR_AVAILABLE and PDF2IMAGE_AVAILABLE
         
         if available:
-            message = "Servizio OCR disponibile"
+            message = "Servizio OCR disponibile (PPStructure mode)"
         elif not PADDLE_OCR_AVAILABLE:
             message = "PaddleOCR non installato. Installa con: pip install paddleocr"
         elif not PDF2IMAGE_AVAILABLE:
@@ -204,7 +207,7 @@ async def get_ocr_status():
     "/sites/{site_id}/ocr/extract",
     response_model=OCRBatchResult,
     summary="Estrai schede US da PDF",
-    description="Estrae schede US da un PDF utilizzando PaddleOCR"
+    description="Estrae schede US da un PDF utilizzando PPStructure per analisi layout"
 )
 async def extract_us_from_pdf(
     site_id: UUID,
@@ -215,10 +218,10 @@ async def extract_us_from_pdf(
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
-    Estrae schede US da un file PDF utilizzando il servizio PaddleOCR.
+    Estrae schede US da un file PDF utilizzando PPStructure.
     
-    Il PDF viene analizzato pagina per pagina e per ogni pagina viene 
-    tentata l'estrazione di una scheda US secondo standard MiC 2021.
+    Il PDF viene analizzato pagina per pagina e i dati vengono estratti
+    secondo lo standard MiC 2021 usando PPStructure per l'analisi del layout.
     
     Returns:
         OCRBatchResult con i risultati dell'estrazione
@@ -264,20 +267,19 @@ async def extract_us_from_pdf(
         # Inizializza servizio OCR
         service = get_paddle_ocr_service(use_gpu=use_gpu)
         
-        # Estrai singola US da PDF combinando tutte le pagine + debug data
+        # Usa PPStructure layout parser
         extraction_result = await service.extract_from_pdf_combined(
             pdf_bytes=pdf_bytes,
             filename=file.filename,
             site_id=str(site_id),
             include_debug=True
         )
+        us_data = extraction_result.get('us_data')
+        debug_info = extraction_result.get('debug', {})
         
         # Build result
         results = []
         debug_pages = []
-        
-        us_data = extraction_result.get('us_data')
-        debug_info = extraction_result.get('debug', {})
         
         if us_data:
             validation = service.validate_extraction_result(us_data)
@@ -300,8 +302,11 @@ async def extract_us_from_pdf(
                 text_lines=page_data.get('text_lines', []),
                 bounding_boxes=page_data.get('bounding_boxes', []),
                 word_count=page_data.get('word_count', 0),
-                avg_confidence=page_data.get('avg_confidence', 0.0)
+                avg_confidence=page_data.get('avg_confidence', 0.0),
+                page_size=page_data.get('page_size'),
+                layout_json=page_data.get('layout_json')
             ))
+
         
         processing_time = time.time() - start_time
         total_pages = len(debug_pages) if debug_pages else 1

@@ -37,6 +37,18 @@ except ImportError:
     PADDLE_OCR_AVAILABLE = False
     logger.warning("PaddleOCR non disponibile. Installa con: pip install paddleocr")
 
+# Import PPStructure per table recognition (nuovo API: PPStructureV3)
+try:
+    from paddleocr import PPStructureV3 as PPStructure
+    PP_STRUCTURE_AVAILABLE = True
+except ImportError:
+    try:
+        from paddleocr import PPStructure
+        PP_STRUCTURE_AVAILABLE = True
+    except ImportError:
+        PP_STRUCTURE_AVAILABLE = False
+        logger.warning("PPStructure non disponibile per table recognition")
+
 # Import PyMuPDF per conversione PDF
 try:
     import fitz  # PyMuPDF
@@ -66,6 +78,10 @@ class PaddleOCRService:
         # Inizializza il modello PaddleOCR (lazy loading)
         self.ocr_model = None
         self._model_loaded = False
+        
+        # PPStructure per table detection (lazy loading)
+        self._table_engine = None
+        self._table_engine_loaded = False
         
         device_name = "GPU" if self.use_gpu else "CPU"
         logger.info(f"PaddleOCRService initialized (Device: {device_name}, Languages: {self.languages})")
@@ -100,6 +116,208 @@ class PaddleOCRService:
             except Exception as e:
                 logger.error(f"Error loading PaddleOCR model: {e}")
                 raise
+    
+    def _ensure_table_engine_loaded(self):
+        """Carica PPStructureV3 per document structure analysis al primo utilizzo."""
+        if not PP_STRUCTURE_AVAILABLE:
+            logger.warning("PPStructureV3 non disponibile per document analysis")
+            return False
+        
+        if self._table_engine is None:
+            device_mode = "GPU" if self.use_gpu else "CPU"
+            logger.info(f"Loading PPStructureV3 pipeline ({device_mode})...")
+            
+            try:
+                # PPStructureV3 API corretta secondo documentazione ufficiale:
+                # https://www.paddleocr.ai/latest/en/version3.x/pipeline_usage/PP-StructureV3.html
+                device = "gpu" if self.use_gpu else "cpu"
+                self._table_engine = PPStructure(
+                    device=device,
+                    use_doc_orientation_classify=True,  # Abilita classificazione orientamento
+                    use_doc_unwarping=False,            # Disabilita unwarping per velocità
+                    use_textline_orientation=False      # Disabilita orientamento righe testo
+                )
+                self._table_engine_loaded = True
+                logger.info(f"PPStructureV3 pipeline loaded successfully ({device_mode})")
+                return True
+            except Exception as e:
+                logger.error(f"Error loading PPStructureV3: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                return False
+        return True
+
+    
+    def analyze_page_structure(self, image: np.ndarray) -> Dict[str, Any]:
+        """
+        Analizza la struttura della pagina usando PPStructureV3.
+        Restituisce l'output JSON completo con layout, tabelle e testo.
+        
+        Args:
+            image: numpy array BGR (da OpenCV)
+            
+        Returns:
+            Dict con struttura completa della pagina secondo API PPStructureV3:
+            {
+                'parsing_res_list': [...],  # Elementi layout con block_label, block_content, block_bbox
+                'tables': [...],            # Tabelle con pred_html, cell_box_list, table_ocr_pred
+                'overall_ocr_res': {...},   # Risultati OCR globali: rec_texts, rec_polys, rec_scores
+                'raw_json': {...}           # Output JSON completo da res.json
+            }
+        """
+        if not self._ensure_table_engine_loaded():
+            return {'parsing_res_list': [], 'tables': [], 'overall_ocr_res': {}, 'raw_json': {}}
+        
+        try:
+            # Esegui PPStructureV3 sulla pagina
+            # predict() restituisce un generatore, convertiamo in lista
+            results = list(self._table_engine.predict(image))
+            
+            if not results:
+                logger.warning("PPStructureV3 returned empty results")
+                return {'parsing_res_list': [], 'tables': [], 'overall_ocr_res': {}, 'raw_json': {}}
+            
+            # Prendi il primo risultato (per immagine singola)
+            res = results[0]
+            
+            # Estrai dati strutturati secondo API PPStructureV3
+            output = {
+                'parsing_res_list': [],
+                'tables': [],
+                'overall_ocr_res': {},
+                'raw_json': {}
+            }
+            
+            # Estrai JSON completo tramite attributo .json
+            if hasattr(res, 'json'):
+                raw_json = res.json
+                output['raw_json'] = raw_json if isinstance(raw_json, dict) else {}
+                logger.info(f"PPStructureV3 raw_json keys: {list(output['raw_json'].keys())[:10]}")
+                
+                # DEBUG: Log attributi disponibili sul risultato
+                res_attrs = [attr for attr in dir(res) if not attr.startswith('_')]
+                logger.info(f"PPStructureV3 result attributes: {res_attrs[:15]}")
+            
+            # Estrai parsing_res_list (layout blocks con contenuto)
+            parsing_res_list = None
+            if hasattr(res, 'parsing_res_list') and res.parsing_res_list:
+                parsing_res_list = res.parsing_res_list
+            elif output['raw_json'].get('res') and isinstance(output['raw_json']['res'], dict):
+                # Fallback: estrai da raw_json['res']
+                parsing_res_list = output['raw_json']['res'].get('parsing_res_list', [])
+            
+            if parsing_res_list:
+                for block in parsing_res_list:
+                    if isinstance(block, dict):
+                        block_bbox = block.get('block_bbox')
+                        if block_bbox is not None:
+                            if hasattr(block_bbox, 'tolist'):
+                                block_bbox = block_bbox.tolist()
+                            else:
+                                block_bbox = list(block_bbox) if block_bbox else []
+                        
+                        output['parsing_res_list'].append({
+                            'block_label': block.get('block_label', ''),
+                            'block_content': block.get('block_content', ''),
+                            'block_bbox': block_bbox,
+                            'block_id': block.get('block_id', 0),
+                            'block_order': block.get('block_order')
+                        })
+                logger.info(f"PPStructureV3 found {len(output['parsing_res_list'])} layout blocks")
+            
+            # Estrai tabelle tramite table_res_list
+            table_res_list = None
+            if hasattr(res, 'table_res_list') and res.table_res_list:
+                table_res_list = res.table_res_list
+            elif output['raw_json'].get('res') and isinstance(output['raw_json']['res'], dict):
+                # Fallback: estrai da raw_json['res']
+                table_res_list = output['raw_json']['res'].get('table_res_list', [])
+            
+            if table_res_list:
+                for table in table_res_list:
+                    if isinstance(table, dict):
+                        table_data = {
+                            'pred_html': table.get('pred_html', ''),
+                            'cell_box_list': [],
+                            'table_ocr_pred': {}
+                        }
+                        
+                        # Estrai celle
+                        cell_boxes = table.get('cell_box_list', [])
+                        for cell_box in cell_boxes:
+                            if hasattr(cell_box, 'tolist'):
+                                table_data['cell_box_list'].append(cell_box.tolist())
+                            elif cell_box is not None:
+                                table_data['cell_box_list'].append(list(cell_box))
+                        
+                        # Estrai OCR delle celle
+                        table_ocr = table.get('table_ocr_pred', {})
+                        if isinstance(table_ocr, dict):
+                            table_data['table_ocr_pred'] = {
+                                'rec_texts': list(table_ocr.get('rec_texts', [])) if table_ocr.get('rec_texts') else [],
+                                'rec_scores': [float(s) for s in table_ocr.get('rec_scores', [])] if table_ocr.get('rec_scores') else [],
+                                'rec_polys': [p.tolist() if hasattr(p, 'tolist') else list(p) for p in table_ocr.get('rec_polys', [])] if table_ocr.get('rec_polys') else []
+                            }
+                        
+                        output['tables'].append(table_data)
+                        logger.info(f"Table found: {len(table_data['cell_box_list'])} cells, HTML len: {len(table_data['pred_html'])}")
+            
+            # Estrai OCR globale tramite overall_ocr_res
+            overall_ocr_res = None
+            if hasattr(res, 'overall_ocr_res') and res.overall_ocr_res:
+                overall_ocr_res = res.overall_ocr_res
+            elif output['raw_json'].get('res') and isinstance(output['raw_json']['res'], dict):
+                # Fallback: estrai da raw_json['res']
+                overall_ocr_res = output['raw_json']['res'].get('overall_ocr_res', {})
+            
+            if overall_ocr_res and isinstance(overall_ocr_res, dict):
+                output['overall_ocr_res'] = {
+                    'rec_texts': list(overall_ocr_res.get('rec_texts', [])) if overall_ocr_res.get('rec_texts') else [],
+                    'rec_scores': [float(s) for s in overall_ocr_res.get('rec_scores', [])] if overall_ocr_res.get('rec_scores') else [],
+                    'rec_polys': [p.tolist() if hasattr(p, 'tolist') else list(p) for p in overall_ocr_res.get('rec_polys', [])] if overall_ocr_res.get('rec_polys') else []
+                }
+                logger.info(f"OCR found {len(output['overall_ocr_res']['rec_texts'])} text regions")
+            
+            logger.info(f"PPStructureV3 analysis complete: {len(output['parsing_res_list'])} blocks, {len(output['tables'])} tables")
+            
+            return output
+
+            
+        except Exception as e:
+            logger.error(f"Error in PPStructureV3 page analysis: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {'parsing_res_list': [], 'tables': [], 'overall_ocr_res': {}, 'raw_json': {}}
+
+    
+    def detect_table_structure(self, image: np.ndarray) -> List[Dict[str, Any]]:
+        """
+        Rileva la struttura delle tabelle nell'immagine usando PPStructure.
+        Wrapper per retrocompatibilità - usa analyze_page_structure internamente.
+        
+        Args:
+            image: numpy array BGR (da OpenCV)
+            
+        Returns:
+            Lista di celle con coordinate {x1, y1, x2, y2, cell_index}
+        """
+        page_struct = self.analyze_page_structure(image)
+        cells = []
+        
+        for table in page_struct.get('tables', []):
+            for i, cell_box in enumerate(table.get('cell_box_list', [])):
+                if len(cell_box) >= 4:
+                    cells.append({
+                        'x1': float(cell_box[0]),
+                        'y1': float(cell_box[1]),
+                        'x2': float(cell_box[2]),
+                        'y2': float(cell_box[3]),
+                        'cell_index': i
+                    })
+        
+        return cells
+
+
     
     def preprocess_image(self, image: Image.Image) -> np.ndarray:
         """
@@ -496,6 +714,10 @@ class PaddleOCRService:
                 
                 all_page_texts.extend(page_texts)
                 
+                # --- PPStructure LAYOUT ANALYSIS ---
+                # Esegui PPStructure per ottenere JSON struttura pagina
+                page_structure = self.analyze_page_structure(processed_cv)
+                
                 # Include debug data with CLEAN image (boxes rendered as SVG overlay in frontend)
                 if include_debug:
                     # Convert clean image to base64 (no boxes drawn - interactive SVG overlay in frontend)
@@ -509,10 +731,19 @@ class PaddleOCRService:
                         'bounding_boxes': page_boxes,
                         'word_count': len(page_texts),
                         'avg_confidence': sum(page_confidences)/len(page_confidences) if page_confidences else 0,
-                        'page_size': (pix.width, pix.height)  # Store page size for layout parser
+                        'page_size': (pix.width, pix.height),  # Store page size for layout parser
+                        # PPStructureV3 JSON output per pagina
+                        'layout_json': {
+                            'parsing_res_list': page_structure.get('parsing_res_list', []),
+                            'tables': page_structure.get('tables', []),
+                            'overall_ocr_res': page_structure.get('overall_ocr_res', {}),
+                            'raw_json': page_structure.get('raw_json', {})
+                        }
                     })
                 
-                logger.info(f"Page {page_num + 1}: extracted {len(page_texts)} text blocks")
+                logger.info(f"Page {page_num + 1}: extracted {len(page_texts)} text blocks, {len(page_structure.get('parsing_res_list', []))} layout blocks")
+
+
             
             pdf_document.close()
             
@@ -555,54 +786,85 @@ class PaddleOCRService:
                 total_height += page_h
             
             # --- TABLE GRID DETECTION ---
-            # Rileva la griglia della tabella dalla prima pagina per migliorare l'estrazione
-            grid_detector = get_table_grid_detector()
-            detected_cells = []
+            # Usa l'output layout_json già calcolato da PPStructure per ogni pagina
+            # Raccogli tutte le celle dalle tabelle trovate
+            all_pp_cells = []
+            all_tables_html = []
             
-            try:
-                if result['debug']['pages']:
-                    # Usa la prima pagina per rilevare la struttura della tabella
-                    first_page = result['debug']['pages'][0]
-                    first_page_img_b64 = first_page.get('image_base64', '')
+            for page_info in result['debug']['pages']:
+                layout_json = page_info.get('layout_json', {})
+                tables = layout_json.get('tables', [])
+                
+                for table in tables:
+                    # Salva HTML tabella per debug (PPStructureV3 usa pred_html)
+                    if table.get('pred_html'):
+                        all_tables_html.append(table['pred_html'])
                     
-                    if first_page_img_b64:
-                        # Decodifica l'immagine base64
-                        import base64
-                        img_data = first_page_img_b64.split(',')[1] if ',' in first_page_img_b64 else first_page_img_b64
-                        img_bytes = base64.b64decode(img_data)
-                        img_array = np.frombuffer(img_bytes, np.uint8)
-                        page_image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-                        
-                        if page_image is not None:
-                            detected_cells, debug_grid_img = grid_detector.detect_grid(page_image, debug=include_debug)
-                            logger.info(f"Grid detection: found {len(detected_cells)} cells")
-                            
-                            # Associa il testo OCR alle celle rilevate
-                            if detected_cells:
-                                first_page_boxes = first_page.get('bounding_boxes', [])
-                                cell_contents = grid_detector.associate_text_to_cells(detected_cells, first_page_boxes)
-                                
-                                # Aggiungi info celle al debug
-                                result['debug']['grid_cells'] = [
-                                    {
-                                        'row': c.row, 'col': c.col,
-                                        'x1': c.x1, 'y1': c.y1, 'x2': c.x2, 'y2': c.y2,
-                                        'text': grid_detector.get_cell_text(cell_contents, i)
-                                    }
-                                    for i, c in enumerate(detected_cells)
-                                ]
-                                logger.info(f"Associated text to {sum(1 for c in cell_contents.values() if c)} cells")
-            except Exception as e:
-                logger.warning(f"Grid detection failed (falling back to label-based): {e}")
-                detected_cells = []
+                    # Estrai celle (PPStructureV3 usa cell_box_list)
+                    for i, cell_box in enumerate(table.get('cell_box_list', [])):
+                        if len(cell_box) >= 4:
+                            all_pp_cells.append({
+                                'x1': float(cell_box[0]),
+                                'y1': float(cell_box[1]),
+                                'x2': float(cell_box[2]),
+                                'y2': float(cell_box[3]),
+                                'cell_index': i
+                            })
+
             
-            # Use layout parser for core fields (with optional cell grid info)
+            if all_pp_cells:
+                logger.info(f"PPStructure extracted {len(all_pp_cells)} cells from {len(all_tables_html)} tables")
+                result['debug']['table_detection_method'] = 'ppstructure'
+                result['debug']['pp_structure_cells'] = all_pp_cells
+                result['debug']['tables_html'] = all_tables_html
+            else:
+                # FALLBACK: Grid detector Hough-based se PPStructure non trova tabelle
+                logger.info("PPStructure found no tables, falling back to Hough grid detector")
+                try:
+                    if result['debug']['pages']:
+                        first_page = result['debug']['pages'][0]
+                        first_page_img_b64 = first_page.get('image_base64', '')
+                        
+                        if first_page_img_b64:
+                            img_data = first_page_img_b64.split(',')[1] if ',' in first_page_img_b64 else first_page_img_b64
+                            img_bytes = base64.b64decode(img_data)
+                            img_array = np.frombuffer(img_bytes, np.uint8)
+                            page_image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                            
+                            if page_image is not None:
+                                from app.services.table_grid_detector import get_table_grid_detector
+                                grid_detector = get_table_grid_detector()
+                                detected_cells, debug_grid_img = grid_detector.detect_grid(page_image, debug=include_debug)
+                                logger.info(f"Grid detection: found {len(detected_cells)} cells")
+                                result['debug']['table_detection_method'] = 'hough_grid'
+                                
+                                if detected_cells:
+                                    first_page_boxes = first_page.get('bounding_boxes', [])
+                                    cell_contents = grid_detector.associate_text_to_cells(detected_cells, first_page_boxes)
+                                    result['debug']['grid_cells'] = [
+                                        {
+                                            'row': c.row, 'col': c.col,
+                                            'x1': c.x1, 'y1': c.y1, 'x2': c.x2, 'y2': c.y2,
+                                            'text': grid_detector.get_cell_text(cell_contents, i)
+                                        }
+                                        for i, c in enumerate(detected_cells)
+                                    ]
+                                    all_pp_cells = result['debug']['grid_cells']
+                except Exception as e:
+                    logger.warning(f"Grid detection fallback failed: {e}")
+            
+            # Collect cells for layout parser
+            cells_for_parser = all_pp_cells
+            
+            # Use layout parser for core fields (with PPStructure cell grid info)
             layout_parser = get_us_layout_parser()
             us_data = layout_parser.parse_core(
                 all_boxes,
                 site_id=site_id,
-                page_size=(max_width, total_height)
+                page_size=(max_width, total_height),
+                detected_cells=cells_for_parser
             )
+
             
             # Always run text parser to fill non-core fields
             # Layout parser handles: us_code, area_edificio, ambiente, quote, tipo (checkbox)

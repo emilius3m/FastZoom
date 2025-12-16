@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from loguru import logger
+
+
 
 @dataclass(frozen=True)
 class Rect:
@@ -196,14 +199,22 @@ class USLayoutParser:
         *,
         site_id: str,
         page_size: Tuple[int, int],
+        detected_cells: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         items: lista come prodotta dal PaddleOCRService.bounding_boxes:
                [{'text': str, 'confidence': float, 'polygon': [[x,y]...]}]
         page_size: (width, height) dell'immagine renderizzata.
+        detected_cells: celle rilevate da PPStructure (opzionale)
+                       [{'x1': float, 'y1': float, 'x2': float, 'y2': float}]
         """
         tokens = self._to_tokens(items)
         w, h = page_size
+        
+        # Store detected cells for use in extraction methods
+        self._detected_cells = detected_cells or []
+        if self._detected_cells:
+            logger.info(f"Using {len(self._detected_cells)} PPStructure cells for extraction")
 
         # Trova label rect per campo
         label_rects: Dict[str, Rect] = {}
@@ -527,6 +538,70 @@ class USLayoutParser:
 
         return Rect(label_rect.x1, label_rect.y1, right, bottom)
 
+    def _find_cell_for_label(self, label_rect: Rect) -> Optional[Dict[str, Any]]:
+        """
+        Trova la cella PPStructure che contiene la label.
+        Restituisce la cella come dict {x1, y1, x2, y2} o None.
+        """
+        if not self._detected_cells:
+            return None
+        
+        label_center_x = label_rect.cx
+        label_center_y = label_rect.cy
+        
+        for cell in self._detected_cells:
+            x1, y1 = cell.get('x1', 0), cell.get('y1', 0)
+            x2, y2 = cell.get('x2', 0), cell.get('y2', 0)
+            
+            # La label è dentro la cella?
+            if x1 <= label_center_x <= x2 and y1 <= label_center_y <= y2:
+                return cell
+        
+        return None
+
+    def _extract_from_ppstructure_cell(
+        self,
+        tokens: List[Dict[str, Any]],
+        label_rect: Rect,
+    ) -> Optional[str]:
+        """
+        Estrae valore usando le celle rilevate da PPStructure.
+        Cerca token sotto la label ma nella stessa cella.
+        """
+        cell = self._find_cell_for_label(label_rect)
+        if not cell:
+            return None
+        
+        cell_rect = Rect(
+            cell['x1'], cell['y1'],
+            cell['x2'], cell['y2']
+        )
+        
+        # Cerca token sotto la label ma dentro la cella
+        value_tokens = []
+        for t in tokens:
+            tok_rect = t["rect"]
+            
+            # Deve essere sotto la label
+            if tok_rect.cy <= label_rect.y2:
+                continue
+            
+            # Deve essere nella cella
+            if not cell_rect.contains_point(tok_rect.cx, tok_rect.cy):
+                continue
+            
+            # Escludi altre label
+            if self._is_probably_label(t["norm"]):
+                continue
+            
+            value_tokens.append(t)
+        
+        if value_tokens:
+            value_tokens.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
+            return self._join_tokens(value_tokens).strip()
+        
+        return None
+
     def _extract_value_in_cell(
         self,
         tokens: List[Dict[str, Any]],
@@ -538,12 +613,19 @@ class USLayoutParser:
     ) -> Optional[str]:
         """
         Estrae il valore da una cella definita dalla label e dalle label vicine.
-        La cella è: left=label.x1, top=label.y2, right=next_label_right, bottom=next_label_below
+        PRIMA prova con celle PPStructure (più precise), poi fallback a euristico.
         """
         label_rect = label_rects.get(label_key)
         if not label_rect:
             return None
 
+        # PRIMO TENTATIVO: usa celle PPStructure se disponibili
+        if self._detected_cells:
+            pp_result = self._extract_from_ppstructure_cell(tokens, label_rect)
+            if pp_result:
+                return pp_result
+
+        # FALLBACK: usa metodo euristico basato su label vicine
         cell = self._cell_rect_from_label(label_rect, label_rects, page_w=page_w, page_h=page_h)
 
         # Regione valore = cella meno la "striscia" della label (valore tipicamente sotto/a destra)

@@ -248,6 +248,8 @@
             showPdfImportModal: false,
             pdfImportResults: null,
             pdfImportError: null,
+            ocrDebugTab: 'result',  // Tab state for OCR debug viewer
+
 
             // ===== CANVAS HELPER FUNCTIONS FOR OCR DEBUG VIEWER =====
             initCanvas(canvas, img, page, hoveredBoxIdx) {
@@ -2201,7 +2203,7 @@
 
                     console.log(`Uploading PDF for OCR extraction (${deviceMode}):`, file.name);
 
-                    // Add use_gpu query parameter
+                    // Add use_gpu query parameter for PPStructure OCR
                     const apiUrl = `/api/v1/ocr/sites/${this.currentSiteId}/ocr/extract?use_gpu=${useGpu}`;
 
                     const response = await fetch(apiUrl, {
