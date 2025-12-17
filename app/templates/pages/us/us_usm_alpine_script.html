@@ -366,7 +366,18 @@
             onFieldFocus(fieldName) {
                 this.highlightedField = fieldName;
 
-                // Find which page contains this field
+                // Check if we have bbox data for this field from backend
+                const currentResult = this.pdfImportResults?.results?.[this.selectedResultIndex];
+                const fieldBboxes = currentResult?.data?._field_bboxes;
+
+                if (fieldBboxes && fieldBboxes[fieldName]) {
+                    // Use precise value bbox from backend
+                    const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx || 0];
+                    this.redrawRevisionCanvasWithBbox('revision_ocr_canvas', page, fieldBboxes[fieldName]);
+                    return;
+                }
+
+                // Fallback: Find which page contains this field's label
                 const pages = this.pdfImportResults?.debug_pages || [];
                 let foundPageIdx = -1;
 
@@ -385,7 +396,7 @@
                     return;
                 }
 
-                // If on same page, highlight immediately
+                // If on same page, highlight immediately (using label-based fallback)
                 const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx || 0];
                 this.redrawRevisionCanvas('revision_ocr_canvas', page, fieldName);
             },
@@ -588,6 +599,37 @@
                 ctx.shadowColor = '#22c55e';
                 ctx.shadowBlur = 20;
                 ctx.stroke();
+                ctx.shadowBlur = 0;
+            },
+
+            // Redraw revision canvas using precise bbox from backend
+            redrawRevisionCanvasWithBbox(canvasId, page, bbox) {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas || !bbox) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw rectangle from bbox coordinates
+                const { x1, y1, x2, y2 } = bbox;
+                const width = x2 - x1;
+                const height = y2 - y1;
+
+                // Fill
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';  // Green
+                ctx.fillRect(x1, y1, width, height);
+
+                // Stroke
+                ctx.strokeStyle = '#16a34a';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(x1, y1, width, height);
+
+                // Glow effect
+                ctx.shadowColor = '#22c55e';
+                ctx.shadowBlur = 20;
+                ctx.strokeRect(x1, y1, width, height);
                 ctx.shadowBlur = 0;
             },
 

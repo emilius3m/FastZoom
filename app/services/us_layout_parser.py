@@ -231,6 +231,7 @@ class USLayoutParser:
                 label_rects[key] = found
 
         out: Dict[str, Any] = {"site_id": site_id}
+        _bboxes: Dict[str, Dict[str, float]] = {}  # Track bounding boxes for each field
 
         # 1) US (us_code)
         us_num = self._extract_us_number(tokens, label_rects.get("US"), page_w=w, page_h=h)
@@ -238,37 +239,61 @@ class USLayoutParser:
             out["us_code"] = f"US{us_num.zfill(3)}"
 
         # 2) ENTE RESPONSABILE - cell-based per evitare confini sporchi
-        v = self._extract_value_in_cell(tokens, "ENTE RESPONSABILE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["ente_responsabile"] = v
+        result = self._extract_value_in_cell(tokens, "ENTE RESPONSABILE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["ente_responsabile"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["ente_responsabile"] = bbox
 
         # 2b) UFFICIO MIC COMPETENTE PER TUTELA
-        v = self._extract_value_in_cell(tokens, "UFFICIO MIC", label_rects, page_w=w, page_h=h)
-        if v:
-            out["ufficio_mic"] = v
+        result = self._extract_value_in_cell(tokens, "UFFICIO MIC", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["ufficio_mic"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["ufficio_mic"] = bbox
 
         # 3) ANNO (int)
-        v = self._extract_value_in_cell(tokens, "ANNO", label_rects, page_w=w, page_h=h)
-        if v:
+        result = self._extract_value_in_cell(tokens, "ANNO", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
             # Estrai anno se presente
-            match = re.search(r"\b(19|20)\d{2}\b", v)
+            match = re.search(r"\b(19|20)\d{2}\b", val)
             if match:
                 out["anno"] = int(match.group(0))
+                bbox = self._compute_union_bbox(val_tokens)
+                if bbox:
+                    _bboxes["anno"] = bbox
 
         # 4) IDENTIFICATIVO
-        v = self._extract_value_in_cell(tokens, "IDENTIFICATIVO", label_rects, page_w=w, page_h=h)
-        if v:
-            out["identificativo_rif"] = v
+        result = self._extract_value_in_cell(tokens, "IDENTIFICATIVO", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["identificativo_rif"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["identificativo_rif"] = bbox
 
         # 5) LOCALITA' - cell-based (ha AREA/EDIFICIO/STRUTTURA sotto)
-        v = self._extract_value_in_cell(tokens, "LOCALITA", label_rects, page_w=w, page_h=h)
-        if v:
-            out["localita"] = v
+        result = self._extract_value_in_cell(tokens, "LOCALITA", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["localita"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["localita"] = bbox
 
         # 6) AREA/EDIFICIO/STRUTTURA - cell-based (ha SAGGIO a destra, AMBIENTE sotto)
-        v = self._extract_value_in_cell(tokens, "AREA/EDIFICIO/STRUTTURA", label_rects, page_w=w, page_h=h)
-        if v:
-            out["area_struttura"] = v
+        result = self._extract_value_in_cell(tokens, "AREA/EDIFICIO/STRUTTURA", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["area_struttura"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["area_struttura"] = bbox
 
         # 7) SAGGIO - estrazione rigorosa solo sotto la label (non a destra)
         # per evitare di catturare il valore di AREA/EDIFICIO/STRUTTURA
@@ -277,19 +302,31 @@ class USLayoutParser:
             out["saggio"] = v
 
         # 8) AMBIENTE/UNITA FUNZIONALE - cell-based
-        v = self._extract_value_in_cell(tokens, "AMBIENTE/UNITA FUNZIONALE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["ambiente_unita_funzione"] = v
+        result = self._extract_value_in_cell(tokens, "AMBIENTE/UNITA FUNZIONALE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["ambiente_unita_funzione"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["ambiente_unita_funzione"] = bbox
 
         # 9) POSIZIONE - cell-based
-        v = self._extract_value_in_cell(tokens, "POSIZIONE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["posizione"] = v
+        result = self._extract_value_in_cell(tokens, "POSIZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["posizione"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["posizione"] = bbox
 
         # 10) DEFINIZIONE - cell-based
-        v = self._extract_value_in_cell(tokens, "DEFINIZIONE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["definizione"] = v
+        result = self._extract_value_in_cell(tokens, "DEFINIZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["definizione"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["definizione"] = bbox
 
         # 11) TIPO (checkbox POSITIVA/NEGATIVA)
         tipo = self._extract_tipo_from_checkboxes(tokens, label_rects, page_w=w, page_h=h)
@@ -302,138 +339,156 @@ class USLayoutParser:
             out["formazione"] = nat_art  # 'naturale' o 'artificiale'
 
         # 13) QUOTE - estrai valori numerici
-        v = self._extract_value_in_cell(tokens, "QUOTE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["quote"] = v
+        result = self._extract_value_in_cell(tokens, "QUOTE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["quote"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["quote"] = bbox
             # Prova a estrarre quote numeriche separate
-            quote_nums = re.findall(r"\d+[,.]?\d*", v)
+            quote_nums = re.findall(r"\d+[,.]?\d*", val)
             if quote_nums:
                 out["quote_list"] = [float(q.replace(",", ".")) for q in quote_nums[:3]]
 
         # 14) DOCUMENTAZIONE
         # PIANTE
-        v = self._extract_value_in_cell(tokens, "PIANTE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["piante_riferimenti"] = v
+        result = self._extract_value_in_cell(tokens, "PIANTE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["piante_riferimenti"] = val
 
         # PROSPETTI
-        v = self._extract_value_in_cell(tokens, "PROSPETTI", label_rects, page_w=w, page_h=h)
-        if v:
-            out["prospetti_riferimenti"] = v
+        result = self._extract_value_in_cell(tokens, "PROSPETTI", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["prospetti_riferimenti"] = val
 
         # SEZIONI
-        v = self._extract_value_in_cell(tokens, "SEZIONI", label_rects, page_w=w, page_h=h)
-        if v:
-            out["sezioni_riferimenti"] = v
+        result = self._extract_value_in_cell(tokens, "SEZIONI", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["sezioni_riferimenti"] = val
 
         # FOTOGRAFIE
-        v = self._extract_value_in_cell(tokens, "FOTOGRAFIE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["fotografie"] = v
+        result = self._extract_value_in_cell(tokens, "FOTOGRAFIE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["fotografie"] = val
 
         # RIFERIMENTI TABELLE MATERIALI
-        v = self._extract_value_in_cell(tokens, "RIFERIMENTI TABELLE MATERIALI", label_rects, page_w=w, page_h=h)
-        if v:
-            out["riferimenti_tabelle_materiali"] = v
+        result = self._extract_value_in_cell(tokens, "RIFERIMENTI TABELLE MATERIALI", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["riferimenti_tabelle_materiali"] = val
 
-        # 15) PROPRIETÀ FISICHE
-        v = self._extract_value_in_cell(tokens, "CONSISTENZA", label_rects, page_w=w, page_h=h)
-        if v:
-            out["consistenza"] = v.lower()
+        # 15) PROPRIETÀ FISICHE (duplicate - already handled above, removing)
+        # Skip: CONSISTENZA, COLORE, MISURE already tracked with bbox above
 
-        v = self._extract_value_in_cell(tokens, "COLORE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["colore"] = v
-
-        v = self._extract_value_in_cell(tokens, "MISURE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["misure"] = v
-
-        v = self._extract_value_in_cell(tokens, "STATO DI CONSERVAZIONE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["stato_conservazione"] = v
+        # STATO DI CONSERVAZIONE
+        result = self._extract_value_in_cell(tokens, "STATO DI CONSERVAZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["stato_conservazione"] = val
 
         # 16) COMPONENTI
-        v = self._extract_value_in_cell(tokens, "COMPONENTI INORGANICI", label_rects, page_w=w, page_h=h)
-        if v:
-            out["componenti_inorganici"] = v
+        result = self._extract_value_in_cell(tokens, "COMPONENTI INORGANICI", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["componenti_inorganici"] = val
 
-        v = self._extract_value_in_cell(tokens, "COMPONENTI ORGANICI", label_rects, page_w=w, page_h=h)
-        if v:
-            out["componenti_organici"] = v
+        result = self._extract_value_in_cell(tokens, "COMPONENTI ORGANICI", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["componenti_organici"] = val
 
         # 17) CRITERI DISTINZIONE - cell-based
-        v = self._extract_value_in_cell(tokens, "CRITERI DISTINZIONE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["criteri_distinzione"] = v
+        result = self._extract_value_in_cell(tokens, "CRITERI DISTINZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["criteri_distinzione"] = val
 
         # 18) MODO FORMAZIONE - cell-based
-        v = self._extract_value_in_cell(tokens, "MODO FORMAZIONE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["modo_formazione"] = v
+        result = self._extract_value_in_cell(tokens, "MODO FORMAZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["modo_formazione"] = val
 
         # 19) DESCRIZIONE - cell-based (può essere multilinea)
-        v = self._extract_value_in_cell(tokens, "DESCRIZIONE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["descrizione"] = v
+        result = self._extract_value_in_cell(tokens, "DESCRIZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["descrizione"] = val
 
         # 20) OSSERVAZIONI
-        v = self._extract_value_in_cell(tokens, "OSSERVAZIONI", label_rects, page_w=w, page_h=h)
-        if v:
-            out["osservazioni"] = v
+        result = self._extract_value_in_cell(tokens, "OSSERVAZIONI", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["osservazioni"] = val
 
         # 21) INTERPRETAZIONE - cell-based
-        v = self._extract_value_in_cell(tokens, "INTERPRETAZIONE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["interpretazione"] = v
+        result = self._extract_value_in_cell(tokens, "INTERPRETAZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["interpretazione"] = val
 
         # 22) DATAZIONE
-        v = self._extract_value_in_cell(tokens, "DATAZIONE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["datazione"] = v
+        result = self._extract_value_in_cell(tokens, "DATAZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["datazione"] = val
 
         # 23) PERIODO
-        v = self._extract_value_in_cell(tokens, "PERIODO", label_rects, page_w=w, page_h=h)
-        if v:
-            out["periodo"] = v
+        result = self._extract_value_in_cell(tokens, "PERIODO", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["periodo"] = val
 
         # 24) FASE
-        v = self._extract_value_in_cell(tokens, "FASE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["fase"] = v
+        result = self._extract_value_in_cell(tokens, "FASE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["fase"] = val
 
         # 25) ATTIVITA
-        v = self._extract_value_in_cell(tokens, "ATTIVITA", label_rects, page_w=w, page_h=h)
-        if v:
-            out["attivita"] = v
+        result = self._extract_value_in_cell(tokens, "ATTIVITA", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["attivita"] = val
 
         # 26) ELEMENTI DATANTI
-        v = self._extract_value_in_cell(tokens, "ELEMENTI DATANTI", label_rects, page_w=w, page_h=h)
-        if v:
-            out["elementi_datanti"] = v
+        result = self._extract_value_in_cell(tokens, "ELEMENTI DATANTI", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["elementi_datanti"] = val
 
         # 27) DATI QUANTITATIVI REPERTI
-        v = self._extract_value_in_cell(tokens, "DATI QUANTITATIVI DEI REPERTI", label_rects, page_w=w, page_h=h)
-        if v:
-            out["dati_quantitativi_reperti"] = v
+        result = self._extract_value_in_cell(tokens, "DATI QUANTITATIVI DEI REPERTI", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["dati_quantitativi_reperti"] = val
 
         # 28) CAMPIONATURE, FLOTTAZIONE, SETACCIATURA
-        v = self._extract_value_in_cell(tokens, "CAMPIONATURE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["campionature"] = v
+        result = self._extract_value_in_cell(tokens, "CAMPIONATURE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["campionature"] = val
 
-        v = self._extract_value_in_cell(tokens, "FLOTTAZIONE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["flottazione"] = v
+        result = self._extract_value_in_cell(tokens, "FLOTTAZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["flottazione"] = val
 
-        v = self._extract_value_in_cell(tokens, "SETACCIATURA", label_rects, page_w=w, page_h=h)
-        if v:
-            out["setacciatura"] = v
+        result = self._extract_value_in_cell(tokens, "SETACCIATURA", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["setacciatura"] = val
 
         # 29) AFFIDABILITA STRATIGRAFICA
-        v = self._extract_value_in_cell(tokens, "AFFIDABILITA STRATIGRAFICA", label_rects, page_w=w, page_h=h)
-        if v:
-            out["affidabilita_stratigrafica"] = v.lower()
+        result = self._extract_value_in_cell(tokens, "AFFIDABILITA STRATIGRAFICA", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["affidabilita_stratigrafica"] = val.lower()
 
         # 30) RESPONSABILE SCIENTIFICO
         v = self._extract_value(tokens, label_rects.get("RESPONSABILE SCIENTIFICO"), page_w=w, page_h=h)
@@ -483,22 +538,42 @@ class USLayoutParser:
             ("POSTERIORE A", "posteriore_a"),
             ("ANTERIORE A", "anteriore_a"),
         ]:
-            v = self._extract_value_in_cell(tokens, label_key, label_rects, page_w=w, page_h=h)
-            if v:
-                out[field_name] = v
+            result = self._extract_value_in_cell(tokens, label_key, label_rects, page_w=w, page_h=h)
+            if result:
+                val, val_tokens = result
+                out[field_name] = val
+                bbox = self._compute_union_bbox(val_tokens)
+                if bbox:
+                    _bboxes[field_name] = bbox
 
         # 37) Proprietà fisiche
-        v = self._extract_value_in_cell(tokens, "CONSISTENZA", label_rects, page_w=w, page_h=h)
-        if v:
-            out["consistenza"] = v
+        result = self._extract_value_in_cell(tokens, "CONSISTENZA", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["consistenza"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["consistenza"] = bbox
 
-        v = self._extract_value_in_cell(tokens, "COLORE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["colore"] = v
+        result = self._extract_value_in_cell(tokens, "COLORE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["colore"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["colore"] = bbox
 
-        v = self._extract_value_in_cell(tokens, "MISURE", label_rects, page_w=w, page_h=h)
-        if v:
-            out["misure"] = v
+        result = self._extract_value_in_cell(tokens, "MISURE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            out["misure"] = val
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["misure"] = bbox
+
+        # Add bounding box data to output
+        if _bboxes:
+            out["_field_bboxes"] = _bboxes
 
         return out
 
@@ -621,10 +696,12 @@ class USLayoutParser:
         *,
         page_w: int,
         page_h: int,
-    ) -> Optional[str]:
+    ) -> Optional[Tuple[str, List[Dict[str, Any]]]]:
         """
         Estrae il valore da una cella definita dalla label e dalle label vicine.
         PRIMA prova con celle PPStructure (più precise), poi fallback a euristico.
+        
+        Ritorna: (valore_estratto, lista_token_usati) o None
         """
         label_rect = label_rects.get(label_key)
         if not label_rect:
@@ -634,7 +711,9 @@ class USLayoutParser:
         if self._detected_cells:
             pp_result = self._extract_from_ppstructure_cell(tokens, label_rect)
             if pp_result:
-                return pp_result
+                # pp_result è già una stringa, dobbiamo ricostruire i token
+                # Per ora usiamo il fallback per avere i token
+                pass
 
         # FALLBACK: usa metodo euristico basato su label vicine
         cell = self._cell_rect_from_label(label_rect, label_rects, page_w=page_w, page_h=page_h)
@@ -660,7 +739,33 @@ class USLayoutParser:
 
         captured.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
         val = self._join_tokens(captured).strip()
-        return val or None
+        
+        if not val:
+            return None
+        
+        return (val, captured)
+
+    def _compute_union_bbox(self, tokens: List[Dict[str, Any]]) -> Optional[Dict[str, float]]:
+        """
+        Calcola il bounding box unione di una lista di token.
+        Ritorna un dict con {x1, y1, x2, y2} o None se la lista è vuota.
+        """
+        if not tokens:
+            return None
+        
+        xs = []
+        ys = []
+        for t in tokens:
+            r = t["rect"]
+            xs.extend([r.x1, r.x2])
+            ys.extend([r.y1, r.y2])
+        
+        return {
+            "x1": min(xs),
+            "y1": min(ys),
+            "x2": max(xs),
+            "y2": max(ys)
+        }
 
     # ---------- internals ----------
 
