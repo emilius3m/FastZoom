@@ -111,173 +111,421 @@
     </div>
 
     <!-- PDF Import Results Modal with Debug View -->
-    <div x-show="showPdfImportModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
-        x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
-        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showPdfImportModal = false">
+    <div x-show="showPdfImportModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 z-50"
+        @click.self="showPdfImportModal = false">
 
+        <div class="bg-white dark:bg-gray-800 absolute inset-0 flex flex-col overflow-hidden shadow-2xl">
+
+            <!-- Modal Header -->
+            <div
+                class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gradient-to-r from-purple-600 to-indigo-600">
+                <h3 class="text-lg font-semibold text-white flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                        </path>
+                    </svg>
+                    Risultati OCR - Debug Viewer
+                </h3>
+                <button @click="showPdfImportModal = false" class="text-white hover:text-gray-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
             </div>
-            <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden"
-                x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100">
 
-                <!-- Modal Header -->
-                <div
-                    class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gradient-to-r from-purple-600 to-indigo-600">
-                    <h3 class="text-lg font-semibold text-white flex items-center">
-                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <!-- Tab Navigation -->
+            <div class="px-6 pt-4 border-b border-gray-200 dark:border-gray-700" x-data="{ocrDebugTab: 'result'}">
+                <div class="flex space-x-4">
+                    <button @click="ocrDebugTab = 'result'"
+                        :class="ocrDebugTab === 'result' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Risultato US
+                    </button>
+                    <button @click="ocrDebugTab = 'pages'"
+                        :class="ocrDebugTab === 'pages' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
                             </path>
                         </svg>
-                        Risultati OCR - Debug Viewer
-                    </h3>
-                    <button @click="showPdfImportModal = false" class="text-white hover:text-gray-200">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        Pagine OCR
+                        <span x-show="pdfImportResults?.debug_pages"
+                            class="ml-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full"
+                            x-text="pdfImportResults?.debug_pages?.length || 0"></span>
+                    </button>
+                    <button @click="ocrDebugTab = 'revision'"
+                        :class="ocrDebugTab === 'revision' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                        class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M6 18L18 6M6 6l12 12"></path>
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+                            </path>
                         </svg>
+                        ✏️ Revisione OCR
+                        <span x-show="pdfImportResults?.results && pdfImportResults.results.length > 0"
+                            class="ml-1 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full"
+                            x-text="pdfImportResults?.results?.length || 0"></span>
                     </button>
                 </div>
 
-                <!-- Tab Navigation -->
-                <div class="px-6 pt-4 border-b border-gray-200 dark:border-gray-700" x-data="{ocrDebugTab: 'result'}">
-                    <div class="flex space-x-4">
-                        <button @click="ocrDebugTab = 'result'"
-                            :class="ocrDebugTab === 'result' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                            class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            Risultato US
-                        </button>
-                        <button @click="ocrDebugTab = 'pages'"
-                            :class="ocrDebugTab === 'pages' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                            class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
-                                </path>
-                            </svg>
-                            Pagine OCR
-                            <span x-show="pdfImportResults?.debug_pages"
-                                class="ml-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full"
-                                x-text="pdfImportResults?.debug_pages?.length || 0"></span>
-                        </button>
-                    </div>
+                <!-- Modal Body -->
+                <div class="flex-1 overflow-y-auto dark:bg-gray-800 p-6">
+                    <!-- Error State -->
+                    <template x-if="pdfImportError">
+                        <div
+                            class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span class="text-red-700 dark:text-red-300" x-text="pdfImportError"></span>
+                            </div>
+                        </div>
+                    </template>
 
-                    <!-- Modal Body -->
-                    <div class="p-6 overflow-y-auto max-h-[65vh]">
-                        <!-- Error State -->
-                        <template x-if="pdfImportError">
-                            <div
-                                class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4">
-                                <div class="flex items-center">
-                                    <svg class="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                    </svg>
-                                    <span class="text-red-700 dark:text-red-300" x-text="pdfImportError"></span>
+                    <!-- TAB: Risultato US -->
+                    <div x-show="ocrDebugTab === 'result'" x-transition>
+                        <template
+                            x-if="pdfImportResults && pdfImportResults.results && pdfImportResults.results.length > 0">
+                            <div>
+                                <!-- Stats -->
+                                <div class="grid grid-cols-4 gap-4 mb-6">
+                                    <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4 text-center">
+                                        <div class="text-2xl font-bold text-blue-600 dark:text-blue-400"
+                                            x-text="pdfImportResults.total_pages"></div>
+                                        <div class="text-sm text-blue-700 dark:text-blue-300">Pagine</div>
+                                    </div>
+                                    <div class="bg-green-50 dark:bg-green-900/30 rounded-lg p-4 text-center">
+                                        <div class="text-2xl font-bold text-green-600 dark:text-green-400"
+                                            x-text="pdfImportResults.successful_extractions"></div>
+                                        <div class="text-sm text-green-700 dark:text-green-300">US Estratte</div>
+                                    </div>
+                                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
+                                        <div class="text-2xl font-bold text-gray-600 dark:text-gray-300"
+                                            x-text="pdfImportResults.processing_time_seconds + 's'"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">Tempo</div>
+                                    </div>
+                                    <div class="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4 text-center">
+                                        <div class="text-2xl font-bold text-purple-600 dark:text-purple-400"
+                                            x-text="pdfImportResults.debug_pages?.reduce((sum, p) => sum + p.word_count, 0) || 0">
+                                        </div>
+                                        <div class="text-sm text-purple-700 dark:text-purple-300">Parole</div>
+                                    </div>
                                 </div>
+
+                                <!-- US Result Card -->
+                                <template x-for="(result, index) in pdfImportResults.results" :key="index">
+                                    <div class="border-2 border-gray-200 dark:border-gray-600 rounded-xl p-5"
+                                        :class="result.is_valid ? ' dark:bg-green-900/20 border-green-300' : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300'">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div class="flex items-center">
+                                                <span class="text-2xl font-bold text-gray-900 dark:text-white"
+                                                    x-text="result.us_code"></span>
+                                                <span class="ml-3 px-3 py-1 text-sm rounded-full font-medium"
+                                                    :class="result.is_valid ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'"
+                                                    x-text="result.is_valid ? '✓ Valido' : '⚠ Incompleto'"></span>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="text-sm text-gray-500">Confidence</div>
+                                                <div class="text-xl font-bold"
+                                                    :class="result.confidence > 0.8 ? 'text-green-600' : 'text-yellow-600'"
+                                                    x-text="(result.confidence * 100).toFixed(0) + '%'"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Extracted Fields Grid -->
+                                        <div class="grid grid-cols-3 gap-4 text-sm mb-4">
+                                            <div x-show="result.data.tipo"><strong>Tipo:</strong> <span
+                                                    x-text="result.data.tipo"></span></div>
+                                            <div x-show="result.data.definizione"><strong>Definizione:</strong>
+                                                <span x-text="(result.data.definizione || '').substring(0, 40)"></span>
+                                            </div>
+                                            <div x-show="result.data.localita"><strong>Località:</strong> <span
+                                                    x-text="result.data.localita"></span></div>
+                                            <div x-show="result.data.area_struttura"><strong>Area:</strong> <span
+                                                    x-text="result.data.area_struttura"></span></div>
+                                            <div x-show="result.data.datazione"><strong>Datazione:</strong> <span
+                                                    x-text="result.data.datazione"></span></div>
+                                            <div x-show="result.data.responsabile_scientifico">
+                                                <strong>Resp:</strong> <span
+                                                    x-text="result.data.responsabile_scientifico"></span>
+                                            </div>
+                                            <div><strong>Campi estratti:</strong> <span
+                                                    x-text="result.extracted_fields_count"></span></div>
+                                        </div>
+
+                                        <!-- Warnings -->
+                                        <template x-if="result.warnings && result.warnings.length > 0">
+                                            <div class="mt-3 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                                                <div
+                                                    class="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-1">
+                                                    Avvisi:</div>
+                                                <template x-for="warn in result.warnings" :key="warn">
+                                                    <div
+                                                        class="text-xs text-yellow-700 dark:text-yellow-400 flex items-center">
+                                                        <span class="mr-1">⚠️</span><span x-text="warn"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+
+                                        <!-- Action Button -->
+                                        <div class="mt-4 flex justify-end">
+                                            <button @click="createUSFromOCR(result.data)" :disabled="!result.is_valid"
+                                                class="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                                </svg>
+                                                Crea US nel Database
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
                         </template>
 
-                        <!-- TAB: Risultato US -->
-                        <div x-show="ocrDebugTab === 'result'" x-transition>
-                            <template
-                                x-if="pdfImportResults && pdfImportResults.results && pdfImportResults.results.length > 0">
-                                <div>
-                                    <!-- Stats -->
-                                    <div class="grid grid-cols-4 gap-4 mb-6">
-                                        <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4 text-center">
-                                            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400"
-                                                x-text="pdfImportResults.total_pages"></div>
-                                            <div class="text-sm text-blue-700 dark:text-blue-300">Pagine</div>
-                                        </div>
-                                        <div class="bg-green-50 dark:bg-green-900/30 rounded-lg p-4 text-center">
-                                            <div class="text-2xl font-bold text-green-600 dark:text-green-400"
-                                                x-text="pdfImportResults.successful_extractions"></div>
-                                            <div class="text-sm text-green-700 dark:text-green-300">US Estratte</div>
-                                        </div>
-                                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
-                                            <div class="text-2xl font-bold text-gray-600 dark:text-gray-300"
-                                                x-text="pdfImportResults.processing_time_seconds + 's'"></div>
-                                            <div class="text-sm text-gray-500 dark:text-gray-400">Tempo</div>
-                                        </div>
-                                        <div class="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4 text-center">
-                                            <div class="text-2xl font-bold text-purple-600 dark:text-purple-400"
-                                                x-text="pdfImportResults.debug_pages?.reduce((sum, p) => sum + p.word_count, 0) || 0">
+                        <!-- No Results -->
+                        <template
+                            x-if="pdfImportResults && (!pdfImportResults.results || pdfImportResults.results.length === 0) && !pdfImportError">
+                            <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                                    </path>
+                                </svg>
+                                <p class="text-lg font-medium">Nessuna scheda US trovata nel PDF</p>
+                                <p class="text-sm mt-2">Controlla la tab "Pagine OCR" per vedere il testo estratto
+                                </p>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- TAB: Revisione OCR -->
+                    <div x-show="ocrDebugTab === 'revision'" x-transition>
+                        <template x-if="pdfImportResults?.results && pdfImportResults.results.length > 0">
+                            <div>
+                                <!-- Result Selector -->
+                                <div
+                                    class="mb-4 flex items-center justify-between bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
+                                    <div class="flex items-center space-x-3">
+                                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Seleziona
+                                            US da revisionare:</label>
+                                        <select x-model="selectedResultIndex" @change="selectResultForEdit()"
+                                            class="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                            <template x-for="(result, idx) in pdfImportResults.results" :key="idx">
+                                                <option :value="idx"
+                                                    x-text="`${result.us_code} - ${result.is_valid ? '✓ Valido' : '⚠ Incompleto'}`">
+                                                </option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="text-sm text-gray-600 dark:text-gray-400">
+                                        <span class="font-medium" x-text="(selectedResultIndex + 1)"></span> di
+                                        <span x-text="pdfImportResults.results.length"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Split Layout: Preview + Form -->
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <!-- Left Panel: PDF Preview with Canvas Overlay -->
+                                    <div
+                                        class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h4
+                                                class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
+                                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z">
+                                                    </path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                                                    </path>
+                                                </svg>
+                                                Anteprima Pagina PDF
+                                            </h4>
+                                            <!-- Page Navigator -->
+                                            <div x-show="pdfImportResults?.debug_pages?.length > 1"
+                                                class="flex items-center space-x-2">
+                                                <button
+                                                    @click="editPageIdx = Math.max(0, editPageIdx - 1); initRevisionCanvas(document.getElementById('revision_ocr_img'), pdfImportResults.debug_pages[editPageIdx])"
+                                                    :disabled="editPageIdx === 0"
+                                                    class="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                                    </svg>
+                                                </button>
+                                                <span class="text-xs text-gray-600 dark:text-gray-400">
+                                                    Pagina <span x-text="editPageIdx + 1"></span> / <span
+                                                        x-text="pdfImportResults?.debug_pages?.length || 0"></span>
+                                                </span>
+                                                <button
+                                                    @click="editPageIdx = Math.min(pdfImportResults.debug_pages.length - 1, editPageIdx + 1); initRevisionCanvas(document.getElementById('revision_ocr_img'), pdfImportResults.debug_pages[editPageIdx])"
+                                                    :disabled="editPageIdx >= (pdfImportResults?.debug_pages?.length || 0) - 1"
+                                                    class="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                                    </svg>
+                                                </button>
                                             </div>
-                                            <div class="text-sm text-purple-700 dark:text-purple-300">Parole</div>
+                                        </div>
+                                        <div
+                                            class="relative overflow-auto max-h-[600px] bg-white dark:bg-gray-800 rounded p-2">
+                                            <template
+                                                x-if="pdfImportResults?.debug_pages && pdfImportResults.debug_pages.length > 0">
+                                                <div class="relative inline-block">
+                                                    <!-- Base PDF Image -->
+                                                    <img :src="pdfImportResults.debug_pages[editPageIdx || 0].image_base64"
+                                                        class="max-w-full h-auto rounded shadow-lg block"
+                                                        alt="Pagina PDF" id="revision_ocr_img"
+                                                        @load="initRevisionCanvas($el, pdfImportResults.debug_pages[editPageIdx || 0])">
+
+                                                    <!-- Canvas Overlay for Field Highlighting -->
+                                                    <canvas id="revision_ocr_canvas"
+                                                        class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+                                                </div>
+                                            </template>
+                                            <div x-show="!pdfImportResults?.debug_pages || pdfImportResults.debug_pages.length === 0"
+                                                class="text-center py-12 text-gray-400">
+                                                <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none"
+                                                    stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z">
+                                                    </path>
+                                                </svg>
+                                                <p class="text-sm">Immagine non disponibile</p>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <!-- US Result Card -->
-                                    <template x-for="(result, index) in pdfImportResults.results" :key="index">
-                                        <div class="border-2 border-gray-200 dark:border-gray-600 rounded-xl p-5"
-                                            :class="result.is_valid ? ' dark:bg-green-900/20 border-green-300' : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300'">
-                                            <div class="flex justify-between items-start mb-4">
-                                                <div class="flex items-center">
-                                                    <span class="text-2xl font-bold text-gray-900 dark:text-white"
-                                                        x-text="result.us_code"></span>
-                                                    <span class="ml-3 px-3 py-1 text-sm rounded-full font-medium"
-                                                        :class="result.is_valid ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'"
-                                                        x-text="result.is_valid ? '✓ Valido' : '⚠ Incompleto'"></span>
-                                                </div>
-                                                <div class="text-right">
-                                                    <div class="text-sm text-gray-500">Confidence</div>
-                                                    <div class="text-xl font-bold"
-                                                        :class="result.confidence > 0.8 ? 'text-green-600' : 'text-yellow-600'"
-                                                        x-text="(result.confidence * 100).toFixed(0) + '%'"></div>
-                                                </div>
+                                    <!-- Right Panel: Editable Form Fields -->
+                                    <div
+                                        class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                                        <h4
+                                            class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center">
+                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+                                                </path>
+                                            </svg>
+                                            Modifica Valori OCR
+                                        </h4>
+                                        <div class="space-y-3 overflow-y-auto max-h-[600px] pr-2">
+                                            <!-- Codice US -->
+                                            <div>
+                                                <label
+                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Codice
+                                                    US</label>
+                                                <input type="text" x-model="editedOCRData.us_code"
+                                                    @focus="onFieldFocus('us_code')" @blur="onFieldBlur()"
+                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
                                             </div>
 
-                                            <!-- Extracted Fields Grid -->
-                                            <div class="grid grid-cols-3 gap-4 text-sm mb-4">
-                                                <div x-show="result.data.tipo"><strong>Tipo:</strong> <span
-                                                        x-text="result.data.tipo"></span></div>
-                                                <div x-show="result.data.definizione"><strong>Definizione:</strong>
-                                                    <span
-                                                        x-text="(result.data.definizione || '').substring(0, 40)"></span>
-                                                </div>
-                                                <div x-show="result.data.localita"><strong>Località:</strong> <span
-                                                        x-text="result.data.localita"></span></div>
-                                                <div x-show="result.data.area_struttura"><strong>Area:</strong> <span
-                                                        x-text="result.data.area_struttura"></span></div>
-                                                <div x-show="result.data.datazione"><strong>Datazione:</strong> <span
-                                                        x-text="result.data.datazione"></span></div>
-                                                <div x-show="result.data.responsabile_scientifico">
-                                                    <strong>Resp:</strong> <span
-                                                        x-text="result.data.responsabile_scientifico"></span>
-                                                </div>
-                                                <div><strong>Campi estratti:</strong> <span
-                                                        x-text="result.extracted_fields_count"></span></div>
+                                            <!-- Tipo -->
+                                            <div>
+                                                <label
+                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
+                                                <select x-model="editedOCRData.tipo" @focus="onFieldFocus('tipo')"
+                                                    @blur="onFieldBlur()"
+                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                                    <option value="">Seleziona...</option>
+                                                    <option value="positiva">Positiva (accumulo)</option>
+                                                    <option value="negativa">Negativa (taglio)</option>
+                                                </select>
                                             </div>
 
-                                            <!-- Warnings -->
-                                            <template x-if="result.warnings && result.warnings.length > 0">
-                                                <div class="mt-3 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                                                    <div
-                                                        class="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-1">
-                                                        Avvisi:</div>
-                                                    <template x-for="warn in result.warnings" :key="warn">
-                                                        <div
-                                                            class="text-xs text-yellow-700 dark:text-yellow-400 flex items-center">
-                                                            <span class="mr-1">⚠️</span><span x-text="warn"></span>
-                                                        </div>
-                                                    </template>
-                                                </div>
-                                            </template>
+                                            <!-- Definizione -->
+                                            <div>
+                                                <label
+                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Definizione</label>
+                                                <textarea x-model="editedOCRData.definizione" rows="2"
+                                                    @focus="onFieldFocus('definizione')" @blur="onFieldBlur()"
+                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
+                                            </div>
 
-                                            <!-- Action Button -->
-                                            <div class="mt-4 flex justify-end">
-                                                <button @click="createUSFromOCR(result.data)"
-                                                    :disabled="!result.is_valid"
-                                                    class="px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                                            <!-- Località -->
+                                            <div>
+                                                <label
+                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Località</label>
+                                                <input type="text" x-model="editedOCRData.localita"
+                                                    @focus="onFieldFocus('localita')" @blur="onFieldBlur()"
+                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                            </div>
+
+                                            <!-- Area/Struttura -->
+                                            <div>
+                                                <label
+                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Area/Struttura</label>
+                                                <input type="text" x-model="editedOCRData.area_struttura"
+                                                    @focus="onFieldFocus('area_struttura')" @blur="onFieldBlur()"
+                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                            </div>
+
+                                            <!-- Descrizione -->
+                                            <div>
+                                                <label
+                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Descrizione</label>
+                                                <textarea x-model="editedOCRData.descrizione" rows="3"
+                                                    @focus="onFieldFocus('descrizione')" @blur="onFieldBlur()"
+                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
+                                            </div>
+
+                                            <!-- Datazione -->
+                                            <div>
+                                                <label
+                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Datazione</label>
+                                                <input type="text" x-model="editedOCRData.datazione"
+                                                    @focus="onFieldFocus('datazione')" @blur="onFieldBlur()"
+                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                            </div>
+
+                                            <!-- Responsabile Scientifico -->
+                                            <div>
+                                                <label
+                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Responsabile
+                                                    Scientifico</label>
+                                                <input type="text" x-model="editedOCRData.responsabile_scientifico"
+                                                    @focus="onFieldFocus('responsabile_scientifico')"
+                                                    @blur="onFieldBlur()"
+                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                            </div>
+
+                                            <!-- Save Button -->
+                                            <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                                                <button @click="saveOCRCorrections()"
+                                                    class="w-full px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 flex items-center justify-center">
+                                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    Salva Correzioni
+                                                </button>
+                                            </div>
+
+                                            <!-- Create US Button -->
+                                            <div>
+                                                <button @click="createUSFromEditedOCR()"
+                                                    class="w-full px-4 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 flex items-center justify-center">
                                                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
                                                         viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -287,132 +535,129 @@
                                                 </button>
                                             </div>
                                         </div>
-                                    </template>
+                                    </div>
                                 </div>
-                            </template>
+                            </div>
+                        </template>
 
-                            <!-- No Results -->
-                            <template
-                                x-if="pdfImportResults && (!pdfImportResults.results || pdfImportResults.results.length === 0) && !pdfImportError">
-                                <div class="text-center py-12 text-gray-500 dark:text-gray-400">
-                                    <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
-                                        </path>
-                                    </svg>
-                                    <p class="text-lg font-medium">Nessuna scheda US trovata nel PDF</p>
-                                    <p class="text-sm mt-2">Controlla la tab "Pagine OCR" per vedere il testo estratto
-                                    </p>
-                                </div>
-                            </template>
-                        </div>
+                        <!-- No Results State -->
+                        <template x-if="!pdfImportResults?.results || pdfImportResults.results.length === 0">
+                            <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                                <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+                                    </path>
+                                </svg>
+                                <p class="text-lg font-medium">Nessun risultato da revisionare</p>
+                                <p class="text-sm mt-2">Importa un PDF per iniziare la revisione OCR</p>
+                            </div>
+                        </template>
+                    </div>
 
-                        <!-- TAB: Pagine OCR con Immagini INTERATTIVE -->
-                        <div x-show="ocrDebugTab === 'pages'" x-transition>
-                            <template x-if="pdfImportResults?.debug_pages && pdfImportResults.debug_pages.length > 0">
-                                <div class="space-y-6">
-                                    <template x-for="(page, pageIdx) in pdfImportResults.debug_pages" :key="pageIdx">
+                    <!-- TAB: Pagine OCR con Immagini INTERATTIVE -->
+                    <div x-show="ocrDebugTab === 'pages'" x-transition>
+                        <template x-if="pdfImportResults?.debug_pages && pdfImportResults.debug_pages.length > 0">
+                            <div class="space-y-6">
+                                <template x-for="(page, pageIdx) in pdfImportResults.debug_pages" :key="pageIdx">
+                                    <div class="border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
+                                        <!-- Page Header -->
                                         <div
-                                            class="border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
-                                            <!-- Page Header -->
+                                            class="bg-gray-100 dark:bg-gray-700 px-4 py-3 flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <span
+                                                    class="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3"
+                                                    x-text="page.page_number"></span>
+                                                <span class="font-medium">Pagina <span
+                                                        x-text="page.page_number"></span></span>
+                                            </div>
+                                            <div class="flex items-center space-x-4 text-sm text-gray-500">
+                                                <span><strong x-text="page.word_count"></strong> parole</span>
+                                                <span>Conf: <strong
+                                                        x-text="(page.avg_confidence * 100).toFixed(0) + '%'"></strong></span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Page Content: Interactive Image + Text -->
+                                        <div class="grid md:grid-cols-2 gap-4 p-4">
+                                            <!-- Image with Canvas Overlay for interactive boxes -->
                                             <div
-                                                class="bg-gray-100 dark:bg-gray-700 px-4 py-3 flex items-center justify-between">
-                                                <div class="flex items-center">
-                                                    <span
-                                                        class="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3"
-                                                        x-text="page.page_number"></span>
-                                                    <span class="font-medium">Pagina <span
-                                                            x-text="page.page_number"></span></span>
-                                                </div>
-                                                <div class="flex items-center space-x-4 text-sm text-gray-500">
-                                                    <span><strong x-text="page.word_count"></strong> parole</span>
-                                                    <span>Conf: <strong
-                                                            x-text="(page.avg_confidence * 100).toFixed(0) + '%'"></strong></span>
+                                                class="bg-gray-100 dark:bg-gray-900 rounded-lg p-2 overflow-auto max-h-[600px] relative">
+                                                <div class="relative inline-block">
+                                                    <!-- Base image -->
+                                                    <img :src="page.image_base64"
+                                                        class="max-w-full h-auto rounded shadow-lg block"
+                                                        :alt="'Pagina ' + page.page_number" :id="'ocr_img_' + pageIdx"
+                                                        @load="initCanvasById('ocr_canvas_' + pageIdx, $el, page)">
+
+                                                    <!-- Canvas overlay for bounding boxes -->
+                                                    <canvas :id="'ocr_canvas_' + pageIdx"
+                                                        class="absolute inset-0 w-full h-full cursor-crosshair"
+                                                        @mousemove="handleCanvasHoverById($event, 'ocr_canvas_' + pageIdx, page)"
+                                                        @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)"></canvas>
                                                 </div>
                                             </div>
 
-                                            <!-- Page Content: Interactive Image + Text -->
-                                            <div class="grid md:grid-cols-2 gap-4 p-4">
-                                                <!-- Image with Canvas Overlay for interactive boxes -->
-                                                <div
-                                                    class="bg-gray-100 dark:bg-gray-900 rounded-lg p-2 overflow-auto max-h-[600px] relative">
-                                                    <div class="relative inline-block">
-                                                        <!-- Base image -->
-                                                        <img :src="page.image_base64"
-                                                            class="max-w-full h-auto rounded shadow-lg block"
-                                                            :alt="'Pagina ' + page.page_number"
-                                                            :id="'ocr_img_' + pageIdx"
-                                                            @load="initCanvasById('ocr_canvas_' + pageIdx, $el, page)">
-
-                                                        <!-- Canvas overlay for bounding boxes -->
-                                                        <canvas :id="'ocr_canvas_' + pageIdx"
-                                                            class="absolute inset-0 w-full h-full cursor-crosshair"
-                                                            @mousemove="handleCanvasHoverById($event, 'ocr_canvas_' + pageIdx, page)"
-                                                            @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)"></canvas>
-                                                    </div>
-                                                </div>
-
-                                                <!-- Extracted Text Lines with hover sync -->
-                                                <div
-                                                    class="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 overflow-auto max-h-[600px]">
-                                                    <div class="text-xs font-mono space-y-1">
-                                                        <template x-for="(box, idx) in page.bounding_boxes" :key="idx">
-                                                            <div class="flex px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150"
-                                                                :class="{
+                                            <!-- Extracted Text Lines with hover sync -->
+                                            <div
+                                                class="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 overflow-auto max-h-[600px]">
+                                                <div class="text-xs font-mono space-y-1">
+                                                    <template x-for="(box, idx) in page.bounding_boxes" :key="idx">
+                                                        <div class="flex px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150"
+                                                            :class="{
                                                                      'bg-yellow-400 dark:bg-yellow-500 ring-2 ring-orange-500 shadow-md': hoveredBoxIdx === idx,
                                                                      'hover:bg-gray-200 dark:hover:bg-gray-700': hoveredBoxIdx !== idx
                                                                  }"
-                                                                @mouseenter="hoveredBoxIdx = idx; redrawCanvasById('ocr_canvas_' + pageIdx, page, idx)"
-                                                                @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)">
-                                                                <span class="w-8 flex-shrink-0 font-bold"
-                                                                    :class="hoveredBoxIdx === idx ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'"
-                                                                    x-text="(idx + 1) + '.'"></span>
-                                                                <span class="flex-1"
-                                                                    :class="hoveredBoxIdx === idx ? 'text-gray-900 dark:text-gray-900 font-semibold' : 'text-gray-700 dark:text-gray-300'"
-                                                                    x-text="box.text"></span>
-                                                                <span class="ml-2 text-xs px-1.5 py-0.5 rounded" :class="{
+                                                            @mouseenter="hoveredBoxIdx = idx; redrawCanvasById('ocr_canvas_' + pageIdx, page, idx)"
+                                                            @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)">
+                                                            <span class="w-8 flex-shrink-0 font-bold"
+                                                                :class="hoveredBoxIdx === idx ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'"
+                                                                x-text="(idx + 1) + '.'"></span>
+                                                            <span class="flex-1"
+                                                                :class="hoveredBoxIdx === idx ? 'text-gray-900 dark:text-gray-900 font-semibold' : 'text-gray-700 dark:text-gray-300'"
+                                                                x-text="box.text"></span>
+                                                            <span class="ml-2 text-xs px-1.5 py-0.5 rounded" :class="{
                                                                           'bg-green-200 text-green-800 dark:bg-green-700 dark:text-green-100': box.confidence > 0.9,
                                                                           'bg-yellow-200 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100': box.confidence > 0.7 && box.confidence <= 0.9,
                                                                           'bg-red-200 text-red-800 dark:bg-red-700 dark:text-red-100': box.confidence <= 0.7
                                                                       }"
-                                                                    x-text="Math.round(box.confidence * 100) + '%'"></span>
-                                                            </div>
-                                                        </template>
-                                                    </div>
+                                                                x-text="Math.round(box.confidence * 100) + '%'"></span>
+                                                        </div>
+                                                    </template>
                                                 </div>
                                             </div>
-
-                                            <!-- Legend -->
-                                            <div
-                                                class="bg-gray-50 dark:bg-gray-800 px-4 py-2 text-xs text-gray-500 flex items-center justify-center space-x-4 border-t border-gray-200 dark:border-gray-700">
-                                                <span>💡 Passa il mouse su un box o sul testo per evidenziare la
-                                                    corrispondenza</span>
-                                            </div>
                                         </div>
-                                    </template>
-                                </div>
-                            </template>
-                            <template
-                                x-if="!pdfImportResults?.debug_pages || pdfImportResults.debug_pages.length === 0">
-                                <div class="text-center py-12 text-gray-500">
-                                    <p>Nessun dato di debug disponibile</p>
-                                </div>
-                            </template>
-                        </div>
 
-
+                                        <!-- Legend -->
+                                        <div
+                                            class="bg-gray-50 dark:bg-gray-800 px-4 py-2 text-xs text-gray-500 flex items-center justify-center space-x-4 border-t border-gray-200 dark:border-gray-700">
+                                            <span>💡 Passa il mouse su un box o sul testo per evidenziare la
+                                                corrispondenza</span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="!pdfImportResults?.debug_pages || pdfImportResults.debug_pages.length === 0">
+                            <div class="text-center py-12 text-gray-500">
+                                <p>Nessun dato di debug disponibile</p>
+                            </div>
+                        </template>
                     </div>
+
+
                 </div>
 
-                <!-- Modal Footer -->
-                <div
-                    class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex justify-end">
-                    <button @click="showPdfImportModal = false"
-                        class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-medium">
-                        Chiudi
-                    </button>
-                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div
+                class="sticky bottom-0 bg-gray-50 dark:bg-gray-800 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                <button @click="showPdfImportModal = false"
+                    class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-medium">
+                    Chiudi
+                </button>
             </div>
         </div>
     </div>
