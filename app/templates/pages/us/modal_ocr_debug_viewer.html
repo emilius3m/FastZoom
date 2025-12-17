@@ -226,7 +226,7 @@
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <!-- Left Panel: PDF Preview with Canvas Overlay -->
                             <div
-                                class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                                class="sticky top-0 self-start bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700 max-h-[calc(100vh-200px)] overflow-y-auto">
                                 <div class="flex items-center justify-between mb-3">
                                     <h4
                                         class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center">
@@ -315,6 +315,44 @@
                                             US</label>
                                         <input type="text" x-model="editedOCRData.us_code"
                                             @focus="onFieldFocus('us_code')" @blur="onFieldBlur()"
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                    </div>
+
+                                    <!-- Ente Responsabile -->
+                                    <div>
+                                        <label
+                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ente
+                                            Responsabile</label>
+                                        <input type="text" x-model="editedOCRData.ente_responsabile"
+                                            @focus="onFieldFocus('ente_responsabile')" @blur="onFieldBlur()"
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                    </div>
+
+                                    <!-- Ufficio MiC -->
+                                    <div>
+                                        <label
+                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ufficio
+                                            MiC</label>
+                                        <input type="text" x-model="editedOCRData.ufficio_mic"
+                                            @focus="onFieldFocus('ufficio_mic')" @blur="onFieldBlur()"
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                    </div>
+
+                                    <!-- Anno -->
+                                    <div>
+                                        <label
+                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Anno</label>
+                                        <input type="number" x-model="editedOCRData.anno" @focus="onFieldFocus('anno')"
+                                            @blur="onFieldBlur()"
+                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                    </div>
+
+                                    <!-- Identificativo -->
+                                    <div>
+                                        <label
+                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Identificativo</label>
+                                        <input type="text" x-model="editedOCRData.identificativo_rif"
+                                            @focus="onFieldFocus('identificativo_rif')" @blur="onFieldBlur()"
                                             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
                                     </div>
 

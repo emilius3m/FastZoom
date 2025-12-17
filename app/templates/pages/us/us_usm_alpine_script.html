@@ -258,6 +258,10 @@
             // Field to bounding box label mapping for canvas highlighting
             fieldLabelMap: {
                 'us_code': ['US', 'US CODE', 'UNITA STRATIGRAFICA'],
+                'ente_responsabile': ['ENTE RESPONSABILE', 'ENTE Schedatore'],
+                'ufficio_mic': ['UFFICIO MIC', 'UFFICIO COMPETENTE'],
+                'anno': ['ANNO'],
+                'identificativo_rif': ['IDENTIFICATIVO', 'IDENTIFICATIVO DEL SAGGIO'],
                 'tipo': ['TIPO', 'TIPO US', 'TIPO USM'],
                 'definizione': ['DEFINIZIONE'],
                 'localita': ['LOCALITA', 'LOCALITÀ'],
@@ -402,6 +406,10 @@
                 // Load result data into editedOCRData for editing - include ALL possible fields
                 this.editedOCRData = {
                     us_code: result.us_code || '',
+                    ente_responsabile: result.data?.ente_responsabile || '',
+                    ufficio_mic: result.data?.ufficio_mic || '',
+                    anno: result.data?.anno || '',
+                    identificativo_rif: result.data?.identificativo_rif || '',
                     tipo: result.data?.tipo || '',
                     definizione: result.data?.definizione || '',
                     localita: result.data?.localita || '',
@@ -446,6 +454,10 @@
                 result.us_code = this.editedOCRData.us_code;
                 result.data = {
                     ...result.data,
+                    ente_responsabile: this.editedOCRData.ente_responsabile,
+                    ufficio_mic: this.editedOCRData.ufficio_mic,
+                    anno: this.editedOCRData.anno,
+                    identificativo_rif: this.editedOCRData.identificativo_rif,
                     tipo: this.editedOCRData.tipo,
                     definizione: this.editedOCRData.definizione,
                     localita: this.editedOCRData.localita,
