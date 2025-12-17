@@ -757,7 +757,6 @@ class PaddleOCRService:
             # --- LAYOUT-AWARE PARSING ---
             # Combine all bounding boxes from all pages (with y-offset for multi-page)
             from app.services.us_layout_parser import get_us_layout_parser
-            from app.services.table_grid_detector import get_table_grid_detector
             
             all_boxes = []
             y_offset = 0
@@ -818,40 +817,8 @@ class PaddleOCRService:
                 result['debug']['pp_structure_cells'] = all_pp_cells
                 result['debug']['tables_html'] = all_tables_html
             else:
-                # FALLBACK: Grid detector Hough-based se PPStructure non trova tabelle
-                logger.info("PPStructure found no tables, falling back to Hough grid detector")
-                try:
-                    if result['debug']['pages']:
-                        first_page = result['debug']['pages'][0]
-                        first_page_img_b64 = first_page.get('image_base64', '')
-                        
-                        if first_page_img_b64:
-                            img_data = first_page_img_b64.split(',')[1] if ',' in first_page_img_b64 else first_page_img_b64
-                            img_bytes = base64.b64decode(img_data)
-                            img_array = np.frombuffer(img_bytes, np.uint8)
-                            page_image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-                            
-                            if page_image is not None:
-                                from app.services.table_grid_detector import get_table_grid_detector
-                                grid_detector = get_table_grid_detector()
-                                detected_cells, debug_grid_img = grid_detector.detect_grid(page_image, debug=include_debug)
-                                logger.info(f"Grid detection: found {len(detected_cells)} cells")
-                                result['debug']['table_detection_method'] = 'hough_grid'
-                                
-                                if detected_cells:
-                                    first_page_boxes = first_page.get('bounding_boxes', [])
-                                    cell_contents = grid_detector.associate_text_to_cells(detected_cells, first_page_boxes)
-                                    result['debug']['grid_cells'] = [
-                                        {
-                                            'row': c.row, 'col': c.col,
-                                            'x1': c.x1, 'y1': c.y1, 'x2': c.x2, 'y2': c.y2,
-                                            'text': grid_detector.get_cell_text(cell_contents, i)
-                                        }
-                                        for i, c in enumerate(detected_cells)
-                                    ]
-                                    all_pp_cells = result['debug']['grid_cells']
-                except Exception as e:
-                    logger.warning(f"Grid detection fallback failed: {e}")
+                logger.info("PPStructure found no tables.")
+                result['debug']['table_detection_method'] = 'none'
             
             # Collect cells for layout parser
             cells_for_parser = all_pp_cells
