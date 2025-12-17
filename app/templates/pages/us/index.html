@@ -111,8 +111,9 @@
     </div>
 
     <!-- PDF Import Results Modal with Debug View -->
-    <div x-show="showPdfImportModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 z-50"
-        @click.self="showPdfImportModal = false">
+    <div x-show="showPdfImportModal" x-cloak
+        x-init="$watch('showPdfImportModal', value => document.body.classList.toggle('overflow-hidden', value))"
+        class="fixed inset-0 bg-black bg-opacity-50 z-50" @click.self="showPdfImportModal = false">
 
         <div x-data="{ocrDebugTab: 'result'}"
             class="bg-white dark:bg-gray-800 absolute inset-0 flex flex-col overflow-hidden shadow-2xl">
