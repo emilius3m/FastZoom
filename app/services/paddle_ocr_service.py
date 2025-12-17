@@ -372,7 +372,6 @@ class PaddleOCRService:
         """
         extracted_text = []
         confidences = []
-        bounding_boxes = []
         
         try:
             if results and len(results) > 0:
@@ -556,140 +555,7 @@ class PaddleOCRService:
     
 
     
-    async def _process_page_for_combined_extraction(
-        self,
-        page: Any,
-        page_num: int,
-        include_debug: bool
-    ) -> Dict[str, Any]:
-        """
-        Helper method to process a single page for combined extraction.
-        
-        Returns:
-            Dict containing 'text_lines', 'debug_info', and 'page_structure'
-        """
-        import base64
-        
-        zoom = 2.5  # Lower for faster processing
-        mat = fitz.Matrix(zoom, zoom)
-        pix = page.get_pixmap(matrix=mat)
-        
-        pil_image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-        
-        # Preprocess
-        processed_cv = self.preprocess_image(pil_image)
-        
-        # OCR
-        results = await self._run_ocr(processed_cv)
-        
-        # Extract text and boxes
-        page_texts = []
-        page_boxes = []
-        page_confidences = []
-        
-        if results and len(results) > 0:
-            ocr_result = results[0]
-            
-            if hasattr(ocr_result, 'get'):
-                rec_texts = ocr_result.get('rec_texts', None)
-                rec_scores = ocr_result.get('rec_scores', None)
-                rec_polys = ocr_result.get('rec_polys', None)
-                
-                # Convert to lists
-                if rec_texts is not None:
-                    if hasattr(rec_texts, 'tolist'):
-                        rec_texts = rec_texts.tolist()
-                    elif not isinstance(rec_texts, list):
-                        rec_texts = list(rec_texts)
-                else:
-                    rec_texts = []
-                
-                if rec_scores is not None:
-                    if hasattr(rec_scores, 'tolist'):
-                        rec_scores = rec_scores.tolist()
-                    elif not isinstance(rec_scores, list):
-                        rec_scores = list(rec_scores)
-                else:
-                    rec_scores = []
-                
-                if rec_polys is not None:
-                    if hasattr(rec_polys, 'tolist'):
-                        rec_polys = rec_polys.tolist()
-                    elif not isinstance(rec_polys, list):
-                        rec_polys = list(rec_polys)
-                else:
-                    rec_polys = []
-                
-                for i, text_val in enumerate(rec_texts):
-                    if text_val is None:
-                        continue
-                    text_str = str(text_val).strip()
-                    if not text_str:
-                        continue
-                    
-                    page_texts.append(text_str)
-                    
-                    conf = 0.9
-                    if i < len(rec_scores):
-                        try:
-                            sv = rec_scores[i]
-                            if hasattr(sv, 'item'):
-                                conf = float(sv.item())
-                            elif sv is not None:
-                                conf = float(sv)
-                        except:
-                            pass
-                    page_confidences.append(conf)
-                    
-                    poly = []
-                    if i < len(rec_polys) and rec_polys[i] is not None:
-                        try:
-                            p = rec_polys[i]
-                            if hasattr(p, 'tolist'):
-                                p = p.tolist()
-                            poly = [[float(pt[0]), float(pt[1])] for pt in p]
-                        except:
-                            pass
-                    
-                    page_boxes.append({
-                        'text': text_str,
-                        'confidence': conf,
-                        'polygon': poly
-                    })
-        
-        # --- PPStructure LAYOUT ANALYSIS ---
-        # Esegui PPStructure per ottenere JSON struttura pagina
-        page_structure = self.analyze_page_structure(processed_cv)
-        
-        debug_info = {}
-        # Include debug data with CLEAN image (boxes rendered as SVG overlay in frontend)
-        if include_debug:
-            # Convert clean image to base64 (no boxes drawn - interactive SVG overlay in frontend)
-            _, buffer = cv2.imencode('.png', processed_cv)
-            img_b64 = base64.b64encode(buffer).decode('utf-8')
-            
-            debug_info = {
-                'page_number': page_num + 1,
-                'image_base64': f"data:image/png;base64,{img_b64}",
-                'text_lines': page_texts,
-                'bounding_boxes': page_boxes,
-                'word_count': len(page_texts),
-                'avg_confidence': sum(page_confidences)/len(page_confidences) if page_confidences else 0,
-                'page_size': (pix.width, pix.height),  # Store page size for layout parser
-                # PPStructureV3 JSON output per pagina
-                'layout_json': {
-                    'parsing_res_list': page_structure.get('parsing_res_list', []),
-                    'tables': page_structure.get('tables', []),
-                    'overall_ocr_res': page_structure.get('overall_ocr_res', {}),
-                    'raw_json': page_structure.get('raw_json', {})
-                }
-            }
 
-        return {
-            'text_lines': page_texts,
-            'debug_info': debug_info,
-            'page_structure': page_structure
-        }
 
     async def extract_from_pdf_combined(
         self, 
@@ -699,26 +565,34 @@ class PaddleOCRService:
         include_debug: bool = True
     ) -> Dict:
         """
-        Estrae UNA singola US da PDF multi-pagina (tutte le pagine = 1 US)
-        Include dati debug per visualizzazione
+        Estrae UNA singola US da PDF multi-pagina.
+        
+        Strategy Update (Fix Scaling): 
+        Renderizza le pagine in immagini (zoom 2.5) e passa quelle a PPStructure.
+        Questo garantisce che le coordinate OCR siano 1:1 con l'immagine di debug.
         
         Args:
             pdf_bytes: Contenuto PDF
             filename: Nome file
             site_id: ID del cantiere
-            include_debug: Se includere immagini/boxes per debug
+            include_debug: Se includere immagini/boxes per debug viewer
             
         Returns:
             Dict con:
             - us_data: dati US parsati (o None)
-            - debug: {pages: [{image_base64, text_lines, bounding_boxes}...]}
+            - debug: {pages: [{image_base64, text_lines, bounding_boxes, layout_json}...]}
         """
         import base64
+        import tempfile
+        import numpy as np
+        import cv2
         
         if not PDF2IMAGE_AVAILABLE:
-            raise RuntimeError("PyMuPDF non installato")
-        
-        self._ensure_model_loaded()
+            raise RuntimeError("PyMuPDF (fitz) required for rendering")
+            
+        # Ensure PPStructure engine is loaded
+        if not self._ensure_table_engine_loaded():
+            raise RuntimeError("Impossibile caricare PPStructureV3")
         
         result = {
             'us_data': None,
@@ -730,56 +604,145 @@ class PaddleOCRService:
         }
         
         try:
-            logger.info(f"Converting PDF {filename} to images (combined mode)...")
+            logger.info(f"Processing PDF {filename} via Rendered Images (zoom=2.5) for precise alignment...")
             
+            # Open PDF with PyMuPDF
             pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+            
             all_page_texts = []
+            all_boxes = []
+            all_pp_cells = []
+            all_tables_html = []
+            
+            y_offset = 0
+            total_height = 0
+            max_width = 0
             
             for page_num in range(len(pdf_document)):
                 page = pdf_document[page_num]
                 
-                # Process page in helper method
-                page_data = await self._process_page_for_combined_extraction(
-                    page=page,
-                    page_num=page_num,
-                    include_debug=include_debug
-                )
+                # 1. RENDER IMAGE (Controlled Zoom)
+                zoom = 2.5
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat)
                 
-                # Unpack results
-                all_page_texts.extend(page_data['text_lines'])
+                # Convert to numpy for PPStructure
+                img_data = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+                # Ensure RGB (PPStructure expects RGB or BGR, usually robust)
+                if pix.n == 4: # RGBA
+                    img_data = cv2.cvtColor(img_data, cv2.COLOR_RGBA2BGR)
+                elif pix.n == 3: # RGB
+                    img_data = cv2.cvtColor(img_data, cv2.COLOR_RGB2BGR) # OpenCV uses BGR
                 
+                # 2. PREDICT ON IMAGE
+                # input can be ndarray
+                pp_results = list(self._table_engine.predict(img_data))
+                
+                # Extract page results (usually just 1 result per image)
+                page_texts = []
+                page_boxes = []
+                layout_json = {
+                    'parsing_res_list': [],
+                    'tables': [],
+                    'overall_ocr_res': {},
+                    'raw_json': {}
+                }
+                
+                if pp_results:
+                    page_result = pp_results[0]
+                    
+                    # Extract JSON
+                    page_json = {}
+                    if hasattr(page_result, 'json'):
+                        page_json = page_result.json if isinstance(page_result.json, dict) else {}
+                    
+                    layout_json['raw_json'] = page_json
+                    
+                    if page_json.get('res') and isinstance(page_json['res'], dict):
+                        overall_ocr = page_json['res'].get('overall_ocr_res', {})
+                        layout_json['overall_ocr_res'] = overall_ocr
+                        
+                        # Texts & Boxes
+                        rec_texts = overall_ocr.get('rec_texts', [])
+                        rec_polys = overall_ocr.get('rec_polys', [])
+                        rec_scores = overall_ocr.get('rec_scores', [])
+                        
+                        # Normalize to list
+                        if hasattr(rec_texts, 'tolist'): rec_texts = rec_texts.tolist()
+                        if hasattr(rec_polys, 'tolist'): rec_polys = rec_polys.tolist()
+                        if hasattr(rec_scores, 'tolist'): rec_scores = rec_scores.tolist()
+                        
+                        for i, text in enumerate(rec_texts):
+                            if not text or not str(text).strip(): continue
+                            text_str = str(text).strip()
+                            page_texts.append(text_str)
+                            all_page_texts.append(text_str)
+                            
+                            conf = 0.9
+                            if i < len(rec_scores) and rec_scores[i] is not None:
+                                try: conf = float(rec_scores[i])
+                                except: pass
+                            
+                            poly = []
+                            if i < len(rec_polys) and rec_polys[i] is not None:
+                                try:
+                                    p = rec_polys[i]
+                                    if hasattr(p, 'tolist'): p = p.tolist()
+                                    # Coordinates are already in image space (1:1)
+                                    poly = [[float(pt[0]), float(pt[1])] for pt in p]
+                                except: pass
+                            
+                            page_boxes.append({
+                                'text': text_str,
+                                'confidence': conf,
+                                'polygon': poly
+                            })
+                            
+                        # Tables
+                        table_res_list = page_json['res'].get('table_res_list', [])
+                        for table in table_res_list:
+                            if isinstance(table, dict):
+                                if table.get('pred_html'):
+                                    all_tables_html.append(table['pred_html'])
+                                for i, cell_box in enumerate(table.get('cell_box_list', [])):
+                                    if len(cell_box) >= 4:
+                                        all_pp_cells.append({
+                                            'x1': float(cell_box[0]),
+                                            'y1': float(cell_box[1]) + y_offset,
+                                            'x2': float(cell_box[2]),
+                                            'y2': float(cell_box[3]) + y_offset,
+                                            'cell_index': i
+                                        })
+                                layout_json['tables'].append({
+                                    'pred_html': table.get('pred_html', ''),
+                                    'cell_box_list': table.get('cell_box_list', []),
+                                    'table_ocr_pred': table.get('table_ocr_pred', {})
+                                })
+                
+                # 3. DEBUG INFO
+                debug_info = {}
                 if include_debug:
-                    result['debug']['pages'].append(page_data['debug_info'])
+                    # Use the same pixmap -> exact match
+                    img_bytes = pix.tobytes("png")
+                    img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                    
+                    debug_info = {
+                        'page_number': page_num + 1,
+                        'image_base64': f"data:image/png;base64,{img_b64}",
+                        'text_lines': page_texts,
+                        'bounding_boxes': page_boxes, # 1:1 coordinates
+                        'word_count': len(page_texts),
+                        'avg_confidence': 0.9, # simplified
+                        'page_size': (pix.width, pix.height),
+                        'layout_json': layout_json
+                    }
+                    result['debug']['pages'].append(debug_info)
                 
-                logger.info(f"Page {page_num + 1}: extracted {len(page_data['text_lines'])} text blocks")
-
-
-            
-            pdf_document.close()
-            
-            # Combine all text and parse as single US
-            combined_text = '\n'.join(all_page_texts)
-            result['debug']['combined_text'] = combined_text
-            result['debug']['total_words'] = len(all_page_texts)
-            
-            logger.info(f"Combined text from {len(result['debug']['pages'])} pages: {len(all_page_texts)} words")
-            
-            # --- LAYOUT-AWARE PARSING ---
-            # Combine all bounding boxes from all pages (with y-offset for multi-page)
-            from app.services.us_layout_parser import get_us_layout_parser
-            
-            all_boxes = []
-            y_offset = 0
-            total_height = 0
-            max_width = 0
-            all_cells = []  # Grid cells from all pages
-            
-            for page_info in result['debug']['pages']:
-                page_w, page_h = page_info.get('page_size', (1000, 1400))
-                max_width = max(max_width, page_w)
+                # Update global offsets
+                max_width = max(max_width, pix.width)
                 
-                for box in page_info.get('bounding_boxes', []):
-                    # Adjust y coordinates for page offset
+                # Add boxes to global list (with Y offset)
+                for box in page_boxes:
                     adjusted_box = {
                         'text': box['text'],
                         'confidence': box['confidence'],
@@ -791,76 +754,56 @@ class PaddleOCRService:
                         ]
                     all_boxes.append(adjusted_box)
                 
-                y_offset += page_h
-                total_height += page_h
+                y_offset += pix.height
+                total_height += pix.height
+                logger.info(f"Page {page_num+1} processed. Size: {pix.width}x{pix.height}, Text blocks: {len(page_boxes)}")
             
-            # --- TABLE GRID DETECTION ---
-            # Usa l'output layout_json già calcolato da PPStructure per ogni pagina
-            # Raccogli tutte le celle dalle tabelle trovate
-            all_pp_cells = []
-            all_tables_html = []
+            pdf_document.close()
             
-            for page_info in result['debug']['pages']:
-                layout_json = page_info.get('layout_json', {})
-                tables = layout_json.get('tables', [])
-                
-                for table in tables:
-                    # Salva HTML tabella per debug (PPStructureV3 usa pred_html)
-                    if table.get('pred_html'):
-                        all_tables_html.append(table['pred_html'])
-                    
-                    # Estrai celle (PPStructureV3 usa cell_box_list)
-                    for i, cell_box in enumerate(table.get('cell_box_list', [])):
-                        if len(cell_box) >= 4:
-                            all_pp_cells.append({
-                                'x1': float(cell_box[0]),
-                                'y1': float(cell_box[1]),
-                                'x2': float(cell_box[2]),
-                                'y2': float(cell_box[3]),
-                                'cell_index': i
-                            })
-
+            # STEP 5: COMBINE & PARSE
+            combined_text = '\n'.join(all_page_texts)
+            result['debug']['combined_text'] = combined_text
+            result['debug']['total_words'] = len(all_page_texts)
             
+            # Table detection summary
             if all_pp_cells:
-                logger.info(f"PPStructure extracted {len(all_pp_cells)} cells from {len(all_tables_html)} tables")
                 result['debug']['table_detection_method'] = 'ppstructure'
                 result['debug']['pp_structure_cells'] = all_pp_cells
                 result['debug']['tables_html'] = all_tables_html
             else:
-                logger.info("PPStructure found no tables.")
                 result['debug']['table_detection_method'] = 'none'
             
-            # Collect cells for layout parser
-            cells_for_parser = all_pp_cells
+            # Layout Parser
+            from app.services.us_layout_parser import get_us_layout_parser
             
-            # Use layout parser for core fields (with PPStructure cell grid info)
             layout_parser = get_us_layout_parser()
             us_data = layout_parser.parse_core(
                 all_boxes,
                 site_id=site_id,
                 page_size=(max_width, total_height),
-                detected_cells=cells_for_parser
+                detected_cells=all_pp_cells
             )
-
-            
-
             
             if us_data and us_data.get('us_code'):
                 us_data['_pdf_source'] = filename
                 us_data['_total_pages'] = len(result['debug']['pages'])
-                us_data['_raw_ocr_text'] = combined_text  # Keep for debug/QA
+                us_data['_raw_ocr_text'] = combined_text
                 result['us_data'] = us_data
-                logger.info(f"✓ Parsed US: {us_data.get('us_code', 'unknown')} (layout parser)")
+                logger.info(f"✓ Parsed US: {us_data.get('us_code', 'unknown')} (Image-based PPStructure)")
             else:
                 logger.warning("No US data could be parsed from combined pages")
             
             return result
-            
+        
         except Exception as e:
             logger.error(f"Error in extract_from_pdf_combined: {e}")
             import traceback
             logger.error(traceback.format_exc())
             raise
+        finally:
+            # Cleanup only if temp file was used (not in this version)
+            pass
+
     
     async def extract_from_image(
         self,
