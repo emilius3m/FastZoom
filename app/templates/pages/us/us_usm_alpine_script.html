@@ -356,6 +356,27 @@
             // Handle field focus
             onFieldFocus(fieldName) {
                 this.highlightedField = fieldName;
+
+                // Find which page contains this field
+                const pages = this.pdfImportResults?.debug_pages || [];
+                let foundPageIdx = -1;
+
+                // Search all pages for this field
+                for (let i = 0; i < pages.length; i++) {
+                    if (this.findBoxForField(fieldName, pages[i]) !== null) {
+                        foundPageIdx = i;
+                        break;
+                    }
+                }
+
+                // Switch page if needed
+                if (foundPageIdx !== -1 && foundPageIdx !== this.editPageIdx) {
+                    this.editPageIdx = foundPageIdx;
+                    // The img @load will trigger initRevisionCanvas which will handle highlighting
+                    return;
+                }
+
+                // If on same page, highlight immediately
                 const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx || 0];
                 this.redrawRevisionCanvas('revision_ocr_canvas', page, fieldName);
             },
@@ -467,6 +488,11 @@
 
                 // Draw all field boxes
                 this.drawRevisionBoxes(canvas, page);
+
+                // Auto-highlight if field is selected/focused
+                if (this.highlightedField) {
+                    this.redrawRevisionCanvas('revision_ocr_canvas', page, this.highlightedField);
+                }
             },
 
             // Draw bounding boxes for all fields on revision canvas
