@@ -1,0 +1,449 @@
+{
+  "form_sections": [
+    {
+      "section_id": "intestazione",
+      "section_label": "INTESTAZIONE",
+      "section_icon": "fa-list",
+      "fields": [
+        {
+          "pdf_label": "US",
+          "model_key": "us_code",
+          "type": "text",
+          "hint": "Codice identificativo (es. US001)",
+          "required": true,
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "ENTE RESPONSABILE",
+          "model_key": "ente_responsabile",
+          "type": "text",
+          "required": false,
+          "width": "col-span-2"
+        },
+        {
+          "pdf_label": "ANNO",
+          "model_key": "anno",
+          "type": "number",
+          "required": false,
+          "width": "col-span-1"
+        }
+      ]
+    },
+    {
+      "section_id": "amministrativi",
+      "section_label": "DATI AMMINISTRATIVI",
+      "section_icon": "fa-file",
+      "fields": [
+        {
+          "pdf_label": "UFFICIO MiC COMPETENTE PER TUTELA",
+          "model_key": "ufficio_mic",
+          "type": "text",
+          "width": "col-span-2"
+        },
+        {
+          "pdf_label": "IDENTIFICATIVO DEL SAGGIO/STRUTTURA",
+          "model_key": "identificativo_rif",
+          "type": "text",
+          "width": "col-span-2"
+        }
+      ]
+    },
+    {
+      "section_id": "localizzazione",
+      "section_label": "LOCALIZZAZIONE",
+      "section_icon": "fa-map-marker-alt",
+      "fields": [
+        {
+          "pdf_label": "LOCALITA",
+          "model_key": "localita",
+          "type": "text",
+          "width": "col-span-2"
+        },
+        {
+          "pdf_label": "AREA/EDIFICIO/STRUTTURA",
+          "model_key": "area_struttura",
+          "type": "text",
+          "width": "col-span-2"
+        },
+        {
+          "pdf_label": "SAGGIO",
+          "model_key": "saggio",
+          "type": "text",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "AMBIENTE/UNITA FUNZIONALE",
+          "model_key": "ambiente_unita_funzione",
+          "type": "text",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "POSIZIONE",
+          "model_key": "posizione",
+          "type": "text",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "SETTORE/I",
+          "model_key": "settori",
+          "type": "text",
+          "placeholder": "A1, A2, B1...",
+          "width": "col-span-1"
+        }
+      ]
+    },
+    {
+      "section_id": "documentazione",
+      "section_label": "DOCUMENTAZIONE",
+      "section_icon": "fa-images",
+      "fields": [
+        {
+          "pdf_label": "PIANTE",
+          "model_key": "piante_riferimenti",
+          "type": "text",
+          "placeholder": "TAV. 8",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "PROSPETTI",
+          "model_key": "prospetti_riferimenti",
+          "type": "text",
+          "placeholder": "TAV. 15-16",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "SEZIONI",
+          "model_key": "sezioni_riferimenti",
+          "type": "text",
+          "placeholder": "TAV. 38-39",
+          "width": "col-span-1"
+        }
+      ]
+    },
+    {
+      "section_id": "tipo",
+      "section_label": "TIPO STRATIGRAFIA",
+      "section_icon": "fa-check-square",
+      "fields": [
+        {
+          "pdf_label": "POSITIVA / NEGATIVA",
+          "model_key": "tipo",
+          "type": "radio_group",
+          "options": [
+            {"label": "Positiva (accumulo)", "value": "positiva"},
+            {"label": "Negativa (taglio)", "value": "negativa"}
+          ],
+          "width": "col-span-3"
+        }
+      ]
+    },
+    {
+      "section_id": "caratterizzazione",
+      "section_label": "CARATTERIZZAZIONE STRATO",
+      "section_icon": "fa-layer-group",
+      "fields": [
+        {
+          "pdf_label": "DEFINIZIONE",
+          "model_key": "definizione",
+          "type": "textarea",
+          "rows": 2,
+          "placeholder": "Es: Accumulo di terreno argilloso",
+          "width": "col-span-3"
+        },
+        {
+          "pdf_label": "CRITERI DI DISTINZIONE",
+          "model_key": "criteri_distinzione",
+          "type": "textarea",
+          "rows": 2,
+          "placeholder": "Composizione, colore, consistenza...",
+          "width": "col-span-3"
+        },
+        {
+          "pdf_label": "MODO DI FORMAZIONE",
+          "model_key": "modo_formazione",
+          "type": "text",
+          "placeholder": "Artificiale intenzionale, naturale...",
+          "width": "col-span-3"
+        },
+        {
+          "pdf_label": "COMPONENTI INORGANICI",
+          "model_key": "componenti_inorganici",
+          "type": "textarea",
+          "rows": 2,
+          "placeholder": "Elementi fittili, elementi lapidei...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "COMPONENTI ORGANICI",
+          "model_key": "componenti_organici",
+          "type": "textarea",
+          "rows": 2,
+          "placeholder": "Apparati radicali, frammenti ossei...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "CONSISTENZA",
+          "model_key": "consistenza",
+          "type": "select",
+          "options": [
+            {"label": "Seleziona...", "value": ""},
+            {"label": "Compatta", "value": "compatta"},
+            {"label": "Media", "value": "media"},
+            {"label": "Friabile", "value": "friabile"},
+            {"label": "Molto friabile", "value": "molto_friabile"},
+            {"label": "Sciolta", "value": "sciolta"}
+          ],
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "COLORE",
+          "model_key": "colore",
+          "type": "text",
+          "placeholder": "Marrone scuro, grigio...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "MISURE",
+          "model_key": "misure",
+          "type": "text",
+          "placeholder": "Es: 10x3.30 m",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "STATO DI CONSERVAZIONE",
+          "model_key": "stato_conservazione",
+          "type": "text",
+          "placeholder": "Ottimo, buono, cattivo...",
+          "width": "col-span-1"
+        }
+      ]
+    },
+    {
+      "section_id": "sequenza",
+      "section_label": "SEQUENZA FISICA (HARRIS MATRIX)",
+      "section_icon": "fa-share-nodes",
+      "fields": [
+        {
+          "pdf_label": "UGUALE A",
+          "model_key": "seq_uguale_a",
+          "type": "text",
+          "placeholder": "US001, US002...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "SI LEGA A",
+          "model_key": "seq_si_lega_a",
+          "type": "text",
+          "placeholder": "US003...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "GLI SI APPOGGIA",
+          "model_key": "seq_gli_si_appoggia",
+          "type": "text",
+          "placeholder": "US004...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "SI APPOGGIA A",
+          "model_key": "seq_si_appoggia_a",
+          "type": "text",
+          "placeholder": "US005...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "COPERTO DA",
+          "model_key": "seq_coperto_da",
+          "type": "text",
+          "placeholder": "US006...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "COPRE",
+          "model_key": "seq_copre",
+          "type": "text",
+          "placeholder": "US007...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "TAGLIATO DA",
+          "model_key": "seq_tagliato_da",
+          "type": "text",
+          "placeholder": "US008...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "TAGLIA",
+          "model_key": "seq_taglia",
+          "type": "text",
+          "placeholder": "US009...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "RIEMPITO DA",
+          "model_key": "seq_riempito_da",
+          "type": "text",
+          "placeholder": "US010...",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "RIEMPIE",
+          "model_key": "seq_riempie",
+          "type": "text",
+          "placeholder": "US011...",
+          "width": "col-span-1"
+        }
+      ]
+    },
+    {
+      "section_id": "descrizioni",
+      "section_label": "DESCRIZIONE E INTERPRETAZIONE",
+      "section_icon": "fa-pen-fancy",
+      "fields": [
+        {
+          "pdf_label": "DESCRIZIONE",
+          "model_key": "descrizione",
+          "type": "textarea",
+          "rows": 3,
+          "placeholder": "Descrizione completa dell'unità stratigrafica...",
+          "width": "col-span-3"
+        },
+        {
+          "pdf_label": "OSSERVAZIONI",
+          "model_key": "osservazioni",
+          "type": "textarea",
+          "rows": 3,
+          "placeholder": "Note aggiuntive...",
+          "width": "col-span-3"
+        },
+        {
+          "pdf_label": "INTERPRETAZIONE",
+          "model_key": "interpretazione",
+          "type": "textarea",
+          "rows": 3,
+          "placeholder": "Interpretazione archeologica...",
+          "width": "col-span-3"
+        }
+      ]
+    },
+    {
+      "section_id": "datazione",
+      "section_label": "DATAZIONE E REPERTI",
+      "section_icon": "fa-calendar",
+      "fields": [
+        {
+          "pdf_label": "DATAZIONE",
+          "model_key": "datazione",
+          "type": "text",
+          "placeholder": "I sec. a.C. - I sec. d.C.",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "PERIODO",
+          "model_key": "periodo",
+          "type": "text",
+          "placeholder": "Es: Romano, Medievale",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "FASE",
+          "model_key": "fase",
+          "type": "text",
+          "placeholder": "Es: Fase I, Fase II",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "ELEMENTI DATANTI",
+          "model_key": "elementi_datanti",
+          "type": "textarea",
+          "rows": 2,
+          "placeholder": "Monete, ceramica sigillata...",
+          "width": "col-span-3"
+        },
+        {
+          "pdf_label": "DATI QUANTITATIVI DEI REPERTI",
+          "model_key": "dati_quantitativi_reperti",
+          "type": "textarea",
+          "rows": 2,
+          "placeholder": "Frr. ceramici: 150, ossa: 20...",
+          "width": "col-span-3"
+        }
+      ]
+    },
+    {
+      "section_id": "campionature",
+      "section_label": "CAMPIONATURE E ANALISI",
+      "section_icon": "fa-flask",
+      "fields": [
+        {
+          "pdf_label": "CAMPIONATURE",
+          "model_key": "campionature_note",
+          "type": "text",
+          "placeholder": "Note campionature...",
+          "width": "col-span-3"
+        },
+        {
+          "pdf_label": "FLOTTAZIONE",
+          "model_key": "campionature_flottazione",
+          "type": "checkbox",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "SETACCIATURA",
+          "model_key": "campionature_setacciatura",
+          "type": "checkbox",
+          "width": "col-span-1"
+        }
+      ]
+    },
+    {
+      "section_id": "responsabilita",
+      "section_label": "QUALITA E RESPONSABILITA",
+      "section_icon": "fa-user-check",
+      "fields": [
+        {
+          "pdf_label": "AFFIDABILITA STRATIGRAFICA",
+          "model_key": "affidabilita_stratigrafica",
+          "type": "select",
+          "options": [
+            {"label": "Seleziona...", "value": ""},
+            {"label": "Alta", "value": "alta"},
+            {"label": "Media", "value": "media"},
+            {"label": "Bassa", "value": "bassa"}
+          ],
+          "width": "col-span-3"
+        },
+        {
+          "pdf_label": "RESPONSABILE SCIENTIFICO",
+          "model_key": "responsabile_scientifico",
+          "type": "text",
+          "width": "col-span-3"
+        },
+        {
+          "pdf_label": "DATA RILEVAMENTO",
+          "model_key": "data_rilevamento",
+          "type": "date",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "RESPONSABILE COMPILAZIONE",
+          "model_key": "responsabile_compilazione",
+          "type": "text",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "DATA RIELABORAZIONE",
+          "model_key": "data_rielaborazione",
+          "type": "date",
+          "width": "col-span-1"
+        },
+        {
+          "pdf_label": "RESPONSABILE RIELABORAZIONE",
+          "model_key": "responsabile_rielaborazione",
+          "type": "text",
+          "width": "col-span-2"
+        }
+      ]
+    }
+  ]
+}

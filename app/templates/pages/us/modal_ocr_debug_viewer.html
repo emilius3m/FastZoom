@@ -307,352 +307,190 @@
                                     </svg>
                                     Modifica Valori OCR
                                 </h4>
-                                <div class="space-y-3 pr-2">
-                                    <!-- Codice US -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Codice
-                                            US</label>
-                                        <input type="text" x-model="editedOCRData.us_code"
-                                            @focus="onFieldFocus('us_code')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
 
-                                    <!-- Ente Responsabile -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ente
-                                            Responsabile</label>
-                                        <input type="text" x-model="editedOCRData.ente_responsabile"
-                                            @focus="onFieldFocus('ente_responsabile')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                <!-- Schema-driven dynamic form -->
+                                <div class="space-y-6 pr-2">
+                                    <template x-for="section in formFieldsSchema?.form_sections || []"
+                                        :key="section.section_id">
+                                        <div class="border-b border-gray-200 dark:border-gray-700 pb-4 last:border-b-0">
+                                            <!-- Section Header -->
+                                            <h5
+                                                class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center">
+                                                <i
+                                                    :class="`fas ${section.section_icon} mr-2 text-purple-600 dark:text-purple-400`"></i>
+                                                <span x-text="section.section_label"></span>
+                                            </h5>
 
-                                    <!-- Ufficio MiC -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ufficio
-                                            MiC</label>
-                                        <input type="text" x-model="editedOCRData.ufficio_mic"
-                                            @focus="onFieldFocus('ufficio_mic')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                            <!-- Fields Grid (3 columns) -->
+                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <template x-for="field in section.fields" :key="field.model_key">
+                                                    <div>
+                                                        <!-- TEXT INPUT -->
+                                                        <template x-if="field.type === 'text'">
+                                                            <div :class="field.width || 'col-span-1'">
+                                                                <label
+                                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                                                    <span x-text="field.pdf_label"></span>
+                                                                    <span x-show="field.required"
+                                                                        class="text-red-500 ml-1">*</span>
+                                                                </label>
+                                                                <input type="text"
+                                                                    x-model="editedOCRData[field.model_key]"
+                                                                    :placeholder="field.placeholder || ''"
+                                                                    @focus="onFieldFocus(field.model_key)"
+                                                                    @blur="onFieldBlur()"
+                                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                                                            </div>
+                                                        </template>
 
-                                    <!-- Anno -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Anno</label>
-                                        <input type="number" x-model="editedOCRData.anno" @focus="onFieldFocus('anno')"
-                                            @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                                        <!-- NUMBER INPUT -->
+                                                        <template x-if="field.type === 'number'">
+                                                            <div :class="field.width || 'col-span-1'">
+                                                                <label
+                                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                                                    <span x-text="field.pdf_label"></span>
+                                                                    <span x-show="field.required"
+                                                                        class="text-red-500 ml-1">*</span>
+                                                                </label>
+                                                                <input type="number"
+                                                                    x-model="editedOCRData[field.model_key]"
+                                                                    :placeholder="field.placeholder || ''"
+                                                                    @focus="onFieldFocus(field.model_key)"
+                                                                    @blur="onFieldBlur()"
+                                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                                                            </div>
+                                                        </template>
 
-                                    <!-- Identificativo -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Identificativo</label>
-                                        <input type="text" x-model="editedOCRData.identificativo_rif"
-                                            @focus="onFieldFocus('identificativo_rif')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                                        <!-- DATE INPUT -->
+                                                        <template x-if="field.type === 'date'">
+                                                            <div :class="field.width || 'col-span-1'">
+                                                                <label
+                                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                                                    <span x-text="field.pdf_label"></span>
+                                                                    <span x-show="field.required"
+                                                                        class="text-red-500 ml-1">*</span>
+                                                                </label>
+                                                                <input type="date"
+                                                                    x-model="editedOCRData[field.model_key]"
+                                                                    @focus="onFieldFocus(field.model_key)"
+                                                                    @blur="onFieldBlur()"
+                                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                                                            </div>
+                                                        </template>
 
-                                    <!-- Tipo -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tipo</label>
-                                        <select x-model="editedOCRData.tipo" @focus="onFieldFocus('tipo')"
-                                            @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                            <option value="">Seleziona...</option>
-                                            <option value="positiva">Positiva (accumulo)</option>
-                                            <option value="negativa">Negativa (taglio)</option>
-                                        </select>
-                                    </div>
+                                                        <!-- TEXTAREA -->
+                                                        <template x-if="field.type === 'textarea'">
+                                                            <div :class="field.width || 'col-span-1'">
+                                                                <label
+                                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                                                    <span x-text="field.pdf_label"></span>
+                                                                    <span x-show="field.required"
+                                                                        class="text-red-500 ml-1">*</span>
+                                                                </label>
+                                                                <textarea x-model="editedOCRData[field.model_key]"
+                                                                    :rows="field.rows || 2"
+                                                                    :placeholder="field.placeholder || ''"
+                                                                    @focus="onFieldFocus(field.model_key)"
+                                                                    @blur="onFieldBlur()"
+                                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
+                                                            </div>
+                                                        </template>
 
-                                    <!-- Definizione -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Definizione</label>
-                                        <textarea x-model="editedOCRData.definizione" rows="2"
-                                            @focus="onFieldFocus('definizione')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
-                                    </div>
+                                                        <!-- SELECT DROPDOWN -->
+                                                        <template x-if="field.type === 'select'">
+                                                            <div :class="field.width || 'col-span-1'">
+                                                                <label
+                                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                                                    <span x-text="field.pdf_label"></span>
+                                                                    <span x-show="field.required"
+                                                                        class="text-red-500 ml-1">*</span>
+                                                                </label>
+                                                                <select x-model="editedOCRData[field.model_key]"
+                                                                    @focus="onFieldFocus(field.model_key)"
+                                                                    @blur="onFieldBlur()"
+                                                                    class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                                                    <template x-for="option in field.options"
+                                                                        :key="option.value">
+                                                                        <option :value="option.value"
+                                                                            x-text="option.label"></option>
+                                                                    </template>
+                                                                </select>
+                                                            </div>
+                                                        </template>
 
-                                    <!-- Località -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Località</label>
-                                        <input type="text" x-model="editedOCRData.localita"
-                                            @focus="onFieldFocus('localita')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                                        <!-- CHECKBOX -->
+                                                        <template x-if="field.type === 'checkbox'">
+                                                            <div :class="field.width || 'col-span-1'">
+                                                                <label class="flex items-center cursor-pointer mt-5">
+                                                                    <input type="checkbox"
+                                                                        x-model="editedOCRData[field.model_key]"
+                                                                        @focus="onFieldFocus(field.model_key)"
+                                                                        @blur="onFieldBlur()"
+                                                                        class="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500" />
+                                                                    <span
+                                                                        class="ml-2 text-xs font-medium text-gray-600 dark:text-gray-400"
+                                                                        x-text="field.pdf_label"></span>
+                                                                </label>
+                                                            </div>
+                                                        </template>
 
-                                    <!-- Area/Struttura -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Area/Struttura</label>
-                                        <input type="text" x-model="editedOCRData.area_struttura"
-                                            @focus="onFieldFocus('area_struttura')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
-
-                                    <!-- Descrizione -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Descrizione</label>
-                                        <textarea x-model="editedOCRData.descrizione" rows="3"
-                                            @focus="onFieldFocus('descrizione')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
-                                    </div>
-
-                                    <!-- Datazione -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Datazione</label>
-                                        <input type="text" x-model="editedOCRData.datazione"
-                                            @focus="onFieldFocus('datazione')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
-
-                                    <!-- Responsabile Scientifico -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Responsabile
-                                            Scientifico</label>
-                                        <input type="text" x-model="editedOCRData.responsabile_scientifico"
-                                            @focus="onFieldFocus('responsabile_scientifico')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
-
-                                    <!-- Saggio -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Saggio</label>
-                                        <input type="text" x-model="editedOCRData.saggio"
-                                            @focus="onFieldFocus('saggio')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
-
-                                    <!-- Ambiente/Unità Funzionale -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ambiente/Unità</label>
-                                        <input type="text" x-model="editedOCRData.ambiente_unita_funzione"
-                                            @focus="onFieldFocus('ambiente_unita_funzione')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
-
-                                    <!-- Periodo -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Periodo</label>
-                                        <input type="text" x-model="editedOCRData.periodo"
-                                            @focus="onFieldFocus('periodo')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
-
-                                    <!-- Fase -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Fase</label>
-                                        <input type="text" x-model="editedOCRData.fase" @focus="onFieldFocus('fase')"
-                                            @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        <!-- Consistenza -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Consistenza</label>
-                                            <input type="text" x-model="editedOCRData.consistenza"
-                                                @focus="onFieldFocus('consistenza')" @blur="onFieldBlur()"
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                                        <!-- RADIO GROUP -->
+                                                        <template x-if="field.type === 'radio_group'">
+                                                            <div :class="field.width || 'col-span-1'">
+                                                                <label
+                                                                    class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                                                                    <span x-text="field.pdf_label"></span>
+                                                                    <span x-show="field.required"
+                                                                        class="text-red-500 ml-1">*</span>
+                                                                </label>
+                                                                <div class="flex flex-wrap gap-3">
+                                                                    <template x-for="option in field.options"
+                                                                        :key="option.value">
+                                                                        <label class="flex items-center cursor-pointer">
+                                                                            <input type="radio"
+                                                                                :name="`radio_${field.model_key}`"
+                                                                                :value="option.value"
+                                                                                x-model="editedOCRData[field.model_key]"
+                                                                                @focus="onFieldFocus(field.model_key)"
+                                                                                @blur="onFieldBlur()"
+                                                                                class="w-4 h-4 text-purple-600 focus:ring-2 focus:ring-purple-500" />
+                                                                            <span
+                                                                                class="ml-2 text-xs text-gray-700 dark:text-gray-300"
+                                                                                x-text="option.label"></span>
+                                                                        </label>
+                                                                    </template>
+                                                                </div>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
                                         </div>
+                                    </template>
 
-                                        <!-- Colore -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Colore</label>
-                                            <input type="text" x-model="editedOCRData.colore"
-                                                @focus="onFieldFocus('colore')" @blur="onFieldBlur()"
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Misure -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Misure</label>
-                                            <textarea x-model="editedOCRData.misure" rows="2"
-                                                @focus="onFieldFocus('misure')" @blur="onFieldBlur()"
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
-                                        </div>
-
-                                        <!-- Interpretazione -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Interpretazione</label>
-                                            <textarea x-model="editedOCRData.interpretazione" rows="3"
-                                                @focus="onFieldFocus('interpretazione')" @blur="onFieldBlur()"
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
-                                        </div>
-
-                                        <!-- Osservazioni -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Osservazioni</label>
-                                            <textarea x-model="editedOCRData.osservazioni" rows="3"
-                                                @focus="onFieldFocus('osservazioni')" @blur="onFieldBlur()"
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
-                                        </div>
-
-                                        <!-- Divider -->
-                                        <div class="pt-3 border-t border-gray-300 dark:border-gray-600">
-                                            <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                                Sequenze Stratigrafiche</h5>
-                                        </div>
-
-                                        <!-- Copre -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Copre</label>
-                                            <input type="text" x-model="editedOCRData.seq_copre"
-                                                @focus="onFieldFocus('copre')" @blur="onFieldBlur()"
-                                                placeholder="US001, US002..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Coperto da -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Coperto
-                                                da</label>
-                                            <input type="text" x-model="editedOCRData.seq_coperto_da"
-                                                @focus="onFieldFocus('coperto_da')" @blur="onFieldBlur()"
-                                                placeholder="US003, US004..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Taglia -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Taglia</label>
-                                            <input type="text" x-model="editedOCRData.seq_taglia"
-                                                @focus="onFieldFocus('taglia')" @blur="onFieldBlur()"
-                                                placeholder="US005..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Tagliato da -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tagliato
-                                                da</label>
-                                            <input type="text" x-model="editedOCRData.seq_tagliato_da"
-                                                @focus="onFieldFocus('tagliato_da')" @blur="onFieldBlur()"
-                                                placeholder="US006..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Si lega a -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Si
-                                                lega a</label>
-                                            <input type="text" x-model="editedOCRData.seq_si_lega_a"
-                                                @focus="onFieldFocus('si_lega_a')" @blur="onFieldBlur()"
-                                                placeholder="US007..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Si appoggia a -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Si
-                                                appoggia a</label>
-                                            <input type="text" x-model="editedOCRData.seq_si_appoggia_a"
-                                                @focus="onFieldFocus('si_appoggia_a')" @blur="onFieldBlur()"
-                                                placeholder="US..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Gli si appoggia -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Gli
-                                                si
-                                                appoggia</label>
-                                            <input type="text" x-model="editedOCRData.seq_gli_si_appoggia"
-                                                @focus="onFieldFocus('gli_si_appoggia')" @blur="onFieldBlur()"
-                                                placeholder="US..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Uguale a -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Uguale
-                                                a</label>
-                                            <input type="text" x-model="editedOCRData.seq_uguale_a"
-                                                @focus="onFieldFocus('uguale_a')" @blur="onFieldBlur()"
-                                                placeholder="US008..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Posteriore a -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Posteriore
-                                                a</label>
-                                            <input type="text" x-model="editedOCRData.seq_posteriore_a"
-                                                @focus="onFieldFocus('posteriore_a')" @blur="onFieldBlur()"
-                                                placeholder="US009..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Anteriore a -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Anteriore
-                                                a</label>
-                                            <input type="text" x-model="editedOCRData.seq_anteriore_a"
-                                                @focus="onFieldFocus('anteriore_a')" @blur="onFieldBlur()"
-                                                placeholder="US010..."
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
-                                        <!-- Responsabile Compilazione -->
-                                        <div>
-                                            <label
-                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Responsabile
-                                                Compilazione</label>
-                                            <input type="text" x-model="editedOCRData.responsabile_compilazione"
-                                                @focus="onFieldFocus('responsabile_compilazione')" @blur="onFieldBlur()"
-                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                        </div>
-
+                                    <!-- Action Buttons -->
+                                    <div class="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
                                         <!-- Save Button -->
-                                        <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                            <button @click="saveOCRCorrections()"
-                                                class="w-full px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 flex items-center justify-center">
-                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                                </svg>
-                                                Salva Correzioni
-                                            </button>
-                                        </div>
+                                        <button @click="saveOCRCorrections()"
+                                            class="w-full px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 flex items-center justify-center transition-colors">
+                                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M5 13l4 4L19 7"></path>
+                                            </svg>
+                                            Salva Correzioni
+                                        </button>
 
                                         <!-- Create US Button -->
-                                        <div>
-                                            <button @click="createUSFromEditedOCR()"
-                                                class="w-full px-4 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 flex items-center justify-center">
-                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                                </svg>
-                                                Crea US nel Database
-                                            </button>
-                                        </div>
+                                        <button @click="createUSFromEditedOCR()"
+                                            class="w-full px-4 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 flex items-center justify-center transition-colors">
+                                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                            </svg>
+                                            Crea US nel Database
+                                        </button>
                                     </div>
                                 </div>
                             </div>
