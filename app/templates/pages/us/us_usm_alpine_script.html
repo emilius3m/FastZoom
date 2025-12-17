@@ -373,16 +373,32 @@
                 const result = this.pdfImportResults?.results?.[this.selectedResultIndex];
                 if (!result) return;
 
-                // Load result data into editedOCRData for editing
+                // Load result data into editedOCRData for editing - include ALL possible fields
                 this.editedOCRData = {
                     us_code: result.us_code || '',
                     tipo: result.data?.tipo || '',
                     definizione: result.data?.definizione || '',
                     localita: result.data?.localita || '',
                     area_struttura: result.data?.area_struttura || '',
+                    saggio: result.data?.saggio || '',
+                    ambiente_unita_funzione: result.data?.ambiente_unita_funzione || '',
                     descrizione: result.data?.descrizione || '',
+                    interpretazione: result.data?.interpretazione || '',
+                    osservazioni: result.data?.osservazioni || '',
                     datazione: result.data?.datazione || '',
-                    responsabile_scientifico: result.data?.responsabile_scientifico || ''
+                    periodo: result.data?.periodo || '',
+                    fase: result.data?.fase || '',
+                    // Sequenze stratigrafiche
+                    seq_copre: result.data?.seq_copre || '',
+                    seq_coperto_da: result.data?.seq_coperto_da || '',
+                    seq_taglia: result.data?.seq_taglia || '',
+                    seq_tagliato_da: result.data?.seq_tagliato_da || '',
+                    seq_si_lega_a: result.data?.seq_si_lega_a || '',
+                    seq_uguale_a: result.data?.seq_uguale_a || '',
+                    seq_posteriore_a: result.data?.seq_posteriore_a || '',
+                    seq_anteriore_a: result.data?.seq_anteriore_a || '',
+                    responsabile_scientifico: result.data?.responsabile_scientifico || '',
+                    responsabile_compilazione: result.data?.responsabile_compilazione || ''
                 };
 
                 // Redraw canvas to highlight fields for this result
@@ -395,7 +411,7 @@
                 const result = this.pdfImportResults?.results?.[this.selectedResultIndex];
                 if (!result) return;
 
-                // Update the result with edited data
+                // Update the result with ALL edited data
                 result.us_code = this.editedOCRData.us_code;
                 result.data = {
                     ...result.data,
@@ -403,9 +419,25 @@
                     definizione: this.editedOCRData.definizione,
                     localita: this.editedOCRData.localita,
                     area_struttura: this.editedOCRData.area_struttura,
+                    saggio: this.editedOCRData.saggio,
+                    ambiente_unita_funzione: this.editedOCRData.ambiente_unita_funzione,
                     descrizione: this.editedOCRData.descrizione,
+                    interpretazione: this.editedOCRData.interpretazione,
+                    osservazioni: this.editedOCRData.osservazioni,
                     datazione: this.editedOCRData.datazione,
-                    responsabile_scientifico: this.editedOCRData.responsabile_scientifico
+                    periodo: this.editedOCRData.periodo,
+                    fase: this.editedOCRData.fase,
+                    // Sequenze
+                    seq_copre: this.editedOCRData.seq_copre,
+                    seq_coperto_da: this.editedOCRData.seq_coperto_da,
+                    seq_taglia: this.editedOCRData.seq_taglia,
+                    seq_tagliato_da: this.editedOCRData.seq_tagliato_da,
+                    seq_si_lega_a: this.editedOCRData.seq_si_lega_a,
+                    seq_uguale_a: this.editedOCRData.seq_uguale_a,
+                    seq_posteriore_a: this.editedOCRData.seq_posteriore_a,
+                    seq_anteriore_a: this.editedOCRData.seq_anteriore_a,
+                    responsabile_scientifico: this.editedOCRData.responsabile_scientifico,
+                    responsabile_compilazione: this.editedOCRData.responsabile_compilazione
                 };
 
                 // Show success notification
