@@ -237,25 +237,26 @@ class USLayoutParser:
         if us_num:
             out["us_code"] = f"US{us_num.zfill(3)}"
 
-        # 2) ENTE RESPONSABILE - valore a destra/sotto
-        v = self._extract_value(tokens, label_rects.get("ENTE RESPONSABILE"), page_w=w, page_h=h)
+        # 2) ENTE RESPONSABILE - cell-based per evitare confini sporchi
+        v = self._extract_value_in_cell(tokens, "ENTE RESPONSABILE", label_rects, page_w=w, page_h=h)
         if v:
             out["ente_responsabile"] = v
 
         # 2b) UFFICIO MIC COMPETENTE PER TUTELA
-        v = self._extract_value(tokens, label_rects.get("UFFICIO MIC"), page_w=w, page_h=h)
+        v = self._extract_value_in_cell(tokens, "UFFICIO MIC", label_rects, page_w=w, page_h=h)
         if v:
             out["ufficio_mic"] = v
 
         # 3) ANNO (int)
-        v = self._extract_value(tokens, label_rects.get("ANNO"), page_w=w, page_h=h, value_regex=r"\b(19|20)\d{2}\b")
+        v = self._extract_value_in_cell(tokens, "ANNO", label_rects, page_w=w, page_h=h)
         if v:
+            # Estrai anno se presente
             match = re.search(r"\b(19|20)\d{2}\b", v)
             if match:
                 out["anno"] = int(match.group(0))
 
         # 4) IDENTIFICATIVO
-        v = self._extract_value(tokens, label_rects.get("IDENTIFICATIVO"), page_w=w, page_h=h)
+        v = self._extract_value_in_cell(tokens, "IDENTIFICATIVO", label_rects, page_w=w, page_h=h)
         if v:
             out["identificativo_rif"] = v
 
