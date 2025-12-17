@@ -116,7 +116,9 @@
         x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
         <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showPdfImportModal = false"></div>
+            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showPdfImportModal = false">
+
+            </div>
             <div class="relative bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden"
                 x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95"
                 x-transition:enter-end="opacity-100 scale-100">
@@ -164,16 +166,6 @@
                             <span x-show="pdfImportResults?.debug_pages"
                                 class="ml-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full"
                                 x-text="pdfImportResults?.debug_pages?.length || 0"></span>
-                        </button>
-                        <button @click="ocrDebugTab = 'template'"
-                            :class="ocrDebugTab === 'template' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                            class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
-                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                </path>
-                            </svg>
-                            Template Overlay
                         </button>
                     </div>
 
@@ -409,897 +401,446 @@
                             </template>
                         </div>
 
-                        <!-- TAB: Template Overlay -->
-                        <div x-show="ocrDebugTab === 'template'" x-transition>
-                            <template x-if="pdfImportResults?.results && pdfImportResults.results.length > 0">
-                                <div class="space-y-4 text-gray-800 text-sm">
 
-                                    <!-- PAGINA 1: IDENTIFICAZIONE -->
-                                    <div class="border-2 border-gray-400 rounded-lg overflow-hidden bg-white">
-                                        <div
-                                            class="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-4 py-2 font-bold flex items-center">
-                                            <span class="text-2xl mr-3">📄</span>
-                                            SCHEDA US - Pagina 1: Identificazione e Caratterizzazione
-                                        </div>
-
-                                        <!-- Header: US, ENTE, ANNO -->
-                                        <div class="grid grid-cols-12 border-b-2 border-gray-400">
-                                            <div class="col-span-2 border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">US</div>
-                                                <div class="text-3xl font-black text-blue-700 text-center"
-                                                    x-text="pdfImportResults.results[0]?.data?.us_code || '-'"></div>
-                                            </div>
-                                            <div class="col-span-8 border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">ENTE RESPONSABILE</div>
-                                                <div class="bg-blue-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.ente_responsabile || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="col-span-2 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">ANNO</div>
-                                                <div class="bg-green-50 px-2 py-1 rounded text-center font-bold"
-                                                    x-text="pdfImportResults.results[0]?.data?.anno || '-'"></div>
-                                            </div>
-                                        </div>
-
-                                        <!-- UFFICIO MIC -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">UFFICIO MiC COMPETENTE PER
-                                                TUTELA</div>
-                                            <div class="bg-blue-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.ufficio_mic || '-'"></div>
-                                        </div>
-
-                                        <!-- IDENTIFICATIVO -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">IDENTIFICATIVO
-                                                SAGGIO/EDIFICIO/STRUTTURA</div>
-                                            <div class="bg-blue-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.identificativo_rif || '-'">
-                                            </div>
-                                        </div>
-
-                                        <!-- LOCALITA -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">LOCALITÀ</div>
-                                            <div class="bg-orange-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.localita || '-'"></div>
-                                        </div>
-
-                                        <!-- AREA, SAGGIO -->
-                                        <div class="grid grid-cols-12 border-b border-gray-300">
-                                            <div class="col-span-8 border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">AREA/EDIFICIO/STRUTTURA
-                                                </div>
-                                                <div class="bg-orange-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.area_struttura || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="col-span-4 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">SAGGIO</div>
-                                                <div class="bg-orange-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.saggio || '-'"></div>
-                                            </div>
-                                        </div>
-
-                                        <!-- AMBIENTE, QUOTE, TIPO -->
-                                        <div class="grid grid-cols-12 border-b border-gray-300">
-                                            <div class="col-span-4 border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">AMBIENTE/UNITÀ FUNZIONALE
-                                                </div>
-                                                <div class="bg-purple-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.ambiente_unita_funzione || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="col-span-4 border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">QUOTE</div>
-                                                <div class="bg-cyan-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.quote || '-'"></div>
-                                            </div>
-                                            <div class="col-span-4 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">TIPO US</div>
-                                                <div class="px-3 py-2 rounded text-center font-bold text-sm"
-                                                    :class="pdfImportResults.results[0]?.data?.tipo === 'positiva' ? 'bg-green-300 text-green-800' : (pdfImportResults.results[0]?.data?.tipo === 'negativa' ? 'bg-red-300 text-red-800' : 'bg-gray-200')"
-                                                    x-text="(pdfImportResults.results[0]?.data?.tipo || 'N/D').toUpperCase()">
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- DOCUMENTAZIONE -->
-                                        <div class="grid grid-cols-12 border-b border-gray-300">
-                                            <div class="col-span-3 border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">📐 PIANTE</div>
-                                                <div class="bg-pink-50 px-2 py-1 rounded text-xs"
-                                                    x-text="pdfImportResults.results[0]?.data?.piante_riferimenti || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="col-span-3 border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">📐 SEZIONI</div>
-                                                <div class="bg-pink-50 px-2 py-1 rounded text-xs"
-                                                    x-text="pdfImportResults.results[0]?.data?.sezioni_riferimenti || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="col-span-3 border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">📷 FOTOGRAFIE</div>
-                                                <div class="bg-pink-50 px-2 py-1 rounded text-xs"
-                                                    x-text="pdfImportResults.results[0]?.data?.fotografie || '-'"></div>
-                                            </div>
-                                            <div class="col-span-3 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">📦 RIF. MATERIALI</div>
-                                                <div class="bg-pink-50 px-2 py-1 rounded text-xs"
-                                                    x-text="pdfImportResults.results[0]?.data?.riferimenti_tabelle_materiali || '-'">
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- DEFINIZIONE -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">DEFINIZIONE</div>
-                                            <div class="bg-indigo-50 px-2 py-1 rounded min-h-[40px]"
-                                                x-text="pdfImportResults.results[0]?.data?.definizione || '-'"></div>
-                                        </div>
-
-                                        <!-- CRITERI DI DISTINZIONE -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">CRITERI DI DISTINZIONE</div>
-                                            <div class="bg-indigo-50 px-2 py-1 rounded min-h-[40px]"
-                                                x-text="pdfImportResults.results[0]?.data?.criteri_distinzione || '-'">
-                                            </div>
-                                        </div>
-
-                                        <!-- MODO DI FORMAZIONE -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">MODO DI FORMAZIONE</div>
-                                            <div class="bg-indigo-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.modo_formazione || '-'">
-                                            </div>
-                                        </div>
-
-                                        <!-- COMPONENTI -->
-                                        <div class="grid grid-cols-2 border-b border-gray-300">
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">COMPONENTI INORGANICI</div>
-                                                <div class="bg-amber-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.componenti_inorganici || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="p-2">
-                                                <div class="text-xs text-gray-500 font-bold">COMPONENTI ORGANICI</div>
-                                                <div class="bg-amber-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.componenti_organici || '-'">
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- CONSISTENZA, COLORE, MISURE -->
-                                        <div class="grid grid-cols-3 border-b border-gray-300">
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">CONSISTENZA</div>
-                                                <div class="bg-teal-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.consistenza || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">COLORE</div>
-                                                <div class="bg-teal-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.colore || '-'"></div>
-                                            </div>
-                                            <div class="p-2">
-                                                <div class="text-xs text-gray-500 font-bold">MISURE</div>
-                                                <div class="bg-teal-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.misure || '-'"></div>
-                                            </div>
-                                        </div>
-
-                                        <!-- STATO CONSERVAZIONE -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">STATO DI CONSERVAZIONE</div>
-                                            <div class="bg-teal-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.stato_conservazione || '-'">
-                                            </div>
-                                        </div>
-
-                                        <!-- SEQUENZA FISICA + STRATIGRAFICA -->
-                                        <div class="grid grid-cols-2 border-b border-gray-300">
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold mb-2">🔗 SEQUENZA FISICA
-                                                </div>
-                                                <div class="grid grid-cols-2 gap-1 text-xs">
-                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.uguale_a">
-                                                        <span class="font-bold">UGUALE A:</span>
-                                                        <span
-                                                            x-text="pdfImportResults.results[0]?.data?.uguale_a"></span>
-                                                    </div>
-                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.si_lega_a">
-                                                        <span class="font-bold">SI LEGA A:</span>
-                                                        <span
-                                                            x-text="pdfImportResults.results[0]?.data?.si_lega_a"></span>
-                                                    </div>
-                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.copre">
-                                                        <span class="font-bold">COPRE:</span>
-                                                        <span x-text="pdfImportResults.results[0]?.data?.copre"></span>
-                                                    </div>
-                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.coperto_da">
-                                                        <span class="font-bold">COPERTO DA:</span>
-                                                        <span
-                                                            x-text="pdfImportResults.results[0]?.data?.coperto_da"></span>
-                                                    </div>
-                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.taglia">
-                                                        <span class="font-bold">TAGLIA:</span>
-                                                        <span x-text="pdfImportResults.results[0]?.data?.taglia"></span>
-                                                    </div>
-                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.tagliato_da">
-                                                        <span class="font-bold">TAGLIATO DA:</span>
-                                                        <span
-                                                            x-text="pdfImportResults.results[0]?.data?.tagliato_da"></span>
-                                                    </div>
-                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.riempie">
-                                                        <span class="font-bold">RIEMPIE:</span>
-                                                        <span
-                                                            x-text="pdfImportResults.results[0]?.data?.riempie"></span>
-                                                    </div>
-                                                    <div class="bg-rose-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.riempito_da">
-                                                        <span class="font-bold">RIEMPITO DA:</span>
-                                                        <span
-                                                            x-text="pdfImportResults.results[0]?.data?.riempito_da"></span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="p-2">
-                                                <div class="text-xs text-gray-500 font-bold mb-2">📋 SEQUENZA
-                                                    STRATIGRAFICA</div>
-                                                <div class="grid grid-cols-1 gap-1 text-xs">
-                                                    <div class="bg-violet-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.posteriore_a">
-                                                        <span class="font-bold">POSTERIORE A:</span>
-                                                        <span
-                                                            x-text="pdfImportResults.results[0]?.data?.posteriore_a"></span>
-                                                    </div>
-                                                    <div class="bg-violet-100 px-2 py-1 rounded flex justify-between"
-                                                        x-show="pdfImportResults.results[0]?.data?.anteriore_a">
-                                                        <span class="font-bold">ANTERIORE A:</span>
-                                                        <span
-                                                            x-text="pdfImportResults.results[0]?.data?.anteriore_a"></span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- PAGINA 2: DESCRIZIONE E DATAZIONE -->
-                                    <div class="border-2 border-gray-400 rounded-lg overflow-hidden bg-white">
-                                        <div
-                                            class="bg-gradient-to-r from-green-600 to-green-800 text-white px-4 py-2 font-bold flex items-center">
-                                            <span class="text-2xl mr-3">📄</span>
-                                            SCHEDA US - Pagina 2: Descrizione e Datazione
-                                        </div>
-
-                                        <!-- DESCRIZIONE -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">DESCRIZIONE</div>
-                                            <div class="bg-blue-50 px-2 py-1 rounded min-h-[80px]"
-                                                x-text="pdfImportResults.results[0]?.data?.descrizione || '-'"></div>
-                                        </div>
-
-                                        <!-- OSSERVAZIONI -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">OSSERVAZIONI</div>
-                                            <div class="bg-green-50 px-2 py-1 rounded min-h-[40px]"
-                                                x-text="pdfImportResults.results[0]?.data?.osservazioni || '-'"></div>
-                                        </div>
-
-                                        <!-- INTERPRETAZIONE -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">INTERPRETAZIONE</div>
-                                            <div class="bg-purple-50 px-2 py-1 rounded min-h-[40px]"
-                                                x-text="pdfImportResults.results[0]?.data?.interpretazione || '-'">
-                                            </div>
-                                        </div>
-
-                                        <!-- DATAZIONE, PERIODO, FASE, ATTIVITA -->
-                                        <div class="grid grid-cols-4 border-b border-gray-300">
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">DATAZIONE</div>
-                                                <div class="bg-orange-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.datazione || '-'"></div>
-                                            </div>
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">PERIODO</div>
-                                                <div class="bg-orange-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.periodo || '-'"></div>
-                                            </div>
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">FASE</div>
-                                                <div class="bg-orange-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.fase || '-'"></div>
-                                            </div>
-                                            <div class="p-2">
-                                                <div class="text-xs text-gray-500 font-bold">ATTIVITÀ</div>
-                                                <div class="bg-orange-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.attivita || '-'"></div>
-                                            </div>
-                                        </div>
-
-                                        <!-- ELEMENTI DATANTI -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">ELEMENTI DATANTI</div>
-                                            <div class="bg-yellow-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.elementi_datanti || '-'">
-                                            </div>
-                                        </div>
-
-                                        <!-- DATI QUANTITATIVI REPERTI -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">DATI QUANTITATIVI DEI REPERTI
-                                            </div>
-                                            <div class="bg-amber-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.dati_quantitativi_reperti || '-'">
-                                            </div>
-                                        </div>
-
-                                        <!-- CAMPIONATURE, FLOTTAZIONE, SETACCIATURA -->
-                                        <div class="grid grid-cols-3 border-b border-gray-300">
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">🧪 CAMPIONATURE</div>
-                                                <div class="bg-teal-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.campionature || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">🌊 FLOTTAZIONE</div>
-                                                <div class="bg-teal-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.flottazione || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="p-2">
-                                                <div class="text-xs text-gray-500 font-bold">🔬 SETACCIATURA</div>
-                                                <div class="bg-teal-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.setacciatura || '-'">
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- AFFIDABILITA STRATIGRAFICA -->
-                                        <div class="border-b border-gray-300 p-2">
-                                            <div class="text-xs text-gray-500 font-bold">AFFIDABILITÀ STRATIGRAFICA
-                                            </div>
-                                            <div class="px-3 py-2 rounded font-bold text-center" :class="{
-                                                     'bg-green-300 text-green-800': pdfImportResults.results[0]?.data?.affidabilita_stratigrafica === 'alta',
-                                                     'bg-yellow-300 text-yellow-800': pdfImportResults.results[0]?.data?.affidabilita_stratigrafica === 'media',
-                                                     'bg-red-300 text-red-800': pdfImportResults.results[0]?.data?.affidabilita_stratigrafica === 'bassa',
-                                                     'bg-gray-200': !pdfImportResults.results[0]?.data?.affidabilita_stratigrafica
-                                                 }"
-                                                x-text="(pdfImportResults.results[0]?.data?.affidabilita_stratigrafica || 'N/D').toUpperCase()">
-                                            </div>
-                                        </div>
-
-                                        <!-- RESPONSABILI -->
-                                        <div class="grid grid-cols-2 border-b border-gray-300">
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">👤 RESPONSABILE SCIENTIFICO
-                                                </div>
-                                                <div class="bg-indigo-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.responsabile_scientifico || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="p-2">
-                                                <div class="text-xs text-gray-500 font-bold">📅 DATA RILEVAMENTO</div>
-                                                <div class="bg-indigo-50 px-2 py-1 rounded font-mono"
-                                                    x-text="pdfImportResults.results[0]?.data?.data_rilevamento || '-'">
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="grid grid-cols-2 border-b border-gray-300">
-                                            <div class="border-r border-gray-300 p-2">
-                                                <div class="text-xs text-gray-500 font-bold">✍️ RESPONSABILE
-                                                    COMPILAZIONE</div>
-                                                <div class="bg-indigo-50 px-2 py-1 rounded"
-                                                    x-text="pdfImportResults.results[0]?.data?.responsabile_compilazione || '-'">
-                                                </div>
-                                            </div>
-                                            <div class="p-2">
-                                                <div class="text-xs text-gray-500 font-bold">📅 DATA RIELABORAZIONE
-                                                </div>
-                                                <div class="bg-indigo-50 px-2 py-1 rounded font-mono"
-                                                    x-text="pdfImportResults.results[0]?.data?.data_rielaborazione || '-'">
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="p-2">
-                                            <div class="text-xs text-gray-500 font-bold">🔄 RESPONSABILE RIELABORAZIONE
-                                            </div>
-                                            <div class="bg-indigo-50 px-2 py-1 rounded"
-                                                x-text="pdfImportResults.results[0]?.data?.responsabile_rielaborazione || '-'">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Legend -->
-            <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                <h4 class="font-medium mb-2">🎨 Legenda Colori</h4>
-                <div class="grid grid-cols-4 gap-2 text-xs">
-                    <div class="flex items-center"><span class="w-4 h-4 bg-yellow-200 rounded mr-2"></span>US Code</div>
-                    <div class="flex items-center"><span
-                            class="w-4 h-4 bg-orange-100 rounded mr-2"></span>Localizzazione
-                    </div>
-                    <div class="flex items-center"><span
-                            class="w-4 h-4 bg-purple-100 rounded mr-2"></span>Posizionamento
-                    </div>
-                    <div class="flex items-center"><span class="w-4 h-4 bg-indigo-100 rounded mr-2"></span>Definizione
-                    </div>
-                    <div class="flex items-center"><span class="w-4 h-4 bg-teal-100 rounded mr-2"></span>Proprietà
-                        fisiche
-                    </div>
-                    <div class="flex items-center"><span class="w-4 h-4 bg-rose-100 rounded mr-2"></span>Sequenza fisica
-                    </div>
-                    <div class="flex items-center"><span class="w-4 h-4 bg-pink-100 rounded mr-2"></span>Documentazione
-                    </div>
-                    <div class="flex items-center"><span class="w-4 h-4 bg-violet-100 rounded mr-2"></span>Cronologia
-                    </div>
+                <!-- Modal Footer -->
+                <div
+                    class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex justify-end">
+                    <button @click="showPdfImportModal = false"
+                        class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-medium">
+                        Chiudi
+                    </button>
                 </div>
             </div>
         </div>
-        </template>
-
-        <template x-if="!pdfImportResults?.results || pdfImportResults.results.length === 0">
-            <div class="text-center py-12 text-gray-500">
-                <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                    </path>
-                </svg>
-                <p>Nessun risultato OCR disponibile</p>
-                <p class="text-sm mt-2">Carica un PDF per vedere l'overlay</p>
-            </div>
-        </template>
     </div>
 
-</div>
-</div>
-
-<!-- Modal Footer -->
-<div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex justify-end">
-    <button @click="showPdfImportModal = false"
-        class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-medium">
-        Chiudi
-    </button>
-</div>
-</div>
-</div>
-</div>
-
-<!-- Filters -->
-<div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-    <!-- Filter Header with Toggle -->
-    <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z">
-                </path>
-            </svg>
-            <h3 class="text-sm font-medium text-gray-900 dark:text-white">Filtri di Ricerca</h3>
-            <span x-show="getActiveFiltersCount() > 0"
-                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                <span x-text="getActiveFiltersCount()"></span> attivi
-            </span>
-        </div>
-        <div class="flex items-center space-x-3">
-            <button @click="resetAllFilters()" x-show="getActiveFiltersCount() > 0"
-                class="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 flex items-center space-x-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+    <!-- Filters -->
+    <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <!-- Filter Header with Toggle -->
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z">
                     </path>
                 </svg>
-                <span>Reset Filtri</span>
-            </button>
-            <button @click="showAdvancedSearch = !showAdvancedSearch"
-                class="inline-flex items-center px-3 py-1.5 border rounded-md text-xs font-medium transition-colors duration-200"
-                :class="showAdvancedSearch 
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white">Filtri di Ricerca</h3>
+                <span x-show="getActiveFiltersCount() > 0"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                    <span x-text="getActiveFiltersCount()"></span> attivi
+                </span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button @click="resetAllFilters()" x-show="getActiveFiltersCount() > 0"
+                    class="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 flex items-center space-x-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                    <span>Reset Filtri</span>
+                </button>
+                <button @click="showAdvancedSearch = !showAdvancedSearch"
+                    class="inline-flex items-center px-3 py-1.5 border rounded-md text-xs font-medium transition-colors duration-200"
+                    :class="showAdvancedSearch 
                             ? 'border-orange-500 text-orange-700 bg-orange-50 dark:border-orange-400 dark:text-orange-300 dark:bg-orange-900/30' 
                             : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600'">
-                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4">
-                    </path>
-                </svg>
-                <span x-text="showAdvancedSearch ? 'Ricerca Semplice' : 'Ricerca Avanzata'"></span>
-                <svg class="w-4 h-4 ml-1 transition-transform duration-200"
-                    :class="showAdvancedSearch ? 'rotate-180' : ''" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- Basic Filters (Always Visible) -->
-    <div class="p-4">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    <svg class="inline w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor"
-                        viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4">
+                        </path>
                     </svg>
-                    Ricerca Rapida
-                </label>
-                <input type="text" x-model="filters.search" @input.debounce.300ms="loadAllLists()"
-                    placeholder="Codice US, descrizione, definizione, località..."
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Affidabilità</label>
-                <select x-model="filters.affidabilita" @change="loadAllLists()"
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white">
-                    <option value="">Tutte</option>
-                    <option value="alta">Alta</option>
-                    <option value="media">Media</option>
-                    <option value="bassa">Bassa</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo US</label>
-                <select x-model="filters.tipo" @change="loadAllLists()"
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white">
-                    <option value="">Tutti i tipi</option>
-                    <option value="positiva">Positiva (accumulo)</option>
-                    <option value="negativa">Negativa (taglio)</option>
-                </select>
+                    <span x-text="showAdvancedSearch ? 'Ricerca Semplice' : 'Ricerca Avanzata'"></span>
+                    <svg class="w-4 h-4 ml-1 transition-transform duration-200"
+                        :class="showAdvancedSearch ? 'rotate-180' : ''" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
             </div>
         </div>
-    </div>
 
-    <!-- Advanced Filters (Collapsible) -->
-    <div x-show="showAdvancedSearch" x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 transform -translate-y-2"
-        x-transition:enter-end="opacity-100 transform translate-y-0"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100 transform translate-y-0"
-        x-transition:leave-end="opacity-0 transform -translate-y-2"
-        class="border-t border-gray-200 dark:border-gray-700">
-        <div class="p-4 bg-gray-50 dark:bg-gray-800/50">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- Code Search -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Codice
-                        US/USM</label>
-                    <input type="text" x-model="filters.code" @input.debounce.300ms="loadAllLists()"
-                        placeholder="es: US001, USM005"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
-                </div>
-
-                <!-- Period -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Periodo</label>
-                    <input type="text" x-model="filters.periodo" @input.debounce.300ms="loadAllLists()"
-                        placeholder="es: Romano, Medievale"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
-                </div>
-
-                <!-- Phase -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fase</label>
-                    <input type="text" x-model="filters.fase" @input.debounce.300ms="loadAllLists()"
-                        placeholder="es: Fase I, Fase II"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
-                </div>
-
-                <!-- Definition -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Definizione</label>
-                    <input type="text" x-model="filters.definizione" @input.debounce.300ms="loadAllLists()"
-                        placeholder="es: strato, muro, fossa"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
-                </div>
-
-                <!-- Locality -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Località</label>
-                    <input type="text" x-model="filters.localita" @input.debounce.300ms="loadAllLists()"
-                        placeholder="es: Area Nord, Settore A"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
-                </div>
-
-                <!-- Area/Structure -->
-                <div>
-                    <label
-                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Area/Struttura</label>
-                    <input type="text" x-model="filters.area_struttura" @input.debounce.300ms="loadAllLists()"
-                        placeholder="es: Edificio A, Terme"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
-                </div>
-
-                <!-- Responsabile -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Responsabile</label>
-                    <input type="text" x-model="filters.responsabile" @input.debounce.300ms="loadAllLists()"
-                        placeholder="Nome responsabile"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
-                </div>
-
-                <!-- Tecnica Costruttiva (USM only) -->
-                <div x-show="activeTab === 'usm'">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tecnica
-                        Costruttiva</label>
-                    <input type="text" x-model="filters.tecnica_costruttiva" @input.debounce.300ms="loadAllLists()"
-                        placeholder="es: opus incertum"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
-                </div>
-            </div>
-
-            <!-- Date Range Row -->
-            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+        <!-- Basic Filters (Always Visible) -->
+        <div class="p-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         <svg class="inline w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
-                            </path>
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
-                        Data Rilevamento Da
+                        Ricerca Rapida
                     </label>
-                    <input type="date" x-model="filters.dateFrom" @change="loadAllLists()"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    <input type="text" x-model="filters.search" @input.debounce.300ms="loadAllLists()"
+                        placeholder="Codice US, descrizione, definizione, località..."
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        <svg class="inline w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
-                            </path>
-                        </svg>
-                        Data Rilevamento A
-                    </label>
-                    <input type="date" x-model="filters.dateTo" @change="loadAllLists()"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Affidabilità</label>
+                    <select x-model="filters.affidabilita" @change="loadAllLists()"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white">
+                        <option value="">Tutte</option>
+                        <option value="alta">Alta</option>
+                        <option value="media">Media</option>
+                        <option value="bassa">Bassa</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo US</label>
+                    <select x-model="filters.tipo" @change="loadAllLists()"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white">
+                        <option value="">Tutti i tipi</option>
+                        <option value="positiva">Positiva (accumulo)</option>
+                        <option value="negativa">Negativa (taglio)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Filters (Collapsible) -->
+        <div x-show="showAdvancedSearch" x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 transform -translate-y-2"
+            x-transition:enter-end="opacity-100 transform translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 transform translate-y-0"
+            x-transition:leave-end="opacity-0 transform -translate-y-2"
+            class="border-t border-gray-200 dark:border-gray-700">
+            <div class="p-4 bg-gray-50 dark:bg-gray-800/50">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Code Search -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Codice
+                            US/USM</label>
+                        <input type="text" x-model="filters.code" @input.debounce.300ms="loadAllLists()"
+                            placeholder="es: US001, USM005"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
+
+                    <!-- Period -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Periodo</label>
+                        <input type="text" x-model="filters.periodo" @input.debounce.300ms="loadAllLists()"
+                            placeholder="es: Romano, Medievale"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
+
+                    <!-- Phase -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fase</label>
+                        <input type="text" x-model="filters.fase" @input.debounce.300ms="loadAllLists()"
+                            placeholder="es: Fase I, Fase II"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
+
+                    <!-- Definition -->
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Definizione</label>
+                        <input type="text" x-model="filters.definizione" @input.debounce.300ms="loadAllLists()"
+                            placeholder="es: strato, muro, fossa"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
+
+                    <!-- Locality -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Località</label>
+                        <input type="text" x-model="filters.localita" @input.debounce.300ms="loadAllLists()"
+                            placeholder="es: Area Nord, Settore A"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
+
+                    <!-- Area/Structure -->
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Area/Struttura</label>
+                        <input type="text" x-model="filters.area_struttura" @input.debounce.300ms="loadAllLists()"
+                            placeholder="es: Edificio A, Terme"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
+
+                    <!-- Responsabile -->
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Responsabile</label>
+                        <input type="text" x-model="filters.responsabile" @input.debounce.300ms="loadAllLists()"
+                            placeholder="Nome responsabile"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
+
+                    <!-- Tecnica Costruttiva (USM only) -->
+                    <div x-show="activeTab === 'usm'">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tecnica
+                            Costruttiva</label>
+                        <input type="text" x-model="filters.tecnica_costruttiva" @input.debounce.300ms="loadAllLists()"
+                            placeholder="es: opus incertum"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
+                </div>
+
+                <!-- Date Range Row -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <svg class="inline w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                            Data Rilevamento Da
+                        </label>
+                        <input type="date" x-model="filters.dateFrom" @change="loadAllLists()"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <svg class="inline w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                            Data Rilevamento A
+                        </label>
+                        <input type="date" x-model="filters.dateTo" @change="loadAllLists()"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 dark:bg-gray-700 dark:text-white text-sm">
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- US/USM Tabs -->
-<div class="mb-6">
-    <div class="border-b border-gray-200 dark:border-gray-700">
-        <nav class="-mb-px flex space-x-8">
-            <button @click="activeTab = 'us'"
-                :class="activeTab === 'us' ? 'border-orange-500 text-orange-600 dark:text-orange-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                class="py-2 px-1 border-b-2 font-medium text-sm">
-                Unità Stratigrafiche (US)
-            </button>
-            <button @click="activeTab = 'usm'"
-                :class="activeTab === 'usm' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                class="py-2 px-1 border-b-2 font-medium text-sm">
-                Unità Stratigrafiche Murarie (USM)
-            </button>
-            <button @click="activeTab = 'harris-matrix'"
-                :class="activeTab === 'harris-matrix' ? 'border-green-500 text-green-600 dark:text-green-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                class="py-2 px-1 border-b-2 font-medium text-sm">
-                Visualizza Matrix
-            </button>
-        </nav>
-    </div>
-</div>
-
-<!-- US List -->
-<div x-show="activeTab === 'us'" x-transition>
-    <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
-        <div x-show="usList.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
-            <i class="fas fa-search text-4xl mb-4"></i>
-            <p>Nessuna US trovata. Prova a modificare i filtri o crea una nuova US.</p>
+    <!-- US/USM Tabs -->
+    <div class="mb-6">
+        <div class="border-b border-gray-200 dark:border-gray-700">
+            <nav class="-mb-px flex space-x-8">
+                <button @click="activeTab = 'us'"
+                    :class="activeTab === 'us' ? 'border-orange-500 text-orange-600 dark:text-orange-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
+                    Unità Stratigrafiche (US)
+                </button>
+                <button @click="activeTab = 'usm'"
+                    :class="activeTab === 'usm' ? 'border-red-500 text-red-600 dark:text-red-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
+                    Unità Stratigrafiche Murarie (USM)
+                </button>
+                <button @click="activeTab = 'harris-matrix'"
+                    :class="activeTab === 'harris-matrix' ? 'border-green-500 text-green-600 dark:text-green-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
+                    class="py-2 px-1 border-b-2 font-medium text-sm">
+                    Visualizza Matrix
+                </button>
+            </nav>
         </div>
-        <ul x-show="usList.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
-            <template x-for="us in usList" :key="us.id">
-                <li class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <div class="px-4 py-4 sm:px-6">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center">
-                                <div
-                                    class="flex-shrink-0 h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
-                                    <span class="text-orange-600 dark:text-orange-300 font-bold"
-                                        x-text="us.us_code.substring(2)"></span>
-                                </div>
-                                <div class="ml-4">
-                                    <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="us.us_code">
+    </div>
+
+    <!-- US List -->
+    <div x-show="activeTab === 'us'" x-transition>
+        <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
+            <div x-show="usList.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
+                <i class="fas fa-search text-4xl mb-4"></i>
+                <p>Nessuna US trovata. Prova a modificare i filtri o crea una nuova US.</p>
+            </div>
+            <ul x-show="usList.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
+                <template x-for="us in usList" :key="us.id">
+                    <li class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <div class="px-4 py-4 sm:px-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div
+                                        class="flex-shrink-0 h-10 w-10 rounded-full bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
+                                        <span class="text-orange-600 dark:text-orange-300 font-bold"
+                                            x-text="us.us_code.substring(2)"></span>
                                     </div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400"
-                                        x-text="us.definizione || 'Nessuna definizione'"></div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400" x-text="us.localita || ''">
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white"
+                                            x-text="us.us_code">
+                                        </div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="us.definizione || 'Nessuna definizione'"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="us.localita || ''">
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <span x-show="us.affidabilita_stratigrafica" :class="{
+                                <div class="flex items-center space-x-2">
+                                    <span x-show="us.affidabilita_stratigrafica" :class="{
                                               'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100': us.affidabilita_stratigrafica === 'alta',
                                               'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100': us.affidabilita_stratigrafica === 'media',
                                               'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100': us.affidabilita_stratigrafica === 'bassa'
                                           }" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
-                                    <span x-text="us.affidabilita_stratigrafica"></span>
-                                </span>
-                                <button @click="openUSModal(us, false)"
-                                    class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
-                                    title="Visualizza">
-                                    <i class="fas fa-eye mr-1"></i>
-                                    Visualizza
-                                </button>
-                                <button @click="openUSModal(us, true)"
-                                    class="px-3 py-2 bg-red-600 text-white rounded hover:bg-orange-700 flex items-center"
-                                    title="Modifica">
-                                    <i class="fas fa-edit mr-1"></i>
-                                    Modifica
-                                </button>
-                                <button @click="deleteUS(us.id)"
-                                    class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
-                                    title="Elimina">
-                                    <i class="fas fa-trash mr-1"></i>
-                                    Elimina
-                                </button>
-                            </div>
-                        </div>
-                        <div class="mt-2 sm:flex sm:justify-between">
-                            <div class="sm:flex">
-                                <div class="mr-6">
-                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Rilevamento
-                                    </p>
-                                    <p class="text-sm text-gray-900 dark:text-white"
-                                        x-text="formatDate(us.data_rilevamento)"></p>
-                                </div>
-                                <div class="mr-6">
-                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile</p>
-                                    <p class="text-sm text-gray-900 dark:text-white"
-                                        x-text="us.responsabile_compilazione || '-'"></p>
+                                        <span x-text="us.affidabilita_stratigrafica"></span>
+                                    </span>
+                                    <button @click="openUSModal(us, false)"
+                                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                                        title="Visualizza">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        Visualizza
+                                    </button>
+                                    <button @click="openUSModal(us, true)"
+                                        class="px-3 py-2 bg-red-600 text-white rounded hover:bg-orange-700 flex items-center"
+                                        title="Modifica">
+                                        <i class="fas fa-edit mr-1"></i>
+                                        Modifica
+                                    </button>
+                                    <button @click="deleteUS(us.id)"
+                                        class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
+                                        title="Elimina">
+                                        <i class="fas fa-trash mr-1"></i>
+                                        Elimina
+                                    </button>
                                 </div>
                             </div>
-                            <div class="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
-                                <p>
-                                    Aggiornato il <span x-text="formatDate(us.updated_at)"></span>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </li>
-            </template>
-        </ul>
-    </div>
-</div>
-
-<!-- USM List -->
-<div x-show="activeTab === 'usm'" x-transition>
-    <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
-        <div x-show="usmList.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
-            <i class="fas fa-search text-4xl mb-4"></i>
-            <p>Nessuna USM trovata. Prova a modificare i filtri o crea una nuova USM.</p>
-        </div>
-        <ul x-show="usmList.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
-            <template x-for="usm in usmList" :key="usm.id">
-                <li class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <div class="px-4 py-4 sm:px-6">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center">
-                                <div
-                                    class="flex-shrink-0 h-10 w-10 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
-                                    <span class="text-red-600 dark:text-red-300 font-bold"
-                                        x-text="usm.usm_code.substring(3)"></span>
-                                </div>
-                                <div class="ml-4">
-                                    <div class="text-sm font-medium text-gray-900 dark:text-white"
-                                        x-text="usm.usm_code"></div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400"
-                                        x-text="usm.definizione || 'Nessuna definizione'"></div>
-                                    <div class="text-sm text-gray-500 dark:text-gray-400" x-text="usm.localita || ''">
+                            <div class="mt-2 sm:flex sm:justify-between">
+                                <div class="sm:flex">
+                                    <div class="mr-6">
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Rilevamento
+                                        </p>
+                                        <p class="text-sm text-gray-900 dark:text-white"
+                                            x-text="formatDate(us.data_rilevamento)"></p>
+                                    </div>
+                                    <div class="mr-6">
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile</p>
+                                        <p class="text-sm text-gray-900 dark:text-white"
+                                            x-text="us.responsabile_compilazione || '-'"></p>
                                     </div>
                                 </div>
+                                <div class="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
+                                    <p>
+                                        Aggiornato il <span x-text="formatDate(us.updated_at)"></span>
+                                    </p>
+                                </div>
                             </div>
-                            <div class="flex items-center space-x-2">
-                                <span x-show="usm.affidabilita_stratigrafica" :class="{
+                        </div>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    </div>
+
+    <!-- USM List -->
+    <div x-show="activeTab === 'usm'" x-transition>
+        <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
+            <div x-show="usmList.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
+                <i class="fas fa-search text-4xl mb-4"></i>
+                <p>Nessuna USM trovata. Prova a modificare i filtri o crea una nuova USM.</p>
+            </div>
+            <ul x-show="usmList.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
+                <template x-for="usm in usmList" :key="usm.id">
+                    <li class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <div class="px-4 py-4 sm:px-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div
+                                        class="flex-shrink-0 h-10 w-10 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                                        <span class="text-red-600 dark:text-red-300 font-bold"
+                                            x-text="usm.usm_code.substring(3)"></span>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white"
+                                            x-text="usm.usm_code"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="usm.definizione || 'Nessuna definizione'"></div>
+                                        <div class="text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="usm.localita || ''">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span x-show="usm.affidabilita_stratigrafica" :class="{
                                               'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100': usm.affidabilita_stratigrafica === 'alta',
                                               'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100': usm.affidabilita_stratigrafica === 'media',
                                               'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100': usm.affidabilita_stratigrafica === 'bassa'
                                           }" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
-                                    <span x-text="usm.affidabilita_stratigrafica"></span>
-                                </span>
-                                <button @click="openUSMModal(usm, false)"
-                                    class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
-                                    title="Visualizza">
-                                    <i class="fas fa-eye mr-1"></i>
-                                    Visualizza
-                                </button>
-                                <button @click="openUSMModal(usm, true)"
-                                    class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
-                                    title="Modifica">
-                                    <i class="fas fa-edit mr-1"></i>
-                                    Modifica
-                                </button>
-                                <button @click="deleteUSM(usm.id)"
-                                    class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
-                                    title="Elimina">
-                                    <i class="fas fa-trash mr-1"></i>
-                                    Elimina
-                                </button>
+                                        <span x-text="usm.affidabilita_stratigrafica"></span>
+                                    </span>
+                                    <button @click="openUSMModal(usm, false)"
+                                        class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                                        title="Visualizza">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        Visualizza
+                                    </button>
+                                    <button @click="openUSMModal(usm, true)"
+                                        class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
+                                        title="Modifica">
+                                        <i class="fas fa-edit mr-1"></i>
+                                        Modifica
+                                    </button>
+                                    <button @click="deleteUSM(usm.id)"
+                                        class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
+                                        title="Elimina">
+                                        <i class="fas fa-trash mr-1"></i>
+                                        Elimina
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="mt-2 sm:flex sm:justify-between">
-                            <div class="sm:flex">
-                                <div class="mr-6">
-                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Rilevamento
+                            <div class="mt-2 sm:flex sm:justify-between">
+                                <div class="sm:flex">
+                                    <div class="mr-6">
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Rilevamento
+                                        </p>
+                                        <p class="text-sm text-gray-900 dark:text-white"
+                                            x-text="formatDate(usm.data_rilevamento)"></p>
+                                    </div>
+                                    <div class="mr-6">
+                                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile</p>
+                                        <p class="text-sm text-gray-900 dark:text-white"
+                                            x-text="usm.responsabile_compilazione || '-'"></p>
+                                    </div>
+                                </div>
+                                <div class="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
+                                    <p>
+                                        Aggiornato il <span x-text="formatDate(usm.updated_at)"></span>
                                     </p>
-                                    <p class="text-sm text-gray-900 dark:text-white"
-                                        x-text="formatDate(usm.data_rilevamento)"></p>
                                 </div>
-                                <div class="mr-6">
-                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile</p>
-                                    <p class="text-sm text-gray-900 dark:text-white"
-                                        x-text="usm.responsabile_compilazione || '-'"></p>
-                                </div>
-                            </div>
-                            <div class="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
-                                <p>
-                                    Aggiornato il <span x-text="formatDate(usm.updated_at)"></span>
-                                </p>
                             </div>
                         </div>
-                    </div>
-                </li>
-            </template>
-        </ul>
+                    </li>
+                </template>
+            </ul>
+        </div>
     </div>
-</div>
 
-<!-- Harris Matrix Tab - Component -->
-<div x-show="activeTab === 'harris-matrix'" x-transition>
-    <div
-        class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {% include "pages/us/harris_matrix_tab_component.html" %}
+    <!-- Harris Matrix Tab - Component -->
+    <div x-show="activeTab === 'harris-matrix'" x-transition>
+        <div
+            class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {% include "pages/us/harris_matrix_tab_component.html" %}
+        </div>
     </div>
-</div>
 
-<!-- Pagination (if needed) -->
-<div x-show="pagination.totalItems > pagination.itemsPerPage" class="mt-6 flex items-center justify-between">
-    <div class="text-sm text-gray-700 dark:text-gray-300">
-        Mostrando <span x-text="(pagination.currentPage - 1) * pagination.itemsPerPage + 1"></span> a
-        <span x-text="Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)"></span> di
-        <span x-text="pagination.totalItems"></span> risultati
+    <!-- Pagination (if needed) -->
+    <div x-show="pagination.totalItems > pagination.itemsPerPage" class="mt-6 flex items-center justify-between">
+        <div class="text-sm text-gray-700 dark:text-gray-300">
+            Mostrando <span x-text="(pagination.currentPage - 1) * pagination.itemsPerPage + 1"></span> a
+            <span x-text="Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)"></span> di
+            <span x-text="pagination.totalItems"></span> risultati
+        </div>
+        <div class="flex items-center space-x-2">
+            <button @click="pagination.currentPage > 1 && (pagination.currentPage--, loadUSList())"
+                :disabled="pagination.currentPage <= 1"
+                class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+                Precedente
+            </button>
+            <span class="px-3 py-1 text-sm text-gray-700 dark:text-gray-300">
+                Pagina <span x-text="pagination.currentPage"></span>
+            </span>
+            <button
+                @click="pagination.currentPage * pagination.itemsPerPage < pagination.totalItems && (pagination.currentPage++, loadUSList())"
+                :disabled="pagination.currentPage * pagination.itemsPerPage >= pagination.totalItems"
+                class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+                Successivo
+            </button>
+        </div>
     </div>
-    <div class="flex items-center space-x-2">
-        <button @click="pagination.currentPage > 1 && (pagination.currentPage--, loadUSList())"
-            :disabled="pagination.currentPage <= 1"
-            class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
-            Precedente
-        </button>
-        <span class="px-3 py-1 text-sm text-gray-700 dark:text-gray-300">
-            Pagina <span x-text="pagination.currentPage"></span>
-        </span>
-        <button
-            @click="pagination.currentPage * pagination.itemsPerPage < pagination.totalItems && (pagination.currentPage++, loadUSList())"
-            :disabled="pagination.currentPage * pagination.itemsPerPage >= pagination.totalItems"
-            class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
-            Successivo
-        </button>
-    </div>
-</div>
 
-<!-- Include modals -->
-{% include "pages/us/modal_usm_create_edit.html" %}
-{% include "pages/us/modal_us_create_edit.html" %}
+
+    <!-- Include modals -->
+    {% include "pages/us/modal_usm_create_edit.html" %}
+    {% include "pages/us/modal_us_create_edit.html" %}
 
 
 

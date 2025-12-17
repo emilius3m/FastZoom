@@ -724,7 +724,7 @@ class PaddleOCRService:
                     _, buffer = cv2.imencode('.png', processed_cv)
                     img_b64 = base64.b64encode(buffer).decode('utf-8')
                     
-                result['debug']['pages'].append({
+                    result['debug']['pages'].append({
                         'page_number': page_num + 1,
                         'image_base64': f"data:image/png;base64,{img_b64}",
                         'text_lines': page_texts,

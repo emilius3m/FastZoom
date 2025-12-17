@@ -249,6 +249,120 @@
             pdfImportResults: null,
             pdfImportError: null,
             ocrDebugTab: 'result',  // Tab state for OCR debug viewer
+            editPageIdx: 0,  // Page index for OCR edit tab
+            highlightedField: null,  // Currently focused field name for canvas highlighting
+
+            // Field to bounding box label mapping for canvas highlighting
+            fieldLabelMap: {
+                'us_code': ['US', 'US CODE', 'UNITA STRATIGRAFICA'],
+                'tipo': ['TIPO', 'TIPO US', 'TIPO USM'],
+                'definizione': ['DEFINIZIONE'],
+                'localita': ['LOCALITA', 'LOCALITÀ'],
+                'area_struttura': ['AREA', 'AREA/EDIFICIO/STRUTTURA', 'STRUTTURA'],
+                'saggio': ['SAGGIO'],
+                'ambiente_unita_funzione': ['AMBIENTE', 'UNITA FUNZIONALE', 'AMBIENTE/UNITÀ'],
+                'quote': ['QUOTE', 'QUOTA'],
+                'descrizione': ['DESCRIZIONE'],
+                'interpretazione': ['INTERPRETAZIONE'],
+                'osservazioni': ['OSSERVAZIONI'],
+                'datazione': ['DATAZIONE'],
+                'periodo': ['PERIODO'],
+                'fase': ['FASE'],
+                'attivita': ['ATTIVITA', 'ATTIVITÀ'],
+                'copre': ['COPRE'],
+                'coperto_da': ['COPERTO DA', 'COPERTO'],
+                'taglia': ['TAGLIA'],
+                'tagliato_da': ['TAGLIATO DA', 'TAGLIATO'],
+                'riempie': ['RIEMPIE'],
+                'riempito_da': ['RIEMPITO DA', 'RIEMPITO'],
+                'si_lega_a': ['SI LEGA A', 'LEGA'],
+                'uguale_a': ['UGUALE A', 'UGUALE'],
+                'posteriore_a': ['POSTERIORE A', 'POSTERIORE'],
+                'anteriore_a': ['ANTERIORE A', 'ANTERIORE'],
+                'responsabile_scientifico': ['RESPONSABILE SCIENTIFICO', 'RESP. SCIENTIFICO'],
+                'responsabile_compilazione': ['RESPONSABILE COMPILAZIONE', 'RESP. COMPILAZIONE']
+            },
+
+            // Find bounding box index for a field name
+            findBoxForField(fieldName, page) {
+                if (!page?.bounding_boxes || !this.fieldLabelMap[fieldName]) return null;
+                const labels = this.fieldLabelMap[fieldName];
+
+                for (let i = 0; i < page.bounding_boxes.length; i++) {
+                    const boxText = (page.bounding_boxes[i].text || '').toUpperCase();
+                    for (const label of labels) {
+                        if (boxText.includes(label.toUpperCase())) {
+                            return i;
+                        }
+                    }
+                }
+                return null;
+            },
+
+            // Initialize edit canvas
+            initEditCanvas(canvasId, img, page) {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas || !img) return;
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                this.redrawEditCanvas(canvasId, page, null);
+            },
+
+            // Redraw edit canvas with highlighted field
+            redrawEditCanvas(canvasId, page, fieldName) {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (!fieldName || !page?.bounding_boxes) return;
+
+                const boxIdx = this.findBoxForField(fieldName, page);
+                if (boxIdx === null) return;
+
+                const box = page.bounding_boxes[boxIdx];
+                if (!box?.polygon || box.polygon.length < 3) return;
+
+                // Draw highlighted polygon
+                ctx.beginPath();
+                ctx.moveTo(box.polygon[0][0], box.polygon[0][1]);
+                for (let i = 1; i < box.polygon.length; i++) {
+                    ctx.lineTo(box.polygon[i][0], box.polygon[i][1]);
+                }
+                ctx.closePath();
+
+                // Bright fill
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';  // Green
+                ctx.fill();
+
+                // Thick stroke
+                ctx.strokeStyle = '#16a34a';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // Optional: draw pulsing animation effect with larger glow
+                ctx.shadowColor = '#22c55e';
+                ctx.shadowBlur = 20;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            },
+
+            // Handle field focus
+            onFieldFocus(fieldName) {
+                this.highlightedField = fieldName;
+                const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx || 0];
+                this.redrawEditCanvas('edit_canvas', page, fieldName);
+            },
+
+            // Handle field blur
+            onFieldBlur() {
+                this.highlightedField = null;
+                const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx || 0];
+                this.redrawEditCanvas('edit_canvas', page, null);
+            },
 
 
             // ===== CANVAS HELPER FUNCTIONS FOR OCR DEBUG VIEWER =====
