@@ -469,22 +469,35 @@ class USLayoutParser:
 
         # 35) Sequenza stratigrafica
         for label_key, field_name in [
-            ("SI LEGA A", "si_lega_a"),
-            ("UGUALE A", "uguale_a"),
-            ("COPRE", "copre"),
-            ("COPERTO DA", "coperto_da"),
-            ("RIEMPIE", "riempie"),
-            ("RIEMPITO DA", "riempito_da"),
-            ("TAGLIA", "taglia"),
-            ("TAGLIATO DA", "tagliato_da"),
-            ("SI APPOGGIA A", "si_appoggia_a"),
-            ("GLI SI APPOGGIA", "gli_si_appoggia"),
+            ("SI LEGA A", "seq_si_lega_a"),
+            ("UGUALE A", "seq_uguale_a"),
+            ("COPRE", "seq_copre"),
+            ("COPERTO DA", "seq_coperto_da"),
+            ("RIEMPIE", "seq_riempie"),
+            ("RIEMPITO DA", "seq_riempito_da"),
+            ("TAGLIA", "seq_taglia"),
+            ("TAGLIATO DA", "seq_tagliato_da"),
+            ("SI APPOGGIA A", "seq_si_appoggia_a"),
+            ("GLI SI APPOGGIA", "seq_gli_si_appoggia"),
             ("POSTERIORE A", "posteriore_a"),
             ("ANTERIORE A", "anteriore_a"),
         ]:
             v = self._extract_value_in_cell(tokens, label_key, label_rects, page_w=w, page_h=h)
             if v:
                 out[field_name] = v
+
+        # 37) Proprietà fisiche
+        v = self._extract_value_in_cell(tokens, "CONSISTENZA", label_rects, page_w=w, page_h=h)
+        if v:
+            out["consistenza"] = v
+
+        v = self._extract_value_in_cell(tokens, "COLORE", label_rects, page_w=w, page_h=h)
+        if v:
+            out["colore"] = v
+
+        v = self._extract_value_in_cell(tokens, "MISURE", label_rects, page_w=w, page_h=h)
+        if v:
+            out["misure"] = v
 
         return out
 

@@ -843,30 +843,14 @@ class PaddleOCRService:
             )
 
             
-            # Always run text parser to fill non-core fields
-            # Layout parser handles: us_code, area_edificio, ambiente, quote, tipo (checkbox)
-            # Text parser fills: descrizione, osservazioni, interpretazione, datazione, reperti, etc.
-            text_parser = get_us_parser()
-            text_data = text_parser.parse_us_sheet(
-                text=combined_text,
-                site_id=site_id,
-                filename=filename
-            )
-            
-            # Merge: layout parser "wins" on core fields, text parser fills the rest
-            if text_data:
-                for key, value in text_data.items():
-                    # Don't overwrite existing values from layout parser
-                    if key not in us_data or not us_data.get(key):
-                        us_data[key] = value
-                logger.info(f"Merged {len(text_data)} fields from text parser")
+
             
             if us_data and us_data.get('us_code'):
                 us_data['_pdf_source'] = filename
                 us_data['_total_pages'] = len(result['debug']['pages'])
                 us_data['_raw_ocr_text'] = combined_text  # Keep for debug/QA
                 result['us_data'] = us_data
-                logger.info(f"✓ Parsed US: {us_data.get('us_code', 'unknown')} (layout parser + text parser merge)")
+                logger.info(f"✓ Parsed US: {us_data.get('us_code', 'unknown')} (layout parser)")
             else:
                 logger.warning("No US data could be parsed from combined pages")
             

@@ -420,156 +420,205 @@
                                         <input type="text" x-model="editedOCRData.fase" @focus="onFieldFocus('fase')"
                                             @blur="onFieldBlur()"
                                             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Consistenza -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Consistenza</label>
+                                            <input type="text" x-model="editedOCRData.consistenza"
+                                                @focus="onFieldFocus('consistenza')" @blur="onFieldBlur()"
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Interpretazione -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Interpretazione</label>
-                                        <textarea x-model="editedOCRData.interpretazione" rows="3"
-                                            @focus="onFieldFocus('interpretazione')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
-                                    </div>
+                                        <!-- Colore -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Colore</label>
+                                            <input type="text" x-model="editedOCRData.colore"
+                                                @focus="onFieldFocus('colore')" @blur="onFieldBlur()"
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Osservazioni -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Osservazioni</label>
-                                        <textarea x-model="editedOCRData.osservazioni" rows="3"
-                                            @focus="onFieldFocus('osservazioni')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
-                                    </div>
+                                        <!-- Misure -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Misure</label>
+                                            <textarea x-model="editedOCRData.misure" rows="2"
+                                                @focus="onFieldFocus('misure')" @blur="onFieldBlur()"
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
+                                        </div>
 
-                                    <!-- Divider -->
-                                    <div class="pt-3 border-t border-gray-300 dark:border-gray-600">
-                                        <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                            Sequenze Stratigrafiche</h5>
-                                    </div>
+                                        <!-- Interpretazione -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Interpretazione</label>
+                                            <textarea x-model="editedOCRData.interpretazione" rows="3"
+                                                @focus="onFieldFocus('interpretazione')" @blur="onFieldBlur()"
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
+                                        </div>
 
-                                    <!-- Copre -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Copre</label>
-                                        <input type="text" x-model="editedOCRData.seq_copre"
-                                            @focus="onFieldFocus('copre')" @blur="onFieldBlur()"
-                                            placeholder="US001, US002..."
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Osservazioni -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Osservazioni</label>
+                                            <textarea x-model="editedOCRData.osservazioni" rows="3"
+                                                @focus="onFieldFocus('osservazioni')" @blur="onFieldBlur()"
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white"></textarea>
+                                        </div>
 
-                                    <!-- Coperto da -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Coperto
-                                            da</label>
-                                        <input type="text" x-model="editedOCRData.seq_coperto_da"
-                                            @focus="onFieldFocus('coperto_da')" @blur="onFieldBlur()"
-                                            placeholder="US003, US004..."
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Divider -->
+                                        <div class="pt-3 border-t border-gray-300 dark:border-gray-600">
+                                            <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                                Sequenze Stratigrafiche</h5>
+                                        </div>
 
-                                    <!-- Taglia -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Taglia</label>
-                                        <input type="text" x-model="editedOCRData.seq_taglia"
-                                            @focus="onFieldFocus('taglia')" @blur="onFieldBlur()" placeholder="US005..."
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Copre -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Copre</label>
+                                            <input type="text" x-model="editedOCRData.seq_copre"
+                                                @focus="onFieldFocus('copre')" @blur="onFieldBlur()"
+                                                placeholder="US001, US002..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Tagliato da -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tagliato
-                                            da</label>
-                                        <input type="text" x-model="editedOCRData.seq_tagliato_da"
-                                            @focus="onFieldFocus('tagliato_da')" @blur="onFieldBlur()"
-                                            placeholder="US006..."
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Coperto da -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Coperto
+                                                da</label>
+                                            <input type="text" x-model="editedOCRData.seq_coperto_da"
+                                                @focus="onFieldFocus('coperto_da')" @blur="onFieldBlur()"
+                                                placeholder="US003, US004..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Si lega a -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Si
-                                            lega a</label>
-                                        <input type="text" x-model="editedOCRData.seq_si_lega_a"
-                                            @focus="onFieldFocus('si_lega_a')" @blur="onFieldBlur()"
-                                            placeholder="US007..."
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Taglia -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Taglia</label>
+                                            <input type="text" x-model="editedOCRData.seq_taglia"
+                                                @focus="onFieldFocus('taglia')" @blur="onFieldBlur()"
+                                                placeholder="US005..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Uguale a -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Uguale
-                                            a</label>
-                                        <input type="text" x-model="editedOCRData.seq_uguale_a"
-                                            @focus="onFieldFocus('uguale_a')" @blur="onFieldBlur()"
-                                            placeholder="US008..."
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Tagliato da -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tagliato
+                                                da</label>
+                                            <input type="text" x-model="editedOCRData.seq_tagliato_da"
+                                                @focus="onFieldFocus('tagliato_da')" @blur="onFieldBlur()"
+                                                placeholder="US006..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Posteriore a -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Posteriore
-                                            a</label>
-                                        <input type="text" x-model="editedOCRData.seq_posteriore_a"
-                                            @focus="onFieldFocus('posteriore_a')" @blur="onFieldBlur()"
-                                            placeholder="US009..."
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Si lega a -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Si
+                                                lega a</label>
+                                            <input type="text" x-model="editedOCRData.seq_si_lega_a"
+                                                @focus="onFieldFocus('si_lega_a')" @blur="onFieldBlur()"
+                                                placeholder="US007..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Anteriore a -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Anteriore
-                                            a</label>
-                                        <input type="text" x-model="editedOCRData.seq_anteriore_a"
-                                            @focus="onFieldFocus('anteriore_a')" @blur="onFieldBlur()"
-                                            placeholder="US010..."
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Si appoggia a -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Si
+                                                appoggia a</label>
+                                            <input type="text" x-model="editedOCRData.seq_si_appoggia_a"
+                                                @focus="onFieldFocus('si_appoggia_a')" @blur="onFieldBlur()"
+                                                placeholder="US..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Responsabile Compilazione -->
-                                    <div>
-                                        <label
-                                            class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Responsabile
-                                            Compilazione</label>
-                                        <input type="text" x-model="editedOCRData.responsabile_compilazione"
-                                            @focus="onFieldFocus('responsabile_compilazione')" @blur="onFieldBlur()"
-                                            class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
-                                    </div>
+                                        <!-- Gli si appoggia -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Gli
+                                                si
+                                                appoggia</label>
+                                            <input type="text" x-model="editedOCRData.seq_gli_si_appoggia"
+                                                @focus="onFieldFocus('gli_si_appoggia')" @blur="onFieldBlur()"
+                                                placeholder="US..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Save Button -->
-                                    <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                        <button @click="saveOCRCorrections()"
-                                            class="w-full px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 flex items-center justify-center">
-                                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M5 13l4 4L19 7"></path>
-                                            </svg>
-                                            Salva Correzioni
-                                        </button>
-                                    </div>
+                                        <!-- Uguale a -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Uguale
+                                                a</label>
+                                            <input type="text" x-model="editedOCRData.seq_uguale_a"
+                                                @focus="onFieldFocus('uguale_a')" @blur="onFieldBlur()"
+                                                placeholder="US008..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
 
-                                    <!-- Create US Button -->
-                                    <div>
-                                        <button @click="createUSFromEditedOCR()"
-                                            class="w-full px-4 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 flex items-center justify-center">
-                                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                            </svg>
-                                            Crea US nel Database
-                                        </button>
+                                        <!-- Posteriore a -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Posteriore
+                                                a</label>
+                                            <input type="text" x-model="editedOCRData.seq_posteriore_a"
+                                                @focus="onFieldFocus('posteriore_a')" @blur="onFieldBlur()"
+                                                placeholder="US009..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
+
+                                        <!-- Anteriore a -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Anteriore
+                                                a</label>
+                                            <input type="text" x-model="editedOCRData.seq_anteriore_a"
+                                                @focus="onFieldFocus('anteriore_a')" @blur="onFieldBlur()"
+                                                placeholder="US010..."
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
+
+                                        <!-- Responsabile Compilazione -->
+                                        <div>
+                                            <label
+                                                class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Responsabile
+                                                Compilazione</label>
+                                            <input type="text" x-model="editedOCRData.responsabile_compilazione"
+                                                @focus="onFieldFocus('responsabile_compilazione')" @blur="onFieldBlur()"
+                                                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white">
+                                        </div>
+
+                                        <!-- Save Button -->
+                                        <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                                            <button @click="saveOCRCorrections()"
+                                                class="w-full px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 flex items-center justify-center">
+                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                </svg>
+                                                Salva Correzioni
+                                            </button>
+                                        </div>
+
+                                        <!-- Create US Button -->
+                                        <div>
+                                            <button @click="createUSFromEditedOCR()"
+                                                class="w-full px-4 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 flex items-center justify-center">
+                                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                                </svg>
+                                                Crea US nel Database
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
                 </template>
 
                 <!-- No Results State -->
