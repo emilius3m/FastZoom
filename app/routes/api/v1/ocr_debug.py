@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image
 
 from app.services.paddle_ocr_service import get_paddle_ocr_service, is_paddle_ocr_available
-from app.services.us_parser import get_us_parser
+from app.services.us_layout_parser import get_us_layout_parser
 
 # Template setup
 templates = Jinja2Templates(directory="app/templates")
@@ -230,11 +230,23 @@ async def debug_ocr(
         
         # Parse US data
         full_text = '\n'.join(extracted_text)
-        us_parser = get_us_parser()
-        parsed_data = us_parser.parse_us_sheet(
-            text=full_text,
+        # Parse US data using Layout Parser (new geometry-aware parser)
+        us_layout_parser = get_us_layout_parser()
+        
+        # Prepare tokens for layout parser (mimic structure)
+        ocr_items = []
+        for i, text in enumerate(extracted_text):
+            box = bounding_boxes[i]
+            ocr_items.append({
+                'text': text,
+                'confidence': box['confidence'],
+                'polygon': box['polygon']
+            })
+            
+        parsed_data = us_layout_parser.parse_core(
+            items=ocr_items,
             site_id="debug",
-            filename=filename
+            page_size=(overlay_cv.shape[1], overlay_cv.shape[0])
         )
         
         # Rimuovi campo raw_ocr_text dal parsed (troppo lungo)

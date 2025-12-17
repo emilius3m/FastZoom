@@ -212,8 +212,15 @@ class USLayoutParser:
         w, h = page_size
         
         # Store detected cells for use in extraction methods
-        self._detected_cells = detected_cells or []
-        if self._detected_cells:
+        self._detected_cells: List[Rect] = []
+        if detected_cells:
+            for c in detected_cells:
+                self._detected_cells.append(Rect(
+                    float(c.get('x1', 0)),
+                    float(c.get('y1', 0)),
+                    float(c.get('x2', 0)),
+                    float(c.get('y2', 0))
+                ))
             logger.info(f"Using {len(self._detected_cells)} PPStructure cells for extraction")
 
         # Trova label rect per campo
@@ -538,23 +545,18 @@ class USLayoutParser:
 
         return Rect(label_rect.x1, label_rect.y1, right, bottom)
 
-    def _find_cell_for_label(self, label_rect: Rect) -> Optional[Dict[str, Any]]:
+    def _find_cell_for_label(self, label_rect: Rect) -> Optional[Rect]:
         """
         Trova la cella PPStructure che contiene la label.
-        Restituisce la cella come dict {x1, y1, x2, y2} o None.
+        Restituisce la cella come Rect o None.
         """
         if not self._detected_cells:
             return None
         
-        label_center_x = label_rect.cx
-        label_center_y = label_rect.cy
+        cx, cy = label_rect.cx, label_rect.cy
         
         for cell in self._detected_cells:
-            x1, y1 = cell.get('x1', 0), cell.get('y1', 0)
-            x2, y2 = cell.get('x2', 0), cell.get('y2', 0)
-            
-            # La label è dentro la cella?
-            if x1 <= label_center_x <= x2 and y1 <= label_center_y <= y2:
+            if cell.contains_point(cx, cy):
                 return cell
         
         return None
@@ -568,14 +570,9 @@ class USLayoutParser:
         Estrae valore usando le celle rilevate da PPStructure.
         Cerca token sotto la label ma nella stessa cella.
         """
-        cell = self._find_cell_for_label(label_rect)
-        if not cell:
+        cell_rect = self._find_cell_for_label(label_rect)
+        if not cell_rect:
             return None
-        
-        cell_rect = Rect(
-            cell['x1'], cell['y1'],
-            cell['x2'], cell['y2']
-        )
         
         # Cerca token sotto la label ma dentro la cella
         value_tokens = []
