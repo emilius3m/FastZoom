@@ -37,19 +37,7 @@
                     </svg>
                     Risultato US
                 </button>
-                <button @click="ocrDebugTab = 'pages'"
-                    :class="ocrDebugTab === 'pages' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
-                    class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
-                        </path>
-                    </svg>
-                    Pagine OCR
-                    <span x-show="pdfImportResults?.debug_pages"
-                        class="ml-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full"
-                        x-text="pdfImportResults?.debug_pages?.length || 0"></span>
-                </button>
+
                 <button @click="ocrDebugTab = 'revision'"
                     :class="ocrDebugTab === 'revision' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
                     class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
@@ -145,24 +133,14 @@
                                 </div>
 
                                 <!-- Extracted Fields Grid -->
-                                <div class="grid grid-cols-3 gap-4 text-sm mb-4">
-                                    <div x-show="result.data.tipo"><strong>Tipo:</strong> <span
-                                            x-text="result.data.tipo"></span></div>
-                                    <div x-show="result.data.definizione"><strong>Definizione:</strong>
-                                        <span x-text="(result.data.definizione || '').substring(0, 40)"></span>
-                                    </div>
-                                    <div x-show="result.data.localita"><strong>Località:</strong> <span
-                                            x-text="result.data.localita"></span></div>
-                                    <div x-show="result.data.area_struttura"><strong>Area:</strong> <span
-                                            x-text="result.data.area_struttura"></span></div>
-                                    <div x-show="result.data.datazione"><strong>Datazione:</strong> <span
-                                            x-text="result.data.datazione"></span></div>
-                                    <div x-show="result.data.responsabile_scientifico">
-                                        <strong>Resp:</strong> <span
-                                            x-text="result.data.responsabile_scientifico"></span>
-                                    </div>
-                                    <div><strong>Campi estratti:</strong> <span
-                                            x-text="result.extracted_fields_count"></span></div>
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-sm mb-4">
+                                    <template x-for="(value, key) in result.data" :key="key">
+                                        <div x-show="value && key !== 'us_code' && key !== '_field_bboxes'"
+                                            class="break-words">
+                                            <strong class="capitalize" x-text="key.replace(/_/g, ' ') + ':'"></strong>
+                                            <span x-text="typeof value === 'object' ? JSON.stringify(value) : value"
+                                                </div>
+                                    </template>
                                 </div>
 
                                 <!-- Warnings -->
@@ -205,8 +183,8 @@
                             </path>
                         </svg>
                         <p class="text-lg font-medium">Nessuna scheda US trovata nel PDF</p>
-                        <p class="text-sm mt-2">Controlla la tab "Pagine OCR" per vedere il testo estratto
-                        </p>
+                        <p class="text-sm mt-2">Verifica il file PDF originale.</p>
+
                     </div>
                 </template>
             </div>
@@ -313,12 +291,14 @@
                                     <div class="flex items-center space-x-2">
                                         <div class="w-4 h-4 border-2 border-blue-500" style="border-style: dashed;">
                                         </div>
-                                        <span class="text-gray-700 dark:text-gray-300">Celle rilevate da PPStructure
+                                        <span class="text-gray-700 dark:text-gray-300">Celle rilevate da
+                                            PPStructure
                                             (C0, C1, ...)</span>
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <div class="w-4 h-4 border-2 border-purple-500"></div>
-                                        <span class="text-gray-700 dark:text-gray-300">Bounding box testo OCR</span>
+                                        <span class="text-gray-700 dark:text-gray-300">Bounding box testo
+                                            OCR</span>
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <div class="w-4 h-4 bg-green-400 border-2 border-green-600"></div>
@@ -544,91 +524,7 @@
                 </template>
             </div>
 
-            <!-- TAB: Pagine OCR con Immagini INTERATTIVE -->
-            <div x-show="ocrDebugTab === 'pages'" x-transition>
-                <template x-if="pdfImportResults?.debug_pages && pdfImportResults.debug_pages.length > 0">
-                    <div class="space-y-6">
-                        <template x-for="(page, pageIdx) in pdfImportResults.debug_pages" :key="pageIdx">
-                            <div class="border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
-                                <!-- Page Header -->
-                                <div class="bg-gray-100 dark:bg-gray-700 px-4 py-3 flex items-center justify-between">
-                                    <div class="flex items-center">
-                                        <span
-                                            class="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3"
-                                            x-text="page.page_number"></span>
-                                        <span class="font-medium">Pagina <span x-text="page.page_number"></span></span>
-                                    </div>
-                                    <div class="flex items-center space-x-4 text-sm text-gray-500">
-                                        <span><strong x-text="page.word_count"></strong> parole</span>
-                                        <span>Conf: <strong
-                                                x-text="(page.avg_confidence * 100).toFixed(0) + '%'"></strong></span>
-                                    </div>
-                                </div>
 
-                                <!-- Page Content: Interactive Image + Text -->
-                                <div class="grid md:grid-cols-2 gap-4 p-4">
-                                    <!-- Image with Canvas Overlay for interactive boxes -->
-                                    <div class="bg-gray-100 dark:bg-gray-900 rounded-lg p-2 relative">
-                                        <div class="relative inline-block">
-                                            <!-- Base image -->
-                                            <img :src="page.image_base64"
-                                                class="max-w-full h-auto rounded shadow-lg block"
-                                                :alt="'Pagina ' + page.page_number" :id="'ocr_img_' + pageIdx"
-                                                @load="initCanvasById('ocr_canvas_' + pageIdx, $el, page)">
-
-                                            <!-- Canvas overlay for bounding boxes -->
-                                            <canvas :id="'ocr_canvas_' + pageIdx"
-                                                class="absolute inset-0 w-full h-full cursor-crosshair"
-                                                @mousemove="handleCanvasHoverById($event, 'ocr_canvas_' + pageIdx, page)"
-                                                @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)"></canvas>
-                                        </div>
-                                    </div>
-
-                                    <!-- Extracted Text Lines with hover sync -->
-                                    <div class="bg-gray-100 dark:bg-gray-900 rounded-lg p-4">
-                                        <div class="text-xs font-mono space-y-1">
-                                            <template x-for="(box, idx) in page.bounding_boxes" :key="idx">
-                                                <div class="flex px-2 py-1.5 rounded-md cursor-pointer transition-all duration-150"
-                                                    :class="{
-                                                                     'bg-yellow-400 dark:bg-yellow-500 ring-2 ring-orange-500 shadow-md': hoveredBoxIdx === idx,
-                                                                     'hover:bg-gray-200 dark:hover:bg-gray-700': hoveredBoxIdx !== idx
-                                                                 }"
-                                                    @mouseenter="hoveredBoxIdx = idx; redrawCanvasById('ocr_canvas_' + pageIdx, page, idx)"
-                                                    @mouseleave="hoveredBoxIdx = null; redrawCanvasById('ocr_canvas_' + pageIdx, page, null)">
-                                                    <span class="w-8 flex-shrink-0 font-bold"
-                                                        :class="hoveredBoxIdx === idx ? 'text-orange-600 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'"
-                                                        x-text="(idx + 1) + '.'"></span>
-                                                    <span class="flex-1"
-                                                        :class="hoveredBoxIdx === idx ? 'text-gray-900 dark:text-gray-900 font-semibold' : 'text-gray-700 dark:text-gray-300'"
-                                                        x-text="box.text"></span>
-                                                    <span class="ml-2 text-xs px-1.5 py-0.5 rounded" :class="{
-                                                                          'bg-green-200 text-green-800 dark:bg-green-700 dark:text-green-100': box.confidence > 0.9,
-                                                                          'bg-yellow-200 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100': box.confidence > 0.7 && box.confidence <= 0.9,
-                                                                          'bg-red-200 text-red-800 dark:bg-red-700 dark:text-red-100': box.confidence <= 0.7
-                                                                      }"
-                                                        x-text="Math.round(box.confidence * 100) + '%'"></span>
-                                                </div>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Legend -->
-                                <div
-                                    class="bg-gray-50 dark:bg-gray-800 px-4 py-2 text-xs text-gray-500 flex items-center justify-center space-x-4 border-t border-gray-200 dark:border-gray-700">
-                                    <span>💡 Passa il mouse su un box o sul testo per evidenziare la
-                                        corrispondenza</span>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </template>
-                <template x-if="!pdfImportResults?.debug_pages || pdfImportResults.debug_pages.length === 0">
-                    <div class="text-center py-12 text-gray-500">
-                        <p>Nessun dato di debug disponibile</p>
-                    </div>
-                </template>
-            </div>
 
             <!-- TAB: PP-Structure Celle -->
             <div x-show="ocrDebugTab === 'pp_cells'" x-transition>
@@ -644,7 +540,8 @@
                             </div>
                             <div class="bg-green-50 dark:bg-green-900/30 rounded-lg p-4 text-center">
                                 <div class="text-2xl font-bold text-green-600 dark:text-green-400"
-                                    x-text="pdfImportResults.debug.table_detection_method || 'ppstructure'"></div>
+                                    x-text="pdfImportResults.debug.table_detection_method || 'ppstructure'">
+                                </div>
                                 <div class="text-sm text-green-700 dark:text-green-300">Metodo</div>
                             </div>
                             <div class="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4 text-center">
@@ -663,7 +560,8 @@
                                     <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"></path>
+                                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z">
+                                        </path>
                                     </svg>
                                     Celle PP-Structure (Coordinate Locali per Pagina)
                                 </h3>
@@ -732,9 +630,12 @@
                                 <div>
                                     <p class="font-medium">Come interpretare le celle:</p>
                                     <ul class="mt-1 text-xs space-y-1 text-blue-700 dark:text-blue-300">
-                                        <li>• Le coordinate sono in pixel relativi all'immagine della pagina</li>
-                                        <li>• Ogni cella rappresenta un'area della tabella rilevata da PPStructure</li>
-                                        <li>• Vai alla tab "Revisione OCR" per vedere le celle disegnate sull'anteprima
+                                        <li>• Le coordinate sono in pixel relativi all'immagine della pagina
+                                        </li>
+                                        <li>• Ogni cella rappresenta un'area della tabella rilevata da
+                                            PPStructure</li>
+                                        <li>• Vai alla tab "Revisione OCR" per vedere le celle disegnate
+                                            sull'anteprima
                                         </li>
                                     </ul>
                                 </div>
@@ -753,11 +654,13 @@
                                 d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z">
                             </path>
                         </svg>
-                        <p class="text-lg font-medium text-gray-500 dark:text-gray-400">Nessuna cella PP-Structure
+                        <p class="text-lg font-medium text-gray-500 dark:text-gray-400">Nessuna cella
+                            PP-Structure
                             rilevata</p>
                         <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">
                             PPStructure non ha rilevato tabelle strutturate nel PDF.<br>
-                            Questo può accadere se il documento non contiene tabelle o se le tabelle sono in formato non
+                            Questo può accadere se il documento non contiene tabelle o se le tabelle sono in
+                            formato non
                             standard.
                         </p>
                     </div>

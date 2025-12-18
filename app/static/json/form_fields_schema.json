@@ -117,6 +117,13 @@
           "type": "text",
           "placeholder": "TAV. 38-39",
           "width": "col-span-1"
+        },
+        {
+          "pdf_label": "FOTOGRAFIE",
+          "model_key": "fotografie_riferimenti",
+          "type": "text",
+          "placeholder": "FOTO 1-5",
+          "width": "col-span-1"
         }
       ]
     },
