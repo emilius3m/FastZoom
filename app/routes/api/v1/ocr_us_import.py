@@ -88,6 +88,8 @@ class OCRBatchResult(BaseModel):
     # Debug data for visualization
     debug_pages: Optional[List[OCRPageDebug]] = None
     combined_text: Optional[str] = None
+    # Additional debug info (pp_structure_cells, table_detection_method, etc.)
+    debug: Optional[Dict[str, Any]] = None
 
 
 class USImportPreviewItem(BaseModel):
@@ -319,7 +321,14 @@ async def extract_us_from_pdf(
             results=results,
             processing_time_seconds=round(processing_time, 2),
             debug_pages=debug_pages,
-            combined_text=debug_info.get('combined_text', '')
+            combined_text=debug_info.get('combined_text', ''),
+            debug={
+                'pp_structure_cells': debug_info.get('pp_structure_cells', []),
+                'cell_mapping': debug_info.get('cell_mapping', {}),
+                'table_detection_method': debug_info.get('table_detection_method', 'none'),
+                'tables_html': debug_info.get('tables_html', []),
+                'total_words': debug_info.get('total_words', 0),
+            }
         )
     
     except HTTPException:
@@ -676,3 +685,235 @@ async def extract_us_from_image(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore durante l'estrazione: {str(e)}"
         )
+
+
+@router.post(
+    "/test-pp-structure-v3",
+    summary="Test PP-StructureV3 cell extraction",
+    description="Endpoint di test per verificare l'estrazione celle con PP-StructureV3"
+)
+async def test_pp_structure_v3(
+    file: UploadFile = File(..., description="File PDF da testare"),
+    use_gpu: bool = Query(False, description="Utilizza GPU"),
+):
+    """
+    Endpoint per testare PP-StructureV3 extraction.
+    
+    Ritorna:
+    - Tutte le celle estratte con coordinate
+    - Info tabelle rilevate
+    - Debug dettagliato
+    """
+    import base64
+    from io import BytesIO
+    
+    try:
+        from app.services.pp_structure_v3_extractor import (
+            get_pp_structure_extractor,
+            create_mic_us_label_mapping,
+            PP_STRUCTURE_AVAILABLE
+        )
+    except ImportError as e:
+        return {
+            "error": f"PP-StructureV3 extractor not available: {e}",
+            "suggestion": "Install with: pip install -U paddleocr"
+        }
+    
+    if not PP_STRUCTURE_AVAILABLE:
+        return {
+            "error": "PP-Structure module not available",
+            "suggestion": "Install with: pip install -U paddleocr"
+        }
+    
+    try:
+        import fitz
+        import cv2
+        import numpy as np
+        from PIL import Image
+        
+        pdf_bytes = await file.read()
+        
+        # Open PDF and render first page
+        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        page = pdf_document[0]
+        
+        zoom = 2.5
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat)
+        
+        # Convert to numpy
+        img_data = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+        if pix.n == 4:
+            img_data = cv2.cvtColor(img_data, cv2.COLOR_RGBA2RGB)
+        
+        pdf_document.close()
+        
+        # Extract with PP-StructureV3
+        extractor = get_pp_structure_extractor(use_gpu=use_gpu)
+        tables = extractor.extract_tables_from_image(img_data)
+        
+        if not tables:
+            return {
+                "success": False,
+                "error": "No tables detected in PDF",
+                "page_size": (pix.width, pix.height)
+            }
+        
+        main_table = tables[0]
+        
+        # Visualize
+        vis_image = extractor.visualize_table(img_data, main_table)
+        
+        # Convert visualization to base64
+        pil_vis = Image.fromarray(vis_image)
+        bio = BytesIO()
+        pil_vis.save(bio, format='PNG')
+        bio.seek(0)
+        vis_b64 = base64.b64encode(bio.getvalue()).decode()
+        
+        # Collect cells data
+        cells_data = []
+        for cell in main_table.cells:
+            cells_data.append({
+                "row": cell.row,
+                "col": cell.col,
+                "text": cell.text,
+                "bbox": list(cell.bbox),
+                "rowspan": cell.rowspan,
+                "colspan": cell.colspan,
+                "confidence": cell.confidence,
+                "width": cell.width,
+                "height": cell.height
+            })
+        
+        # Test field extraction
+        label_mapping = create_mic_us_label_mapping()
+        extracted_fields = extractor.extract_fields_by_label(tables, label_mapping)
+        
+        return {
+            "success": True,
+            "page_size": (pix.width, pix.height),
+            "tables_count": len(tables),
+            "table": {
+                "rows": main_table.rows,
+                "cols": main_table.cols,
+                "cells_count": len(main_table.cells),
+                "bbox": list(main_table.bbox),
+            },
+            "cells": cells_data,
+            "extracted_fields": extracted_fields,
+            "visualization": f"data:image/png;base64,{vis_b64}"
+        }
+    
+    except Exception as e:
+        logger.error(f"Test PP-StructureV3 failed: {e}")
+        import traceback
+        return {
+            "error": str(e),
+            "type": type(e).__name__,
+            "traceback": traceback.format_exc()
+        }
+
+
+@router.post(
+    "/sites/{site_id}/ocr/extract-v3",
+    summary="Estrai schede US con PP-StructureV3",
+    description="Estrae usando il nuovo metodo PP-StructureV3 con celle precise"
+)
+async def extract_us_from_pdf_v3(
+    site_id: UUID,
+    file: UploadFile = File(..., description="File PDF da processare"),
+    use_gpu: bool = Query(False, description="Utilizza GPU se disponibile"),
+    db: AsyncSession = Depends(get_async_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """
+    Estrae schede US da PDF utilizzando PP-StructureV3 per estrazione celle.
+    
+    Metodo alternativo che usa:
+    - Coordinate celle precise
+    - Supporto merged cells
+    - Mapping label -> campo automatico
+    """
+    import time
+    start_time = time.time()
+    
+    # Verifica accesso
+    verify_site_access(site_id, user_sites)
+    
+    if not is_paddle_ocr_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Servizio OCR non disponibile"
+        )
+    
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Il file deve essere in formato PDF"
+        )
+    
+    try:
+        pdf_bytes = await file.read()
+        
+        if len(pdf_bytes) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Il file PDF è vuoto"
+            )
+        
+        logger.info(f"Processing PDF {file.filename} via PP-StructureV3 for site {site_id}")
+        
+        # Use new PP-StructureV3 method
+        service = get_paddle_ocr_service(use_gpu=use_gpu)
+        result = await service.extract_from_pdf_pp_structure_v3(
+            pdf_bytes=pdf_bytes,
+            filename=file.filename,
+            site_id=str(site_id),
+            use_gpu=use_gpu,
+            include_debug=True
+        )
+        
+        processing_time = time.time() - start_time
+        
+        # Build response
+        us_data = result.get('us_data')
+        debug = result.get('debug', {})
+        
+        return {
+            "success": bool(us_data),
+            "method": "pp_structure_v3",
+            "processing_time_seconds": round(processing_time, 2),
+            "us_data": us_data,
+            "tables_detected": len(debug.get('tables', [])),
+            "cells_extracted": len(debug.get('cells', [])),
+            "debug": {
+                "tables": debug.get('tables', []),
+                "cells": debug.get('cells', [])[:50],  # Limit for response size
+                "pages": [
+                    {
+                        "page_number": p.get('page_number'),
+                        "tables_count": p.get('tables_count'),
+                        "cells_count": p.get('cells_count'),
+                        "page_size": p.get('page_size'),
+                        "image_base64": p.get('image_base64'),
+                        "visualization": p.get('visualization'),
+                    }
+                    for p in debug.get('pages', [])
+                ]
+            },
+            "error": result.get('error')
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in PP-StructureV3 extraction: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore durante l'estrazione: {str(e)}"
+        )
+

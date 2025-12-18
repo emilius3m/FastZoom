@@ -296,7 +296,48 @@
                 'responsabile_compilazione': ['RESPONSABILE COMPILAZIONE', 'RESP. COMPILAZIONE']
             },
 
-            // Find bounding box index for a field name
+            // Select a result for editing in the revision tab
+            selectResultForEdit() {
+                if (!this.pdfImportResults?.results || this.pdfImportResults.results.length === 0) return;
+
+                const result = this.pdfImportResults.results[this.selectedResultIndex];
+                if (!result) return;
+
+                // Deep copy data to avoid mutating original until saved
+                this.editedOCRData = JSON.parse(JSON.stringify(result.data));
+
+                // Determine which page to show (default to first page useful for this result, or just page 0)
+                // If we knew which page the US came from, we'd use that. 
+                // For combined results, we default to current editPageIdx or 0.
+                if (this.editPageIdx === undefined) this.editPageIdx = 0;
+
+                // Initialize canvas for this page
+                this.$nextTick(() => {
+                    const img = document.getElementById('revision_ocr_img');
+                    const page = this.pdfImportResults.debug_pages?.[this.editPageIdx];
+                    if (img && page) {
+                        this.initRevisionCanvas(img, page);
+                    }
+                });
+            },
+
+            // Handle field focus to highlight corresponding area on canvas
+            onFieldFocus(fieldName) {
+                this.highlightedField = fieldName;
+                const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx];
+                if (page) {
+                    this.redrawRevisionCanvas('revision_ocr_canvas', page, fieldName);
+                }
+            },
+
+            onFieldBlur() {
+                this.highlightedField = null;
+                const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx];
+                const canvas = document.getElementById('revision_ocr_canvas');
+                if (page && canvas) {
+                    this.drawRevisionBoxes(canvas, page);
+                }
+            },
             findBoxForField(fieldName, page) {
                 if (!page?.bounding_boxes || !this.fieldLabelMap[fieldName]) return null;
                 const labels = this.fieldLabelMap[fieldName];
@@ -310,6 +351,21 @@
                     }
                 }
                 return null;
+            },
+
+            saveOCRCorrections() {
+                if (this.selectedResultIndex >= 0 && this.pdfImportResults?.results && this.pdfImportResults.results[this.selectedResultIndex]) {
+                    this.pdfImportResults.results[this.selectedResultIndex].data = JSON.parse(JSON.stringify(this.editedOCRData));
+                    this.showNotification('Correzioni salvate localmente', 'success');
+                }
+            },
+
+            createUSFromEditedOCR() {
+                if (!this.editedOCRData) {
+                    this.showNotification('Nessun dato da salvare', 'warning');
+                    return;
+                }
+                this.createUSFromOCR(this.editedOCRData);
             },
 
             // Initialize edit canvas
@@ -525,6 +581,39 @@
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+                // STEP 1: Draw PPStructure cells if available (using page-local cells)
+                // Use page.cells (new backend format) or fallback to global list (legacy support)
+                let ppCells = page.cells || [];
+
+                // Fallback for older backend responses (though coordinate mismatch might occur)
+                if (!ppCells.length && this.pdfImportResults?.debug?.pp_structure_cells) {
+                    // Only use global cells if page number is 1 (index 0) to avoid offset issues
+                    if (this.editPageIdx === 0) {
+                        ppCells = this.pdfImportResults.debug.pp_structure_cells;
+                    }
+                }
+
+                if (ppCells.length > 0) {
+                    ppCells.forEach((cell, idx) => {
+                        const { x1, y1, x2, y2 } = cell;
+                        const width = x2 - x1;
+                        const height = y2 - y1;
+
+                        // Draw dashed cell outline in blue
+                        ctx.setLineDash([5, 3]);
+                        ctx.strokeStyle = 'rgba(59, 130, 246, 0.7)';  // Blue
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x1, y1, width, height);
+                        ctx.setLineDash([]);  // Reset line dash
+
+                        // Draw cell index label
+                        ctx.font = 'bold 12px Arial';
+                        ctx.fillStyle = 'rgba(59, 130, 246, 0.9)';
+                        ctx.fillText(`C${idx}`, x1 + 5, y1 + 15);
+                    });
+                }
+
+                // STEP 2: Draw OCR bounding boxes in purple
                 const boxes = page.bounding_boxes || [];
                 boxes.forEach((box, idx) => {
                     if (!box.polygon || box.polygon.length < 3) return;
@@ -546,48 +635,31 @@
 
             // Redraw revision canvas with highlighted field
             redrawRevisionCanvas(canvasId, page, fieldName) {
-                const canvas = document.getElementById(canvasId);
-                if (!canvas) return;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-
-                // Clear canvas
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-
                 if (!fieldName || !page?.bounding_boxes) return;
 
                 const boxIdx = this.findBoxForField(fieldName, page);
                 if (boxIdx === null) return;
 
                 const box = page.bounding_boxes[boxIdx];
-                if (!box?.polygon || box.polygon.length < 3) return;
+                if (!box) return;
 
-                // Draw highlighted polygon
-                ctx.beginPath();
-                ctx.moveTo(box.polygon[0][0], box.polygon[0][1]);
-                for (let i = 1; i < box.polygon.length; i++) {
-                    ctx.lineTo(box.polygon[i][0], box.polygon[i][1]);
+                // Construct bbox from polygon or existing properties
+                let bbox = box;
+                if ((!bbox.x1 || !bbox.x2) && box.polygon && box.polygon.length > 0) {
+                    const xs = box.polygon.map(p => p[0]);
+                    const ys = box.polygon.map(p => p[1]);
+                    bbox = {
+                        x1: Math.min(...xs), y1: Math.min(...ys),
+                        x2: Math.max(...xs), y2: Math.max(...ys)
+                    };
                 }
-                ctx.closePath();
 
-                // Bright fill with green color
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';  // Green
-                ctx.fill();
-
-                // Thick stroke
-                ctx.strokeStyle = '#16a34a';
-                ctx.lineWidth = 4;
-                ctx.stroke();
-
-                // Optional: draw pulsing animation effect with larger glow
-                ctx.shadowColor = '#22c55e';
-                ctx.shadowBlur = 20;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
+                // Delegate to the main drawing function which handles PP-Structure cells + highlighting
+                this.redrawRevisionCanvasWithBbox(canvasId, page, bbox, fieldName);
             },
 
             // Redraw revision canvas using precise bbox from backend
-            redrawRevisionCanvasWithBbox(canvasId, page, bbox) {
+            redrawRevisionCanvasWithBbox(canvasId, page, bbox, fieldName = null) {
                 const canvas = document.getElementById(canvasId);
                 if (!canvas || !bbox) return;
                 const ctx = canvas.getContext('2d');
@@ -596,25 +668,91 @@
                 // Clear canvas
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // Draw rectangle from bbox coordinates
-                const { x1, y1, x2, y2 } = bbox;
-                const width = x2 - x1;
-                const height = y2 - y1;
+                // Get global data
+                const ppCellsGlobal = this.pdfImportResults?.debug?.pp_structure_cells || [];
+                const cellMapping = this.pdfImportResults?.debug?.cell_mapping || {};
 
-                // Fill
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';  // Green
-                ctx.fillRect(x1, y1, width, height);
+                // Determine current page index (0-based)
+                const pageNum = page.page_number;
+                const pageIdx = pageNum ? (pageNum - 1) : 0;
 
-                // Stroke
-                ctx.strokeStyle = '#16a34a';
-                ctx.lineWidth = 4;
-                ctx.strokeRect(x1, y1, width, height);
+                // Filter cells for this page
+                const pageCells = ppCellsGlobal.filter(c => c.page === pageIdx);
 
-                // Glow effect
-                ctx.shadowColor = '#22c55e';
-                ctx.shadowBlur = 20;
-                ctx.strokeRect(x1, y1, width, height);
-                ctx.shadowBlur = 0;
+                // STEP 1: Draw all PP-Structure cells in light blue (background)
+                pageCells.forEach((cell, idx) => {
+                    const cellW = cell.bbox[2] - cell.bbox[0];
+                    const cellH = cell.bbox[3] - cell.bbox[1];
+
+                    ctx.setLineDash([5, 3]);
+                    ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';  // Light blue
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(cell.bbox[0], cell.bbox[1], cellW, cellH);
+
+                    // Restore cell labels
+                    ctx.font = 'bold 12px Arial';
+                    ctx.fillStyle = 'rgba(59, 130, 246, 0.6)';
+                    ctx.fillText(`C${idx}`, cell.bbox[0] + 5, cell.bbox[1] + 15);
+                });
+                ctx.setLineDash([]);
+
+                // STEP 2: Identify cells to highlight
+                let cellsToHighlight = [];
+
+                if (fieldName && cellMapping[fieldName]) {
+                    // EXPLICIT MAPPING
+                    const cellIndices = cellMapping[fieldName];
+                    cellIndices.forEach(idx => {
+                        const cell = ppCellsGlobal[idx];
+                        if (cell && cell.page === pageIdx) {
+                            cellsToHighlight.push(cell);
+                        }
+                    });
+                }
+
+                // FALLBACK: Geometric containment if no mapping found
+                if (cellsToHighlight.length === 0) {
+                    const bboxCenterX = (bbox.x1 + bbox.x2) / 2;
+                    const bboxCenterY = (bbox.y1 + bbox.y2) / 2;
+
+                    pageCells.forEach(cell => {
+                        if (bboxCenterX >= cell.bbox[0] && bboxCenterX <= cell.bbox[2] &&
+                            bboxCenterY >= cell.bbox[1] && bboxCenterY <= cell.bbox[3]) {
+                            cellsToHighlight.push(cell);
+                        }
+                    });
+                }
+
+                // FALLBACK 2: If still no cells found, treat the field bbox itself as the cell to highlight
+                // This ensures we always show something (in the requested blue style) even if PPStructure missed the cell
+                if (cellsToHighlight.length === 0 && bbox) {
+                    cellsToHighlight.push({
+                        bbox: [bbox.x1, bbox.y1, bbox.x2, bbox.y2]
+                    });
+                }
+
+                // STEP 3: Highlight target cells in BRIGHT BLUE ("lit up")
+                cellsToHighlight.forEach(cell => {
+                    const cellW = cell.bbox[2] - cell.bbox[0];
+                    const cellH = cell.bbox[3] - cell.bbox[1];
+
+                    // Bright Blue fill
+                    ctx.fillStyle = 'rgba(59, 130, 246, 0.4)';
+                    ctx.fillRect(cell.bbox[0], cell.bbox[1], cellW, cellH);
+
+                    // Solid Blue border
+                    ctx.strokeStyle = '#2563eb'; // blue-600
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(cell.bbox[0], cell.bbox[1], cellW, cellH);
+
+                    // Blue Glow
+                    ctx.shadowColor = '#3b82f6';
+                    ctx.shadowBlur = 15;
+                    ctx.strokeRect(cell.bbox[0], cell.bbox[1], cellW, cellH);
+                    ctx.shadowBlur = 0;
+                });
+
+                // STEP 4: Green bbox REMOVED
             },
 
             // Create US from OCR data (existing function - ensure it exists)

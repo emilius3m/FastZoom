@@ -49,6 +49,15 @@ class Rect:
         inter = max(0.0, min(self.y2, other.y2) - max(self.y1, other.y1))
         denom = max(self.h, other.h, 1e-6)
         return inter / denom
+    
+    def overlaps(self, other: "Rect") -> bool:
+        """Verifica se questo rettangolo si sovrappone con un altro."""
+        # Nessuna sovrapposizione se uno è completamente a sinistra/destra/sopra/sotto dell'altro
+        if self.x2 < other.x1 or self.x1 > other.x2:
+            return False
+        if self.y2 < other.y1 or self.y1 > other.y2:
+            return False
+        return True
 
 
 def _norm(s: str) -> str:
@@ -295,11 +304,22 @@ class USLayoutParser:
             if bbox:
                 _bboxes["area_struttura"] = bbox
 
-        # 7) SAGGIO - estrazione rigorosa solo sotto la label (non a destra)
-        # per evitare di catturare il valore di AREA/EDIFICIO/STRUTTURA
-        v = self._extract_value_below_only(tokens, label_rects.get("SAGGIO"), page_w=w, page_h=h)
-        if v:
-            out["saggio"] = v
+        # 7) SAGGIO - usa celle PPStructure se disponibili, altrimenti estrazione in cell
+        # Il metodo _extract_value_below_only era troppo fragile e catturava valori sbagliati
+        result = self._extract_value_in_cell(tokens, "SAGGIO", label_rects, page_w=w, page_h=h)
+        if result:
+            val, val_tokens = result
+            # Validazione: SAGGIO dovrebbe essere breve (nome saggio, non lunghe descrizioni)
+            if len(val) < 100:  # Limite ragionevole per un nome saggio
+                out["saggio"] = val
+                bbox = self._compute_union_bbox(val_tokens)
+                if bbox:
+                    _bboxes["saggio"] = bbox
+                logger.info(f"SAGGIO extracted: '{val}'")
+            else:
+                logger.warning(f"SAGGIO: rejected too long value ({len(val)} chars)")
+        else:
+            logger.debug("SAGGIO: no value found")
 
         # 8) AMBIENTE/UNITA FUNZIONALE - cell-based
         result = self._extract_value_in_cell(tokens, "AMBIENTE/UNITA FUNZIONALE", label_rects, page_w=w, page_h=h)
@@ -310,14 +330,15 @@ class USLayoutParser:
             if bbox:
                 _bboxes["ambiente_unita_funzione"] = bbox
 
-        # 9) POSIZIONE - cell-based
-        result = self._extract_value_in_cell(tokens, "POSIZIONE", label_rects, page_w=w, page_h=h)
-        if result:
-            val, val_tokens = result
-            out["posizione"] = val
-            bbox = self._compute_union_bbox(val_tokens)
-            if bbox:
-                _bboxes["posizione"] = bbox
+        # 9) POSIZIONE - usa metodo semplificato per catturare tutto il testo multi-riga
+        if "POSIZIONE" in label_rects:
+            result = self._extract_value_simple(tokens, label_rects["POSIZIONE"], page_w=w, page_h=h)
+            if result:
+                val, val_tokens = result
+                out["posizione"] = val
+                bbox = self._compute_union_bbox(val_tokens)
+                if bbox:
+                    _bboxes["posizione"] = bbox
 
         # 10) DEFINIZIONE - cell-based
         result = self._extract_value_in_cell(tokens, "DEFINIZIONE", label_rects, page_w=w, page_h=h)
@@ -491,37 +512,44 @@ class USLayoutParser:
             out["affidabilita_stratigrafica"] = val.lower()
 
         # 30) RESPONSABILE SCIENTIFICO
-        v = self._extract_value(tokens, label_rects.get("RESPONSABILE SCIENTIFICO"), page_w=w, page_h=h)
-        if v:
-            out["responsabile_scientifico"] = v
+        result = self._extract_value_in_cell(tokens, "RESPONSABILE SCIENTIFICO", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["responsabile_scientifico"] = val
 
         # 31) DATA RILEVAMENTO
-        v = self._extract_value(tokens, label_rects.get("DATA RILEVAMENTO"), page_w=w, page_h=h, 
-                                value_regex=r"\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}")
-        if v:
-            # Converti in formato ISO per API
-            iso_date = self._parse_date_to_iso(v)
-            if iso_date:
-                out["data_rilevamento"] = iso_date
+        result = self._extract_value_in_cell(tokens, "DATA RILEVAMENTO", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            # Estrai solo la data con regex
+            match = re.search(r"\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}", val)
+            if match:
+                iso_date = self._parse_date_to_iso(match.group(0))
+                if iso_date:
+                    out["data_rilevamento"] = iso_date
 
         # 32) RESPONSABILE COMPILAZIONE
-        v = self._extract_value(tokens, label_rects.get("RESPONSABILE COMPILAZIONE"), page_w=w, page_h=h)
-        if v:
-            out["responsabile_compilazione"] = v
+        result = self._extract_value_in_cell(tokens, "RESPONSABILE COMPILAZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["responsabile_compilazione"] = val
 
         # 33) DATA RIELABORAZIONE
-        v = self._extract_value(tokens, label_rects.get("DATA RIELABORAZIONE"), page_w=w, page_h=h,
-                                value_regex=r"\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}")
-        if v:
-            # Converti in formato ISO per API
-            iso_date = self._parse_date_to_iso(v)
-            if iso_date:
-                out["data_rielaborazione"] = iso_date
+        result = self._extract_value_in_cell(tokens, "DATA RIELABORAZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            # Estrai solo la data con regex
+            match = re.search(r"\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}", val)
+            if match:
+                iso_date = self._parse_date_to_iso(match.group(0))
+                if iso_date:
+                    out["data_rielaborazione"] = iso_date
 
         # 34) RESPONSABILE RIELABORAZIONE
-        v = self._extract_value(tokens, label_rects.get("RESPONSABILE RIELABORAZIONE"), page_w=w, page_h=h)
-        if v:
-            out["responsabile_rielaborazione"] = v
+        result = self._extract_value_in_cell(tokens, "RESPONSABILE RIELABORAZIONE", label_rects, page_w=w, page_h=h)
+        if result:
+            val, _ = result
+            out["responsabile_rielaborazione"] = val
 
         # 35) Sequenza stratigrafica
         for label_key, field_name in [
@@ -629,8 +657,14 @@ class USLayoutParser:
 
         # Confine destro: a metà tra label e label vicina (non invadere la cella accanto)
         right = (r_right.x1 + label_rect.x2) / 2.0 if r_right else page_w * 0.98
-        # Confine inferiore: a metà tra label e label sotto
-        bottom = (r_below.y1 + label_rect.y2) / 2.0 if r_below else page_h * 0.98
+        
+        # Confine inferiore: usa il 90% dello spazio invece del 50% per catturare testo multi-riga
+        # Questo permette di catturare più righe di testo nella stessa cella
+        if r_below:
+            gap = r_below.y1 - label_rect.y2
+            bottom = label_rect.y2 + (gap * 0.90)  # Usa 90% dello spazio disponibile
+        else:
+            bottom = page_h * 0.98
 
         return Rect(label_rect.x1, label_rect.y1, right, bottom)
 
@@ -650,6 +684,84 @@ class USLayoutParser:
         
         return None
 
+    def _extract_value_simple(
+        self,
+        tokens: List[Dict[str, Any]],
+        label_rect: Rect,
+        *,
+        page_w: int,
+        page_h: int,
+    ) -> Optional[Tuple[str, List[Dict[str, Any]]]]:
+        """
+        Metodo semplificato: cattura TUTTO il testo nella cella che contiene la label.
+        
+        Se ci sono celle PPStructure, usa quella cella.
+        Altrimenti, cattura tutto il testo sotto/a destra della label fino alla fine della pagina,
+        escludendo solo altre label conosciute.
+        
+        Ritorna: (valore_estratto, lista_token_usati) o None
+        """
+        # TENTATIVO 1: Usa cella PPStructure se disponibile
+        if self._detected_cells:
+            cell_rect = self._find_cell_for_label(label_rect)
+            if cell_rect:
+                value_tokens = []
+                for t in tokens:
+                    tok_rect = t["rect"]
+                    
+                    # Deve essere sotto la label (non la label stessa)
+                    if tok_rect.cy <= label_rect.y2:
+                        continue
+                    
+                    # Deve essere nella stessa cella (overlap, non solo centro)
+                    if not cell_rect.overlaps(tok_rect):
+                        continue
+                    
+                    # Escludi altre label conosciute
+                    if self._is_probably_label(t["norm"]):
+                        continue
+                    
+                    value_tokens.append(t)
+                
+                if value_tokens:
+                    value_tokens.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
+                    val = self._join_tokens(value_tokens).strip()
+                    logger.debug(f"PPStructure simple extract: {len(value_tokens)} tokens, value='{val[:50]}...'")
+                    return (val, value_tokens)
+        
+        # FALLBACK: Cattura tutto sotto/a destra della label fino a fine pagina
+        # Crea una grande regione che parte dalla label e va fino alla fine
+        value_region = Rect(
+            label_rect.x1,
+            label_rect.y2,  # Sotto la label
+            page_w * 0.98,  # Fino al bordo destro
+            page_h * 0.98,  # Fino al fondo
+        )
+        
+        captured = []
+        for t in tokens:
+            r = t["rect"]
+            
+            # Deve sovrapporsi con la regione
+            if not value_region.overlaps(r):
+                continue
+            
+            # Escludi label conosciute
+            if self._is_probably_label(t["norm"]):
+                continue
+            
+            captured.append(t)
+        
+        # Ordina per posizione (top-to-bottom, left-to-right)
+        captured.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
+        
+        if not captured:
+            return None
+        
+        val = self._join_tokens(captured).strip()
+        logger.debug(f"Fallback simple extract: {len(captured)} tokens, value='{val[:50]}...'")
+        return (val, captured)
+    
     def _extract_from_ppstructure_cell(
         self,
         tokens: List[Dict[str, Any]],
@@ -672,8 +784,8 @@ class USLayoutParser:
             if tok_rect.cy <= label_rect.y2:
                 continue
             
-            # Deve essere nella cella
-            if not cell_rect.contains_point(tok_rect.cx, tok_rect.cy):
+            # Deve sovrapporsi con la cella (non solo il centro)
+            if not cell_rect.overlaps(tok_rect):
                 continue
             
             # Escludi altre label
@@ -719,18 +831,22 @@ class USLayoutParser:
         cell = self._cell_rect_from_label(label_rect, label_rects, page_w=page_w, page_h=page_h)
 
         # Regione valore = cella meno la "striscia" della label (valore tipicamente sotto/a destra)
+        # Riduci margini per catturare tutto il testo multi-riga
         value_region = Rect(
-            cell.x1 + 2,
-            label_rect.y2 + 2,  # Inizia sotto la label
-            cell.x2 - 2,
-            cell.y2 - 2,
+            cell.x1,  # Nessun margine sinistro
+            label_rect.y2,  # Inizia subito sotto la label senza margine
+            cell.x2,  # Nessun margine destro
+            cell.y2,  # Estendi fino al fondo della cella
         )
+        
+        logger.debug(f"Extracting {label_key}: cell={cell}, value_region={value_region}")
 
         captured = []
         for t in tokens:
             r = t["rect"]
-            # Il centro del token deve essere dentro la regione valore
-            if not value_region.contains_point(r.cx, r.cy):
+            # Il token deve sovrapporsi con la regione valore (non solo il centro)
+            # Questo cattura anche token multi-riga che sono parzialmente nella cella
+            if not value_region.overlaps(r):
                 continue
             # Escludi token che sono label note
             if self._is_probably_label(t["norm"]):
@@ -739,6 +855,8 @@ class USLayoutParser:
 
         captured.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
         val = self._join_tokens(captured).strip()
+        
+        logger.debug(f"Extracted {label_key}: captured {len(captured)} tokens, value='{val[:100] if val else ''}...'")  
         
         if not val:
             return None

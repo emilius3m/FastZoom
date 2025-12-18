@@ -699,6 +699,7 @@ class PaddleOCRService:
                             })
                             
                         # Tables
+                        page_cells = []
                         table_res_list = page_json['res'].get('table_res_list', [])
                         for table in table_res_list:
                             if isinstance(table, dict):
@@ -706,6 +707,7 @@ class PaddleOCRService:
                                     all_tables_html.append(table['pred_html'])
                                 for i, cell_box in enumerate(table.get('cell_box_list', [])):
                                     if len(cell_box) >= 4:
+                                        # Global cells (for layout parser)
                                         all_pp_cells.append({
                                             'x1': float(cell_box[0]),
                                             'y1': float(cell_box[1]) + y_offset,
@@ -713,6 +715,15 @@ class PaddleOCRService:
                                             'y2': float(cell_box[3]) + y_offset,
                                             'cell_index': i
                                         })
+                                        # Page-local cells (for debug viewer)
+                                        page_cells.append({
+                                            'x1': float(cell_box[0]),
+                                            'y1': float(cell_box[1]),
+                                            'x2': float(cell_box[2]),
+                                            'y2': float(cell_box[3]),
+                                            'cell_index': i
+                                        })
+
                                 layout_json['tables'].append({
                                     'pred_html': table.get('pred_html', ''),
                                     'cell_box_list': table.get('cell_box_list', []),
@@ -731,6 +742,7 @@ class PaddleOCRService:
                         'image_base64': f"data:image/png;base64,{img_b64}",
                         'text_lines': page_texts,
                         'bounding_boxes': page_boxes, # 1:1 coordinates
+                        'cells': page_cells, # PPStructure cells (local coordinates)
                         'word_count': len(page_texts),
                         'avg_confidence': 0.9, # simplified
                         'page_size': (pix.width, pix.height),
@@ -767,10 +779,13 @@ class PaddleOCRService:
             
             # Table detection summary
             if all_pp_cells:
+                logger.info(f"✓ PPStructure detected {len(all_pp_cells)} cells")
+                logger.debug(f"Cell coordinates: {all_pp_cells[:3]}...")  # Log first 3 cells
                 result['debug']['table_detection_method'] = 'ppstructure'
                 result['debug']['pp_structure_cells'] = all_pp_cells
                 result['debug']['tables_html'] = all_tables_html
             else:
+                logger.warning("⚠ PPStructure did not detect any table cells")
                 result['debug']['table_detection_method'] = 'none'
             
             # Layout Parser
@@ -804,6 +819,226 @@ class PaddleOCRService:
             # Cleanup only if temp file was used (not in this version)
             pass
 
+    async def extract_from_pdf_pp_structure_v3(
+        self,
+        pdf_bytes: bytes,
+        filename: str,
+        site_id: str,
+        use_gpu: bool = False,
+        include_debug: bool = True,
+    ) -> Dict:
+        """
+        Estrae US da PDF usando PP-StructureV3 (table cell aware).
+        
+        Metodo alternativo che usa l'extractor PP-StructureV3 dedicato
+        per estrarre celle con coordinate precise e supporto merged cells.
+        
+        Args:
+            pdf_bytes: contenuto PDF
+            filename: nome file
+            site_id: ID sito
+            use_gpu: Usa GPU se disponibile
+            include_debug: Includi debug info (celle, visualizzazione)
+        
+        Returns:
+            {
+                "us_data": {...},
+                "method": "pp_structure_v3",
+                "debug": {
+                    "tables": [...],
+                    "cells": [...],
+                    "visualization": "base64..."
+                }
+            }
+        """
+        import base64
+        from io import BytesIO
+        
+        try:
+            from app.services.pp_structure_v3_extractor import (
+                get_pp_structure_extractor,
+                create_mic_us_label_mapping
+            )
+        except ImportError as e:
+            logger.error(f"PP-StructureV3 extractor not available: {e}")
+            return {
+                "us_data": None,
+                "method": "pp_structure_v3",
+                "error": str(e)
+            }
+        
+        if not PDF2IMAGE_AVAILABLE:
+            raise RuntimeError("PyMuPDF (fitz) required for PDF rendering")
+        
+        result = {
+            'us_data': None,
+            'method': 'pp_structure_v3',
+            'debug': {
+                'pages': [],
+                'tables': [],
+                'cells': [],
+            }
+        }
+        
+        loop = asyncio.get_event_loop()
+        
+        try:
+            logger.info(f"Processing PDF {filename} via PP-StructureV3 cell extraction...")
+            
+            # Open PDF with PyMuPDF
+            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+            
+            # Inizializza extractor
+            extractor = await loop.run_in_executor(
+                None,
+                lambda: get_pp_structure_extractor(use_gpu=use_gpu)
+            )
+            
+            all_cells = []
+            all_tables_info = []
+            
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                
+                # Render page to image
+                zoom = 2.5
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat)
+                
+                # Convert to numpy
+                img_data = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+                if pix.n == 4:  # RGBA
+                    img_data = cv2.cvtColor(img_data, cv2.COLOR_RGBA2RGB)
+                elif pix.n == 3:  # RGB
+                    pass  # Already RGB
+                
+                # Extract tables from page
+                tables = await loop.run_in_executor(
+                    None,
+                    lambda: extractor.extract_tables_from_image(img_data)
+                )
+                
+                logger.info(f"Page {page_num + 1}: extracted {len(tables)} table(s)")
+                
+                for table_idx, table in enumerate(tables):
+                    table.page_num = page_num
+                    
+                    # Collect cells with page info
+                    for cell in table.cells:
+                        all_cells.append({
+                            "page": page_num,
+                            "table": table_idx,
+                            "row": cell.row,
+                            "col": cell.col,
+                            "text": cell.text,
+                            "bbox": list(cell.bbox),
+                            "rowspan": cell.rowspan,
+                            "colspan": cell.colspan,
+                            "confidence": cell.confidence
+                        })
+                    
+                    all_tables_info.append({
+                        "page": page_num,
+                        "rows": table.rows,
+                        "cols": table.cols,
+                        "cells_count": len(table.cells),
+                        "bbox": list(table.bbox)
+                    })
+                
+                # Debug info per pagina
+                if include_debug:
+                    img_bytes = pix.tobytes("png")
+                    img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                    
+                    # Visualizza celle sulla pagina
+                    vis_img = None
+                    if tables:
+                        vis_img = await loop.run_in_executor(
+                            None,
+                            lambda: extractor.visualize_table(img_data, tables[0])
+                        )
+                        # Convert visualization to base64
+                        from PIL import Image
+                        pil_vis = Image.fromarray(vis_img)
+                        vis_buffer = BytesIO()
+                        pil_vis.save(vis_buffer, format='PNG')
+                        vis_buffer.seek(0)
+                        vis_b64 = base64.b64encode(vis_buffer.getvalue()).decode('utf-8')
+                    else:
+                        vis_b64 = img_b64
+                    
+                    result['debug']['pages'].append({
+                        'page_number': page_num + 1,
+                        'image_base64': f"data:image/png;base64,{img_b64}",
+                        'visualization': f"data:image/png;base64,{vis_b64}",
+                        'tables_count': len(tables),
+                        'cells_count': sum(len(t.cells) for t in tables),
+                        'page_size': (pix.width, pix.height)
+                    })
+            
+            pdf_document.close()
+            
+            result['debug']['tables'] = all_tables_info
+            result['debug']['cells'] = all_cells
+            
+            # Extract fields using label mapping
+            if all_tables_info:
+                # Re-extract tables for field mapping (use first page)
+                pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+                page = pdf_document[0]
+                zoom = 2.5
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat)
+                img_data = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+                if pix.n == 4:
+                    img_data = cv2.cvtColor(img_data, cv2.COLOR_RGBA2RGB)
+                pdf_document.close()
+                
+                tables = await loop.run_in_executor(
+                    None,
+                    lambda: extractor.extract_tables_from_image(img_data)
+                )
+                
+                # Use label mapping to extract fields
+                label_mapping = create_mic_us_label_mapping()
+                us_data_result = await loop.run_in_executor(
+                    None,
+                    lambda: extractor.extract_fields_by_label(
+                        tables, 
+                        label_mapping,
+                        return_mapping=True
+                    )
+                )
+                
+                # Handle tuple return (values, mapping)
+                if isinstance(us_data_result, tuple):
+                    us_data, cell_mapping = us_data_result
+                    # Add mapping to debug info
+                    result['debug']['cell_mapping'] = cell_mapping
+                else:
+                    us_data = us_data_result
+                
+                if us_data:
+                    us_data['site_id'] = site_id
+                    us_data['_pdf_source'] = filename
+                    us_data['_extraction_method'] = 'pp_structure_v3'
+                    us_data['_tables_detected'] = len(all_tables_info)
+                    us_data['_cells_extracted'] = len(all_cells)
+                    # Add mapping to US data for frontend access (optional but useful)
+                    if 'cell_mapping' in result['debug']:
+                         us_data['_cell_mapping'] = result['debug']['cell_mapping']
+                         
+                    result['us_data'] = us_data
+                    logger.info(f"✓ PP-StructureV3: extracted {len(us_data)} fields from {len(all_cells)} cells")
+            
+            return result
+        
+        except Exception as e:
+            logger.error(f"Error in extract_from_pdf_pp_structure_v3: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            result['error'] = str(e)
+            return result
     
     async def extract_from_image(
         self,
