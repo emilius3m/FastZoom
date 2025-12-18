@@ -713,7 +713,9 @@ class PaddleOCRService:
                                             'y1': float(cell_box[1]) + y_offset,
                                             'x2': float(cell_box[2]),
                                             'y2': float(cell_box[3]) + y_offset,
-                                            'cell_index': i
+                                            'cell_index': i,
+                                            'page': page_num,
+                                            'bbox': [float(cell_box[0]), float(cell_box[1]), float(cell_box[2]), float(cell_box[3])]
                                         })
                                         # Page-local cells (for debug viewer)
                                         page_cells.append({
@@ -799,10 +801,17 @@ class PaddleOCRService:
                 detected_cells=all_pp_cells
             )
             
+            # Expose PPStructure cells for debug viewer
+            result['debug']['pp_structure_cells'] = all_pp_cells
+
             if us_data and us_data.get('us_code'):
                 us_data['_pdf_source'] = filename
                 us_data['_total_pages'] = len(result['debug']['pages'])
                 us_data['_raw_ocr_text'] = combined_text
+                
+                # Expose cell mapping for highlighting
+                result['debug']['cell_mapping'] = us_data.get('_cell_mapping', {})
+                
                 result['us_data'] = us_data
                 logger.info(f"✓ Parsed US: {us_data.get('us_code', 'unknown')} (Image-based PPStructure)")
             else:

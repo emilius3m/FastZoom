@@ -676,8 +676,12 @@
                 const pageNum = page.page_number;
                 const pageIdx = pageNum ? (pageNum - 1) : 0;
 
-                // Filter cells for this page
-                const pageCells = ppCellsGlobal.filter(c => c.page === pageIdx);
+                // Detect legacy data (missing 'page' or 'bbox')
+                const isLegacy = ppCellsGlobal.length > 0 && ppCellsGlobal[0].page === undefined;
+
+                // Filter cells for this page (with polyfill)
+                const pageCells = ppCellsGlobal.filter(c => c.page === pageIdx || (isLegacy && pageIdx === 0))
+                    .map(c => (!c.bbox ? { ...c, bbox: [c.x1, c.y1, c.x2, c.y2] } : c));
 
                 // STEP 1: Draw all PP-Structure cells in light blue (background)
                 pageCells.forEach((cell, idx) => {
@@ -690,9 +694,10 @@
                     ctx.strokeRect(cell.bbox[0], cell.bbox[1], cellW, cellH);
 
                     // Restore cell labels
+                    const labelIdx = cell.cell_index !== undefined ? cell.cell_index : idx;
                     ctx.font = 'bold 12px Arial';
                     ctx.fillStyle = 'rgba(59, 130, 246, 0.6)';
-                    ctx.fillText(`C${idx}`, cell.bbox[0] + 5, cell.bbox[1] + 15);
+                    ctx.fillText(`C${labelIdx}`, cell.bbox[0] + 5, cell.bbox[1] + 15);
                 });
                 ctx.setLineDash([]);
 
@@ -703,9 +708,13 @@
                     // EXPLICIT MAPPING
                     const cellIndices = cellMapping[fieldName];
                     cellIndices.forEach(idx => {
-                        const cell = ppCellsGlobal[idx];
-                        if (cell && cell.page === pageIdx) {
-                            cellsToHighlight.push(cell);
+                        let cell = ppCellsGlobal[idx];
+                        if (cell) {
+                            const onPage = cell.page === pageIdx || (isLegacy && pageIdx === 0);
+                            if (onPage) {
+                                if (!cell.bbox) cell = { ...cell, bbox: [cell.x1, cell.y1, cell.x2, cell.y2] };
+                                cellsToHighlight.push(cell);
+                            }
                         }
                     });
                 }
