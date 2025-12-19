@@ -329,7 +329,7 @@ class USLayoutParser:
 
         # 9) POSIZIONE - usa metodo semplificato per catturare tutto il testo multi-riga
         if "POSIZIONE" in label_rects:
-            result = self._extract_value_simple(tokens, label_rects["POSIZIONE"], page_w=w, page_h=h)
+            result = self._extract_value_in_cell(tokens, "POSIZIONE", label_rects, page_w=w, page_h=h)
             if result:
                 val, val_tokens = result
                 out["posizione"] = val
@@ -604,67 +604,6 @@ class USLayoutParser:
 
     # ---------- CELL-BASED EXTRACTION METHODS ----------
 
-    def _nearest_label_right(self, label_rect: Rect, label_rects: Dict[str, Rect]) -> Optional[Rect]:
-        """Trova la label più vicina a destra sulla stessa riga."""
-        best = None
-        best_dx = None
-        for r in label_rects.values():
-            # Deve essere a destra
-            if r.x1 <= label_rect.x2 + 3:
-                continue
-            # Stessa banda verticale (overlap significativo)
-            if label_rect.y_overlap_ratio(r) < 0.25:
-                continue
-            dx = r.x1 - label_rect.x2
-            if best_dx is None or dx < best_dx:
-                best_dx = dx
-                best = r
-        return best
-
-    def _nearest_label_below(self, label_rect: Rect, label_rects: Dict[str, Rect]) -> Optional[Rect]:
-        """Trova la label più vicina sotto nella stessa colonna."""
-        best = None
-        best_dy = None
-        for r in label_rects.values():
-            # Deve essere sotto
-            if r.y1 <= label_rect.y2 + 3:
-                continue
-            # Stessa colonna (overlap orizzontale)
-            x_overlap_val = min(label_rect.x2, r.x2) - max(label_rect.x1, r.x1)
-            x_overlap = x_overlap_val / max(label_rect.w, 1e-6)
-            if x_overlap < 0.20:
-                continue
-            dy = r.y1 - label_rect.y2
-            if best_dy is None or dy < best_dy:
-                best_dy = dy
-                best = r
-        return best
-
-    def _cell_rect_from_label(
-        self,
-        label_rect: Rect,
-        label_rects: Dict[str, Rect],
-        *,
-        page_w: int,
-        page_h: int,
-    ) -> Rect:
-        """Calcola il rettangolo della cella usando le label vicine come confini."""
-        r_right = self._nearest_label_right(label_rect, label_rects)
-        r_below = self._nearest_label_below(label_rect, label_rects)
-
-        # Confine destro: a metà tra label e label vicina (non invadere la cella accanto)
-        right = (r_right.x1 + label_rect.x2) / 2.0 if r_right else page_w * 0.98
-        
-        # Confine inferiore: usa il 90% dello spazio invece del 50% per catturare testo multi-riga
-        # Questo permette di catturare più righe di testo nella stessa cella
-        if r_below:
-            gap = r_below.y1 - label_rect.y2
-            bottom = label_rect.y2 + (gap * 0.90)  # Usa 90% dello spazio disponibile
-        else:
-            bottom = page_h * 0.98
-
-        return Rect(label_rect.x1, label_rect.y1, right, bottom)
-
     def _find_cell_for_label(self, label_rect: Rect) -> Optional[Rect]:
         """
         Trova la cella PPStructure che contiene la label.
@@ -681,92 +620,17 @@ class USLayoutParser:
         
         return None
 
-    def _extract_value_simple(
-        self,
-        tokens: List[Dict[str, Any]],
-        label_rect: Rect,
-        *,
-        page_w: int,
-        page_h: int,
-    ) -> Optional[Tuple[str, List[Dict[str, Any]]]]:
-        """
-        Metodo semplificato: cattura TUTTO il testo nella cella che contiene la label.
-        
-        Se ci sono celle PPStructure, usa quella cella.
-        Altrimenti, cattura tutto il testo sotto/a destra della label fino alla fine della pagina,
-        escludendo solo altre label conosciute.
-        
-        Ritorna: (valore_estratto, lista_token_usati) o None
-        """
-        # TENTATIVO 1: Usa cella PPStructure se disponibile
-        if self._detected_cells:
-            cell_rect = self._find_cell_for_label(label_rect)
-            if cell_rect:
-                value_tokens = []
-                for t in tokens:
-                    tok_rect = t["rect"]
-                    
-                    # Deve essere sotto la label (non la label stessa)
-                    if tok_rect.cy <= label_rect.y2:
-                        continue
-                    
-                    # Deve essere nella stessa cella (overlap, non solo centro)
-                    if not cell_rect.overlaps(tok_rect):
-                        continue
-                    
-                    # Escludi altre label conosciute
-                    if self._is_probably_label(t["norm"]):
-                        continue
-                    
-                    value_tokens.append(t)
-                
-                if value_tokens:
-                    value_tokens.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
-                    val = self._join_tokens(value_tokens).strip()
-                    logger.debug(f"PPStructure simple extract: {len(value_tokens)} tokens, value='{val[:50]}...'")
-                    return (val, value_tokens)
-        
-        # FALLBACK: Cattura tutto sotto/a destra della label fino a fine pagina
-        # Crea una grande regione che parte dalla label e va fino alla fine
-        value_region = Rect(
-            label_rect.x1,
-            label_rect.y2,  # Sotto la label
-            page_w * 0.98,  # Fino al bordo destro
-            page_h * 0.98,  # Fino al fondo
-        )
-        
-        captured = []
-        for t in tokens:
-            r = t["rect"]
-            
-            # Deve sovrapporsi con la regione
-            if not value_region.overlaps(r):
-                continue
-            
-            # Escludi label conosciute
-            if self._is_probably_label(t["norm"]):
-                continue
-            
-            captured.append(t)
-        
-        # Ordina per posizione (top-to-bottom, left-to-right)
-        captured.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
-        
-        if not captured:
-            return None
-        
-        val = self._join_tokens(captured).strip()
-        logger.debug(f"Fallback simple extract: {len(captured)} tokens, value='{val[:50]}...'")
-        return (val, captured)
     
     def _extract_from_ppstructure_cell(
         self,
         tokens: List[Dict[str, Any]],
         label_rect: Rect,
-    ) -> Optional[str]:
+    ) -> Optional[Tuple[str, List[Dict[str, Any]]]]:
         """
         Estrae valore usando le celle rilevate da PPStructure.
         Cerca token sotto la label ma nella stessa cella.
+        
+        Ritorna: (valore, tokens) o None
         """
         cell_rect = self._find_cell_for_label(label_rect)
         if not cell_rect:
@@ -781,7 +645,7 @@ class USLayoutParser:
             if tok_rect.cy <= label_rect.y2:
                 continue
             
-            # Deve sovrapporsi con la cella (non solo il centro)
+            # Deve sovrapporsi con la cella
             if not cell_rect.overlaps(tok_rect):
                 continue
             
@@ -793,7 +657,8 @@ class USLayoutParser:
         
         if value_tokens:
             value_tokens.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
-            return self._join_tokens(value_tokens).strip()
+            val = self._join_tokens(value_tokens).strip()
+            return (val, value_tokens)
         
         return None
 
@@ -807,8 +672,15 @@ class USLayoutParser:
         page_h: int,
     ) -> Optional[Tuple[str, List[Dict[str, Any]]]]:
         """
-        Estrae il valore da una cella definita dalla label e dalle label vicine.
-        PRIMA prova con celle PPStructure (più precise), poi fallback a euristico.
+        Estrae il valore da una cella.
+        
+        MODALITÀ STRICT PPSTRUCTURE:
+        Se sono state passate detected_cells (da PPStructure), usiamo SOLO quelle.
+        Se non troviamo una cella per la label, ritorniamo None.
+        Nessun fallback euristico.
+        
+        Se detected_cells non è presente (vecchio metodo), si potrebbe usare il fallback,
+        ma qui assumiamo che il contesto sia ormai PPStructure-first.
         
         Ritorna: (valore_estratto, lista_token_usati) o None
         """
@@ -816,49 +688,15 @@ class USLayoutParser:
         if not label_rect:
             return None
 
-        # PRIMO TENTATIVO: usa celle PPStructure se disponibili
+        # STRICT PPSTRUCTURE MODE
         if self._detected_cells:
-            pp_result = self._extract_from_ppstructure_cell(tokens, label_rect)
-            if pp_result:
-                # pp_result è già una stringa, dobbiamo ricostruire i token
-                # Per ora usiamo il fallback per avere i token
-                pass
+            return self._extract_from_ppstructure_cell(tokens, label_rect)
+            
+        # NESSUNA CELLA RILEVATA O DISPONIBILE
+        # Se vogliamo essere strict:
+        return None
 
-        # FALLBACK: usa metodo euristico basato su label vicine
-        cell = self._cell_rect_from_label(label_rect, label_rects, page_w=page_w, page_h=page_h)
 
-        # Regione valore = cella meno la "striscia" della label (valore tipicamente sotto/a destra)
-        # Riduci margini per catturare tutto il testo multi-riga
-        value_region = Rect(
-            cell.x1,  # Nessun margine sinistro
-            label_rect.y2,  # Inizia subito sotto la label senza margine
-            cell.x2,  # Nessun margine destro
-            cell.y2,  # Estendi fino al fondo della cella
-        )
-        
-        logger.debug(f"Extracting {label_key}: cell={cell}, value_region={value_region}")
-
-        captured = []
-        for t in tokens:
-            r = t["rect"]
-            # Il token deve sovrapporsi con la regione valore (non solo il centro)
-            # Questo cattura anche token multi-riga che sono parzialmente nella cella
-            if not value_region.overlaps(r):
-                continue
-            # Escludi token che sono label note
-            if self._is_probably_label(t["norm"]):
-                continue
-            captured.append(t)
-
-        captured.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
-        val = self._join_tokens(captured).strip()
-        
-        logger.debug(f"Extracted {label_key}: captured {len(captured)} tokens, value='{val[:100] if val else ''}...'")  
-        
-        if not val:
-            return None
-        
-        return (val, captured)
 
     def _compute_union_bbox(self, tokens: List[Dict[str, Any]]) -> Optional[Dict[str, float]]:
         """
