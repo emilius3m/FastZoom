@@ -771,6 +771,14 @@ class USLayoutParser:
             if best_match:
                 return best_match
 
+        # CRITERI DISTINZIONE: gestisce typos o merge
+        # Cerca token che contenga sia "CRITERI" che "DISTINZIONE"
+        if any("CRITERI" in a for a in aliases):
+             for t in tokens:
+                 nt = t["norm"]
+                 if "CRITERI" in nt and "DISTINZIONE" in nt:
+                     return t["rect"]
+
         return None
     
     def _find_label_with_similarity(

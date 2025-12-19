@@ -124,6 +124,13 @@
           "type": "text",
           "placeholder": "FOTO 1-5",
           "width": "col-span-1"
+        },
+        {
+          "pdf_label": "RIFERIMENTI TABELLE MATERIALI",
+          "model_key": "riferimenti_tabelle_materiali",
+          "type": "text",
+          "placeholder": "ES: TAB. 1",
+          "width": "col-span-2"
         }
       ]
     },
@@ -137,8 +144,14 @@
           "model_key": "tipo",
           "type": "radio_group",
           "options": [
-            {"label": "Positiva (accumulo)", "value": "positiva"},
-            {"label": "Negativa (taglio)", "value": "negativa"}
+            {
+              "label": "Positiva (accumulo)",
+              "value": "positiva"
+            },
+            {
+              "label": "Negativa (taglio)",
+              "value": "negativa"
+            }
           ],
           "width": "col-span-3"
         }
@@ -193,12 +206,30 @@
           "model_key": "consistenza",
           "type": "select",
           "options": [
-            {"label": "Seleziona...", "value": ""},
-            {"label": "Compatta", "value": "compatta"},
-            {"label": "Media", "value": "media"},
-            {"label": "Friabile", "value": "friabile"},
-            {"label": "Molto friabile", "value": "molto_friabile"},
-            {"label": "Sciolta", "value": "sciolta"}
+            {
+              "label": "Seleziona...",
+              "value": ""
+            },
+            {
+              "label": "Compatta",
+              "value": "compatta"
+            },
+            {
+              "label": "Media",
+              "value": "media"
+            },
+            {
+              "label": "Friabile",
+              "value": "friabile"
+            },
+            {
+              "label": "Molto friabile",
+              "value": "molto_friabile"
+            },
+            {
+              "label": "Sciolta",
+              "value": "sciolta"
+            }
           ],
           "width": "col-span-1"
         },
@@ -413,10 +444,22 @@
           "model_key": "affidabilita_stratigrafica",
           "type": "select",
           "options": [
-            {"label": "Seleziona...", "value": ""},
-            {"label": "Alta", "value": "alta"},
-            {"label": "Media", "value": "media"},
-            {"label": "Bassa", "value": "bassa"}
+            {
+              "label": "Seleziona...",
+              "value": ""
+            },
+            {
+              "label": "Alta",
+              "value": "alta"
+            },
+            {
+              "label": "Media",
+              "value": "media"
+            },
+            {
+              "label": "Bassa",
+              "value": "bassa"
+            }
           ],
           "width": "col-span-3"
         },
