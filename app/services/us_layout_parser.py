@@ -112,7 +112,8 @@ class USLayoutParser:
         "ENTE RESPONSABILE": ["ENTE RESPONSABILE"],
         "UFFICIO MIC": [
             "UFFICIO MIC COMPETENTE PER TUTELA", "UFFICIO MiC COMPETENTE PER TUTELA",
-             "COMPETENTE PER TUTELA"
+            "UFFICIO MIC COMPETENTE", "UFFICIO MiC COMPETENTE",
+            "COMPETENTE PER TUTELA", "UFFICIO COMPETENTE"
         ],
         "ANNO": ["ANNO"],
         "IDENTIFICATIVO": [
@@ -913,17 +914,105 @@ class USLayoutParser:
 
     def _find_label(self, tokens: List[Dict[str, Any]], aliases: List[str]) -> Optional[Rect]:
         alias_norm = [_norm(a) for a in aliases]
-        # match esatto su token singolo
+        
+        # Match esatto su token singolo
         for t in tokens:
             if t["norm"] in alias_norm:
                 return t["rect"]
 
-        # match "starts with" utile per label lunghe (IDENTIFICATIVO...)
+        # Match "starts with" per label lunghe
         for t in tokens:
             for a in alias_norm:
                 if a and t["norm"].startswith(a):
                     return t["rect"]
 
+        # APPROCCIO EURISTICO PER GESTIRE ERRORI OCR
+        # Per label specifiche come UFFICIO MIC, usiamo similarity score
+        if any("UFFICIO" in a for a in aliases):
+            best_match = self._find_label_with_similarity(tokens, aliases, target_keywords=["UFFICIO", "COMPETENTE"])
+            if best_match:
+                return best_match
+
+        return None
+    
+    def _find_label_with_similarity(
+        self,
+        tokens: List[Dict[str, Any]],
+        aliases: List[str],
+        target_keywords: List[str] = None
+    ) -> Optional[Rect]:
+        """
+        Trova label usando similarity score invece di match esatto.
+        Utile per gestire errori di riconoscimento OCR.
+        
+        Args:
+            tokens: Lista token con testo e coordinate
+            aliases: Alias normalizzati della label target
+            target_keywords: Parole chiave che devono essere presenti
+        
+        Returns:
+            Rect della label migliore o None
+        """
+        target_keywords = target_keywords or []
+        
+        # Prepara keyword normalizzate
+        target_norm = [_norm(kw) for kw in target_keywords]
+        
+        candidates = []
+        
+        for t in tokens:
+            norm_text = t["norm"]
+            
+            # Skip token troppo corti o troppo lunghi
+            if len(norm_text) < 3 or len(norm_text) > 50:
+                continue
+            
+            # Calcola similarity score
+            score = 0.0
+            
+            # 1. Presenza delle keyword target
+            for kw in target_norm:
+                if kw in norm_text:
+                    score += len(kw) / len(norm_text)
+            
+            # 2. Lunghezza appropriata per label UFFICIO
+            if any("UFFICIO" in a for a in aliases):
+                # UFFICIO MIC labels di solito sono tra 10 e 30 caratteri
+                if 10 <= len(norm_text) <= 30:
+                    score += 0.3
+                elif 30 <= len(norm_text) <= 50:
+                    score += 0.2
+            
+            # 3. Contiene "UFFICIO" o "COMPETENTE"
+            if "UFFICIO" in norm_text:
+                score += 0.5
+            if "COMPETENTE" in norm_text:
+                score += 0.4
+            if "TUTELA" in norm_text:
+                score += 0.3
+            if "MIC" in norm_text:
+                score += 0.3
+            
+            # 4. Evita token che sono solo numeri o simboli
+            if re.match(r'^[0-9\s\-\._/]+$', norm_text):
+                score -= 0.8
+            
+            # 5. Penalty per testo troppo generico
+            generic_words = ["TITOLO", "SEZIONE", "CAPITOLO", "PARTE"]
+            for gw in generic_words:
+                if gw in norm_text:
+                    score -= 0.5
+            
+            if score > 0.3:  # Threshold minimo
+                candidates.append((score, t["rect"], norm_text))
+        
+        # Ritorna il migliore
+        if candidates:
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            best_score, best_rect, best_text = candidates[0]
+            logger.debug(f"Found UFFICIO label with similarity: {best_score:.2f} = '{best_text}'")
+            return best_rect
+        
         return None
 
     def _extract_us_number(self, tokens: List[Dict[str, Any]], us_label: Optional[Rect], *, page_w: int, page_h: int) -> Optional[str]:

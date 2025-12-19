@@ -251,7 +251,7 @@
             selectedResultIndex: 0,  // Which US result is being edited
             editedOCRData: {},       // Holds user corrections for current result
             hoveredFieldKey: null,   // For canvas overlay highlighting
-            ocrDebugTab: 'result',  // Tab state for OCR debug viewer
+            ocrDebugTab: 'revision',  // Tab state for OCR debug viewer
             editPageIdx: 0,  // Page index for OCR edit tab
             highlightedField: null,  // Currently focused field name for canvas highlighting
             formFieldsSchema: null,  // JSON schema for dynamic form generation
@@ -297,47 +297,6 @@
             },
 
             // Select a result for editing in the revision tab
-            selectResultForEdit() {
-                if (!this.pdfImportResults?.results || this.pdfImportResults.results.length === 0) return;
-
-                const result = this.pdfImportResults.results[this.selectedResultIndex];
-                if (!result) return;
-
-                // Deep copy data to avoid mutating original until saved
-                this.editedOCRData = JSON.parse(JSON.stringify(result.data));
-
-                // Determine which page to show (default to first page useful for this result, or just page 0)
-                // If we knew which page the US came from, we'd use that. 
-                // For combined results, we default to current editPageIdx or 0.
-                if (this.editPageIdx === undefined) this.editPageIdx = 0;
-
-                // Initialize canvas for this page
-                this.$nextTick(() => {
-                    const img = document.getElementById('revision_ocr_img');
-                    const page = this.pdfImportResults.debug_pages?.[this.editPageIdx];
-                    if (img && page) {
-                        this.initRevisionCanvas(img, page);
-                    }
-                });
-            },
-
-            // Handle field focus to highlight corresponding area on canvas
-            onFieldFocus(fieldName) {
-                this.highlightedField = fieldName;
-                const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx];
-                if (page) {
-                    this.redrawRevisionCanvas('revision_ocr_canvas', page, fieldName);
-                }
-            },
-
-            onFieldBlur() {
-                this.highlightedField = null;
-                const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx];
-                const canvas = document.getElementById('revision_ocr_canvas');
-                if (page && canvas) {
-                    this.drawRevisionBoxes(canvas, page);
-                }
-            },
             findBoxForField(fieldName, page) {
                 if (!page?.bounding_boxes || !this.fieldLabelMap[fieldName]) return null;
                 const labels = this.fieldLabelMap[fieldName];
@@ -351,72 +310,6 @@
                     }
                 }
                 return null;
-            },
-
-            saveOCRCorrections() {
-                if (this.selectedResultIndex >= 0 && this.pdfImportResults?.results && this.pdfImportResults.results[this.selectedResultIndex]) {
-                    this.pdfImportResults.results[this.selectedResultIndex].data = JSON.parse(JSON.stringify(this.editedOCRData));
-                    this.showNotification('Correzioni salvate localmente', 'success');
-                }
-            },
-
-            createUSFromEditedOCR() {
-                if (!this.editedOCRData) {
-                    this.showNotification('Nessun dato da salvare', 'warning');
-                    return;
-                }
-                this.createUSFromOCR(this.editedOCRData);
-            },
-
-            // Initialize edit canvas
-            initEditCanvas(canvasId, img, page) {
-                const canvas = document.getElementById(canvasId);
-                if (!canvas || !img) return;
-                canvas.width = img.naturalWidth || img.width;
-                canvas.height = img.naturalHeight || img.height;
-                this.redrawEditCanvas(canvasId, page, null);
-            },
-
-            // Redraw edit canvas with highlighted field
-            redrawEditCanvas(canvasId, page, fieldName) {
-                const canvas = document.getElementById(canvasId);
-                if (!canvas) return;
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return;
-
-                // Clear canvas
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                if (!fieldName || !page?.bounding_boxes) return;
-
-                const boxIdx = this.findBoxForField(fieldName, page);
-                if (boxIdx === null) return;
-
-                const box = page.bounding_boxes[boxIdx];
-                if (!box?.polygon || box.polygon.length < 3) return;
-
-                // Draw highlighted polygon
-                ctx.beginPath();
-                ctx.moveTo(box.polygon[0][0], box.polygon[0][1]);
-                for (let i = 1; i < box.polygon.length; i++) {
-                    ctx.lineTo(box.polygon[i][0], box.polygon[i][1]);
-                }
-                ctx.closePath();
-
-                // Bright fill
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.4)';  // Green
-                ctx.fill();
-
-                // Thick stroke
-                ctx.strokeStyle = '#16a34a';
-                ctx.lineWidth = 4;
-                ctx.stroke();
-
-                // Optional: draw pulsing animation effect with larger glow
-                ctx.shadowColor = '#22c55e';
-                ctx.shadowBlur = 20;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
             },
 
             // Handle field focus
@@ -470,7 +363,7 @@
             // Load form fields schema from JSON
             async loadFormSchema() {
                 try {
-                    const response = await fetch('/static/json/form_fields_schema.json');
+                    const response = await fetch('/static/json/form_fields_schema.json?v=' + new Date().getTime());
                     if (!response.ok) {
                         throw new Error(`HTTP error ${response.status}`);
                     }
@@ -540,7 +433,7 @@
 
                 // Show success notification
                 console.log('✓ OCR corrections saved:', result);
-                alert('✓ Correzioni salvate! Le modifiche sono visibili nel tab "Risultato US".');
+                alert('✓ Correzioni salvate!');
             },
 
             // Create US from edited OCR data
