@@ -89,6 +89,13 @@
           "type": "text",
           "placeholder": "A1, A2, B1...",
           "width": "col-span-1"
+        },
+        {
+          "pdf_label": "QUADRATO/I",
+          "model_key": "quadrati",
+          "type": "text",
+          "placeholder": "",
+          "width": "col-span-1"
         }
       ]
     },

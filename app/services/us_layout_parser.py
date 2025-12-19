@@ -346,6 +346,26 @@ class USLayoutParser:
             if bbox:
                 _bboxes["definizione"] = bbox
 
+        # SETTORE/I
+        if "SETTORE/I" in label_rects:
+            result = self._extract_value_in_cell(tokens, "SETTORE/I", label_rects, page_w=w, page_h=h)
+            if result:
+                val, val_tokens = result
+                out["settori"] = val
+                bbox = self._compute_union_bbox(val_tokens)
+                if bbox:
+                    _bboxes["settori"] = bbox
+
+        # QUADRATO/I
+        if "QUADRATO/I" in label_rects:
+            result = self._extract_value_in_cell(tokens, "QUADRATO/I", label_rects, page_w=w, page_h=h)
+            if result:
+                val, val_tokens = result
+                out["quadrati"] = val
+                bbox = self._compute_union_bbox(val_tokens)
+                if bbox:
+                    _bboxes["quadrati"] = bbox
+
         # 11) TIPO (checkbox POSITIVA/NEGATIVA)
         tipo = self._extract_tipo_from_checkboxes(tokens, label_rects, page_w=w, page_h=h)
         if tipo:
@@ -608,17 +628,24 @@ class USLayoutParser:
         """
         Trova la cella PPStructure che contiene la label.
         Restituisce la cella come Rect o None.
+        Se più celle contengono il punto (sovrapposizione), sceglie la più piccola (più specifica).
         """
         if not self._detected_cells:
             return None
         
         cx, cy = label_rect.cx, label_rect.cy
         
+        candidates = []
         for cell in self._detected_cells:
             if cell.contains_point(cx, cy):
-                return cell
+                candidates.append(cell)
         
-        return None
+        if not candidates:
+            return None
+            
+        # Ordina per area (w * h) ascendente: la più piccola è la più specifica
+        candidates.sort(key=lambda c: c.w * c.h)
+        return candidates[0]
 
     
     def _extract_from_ppstructure_cell(
