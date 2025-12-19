@@ -218,7 +218,9 @@ class USLayoutParser:
         w, h = page_size
         
         # Store detected cells for use in extraction methods
+        # Also store metadata for potential future use
         self._detected_cells: List[Rect] = []
+        self._cell_metadata: List[Dict[str, Any]] = []  # Preserva metadati originali
         if detected_cells:
             for c in detected_cells:
                 self._detected_cells.append(Rect(
@@ -227,7 +229,20 @@ class USLayoutParser:
                     float(c.get('x2', 0)),
                     float(c.get('y2', 0))
                 ))
-            logger.info(f"Using {len(self._detected_cells)} PPStructure cells for extraction")
+                self._cell_metadata.append({
+                    'cell_index': c.get('cell_index'),
+                    'table_index': c.get('table_index'),
+                    'page': c.get('page'),
+                })
+            
+            # SOLUZIONE 1: Filtra celle annidate (contenute completamente in altre)
+            original_count = len(self._detected_cells)
+            self._detected_cells = self._filter_nested_cells(self._detected_cells)
+            filtered_count = original_count - len(self._detected_cells)
+            if filtered_count > 0:
+                logger.info(f"Filtered {filtered_count} nested cells (kept {len(self._detected_cells)} of {original_count})")
+            else:
+                logger.info(f"Using {len(self._detected_cells)} PPStructure cells for extraction")
 
         # Trova label rect per campo
         label_rects: Dict[str, Rect] = {}
@@ -624,28 +639,79 @@ class USLayoutParser:
 
     # ---------- CELL-BASED EXTRACTION METHODS ----------
 
+    def _filter_nested_cells(self, cells: List[Rect]) -> List[Rect]:
+        """
+        SOLUZIONE 1: Rimuove celle che sono completamente contenute in altre celle.
+        Mantiene solo le celle "foglia" (più specifiche).
+        
+        Una cella A è considerata "annidata" in B se:
+        - A è completamente contenuta in B (tutti i bordi di A sono dentro B)
+        - B ha un'area maggiore di A
+        
+        Returns:
+            Lista di celle filtrate (senza celle annidate)
+        """
+        if not cells:
+            return cells
+        
+        result = []
+        for i, cell in enumerate(cells):
+            is_nested = False
+            for j, other in enumerate(cells):
+                if i == j:
+                    continue
+                # 'cell' è completamente dentro 'other'?
+                if (other.x1 <= cell.x1 and other.y1 <= cell.y1 and
+                    other.x2 >= cell.x2 and other.y2 >= cell.y2):
+                    # 'other' è più grande di 'cell'?
+                    if (other.w * other.h) > (cell.w * cell.h):
+                        is_nested = True
+                        break
+            if not is_nested:
+                result.append(cell)
+        return result
+
     def _find_cell_for_label(self, label_rect: Rect) -> Optional[Rect]:
         """
-        Trova la cella PPStructure che contiene la label.
-        Restituisce la cella come Rect o None.
-        Se più celle contengono il punto (sovrapposizione), sceglie la più piccola (più specifica).
+        SOLUZIONE 2: Trova la cella PPStructure che contiene la label.
+        
+        Strategia migliorata:
+        1. Prima cerca celle che contengono TUTTI i 4 angoli della label
+        2. Se non trovata, fallback al centro
+        3. Se più celle matchano, sceglie la più piccola (più specifica)
+        
+        Returns:
+            Rect della cella trovata o None
         """
         if not self._detected_cells:
             return None
         
-        cx, cy = label_rect.cx, label_rect.cy
+        # FASE 1: Cerca celle che contengono l'intera label (tutti i 4 angoli)
+        full_match_candidates = []
+        for cell in self._detected_cells:
+            if (cell.contains_point(label_rect.x1, label_rect.y1) and
+                cell.contains_point(label_rect.x2, label_rect.y1) and
+                cell.contains_point(label_rect.x1, label_rect.y2) and
+                cell.contains_point(label_rect.x2, label_rect.y2)):
+                full_match_candidates.append(cell)
         
-        candidates = []
+        if full_match_candidates:
+            # Ordina per area ascendente: la più piccola è la più specifica
+            full_match_candidates.sort(key=lambda c: c.w * c.h)
+            return full_match_candidates[0]
+        
+        # FASE 2: Fallback - cerca celle che contengono almeno il centro
+        cx, cy = label_rect.cx, label_rect.cy
+        center_candidates = []
         for cell in self._detected_cells:
             if cell.contains_point(cx, cy):
-                candidates.append(cell)
+                center_candidates.append(cell)
         
-        if not candidates:
-            return None
-            
-        # Ordina per area (w * h) ascendente: la più piccola è la più specifica
-        candidates.sort(key=lambda c: c.w * c.h)
-        return candidates[0]
+        if center_candidates:
+            center_candidates.sort(key=lambda c: c.w * c.h)
+            return center_candidates[0]
+        
+        return None
 
     
     def _extract_from_ppstructure_cell(

@@ -380,19 +380,20 @@ class PaddleOCRService:
                         # Tables
                         page_cells = []
                         table_res_list = page_json['res'].get('table_res_list', [])
-                        for table in table_res_list:
+                        for table_idx, table in enumerate(table_res_list):
                             if isinstance(table, dict):
                                 if table.get('pred_html'):
                                     all_tables_html.append(table['pred_html'])
                                 for i, cell_box in enumerate(table.get('cell_box_list', [])):
                                     if len(cell_box) >= 4:
-                                        # Global cells (for layout parser)
+                                        # Global cells (for layout parser) - SOLUZIONE 4: aggiungi table_index
                                         all_pp_cells.append({
                                             'x1': float(cell_box[0]),
                                             'y1': float(cell_box[1]) + y_offset,
                                             'x2': float(cell_box[2]),
                                             'y2': float(cell_box[3]) + y_offset,
                                             'cell_index': i,
+                                            'table_index': table_idx,  # NUOVO: indice tabella
                                             'page': page_num,
                                             'bbox': [float(cell_box[0]), float(cell_box[1]), float(cell_box[2]), float(cell_box[3])]
                                         })
@@ -402,10 +403,12 @@ class PaddleOCRService:
                                             'y1': float(cell_box[1]),
                                             'x2': float(cell_box[2]),
                                             'y2': float(cell_box[3]),
-                                            'cell_index': i
+                                            'cell_index': i,
+                                            'table_index': table_idx  # NUOVO: indice tabella
                                         })
 
                                 layout_json['tables'].append({
+                                    'table_index': table_idx,  # NUOVO: indice tabella
                                     'pred_html': table.get('pred_html', ''),
                                     'cell_box_list': table.get('cell_box_list', []),
                                     'table_ocr_pred': table.get('table_ocr_pred', {})
