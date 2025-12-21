@@ -290,7 +290,7 @@ class PaddleOCRService:
             
             all_page_texts = []
             all_boxes = []
-            all_pp_cells = []
+            all_pp_cells = []  # PPStructure riempirà questa lista
             all_tables_html = []
             
             y_offset = 0
@@ -377,7 +377,7 @@ class PaddleOCRService:
                                 'polygon': poly
                             })
                             
-                        # Tables
+                        # Tables - Integrated PPStructure (pdfplumber removed)
                         page_cells = []
                         table_res_list = page_json['res'].get('table_res_list', [])
                         for table_idx, table in enumerate(table_res_list):
@@ -395,7 +395,8 @@ class PaddleOCRService:
                                             'cell_index': i,
                                             'table_index': table_idx,  # NUOVO: indice tabella
                                             'page': page_num,
-                                            'bbox': [float(cell_box[0]), float(cell_box[1]), float(cell_box[2]), float(cell_box[3])]
+                                            'bbox': [float(cell_box[0]), float(cell_box[1]), float(cell_box[2]), float(cell_box[3])],
+                                            'source': 'ppstructure'
                                         })
                                         # Page-local cells (for debug viewer)
                                         page_cells.append({
@@ -556,12 +557,12 @@ _paddle_ocr_service_cpu: Optional[PaddleOCRService] = None
 _paddle_ocr_service_gpu: Optional[PaddleOCRService] = None
 
 
-def get_paddle_ocr_service(use_gpu: bool = False) -> PaddleOCRService:
+def get_paddle_ocr_service(use_gpu: bool = True) -> PaddleOCRService:
     """
     Factory per servizio PaddleOCR US
     
     Args:
-        use_gpu: True=forza GPU, False=forza CPU (default CPU per compatibilità)
+        use_gpu: True=forza GPU (default), False=forza CPU
     
     Returns:
         PaddleOCRService instance (cached per mode)

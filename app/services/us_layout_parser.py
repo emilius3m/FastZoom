@@ -1,7 +1,7 @@
 # app/services/us_layout_parser.py
 """
-Parser layout-aware per schede US: usa bounding boxes per estrarre i campi
-in modo più stabile del parsing "a righe".
+Parser layout-aware per schede US: usa SOLO bounding boxes PPStructure per estrarre i campi.
+Nessun fallback euristico.
 """
 
 from __future__ import annotations
@@ -11,9 +11,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
-
 from loguru import logger
-
 
 
 @dataclass(frozen=True)
@@ -49,10 +47,9 @@ class Rect:
         inter = max(0.0, min(self.y2, other.y2) - max(self.y1, other.y1))
         denom = max(self.h, other.h, 1e-6)
         return inter / denom
-    
+
     def overlaps(self, other: "Rect") -> bool:
         """Verifica se questo rettangolo si sovrappone con un altro."""
-        # Nessuna sovrapposizione se uno è completamente a sinistra/destra/sopra/sotto dell'altro
         if self.x2 < other.x1 or self.x1 > other.x2:
             return False
         if self.y2 < other.y1 or self.y1 > other.y2:
@@ -64,13 +61,13 @@ def _norm(s: str) -> str:
     """Normalizza per confronti label: uppercase, no accenti, spazi compressi, punteggiatura ridotta."""
     if not s:
         return ""
+    s = ''.join(ch for ch in s if unicodedata.category(ch)[0] != 'C')
     s = unicodedata.normalize("NFKD", s)
     s = "".join(ch for ch in s if not unicodedata.combining(ch))
     s = s.upper()
     s = s.replace("'", "'").replace(""", '"').replace(""", '"')
-    # Tieni / e . perché utili in label e sigle, rimuovi il resto
-    s = re.sub(r"[^A-Z0-9/.\s'-]+", " ", s)
-    s = re.sub(r"\s+", " ", s).strip()
+    s = re.sub(r"[^A-Z0-9/.\\s'\\-]+", " ", s)
+    s = re.sub(r"\\s+", " ", s).strip()
     return s
 
 
@@ -83,16 +80,13 @@ def _bbox_to_rect(bbox: Any) -> Optional[Rect]:
     if bbox is None:
         return None
     try:
-        # Handle 'polygon' key if present
         if isinstance(bbox, dict):
             bbox = bbox.get('polygon', bbox)
-        
         if isinstance(bbox, (list, tuple)) and len(bbox) == 4 and isinstance(bbox[0], (list, tuple)):
             xs = [float(p[0]) for p in bbox]
             ys = [float(p[1]) for p in bbox]
             return Rect(min(xs), min(ys), max(xs), max(ys))
         if isinstance(bbox, (list, tuple)) and len(bbox) >= 4 and all(isinstance(v, (int, float)) for v in bbox[:4]):
-            # Non perfetto, ma meglio di niente
             x1, y1, x2, y2 = map(float, bbox[:4])
             return Rect(min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2))
     except Exception:
@@ -102,8 +96,8 @@ def _bbox_to_rect(bbox: Any) -> Optional[Rect]:
 
 class USLayoutParser:
     """
-    Parser layout-aware: trova la bbox della label e poi legge il valore
-    dalla zona a destra (preferita) o sotto (fallback).
+    Parser layout-aware: usa SOLO PPStructure cells per estrarre i campi.
+    Nessun fallback euristico. Se mancano celle PPStructure, il campo sarà None.
     """
 
     # Label "core" (normalizzate) + alias tipici OCR
@@ -127,14 +121,11 @@ class USLayoutParser:
         "SETTORE/I": ["SETTORE/I", "SETTORI", "SETTORE"],
         "QUADRATO/I": ["QUADRATO/I", "QUADRATI", "QUADRATO"],
         "DEFINIZIONE": ["DEFINIZIONE"],
-        # Checkbox per tipo US
         "POSITIVA": ["POSITIVA"],
         "NEGATIVA": ["NEGATIVA"],
         "NATURALE": ["NATURALE"],
         "ARTIFICIALE": ["ARTIFICIALE"],
-        # Quote
         "QUOTE": ["QUOTE"],
-        # Documentazione
         "PIANTE": ["PIANTE"],
         "PROSPETTI": ["PROSPETTI"],
         "SEZIONI": ["SEZIONI"],
@@ -143,12 +134,10 @@ class USLayoutParser:
             "RIFERIMENTI TABELLE MATERIALI", "RIFERIMENTITABELLEMATERIALI",
             "RIFERIMENTI TABELLE", "TABELLE MATERIALI", "RIF TABELLE MATERIALI"
         ],
-        # Proprietà fisiche
         "CONSISTENZA": ["CONSISTENZA"],
         "COLORE": ["COLORE"],
         "MISURE": ["MISURE"],
         "STATO DI CONSERVAZIONE": ["STATO DI CONSERVAZIONE"],
-        # Estese
         "CRITERI DISTINZIONE": ["CRITERI DISTINZIONE", "CRITERI DI DISTINZIONE"],
         "MODO FORMAZIONE": ["MODO FORMAZIONE", "MODO DI FORMAZIONE"],
         "COMPONENTI INORGANICI": ["INORGANICI", "COMPONENTI INORGANICI"],
@@ -183,7 +172,6 @@ class USLayoutParser:
             "RESPONSABILE RIELABORAZIONE", "RESPONSABILERIELABORAZIONE",
             "RESP RIELABORAZIONE", "RESPONSABILE DELLA RIELABORAZIONE"
         ],
-        # Sequenza stratigrafica labels
         "SI LEGA A": ["SI LEGA A"],
         "UGUALE A": ["UGUALE A"],
         "COPRE": ["COPRE"],
@@ -194,7 +182,6 @@ class USLayoutParser:
         "TAGLIATO DA": ["TAGLIATO DA"],
         "SI APPOGGIA A": ["SI APPOGGIA A"],
         "GLI SI APPOGGIA": ["GLI SI APPOGGIA"],
-        # Sequenza stratigrafica (ICCD)
         "POSTERIORE A": ["POSTERIORE A"],
         "ANTERIORE A": ["ANTERIORE A"],
     }
@@ -208,20 +195,21 @@ class USLayoutParser:
         detected_cells: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
-        items: lista come prodotta dal PaddleOCRService.bounding_boxes:
-               [{'text': str, 'confidence': float, 'polygon': [[x,y]...]}]
-        page_size: (width, height) dell'immagine renderizzata.
-        detected_cells: celle rilevate da PPStructure (opzionale)
-                       [{'x1': float, 'y1': float, 'x2': float, 'y2': float}]
+        items: lista come prodotta dal PaddleOCRService.bounding_boxes
+        page_size: (width, height) dell'immagine renderizzata
+        detected_cells: celle rilevate da PPStructure
         """
         tokens = self._to_tokens(items)
         w, h = page_size
-        
-        # Store detected cells for use in extraction methods
-        # Also store metadata for potential future use
+
+        # Valida che PPStructure cells siano presenti
         self._detected_cells: List[Rect] = []
-        self._cell_metadata: List[Dict[str, Any]] = []  # Preserva metadati originali
-        if detected_cells:
+        self._cell_metadata: List[Dict[str, Any]] = []
+
+        if not detected_cells:
+            logger.warning("No PPStructure cells provided. Fields will be None.")
+            # Prosegui comunque ma i campi cell-based saranno vuoti
+        else:
             for c in detected_cells:
                 self._detected_cells.append(Rect(
                     float(c.get('x1', 0)),
@@ -234,8 +222,8 @@ class USLayoutParser:
                     'table_index': c.get('table_index'),
                     'page': c.get('page'),
                 })
-            
-            # SOLUZIONE 1: Filtra celle annidate (contenute completamente in altre)
+
+            # Filtra celle annidate
             original_count = len(self._detected_cells)
             self._detected_cells = self._filter_nested_cells(self._detected_cells)
             filtered_count = original_count - len(self._detected_cells)
@@ -252,14 +240,14 @@ class USLayoutParser:
                 label_rects[key] = found
 
         out: Dict[str, Any] = {"site_id": site_id}
-        _bboxes: Dict[str, Dict[str, float]] = {}  # Track bounding boxes for each field
+        _bboxes: Dict[str, Dict[str, float]] = {}
 
         # 1) US (us_code)
         us_num = self._extract_us_number(tokens, label_rects.get("US"), page_w=w, page_h=h)
         if us_num:
             out["us_code"] = f"US{us_num.zfill(3)}"
 
-        # 2) ENTE RESPONSABILE - cell-based per evitare confini sporchi
+        # 2) ENTE RESPONSABILE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "ENTE RESPONSABILE", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
@@ -268,7 +256,7 @@ class USLayoutParser:
             if bbox:
                 _bboxes["ente_responsabile"] = bbox
 
-        # 2b) UFFICIO MIC COMPETENTE PER TUTELA
+        # 2b) UFFICIO MIC - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "UFFICIO MIC", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
@@ -277,19 +265,18 @@ class USLayoutParser:
             if bbox:
                 _bboxes["ufficio_mic"] = bbox
 
-        # 3) ANNO (int)
+        # 3) ANNO - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "ANNO", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
-            # Estrai anno se presente
             match = re.search(r"\b(19|20)\d{2}\b", val)
             if match:
                 out["anno"] = int(match.group(0))
-                bbox = self._compute_union_bbox(val_tokens)
-                if bbox:
-                    _bboxes["anno"] = bbox
+            bbox = self._compute_union_bbox(val_tokens)
+            if bbox:
+                _bboxes["anno"] = bbox
 
-        # 4) IDENTIFICATIVO
+        # 4) IDENTIFICATIVO - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "IDENTIFICATIVO", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
@@ -298,7 +285,7 @@ class USLayoutParser:
             if bbox:
                 _bboxes["identificativo_rif"] = bbox
 
-        # 5) LOCALITA' - cell-based (ha AREA/EDIFICIO/STRUTTURA sotto)
+        # 5) LOCALITA - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "LOCALITA", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
@@ -307,7 +294,7 @@ class USLayoutParser:
             if bbox:
                 _bboxes["localita"] = bbox
 
-        # 6) AREA/EDIFICIO/STRUTTURA - cell-based (ha SAGGIO a destra, AMBIENTE sotto)
+        # 6) AREA/EDIFICIO/STRUTTURA - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "AREA/EDIFICIO/STRUTTURA", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
@@ -316,13 +303,11 @@ class USLayoutParser:
             if bbox:
                 _bboxes["area_struttura"] = bbox
 
-        # 7) SAGGIO - usa celle PPStructure se disponibili, altrimenti estrazione in cell
-        # Il metodo _extract_value_below_only era troppo fragile e catturava valori sbagliati
+        # 7) SAGGIO - PPStructure ONLY con validazione lunghezza
         result = self._extract_value_in_cell(tokens, "SAGGIO", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
-            # Validazione: SAGGIO dovrebbe essere breve (nome saggio, non lunghe descrizioni)
-            if len(val) < 100:  # Limite ragionevole per un nome saggio
+            if len(val) < 100:
                 out["saggio"] = val
                 bbox = self._compute_union_bbox(val_tokens)
                 if bbox:
@@ -331,9 +316,9 @@ class USLayoutParser:
             else:
                 logger.warning(f"SAGGIO: rejected too long value ({len(val)} chars)")
         else:
-            logger.debug("SAGGIO: no value found")
+            logger.debug("SAGGIO: no value found (no PPStructure cell or empty)")
 
-        # 8) AMBIENTE/UNITA FUNZIONALE - cell-based
+        # 8) AMBIENTE/UNITA FUNZIONALE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "AMBIENTE/UNITA FUNZIONALE", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
@@ -342,7 +327,7 @@ class USLayoutParser:
             if bbox:
                 _bboxes["ambiente_unita_funzione"] = bbox
 
-        # 9) POSIZIONE - usa metodo semplificato per catturare tutto il testo multi-riga
+        # 9) POSIZIONE - PPStructure ONLY
         if "POSIZIONE" in label_rects:
             result = self._extract_value_in_cell(tokens, "POSIZIONE", label_rects, page_w=w, page_h=h)
             if result:
@@ -352,7 +337,7 @@ class USLayoutParser:
                 if bbox:
                     _bboxes["posizione"] = bbox
 
-        # 10) DEFINIZIONE - cell-based
+        # 10) DEFINIZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "DEFINIZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
@@ -361,7 +346,7 @@ class USLayoutParser:
             if bbox:
                 _bboxes["definizione"] = bbox
 
-        # SETTORE/I
+        # SETTORE/I - PPStructure ONLY
         if "SETTORE/I" in label_rects:
             result = self._extract_value_in_cell(tokens, "SETTORE/I", label_rects, page_w=w, page_h=h)
             if result:
@@ -371,7 +356,7 @@ class USLayoutParser:
                 if bbox:
                     _bboxes["settori"] = bbox
 
-        # QUADRATO/I
+        # QUADRATO/I - PPStructure ONLY
         if "QUADRATO/I" in label_rects:
             result = self._extract_value_in_cell(tokens, "QUADRATO/I", label_rects, page_w=w, page_h=h)
             if result:
@@ -389,9 +374,9 @@ class USLayoutParser:
         # 12) NATURALE/ARTIFICIALE (checkbox)
         nat_art = self._extract_nat_art_from_checkboxes(tokens, label_rects, page_w=w, page_h=h)
         if nat_art:
-            out["formazione"] = nat_art  # 'naturale' o 'artificiale'
+            out["formazione"] = nat_art
 
-        # 13) QUOTE - estrai valori numerici
+        # 13) QUOTE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "QUOTE", label_rects, page_w=w, page_h=h)
         if result:
             val, val_tokens = result
@@ -399,204 +384,157 @@ class USLayoutParser:
             bbox = self._compute_union_bbox(val_tokens)
             if bbox:
                 _bboxes["quote"] = bbox
-            # Prova a estrarre quote numeriche separate
             quote_nums = re.findall(r"\d+[,.]?\d*", val)
             if quote_nums:
                 out["quote_list"] = [float(q.replace(",", ".")) for q in quote_nums[:3]]
 
-        # 14) DOCUMENTAZIONE
-        # PIANTE
-        result = self._extract_value_in_cell(tokens, "PIANTE", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["piante_riferimenti"] = val
+        # 14) DOCUMENTAZIONE - PPStructure ONLY
+        for label_key, field_key in [("PIANTE", "piante_riferimenti"), ("PROSPETTI", "prospetti_riferimenti"),
+                                     ("SEZIONI", "sezioni_riferimenti"), ("FOTOGRAFIE", "fotografie"),
+                                     ("RIFERIMENTI TABELLE MATERIALI", "riferimenti_tabelle_materiali")]:
+            result = self._extract_value_in_cell(tokens, label_key, label_rects, page_w=w, page_h=h)
+            if result:
+                val, _ = result
+                out[field_key] = val
 
-        # PROSPETTI
-        result = self._extract_value_in_cell(tokens, "PROSPETTI", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["prospetti_riferimenti"] = val
-
-        # SEZIONI
-        result = self._extract_value_in_cell(tokens, "SEZIONI", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["sezioni_riferimenti"] = val
-
-        # FOTOGRAFIE
-        result = self._extract_value_in_cell(tokens, "FOTOGRAFIE", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["fotografie"] = val
-
-        # RIFERIMENTI TABELLE MATERIALI
-        result = self._extract_value_in_cell(tokens, "RIFERIMENTI TABELLE MATERIALI", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["riferimenti_tabelle_materiali"] = val
-
-        # 15) PROPRIETÀ FISICHE (duplicate - already handled above, removing)
-        # Skip: CONSISTENZA, COLORE, MISURE already tracked with bbox above
-
-        # STATO DI CONSERVAZIONE
+        # 15) STATO DI CONSERVAZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "STATO DI CONSERVAZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["stato_conservazione"] = val
 
-        # 16) COMPONENTI
-        result = self._extract_value_in_cell(tokens, "COMPONENTI INORGANICI", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["componenti_inorganici"] = val
+        # 16) COMPONENTI - PPStructure ONLY
+        for label_key, field_key in [("COMPONENTI INORGANICI", "componenti_inorganici"),
+                                     ("COMPONENTI ORGANICI", "componenti_organici")]:
+            result = self._extract_value_in_cell(tokens, label_key, label_rects, page_w=w, page_h=h)
+            if result:
+                val, _ = result
+                out[field_key] = val
 
-        result = self._extract_value_in_cell(tokens, "COMPONENTI ORGANICI", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["componenti_organici"] = val
-
-        # 17) CRITERI DISTINZIONE - cell-based
+        # 17) CRITERI DISTINZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "CRITERI DISTINZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["criteri_distinzione"] = val
 
-        # 18) MODO FORMAZIONE - cell-based
+        # 18) MODO FORMAZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "MODO FORMAZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["modo_formazione"] = val
 
-        # 19) DESCRIZIONE - cell-based (può essere multilinea)
+        # 19) DESCRIZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "DESCRIZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["descrizione"] = val
 
-        # 20) OSSERVAZIONI
+        # 20) OSSERVAZIONI - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "OSSERVAZIONI", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["osservazioni"] = val
 
-        # 21) INTERPRETAZIONE - cell-based
+        # 21) INTERPRETAZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "INTERPRETAZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["interpretazione"] = val
 
-        # 22) DATAZIONE
+        # 22) DATAZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "DATAZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["datazione"] = val
 
-        # 23) PERIODO
+        # 23) PERIODO - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "PERIODO", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["periodo"] = val
 
-        # 24) FASE
+        # 24) FASE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "FASE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["fase"] = val
 
-        # 25) ATTIVITA
+        # 25) ATTIVITA - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "ATTIVITA", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["attivita"] = val
 
-        # 26) ELEMENTI DATANTI
+        # 26) ELEMENTI DATANTI - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "ELEMENTI DATANTI", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["elementi_datanti"] = val
 
-        # 27) DATI QUANTITATIVI REPERTI
+        # 27) DATI QUANTITATIVI REPERTI - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "DATI QUANTITATIVI DEI REPERTI", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["dati_quantitativi_reperti"] = val
 
-        # 28) CAMPIONATURE, FLOTTAZIONE, SETACCIATURA
-        result = self._extract_value_in_cell(tokens, "CAMPIONATURE", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["campionature"] = val
+        # 28) CAMPIONATURE, FLOTTAZIONE, SETACCIATURA - PPStructure ONLY
+        for label_key, field_key in [("CAMPIONATURE", "campionature"), ("FLOTTAZIONE", "flottazione"),
+                                     ("SETACCIATURA", "setacciatura")]:
+            result = self._extract_value_in_cell(tokens, label_key, label_rects, page_w=w, page_h=h)
+            if result:
+                val, _ = result
+                out[field_key] = val
 
-        result = self._extract_value_in_cell(tokens, "FLOTTAZIONE", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["flottazione"] = val
-
-        result = self._extract_value_in_cell(tokens, "SETACCIATURA", label_rects, page_w=w, page_h=h)
-        if result:
-            val, _ = result
-            out["setacciatura"] = val
-
-        # 29) AFFIDABILITA STRATIGRAFICA
+        # 29) AFFIDABILITA STRATIGRAFICA - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "AFFIDABILITA STRATIGRAFICA", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["affidabilita_stratigrafica"] = val.lower()
 
-        # 30) RESPONSABILE SCIENTIFICO
+        # 30) RESPONSABILE SCIENTIFICO - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "RESPONSABILE SCIENTIFICO", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["responsabile_scientifico"] = val
 
-        # 31) DATA RILEVAMENTO
+        # 31) DATA RILEVAMENTO - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "DATA RILEVAMENTO", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
-            # Estrai solo la data con regex
             match = re.search(r"\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}", val)
             if match:
                 iso_date = self._parse_date_to_iso(match.group(0))
                 if iso_date:
                     out["data_rilevamento"] = iso_date
 
-        # 32) RESPONSABILE COMPILAZIONE
+        # 32) RESPONSABILE COMPILAZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "RESPONSABILE COMPILAZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["responsabile_compilazione"] = val
 
-        # 33) DATA RIELABORAZIONE
+        # 33) DATA RIELABORAZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "DATA RIELABORAZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
-            # Estrai solo la data con regex
             match = re.search(r"\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}", val)
             if match:
                 iso_date = self._parse_date_to_iso(match.group(0))
                 if iso_date:
                     out["data_rielaborazione"] = iso_date
 
-        # 34) RESPONSABILE RIELABORAZIONE
+        # 34) RESPONSABILE RIELABORAZIONE - PPStructure ONLY
         result = self._extract_value_in_cell(tokens, "RESPONSABILE RIELABORAZIONE", label_rects, page_w=w, page_h=h)
         if result:
             val, _ = result
             out["responsabile_rielaborazione"] = val
 
-        # 35) Sequenza stratigrafica
+        # 35) Sequenza stratigrafica - PPStructure ONLY
         for label_key, field_name in [
-            ("SI LEGA A", "seq_si_lega_a"),
-            ("UGUALE A", "seq_uguale_a"),
-            ("COPRE", "seq_copre"),
-            ("COPERTO DA", "seq_coperto_da"),
-            ("RIEMPIE", "seq_riempie"),
-            ("RIEMPITO DA", "seq_riempito_da"),
-            ("TAGLIA", "seq_taglia"),
-            ("TAGLIATO DA", "seq_tagliato_da"),
-            ("SI APPOGGIA A", "seq_si_appoggia_a"),
-            ("GLI SI APPOGGIA", "seq_gli_si_appoggia"),
-            ("POSTERIORE A", "posteriore_a"),
-            ("ANTERIORE A", "anteriore_a"),
+            ("SI LEGA A", "seq_si_lega_a"), ("UGUALE A", "seq_uguale_a"), ("COPRE", "seq_copre"),
+            ("COPERTO DA", "seq_coperto_da"), ("RIEMPIE", "seq_riempie"), ("RIEMPITO DA", "seq_riempito_da"),
+            ("TAGLIA", "seq_taglia"), ("TAGLIATO DA", "seq_tagliato_da"), ("SI APPOGGIA A", "seq_si_appoggia_a"),
+            ("GLI SI APPOGGIA", "seq_gli_si_appoggia"), ("POSTERIORE A", "posteriore_a"), ("ANTERIORE A", "anteriore_a"),
         ]:
             result = self._extract_value_in_cell(tokens, label_key, label_rects, page_w=w, page_h=h)
             if result:
@@ -606,153 +544,150 @@ class USLayoutParser:
                 if bbox:
                     _bboxes[field_name] = bbox
 
-        # 37) Proprietà fisiche
-        result = self._extract_value_in_cell(tokens, "CONSISTENZA", label_rects, page_w=w, page_h=h)
-        if result:
-            val, val_tokens = result
-            out["consistenza"] = val
-            bbox = self._compute_union_bbox(val_tokens)
-            if bbox:
-                _bboxes["consistenza"] = bbox
+        # 37) Proprietà fisiche - PPStructure ONLY
+        for label_key, field_key in [("CONSISTENZA", "consistenza"), ("COLORE", "colore"), ("MISURE", "misure")]:
+            result = self._extract_value_in_cell(tokens, label_key, label_rects, page_w=w, page_h=h)
+            if result:
+                val, val_tokens = result
+                out[field_key] = val
+                bbox = self._compute_union_bbox(val_tokens)
+                if bbox:
+                    _bboxes[field_key] = bbox
 
-        result = self._extract_value_in_cell(tokens, "COLORE", label_rects, page_w=w, page_h=h)
-        if result:
-            val, val_tokens = result
-            out["colore"] = val
-            bbox = self._compute_union_bbox(val_tokens)
-            if bbox:
-                _bboxes["colore"] = bbox
-
-        result = self._extract_value_in_cell(tokens, "MISURE", label_rects, page_w=w, page_h=h)
-        if result:
-            val, val_tokens = result
-            out["misure"] = val
-            bbox = self._compute_union_bbox(val_tokens)
-            if bbox:
-                _bboxes["misure"] = bbox
-
-        # Add bounding box data to output
+        # Aggiungi bounding box data
         if _bboxes:
             out["_field_bboxes"] = _bboxes
 
         return out
 
-    # ---------- CELL-BASED EXTRACTION METHODS ----------
+    # ---------- PPStructure-based extraction (ONLY METHOD) ----------
 
     def _filter_nested_cells(self, cells: List[Rect]) -> List[Rect]:
-        """
-        SOLUZIONE 1: Rimuove celle che sono completamente contenute in altre celle.
-        Mantiene solo le celle "foglia" (più specifiche).
-        
-        Una cella A è considerata "annidata" in B se:
-        - A è completamente contenuta in B (tutti i bordi di A sono dentro B)
-        - B ha un'area maggiore di A
-        
-        Returns:
-            Lista di celle filtrate (senza celle annidate)
-        """
-        if not cells:
+        """Rimuove celle annidate (contenute completamente in altre)."""
+        if not cells or len(cells) <= 1:
             return cells
-        
+
+        cells_with_area = [(cell, cell.w * cell.h) for cell in cells]
+        cells_with_area.sort(key=lambda x: x[1])
+
         result = []
-        for i, cell in enumerate(cells):
+        filtered_count = 0
+
+        for i, (cell, cell_area) in enumerate(cells_with_area):
             is_nested = False
-            for j, other in enumerate(cells):
-                if i == j:
+            for j in range(i + 1, len(cells_with_area)):
+                other, other_area = cells_with_area[j]
+                if other_area <= cell_area * 1.1:
                     continue
-                # 'cell' è completamente dentro 'other'?
-                if (other.x1 <= cell.x1 and other.y1 <= cell.y1 and
-                    other.x2 >= cell.x2 and other.y2 >= cell.y2):
-                    # 'other' è più grande di 'cell'?
-                    if (other.w * other.h) > (cell.w * cell.h):
-                        is_nested = True
-                        break
+                tolerance = 2.0
+                if (other.x1 - tolerance <= cell.x1 and
+                    other.y1 - tolerance <= cell.y1 and
+                    other.x2 + tolerance >= cell.x2 and
+                    other.y2 + tolerance >= cell.y2):
+                    is_nested = True
+                    filtered_count += 1
+                    break
             if not is_nested:
                 result.append(cell)
+
+        if filtered_count > 0:
+            logger.debug(f"Filtered {filtered_count} nested cells, kept {len(result)} of {len(cells)}")
         return result
 
     def _find_cell_for_label(self, label_rect: Rect) -> Optional[Rect]:
-        """
-        SOLUZIONE 2: Trova la cella PPStructure che contiene la label.
-        
-        Strategia migliorata:
-        1. Prima cerca celle che contengono TUTTI i 4 angoli della label
-        2. Se non trovata, fallback al centro
-        3. Se più celle matchano, sceglie la più piccola (più specifica)
-        
-        Returns:
-            Rect della cella trovata o None
-        """
-        if not self._detected_cells:
+        """Trova la cella PPStructure che contiene il centro della label."""
+        if not self._detected_cells or not label_rect:
             return None
-        
-        # FASE 1: Cerca celle che contengono l'intera label (tutti i 4 angoli)
-        full_match_candidates = []
-        for cell in self._detected_cells:
-            if (cell.contains_point(label_rect.x1, label_rect.y1) and
-                cell.contains_point(label_rect.x2, label_rect.y1) and
-                cell.contains_point(label_rect.x1, label_rect.y2) and
-                cell.contains_point(label_rect.x2, label_rect.y2)):
-                full_match_candidates.append(cell)
-        
-        if full_match_candidates:
-            # Ordina per area ascendente: la più piccola è la più specifica
-            full_match_candidates.sort(key=lambda c: c.w * c.h)
-            return full_match_candidates[0]
-        
-        # FASE 2: Fallback - cerca celle che contengono almeno il centro
-        cx, cy = label_rect.cx, label_rect.cy
-        center_candidates = []
-        for cell in self._detected_cells:
-            if cell.contains_point(cx, cy):
-                center_candidates.append(cell)
-        
-        if center_candidates:
-            center_candidates.sort(key=lambda c: c.w * c.h)
-            return center_candidates[0]
-        
-        return None
 
-    
+        label_points = [
+            (label_rect.x1, label_rect.y1), (label_rect.x2, label_rect.y1),
+            (label_rect.x1, label_rect.y2), (label_rect.x2, label_rect.y2),
+            (label_rect.cx, label_rect.cy)
+        ]
+
+        candidates = []
+        for cell in self._detected_cells:
+            score = 0.0
+            contained_points = sum(1 for px, py in label_points if cell.contains_point(px, py))
+
+            if contained_points == 5:
+                score = 1.0
+            elif contained_points >= 4:
+                score = 0.9
+            elif contained_points >= 2:
+                score = 0.7
+            elif contained_points == 1:
+                score = 0.5
+            else:
+                continue
+
+            cell_area = cell.w * cell.h
+            label_area = label_rect.w * label_rect.h
+
+            if cell_area > label_area * 10:
+                score *= 0.7
+            elif cell_area <= label_area * 3:
+                score *= 1.1
+            if cell_area >= label_area * 0.5:
+                score *= 1.05
+
+            candidates.append((score, cell))
+
+        if not candidates:
+            logger.debug(f"No PPStructure cell found for label at {label_rect}")
+            return None
+
+        candidates.sort(key=lambda x: (-x[0], x[1].w * x[1].h))
+        best_score, best_cell = candidates[0]
+
+        if best_score > 0.4:
+            logger.debug(f"Found cell with score {best_score:.2f} for label")
+            return best_cell
+        else:
+            logger.debug(f"Best cell score below threshold: {best_score:.2f}")
+            return None
+
     def _extract_from_ppstructure_cell(
         self,
         tokens: List[Dict[str, Any]],
         label_rect: Rect,
     ) -> Optional[Tuple[str, List[Dict[str, Any]]]]:
-        """
-        Estrae valore usando le celle rilevate da PPStructure.
-        Cerca token sotto la label ma nella stessa cella.
-        
-        Ritorna: (valore, tokens) o None
-        """
+        """Estrae il valore SOLO dalla cella PPStructure. Nessun fallback."""
+        if not tokens or not label_rect:
+            return None
+
         cell_rect = self._find_cell_for_label(label_rect)
         if not cell_rect:
+            logger.debug(f"No PPStructure cell found for label at {label_rect}")
             return None
-        
-        # Cerca token sotto la label ma dentro la cella
+
+        search_y_min = label_rect.y2 + 1
+        search_y_max = cell_rect.y2
+
         value_tokens = []
         for t in tokens:
             tok_rect = t["rect"]
-            
-            # Deve essere sotto la label
-            if tok_rect.cy <= label_rect.y2:
+
+            if (tok_rect.cy <= search_y_min or tok_rect.cy > search_y_max or
+                not cell_rect.contains_point(tok_rect.cx, tok_rect.cy) or 
+                self._is_probably_label(t["norm"])):
                 continue
-            
-            # Deve sovrapporsi con la cella
-            if not cell_rect.overlaps(tok_rect):
+
+            if t.get("conf", 0) < 0.3:
                 continue
-            
-            # Escludi altre label
-            if self._is_probably_label(t["norm"]):
-                continue
-            
+
             value_tokens.append(t)
-        
+
         if value_tokens:
             value_tokens.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
             val = self._join_tokens(value_tokens).strip()
-            return (val, value_tokens)
-        
+            if val and len(val) > 0:
+                logger.debug(f"Extracted value '{val}' from {len(value_tokens)} tokens")
+                return (val, value_tokens)
+            else:
+                logger.debug("Empty value after joining tokens")
+                return None
+
         return None
 
     def _extract_value_in_cell(
@@ -765,47 +700,43 @@ class USLayoutParser:
         page_h: int,
     ) -> Optional[Tuple[str, List[Dict[str, Any]]]]:
         """
-        Estrae il valore da una cella.
-        
-        MODALITÀ STRICT PPSTRUCTURE:
-        Se sono state passate detected_cells (da PPStructure), usiamo SOLO quelle.
-        Se non troviamo una cella per la label, ritorniamo None.
-        Nessun fallback euristico.
-        
-        Se detected_cells non è presente (vecchio metodo), si potrebbe usare il fallback,
-        ma qui assumiamo che il contesto sia ormai PPStructure-first.
-        
-        Ritorna: (valore_estratto, lista_token_usati) o None
+        Estrae il valore SOLO tramite PPStructure.
+        Nessun fallback euristico. Se non ci sono celle, ritorna None.
         """
+        if not tokens or not label_rects:
+            return None
+
         label_rect = label_rects.get(label_key)
         if not label_rect:
+            logger.debug(f"No label rectangle found for key: {label_key}")
             return None
 
-        # STRICT PPSTRUCTURE MODE
-        if self._detected_cells:
-            return self._extract_from_ppstructure_cell(tokens, label_rect)
-            
-        # NESSUNA CELLA RILEVATA O DISPONIBILE
-        # Se vogliamo essere strict:
-        return None
+        # UNICA MODALITA': PPStructure
+        if not self._detected_cells:
+            logger.debug(f"No PPStructure cells available for {label_key}")
+            return None
 
-
+        result = self._extract_from_ppstructure_cell(tokens, label_rect)
+        if result:
+            val, val_tokens = result
+            logger.debug(f"PPStructure extraction successful for {label_key}: '{val}'")
+            return result
+        else:
+            logger.debug(f"PPStructure extraction failed for {label_key} (empty cell or no tokens)")
+            return None
 
     def _compute_union_bbox(self, tokens: List[Dict[str, Any]]) -> Optional[Dict[str, float]]:
-        """
-        Calcola il bounding box unione di una lista di token.
-        Ritorna un dict con {x1, y1, x2, y2} o None se la lista è vuota.
-        """
+        """Calcola il bounding box unione di una lista di token."""
         if not tokens:
             return None
-        
+
         xs = []
         ys = []
         for t in tokens:
             r = t["rect"]
             xs.extend([r.x1, r.x2])
             ys.extend([r.y1, r.y2])
-        
+
         return {
             "x1": min(xs),
             "y1": min(ys),
@@ -816,155 +747,164 @@ class USLayoutParser:
     # ---------- internals ----------
 
     def _to_tokens(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Converte gli item OCR in token normalizzati."""
+        if not items:
+            return []
+
         toks = []
         for it in items:
             text = (it.get("text") or "").strip()
-            if not text:
-                continue
-            conf = float(it.get("confidence") or 0.0)
-            # Filtra rumore evidente
-            if conf < 0.25 and len(text) <= 2:
+            if not text or len(text.strip()) == 0:
                 continue
 
-            # Get bbox from 'polygon' key or 'bbox' key
+            conf = float(it.get("confidence") or 0.0)
+            if conf < 0.15:
+                continue
+
             bbox_data = it.get("polygon") or it.get("bbox")
             rect = _bbox_to_rect(bbox_data)
             if not rect or rect.w <= 0 or rect.h <= 0:
                 continue
 
+            norm_text = _norm(text)
+            if not norm_text:
+                continue
+
             toks.append({
                 "text": text,
-                "norm": _norm(text),
+                "norm": norm_text,
                 "conf": conf,
                 "rect": rect,
             })
 
-        # Ordina top-down, left-right
-        toks.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
+        toks.sort(key=lambda t: (t["rect"].cy, t["rect"].cx, t["text"]))
         return toks
 
     def _find_label(self, tokens: List[Dict[str, Any]], aliases: List[str]) -> Optional[Rect]:
+        """Trova la label tra i token."""
         alias_norm = [_norm(a) for a in aliases]
-        
-        # Match esatto su token singolo
+
         for t in tokens:
             if t["norm"] in alias_norm:
                 return t["rect"]
 
-        # Match "starts with" per label lunghe
         for t in tokens:
             for a in alias_norm:
                 if a and t["norm"].startswith(a):
                     return t["rect"]
 
-        # APPROCCIO EURISTICO PER GESTIRE ERRORI OCR
-        # Per label specifiche come UFFICIO MIC, usiamo similarity score
         if any("UFFICIO" in a for a in aliases):
             best_match = self._find_label_with_similarity(tokens, aliases, target_keywords=["UFFICIO", "COMPETENTE"])
             if best_match:
                 return best_match
 
-        # CRITERI DISTINZIONE: gestisce typos o merge
-        # Cerca token che contenga sia "CRITERI" che "DISTINZIONE"
         if any("CRITERI" in a for a in aliases):
-             for t in tokens:
-                 nt = t["norm"]
-                 if "CRITERI" in nt and "DISTINZIONE" in nt:
-                     return t["rect"]
+            for t in tokens:
+                nt = t["norm"]
+                if "CRITERI" in nt and "DISTINZIONE" in nt:
+                    return t["rect"]
 
         return None
-    
+
     def _find_label_with_similarity(
         self,
         tokens: List[Dict[str, Any]],
         aliases: List[str],
         target_keywords: List[str] = None
     ) -> Optional[Rect]:
-        """
-        Trova label usando similarity score invece di match esatto.
-        Utile per gestire errori di riconoscimento OCR.
-        
-        Args:
-            tokens: Lista token con testo e coordinate
-            aliases: Alias normalizzati della label target
-            target_keywords: Parole chiave che devono essere presenti
-        
-        Returns:
-            Rect della label migliore o None
-        """
+        """Trova label usando similarity score."""
+        if not tokens or not aliases:
+            return None
+
         target_keywords = target_keywords or []
-        
-        # Prepara keyword normalizzate
-        target_norm = [_norm(kw) for kw in target_keywords]
-        
+        target_norm = [_norm(kw) for kw in target_keywords if kw]
+        aliases_norm = [_norm(a) for a in aliases]
+
         candidates = []
-        
+
         for t in tokens:
             norm_text = t["norm"]
-            
-            # Skip token troppo corti o troppo lunghi
-            if len(norm_text) < 3 or len(norm_text) > 50:
+            text_len = len(norm_text)
+
+            if text_len < 3 or text_len > 60:
                 continue
-            
-            # Calcola similarity score
+            if t.get("conf", 0) < 0.4:
+                continue
+
             score = 0.0
-            
-            # 1. Presenza delle keyword target
+
+            best_alias_score = 0.0
+            for alias in aliases_norm:
+                if not alias:
+                    continue
+                if norm_text == alias:
+                    best_alias_score = 1.0
+                    break
+                elif alias in norm_text or norm_text in alias:
+                    best_alias_score = max(best_alias_score, 0.8)
+                else:
+                    common_chars = set(alias) & set(norm_text)
+                    similarity = len(common_chars) / max(len(alias), len(norm_text))
+                    best_alias_score = max(best_alias_score, similarity * 0.5)
+
+            score += best_alias_score * 0.6
+
+            keyword_score = 0.0
             for kw in target_norm:
-                if kw in norm_text:
-                    score += len(kw) / len(norm_text)
-            
-            # 2. Lunghezza appropriata per label UFFICIO
+                if kw and kw in norm_text:
+                    keyword_score += len(kw) / text_len
+            score += min(keyword_score, 1.0) * 0.2
+
+            pattern_score = 0.0
             if any("UFFICIO" in a for a in aliases):
-                # UFFICIO MIC labels di solito sono tra 10 e 30 caratteri
-                if 10 <= len(norm_text) <= 30:
-                    score += 0.3
-                elif 30 <= len(norm_text) <= 50:
-                    score += 0.2
-            
-            # 3. Contiene "UFFICIO" o "COMPETENTE"
-            if "UFFICIO" in norm_text:
-                score += 0.5
-            if "COMPETENTE" in norm_text:
-                score += 0.4
-            if "TUTELA" in norm_text:
-                score += 0.3
-            if "MIC" in norm_text:
-                score += 0.3
-            
-            # 4. Evita token che sono solo numeri o simboli
+                if 8 <= text_len <= 35:
+                    pattern_score += 0.3
+                if "UFFICIO" in norm_text:
+                    pattern_score += 0.4
+                if "COMPETENTE" in norm_text:
+                    pattern_score += 0.3
+                if "TUTELA" in norm_text:
+                    pattern_score += 0.2
+                if "MIC" in norm_text:
+                    pattern_score += 0.2
+            score += min(pattern_score, 1.0) * 0.2
+
             if re.match(r'^[0-9\s\-\._/]+$', norm_text):
-                score -= 0.8
-            
-            # 5. Penalty per testo troppo generico
-            generic_words = ["TITOLO", "SEZIONE", "CAPITOLO", "PARTE"]
-            for gw in generic_words:
-                if gw in norm_text:
-                    score -= 0.5
-            
-            if score > 0.3:  # Threshold minimo
-                candidates.append((score, t["rect"], norm_text))
-        
-        # Ritorna il migliore
+                score -= 0.9
+            elif any(generic in norm_text for generic in ["TITOLO", "SEZIONE", "CAPITOLO", "PARTE", "NUMERO"]):
+                score -= 0.6
+            elif text_len < 5 and norm_text.isupper():
+                score -= 0.3
+
+            ocr_confidence = t.get("conf", 0)
+            if ocr_confidence > 0.9:
+                score += 0.1
+            elif ocr_confidence < 0.6:
+                score -= 0.1
+
+            if score > 0.4:
+                candidates.append((score, t["rect"], norm_text, ocr_confidence))
+
         if candidates:
-            candidates.sort(key=lambda x: x[0], reverse=True)
-            best_score, best_rect, best_text = candidates[0]
-            logger.debug(f"Found UFFICIO label with similarity: {best_score:.2f} = '{best_text}'")
-            return best_rect
-        
+            candidates.sort(key=lambda x: (x[0], x[3]), reverse=True)
+            best_score, best_rect, best_text, best_conf = candidates[0]
+
+            if best_score > 0.6:
+                logger.debug(f"Found label with similarity: score={best_score:.2f}, text='{best_text}', conf={best_conf:.2f}")
+                return best_rect
+            else:
+                logger.debug(f"Best candidate below threshold: {best_score:.2f} = '{best_text}'")
+                return None
+
         return None
 
     def _extract_us_number(self, tokens: List[Dict[str, Any]], us_label: Optional[Rect], *, page_w: int, page_h: int) -> Optional[str]:
-        """
-        Cerca un numero vicino alla label "US" (distanza minima).
-        Fallback: primo numero "piccolo" in alto pagina, ma evita anni (4 cifre).
-        """
+        """Estrae il numero US vicino alla label."""
         digit_tokens = []
         for t in tokens:
             m = re.fullmatch(r"\d{1,4}", t["text"])
             if not m:
                 continue
-            # evita prendere 2023 come US
             if len(t["text"]) == 4 and t["text"].startswith(("19", "20")):
                 continue
             digit_tokens.append(t)
@@ -972,7 +912,6 @@ class USLayoutParser:
         if us_label and digit_tokens:
             best = None
             for t in digit_tokens:
-                # penalizza se molto lontano in verticale
                 dy = abs(t["rect"].cy - us_label.cy)
                 dx = abs(t["rect"].cx - us_label.cx)
                 dist = dx + 2.0 * dy
@@ -980,54 +919,12 @@ class USLayoutParser:
                     best = (dist, t)
             return best[1]["text"] if best else None
 
-        # fallback: numero 1-3 cifre nella parte alta del foglio
         top_limit = page_h * 0.35
         for t in digit_tokens:
             if t["rect"].cy <= top_limit and 1 <= len(t["text"]) <= 3:
                 return t["text"]
 
         return None
-
-    def _extract_value_below_only(
-        self,
-        tokens: List[Dict[str, Any]],
-        label_rect: Optional[Rect],
-        *,
-        page_w: int,
-        page_h: int,
-    ) -> Optional[str]:
-        """
-        Estrae il valore SOLO dalla zona direttamente sotto la label.
-        Non cerca a destra - utile per campi piccoli come SAGGIO
-        che potrebbero catturare valori da campi adiacenti.
-        """
-        if not label_rect:
-            return None
-
-        # Cerchiamo solo sotto la label, in una colonna stretta
-        y_min = label_rect.y2 + 2
-        y_max = min(page_h, label_rect.y2 + page_h * 0.08)  # Poco sotto
-        
-        # Colonna stretta: dalla x della label alla sua larghezza + un po'
-        col_x1 = label_rect.x1 - 5
-        col_x2 = label_rect.x2 + label_rect.w * 0.5  # Solo un po' più largo della label
-        
-        below_candidates = []
-        for t in tokens:
-            # Deve essere sotto la label
-            if t["rect"].cy < y_min or t["rect"].cy > y_max:
-                continue
-            # Deve essere nella colonna della label
-            if t["rect"].cx < col_x1 or t["rect"].cx > col_x2:
-                continue
-            # Escludi label
-            if self._is_probably_label(t["norm"]):
-                continue
-            below_candidates.append(t)
-
-        below_candidates.sort(key=lambda t: (t["rect"].cy, t["rect"].cx))
-        val = self._join_tokens(below_candidates).strip()
-        return val or None
 
     def _extract_value(
         self,
@@ -1037,14 +934,15 @@ class USLayoutParser:
         page_w: int,
         page_h: int,
         value_regex: Optional[str] = None,
-        extract_match: bool = True,  # Se True, ritorna solo la corrispondenza regex
+        extract_match: bool = True,
     ) -> Optional[str]:
+        """Metodo legacy (non usato in modalità PPStructure-only)."""
         if not label_rect:
             return None
 
-        # 1) Preferenza: valore a destra della label (stessa riga/banda)
         band = Rect(0, label_rect.y1 - label_rect.h * 0.6, page_w, label_rect.y2 + label_rect.h * 0.6)
         right_candidates = []
+
         for t in tokens:
             if t["rect"].x1 <= label_rect.x2 + 8:
                 continue
@@ -1063,16 +961,13 @@ class USLayoutParser:
             if value_regex:
                 match = re.search(value_regex, val)
                 if match:
-                    # Ritorna solo la corrispondenza, non tutto il testo
                     return match.group(0).strip() if extract_match else val.strip()
             else:
                 return val.strip()
 
-        # 2) Fallback: valore sotto la label (box verticale)
         below_candidates = []
         y_min = label_rect.y2 + 6
-        y_max = min(page_h, label_rect.y2 + page_h * 0.12)  # "poco sotto"
-        # Colonna: dalla x della label verso destra
+        y_max = min(page_h, label_rect.y2 + page_h * 0.12)
         col = Rect(label_rect.x1 - 5, y_min, page_w * 0.98, y_max)
 
         for t in tokens:
@@ -1098,26 +993,20 @@ class USLayoutParser:
         return None
 
     def _join_tokens(self, toks: List[Dict[str, Any]]) -> str:
+        """Unisce token in una stringa."""
         if not toks:
             return ""
         parts = [t["text"] for t in toks]
         s = " ".join(parts)
         s = re.sub(r"\s+", " ", s).strip()
-        # Separa parole maiuscole concatenate
         s = self._split_concatenated_words(s)
         return s
 
     def _split_concatenated_words(self, text: str) -> str:
-        """
-        Separa parole maiuscole concatenate come 'RESPONSABILECOMPILAZIONE'
-        in 'RESPONSABILE COMPILAZIONE'.
-        
-        Usa un dizionario di parole comuni nelle schede US per riconoscere i confini.
-        """
+        """Separa parole maiuscole concatenate."""
         if not text or len(text) < 10:
             return text
-        
-        # Parole comuni nelle schede US da cercare e separare
+
         common_words = [
             "RESPONSABILE", "COMPILAZIONE", "RILEVAMENTO", "RIELABORAZIONE",
             "SCIENTIFICO", "STRATIGRAFICA", "AFFIDABILITA", "AFFIDABILITÀ",
@@ -1134,61 +1023,50 @@ class USLayoutParser:
             "COPRE", "COPERTO", "TAGLIA", "TAGLIATO", "RIEMPIE", "RIEMPITO",
             "UGUALE", "LEGA", "APPOGGIA", "DELLE", "DELLA", "DEL", "SUL"
         ]
-        
+
         result = text
         for word in common_words:
-            # Pattern: parola seguita da lettera maiuscola (senza spazio)
             pattern = f"({word})([A-ZÀÈÉÌÒÙ])"
             result = re.sub(pattern, r"\1 \2", result)
-            # Pattern: lettera minuscola/maiuscola seguita da parola (senza spazio)
             pattern = f"([a-zàèéìòù0-9])({word})"
             result = re.sub(pattern, r"\1 \2", result, flags=re.IGNORECASE)
-        
-        # Pulisci spazi multipli
+
         result = re.sub(r"\s+", " ", result).strip()
         return result
 
     def _parse_date_to_iso(self, date_str: str) -> Optional[str]:
-        """
-        Converte una data in formato italiano (DD/MM/YYYY o DD-MM-YYYY)
-        in formato ISO (YYYY-MM-DD) per compatibilità API.
-        
-        Returns:
-            Stringa ISO o None se parsing fallisce
-        """
+        """Converte data italiana a ISO."""
         if not date_str:
             return None
-        
-        # Formati supportati
-        formats = [
-            '%d/%m/%Y',  # 24/08/2023
-            '%d-%m-%Y',  # 24-08-2023
-            '%d.%m.%Y',  # 24.08.2023
-            '%d/%m/%y',  # 24/08/23
-            '%d-%m-%y',  # 24-08-23
-        ]
-        
+
+        formats = ['%d/%m/%Y', '%d-%m-%Y', '%d.%m.%Y', '%d/%m/%y', '%d-%m-%y']
+
         for fmt in formats:
             try:
                 parsed = datetime.strptime(date_str.strip(), fmt)
-                return parsed.strftime('%Y-%m-%d')  # ISO format
+                return parsed.strftime('%Y-%m-%d')
             except ValueError:
                 continue
-        
+
         return None
 
     def _is_probably_label(self, norm_text: str) -> bool:
-        # se il token coincide con una label nota (o un alias), trattalo come label
+        """Controlla se il token è una label."""
         for aliases in self.LABELS.values():
             for a in aliases:
-                if norm_text == _norm(a) or norm_text.startswith(_norm(a)):
+                norm_alias = _norm(a)
+                # Stricter check: exact match OR starts with alias followed by space
+                # This prevents "USM" from matching "US"
+                if norm_text == norm_alias:
+                    return True
+                if norm_text.startswith(norm_alias + " "):
                     return True
         return False
 
     # ---------- CHECKBOX DETECTION ----------
 
     def _is_checkmark(self, text: str) -> bool:
-        """Verifica se un token è un checkmark (X, x, ✓, ✔)."""
+        """Verifica se il token è un checkmark."""
         s = (text or "").strip()
         return s in {"X", "x", "✓", "✔", "V", "v", "×", "*"}
 
@@ -1200,14 +1078,10 @@ class USLayoutParser:
         page_w: int,
         page_h: int,
     ) -> bool:
-        """
-        Verifica se c'è un checkmark (X, ✓) vicino alla label.
-        Cerca in una finestra stretta a destra della label.
-        """
+        """Verifica se c'è un checkmark vicino alla label."""
         if not label_rect:
             return False
 
-        # Finestra a destra della label, stessa banda verticale
         x1 = label_rect.x2 + 3
         x2 = min(page_w, label_rect.x2 + page_w * 0.15)
         y1 = max(0.0, label_rect.y1 - label_rect.h * 0.50)
@@ -1231,9 +1105,7 @@ class USLayoutParser:
         page_w: int,
         page_h: int,
     ) -> Optional[str]:
-        """
-        Estrae il tipo US (positiva/negativa) cercando checkbox marcati.
-        """
+        """Estrae tipo US da checkbox."""
         pos = self._checkbox_checked_near_label(tokens, label_rects.get("POSITIVA"), page_w=page_w, page_h=page_h)
         neg = self._checkbox_checked_near_label(tokens, label_rects.get("NEGATIVA"), page_w=page_w, page_h=page_h)
 
@@ -1251,9 +1123,7 @@ class USLayoutParser:
         page_w: int,
         page_h: int,
     ) -> Optional[str]:
-        """
-        Estrae naturale/artificiale cercando checkbox marcati.
-        """
+        """Estrae naturale/artificiale da checkbox."""
         nat = self._checkbox_checked_near_label(tokens, label_rects.get("NATURALE"), page_w=page_w, page_h=page_h)
         art = self._checkbox_checked_near_label(tokens, label_rects.get("ARTIFICIALE"), page_w=page_w, page_h=page_h)
 
