@@ -256,6 +256,14 @@
             highlightedField: null,  // Currently focused field name for canvas highlighting
             formFieldsSchema: null,  // JSON schema for dynamic form generation
 
+            // Interactive OCR Selection state (Tesseract.js)
+            ocrSelectionMode: false,     // true when user is selecting area
+            ocrSelectionField: null,     // target field key to fill
+            ocrSelectionRect: null,      // {x1, y1, x2, y2} selection rectangle
+            ocrProcessing: false,        // true during OCR processing
+            ocrSelectionStart: null,     // {x, y} mouse start position
+            tesseractReady: false,       // true when Tesseract worker is loaded
+
             // Field to bounding box label mapping for canvas highlighting
             fieldLabelMap: {
                 'us_code': ['US', 'US CODE', 'UNITA STRATIGRAFICA'],
@@ -681,8 +689,197 @@
                 this.openUSModal();
             },
 
+            // ===== INTERACTIVE OCR SELECTION (Tesseract.js) =====
+
+            // Enable OCR selection mode for a specific field
+            enableOCRSelection(fieldKey) {
+                this.ocrSelectionMode = true;
+                this.ocrSelectionField = fieldKey;
+                this.ocrSelectionRect = null;
+                this.ocrSelectionStart = null;
+
+                // Make canvas interactive
+                const canvas = document.getElementById('revision_ocr_canvas');
+                if (canvas) {
+                    canvas.style.pointerEvents = 'auto';
+                    canvas.style.cursor = 'crosshair';
+                }
+
+                console.log(`🎯 OCR Selection mode enabled for field: ${fieldKey}`);
+            },
+
+            // Cancel OCR selection mode
+            cancelOCRSelection() {
+                this.ocrSelectionMode = false;
+                this.ocrSelectionField = null;
+                this.ocrSelectionRect = null;
+                this.ocrSelectionStart = null;
+
+                const canvas = document.getElementById('revision_ocr_canvas');
+                if (canvas) {
+                    canvas.style.pointerEvents = 'none';
+                    canvas.style.cursor = 'default';
+                }
+
+                // Redraw canvas without selection
+                const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx || 0];
+                if (page) {
+                    this.initRevisionCanvas(document.getElementById('revision_ocr_img'), page);
+                }
+            },
+
+            // Handle mouse down on canvas - start selection
+            handleSelectionMouseDown(e) {
+                if (!this.ocrSelectionMode) return;
+
+                const canvas = e.target;
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+
+                this.ocrSelectionStart = {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY
+                };
+                this.ocrSelectionRect = null;
+            },
+
+            // Handle mouse move on canvas - update selection rectangle
+            handleSelectionMouseMove(e) {
+                if (!this.ocrSelectionMode || !this.ocrSelectionStart) return;
+
+                const canvas = e.target;
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+
+                const currentX = (e.clientX - rect.left) * scaleX;
+                const currentY = (e.clientY - rect.top) * scaleY;
+
+                this.ocrSelectionRect = {
+                    x1: Math.min(this.ocrSelectionStart.x, currentX),
+                    y1: Math.min(this.ocrSelectionStart.y, currentY),
+                    x2: Math.max(this.ocrSelectionStart.x, currentX),
+                    y2: Math.max(this.ocrSelectionStart.y, currentY)
+                };
+
+                // Redraw canvas with selection rectangle
+                this.drawSelectionRect(canvas);
+            },
+
+            // Handle mouse up on canvas - finish selection and OCR
+            async handleSelectionMouseUp(e) {
+                if (!this.ocrSelectionMode || !this.ocrSelectionRect) return;
+
+                const rect = this.ocrSelectionRect;
+                const width = rect.x2 - rect.x1;
+                const height = rect.y2 - rect.y1;
+
+                // Minimum size check
+                if (width < 20 || height < 10) {
+                    console.log('Selection too small, ignoring');
+                    this.cancelOCRSelection();
+                    return;
+                }
+
+                // Perform OCR on selected area
+                await this.performOCROnSelection();
+            },
+
+            // Draw selection rectangle on canvas
+            drawSelectionRect(canvas) {
+                if (!canvas || !this.ocrSelectionRect) return;
+
+                const ctx = canvas.getContext('2d');
+                const page = this.pdfImportResults?.debug_pages?.[this.editPageIdx || 0];
+
+                // Redraw base boxes first
+                this.drawRevisionBoxes(canvas, page);
+
+                // Draw selection rectangle
+                const rect = this.ocrSelectionRect;
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';  // Green semi-transparent
+                ctx.fillRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+
+                ctx.strokeStyle = '#22c55e';  // Green
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+
+                // Draw corner handles
+                const handleSize = 8;
+                ctx.fillStyle = '#22c55e';
+                ctx.fillRect(rect.x1 - handleSize / 2, rect.y1 - handleSize / 2, handleSize, handleSize);
+                ctx.fillRect(rect.x2 - handleSize / 2, rect.y1 - handleSize / 2, handleSize, handleSize);
+                ctx.fillRect(rect.x1 - handleSize / 2, rect.y2 - handleSize / 2, handleSize, handleSize);
+                ctx.fillRect(rect.x2 - handleSize / 2, rect.y2 - handleSize / 2, handleSize, handleSize);
+            },
+
+            // Perform OCR on the selected area using Tesseract.js
+            async performOCROnSelection() {
+                if (!this.ocrSelectionRect || !this.ocrSelectionField) return;
+
+                this.ocrProcessing = true;
+                const fieldKey = this.ocrSelectionField;
+                const rect = this.ocrSelectionRect;
+
+                try {
+                    // Get source image
+                    const img = document.getElementById('revision_ocr_img');
+                    if (!img) throw new Error('Image not found');
+
+                    // Create canvas for cropping
+                    const cropCanvas = document.createElement('canvas');
+                    const cropCtx = cropCanvas.getContext('2d');
+
+                    const cropWidth = rect.x2 - rect.x1;
+                    const cropHeight = rect.y2 - rect.y1;
+                    cropCanvas.width = cropWidth;
+                    cropCanvas.height = cropHeight;
+
+                    // Draw cropped area
+                    cropCtx.drawImage(img, rect.x1, rect.y1, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+                    // Get image data URL
+                    const imageDataUrl = cropCanvas.toDataURL('image/png');
+
+                    console.log(`🔍 Running Tesseract OCR on ${cropWidth}x${cropHeight} area...`);
+
+                    // Check if Tesseract is available
+                    if (typeof Tesseract === 'undefined') {
+                        throw new Error('Tesseract.js not loaded. Add CDN script.');
+                    }
+
+                    // Run Tesseract OCR
+                    const result = await Tesseract.recognize(imageDataUrl, 'ita', {
+                        logger: m => {
+                            if (m.status === 'recognizing text') {
+                                console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+                            }
+                        }
+                    });
+
+                    const extractedText = result.data.text.trim();
+                    console.log(`✅ OCR Result: "${extractedText}"`);
+
+                    // Fill the target field
+                    if (extractedText) {
+                        this.editedOCRData[fieldKey] = extractedText;
+                        console.log(`📝 Field "${fieldKey}" filled with: ${extractedText}`);
+                    }
+
+                } catch (error) {
+                    console.error('OCR Error:', error);
+                    alert(`Errore OCR: ${error.message}`);
+                } finally {
+                    this.ocrProcessing = false;
+                    this.cancelOCRSelection();
+                }
+            },
+
 
             // ===== CANVAS HELPER FUNCTIONS FOR OCR DEBUG VIEWER - REMOVED =====
+
 
 
             // ===== INITIALIZATION =====

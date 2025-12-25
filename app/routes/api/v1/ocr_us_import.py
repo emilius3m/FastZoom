@@ -1,7 +1,7 @@
 # app/routes/api/v1/ocr_us_import.py
 """
 API v1 - OCR Import US Sheets
-Endpoints per importazione schede US da PDF tramite PaddleOCR
+Endpoints per importazione schede US da PDF tramite DeepSeek-OCR (via Ollama)
 """
 
 from typing import List, Dict, Any, Optional
@@ -31,10 +31,10 @@ from app.core.security import (
     get_current_user_sites_with_blacklist,
 )
 from app.models.stratigraphy import UnitaStratigrafica
-from app.services.paddle_ocr_service import (
-    get_paddle_ocr_service, 
-    is_paddle_ocr_available,
-    PaddleOCRService
+from app.services.deepseek_ocr_service import (
+    get_deepseek_ocr_service, 
+    is_deepseek_ocr_available,
+    DeepSeekOCRService
 )
 
 
@@ -46,9 +46,9 @@ router = APIRouter()
 class OCRStatusResponse(BaseModel):
     """Stato del servizio OCR"""
     available: bool
-    paddle_ocr_installed: bool
-    pdf2image_installed: bool
-    gpu_enabled: bool
+    deepseek_ocr_available: bool
+    ollama_available: bool
+    pymupdf_available: bool
     message: str
 
 
@@ -73,8 +73,8 @@ class OCRPageDebug(BaseModel):
     word_count: int = 0
     avg_confidence: float = 0.0
     page_size: Optional[tuple] = None
-    # PPStructureV3 layout analysis output
-    layout_json: Optional[Dict[str, Any]] = None
+    # Markdown raw output from DeepSeek-OCR
+    markdown_raw: Optional[str] = None
 
 
 class OCRBatchResult(BaseModel):
@@ -88,9 +88,8 @@ class OCRBatchResult(BaseModel):
     # Debug data for visualization
     debug_pages: Optional[List[OCRPageDebug]] = None
     combined_text: Optional[str] = None
-    # Additional debug info (pp_structure_cells, table_detection_method, etc.)
+    # Additional debug info
     debug: Optional[Dict[str, Any]] = None
-
 
 
 
@@ -119,38 +118,36 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]):
     "/status",
     response_model=OCRStatusResponse,
     summary="Stato servizio OCR",
-    description="Verifica disponibilità del servizio OCR PaddleOCR"
+    description="Verifica disponibilità del servizio DeepSeek-OCR via Ollama"
 )
 async def get_ocr_status():
     """
     Verifica lo stato del servizio OCR per l'importazione PDF.
     
     Controlla:
-    - Installazione PaddleOCR
-    - Installazione PyMuPDF
-    - Disponibilità GPU
+    - Disponibilità Ollama
+    - Disponibilità PyMuPDF
+    - Modelli DeepSeek-OCR e llama3.2
     """
     try:
-        service = get_paddle_ocr_service(use_gpu=False)
+        from app.services.deepseek_ocr_service import OLLAMA_AVAILABLE, PYMUPDF_AVAILABLE
         
-        from app.services.paddle_ocr_service import PADDLE_OCR_AVAILABLE, PDF2IMAGE_AVAILABLE
-        
-        available = PADDLE_OCR_AVAILABLE and PDF2IMAGE_AVAILABLE
+        available = OLLAMA_AVAILABLE and PYMUPDF_AVAILABLE
         
         if available:
-            message = "Servizio OCR disponibile (PPStructure mode)"
-        elif not PADDLE_OCR_AVAILABLE:
-            message = "PaddleOCR non installato. Installa con: pip install paddleocr"
-        elif not PDF2IMAGE_AVAILABLE:
+            message = "Servizio OCR disponibile (DeepSeek-OCR via Ollama)"
+        elif not OLLAMA_AVAILABLE:
+            message = "Ollama non installato. Installa con: pip install ollama"
+        elif not PYMUPDF_AVAILABLE:
             message = "PyMuPDF non installato. Installa con: pip install pymupdf"
         else:
             message = "Servizio OCR non disponibile"
         
         return OCRStatusResponse(
             available=available,
-            paddle_ocr_installed=PADDLE_OCR_AVAILABLE,
-            pdf2image_installed=PDF2IMAGE_AVAILABLE,
-            gpu_enabled=service.use_gpu,
+            deepseek_ocr_available=available,
+            ollama_available=OLLAMA_AVAILABLE,
+            pymupdf_available=PYMUPDF_AVAILABLE,
             message=message
         )
     
@@ -158,9 +155,9 @@ async def get_ocr_status():
         logger.error(f"Error checking OCR status: {e}")
         return OCRStatusResponse(
             available=False,
-            paddle_ocr_installed=False,
-            pdf2image_installed=False,
-            gpu_enabled=False,
+            deepseek_ocr_available=False,
+            ollama_available=False,
+            pymupdf_available=False,
             message=f"Errore verifica servizio: {str(e)}"
         )
 
@@ -169,21 +166,22 @@ async def get_ocr_status():
     "/sites/{site_id}/ocr/extract",
     response_model=OCRBatchResult,
     summary="Estrai schede US da PDF",
-    description="Estrae schede US da un PDF utilizzando PPStructure per analisi layout"
+    description="Estrae schede US da un PDF utilizzando DeepSeek-OCR via Ollama"
 )
 async def extract_us_from_pdf(
     site_id: UUID,
     file: UploadFile = File(..., description="File PDF da processare"),
-    use_gpu: bool = Query(True, description="Utilizza GPU se disponibile"),
     db: AsyncSession = Depends(get_async_session),
     user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
-    Estrae schede US da un file PDF utilizzando PPStructure.
+    Estrae schede US da un file PDF utilizzando DeepSeek-OCR.
     
-    Il PDF viene analizzato pagina per pagina e i dati vengono estratti
-    secondo lo standard MiC 2021 usando PPStructure per l'analisi del layout.
+    Pipeline:
+    1. PDF → Immagini (PyMuPDF)
+    2. Immagini → Markdown (DeepSeek-OCR via Ollama)
+    3. Markdown → JSON strutturato (llama3.2:3b)
     
     Returns:
         OCRBatchResult con i risultati dell'estrazione
@@ -195,10 +193,10 @@ async def extract_us_from_pdf(
     verify_site_access(site_id, user_sites)
     
     # Verifica disponibilità OCR
-    if not is_paddle_ocr_available():
+    if not is_deepseek_ocr_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Servizio OCR non disponibile. Assicurati che PaddleOCR e PyMuPDF siano installati."
+            detail="Servizio OCR non disponibile. Assicurati che Ollama e PyMuPDF siano installati."
         )
     
     # Verifica tipo file
@@ -224,184 +222,70 @@ async def extract_us_from_pdf(
                 detail="Il file PDF è troppo grande (max 50MB)"
             )
         
-        logger.info(f"Processing PDF {file.filename} ({len(pdf_bytes)} bytes) for site {site_id}")
+        logger.info(f"Processing PDF {file.filename} ({len(pdf_bytes)} bytes) with DeepSeek-OCR for site {site_id}")
         
-        # Inizializza servizio OCR
-        service = get_paddle_ocr_service(use_gpu=use_gpu)
+        # Inizializza servizio DeepSeek-OCR
+        service = get_deepseek_ocr_service()
         
-        # Usa PPStructure layout parser
-        extraction_result = await service.extract_from_pdf_combined(
+        # Estrai con DeepSeek-OCR
+        extraction_result = service.extract_from_pdf(
             pdf_bytes=pdf_bytes,
             filename=file.filename,
             site_id=str(site_id),
             include_debug=True
         )
-        us_data = extraction_result.get('us_data')
-        debug_info = extraction_result.get('debug', {})
         
-        # Build result
+        # Check for errors
+        if extraction_result.get('error'):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=extraction_result.get('error')
+            )
+        
+        # Build results from extraction
         results = []
-        debug_pages = []
-        
-        if us_data:
-            validation = service.validate_extraction_result(us_data)
+        for result_data in extraction_result.get('results', []):
             results.append(OCRExtractionResult(
-                us_code=validation['us_code'] or 'UNKNOWN',
-                page_number=1,  # Single combined result
-                confidence=validation['confidence'],
-                is_valid=validation['is_valid'],
-                issues=validation['issues'],
-                warnings=validation['warnings'],
-                extracted_fields_count=validation['extracted_fields_count'],
-                data=us_data
+                us_code=result_data.get('us_code', 'UNKNOWN'),
+                page_number=result_data.get('page_number', 1),
+                confidence=result_data.get('confidence', 0.0),
+                is_valid=result_data.get('is_valid', False),
+                issues=result_data.get('issues', []),
+                warnings=result_data.get('warnings', []),
+                extracted_fields_count=result_data.get('extracted_fields_count', 0),
+                data=result_data.get('data', {})
             ))
         
         # Build debug pages
-        for page_data in debug_info.get('pages', []):
+        debug_pages = []
+        for page_data in extraction_result.get('debug_pages', []):
             debug_pages.append(OCRPageDebug(
                 page_number=page_data.get('page_number', 0),
                 image_base64=page_data.get('image_base64'),
                 text_lines=page_data.get('text_lines', []),
-                bounding_boxes=page_data.get('bounding_boxes', []),
                 word_count=page_data.get('word_count', 0),
-                avg_confidence=page_data.get('avg_confidence', 0.0),
                 page_size=page_data.get('page_size'),
-                layout_json=page_data.get('layout_json')
+                markdown_raw=page_data.get('markdown_raw')
             ))
-
         
         processing_time = time.time() - start_time
-        total_pages = len(debug_pages) if debug_pages else 1
         
         return OCRBatchResult(
             filename=file.filename,
-            total_pages=total_pages,
-            successful_extractions=1 if us_data else 0,
-            failed_extractions=0 if us_data else 1,
+            total_pages=extraction_result.get('total_pages', 1),
+            successful_extractions=extraction_result.get('successful_extractions', 0),
+            failed_extractions=extraction_result.get('failed_extractions', 0),
             results=results,
             processing_time_seconds=round(processing_time, 2),
             debug_pages=debug_pages,
-            combined_text=debug_info.get('combined_text', ''),
-            debug={
-                'pp_structure_cells': debug_info.get('pp_structure_cells', []),
-                'cell_mapping': debug_info.get('cell_mapping', {}),
-                'table_detection_method': debug_info.get('table_detection_method', 'none'),
-                'tables_html': debug_info.get('tables_html', []),
-                'total_words': debug_info.get('total_words', 0),
-            }
+            combined_text=extraction_result.get('combined_text', ''),
+            debug=extraction_result.get('debug', {})
         )
     
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error extracting US from PDF: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Errore durante l'estrazione: {str(e)}"
-        )
-
-
-
-
-
-
-
-
-@router.post(
-    "/sites/{site_id}/ocr/extract-v3",
-    summary="Estrai schede US con PP-StructureV3",
-    description="Estrae usando il nuovo metodo PP-StructureV3 con celle precise"
-)
-async def extract_us_from_pdf_v3(
-    site_id: UUID,
-    file: UploadFile = File(..., description="File PDF da processare"),
-    use_gpu: bool = Query(False, description="Utilizza GPU se disponibile"),
-    db: AsyncSession = Depends(get_async_session),
-    user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
-):
-    """
-    Estrae schede US da PDF utilizzando PP-StructureV3 per estrazione celle.
-    
-    Metodo alternativo che usa:
-    - Coordinate celle precise
-    - Supporto merged cells
-    - Mapping label -> campo automatico
-    """
-    import time
-    start_time = time.time()
-    
-    # Verifica accesso
-    verify_site_access(site_id, user_sites)
-    
-    if not is_paddle_ocr_available():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Servizio OCR non disponibile"
-        )
-    
-    if not file.filename or not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Il file deve essere in formato PDF"
-        )
-    
-    try:
-        pdf_bytes = await file.read()
-        
-        if len(pdf_bytes) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Il file PDF è vuoto"
-            )
-        
-        logger.info(f"Processing PDF {file.filename} via PP-StructureV3 for site {site_id}")
-        
-        # Use new PP-StructureV3 method
-        service = get_paddle_ocr_service(use_gpu=use_gpu)
-        result = await service.extract_from_pdf_pp_structure_v3(
-            pdf_bytes=pdf_bytes,
-            filename=file.filename,
-            site_id=str(site_id),
-            use_gpu=use_gpu,
-            include_debug=True
-        )
-        
-        processing_time = time.time() - start_time
-        
-        # Build response
-        us_data = result.get('us_data')
-        debug = result.get('debug', {})
-        
-        return {
-            "success": bool(us_data),
-            "method": "pp_structure_v3",
-            "processing_time_seconds": round(processing_time, 2),
-            "us_data": us_data,
-            "tables_detected": len(debug.get('tables', [])),
-            "cells_extracted": len(debug.get('cells', [])),
-            "debug": {
-                "tables": debug.get('tables', []),
-                "cells": debug.get('cells', [])[:50],  # Limit for response size
-                "pages": [
-                    {
-                        "page_number": p.get('page_number'),
-                        "tables_count": p.get('tables_count'),
-                        "cells_count": p.get('cells_count'),
-                        "page_size": p.get('page_size'),
-                        "image_base64": p.get('image_base64'),
-                        "visualization": p.get('visualization'),
-                    }
-                    for p in debug.get('pages', [])
-                ]
-            },
-            "error": result.get('error')
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in PP-StructureV3 extraction: {e}")
         import traceback
         logger.error(traceback.format_exc())
         raise HTTPException(
@@ -409,3 +293,169 @@ async def extract_us_from_pdf_v3(
             detail=f"Errore durante l'estrazione: {str(e)}"
         )
 
+
+
+
+
+
+
+# ===== LLM OCR IMPORT ENDPOINT =====
+
+@router.post(
+    "/sites/{site_id}/ocr/import-llm-json",
+    status_code=status.HTTP_201_CREATED,
+    summary="Importa US da JSON generato da LLM",
+    description="Importa una scheda US dal JSON strutturato prodotto da un modello VLM (Qwen3-VL, etc.)"
+)
+async def import_us_from_llm_json(
+    site_id: UUID,
+    payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_async_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """
+    Importa una scheda US dal JSON prodotto da un modello VLM.
+    
+    Il JSON deve seguire lo schema LLMUSDocument con:
+    - schema_version: "fz.us.llm.v1"
+    - document_type: "US"
+    - pages: array con dati estratti per pagina
+    - mapped: oggetto con campi normalizzati pronti per il DB
+    
+    Returns:
+        Dict con success, us_code e id del record creato
+    """
+    from app.schemas.llm_ocr import LLMUSDocument
+    from pydantic import ValidationError
+    
+    # Verifica accesso al sito
+    verify_site_access(site_id, user_sites)
+    
+    try:
+        # Valida payload con Pydantic
+        doc = LLMUSDocument(**payload)
+        
+        # Converti in dict pronto per DB
+        us_data = doc.to_db_dict(str(site_id))
+        
+        # Rimuovi campi metadata che non appartengono al modello DB
+        llm_metadata = {
+            '_llm_source': us_data.pop('_llm_source', None),
+            '_llm_confidence': us_data.pop('_llm_confidence', None),
+            '_llm_issues': us_data.pop('_llm_issues', None),
+        }
+        
+        # Verifica che us_code non esista già per questo sito
+        existing = await db.execute(
+            select(UnitaStratigrafica).where(
+                UnitaStratigrafica.site_id == str(site_id),
+                UnitaStratigrafica.us_code == us_data.get('us_code')
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"US {us_data.get('us_code')} esiste già per questo sito"
+            )
+        
+        # Crea record US
+        new_us = UnitaStratigrafica(**us_data)
+        db.add(new_us)
+        await db.commit()
+        await db.refresh(new_us)
+        
+        logger.info(f"LLM Import: Created US {new_us.us_code} (id={new_us.id}) for site {site_id}")
+        
+        return {
+            "success": True,
+            "us_code": new_us.us_code,
+            "id": str(new_us.id),
+            "llm_metadata": llm_metadata,
+            "fields_imported": len([k for k, v in us_data.items() if v is not None and not k.startswith('_')])
+        }
+    
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Validazione JSON fallita: {e.errors()}"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error importing LLM JSON: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Errore durante l'import: {str(e)}"
+        )
+
+
+@router.post(
+    "/sites/{site_id}/ocr/validate-llm-json",
+    summary="Valida JSON LLM senza importare",
+    description="Valida il JSON prodotto da un modello VLM senza salvarlo nel DB"
+)
+async def validate_llm_json(
+    site_id: UUID,
+    payload: Dict[str, Any],
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
+):
+    """
+    Valida un JSON LLM OCR senza importarlo.
+    
+    Utile per verificare che l'output del modello sia corretto
+    prima di procedere con l'import.
+    """
+    from app.schemas.llm_ocr import LLMUSDocument
+    from pydantic import ValidationError
+    
+    verify_site_access(site_id, user_sites)
+    
+    try:
+        doc = LLMUSDocument(**payload)
+        
+        # Verifica campi mappati
+        mapped = doc.mapped
+        issues = []
+        warnings = []
+        
+        if not mapped.us_code:
+            issues.append("us_code mancante")
+        
+        if not mapped.definizione:
+            warnings.append("definizione mancante")
+        
+        if not mapped.descrizione:
+            warnings.append("descrizione mancante")
+        
+        # Verifica date
+        if mapped.data_rilevamento and mapped.data_rilevamento.count('-') != 2:
+            warnings.append("data_rilevamento non in formato YYYY-MM-DD")
+        
+        return {
+            "valid": len(issues) == 0,
+            "schema_version": doc.schema_version,
+            "us_code": mapped.us_code,
+            "confidence": doc.confidence,
+            "pages_count": len(doc.pages),
+            "fields_count": len([k for k, v in mapped.model_dump().items() if v is not None]),
+            "issues": issues,
+            "warnings": warnings,
+            "global_issues": doc.global_issues
+        }
+    
+    except ValidationError as e:
+        return {
+            "valid": False,
+            "issues": [err['msg'] for err in e.errors()],
+            "validation_errors": e.errors()
+        }
+    except Exception as e:
+        return {
+            "valid": False,
+            "issues": [str(e)]
+        }

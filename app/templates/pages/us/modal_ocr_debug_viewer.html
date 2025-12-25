@@ -1,3 +1,6 @@
+<!-- Tesseract.js for client-side OCR (local copy to avoid CSP issues) -->
+<script src="/static/js/tesseract/tesseract.min.js"></script>
+
 <!-- PDF Import Results Modal with Debug View -->
 <div x-show="showPdfImportModal" x-cloak
     x-init="$watch('showPdfImportModal', value => document.body.classList.toggle('overflow-hidden', value))"
@@ -41,18 +44,17 @@
                         class="ml-1 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full"
                         x-text="pdfImportResults?.results?.length || 0"></span>
                 </button>
-                <button @click="ocrDebugTab = 'pp_cells'"
-                    :class="ocrDebugTab === 'pp_cells' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                <button @click="ocrDebugTab = 'deepseek_raw'"
+                    :class="ocrDebugTab === 'deepseek_raw' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
                     class="pb-3 px-1 border-b-2 font-medium text-sm flex items-center">
                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z">
                         </path>
                     </svg>
-                    🔲 PP-Structure Celle
-                    <span x-show="pdfImportResults?.debug?.pp_structure_cells"
-                        class="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full"
-                        x-text="pdfImportResults?.debug?.pp_structure_cells?.length || 0"></span>
+                    🤖 DeepSeek-OCR Raw
+                    <span x-show="pdfImportResults?.combined_text"
+                        class="ml-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">MD</span>
                 </button>
             </div>
         </div>
@@ -135,6 +137,20 @@
                                     </div>
                                 </div>
 
+                                <!-- OCR Selection Mode Status Bar -->
+                                <div x-show="ocrSelectionMode"
+                                    class="bg-green-100 dark:bg-green-900 border border-green-300 dark:border-green-700 rounded-lg p-2 mb-2 flex items-center justify-between">
+                                    <div class="flex items-center text-green-800 dark:text-green-200 text-sm">
+                                        <span class="mr-2">🎯</span>
+                                        <span>Seleziona area per: <strong x-text="ocrSelectionField"></strong></span>
+                                        <span x-show="ocrProcessing" class="ml-2 animate-pulse">⏳ OCR in corso...</span>
+                                    </div>
+                                    <button @click="cancelOCRSelection()"
+                                        class="text-xs px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600">
+                                        ✕ Annulla
+                                    </button>
+                                </div>
+
                                 <!-- Scrollable Image Container -->
                                 <div
                                     class="relative bg-white dark:bg-gray-800 rounded p-2 overflow-y-auto flex-1 border border-gray-200 dark:border-gray-700">
@@ -147,9 +163,12 @@
                                                 id="revision_ocr_img"
                                                 @load="initRevisionCanvas($el, pdfImportResults.debug_pages[editPageIdx || 0])">
 
-                                            <!-- Canvas Overlay for Field Highlighting -->
-                                            <canvas id="revision_ocr_canvas"
-                                                class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+                                            <!-- Canvas Overlay for Field Highlighting and OCR Selection -->
+                                            <canvas id="revision_ocr_canvas" class="absolute inset-0 w-full h-full"
+                                                :class="ocrSelectionMode ? 'cursor-crosshair' : 'pointer-events-none'"
+                                                @mousedown="handleSelectionMouseDown($event)"
+                                                @mousemove="handleSelectionMouseMove($event)"
+                                                @mouseup="handleSelectionMouseUp($event)"></canvas>
                                         </div>
                                     </template>
                                     <div x-show="!pdfImportResults?.debug_pages || pdfImportResults.debug_pages.length === 0"
@@ -233,12 +252,22 @@
                                                                         <span x-show="field.required"
                                                                             class="text-red-500 ml-1">*</span>
                                                                     </label>
-                                                                    <input type="text"
-                                                                        x-model="editedOCRData[field.model_key]"
-                                                                        :placeholder="field.placeholder || ''"
-                                                                        @focus="onFieldFocus(field.model_key)"
-                                                                        @blur="onFieldBlur()"
-                                                                        class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                                                                    <div class="flex items-center gap-1">
+                                                                        <input type="text"
+                                                                            x-model="editedOCRData[field.model_key]"
+                                                                            :placeholder="field.placeholder || ''"
+                                                                            @focus="onFieldFocus(field.model_key)"
+                                                                            @blur="onFieldBlur()"
+                                                                            class="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                                                                        <button type="button"
+                                                                            @click="enableOCRSelection(field.model_key)"
+                                                                            :disabled="ocrSelectionMode || ocrProcessing"
+                                                                            :class="ocrSelectionField === field.model_key ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900'"
+                                                                            class="p-2 rounded-md text-xs transition-colors disabled:opacity-50"
+                                                                            title="Seleziona area per OCR">
+                                                                            🎯
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </template>
 
@@ -269,11 +298,22 @@
                                                                         <span x-show="field.required"
                                                                             class="text-red-500 ml-1">*</span>
                                                                     </label>
-                                                                    <input type="date"
-                                                                        x-model="editedOCRData[field.model_key]"
-                                                                        @focus="onFieldFocus(field.model_key)"
-                                                                        @blur="onFieldBlur()"
-                                                                        class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                                                                    <div class="flex items-center gap-1">
+                                                                        <input type="text"
+                                                                            x-model="editedOCRData[field.model_key]"
+                                                                            placeholder="DD/MM/YYYY"
+                                                                            @focus="onFieldFocus(field.model_key)"
+                                                                            @blur="onFieldBlur()"
+                                                                            class="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white" />
+                                                                        <button type="button"
+                                                                            @click="enableOCRSelection(field.model_key)"
+                                                                            :disabled="ocrSelectionMode || ocrProcessing"
+                                                                            :class="ocrSelectionField === field.model_key ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900'"
+                                                                            class="p-2 rounded-md text-xs transition-colors disabled:opacity-50"
+                                                                            title="Seleziona area per OCR">
+                                                                            🎯
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </template>
 
@@ -281,10 +321,20 @@
                                                             <template x-if="field.type === 'textarea'">
                                                                 <div :class="field.width || 'col-span-1'">
                                                                     <label
-                                                                        class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                                                        <span x-text="field.pdf_label"></span>
-                                                                        <span x-show="field.required"
-                                                                            class="text-red-500 ml-1">*</span>
+                                                                        class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center justify-between">
+                                                                        <span>
+                                                                            <span x-text="field.pdf_label"></span>
+                                                                            <span x-show="field.required"
+                                                                                class="text-red-500 ml-1">*</span>
+                                                                        </span>
+                                                                        <button type="button"
+                                                                            @click="enableOCRSelection(field.model_key)"
+                                                                            :disabled="ocrSelectionMode || ocrProcessing"
+                                                                            :class="ocrSelectionField === field.model_key ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900'"
+                                                                            class="p-1 rounded text-xs transition-colors disabled:opacity-50"
+                                                                            title="Seleziona area per OCR">
+                                                                            🎯
+                                                                        </button>
                                                                     </label>
                                                                     <textarea x-model="editedOCRData[field.model_key]"
                                                                         :rows="field.rows || 2"
@@ -418,32 +468,31 @@
 
 
 
-            <!-- TAB: PP-Structure Celle -->
-            <div x-show="ocrDebugTab === 'pp_cells'" x-transition>
-                <template
-                    x-if="pdfImportResults?.debug?.pp_structure_cells && pdfImportResults.debug.pp_structure_cells.length > 0">
+            <!-- TAB: DeepSeek-OCR Raw Output -->
+            <div x-show="ocrDebugTab === 'deepseek_raw'" x-transition>
+                <template x-if="pdfImportResults?.combined_text">
                     <div class="space-y-6">
                         <!-- Stats -->
                         <div class="grid grid-cols-3 gap-4">
                             <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4 text-center">
                                 <div class="text-2xl font-bold text-blue-600 dark:text-blue-400"
-                                    x-text="pdfImportResults.debug.pp_structure_cells?.length || 0"></div>
-                                <div class="text-sm text-blue-700 dark:text-blue-300">Celle Rilevate</div>
+                                    x-text="pdfImportResults.combined_text?.length || 0"></div>
+                                <div class="text-sm text-blue-700 dark:text-blue-300">Caratteri Estratti</div>
                             </div>
                             <div class="bg-green-50 dark:bg-green-900/30 rounded-lg p-4 text-center">
                                 <div class="text-2xl font-bold text-green-600 dark:text-green-400"
-                                    x-text="pdfImportResults.debug.table_detection_method || 'ppstructure'">
+                                    x-text="pdfImportResults.debug?.ocr_model || 'deepseek-ocr'">
                                 </div>
-                                <div class="text-sm text-green-700 dark:text-green-300">Metodo</div>
+                                <div class="text-sm text-green-700 dark:text-green-300">Modello OCR</div>
                             </div>
                             <div class="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4 text-center">
                                 <div class="text-2xl font-bold text-purple-600 dark:text-purple-400"
-                                    x-text="pdfImportResults.debug_pages?.length || 0"></div>
-                                <div class="text-sm text-purple-700 dark:text-purple-300">Pagine</div>
+                                    x-text="pdfImportResults.debug?.llm_model || 'llama3.2'"></div>
+                                <div class="text-sm text-purple-700 dark:text-purple-300">Modello JSON</div>
                             </div>
                         </div>
 
-                        <!-- Cells Table -->
+                        <!-- Markdown Output -->
                         <div
                             class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div
@@ -452,65 +501,42 @@
                                     <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z">
+                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
                                         </path>
                                     </svg>
-                                    Celle PP-Structure (Coordinate Locali per Pagina)
+                                    Output Markdown DeepSeek-OCR
                                 </h3>
                             </div>
                             <div class="max-h-96 overflow-y-auto">
-                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                    <thead class="bg-gray-100 dark:bg-gray-700 sticky top-0">
-                                        <tr>
-                                            <th
-                                                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                                                #</th>
-                                            <th
-                                                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                                                X1</th>
-                                            <th
-                                                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                                                Y1</th>
-                                            <th
-                                                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                                                X2</th>
-                                            <th
-                                                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                                                Y2</th>
-                                            <th
-                                                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                                                Larghezza</th>
-                                            <th
-                                                class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                                                Altezza</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                                        <template x-for="(cell, idx) in pdfImportResults.debug.pp_structure_cells"
-                                            :key="idx">
-                                            <tr class="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                                                <td class="px-3 py-2 text-sm font-mono text-gray-600 dark:text-gray-400"
-                                                    x-text="'C' + idx"></td>
-                                                <td class="px-3 py-2 text-sm font-mono text-gray-800 dark:text-gray-200"
-                                                    x-text="Math.round(cell.x1)"></td>
-                                                <td class="px-3 py-2 text-sm font-mono text-gray-800 dark:text-gray-200"
-                                                    x-text="Math.round(cell.y1)"></td>
-                                                <td class="px-3 py-2 text-sm font-mono text-gray-800 dark:text-gray-200"
-                                                    x-text="Math.round(cell.x2)"></td>
-                                                <td class="px-3 py-2 text-sm font-mono text-gray-800 dark:text-gray-200"
-                                                    x-text="Math.round(cell.y2)"></td>
-                                                <td class="px-3 py-2 text-sm font-mono text-blue-600 dark:text-blue-400"
-                                                    x-text="Math.round(cell.x2 - cell.x1) + 'px'"></td>
-                                                <td class="px-3 py-2 text-sm font-mono text-blue-600 dark:text-blue-400"
-                                                    x-text="Math.round(cell.y2 - cell.y1) + 'px'"></td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
+                                <pre class="p-4 text-sm font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words"
+                                    x-text="pdfImportResults.combined_text"></pre>
                             </div>
                         </div>
 
-                        <!-- Legend -->
+                        <!-- JSON Debug -->
+                        <template x-if="pdfImportResults.debug?.raw_json">
+                            <div
+                                class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div
+                                    class="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                                    <h3 class="font-semibold text-gray-800 dark:text-gray-200 flex items-center">
+                                        <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4">
+                                            </path>
+                                        </svg>
+                                        JSON Estratto (LLM)
+                                    </h3>
+                                </div>
+                                <div class="max-h-96 overflow-y-auto">
+                                    <pre class="p-4 text-sm font-mono text-green-800 dark:text-green-200 whitespace-pre-wrap"
+                                        x-text="JSON.stringify(pdfImportResults.debug.raw_json, null, 2)"></pre>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Info -->
                         <div
                             class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 text-sm text-blue-800 dark:text-blue-200">
                             <div class="flex items-start">
@@ -520,15 +546,11 @@
                                         d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                                 <div>
-                                    <p class="font-medium">Come interpretare le celle:</p>
+                                    <p class="font-medium">Pipeline DeepSeek-OCR:</p>
                                     <ul class="mt-1 text-xs space-y-1 text-blue-700 dark:text-blue-300">
-                                        <li>• Le coordinate sono in pixel relativi all'immagine della pagina
-                                        </li>
-                                        <li>• Ogni cella rappresenta un'area della tabella rilevata da
-                                            PPStructure</li>
-                                        <li>• Vai alla tab "Revisione OCR" per vedere le celle disegnate
-                                            sull'anteprima
-                                        </li>
+                                        <li>1. PDF → Immagini (PyMuPDF zoom 2x)</li>
+                                        <li>2. Immagini → Markdown (DeepSeek-OCR:3b via Ollama)</li>
+                                        <li>3. Markdown → JSON strutturato (llama3.2:3b)</li>
                                     </ul>
                                 </div>
                             </div>
@@ -536,24 +558,18 @@
                     </div>
                 </template>
 
-                <!-- No cells state -->
-                <template
-                    x-if="!pdfImportResults?.debug?.pp_structure_cells || pdfImportResults.debug.pp_structure_cells.length === 0">
+                <!-- No data state -->
+                <template x-if="!pdfImportResults?.combined_text">
                     <div class="text-center py-12">
                         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z">
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
                             </path>
                         </svg>
-                        <p class="text-lg font-medium text-gray-500 dark:text-gray-400">Nessuna cella
-                            PP-Structure
-                            rilevata</p>
+                        <p class="text-lg font-medium text-gray-500 dark:text-gray-400">Nessun output OCR</p>
                         <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">
-                            PPStructure non ha rilevato tabelle strutturate nel PDF.<br>
-                            Questo può accadere se il documento non contiene tabelle o se le tabelle sono in
-                            formato non
-                            standard.
+                            Importa un PDF per vedere il Markdown estratto da DeepSeek-OCR.
                         </p>
                     </div>
                 </template>

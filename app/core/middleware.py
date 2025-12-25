@@ -44,13 +44,14 @@ class MiddlewareConfig:
     # Security Headers
     CSP_POLICY = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net blob:; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "img-src 'self' data: https:; "
+        "img-src 'self' data: https: blob:; "
         "font-src 'self' data: https://cdn.jsdelivr.net; "
-        "connect-src 'self'; "
+        "connect-src 'self' data: https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; "
         "media-src 'self'; "
         "object-src 'none'; "
+        "worker-src 'self' blob:; "
         "frame-ancestors 'none';"
     )
     
