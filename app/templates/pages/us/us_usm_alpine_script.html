@@ -394,19 +394,28 @@
                 // Initialize editedOCRData with empty structure
                 this.editedOCRData = {};
 
+                // Check for saved corrections in localStorage FIRST
+                const savedCorrections = this.loadSavedOCRCorrections(result.us_code);
+
                 // Dynamically populate all fields from schema
                 if (this.formFieldsSchema?.form_sections) {
                     this.formFieldsSchema.form_sections.forEach(section => {
                         section.fields.forEach(field => {
                             const key = field.model_key;
-                            // Get value from result.data or use empty default
-                            if (key === 'us_code') {
+                            // Priority: 1) savedCorrections, 2) result.data, 3) empty
+                            if (savedCorrections && savedCorrections[key] !== undefined) {
+                                this.editedOCRData[key] = savedCorrections[key];
+                            } else if (key === 'us_code') {
                                 this.editedOCRData[key] = result.us_code || '';
                             } else {
                                 this.editedOCRData[key] = result.data?.[key] || '';
                             }
                         });
                     });
+
+                    if (savedCorrections) {
+                        console.log(`📂 Loaded saved corrections for ${result.us_code}`);
+                    }
                 } else {
                     // Fallback: Load hardcoded subset if schema failed
                     this.editedOCRData = {
@@ -425,7 +434,7 @@
                 this.initRevisionCanvas(document.getElementById('revision_ocr_img'), page);
             },
 
-            // Save corrected OCR values back to the result
+            // Save corrected OCR values back to the result and localStorage
             saveOCRCorrections() {
                 const result = this.pdfImportResults?.results?.[this.selectedResultIndex];
                 if (!result) return;
@@ -442,9 +451,45 @@
                 // Remove us_code from data object (it's stored separately)
                 delete result.data.us_code;
 
+                // Save to localStorage for persistence across page reloads
+                const storageKey = `ocr_corrections_${this.currentSiteId}_${result.us_code || 'draft'}`;
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify({
+                        us_code: result.us_code,
+                        data: this.editedOCRData,
+                        timestamp: new Date().toISOString()
+                    }));
+                    console.log(`💾 Corrections saved to localStorage: ${storageKey}`);
+                } catch (e) {
+                    console.warn('localStorage save failed:', e);
+                }
+
                 // Show success notification
                 console.log('✓ OCR corrections saved:', result);
-                alert('✓ Correzioni salvate!');
+                alert('✓ Correzioni salvate! (persistite in localStorage)');
+            },
+
+            // Load saved corrections from localStorage
+            loadSavedOCRCorrections(usCode) {
+                const storageKey = `ocr_corrections_${this.currentSiteId}_${usCode || 'draft'}`;
+                try {
+                    const saved = localStorage.getItem(storageKey);
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        console.log(`📂 Loaded corrections from localStorage: ${storageKey}`, parsed);
+                        return parsed.data || {};
+                    }
+                } catch (e) {
+                    console.warn('localStorage load failed:', e);
+                }
+                return null;
+            },
+
+            // Clear saved corrections from localStorage
+            clearSavedOCRCorrections(usCode) {
+                const storageKey = `ocr_corrections_${this.currentSiteId}_${usCode || 'draft'}`;
+                localStorage.removeItem(storageKey);
+                console.log(`🗑️ Cleared corrections from localStorage: ${storageKey}`);
             },
 
             // Create US from edited OCR data

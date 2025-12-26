@@ -349,7 +349,7 @@
           "pdf_label": "DESCRIZIONE",
           "model_key": "descrizione",
           "type": "textarea",
-          "rows": 3,
+          "rows": 6,
           "placeholder": "Descrizione completa dell'unità stratigrafica...",
           "width": "col-span-3"
         },
@@ -357,7 +357,7 @@
           "pdf_label": "OSSERVAZIONI",
           "model_key": "osservazioni",
           "type": "textarea",
-          "rows": 3,
+          "rows": 4,
           "placeholder": "Note aggiuntive...",
           "width": "col-span-3"
         },
@@ -365,7 +365,7 @@
           "pdf_label": "INTERPRETAZIONE",
           "model_key": "interpretazione",
           "type": "textarea",
-          "rows": 3,
+          "rows": 5,
           "placeholder": "Interpretazione archeologica...",
           "width": "col-span-3"
         }
