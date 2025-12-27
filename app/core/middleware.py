@@ -663,7 +663,7 @@ def setup_middleware(app, config: dict = None):
     if config.get('enable_rate_limit', True):
         app.add_middleware(
             RateLimitMiddleware,
-            requests_per_minute=config.get('requests_per_minute', 60)
+            requests_per_minute=config.get('requests_per_minute', 2000)  # Increased for development
         )
     
     # 2. CORS

@@ -17,9 +17,10 @@
             <li>
                 <div class="flex items-center">
                     <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                    <a href="/sites/{{ site_id }}/dashboard"
-                        class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">{{
-                        site.site_name if site else "Sito" }}</a>
+                    <a href="/view/{{ site_id }}/dashboard"
+                        class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                        {{ site_info.site_name if site_info else "Sito" }}
+                    </a>
                 </div>
             </li>
             <li aria-current="page">
@@ -591,10 +592,10 @@
             loading: false,
 
             // Data
-            cantieri: {{ cantieri | tojson }},
+            cantieri: {{ cantieri | tojson | safe }},
 
     // Statistics
-    stats: {{ stats | tojson }},
+    stats: {{ stats | tojson | safe }},
 
     // Filters
     filters: {
@@ -626,8 +627,8 @@
         this.watchFilters();
     },
 
-                // Computed: Filtered Cantieri
-                get filteredCantieri() {
+            // Computed: Filtered Cantieri
+            get filteredCantieri() {
         let result = [...this.cantieri];
 
         // Search filter
@@ -710,8 +711,8 @@
         this.modal.isOpen = false;
     },
 
-                // Form Submit
-                async submitForm() {
+            // Form Submit
+            async submitForm() {
         // Validazione
         if (!this.modal.formData.nome?.trim()) {
             this.showAlert('error', 'Il nome del cantiere è obbligatorio');

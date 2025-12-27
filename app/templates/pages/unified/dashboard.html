@@ -128,27 +128,6 @@
                     </div>
                 </template>
 
-                <template x-if="activeTab === 'giornale'">
-                    <div class="flex gap-2">
-                        <a href="/giornale-cantiere/operatori"
-                            class=" bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
-                            <i class="fas fa-users mr-2"></i>Operatori
-                        </a>
-                        <a href="/giornale-cantiere/reports"
-                            class=" bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
-                            <i class="fas fa-chart-bar mr-2"></i>Report
-                        </a>
-                    </div>
-                </template>
-
-                <template x-if="activeTab === 'analytics'">
-                    <div class="flex gap-2">
-                        <button @click="exportAnalytics()"
-                            class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition flex items-center">
-                            <i class="fas fa-download mr-2"></i>Esporta
-                        </button>
-                    </div>
-                </template>
             </div>
         </div>
     </div>
