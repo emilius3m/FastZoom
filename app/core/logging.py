@@ -176,7 +176,11 @@ def setup_logging_interception() -> None:
     for logger_name in loggers_to_configure:
         logging_logger = logging.getLogger(logger_name)
         logging_logger.handlers = []
-        logging_logger.setLevel(logging.DEBUG)
+        # Set SQLAlchemy loggers to WARNING to reduce verbose query logging
+        if logger_name.startswith("sqlalchemy"):
+            logging_logger.setLevel(logging.WARNING)
+        else:
+            logging_logger.setLevel(logging.DEBUG)
         logging_logger.propagate = True
 
 

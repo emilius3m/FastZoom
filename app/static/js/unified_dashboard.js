@@ -72,7 +72,8 @@ document.addEventListener("alpine:init", () => {
             sites: false,
             giornaleSites: false,
             activities: false,
-            moreActivities: false
+            moreActivities: false,
+            analytics: false
         },
         
         // Data storage
@@ -91,6 +92,16 @@ document.addEventListener("alpine:init", () => {
             giornali_pendenti: 0
         },
         giornaleSiteStats: {},
+        analyticsStats: {
+            total_documents: 0,
+            total_photos: 0,
+            total_us: 0,
+            total_giornali: 0,
+            total_activities_week: 0,
+            productivity_change: 0,
+            documents_by_site: [],
+            activities_by_day: []
+        },
         activities: [],
         recentActivities: [],
         activityFilter: 'all',
@@ -357,8 +368,41 @@ document.addEventListener("alpine:init", () => {
         
         // Analytics data loading
         async loadAnalyticsData() {
-            // Analytics data loading will be implemented as needed
-            console.log('Loading analytics data...');
+            this.loading.analytics = true;
+            
+            try {
+                const response = await this.apiCallWithRetry(
+                    '/api/v1/analytics/overview',
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
+                    },
+                    'analytics'
+                );
+                
+                if (response && response.ok) {
+                    const data = await response.json();
+                    this.analyticsStats = {
+                        total_documents: data.total_documents || 0,
+                        total_photos: data.total_photos || 0,
+                        total_us: data.total_us || 0,
+                        total_giornali: data.total_giornali || 0,
+                        total_activities_week: data.total_activities_week || 0,
+                        productivity_change: data.productivity_change || 0,
+                        documents_by_site: data.documents_by_site || [],
+                        activities_by_day: data.activities_by_day || []
+                    };
+                    console.log('Analytics data loaded:', this.analyticsStats);
+                } else {
+                    console.warn('Failed to load analytics data');
+                }
+            } catch (error) {
+                this.handleError(error, 'analytics_load');
+            } finally {
+                this.loading.analytics = false;
+            }
         },
         
         // Activities management

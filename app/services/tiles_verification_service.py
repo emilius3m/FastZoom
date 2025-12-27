@@ -227,18 +227,17 @@ class TilesVerificationService:
                             )
                             failed_verifications += 1
                         else:
-                            logger.info(
-                                "Verification completed for site",
+                            logger.debug(
+                                f"Verification completed for site {site_ids[i]}",
                                 extra={
                                     "site_id": str(site_ids[i]),
-                                    "result": result,
                                     "verification_successful": True
                                 }
                             )
                             successful_verifications += 1
                     
                     logger.info(
-                        "All sites verification completed",
+                        f"Tiles verification completed: {successful_verifications}/{len(site_ids)} sites verified successfully",
                         extra={
                             "total_sites": len(site_ids),
                             "successful_verifications": successful_verifications,

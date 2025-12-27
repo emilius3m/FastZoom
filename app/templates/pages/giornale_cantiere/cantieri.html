@@ -4,947 +4,895 @@
 
 {% block content %}
 
-    <!-- Breadcrumb Navigation -->
-    <div class="container mx-auto px-4 pt-8">
-        <nav class="flex mb-4" aria-label="Breadcrumb">
-            <ol class="inline-flex items-center space-x-1 md:space-x-3">
-                <li class="inline-flex items-center">
-                    <a href="/dashboard" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                        <i class="fas fa-home mr-2"></i>Dashboard
-                    </a>
-                </li>
-                <li>
-                    <div class="flex items-center">
-                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <a href="/sites/{{ site_id }}/dashboard" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">{{ site.name if site else "Sito" }}</a>
+<!-- Breadcrumb Navigation -->
+<div class="container mx-auto px-4 pt-8">
+    <nav class="flex mb-4" aria-label="Breadcrumb">
+        <ol class="inline-flex items-center space-x-1 md:space-x-3">
+            <li class="inline-flex items-center">
+                <a href="/dashboard"
+                    class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                    <i class="fas fa-home mr-2"></i>Dashboard
+                </a>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                    <a href="/sites/{{ site_id }}/dashboard"
+                        class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">{{
+                        site.site_name if site else "Sito" }}</a>
+                </div>
+            </li>
+            <li aria-current="page">
+                <div class="flex items-center">
+                    <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                    <span class="text-gray-500 dark:text-gray-400">Cantieri</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+</div>
+
+<!-- Main Content -->
+<div class="container mx-auto px-4 pb-8" x-data="cantieriApp('{{ site_id }}')">
+
+    <!-- Header Section -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-2">Cantieri Archeologici</h1>
+                <p class="text-gray-600 dark:text-gray-400">Gestisci le aree di scavo e documentazione</p>
+            </div>
+            <div class="flex gap-3">
+                <a :href="`/giornale-cantiere/site/{{ site_id }}/operatori`" type="button"
+                    class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-green-600 dark:hover:bg-green-700 focus:outline-none dark:focus:ring-green-800 flex items-center gap-2">
+                    <i class="fas fa-users"></i>
+                    Gestione Operatori
+                </a>
+                <button @click="openCreateModal()" type="button"
+                    class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 flex items-center gap-2">
+                    <i class="fas fa-plus"></i>
+                    Nuovo Cantiere
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-hard-hat text-blue-600 text-3xl"></i>
                     </div>
-                </li>
-                <li aria-current="page">
-                    <div class="flex items-center">
-                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <span class="text-gray-500 dark:text-gray-400">Cantieri</span>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Totale Cantieri</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white"
+                            x-text="stats.total || cantieri.length"></p>
                     </div>
-                </li>
-            </ol>
-        </nav>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-play-circle text-green-600 text-3xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">In Corso</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white"
+                            x-text="stats.in_corso || cantieri.filter(c => c.stato === 'in_corso').length"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-clock text-yellow-600 text-3xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pianificati</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white"
+                            x-text="stats.pianificati || cantieri.filter(c => c.stato === 'pianificato').length"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-check-circle text-gray-600 text-3xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Completati</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white"
+                            x-text="stats.completati || cantieri.filter(c => c.stato === 'completato').length"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filter -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="search" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                        <i class="fas fa-search mr-1"></i>Cerca
+                    </label>
+                    <input type="text" id="search" x-model="filters.search"
+                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+                        placeholder="Nome, codice o descrizione...">
+                </div>
+
+                <div>
+                    <label for="stato-filter" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                        <i class="fas fa-filter mr-1"></i>Stato
+                    </label>
+                    <select id="stato-filter" x-model="filters.stato"
+                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="">Tutti gli stati</option>
+                        <option value="pianificato">Pianificato</option>
+                        <option value="in_corso">In Corso</option>
+                        <option value="sospeso">Sospeso</option>
+                        <option value="completato">Completato</option>
+                        <option value="annullato">Annullato</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="sort" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                        <i class="fas fa-sort mr-1"></i>Ordina per
+                    </label>
+                    <select id="sort" x-model="filters.sortBy"
+                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="nome">Nome (A-Z)</option>
+                        <option value="data_creazione">Data creazione</option>
+                        <option value="data_inizio">Data inizio</option>
+                    </select>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="container mx-auto px-4 pb-8" x-data="cantieriApp('{{ site_id }}')">
-
-        <!-- Header Section -->
-        <div class="mb-8">
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-2">Cantieri Archeologici</h1>
-                    <p class="text-gray-600 dark:text-gray-400">Gestisci le aree di scavo e documentazione</p>
-                </div>
-                <div class="flex gap-3">
-                    <a
-                        :href="`/giornale-cantiere/site/{{ site_id }}/operatori`"
-                        type="button"
-                        class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-green-600 dark:hover:bg-green-700 focus:outline-none dark:focus:ring-green-800 flex items-center gap-2">
-                        <i class="fas fa-users"></i>
-                        Gestione Operatori
-                    </a>
-                    <button
-                        @click="openCreateModal()"
-                        type="button"
-                        class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 flex items-center gap-2">
-                        <i class="fas fa-plus"></i>
-                        Nuovo Cantiere
-                    </button>
-                </div>
-            </div>
-
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-hard-hat text-blue-600 text-3xl"></i>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Totale Cantieri</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="stats.total || cantieri.length"></p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-play-circle text-green-600 text-3xl"></i>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">In Corso</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="stats.in_corso || cantieri.filter(c => c.stato === 'in_corso').length"></p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-clock text-yellow-600 text-3xl"></i>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pianificati</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="stats.pianificati || cantieri.filter(c => c.stato === 'pianificato').length"></p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-check-circle text-gray-600 text-3xl"></i>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Completati</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="stats.completati || cantieri.filter(c => c.stato === 'completato').length"></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Search and Filter -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label for="search" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                            <i class="fas fa-search mr-1"></i>Cerca
-                        </label>
-                        <input 
-                            type="text" 
-                            id="search"
-                            x-model="filters.search"
-                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" 
-                            placeholder="Nome, codice o descrizione...">
-                    </div>
-
-                    <div>
-                        <label for="stato-filter" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                            <i class="fas fa-filter mr-1"></i>Stato
-                        </label>
-                        <select 
-                            id="stato-filter"
-                            x-model="filters.stato"
-                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                            <option value="">Tutti gli stati</option>
-                            <option value="pianificato">Pianificato</option>
-                            <option value="in_corso">In Corso</option>
-                            <option value="sospeso">Sospeso</option>
-                            <option value="completato">Completato</option>
-                            <option value="annullato">Annullato</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="sort" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                            <i class="fas fa-sort mr-1"></i>Ordina per
-                        </label>
-                        <select 
-                            id="sort"
-                            x-model="filters.sortBy"
-                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                            <option value="nome">Nome (A-Z)</option>
-                            <option value="data_creazione">Data creazione</option>
-                            <option value="data_inizio">Data inizio</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
+    <!-- Loading State -->
+    <div x-show="loading" class="text-center py-12">
+        <div role="status">
+            <svg aria-hidden="true" class="inline w-16 h-16 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
+                viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+                    fill="currentColor" />
+                <path
+                    d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                    fill="currentFill" />
+            </svg>
+            <span class="sr-only">Loading...</span>
         </div>
+        <p class="text-gray-600 dark:text-gray-400 mt-4">Caricamento cantieri...</p>
+    </div>
 
-        <!-- Loading State -->
-        <div x-show="loading" class="text-center py-12">
-            <div role="status">
-                <svg aria-hidden="true" class="inline w-16 h-16 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
-                    <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
-                </svg>
-                <span class="sr-only">Loading...</span>
-            </div>
-            <p class="text-gray-600 dark:text-gray-400 mt-4">Caricamento cantieri...</p>
-        </div>
-
-        <!-- Alert Message -->
-        <div 
-            x-show="alert.show" 
-            x-transition
-            :class="{
+    <!-- Alert Message -->
+    <div x-show="alert.show" x-transition :class="{
                 'text-green-800 bg-green-50 dark:bg-gray-800 dark:text-green-400': alert.type === 'success',
                 'text-red-800 bg-red-50 dark:bg-gray-800 dark:text-red-400': alert.type === 'error'
-            }"
-            class="flex items-center p-4 mb-4 rounded-lg" 
-            role="alert">
-            <i :class="alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'" class="fas flex-shrink-0 w-4 h-4"></i>
-            <span class="sr-only" x-text="alert.type"></span>
-            <div class="ms-3 text-sm font-medium" x-text="alert.message"></div>
-            <button 
-                @click="alert.show = false" 
-                type="button" 
-                class="ms-auto -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 inline-flex items-center justify-center h-8 w-8"
-                :class="{
+            }" class="flex items-center p-4 mb-4 rounded-lg" role="alert">
+        <i :class="alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'"
+            class="fas flex-shrink-0 w-4 h-4"></i>
+        <span class="sr-only" x-text="alert.type"></span>
+        <div class="ms-3 text-sm font-medium" x-text="alert.message"></div>
+        <button @click="alert.show = false" type="button"
+            class="ms-auto -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 inline-flex items-center justify-center h-8 w-8"
+            :class="{
                     'bg-green-50 text-green-500 hover:bg-green-200 dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700': alert.type === 'success',
                     'bg-red-50 text-red-500 hover:bg-red-200 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700': alert.type === 'error'
                 }">
-                <span class="sr-only">Chiudi</span>
-                <i class="fas fa-times w-3 h-3"></i>
+            <span class="sr-only">Chiudi</span>
+            <i class="fas fa-times w-3 h-3"></i>
+        </button>
+    </div>
+
+    <!-- Empty State -->
+    <template x-if="!loading && filteredCantieri.length === 0">
+        <div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
+            <i class="fas fa-hard-hat text-gray-300 dark:text-gray-600 text-6xl mb-4"></i>
+            <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Nessun cantiere trovato</h3>
+            <p class="text-gray-500 dark:text-gray-400 mb-6">
+                <span x-show="!filters.search && !filters.stato">Inizia creando il tuo primo cantiere
+                    archeologico</span>
+                <span x-show="filters.search || filters.stato">Prova a modificare i filtri di ricerca</span>
+            </p>
+            <button @click="openCreateModal()" type="button"
+                class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
+                <i class="fas fa-plus mr-2"></i>Crea Cantiere
             </button>
         </div>
+    </template>
 
-        <!-- Empty State -->
-        <template x-if="!loading && filteredCantieri.length === 0">
-            <div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-                <i class="fas fa-hard-hat text-gray-300 dark:text-gray-600 text-6xl mb-4"></i>
-                <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Nessun cantiere trovato</h3>
-                <p class="text-gray-500 dark:text-gray-400 mb-6">
-                    <span x-show="!filters.search && !filters.stato">Inizia creando il tuo primo cantiere archeologico</span>
-                    <span x-show="filters.search || filters.stato">Prova a modificare i filtri di ricerca</span>
-                </p>
-                <button 
-                    @click="openCreateModal()"
-                    type="button" 
-                    class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
-                    <i class="fas fa-plus mr-2"></i>Crea Cantiere
-                </button>
-            </div>
-        </template>
-
-        <!-- Cantieri Table -->
-        <div x-show="!loading && filteredCantieri.length > 0" class="relative overflow-x-auto shadow-md sm:rounded-lg">
-            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                    <tr>
-                        <th scope="col" class="px-6 py-3">Nome Cantiere</th>
-                        <th scope="col" class="px-6 py-3">Codice</th>
-                        <th scope="col" class="px-6 py-3">Stato</th>
-                        <th scope="col" class="px-6 py-3">Responsabile</th>
-                        <th scope="col" class="px-6 py-3">Impresa</th>
-                        <th scope="col" class="px-6 py-3">Importo</th>
-                        <th scope="col" class="px-6 py-3">Data Inizio</th>
-                        <th scope="col" class="px-6 py-3">Azioni</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for cantiere_data in cantieri %}
-                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                        <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                            <div class="flex items-center">
-                                <i class="fas fa-hard-hat mr-2 text-blue-600"></i>
-                                <span>{{ cantiere_data.nome }}</span>
-                            </div>
-                        </th>
-                        <td class="px-6 py-4">{{ cantiere_data.codice or '-' }}</td>
-                        <td class="px-6 py-4">
-                            <span
-                                class="px-2 py-1 text-xs font-medium rounded-full
+    <!-- Cantieri Table -->
+    <div x-show="!loading && filteredCantieri.length > 0" class="relative overflow-x-auto shadow-md sm:rounded-lg">
+        <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                <tr>
+                    <th scope="col" class="px-6 py-3">Nome Cantiere</th>
+                    <th scope="col" class="px-6 py-3">Codice</th>
+                    <th scope="col" class="px-6 py-3">Stato</th>
+                    <th scope="col" class="px-6 py-3">Responsabile</th>
+                    <th scope="col" class="px-6 py-3">Impresa</th>
+                    <th scope="col" class="px-6 py-3">Importo</th>
+                    <th scope="col" class="px-6 py-3">Data Inizio</th>
+                    <th scope="col" class="px-6 py-3">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cantiere_data in cantieri %}
+                <tr
+                    class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                        <div class="flex items-center">
+                            <i class="fas fa-hard-hat mr-2 text-blue-600"></i>
+                            <span>{{ cantiere_data.nome }}</span>
+                        </div>
+                    </th>
+                    <td class="px-6 py-4">{{ cantiere_data.codice or '-' }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full
                                 {% if cantiere_data.stato == 'pianificato' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300
                                 {% elif cantiere_data.stato == 'in_corso' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
                                 {% elif cantiere_data.stato == 'sospeso' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300
                                 {% elif cantiere_data.stato == 'completato' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300
                                 {% elif cantiere_data.stato == 'annullato' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300
                                 {% endif %}">
-                                {{ cantiere_data.stato_formattato or cantiere_data.stato.replace('_', ' ').title() }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4">{{ cantiere_data.responsabile_cantiere or '-' }}</td>
-                        <td class="px-6 py-4">
-                            {% if cantiere_data.impresa_esecutrice %}
-                                <span class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded">
-                                    {{ cantiere_data.impresa_esecutrice[:15] }}{% if cantiere_data.impresa_esecutrice|length > 15 %}...{% endif %}
-                                </span>
-                            {% else %}
-                                <span class="text-gray-400">-</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4">
-                            {% if cantiere_data.importo_lavori %}
-                                <span class="text-sm font-semibold text-green-700 dark:text-green-300">
-                                    €{{ "{:,.0f}".format(cantiere_data.importo_lavori) }}
-                                </span>
-                            {% else %}
-                                <span class="text-gray-400">-</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4">
-                            {% if cantiere_data.data_inizio_prevista %}
-                                {{ cantiere_data.data_inizio_prevista[:10] }}
-                            {% elif cantiere_data.data_inizio_effettiva %}
-                                {{ cantiere_data.data_inizio_effettiva[:10] }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex items-center gap-2">
-                                <a
-                                    href="/cantieri/{{ cantiere_data.id }}"
-                                    type="button"
-                                    class="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1"
-                                    title="Visualizza">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <button
-                                    @click='openEditModal({{ cantiere_data | tojson | safe }})'
-                                    type="button"
-                                    class="inline-flex items-center justify-center w-8 h-8 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded p-1"
-                                    title="Modifica">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button
-                                    @click="deleteCantiere('{{ cantiere_data.id }}')"
-                                    type="button"
-                                    class="inline-flex items-center justify-center w-8 h-8 text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded p-1"
-                                    title="Elimina">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                            {{ cantiere_data.stato_formattato or cantiere_data.stato.replace('_', ' ').title() }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">{{ cantiere_data.responsabile_cantiere or '-' }}</td>
+                    <td class="px-6 py-4">
+                        {% if cantiere_data.impresa_esecutrice %}
+                        <span
+                            class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded">
+                            {{ cantiere_data.impresa_esecutrice[:15] }}{% if cantiere_data.impresa_esecutrice|length >
+                            15 %}...{% endif %}
+                        </span>
+                        {% else %}
+                        <span class="text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if cantiere_data.importo_lavori %}
+                        <span class="text-sm font-semibold text-green-700 dark:text-green-300">
+                            €{{ "{:,.0f}".format(cantiere_data.importo_lavori) }}
+                        </span>
+                        {% else %}
+                        <span class="text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if cantiere_data.data_inizio_prevista %}
+                        {{ cantiere_data.data_inizio_prevista[:10] }}
+                        {% elif cantiere_data.data_inizio_effettiva %}
+                        {{ cantiere_data.data_inizio_effettiva[:10] }}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                            <a href="/cantieri/{{ cantiere_data.id }}" type="button"
+                                class="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1"
+                                title="Visualizza">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <button @click='openEditModal({{ cantiere_data | tojson | safe }})' type="button"
+                                class="inline-flex items-center justify-center w-8 h-8 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded p-1"
+                                title="Modifica">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button @click="deleteCantiere('{{ cantiere_data.id }}')" type="button"
+                                class="inline-flex items-center justify-center w-8 h-8 text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded p-1"
+                                title="Elimina">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-        <!-- Modal Form -->
-        <div 
-            x-show="modal.isOpen" 
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
+    <!-- Modal Form -->
+    <div x-show="modal.isOpen" x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0" tabindex="-1"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-gray-900 bg-opacity-50"
+        @click.self="closeModal()">
+
+        <div x-show="modal.isOpen" x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
             x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            tabindex="-1" 
-            class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden bg-gray-900 bg-opacity-50"
-            @click.self="closeModal()">
+            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+            x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            class="relative w-full max-w-2xl max-h-full p-4">
 
-            <div 
-                x-show="modal.isOpen"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                class="relative w-full max-w-2xl max-h-full p-4">
+            <!-- Modal content -->
+            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+                <!-- Modal header -->
+                <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="modal.title"></h3>
+                    <button @click="closeModal()" type="button"
+                        class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
+                        <i class="fas fa-times"></i>
+                        <span class="sr-only">Chiudi modal</span>
+                    </button>
+                </div>
 
-                <!-- Modal content -->
-                <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
-                    <!-- Modal header -->
-                    <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
-                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="modal.title"></h3>
-                        <button 
-                            @click="closeModal()" 
-                            type="button" 
-                            class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white">
-                            <i class="fas fa-times"></i>
-                            <span class="sr-only">Chiudi modal</span>
-                        </button>
-                    </div>
+                <!-- Modal body -->
+                <form @submit.prevent="submitForm()" class="p-4 md:p-5">
+                    <div class="grid gap-4 mb-4 grid-cols-2">
+                        <!-- Nome -->
+                        <div class="col-span-2">
+                            <label for="nome" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                Nome Cantiere <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="nome" x-model="modal.formData.nome" required
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                placeholder="Es: Scavo Area Nord">
+                        </div>
 
-                    <!-- Modal body -->
-                    <form @submit.prevent="submitForm()" class="p-4 md:p-5">
-                        <div class="grid gap-4 mb-4 grid-cols-2">
-                            <!-- Nome -->
-                            <div class="col-span-2">
-                                <label for="nome" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                    Nome Cantiere <span class="text-red-500">*</span>
-                                </label>
-                                <input 
-                                    type="text" 
-                                    id="nome"
-                                    x-model="modal.formData.nome"
-                                    required
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" 
-                                    placeholder="Es: Scavo Area Nord">
-                            </div>
+                        <!-- Codice -->
+                        <div class="col-span-2 sm:col-span-1">
+                            <label for="codice"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Codice</label>
+                            <input type="text" id="codice" x-model="modal.formData.codice"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                placeholder="CANT-2025-001">
+                        </div>
 
-                            <!-- Codice -->
-                            <div class="col-span-2 sm:col-span-1">
-                                <label for="codice" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Codice</label>
-                                <input 
-                                    type="text" 
-                                    id="codice"
-                                    x-model="modal.formData.codice"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white" 
-                                    placeholder="CANT-2025-001">
-                            </div>
+                        <!-- Stato -->
+                        <div class="col-span-2 sm:col-span-1">
+                            <label for="stato"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Stato</label>
+                            <select id="stato" x-model="modal.formData.stato"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                                <option value="pianificato">Pianificato</option>
+                                <option value="in_corso">In Corso</option>
+                                <option value="sospeso">Sospeso</option>
+                                <option value="completato">Completato</option>
+                                <option value="annullato">Annullato</option>
+                            </select>
+                        </div>
 
-                            <!-- Stato -->
-                            <div class="col-span-2 sm:col-span-1">
-                                <label for="stato" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Stato</label>
-                                <select 
-                                    id="stato"
-                                    x-model="modal.formData.stato"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
-                                    <option value="pianificato">Pianificato</option>
-                                    <option value="in_corso">In Corso</option>
-                                    <option value="sospeso">Sospeso</option>
-                                    <option value="completato">Completato</option>
-                                    <option value="annullato">Annullato</option>
-                                </select>
-                            </div>
+                        <!-- Responsabile -->
+                        <div class="col-span-2">
+                            <label for="responsabile_cantiere"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Responsabile</label>
+                            <input type="text" id="responsabile_cantiere" x-model="modal.formData.responsabile_cantiere"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                placeholder="Nome del responsabile">
+                        </div>
 
-                            <!-- Responsabile -->
-                            <div class="col-span-2">
-                                <label for="responsabile_cantiere" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Responsabile</label>
-                                <input
-                                    type="text"
-                                    id="responsabile_cantiere"
-                                    x-model="modal.formData.responsabile_cantiere"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                    placeholder="Nome del responsabile">
-                            </div>
+                        <!-- Date -->
+                        <div class="col-span-2 sm:col-span-1">
+                            <label for="data_inizio_prevista"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Data Inizio
+                                Prevista</label>
+                            <input type="date" id="data_inizio_prevista" x-model="modal.formData.data_inizio_prevista"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                        </div>
 
-                            <!-- Date -->
-                            <div class="col-span-2 sm:col-span-1">
-                                <label for="data_inizio_prevista" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Data Inizio Prevista</label>
-                                <input
-                                    type="date"
-                                    id="data_inizio_prevista"
-                                    x-model="modal.formData.data_inizio_prevista"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
-                            </div>
+                        <div class="col-span-2 sm:col-span-1">
+                            <label for="data_fine_prevista"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Data Fine
+                                Prevista</label>
+                            <input type="date" id="data_fine_prevista" x-model="modal.formData.data_fine_prevista"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                        </div>
 
-                            <div class="col-span-2 sm:col-span-1">
-                                <label for="data_fine_prevista" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Data Fine Prevista</label>
-                                <input
-                                    type="date"
-                                    id="data_fine_prevista"
-                                    x-model="modal.formData.data_fine_prevista"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
-                            </div>
+                        <!-- Tipologia Intervento -->
+                        <div class="col-span-2 sm:col-span-1">
+                            <label for="tipologia_intervento"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Tipologia
+                                Intervento</label>
+                            <select id="tipologia_intervento" x-model="modal.formData.tipologia_intervento"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                                <option value="">Seleziona tipologia</option>
+                                <option value="scavo">Scavo Archeologico</option>
+                                <option value="prospezione">Prospezione Geofisica</option>
+                                <option value="ricerca">Ricerca di Superficie</option>
+                                <option value="documentazione">Documentazione</option>
+                                <option value="conservazione">Conservazione e Restauro</option>
+                                <option value="monitoraggio">Monitoraggio</option>
+                                <option value="altro">Altro</option>
+                            </select>
+                        </div>
 
-                            <!-- Tipologia Intervento -->
-                            <div class="col-span-2 sm:col-span-1">
-                                <label for="tipologia_intervento" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Tipologia Intervento</label>
-                                <select
-                                    id="tipologia_intervento"
-                                    x-model="modal.formData.tipologia_intervento"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
-                                    <option value="">Seleziona tipologia</option>
-                                    <option value="scavo">Scavo Archeologico</option>
-                                    <option value="prospezione">Prospezione Geofisica</option>
-                                    <option value="ricerca">Ricerca di Superficie</option>
-                                    <option value="documentazione">Documentazione</option>
-                                    <option value="conservazione">Conservazione e Restauro</option>
-                                    <option value="monitoraggio">Monitoraggio</option>
-                                    <option value="altro">Altro</option>
-                                </select>
-                            </div>
+                        <!-- Priorità -->
+                        <div class="col-span-2 sm:col-span-1">
+                            <label for="priorita"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Priorità</label>
+                            <select id="priorita" x-model="modal.formData.priorita"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                                <option value="1">Alta</option>
+                                <option value="2">Media-Alta</option>
+                                <option value="3">Media</option>
+                                <option value="4">Bassa</option>
+                                <option value="5">Molto Bassa</option>
+                            </select>
+                        </div>
 
-                            <!-- Priorità -->
-                            <div class="col-span-2 sm:col-span-1">
-                                <label for="priorita" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Priorità</label>
-                                <select
-                                    id="priorita"
-                                    x-model="modal.formData.priorita"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
-                                    <option value="1">Alta</option>
-                                    <option value="2">Media-Alta</option>
-                                    <option value="3">Media</option>
-                                    <option value="4">Bassa</option>
-                                    <option value="5">Molto Bassa</option>
-                                </select>
-                            </div>
+                        <!-- Area Descrizione -->
+                        <div class="col-span-2">
+                            <label for="area_descrizione"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Area
+                                Descrizione</label>
+                            <input type="text" id="area_descrizione" x-model="modal.formData.area_descrizione"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                placeholder="Descrizione dell'area specifica">
+                        </div>
 
-                            <!-- Area Descrizione -->
-                            <div class="col-span-2">
-                                <label for="area_descrizione" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Area Descrizione</label>
-                                <input
-                                    type="text"
-                                    id="area_descrizione"
-                                    x-model="modal.formData.area_descrizione"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                    placeholder="Descrizione dell'area specifica">
-                            </div>
+                        <!-- Descrizione -->
+                        <div class="col-span-2">
+                            <label for="descrizione"
+                                class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Descrizione</label>
+                            <textarea id="descrizione" x-model="modal.formData.descrizione" rows="4"
+                                class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-600 focus:border-blue-600 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                placeholder="Descrizione dettagliata del cantiere..."></textarea>
+                        </div>
 
-                            <!-- Descrizione -->
-                            <div class="col-span-2">
-                                <label for="descrizione" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Descrizione</label>
-                                <textarea
-                                    id="descrizione"
-                                    x-model="modal.formData.descrizione"
-                                    rows="4"
-                                    class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-600 focus:border-blue-600 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                    placeholder="Descrizione dettagliata del cantiere..."></textarea>
-                            </div>
+                        <!-- Dati Contrattuali Section -->
+                        <div class="col-span-2 mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                <i class="fas fa-file-contract mr-2"></i>Dati Contrattuali
+                            </h4>
 
-                            <!-- Dati Contrattuali Section -->
-                            <div class="col-span-2 mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
-                                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                    <i class="fas fa-file-contract mr-2"></i>Dati Contrattuali
-                                </h4>
-                                
-                                <div class="grid gap-4 grid-cols-2">
-                                    <!-- Committente -->
-                                    <div class="col-span-2 sm:col-span-1">
-                                        <label for="committente" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Committente</label>
-                                        <input
-                                            type="text"
-                                            id="committente"
-                                            x-model="modal.formData.committente"
-                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                            placeholder="Nome del committente"
-                                            maxlength="200">
-                                    </div>
+                            <div class="grid gap-4 grid-cols-2">
+                                <!-- Committente -->
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label for="committente"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Committente</label>
+                                    <input type="text" id="committente" x-model="modal.formData.committente"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="Nome del committente" maxlength="200">
+                                </div>
 
-                                    <!-- Impresa Esecutrice -->
-                                    <div class="col-span-2 sm:col-span-1">
-                                        <label for="impresa_esecutrice" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Impresa Esecutrice</label>
-                                        <input
-                                            type="text"
-                                            id="impresa_esecutrice"
-                                            x-model="modal.formData.impresa_esecutrice"
-                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                            placeholder="Nome dell'impresa esecutrice"
-                                            maxlength="200">
-                                    </div>
+                                <!-- Impresa Esecutrice -->
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label for="impresa_esecutrice"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Impresa
+                                        Esecutrice</label>
+                                    <input type="text" id="impresa_esecutrice"
+                                        x-model="modal.formData.impresa_esecutrice"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="Nome dell'impresa esecutrice" maxlength="200">
+                                </div>
 
-                                    <!-- Direttore Lavori -->
-                                    <div class="col-span-2 sm:col-span-1">
-                                        <label for="direttore_lavori" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Direttore Lavori</label>
-                                        <input
-                                            type="text"
-                                            id="direttore_lavori"
-                                            x-model="modal.formData.direttore_lavori"
-                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                            placeholder="Nome del direttore lavori"
-                                            maxlength="200">
-                                    </div>
+                                <!-- Direttore Lavori -->
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label for="direttore_lavori"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Direttore
+                                        Lavori</label>
+                                    <input type="text" id="direttore_lavori" x-model="modal.formData.direttore_lavori"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="Nome del direttore lavori" maxlength="200">
+                                </div>
 
-                                    <!-- Responsabile Procedimento -->
-                                    <div class="col-span-2 sm:col-span-1">
-                                        <label for="responsabile_procedimento" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Responsabile Procedimento</label>
-                                        <input
-                                            type="text"
-                                            id="responsabile_procedimento"
-                                            x-model="modal.formData.responsabile_procedimento"
-                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                            placeholder="Nome del responsabile procedimento"
-                                            maxlength="200">
-                                    </div>
+                                <!-- Responsabile Procedimento -->
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label for="responsabile_procedimento"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Responsabile
+                                        Procedimento</label>
+                                    <input type="text" id="responsabile_procedimento"
+                                        x-model="modal.formData.responsabile_procedimento"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="Nome del responsabile procedimento" maxlength="200">
+                                </div>
 
-                                    <!-- Oggetto Appalto -->
-                                    <div class="col-span-2">
-                                        <label for="oggetto_appalto" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Oggetto Appalto</label>
-                                        <textarea
-                                            id="oggetto_appalto"
-                                            x-model="modal.formData.oggetto_appalto"
-                                            rows="3"
-                                            class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-600 focus:border-blue-600 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                            placeholder="Descrizione dell'oggetto dell'appalto"></textarea>
-                                    </div>
+                                <!-- Oggetto Appalto -->
+                                <div class="col-span-2">
+                                    <label for="oggetto_appalto"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Oggetto
+                                        Appalto</label>
+                                    <textarea id="oggetto_appalto" x-model="modal.formData.oggetto_appalto" rows="3"
+                                        class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-600 focus:border-blue-600 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="Descrizione dell'oggetto dell'appalto"></textarea>
+                                </div>
 
-                                    <!-- Codice CUP -->
-                                    <div class="col-span-2 sm:col-span-1">
-                                        <label for="codice_cup" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Codice CUP</label>
-                                        <input
-                                            type="text"
-                                            id="codice_cup"
-                                            x-model="modal.formData.codice_cup"
-                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                            placeholder="Codice unico progetto"
-                                            maxlength="50">
-                                    </div>
+                                <!-- Codice CUP -->
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label for="codice_cup"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Codice
+                                        CUP</label>
+                                    <input type="text" id="codice_cup" x-model="modal.formData.codice_cup"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="Codice unico progetto" maxlength="50">
+                                </div>
 
-                                    <!-- Codice CIG -->
-                                    <div class="col-span-2 sm:col-span-1">
-                                        <label for="codice_cig" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Codice CIG</label>
-                                        <input
-                                            type="text"
-                                            id="codice_cig"
-                                            x-model="modal.formData.codice_cig"
-                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                            placeholder="Codice identificativo gara"
-                                            maxlength="50">
-                                    </div>
+                                <!-- Codice CIG -->
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label for="codice_cig"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Codice
+                                        CIG</label>
+                                    <input type="text" id="codice_cig" x-model="modal.formData.codice_cig"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="Codice identificativo gara" maxlength="50">
+                                </div>
 
-                                    <!-- Importo Lavori -->
-                                    <div class="col-span-2">
-                                        <label for="importo_lavori" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Importo Lavori (€)</label>
-                                        <input
-                                            type="number"
-                                            id="importo_lavori"
-                                            x-model="modal.formData.importo_lavori"
-                                            step="0.01"
-                                            min="0"
-                                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                                            placeholder="0.00">
-                                    </div>
+                                <!-- Importo Lavori -->
+                                <div class="col-span-2">
+                                    <label for="importo_lavori"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Importo
+                                        Lavori (€)</label>
+                                    <input type="number" id="importo_lavori" x-model="modal.formData.importo_lavori"
+                                        step="0.01" min="0"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="0.00">
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Modal footer -->
-                        <div class="flex items-center justify-end gap-3">
-                            <button 
-                                @click="closeModal()" 
-                                type="button" 
-                                class="py-2.5 px-5 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">
-                                Annulla
-                            </button>
-                            <button 
-                                type="submit"
-                                :disabled="modal.loading"
-                                class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <span x-show="!modal.loading">
-                                    <i class="fas fa-save mr-2"></i>Salva
-                                </span>
-                                <span x-show="modal.loading">
-                                    <i class="fas fa-spinner fa-spin mr-2"></i>Salvataggio...
-                                </span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                    <!-- Modal footer -->
+                    <div class="flex items-center justify-end gap-3">
+                        <button @click="closeModal()" type="button"
+                            class="py-2.5 px-5 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">
+                            Annulla
+                        </button>
+                        <button type="submit" :disabled="modal.loading"
+                            class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span x-show="!modal.loading">
+                                <i class="fas fa-save mr-2"></i>Salva
+                            </span>
+                            <span x-show="modal.loading">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Salvataggio...
+                            </span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
-
     </div>
 
+</div>
 
 
-    <!-- Alpine.js Application -->
-    <script>
-        // Alpine Store
-        document.addEventListener('alpine:init', () => {
-            Alpine.store('cantieri', {
-                items: [],
 
-                add(item) {
-                    this.items.push(item);
-                },
+<!-- Alpine.js Application -->
+<script>
+    // Alpine Store
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('cantieri', {
+            items: [],
 
-                update(id, data) {
-                    const index = this.items.findIndex(c => c.id === id);
-                    if (index !== -1) {
-                        this.items[index] = { ...this.items[index], ...data };
-                    }
-                },
+            add(item) {
+                this.items.push(item);
+            },
 
-                remove(id) {
-                    this.items = this.items.filter(c => c.id !== id);
-                },
-
-                find(id) {
-                    return this.items.find(c => c.id === id);
+            update(id, data) {
+                const index = this.items.findIndex(c => c.id === id);
+                if (index !== -1) {
+                    this.items[index] = { ...this.items[index], ...data };
                 }
-            });
+            },
+
+            remove(id) {
+                this.items = this.items.filter(c => c.id !== id);
+            },
+
+            find(id) {
+                return this.items.find(c => c.id === id);
+            }
         });
+    });
 
-        function cantieriApp(siteId) {
-            return {
-                siteId: siteId,
-                loading: false,
+    function cantieriApp(siteId) {
+        return {
+            siteId: siteId,
+            loading: false,
 
-                // Data
-                cantieri: {{ cantieri | tojson }},
-                
-                // Statistics
-                stats: {{ stats | tojson }},
+            // Data
+            cantieri: {{ cantieri | tojson }},
 
-                // Filters
-                filters: {
-                    search: '',
-                    stato: '',
-                    sortBy: 'nome'
-                },
+    // Statistics
+    stats: {{ stats | tojson }},
 
-                // Modal
-                modal: {
-                    isOpen: false,
-                    title: '',
-                    mode: 'create',
+    // Filters
+    filters: {
+        search: '',
+            stato: '',
+                sortBy: 'nome'
+    },
+
+    // Modal
+    modal: {
+        isOpen: false,
+            title: '',
+                mode: 'create',
                     loading: false,
-                    formData: {}
-                },
+                        formData: { }
+    },
 
-                // Alert
-                alert: {
-                    show: false,
-                    type: 'success',
-                    message: ''
-                },
+    // Alert
+    alert: {
+        show: false,
+            type: 'success',
+                message: ''
+    },
 
-                // Init
-                init() {
-                    this.loadCantieri();
-                    this.loadStats();
-                    this.watchFilters();
-                },
+    // Init
+    init() {
+        this.loadCantieri();
+        this.loadStats();
+        this.watchFilters();
+    },
 
                 // Computed: Filtered Cantieri
                 get filteredCantieri() {
-                    let result = [...this.cantieri];
+        let result = [...this.cantieri];
 
-                    // Search filter
-                    if (this.filters.search) {
-                        const search = this.filters.search.toLowerCase();
-                        result = result.filter(c =>
-                            c.nome?.toLowerCase().includes(search) ||
-                            c.codice?.toLowerCase().includes(search) ||
-                            c.descrizione?.toLowerCase().includes(search)
-                        );
-                    }
+        // Search filter
+        if (this.filters.search) {
+            const search = this.filters.search.toLowerCase();
+            result = result.filter(c =>
+                c.nome?.toLowerCase().includes(search) ||
+                c.codice?.toLowerCase().includes(search) ||
+                c.descrizione?.toLowerCase().includes(search)
+            );
+        }
 
-                    // Status filter
-                    if (this.filters.stato) {
-                        result = result.filter(c => c.stato === this.filters.stato);
-                    }
+        // Status filter
+        if (this.filters.stato) {
+            result = result.filter(c => c.stato === this.filters.stato);
+        }
 
-                    // Sort
-                    result.sort((a, b) => {
-                        if (this.filters.sortBy === 'nome') {
-                            return a.nome.localeCompare(b.nome);
-                        } else if (this.filters.sortBy === 'data_creazione') {
-                            return new Date(a.created_at) - new Date(b.created_at);
-                        } else if (this.filters.sortBy === 'data_inizio') {
-                            const dateA = a.data_inizio_prevista || a.data_inizio_effettiva;
-                            const dateB = b.data_inizio_prevista || b.data_inizio_effettiva;
-                            if (!dateA && !dateB) return 0;
-                            if (!dateA) return 1;
-                            if (!dateB) return -1;
-                            return new Date(dateA) - new Date(dateB);
-                        }
-                        return 0;
-                    });
+        // Sort
+        result.sort((a, b) => {
+            if (this.filters.sortBy === 'nome') {
+                return a.nome.localeCompare(b.nome);
+            } else if (this.filters.sortBy === 'data_creazione') {
+                return new Date(a.created_at) - new Date(b.created_at);
+            } else if (this.filters.sortBy === 'data_inizio') {
+                const dateA = a.data_inizio_prevista || a.data_inizio_effettiva;
+                const dateB = b.data_inizio_prevista || b.data_inizio_effettiva;
+                if (!dateA && !dateB) return 0;
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return new Date(dateA) - new Date(dateB);
+            }
+            return 0;
+        });
 
-                    return result;
-                },
+        return result;
+    },
 
-                // Modal Methods
-                openCreateModal() {
-                    this.modal = {
-                        isOpen: true,
-                        title: 'Nuovo Cantiere',
-                        mode: 'create',
-                        loading: false,
-                        formData: {
-                            nome: '',
-                            codice: '',
-                            stato: 'pianificato',
-                            responsabile_cantiere: '',
-                            data_inizio_prevista: '',
-                            data_fine_prevista: '',
-                            descrizione: '',
-                            area_descrizione: '',
-                            tipologia_intervento: '',
-                            priorita: 3,
-                            // New fields
-                            committente: '',
-                            impresa_esecutrice: '',
-                            direttore_lavori: '',
-                            responsabile_procedimento: '',
-                            oggetto_appalto: '',
-                            codice_cup: '',
-                            codice_cig: '',
-                            importo_lavori: ''
-                        }
-                    };
-                },
+    // Modal Methods
+    openCreateModal() {
+        this.modal = {
+            isOpen: true,
+            title: 'Nuovo Cantiere',
+            mode: 'create',
+            loading: false,
+            formData: {
+                nome: '',
+                codice: '',
+                stato: 'pianificato',
+                responsabile_cantiere: '',
+                data_inizio_prevista: '',
+                data_fine_prevista: '',
+                descrizione: '',
+                area_descrizione: '',
+                tipologia_intervento: '',
+                priorita: 3,
+                // New fields
+                committente: '',
+                impresa_esecutrice: '',
+                direttore_lavori: '',
+                responsabile_procedimento: '',
+                oggetto_appalto: '',
+                codice_cup: '',
+                codice_cig: '',
+                importo_lavori: ''
+            }
+        };
+    },
 
-                openEditModal(cantiere) {
-                    this.modal = {
-                        isOpen: true,
-                        title: 'Modifica Cantiere',
-                        mode: 'edit',
-                        loading: false,
-                        formData: { ...cantiere }
-                    };
-                },
+    openEditModal(cantiere) {
+        this.modal = {
+            isOpen: true,
+            title: 'Modifica Cantiere',
+            mode: 'edit',
+            loading: false,
+            formData: { ...cantiere }
+        };
+    },
 
-                closeModal() {
-                    this.modal.isOpen = false;
-                },
+    closeModal() {
+        this.modal.isOpen = false;
+    },
 
                 // Form Submit
                 async submitForm() {
-                    // Validazione
-                    if (!this.modal.formData.nome?.trim()) {
-                        this.showAlert('error', 'Il nome del cantiere è obbligatorio');
-                        return;
-                    }
+        // Validazione
+        if (!this.modal.formData.nome?.trim()) {
+            this.showAlert('error', 'Il nome del cantiere è obbligatorio');
+            return;
+        }
 
-                    if (this.modal.formData.data_inizio_prevista && this.modal.formData.data_fine_prevista) {
-                        if (new Date(this.modal.formData.data_inizio_prevista) > new Date(this.modal.formData.data_fine_prevista)) {
-                            this.showAlert('error', 'La data di fine deve essere successiva alla data di inizio');
-                            return;
-                        }
-                    }
+        if (this.modal.formData.data_inizio_prevista && this.modal.formData.data_fine_prevista) {
+            if (new Date(this.modal.formData.data_inizio_prevista) > new Date(this.modal.formData.data_fine_prevista)) {
+                this.showAlert('error', 'La data di fine deve essere successiva alla data di inizio');
+                return;
+            }
+        }
 
-                    this.modal.loading = true;
+        this.modal.loading = true;
 
-                    try {
-                        let url;
-                        let method;
+        try {
+            let url;
+            let method;
 
-                        if (this.modal.mode === 'create') {
-                            url = `/api/v1/cantieri/sites/${this.siteId}/cantieri`;
-                            method = 'POST';
-                        } else {
-                            url = `/api/v1/cantieri/cantieri/${this.modal.formData.id}`;
-                            method = 'PUT';
-                        }
+            if (this.modal.mode === 'create') {
+                url = `/api/v1/cantieri/sites/${this.siteId}/cantieri`;
+                method = 'POST';
+            } else {
+                url = `/api/v1/cantieri/cantieri/${this.modal.formData.id}`;
+                method = 'PUT';
+            }
 
-                        const response = await fetch(url, {
-                            method: method,
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify(this.modal.formData)
-                        });
-
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(errorData.detail || 'Errore durante il salvataggio');
-                        }
-
-                        const result = await response.json();
-
-                        if (this.modal.mode === 'create') {
-                            this.showAlert('success', 'Cantiere creato con successo');
-                            await this.loadCantieri();
-                            await this.loadStats();
-                        } else {
-                            // Update existing cantiere in the list
-                            const index = this.cantieri.findIndex(c => c.id === this.modal.formData.id);
-                            if (index !== -1) {
-                                this.cantieri[index] = { ...this.modal.formData };
-                            }
-                            this.showAlert('success', 'Cantiere aggiornato con successo');
-                        }
-
-                        this.modal.loading = false;
-                        this.closeModal();
-
-                    } catch (error) {
-                        console.error('Error saving cantiere:', error);
-                        this.showAlert('error', error.message || 'Errore durante il salvataggio');
-                        this.modal.loading = false;
-                    }
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
                 },
+                body: JSON.stringify(this.modal.formData)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Errore durante il salvataggio');
+            }
+
+            const result = await response.json();
+
+            if (this.modal.mode === 'create') {
+                this.showAlert('success', 'Cantiere creato con successo');
+                await this.loadCantieri();
+                await this.loadStats();
+            } else {
+                // Update existing cantiere in the list
+                const index = this.cantieri.findIndex(c => c.id === this.modal.formData.id);
+                if (index !== -1) {
+                    this.cantieri[index] = { ...this.modal.formData };
+                }
+                this.showAlert('success', 'Cantiere aggiornato con successo');
+            }
+
+            this.modal.loading = false;
+            this.closeModal();
+
+        } catch (error) {
+            console.error('Error saving cantiere:', error);
+            this.showAlert('error', error.message || 'Errore durante il salvataggio');
+            this.modal.loading = false;
+        }
+    },
 
                 // Delete Cantiere
                 async deleteCantiere(id) {
-                    if (!confirm('Sei sicuro di voler eliminare questo cantiere? Questa azione non può essere annullata.')) {
-                        return;
-                    }
+        if (!confirm('Sei sicuro di voler eliminare questo cantiere? Questa azione non può essere annullata.')) {
+            return;
+        }
 
-                    this.loading = true;
+        this.loading = true;
 
-                    try {
-                        const response = await fetch(`/api/v1/cantieri/cantieri/${id}`, {
-                            method: 'DELETE'
-                        });
+        try {
+            const response = await fetch(`/api/v1/cantieri/cantieri/${id}`, {
+                method: 'DELETE'
+            });
 
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(errorData.detail || 'Errore durante l\'eliminazione');
-                        }
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Errore durante l\'eliminazione');
+            }
 
-                        await response.json();
+            await response.json();
 
-                        this.cantieri = this.cantieri.filter(c => c.id !== id);
-                        this.showAlert('success', 'Cantiere eliminato con successo');
-                        await this.loadStats();
+            this.cantieri = this.cantieri.filter(c => c.id !== id);
+            this.showAlert('success', 'Cantiere eliminato con successo');
+            await this.loadStats();
 
-                    } catch (error) {
-                        console.error('Error deleting cantiere:', error);
-                        this.showAlert('error', error.message || 'Errore durante l\'eliminazione');
-                    } finally {
-                        this.loading = false;
-                    }
-                },
+        } catch (error) {
+            console.error('Error deleting cantiere:', error);
+            this.showAlert('error', error.message || 'Errore durante l\'eliminazione');
+        } finally {
+            this.loading = false;
+        }
+    },
 
-                // View Cantiere
-                viewCantiere(id) {
-                    window.location.href = `/cantieri/${id}`;
-                },
+    // View Cantiere
+    viewCantiere(id) {
+        window.location.href = `/cantieri/${id}`;
+    },
 
-                // Helper Methods
-                showAlert(type, message) {
-                    this.alert = { show: true, type, message };
-                    setTimeout(() => {
-                        this.alert.show = false;
-                    }, 5000);
-                },
+    // Helper Methods
+    showAlert(type, message) {
+        this.alert = { show: true, type, message };
+        setTimeout(() => {
+            this.alert.show = false;
+        }, 5000);
+    },
 
-                getStatoLabel(stato) {
-                    const labels = {
-                        'pianificato': 'Pianificato',
-                        'in_corso': 'In Corso',
-                        'sospeso': 'Sospeso',
-                        'completato': 'Completato',
-                        'annullato': 'Annullato'
-                    };
-                    return labels[stato] || stato;
-                },
+    getStatoLabel(stato) {
+        const labels = {
+            'pianificato': 'Pianificato',
+            'in_corso': 'In Corso',
+            'sospeso': 'Sospeso',
+            'completato': 'Completato',
+            'annullato': 'Annullato'
+        };
+        return labels[stato] || stato;
+    },
 
-                formatDate(dateString) {
-                    if (!dateString) return '-';
-                    const date = new Date(dateString);
-                    return date.toLocaleDateString('it-IT', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    });
-                },
+    formatDate(dateString) {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('it-IT', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    },
 
                 // API Methods
                 async loadCantieri() {
-                    try {
-                        const params = new URLSearchParams();
-                        if (this.filters.search) params.append('search', this.filters.search);
-                        if (this.filters.stato) params.append('stato', this.filters.stato);
-                        
-                        const response = await fetch(`/api/v1/cantieri/sites/${this.siteId}/cantieri?${params}`);
-                        
-                        if (!response.ok) {
-                            throw new Error('Errore nel caricamento dei cantieri');
-                        }
-                        
-                        const data = await response.json();
-                        this.cantieri = data.cantieri || [];
-                        
-                    } catch (error) {
-                        console.error('Error loading cantieri:', error);
-                        this.showAlert('error', 'Errore nel caricamento dei cantieri');
-                    }
-                },
+        try {
+            const params = new URLSearchParams();
+            if (this.filters.search) params.append('search', this.filters.search);
+            if (this.filters.stato) params.append('stato', this.filters.stato);
+
+            const response = await fetch(`/api/v1/cantieri/sites/${this.siteId}/cantieri?${params}`);
+
+            if (!response.ok) {
+                throw new Error('Errore nel caricamento dei cantieri');
+            }
+
+            const data = await response.json();
+            this.cantieri = data.cantieri || [];
+
+        } catch (error) {
+            console.error('Error loading cantieri:', error);
+            this.showAlert('error', 'Errore nel caricamento dei cantieri');
+        }
+    },
 
                 async loadStats() {
-                    try {
-                        const response = await fetch(`/api/v1/cantieri/sites/${this.siteId}/stats/cantieri`);
-                        
-                        if (!response.ok) {
-                            throw new Error('Errore nel caricamento delle statistiche');
-                        }
-                        
-                        const data = await response.json();
-                        this.stats = {
-                            total: data.total_cantieri || 0,
-                            in_corso: data.in_corso || 0,
-                            pianificati: data.pianificato || 0,
-                            completati: data.completato || 0
-                        };
-                        
-                    } catch (error) {
-                        console.error('Error loading stats:', error);
-                        // Don't show alert for stats errors, just use fallback
-                    }
-                },
+        try {
+            const response = await fetch(`/api/v1/cantieri/sites/${this.siteId}/stats/cantieri`);
 
-                // Watch for filter changes
-                watchFilters() {
-                    this.$watch('filters.search', () => this.loadCantieri());
-                    this.$watch('filters.stato', () => this.loadCantieri());
-                }
+            if (!response.ok) {
+                throw new Error('Errore nel caricamento delle statistiche');
+            }
+
+            const data = await response.json();
+            this.stats = {
+                total: data.total_cantieri || 0,
+                in_corso: data.in_corso || 0,
+                pianificati: data.pianificato || 0,
+                completati: data.completato || 0
+            };
+
+        } catch (error) {
+            console.error('Error loading stats:', error);
+            // Don't show alert for stats errors, just use fallback
+        }
+    },
+
+    // Watch for filter changes
+    watchFilters() {
+        this.$watch('filters.search', () => this.loadCantieri());
+        this.$watch('filters.stato', () => this.loadCantieri());
+    }
             }
         }
-    </script>
+</script>
 {% endblock %}

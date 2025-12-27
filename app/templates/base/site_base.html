@@ -1,353 +1,353 @@
 <!DOCTYPE html>
 <html lang="it">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}Sistema Archeologico{% endblock %}</title>
 
-    <!-- CSS and JavaScript resources organized by category for better maintainability -->
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Sistema Archeologico{% endblock %}</title>
 
-    <!-- External CSS Libraries -->
-    <link
-      href="/static/css/flowbite.min.css"
-      rel="stylesheet"
-    />
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="/static/css/font-awesome.css" />
-    <link href="/static/css/themes.css" rel="stylesheet">
+  <!-- CSS and JavaScript resources organized by category for better maintainability -->
 
-    <!-- External JavaScript Libraries -->
-    <script src="/static/js/flowbite.min.js"></script>
-    <script src="/static/js/alpine.min.js" defer></script>
-    <!-- OpenSeadragon Library for deep zoom image viewing -->
-    <script src="/static/js/openseadragon.min.js"></script>
-     <script src="/static/js/api-client.js"></script>
-    <!-- Initialize Libraries -->
-    <script>
-      // Expose server-side variables to JavaScript before any initialization
-      window.currentUser = {% if current_user %}{
-        id: "{{ current_user.id }}",
+  <!-- External CSS Libraries -->
+  <link href="/static/css/flowbite.min.css" rel="stylesheet" />
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="/static/css/font-awesome.css" />
+  <link href="/static/css/themes.css" rel="stylesheet">
+
+  <!-- External JavaScript Libraries -->
+  <script src="/static/js/flowbite.min.js"></script>
+  <script src="/static/js/alpine.min.js" defer></script>
+  <!-- OpenSeadragon Library for deep zoom image viewing -->
+  <script src="/static/js/openseadragon.min.js"></script>
+  <script src="/static/js/api-client.js"></script>
+  <!-- Initialize Libraries -->
+  <script>
+    // Expose server-side variables to JavaScript before any initialization
+    window.currentUser = {% if current_user %}{
+      id: "{{ current_user.id }}",
         email: "{{ current_user.email }}",
-        isAuthenticated: true
-      }{% elif user %}{
-        id: "{{ user.id }}",
+          isAuthenticated: true
+    } {% elif user %} {
+      id: "{{ user.id }}",
         email: "{{ user.email }}",
-        isAuthenticated: true
-      }{% else %}{ isAuthenticated: false }{% endif %};
-      
-      // Debug logging for current user exposure
-      console.log('DEBUG: Current user exposed to JavaScript:', window.currentUser);
-      
-      // Profile modal initialization function
-      function initializeProfileModal() {
-        try {
+          isAuthenticated: true
+    } {% else %} { isAuthenticated: false } {% endif %};
 
-            // Check if modal element exists first (before checking authentication)
-          const profileModal = document.getElementById('profile-modal');
-          if (!profileModal) {
-            console.log('DEBUG: Profile modal element not found in DOM, skipping initialization');
-            return;
-          }
-          
-          // Check if user is authenticated
-          if (!window.currentUser.isAuthenticated) {
-            console.log('DEBUG: User not authenticated, skipping modal initialization');
-            return;
-          }
+    // Debug logging for current user exposure
+    console.log('DEBUG: Current user exposed to JavaScript:', window.currentUser);
 
-          // Initialize Flowbite modal if available
-          if (typeof window.Modal !== 'undefined') {
-            try {
-              const modal = new window.Modal(profileModal, {
-                backdrop: 'dynamic',
-                backdropClasses: 'bg-gray-900 bg-opacity-50 dark:bg-opacity-80 fixed inset-0 z-40',
-                closable: true,
-                hideOnBackdropClick: true,
-                hideOnEsc: true,
-                showOn: false
-              });
+    // Profile modal initialization function
+    function initializeProfileModal() {
+      try {
 
-              // Store modal instance for later use
-              window.profileModalInstance = modal;
-            } catch (error) {
-              console.error('DEBUG: Error initializing Flowbite modal:', error);
-            }
-          } else {
-            console.warn('DEBUG: Flowbite Modal class not available');
-          }
-          
-          // Set up event listeners for modal triggers
-          setupModalEventListeners();
-          
-        } catch (error) {
-          console.error('DEBUG: Error in profile modal initialization:', error);
-        }
-      }
-      
-      // Function to set up modal event listeners
-      function setupModalEventListeners() {
-        try {
-          const profileModal = document.getElementById('profile-modal');
-          if (!profileModal) {
-            console.log('DEBUG: Profile modal not found, skipping event listener setup');
-            return;
-          }
-          
-          const profileModalTriggers = document.querySelectorAll('[data-modal-target="profile-modal"]');
-          
-          console.log('DEBUG: Profile modal triggers found:', profileModalTriggers.length);
-          
-          if (profileModalTriggers.length === 0) {
-            console.warn('DEBUG: No profile modal triggers found');
-            return;
-          }
-          
-          // Add click handlers to triggers
-          profileModalTriggers.forEach(trigger => {
-            trigger.addEventListener('click', function(e) {
-
-              e.preventDefault();
-              
-              // Try Flowbite modal first
-              if (window.profileModalInstance) {
-                try {
-                  window.profileModalInstance.show();
-                  console.log('DEBUG: Flowbite modal opened via instance');
-                  return;
-                } catch (error) {
-                  console.log('DEBUG: Flowbite modal instance failed, trying new instance:', error);
-                }
-              }
-              
-              // Try creating new Flowbite modal
-              if (typeof window.Modal !== 'undefined') {
-                try {
-                  const modal = new window.Modal(profileModal);
-                  modal.show();
-
-                  return;
-                } catch (error) {
-                  console.log('DEBUG: Flowbite modal failed, using fallback:', error);
-                }
-              }
-              
-              // Fallback to manual show/hide
-              profileModal.classList.remove('hidden');
-              profileModal.classList.add('flex');
-
-            });
-          });
-          
-          // Add close handlers
-          const closeButtons = document.querySelectorAll('[data-modal-hide="profile-modal"]');
-          console.log('DEBUG: Close buttons found:', closeButtons.length);
-          
-          closeButtons.forEach(button => {
-            button.addEventListener('click', function() {
-              console.log('DEBUG: Profile modal close button clicked');
-              closeModal();
-            });
-          });
-          
-          // Close on backdrop click
-          profileModal.addEventListener('click', function(e) {
-            if (e.target === profileModal) {
-              console.log('DEBUG: Profile modal backdrop clicked');
-              closeModal();
-            }
-          });
-          
-        } catch (error) {
-          console.error('DEBUG: Error setting up modal event listeners:', error);
-        }
-      }
-      
-      // Function to close modal
-      function closeModal() {
-        try {
-          const profileModal = document.getElementById('profile-modal');
-          if (!profileModal) {
-            console.log('DEBUG: Profile modal not found, cannot close');
-            return;
-          }
-          
-          // Try Flowbite modal first
-          if (window.profileModalInstance) {
-            try {
-              window.profileModalInstance.hide();
-              console.log('DEBUG: Flowbite modal closed via instance');
-              return;
-            } catch (error) {
-              console.log('DEBUG: Flowbite modal instance close failed, using fallback:', error);
-            }
-          }
-          
-          // Try creating new Flowbite modal
-          if (typeof window.Modal !== 'undefined') {
-            try {
-              const modal = new window.Modal(profileModal);
-              modal.hide();
-              console.log('DEBUG: Flowbite modal closed with new instance');
-              return;
-            } catch (error) {
-              console.log('DEBUG: Flowbite modal close failed, using fallback:', error);
-            }
-          }
-          
-          // Fallback to manual show/hide
-          profileModal.classList.add('hidden');
-          profileModal.classList.remove('flex');
-          console.log('DEBUG: Profile modal closed with fallback method');
-          
-        } catch (error) {
-          console.error('DEBUG: Error closing modal:', error);
-        }
-      }
-      
-      // Initialize when DOM is ready
-      document.addEventListener('DOMContentLoaded', function() {
-        console.log('DEBUG: DOM content loaded');
-        
-        // Initialize profile modal first (it will check if modal exists)
-        initializeProfileModal();
-        
-        // Then initialize Flowbite components (this will handle any remaining components)
-        if (typeof initFlowbite === 'function') {
-          try {
-            initFlowbite();
-            console.log('DEBUG: Flowbite components initialized');
-          } catch (error) {
-            console.error('DEBUG: Error initializing Flowbite:', error);
-          }
-        }
-      });
-      
-      // Fallback initialization for dynamic content
-      window.addEventListener('load', function() {
-        console.log('DEBUG: Window fully loaded');
-        
-        // Re-initialize if modal wasn't found earlier (might be loaded dynamically)
-        if (!document.getElementById('profile-modal')) {
-          console.log('DEBUG: Profile modal still not found after full load, skipping retry');
-          return;
-        }
-        
-        if (window.currentUser.isAuthenticated) {
-          console.log('DEBUG: Retrying modal initialization after full load');
-          setTimeout(initializeProfileModal, 100);
-        }
-      });
-    </script>
-
-    <!-- Additional head content from child templates -->
-    {% block additional_head %}{% endblock %}
-  </head>
-
-  <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
-    <!-- Theme Toggle Button (Fixed Position - Always Available) -->
-    <!-- Global UI controls that persist across all pages -->
-    <div class="fixed top-4 right-4 z-50 flex space-x-2">
-      <button
-        id="theme-toggle"
-        type="button"
-        class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5"
-        aria-label="Toggle theme"
-        title="Cambia tema"
-      >
-        <!-- Light mode icon -->
-        <svg id="theme-toggle-light-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-          <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
-        </svg>
-        <!-- Dark mode icon -->
-        <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
-        </svg>
-      </button>
-    </div>
-
-    {% if (current_page is not defined) or (current_page not in ["register", "login"]) %}
-      {% include "partials/auth_navigation.html" %}
-    {% endif %}
-
-    <!-- Main content area with responsive layout support -->
-    <main class="pt-20 {% if layout_type == 'sidebar' %}flex-1 p-4 pt-20{% if site and site.id %} sm:ml-64{% endif %}{% else %}min-h-screen{% endif %}">
-      {% block content %}{% endblock %}
-    </main>
-
-    <!-- Application-specific JavaScript modules -->
-    <script type="text/javascript" src="/static/js/components.js"></script>
-    <script type="text/javascript" src="/static/js/theme.js"></script>
-
-    <!-- Additional scripts from child templates -->
-    {% block additional_scripts %}{% endblock %}
-
-    <!-- User-specific components (only shown when authenticated) -->
-    {% if current_user or user %}
-      {% include "partials/profile_modal.html" %}
-    {% endif %}
-
-    <!-- Profile modal re-initialization for dynamic content -->
-    <script>
-      // Re-initialize profile modal if content is loaded dynamically
-      function reinitializeProfileModal() {
-        console.log('DEBUG: Re-initializing profile modal for dynamic content...');
-        
-        // Check if modal exists first
+        // Check if modal element exists first (before checking authentication)
         const profileModal = document.getElementById('profile-modal');
         if (!profileModal) {
-          console.log('DEBUG: Profile modal not found, skipping re-initialization');
+          console.log('DEBUG: Profile modal element not found in DOM, skipping initialization');
           return;
         }
-        
-        // Only proceed if user is authenticated
-        if (!window.currentUser || !window.currentUser.isAuthenticated) {
-          console.log('DEBUG: User not authenticated, skipping re-initialization');
+
+        // Check if user is authenticated
+        if (!window.currentUser.isAuthenticated) {
+          console.log('DEBUG: User not authenticated, skipping modal initialization');
           return;
         }
-        
-        // Check if modal exists but wasn't initialized
-        if (!window.profileModalInstance) {
-          console.log('DEBUG: Modal found but not initialized, re-initializing...');
-          initializeProfileModal();
+
+        // Initialize Flowbite modal if available
+        if (typeof window.Modal !== 'undefined') {
+          try {
+            const modal = new window.Modal(profileModal, {
+              backdrop: 'dynamic',
+              backdropClasses: 'bg-gray-900 bg-opacity-50 dark:bg-opacity-80 fixed inset-0 z-40',
+              closable: true,
+              hideOnBackdropClick: true,
+              hideOnEsc: true,
+              showOn: false
+            });
+
+            // Store modal instance for later use
+            window.profileModalInstance = modal;
+          } catch (error) {
+            console.error('DEBUG: Error initializing Flowbite modal:', error);
+          }
+        } else {
+          console.warn('DEBUG: Flowbite Modal class not available');
+        }
+
+        // Set up event listeners for modal triggers
+        setupModalEventListeners();
+
+      } catch (error) {
+        console.error('DEBUG: Error in profile modal initialization:', error);
+      }
+    }
+
+    // Function to set up modal event listeners
+    function setupModalEventListeners() {
+      try {
+        const profileModal = document.getElementById('profile-modal');
+        if (!profileModal) {
+          console.log('DEBUG: Profile modal not found, skipping event listener setup');
+          return;
+        }
+
+        const profileModalTriggers = document.querySelectorAll('[data-modal-target="profile-modal"]');
+
+        console.log('DEBUG: Profile modal triggers found:', profileModalTriggers.length);
+
+        if (profileModalTriggers.length === 0) {
+          console.warn('DEBUG: No profile modal triggers found');
+          return;
+        }
+
+        // Add click handlers to triggers
+        profileModalTriggers.forEach(trigger => {
+          trigger.addEventListener('click', function (e) {
+
+            e.preventDefault();
+
+            // Try Flowbite modal first
+            if (window.profileModalInstance) {
+              try {
+                window.profileModalInstance.show();
+                console.log('DEBUG: Flowbite modal opened via instance');
+                return;
+              } catch (error) {
+                console.log('DEBUG: Flowbite modal instance failed, trying new instance:', error);
+              }
+            }
+
+            // Try creating new Flowbite modal
+            if (typeof window.Modal !== 'undefined') {
+              try {
+                const modal = new window.Modal(profileModal);
+                modal.show();
+
+                return;
+              } catch (error) {
+                console.log('DEBUG: Flowbite modal failed, using fallback:', error);
+              }
+            }
+
+            // Fallback to manual show/hide
+            profileModal.classList.remove('hidden');
+            profileModal.classList.add('flex');
+
+          });
+        });
+
+        // Add close handlers
+        const closeButtons = document.querySelectorAll('[data-modal-hide="profile-modal"]');
+        console.log('DEBUG: Close buttons found:', closeButtons.length);
+
+        closeButtons.forEach(button => {
+          button.addEventListener('click', function () {
+            console.log('DEBUG: Profile modal close button clicked');
+            closeModal();
+          });
+        });
+
+        // Close on backdrop click
+        profileModal.addEventListener('click', function (e) {
+          if (e.target === profileModal) {
+            console.log('DEBUG: Profile modal backdrop clicked');
+            closeModal();
+          }
+        });
+
+      } catch (error) {
+        console.error('DEBUG: Error setting up modal event listeners:', error);
+      }
+    }
+
+    // Function to close modal
+    function closeModal() {
+      try {
+        const profileModal = document.getElementById('profile-modal');
+        if (!profileModal) {
+          console.log('DEBUG: Profile modal not found, cannot close');
+          return;
+        }
+
+        // Try Flowbite modal first
+        if (window.profileModalInstance) {
+          try {
+            window.profileModalInstance.hide();
+            console.log('DEBUG: Flowbite modal closed via instance');
+            return;
+          } catch (error) {
+            console.log('DEBUG: Flowbite modal instance close failed, using fallback:', error);
+          }
+        }
+
+        // Try creating new Flowbite modal
+        if (typeof window.Modal !== 'undefined') {
+          try {
+            const modal = new window.Modal(profileModal);
+            modal.hide();
+            console.log('DEBUG: Flowbite modal closed with new instance');
+            return;
+          } catch (error) {
+            console.log('DEBUG: Flowbite modal close failed, using fallback:', error);
+          }
+        }
+
+        // Fallback to manual show/hide
+        profileModal.classList.add('hidden');
+        profileModal.classList.remove('flex');
+        console.log('DEBUG: Profile modal closed with fallback method');
+
+      } catch (error) {
+        console.error('DEBUG: Error closing modal:', error);
+      }
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', function () {
+      console.log('DEBUG: DOM content loaded');
+
+      // Initialize profile modal first (it will check if modal exists)
+      initializeProfileModal();
+
+      // Then initialize Flowbite components (this will handle any remaining components)
+      if (typeof initFlowbite === 'function') {
+        try {
+          initFlowbite();
+          console.log('DEBUG: Flowbite components initialized');
+        } catch (error) {
+          console.error('DEBUG: Error initializing Flowbite:', error);
         }
       }
-      
-      // Set up a mutation observer to detect when the modal is added to the DOM
-      document.addEventListener('DOMContentLoaded', function() {
-        // Only set up observer if user is authenticated
-        if (window.currentUser && window.currentUser.isAuthenticated) {
-          const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-              if (mutation.type === 'childList') {
-                // Check if profile modal was added
-                for (let node of mutation.addedNodes) {
-                  if (node.nodeType === 1) { // Element node
-                    if (node.id === 'profile-modal' || node.querySelector('#profile-modal')) {
-                      console.log('DEBUG: Profile modal detected via mutation observer');
-                      // Check if modal actually exists before trying to initialize
-                      if (document.getElementById('profile-modal')) {
-                        setTimeout(reinitializeProfileModal, 50);
-                      }
-                      return;
+    });
+
+    // Fallback initialization for dynamic content
+    window.addEventListener('load', function () {
+      console.log('DEBUG: Window fully loaded');
+
+      // Re-initialize if modal wasn't found earlier (might be loaded dynamically)
+      if (!document.getElementById('profile-modal')) {
+        console.log('DEBUG: Profile modal still not found after full load, skipping retry');
+        return;
+      }
+
+      if (window.currentUser.isAuthenticated) {
+        console.log('DEBUG: Retrying modal initialization after full load');
+        setTimeout(initializeProfileModal, 100);
+      }
+    });
+  </script>
+
+  <!-- Additional head content from child templates -->
+  {% block additional_head %}{% endblock %}
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+  <!-- Theme Toggle Button (Fixed Position - Always Available) -->
+  <!-- Global UI controls that persist across all pages -->
+  <div class="fixed top-4 right-4 z-50 flex space-x-2">
+    <button id="theme-toggle" type="button"
+      class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5"
+      aria-label="Toggle theme" title="Cambia tema">
+      <!-- Light mode icon -->
+      <svg id="theme-toggle-light-icon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"
+        xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd"
+          d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
+          clip-rule="evenodd" />
+      </svg>
+      <!-- Dark mode icon -->
+      <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20"
+        xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+      </svg>
+    </button>
+  </div>
+
+  {% if (current_page is not defined) or (current_page not in ["register", "login"]) %}
+  {% include "partials/auth_navigation.html" %}
+  {% endif %}
+
+  <!-- Main content area with responsive layout support -->
+  <main
+    class="pt-20 {% if layout_type == 'sidebar' %}flex-1 p-4 pt-20{% if site and (site.id is defined or site.site_id is defined) %} sm:ml-64{% endif %}{% else %}min-h-screen{% endif %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Application-specific JavaScript modules -->
+  <script type="text/javascript" src="/static/js/components.js"></script>
+  <script type="text/javascript" src="/static/js/theme.js"></script>
+
+  <!-- Additional scripts from child templates -->
+  {% block additional_scripts %}{% endblock %}
+
+  <!-- User-specific components (only shown when authenticated) -->
+  {% if current_user or user %}
+  {% include "partials/profile_modal.html" %}
+  {% endif %}
+
+  <!-- Profile modal re-initialization for dynamic content -->
+  <script>
+    // Re-initialize profile modal if content is loaded dynamically
+    function reinitializeProfileModal() {
+      console.log('DEBUG: Re-initializing profile modal for dynamic content...');
+
+      // Check if modal exists first
+      const profileModal = document.getElementById('profile-modal');
+      if (!profileModal) {
+        console.log('DEBUG: Profile modal not found, skipping re-initialization');
+        return;
+      }
+
+      // Only proceed if user is authenticated
+      if (!window.currentUser || !window.currentUser.isAuthenticated) {
+        console.log('DEBUG: User not authenticated, skipping re-initialization');
+        return;
+      }
+
+      // Check if modal exists but wasn't initialized
+      if (!window.profileModalInstance) {
+        console.log('DEBUG: Modal found but not initialized, re-initializing...');
+        initializeProfileModal();
+      }
+    }
+
+    // Set up a mutation observer to detect when the modal is added to the DOM
+    document.addEventListener('DOMContentLoaded', function () {
+      // Only set up observer if user is authenticated
+      if (window.currentUser && window.currentUser.isAuthenticated) {
+        const observer = new MutationObserver(function (mutations) {
+          mutations.forEach(function (mutation) {
+            if (mutation.type === 'childList') {
+              // Check if profile modal was added
+              for (let node of mutation.addedNodes) {
+                if (node.nodeType === 1) { // Element node
+                  if (node.id === 'profile-modal' || node.querySelector('#profile-modal')) {
+                    console.log('DEBUG: Profile modal detected via mutation observer');
+                    // Check if modal actually exists before trying to initialize
+                    if (document.getElementById('profile-modal')) {
+                      setTimeout(reinitializeProfileModal, 50);
                     }
+                    return;
                   }
                 }
               }
-            });
+            }
           });
-          
-          // Start observing the document body for changes
-          observer.observe(document.body, {
-            childList: true,
-            subtree: true
-          });
-          
-          console.log('DEBUG: Mutation observer set up for profile modal');
-        }
-      });
-      
-      // Expose re-initialization function globally for manual calls
-      window.reinitializeProfileModal = reinitializeProfileModal;
-    </script>
-  </body>
+        });
+
+        // Start observing the document body for changes
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+
+        console.log('DEBUG: Mutation observer set up for profile modal');
+      }
+    });
+
+    // Expose re-initialization function globally for manual calls
+    window.reinitializeProfileModal = reinitializeProfileModal;
+  </script>
+</body>
+
 </html>

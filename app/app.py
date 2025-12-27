@@ -460,6 +460,14 @@ app.include_router(
     dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
 
+# 📈 INCLUSIONE ROUTER ANALYTICS - API per statistiche dashboard
+from app.routes.api.analytics import router as analytics_router
+app.include_router(
+    analytics_router,
+    tags=["analytics"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
+
 # 📎 INCLUSIONE ROUTER US/USM FILES - Gestione file US/USM
 # app.include_router(
 #     us_files_router,

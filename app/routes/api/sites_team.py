@@ -39,7 +39,7 @@ async def get_team_members(
     ).join(
         User, UserSitePermission.user_id == User.id
     ).where(
-        UserSitePermission.site_id == site_id
+        UserSitePermission.site_id == str(site_id)
     ).order_by(UserSitePermission.created_at.desc())
 
     result = await db.execute(query)
@@ -134,7 +134,7 @@ async def get_site_team(db: AsyncSession, site_id: UUID) -> List[Dict]:
         UserSitePermission, User.id == UserSitePermission.user_id
     ).options(selectinload(User.profile)).where(
         and_(
-            UserSitePermission.site_id == site_id,
+            UserSitePermission.site_id == str(site_id),
             UserSitePermission.is_active == True
         )
     ).order_by(UserSitePermission.permission_level.desc())
