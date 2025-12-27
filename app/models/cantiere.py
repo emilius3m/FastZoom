@@ -87,6 +87,11 @@ class Cantiere(Base):
     tipologia_intervento = Column(String(100), nullable=True)  # Tipo di intervento
     priorita = Column(Integer, nullable=False, default=3)  # Priorità (1-5)
     
+    # Campi Scientifici ICCD (per RE - Reperimento)
+    iccd_re_tipo = Column(String(50), nullable=True)  # scavo, ricognizione, altra_indagine
+    iccd_re_metodo = Column(String(50), nullable=True)  # stratigrafico, sistematica, etc.
+    iccd_geometria = Column(Text, nullable=True)  # WKT/GeoJSON del poligono di indagine
+    
     # Timestamp
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -167,6 +172,10 @@ class Cantiere(Base):
             "coordinate_lat": self.coordinate_lat,
             "coordinate_lon": self.coordinate_lon,
             "quota": self.quota,
+            # Campi ICCD
+            "iccd_re_tipo": self.iccd_re_tipo,
+            "iccd_re_metodo": self.iccd_re_metodo,
+            "iccd_geometria": self.iccd_geometria,
             # Metadati
             "responsabile_cantiere": self.responsabile_cantiere,
             "tipologia_intervento": self.tipologia_intervento,

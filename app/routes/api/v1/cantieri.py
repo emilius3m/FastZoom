@@ -372,6 +372,10 @@ async def v1_create_cantiere(
             coordinate_lat=cantiere_data.get("coordinate_lat"),
             coordinate_lon=cantiere_data.get("coordinate_lon"),
             quota=cantiere_data.get("quota"),
+            # Campi Scientifici ICCD
+            iccd_re_tipo=cantiere_data.get("iccd_re_tipo"),
+            iccd_re_metodo=cantiere_data.get("iccd_re_metodo"),
+            iccd_geometria=cantiere_data.get("iccd_geometria"),
             # Metadati
             responsabile_cantiere=cantiere_data.get("responsabile_cantiere"),
             tipologia_intervento=cantiere_data.get("tipologia_intervento"),
@@ -528,6 +532,14 @@ async def v1_update_cantiere(
             cantiere.coordinate_lon = cantiere_data["coordinate_lon"]
         if "quota" in cantiere_data:
             cantiere.quota = cantiere_data["quota"]
+            
+        # Aggiorna Campi Scientifici ICCD
+        if "iccd_re_tipo" in cantiere_data:
+            cantiere.iccd_re_tipo = cantiere_data["iccd_re_tipo"]
+        if "iccd_re_metodo" in cantiere_data:
+            cantiere.iccd_re_metodo = cantiere_data["iccd_re_metodo"]
+        if "iccd_geometria" in cantiere_data:
+            cantiere.iccd_geometria = cantiere_data["iccd_geometria"]
         
         # Aggiorna metadati
         if "responsabile_cantiere" in cantiere_data:

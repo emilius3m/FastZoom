@@ -441,6 +441,69 @@
                                 placeholder="Descrizione dettagliata del cantiere..."></textarea>
                         </div>
 
+                        <!-- Dati Scientifici Section -->
+                        <div class="col-span-2 mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
+                            <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                <i class="fas fa-microscope mr-2"></i>Dati Scientifici (Standard ICCD)
+                            </h4>
+                            <div class="grid gap-4 grid-cols-2">
+                                <!-- Tipo Indagine -->
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label for="iccd_re_tipo"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Tipo
+                                        Indagine</label>
+                                    <select id="iccd_re_tipo" x-model="modal.formData.iccd_re_tipo"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                                        <option value="">Seleziona tipo</option>
+                                        <option value="scavo">Scavo (RES)</option>
+                                        <option value="ricognizione">Ricognizione (RER)</option>
+                                        <option value="altra_indagine">Altra Indagine (REA)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Metodo Indagine -->
+                                <div class="col-span-2 sm:col-span-1">
+                                    <label for="iccd_re_metodo"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Metodo</label>
+                                    <select id="iccd_re_metodo" x-model="modal.formData.iccd_re_metodo"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                                        <option value="">Seleziona metodo</option>
+                                        <template x-if="modal.formData.iccd_re_tipo === 'scavo'">
+                                            <optgroup label="Scavo">
+                                                <option value="stratigrafico">Stratigrafico</option>
+                                                <option value="livelli_artificiali">Per livelli artificiali</option>
+                                                <option value="in_estensione">In estensione</option>
+                                            </optgroup>
+                                        </template>
+                                        <template x-if="modal.formData.iccd_re_tipo === 'ricognizione'">
+                                            <optgroup label="Ricognizione">
+                                                <option value="sistematica">Sistematica</option>
+                                                <option value="intensiva">Intensiva</option>
+                                                <option value="estensiva">Estensiva</option>
+                                            </optgroup>
+                                        </template>
+                                        <template
+                                            x-if="modal.formData.iccd_re_tipo === 'altra_indagine' || !modal.formData.iccd_re_tipo">
+                                            <option value="altro">Altro</option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                <!-- Geometria -->
+                                <div class="col-span-2">
+                                    <label for="iccd_geometria"
+                                        class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                        Geometria Area (WKT/GeoJSON)
+                                        <span class="text-xs text-gray-500 font-normal ml-2">Opzionale - Per
+                                            esportazione GIS/ICCD</span>
+                                    </label>
+                                    <textarea id="iccd_geometria" x-model="modal.formData.iccd_geometria" rows="2"
+                                        class="block p-2.5 w-full text-sm font-mono text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-600 focus:border-blue-600 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="POLYGON((...))"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Dati Contrattuali Section -->
                         <div class="col-span-2 mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
                             <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -692,7 +755,11 @@
                 oggetto_appalto: '',
                 codice_cup: '',
                 codice_cig: '',
-                importo_lavori: ''
+                importo_lavori: '',
+                // ICCD Fields
+                iccd_re_tipo: '',
+                iccd_re_metodo: '',
+                iccd_geometria: ''
             }
         };
     },
