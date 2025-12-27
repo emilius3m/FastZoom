@@ -7,7 +7,7 @@
 
 {% block content %}
 <div class=" mx-auto p-6" x-data="teamManager">
-    
+
     <!-- Header -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div class="px-6 py-4 border-b border-gray-200">
@@ -20,16 +20,19 @@
                 </div>
                 <div class="flex items-center space-x-3 mt-4 sm:mt-0">
                     <button @click="showInviteModal = true"
-                            class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+                        class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                         </svg>
                         Invita Utente
                     </button>
                     <button @click="exportTeamData"
-                            class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
                         </svg>
                         Esporta Team
                     </button>
@@ -45,7 +48,9 @@
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                        </path>
                     </svg>
                 </div>
                 <div class="ml-4">
@@ -60,12 +65,14 @@
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
                 <div class="ml-4">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">Membri Attivi</h3>
-                    <p class="text-2xl font-semibold text-green-600 dark:text-green-400" x-text="stats.activeMembers"></p>
+                    <p class="text-2xl font-semibold text-green-600 dark:text-green-400" x-text="stats.activeMembers">
+                    </p>
                 </div>
             </div>
         </div>
@@ -75,7 +82,9 @@
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                        </path>
                     </svg>
                 </div>
                 <div class="ml-4">
@@ -90,12 +99,14 @@
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
                 <div class="ml-4">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-white">Inviti Pendenti</h3>
-                    <p class="text-2xl font-semibold text-yellow-600 dark:text-yellow-400" x-text="stats.pendingInvites"></p>
+                    <p class="text-2xl font-semibold text-yellow-600 dark:text-yellow-400"
+                        x-text="stats.pendingInvites"></p>
                 </div>
             </div>
         </div>
@@ -106,346 +117,410 @@
         <div class="flex items-start">
             <div class="flex-shrink-0">
                 <svg class="h-6 w-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-            </svg>
-        </div>
-        <div class="ml-3">
-            <h4 class="text-lg font-medium text-blue-800 dark:text-blue-200 mb-2">Ruoli e Permessi del Sito Archeologico</h4>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-700 dark:text-blue-300">
-                <div>
-                    <strong class="font-semibold">Admin (Direttore di Scavo)</strong>
-                    <ul class="mt-1 list-disc list-inside space-y-1">
-                        <li>Gestione completa del team</li>
-                        <li>Modifica informazioni sito</li>
-                        <li>Upload e modifica foto</li>
-                        <li>Gestione documentazione</li>
-                        <li>Validazione dati</li>
-                    </ul>
-                </div>
-                <div>
-                    <strong class="font-semibold">Write (Archeologo)</strong>
-                    <ul class="mt-1 list-disc list-inside space-y-1">
-                        <li>Upload e modifica proprie foto</li>
-                        <li>Aggiunta documentazione</li>
-                        <li>Modifica metadati archeologici</li>
-                        <li>Accesso completo in lettura</li>
-                    </ul>
-                </div>
-                <div>
-                    <strong class="font-semibold">Read (Collaboratore)</strong>
-                    <ul class="mt-1 list-disc list-inside space-y-1">
-                        <li>Visualizzazione foto e documenti</li>
-                        <li>Download contenuti</li>
-                        <li>Export dati</li>
-                        <li>Accesso statistiche</li>
-                    </ul>
+                    <path fill-rule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                        clip-rule="evenodd"></path>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h4 class="text-lg font-medium text-blue-800 dark:text-blue-200 mb-2">Ruoli e Permessi del Sito
+                    Archeologico</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-700 dark:text-blue-300">
+                    <div>
+                        <strong class="font-semibold">Admin (Direttore di Scavo)</strong>
+                        <ul class="mt-1 list-disc list-inside space-y-1">
+                            <li>Gestione completa del team</li>
+                            <li>Modifica informazioni sito</li>
+                            <li>Upload e modifica foto</li>
+                            <li>Gestione documentazione</li>
+                            <li>Validazione dati</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="font-semibold">Write (Archeologo)</strong>
+                        <ul class="mt-1 list-disc list-inside space-y-1">
+                            <li>Upload e modifica proprie foto</li>
+                            <li>Aggiunta documentazione</li>
+                            <li>Modifica metadati archeologici</li>
+                            <li>Accesso completo in lettura</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <strong class="font-semibold">Read (Collaboratore)</strong>
+                        <ul class="mt-1 list-disc list-inside space-y-1">
+                            <li>Visualizzazione foto e documenti</li>
+                            <li>Download contenuti</li>
+                            <li>Export dati</li>
+                            <li>Accesso statistiche</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Search and Filters -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="md:col-span-2">
-                    <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cerca Membri</label>
-                    <input type="text"
-                           id="search"
-                           x-model="searchTerm"
-                           @input="filterMembers"
-                           class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                           placeholder="Cerca per nome, email, specializzazione...">
-                </div>
-                
-                <div>
-                    <label for="roleFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ruolo</label>
-                    <select id="roleFilter"
-                            x-model="roleFilter"
-                            @change="filterMembers"
-                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
-                        <option value="">Tutti i ruoli</option>
-                        <option value="admin">Amministratori</option>
-                        <option value="write">Scrittori</option>
-                        <option value="read">Lettori</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stato</label>
-                    <select id="statusFilter"
-                            x-model="statusFilter"
-                            @change="filterMembers"
-                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
-                        <option value="">Tutti gli stati</option>
-                        <option value="active">Attivo</option>
-                        <option value="inactive">Inattivo</option>
-                        <option value="pending">Invito Pendente</option>
-                        <option value="expired">Scaduto</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-    </div>
+        <!-- Search and Filters -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2">
+                        <label for="search"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cerca Membri</label>
+                        <input type="text" id="search" x-model="searchTerm" @input="filterMembers"
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                            placeholder="Cerca per nome, email, specializzazione...">
+                    </div>
 
-    <!-- Team Members List -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <div class="flex justify-between items-center">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                    Membri del Team (<span x-text="filteredMembers.length"></span>)
-                </h2>
-                <div class="text-sm text-gray-500 dark:text-gray-400">
-                    Ultimo aggiornamento: <span x-text="formatDate(new Date())"></span>
+                    <div>
+                        <label for="roleFilter"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ruolo</label>
+                        <select id="roleFilter" x-model="roleFilter" @change="filterMembers"
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                            <option value="">Tutti i ruoli</option>
+                            <option value="admin">Amministratori</option>
+                            <option value="write">Scrittori</option>
+                            <option value="read">Lettori</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="statusFilter"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stato</label>
+                        <select id="statusFilter" x-model="statusFilter" @change="filterMembers"
+                            class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                            <option value="">Tutti gli stati</option>
+                            <option value="active">Attivo</option>
+                            <option value="inactive">Inattivo</option>
+                            <option value="pending">Invito Pendente</option>
+                            <option value="expired">Scaduto</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
-        
-        <div class="overflow-x-auto">
-            <table class="w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                        <th @click="setSortBy('name')"
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            <div class="flex items-center space-x-1">
-                                <span>Utente</span>
-                                <svg x-show="sortBy === 'name'" class="w-4 h-4" :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </div>
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Ruolo Archeologico
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Permessi
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Stato
-                        </th>
-                        <th @click="setSortBy('granted_at')"
-                            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            <div class="flex items-center space-x-1">
-                                <span>Accesso Dal</span>
-                                <svg x-show="sortBy === 'granted_at'" class="w-4 h-4" :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </div>
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Attività
-                        </th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                            Azioni
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    <!-- Empty State -->
-                    <tr x-show="filteredMembers.length === 0">
-                        <td colspan="7" class="px-6 py-12 text-center">
-                            <div class="flex flex-col items-center">
-                                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                                </svg>
-                                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Nessun membro trovato</h3>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                    <span x-show="hasActiveFilters()">Prova a modificare i filtri di ricerca.</span>
-                                    <span x-show="!hasActiveFilters()">Inizia invitando il primo membro del team.</span>
-                                </p>
-                                <div class="mt-6">
-                                    <button @click="showInviteModal = true" 
+
+        <!-- Team Members List -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        Membri del Team (<span x-text="filteredMembers.length"></span>)
+                    </h2>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        Ultimo aggiornamento: <span x-text="formatDate(new Date())"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th @click="setSortBy('name')"
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                                <div class="flex items-center space-x-1">
+                                    <span>Utente</span>
+                                    <svg x-show="sortBy === 'name'" class="w-4 h-4"
+                                        :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </th>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Ruolo Archeologico
+                            </th>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Permessi
+                            </th>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Stato
+                            </th>
+                            <th @click="setSortBy('granted_at')"
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                                <div class="flex items-center space-x-1">
+                                    <span>Accesso Dal</span>
+                                    <svg x-show="sortBy === 'granted_at'" class="w-4 h-4"
+                                        :class="sortDirection === 'asc' ? 'transform rotate-180' : ''" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </div>
+                            </th>
+                            <th
+                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Attività
+                            </th>
+                            <th
+                                class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                Azioni
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        <!-- Empty State -->
+                        <tr x-show="filteredMembers.length === 0">
+                            <td colspan="7" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                                        </path>
+                                    </svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Nessun membro
+                                        trovato</h3>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                        <span x-show="hasActiveFilters()">Prova a modificare i filtri di ricerca.</span>
+                                        <span x-show="!hasActiveFilters()">Inizia invitando il primo membro del
+                                            team.</span>
+                                    </p>
+                                    <div class="mt-6">
+                                        <button @click="showInviteModal = true"
                                             class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                                        <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                        </svg>
-                                        Invita Primo Membro
-                                    </button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-
-                    <!-- Member Rows -->
-                    <template x-for="member in filteredMembers" :key="member.id">
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700" :class="{'opacity-50': !member.is_active}">
-                            <!-- User Info -->
-                            <td class="px-6 py-4">
-                                <div class="flex items-center">
-                                    <!-- Avatar -->
-                                    <div class="flex-shrink-0 h-10 w-10">
-                                        <div class="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm"
-                                             x-text="getUserInitials(member)">
-                                        </div>
+                                            <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                            </svg>
+                                            Invita Primo Membro
+                                        </button>
                                     </div>
-                                    <div class="ml-4">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white"
-                                             x-text="getUserDisplayName(member)"></div>
-                                        <div class="text-sm text-gray-500 dark:text-gray-400" x-text="member.email"></div>
-                                        <div x-show="member.specialization"
-                                             class="text-xs text-gray-400 dark:text-gray-500"
-                                             x-text="'Specializzazione: ' + member.specialization"></div>
-                                    </div>
-                                </div>
-                            </td>
-
-                            <!-- Archaeological Role -->
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 dark:text-gray-200" x-text="member.archaeological_role || 'Non specificato'"></div>
-                                <div x-show="member.institution"
-                                     class="text-xs text-gray-500 dark:text-gray-400"
-                                     x-text="member.institution"></div>
-                            </td>
-
-                            <!-- Permission Level -->
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <span :class="getPermissionBadgeClass(member.permission_level)" 
-                                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                      x-text="getPermissionDisplayName(member.permission_level)">
-                                </span>
-                                <div x-show="member.expires_at" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Scade: <span x-text="formatDate(member.expires_at)"></span>
-                                </div>
-                            </td>
-
-                            <!-- Status -->
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="flex flex-col space-y-1">
-                                    <span x-show="member.is_active && !member.is_pending" 
-                                          class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                                        </svg>
-                                        Attivo
-                                    </span>
-                                    <span x-show="!member.is_active" 
-                                          class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                                        </svg>
-                                        Inattivo
-                                    </span>
-                                    <span x-show="member.is_pending" 
-                                          class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
-                                        </svg>
-                                        Pendente
-                                    </span>
-                                    <span x-show="isExpired(member)" 
-                                          class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                        Scaduto
-                                    </span>
-                                </div>
-                            </td>
-
-                            <!-- Access Date -->
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                <div x-text="formatDate(member.granted_at)"></div>
-                                <div class="text-xs text-gray-400 dark:text-gray-500">
-                                    da <span x-text="member.granted_by_name || 'Sistema'"></span>
-                                </div>
-                            </td>
-
-                            <!-- Activity -->
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 dark:text-gray-200">
-                                    <span x-text="member.photos_uploaded || 0"></span> foto
-                                </div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400">
-                                    Ultimo accesso: <span x-text="member.last_login_at ? formatDate(member.last_login_at) : 'Mai'"></span>
-                                </div>
-                            </td>
-
-                            <!-- Actions -->
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <div class="flex items-center justify-end space-x-2">
-                                    <!-- Edit Permissions -->
-                                    <button @click="editMemberPermissions(member)"
-                                            class="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-100 rounded-full"
-                                            title="Modifica permessi">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                                        </svg>
-                                    </button>
-
-                                    <!-- Toggle Active Status -->
-                                    <button @click="toggleMemberStatus(member)"
-                                            :class="member.is_active ? 'text-red-600 hover:text-red-900 hover:bg-red-100' : 'text-green-600 hover:text-green-900 hover:bg-green-100'"
-                                            class="p-2 rounded-full"
-                                            :title="member.is_active ? 'Disattiva membro' : 'Attiva membro'">
-                                        <svg x-show="member.is_active" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728"></path>
-                                        </svg>
-                                        <svg x-show="!member.is_active" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                    </button>
-
-                                    <!-- Resend Invitation -->
-                                    <button x-show="member.is_pending" 
-                                            @click="resendInvitation(member)"
-                                            class="p-2 text-yellow-600 hover:text-yellow-900 hover:bg-yellow-100 rounded-full"
-                                            title="Reinvia invito">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 7.89a2 2 0 002.829 0L21.06 8.94A2 2 0 0020.348 5H3.652a2 2 0 00-1.414 3.414z"></path>
-                                        </svg>
-                                    </button>
-
-                                    <!-- Remove Member (dangerous) -->
-                                    <button @click="removeMember(member)"
-                                            class="p-2 text-red-600 hover:text-red-900 hover:bg-red-100 rounded-full"
-                                            title="Rimuovi dal team">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                    </button>
                                 </div>
                             </td>
                         </tr>
-                    </template>
-                </tbody>
-            </table>
+
+                        <!-- Member Rows -->
+                        <template x-for="member in filteredMembers" :key="member.id">
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700"
+                                :class="{'opacity-50': !member.is_active}">
+                                <!-- User Info -->
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center">
+                                        <!-- Avatar -->
+                                        <div class="flex-shrink-0 h-10 w-10">
+                                            <div class="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm"
+                                                x-text="getUserInitials(member)">
+                                            </div>
+                                        </div>
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white"
+                                                x-text="getUserDisplayName(member)"></div>
+                                            <div class="text-sm text-gray-500 dark:text-gray-400" x-text="member.email">
+                                            </div>
+                                            <div x-show="member.specialization"
+                                                class="text-xs text-gray-400 dark:text-gray-500"
+                                                x-text="'Specializzazione: ' + member.specialization"></div>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- Archaeological Role -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900 dark:text-gray-200"
+                                        x-text="member.archaeological_role || 'Non specificato'"></div>
+                                    <div x-show="member.institution" class="text-xs text-gray-500 dark:text-gray-400"
+                                        x-text="member.institution"></div>
+                                </td>
+
+                                <!-- Permission Level -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span :class="getPermissionBadgeClass(member.permission_level)"
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                        x-text="getPermissionDisplayName(member.permission_level)">
+                                    </span>
+                                    <div x-show="member.expires_at"
+                                        class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Scade: <span x-text="formatDate(member.expires_at)"></span>
+                                    </div>
+                                </td>
+
+                                <!-- Status -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex flex-col space-y-1">
+                                        <span x-show="member.is_active && !member.is_pending"
+                                            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd"
+                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                    clip-rule="evenodd"></path>
+                                            </svg>
+                                            Attivo
+                                        </span>
+                                        <span x-show="!member.is_active"
+                                            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd"
+                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                                    clip-rule="evenodd"></path>
+                                            </svg>
+                                            Inattivo
+                                        </span>
+                                        <span x-show="member.is_pending"
+                                            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd"
+                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                                                    clip-rule="evenodd"></path>
+                                            </svg>
+                                            Pendente
+                                        </span>
+                                        <span x-show="isExpired(member)"
+                                            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                            Scaduto
+                                        </span>
+                                    </div>
+                                </td>
+
+                                <!-- Access Date -->
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                    <div x-text="formatDate(member.granted_at)"></div>
+                                    <div class="text-xs text-gray-400 dark:text-gray-500">
+                                        da <span x-text="member.granted_by_name || 'Sistema'"></span>
+                                    </div>
+                                </td>
+
+                                <!-- Activity -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900 dark:text-gray-200">
+                                        <span x-text="member.photos_uploaded || 0"></span> foto
+                                    </div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                        Ultimo accesso: <span
+                                            x-text="member.last_login_at ? formatDate(member.last_login_at) : 'Mai'"></span>
+                                    </div>
+                                </td>
+
+                                <!-- Actions -->
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div class="flex items-center justify-end space-x-2">
+                                        <!-- Edit Permissions -->
+                                        <button @click="editMemberPermissions(member)"
+                                            class="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-100 rounded-full"
+                                            title="Modifica permessi">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                                                </path>
+                                            </svg>
+                                        </button>
+
+                                        <!-- Toggle Active Status -->
+                                        <button @click="toggleMemberStatus(member)"
+                                            :class="member.is_active ? 'text-red-600 hover:text-red-900 hover:bg-red-100' : 'text-green-600 hover:text-green-900 hover:bg-green-100'"
+                                            class="p-2 rounded-full"
+                                            :title="member.is_active ? 'Disattiva membro' : 'Attiva membro'">
+                                            <svg x-show="member.is_active" class="w-4 h-4" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728">
+                                                </path>
+                                            </svg>
+                                            <svg x-show="!member.is_active" class="w-4 h-4" fill="none"
+                                                stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </button>
+
+                                        <!-- Resend Invitation -->
+                                        <button x-show="member.is_pending" @click="resendInvitation(member)"
+                                            class="p-2 text-yellow-600 hover:text-yellow-900 hover:bg-yellow-100 rounded-full"
+                                            title="Reinvia invito">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M3 8l7.89 7.89a2 2 0 002.829 0L21.06 8.94A2 2 0 0020.348 5H3.652a2 2 0 00-1.414 3.414z">
+                                                </path>
+                                            </svg>
+                                        </button>
+
+                                        <!-- Remove Member (dangerous) -->
+                                        <button @click="removeMember(member)"
+                                            class="p-2 text-red-600 hover:text-red-900 hover:bg-red-100 rounded-full"
+                                            title="Rimuovi dal team">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                                </path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
         </div>
+
+        <!-- Modals -->
+        {% include 'sites/components/_team_invite_modal.html' %}
+        {% include 'sites/components/_team_edit_permissions_modal.html' %}
     </div>
 
-    <!-- Modals -->
-    {% include 'sites/components/_team_invite_modal.html' %}
-    {% include 'sites/components/_team_edit_permissions_modal.html' %}
-</div>
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('teamManager', () => ({
+                // Data
+                members: {{ team_members| tojson if team_members else '[]'
+        }},
+            filteredMembers: [],
 
-<script>
-document.addEventListener('alpine:init', () => {
-    Alpine.data('teamManager', () => ({
-        // Data
-        members: {{ team_members|tojson if team_members else '[]' }},
-        filteredMembers: [],
-        
-        // Filters and search
-        searchTerm: '',
-        roleFilter: '',
-        statusFilter: '',
-        sortBy: 'name',
-        sortDirection: 'asc',
-        
-        // Stats
-        stats: {
+            // Filters and search
+            searchTerm: '',
+            roleFilter: '',
+            statusFilter: '',
+            sortBy: 'name',
+            sortDirection: 'asc',
+
+            // Stats
+            stats: {
             totalMembers: 0,
             activeMembers: 0,
             administrators: 0,
             pendingInvites: 0
         },
-        
-        // Modals
-        showInviteModal: false,
-        showEditModal: false,
-        selectedMember: null,
-        
+
+            // Modals
+            showInviteModal: false,
+            showEditModal: false,
+            selectedMember: null,
+
+            // Invite Modal Data
+            inviteMethod: 'existing',
+            selectedUserId: '',
+            availableUsers: [],
+            isSendingInvite: false,
+            inviteData: {
+            email: '',
+            full_name: '',
+            archaeological_role: '',
+            specialization: '',
+            institution: '',
+            permission_level: 'read',
+            access_duration: 'permanent',
+            expires_at: '',
+            welcome_message: ''
+        },
+
+            get canSendInvite() {
+            if(this.inviteMethod === 'existing') {
+            return this.selectedUserId && this.inviteData.permission_level;
+        } else {
+            return this.inviteData.email && this.inviteData.permission_level;
+        }
+            },
+
         init() {
             this.filteredMembers = [...this.members];
             this.calculateStats();
+            this.loadAvailableUsers();
         },
-        
+
         calculateStats() {
             this.stats = {
                 totalMembers: this.members.length,
@@ -454,26 +529,26 @@ document.addEventListener('alpine:init', () => {
                 pendingInvites: this.members.filter(m => m.is_pending).length
             };
         },
-        
+
         filterMembers() {
             let filtered = [...this.members];
-            
+
             // Text search
             if (this.searchTerm) {
                 const term = this.searchTerm.toLowerCase();
-                filtered = filtered.filter(member => 
+                filtered = filtered.filter(member =>
                     (member.full_name && member.full_name.toLowerCase().includes(term)) ||
                     (member.email && member.email.toLowerCase().includes(term)) ||
                     (member.specialization && member.specialization.toLowerCase().includes(term)) ||
                     (member.archaeological_role && member.archaeological_role.toLowerCase().includes(term))
                 );
             }
-            
+
             // Role filter
             if (this.roleFilter) {
                 filtered = filtered.filter(member => member.permission_level === this.roleFilter);
             }
-            
+
             // Status filter
             if (this.statusFilter) {
                 filtered = filtered.filter(member => {
@@ -486,11 +561,11 @@ document.addEventListener('alpine:init', () => {
                     }
                 });
             }
-            
+
             this.filteredMembers = filtered;
             this.sortMembers();
         },
-        
+
         setSortBy(column) {
             if (this.sortBy === column) {
                 this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -500,42 +575,43 @@ document.addEventListener('alpine:init', () => {
             }
             this.sortMembers();
         },
-        
+
         sortMembers() {
             this.filteredMembers.sort((a, b) => {
                 let aVal = a[this.sortBy];
                 let bVal = b[this.sortBy];
-                
+
                 if (this.sortBy === 'name') {
                     aVal = this.getUserDisplayName(a).toLowerCase();
                     bVal = this.getUserDisplayName(b).toLowerCase();
                 }
-                
+
                 if (this.sortBy === 'granted_at') {
                     aVal = aVal ? new Date(aVal) : new Date(0);
                     bVal = bVal ? new Date(bVal) : new Date(0);
                 }
-                
+
                 if (aVal < bVal) return this.sortDirection === 'asc' ? -1 : 1;
                 if (aVal > bVal) return this.sortDirection === 'asc' ? 1 : -1;
                 return 0;
             });
         },
-        
+
         hasActiveFilters() {
             return !!(this.searchTerm || this.roleFilter || this.statusFilter);
         },
-        
+
         // Member actions
         editMemberPermissions(member) {
             this.selectedMember = member;
+            this.loadEditData(member);
             this.showEditModal = true;
         },
         
         async toggleMemberStatus(member) {
             const action = member.is_active ? 'disattivare' : 'attivare';
             if (!confirm(`Vuoi ${action} ${this.getUserDisplayName(member)}?`)) return;
-            
+
             try {
                 const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members/${member.user_id}`, {
                     method: 'PUT',
@@ -547,7 +623,7 @@ document.addEventListener('alpine:init', () => {
                         is_active: !member.is_active
                     })
                 });
-                
+
                 if (response.ok) {
                     member.is_active = !member.is_active;
                     this.calculateStats();
@@ -559,21 +635,21 @@ document.addEventListener('alpine:init', () => {
                 alert('Errore nel cambio stato membro');
             }
         },
-        
+
 		// Nel team.html, aggiorna la chiamata API v1
 		async refreshTeam() {
-			try {
-				const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members`);
-				if (response.ok) {
-					const data = await response.json();
-					this.members = data.members || [];
-					this.filteredMembers = [...this.members];
-					this.calculateStats();
-				}
-			} catch (error) {
-				console.error('Error loading team:', error);
-			}
-		},
+            try {
+                const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.members = data.members || [];
+                    this.filteredMembers = [...this.members];
+                    this.calculateStats();
+                }
+            } catch (error) {
+                console.error('Error loading team:', error);
+            }
+        },
 
 		
 		
@@ -589,7 +665,7 @@ document.addEventListener('alpine:init', () => {
                         notes: 'Invito reinviato'
                     })
                 });
-                
+
                 if (response.ok) {
                     alert('Invito reinviato con successo');
                 } else {
@@ -604,15 +680,15 @@ document.addEventListener('alpine:init', () => {
         async removeMember(member) {
             const displayName = this.getUserDisplayName(member);
             const confirmText = `Sei sicuro di voler rimuovere ${displayName} dal team?\n\nQuesta azione:\n- Rimuoverà tutti i permessi per questo sito\n- Non potrà più accedere alle foto e documenti\n- L'utente riceverà una notifica\n\nDigita "RIMUOVI" per confermare:`;
-            
+
             const confirmation = prompt(confirmText);
             if (confirmation !== 'RIMUOVI') return;
-            
+
             try {
                 const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members/${member.user_id}`, {
                     method: 'DELETE'
                 });
-                
+
                 if (response.ok) {
                     // Remove from local array
                     this.members = this.members.filter(m => m.user_id !== member.user_id);
@@ -626,7 +702,7 @@ document.addEventListener('alpine:init', () => {
                 alert('Errore nella rimozione del membro');
             }
         },
-        
+
         exportTeamData() {
             const headers = ['Nome', 'Email', 'Ruolo Archeologico', 'Permessi', 'Specializzazione', 'Istituzione', 'Stato', 'Accesso Dal', 'Foto Caricate', 'Ultimo Accesso'];
             const csvContent = [
@@ -644,29 +720,31 @@ document.addEventListener('alpine:init', () => {
                     member.last_login_at ? this.formatDate(member.last_login_at) : 'Mai'
                 ].map(field => `"${field}"`).join(','))
             ].join('\n');
-            
+
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = `team_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
         },
-        
+
         // Helper methods
         getUserInitials(member) {
+            if (!member) return '?';
             if (member.first_name && member.last_name) {
                 return (member.first_name[0] + member.last_name[0]).toUpperCase();
             }
-            return member.email[0].toUpperCase();
+            return member.email ? member.email[0].toUpperCase() : '?';
         },
-        
+
         getUserDisplayName(member) {
+            if (!member) return '';
             if (member.first_name && member.last_name) {
                 return `${member.first_name} ${member.last_name}`;
             }
-            return member.email.split('@')[0];
+            return member.email ? member.email.split('@')[0] : 'Utente';
         },
-        
+
         getPermissionBadgeClass(level) {
             const classes = {
                 'admin': 'bg-red-100 text-red-800',
@@ -675,7 +753,7 @@ document.addEventListener('alpine:init', () => {
             };
             return classes[level] || classes.read;
         },
-        
+
         getPermissionDisplayName(level) {
             const names = {
                 'admin': 'Amministratore',
@@ -684,12 +762,12 @@ document.addEventListener('alpine:init', () => {
             };
             return names[level] || 'Sconosciuto';
         },
-        
+
         isExpired(member) {
             if (!member.expires_at) return false;
             return new Date(member.expires_at) < new Date();
         },
-        
+
         formatDate(dateString) {
             if (!dateString) return '';
             return new Date(dateString).toLocaleDateString('it-IT', {
@@ -697,8 +775,195 @@ document.addEventListener('alpine:init', () => {
                 month: '2-digit',
                 day: '2-digit'
             });
+        },
+
+        // ===== Edit Permissions Modal Data and Functions =====
+        editData: {
+            archaeological_role: '',
+                specialization: '',
+                    institution: '',
+                        permission_level: 'read',
+                            access_duration: 'no_change',
+                                expires_at: '',
+                                    notes: '',
+                                        is_active: true
+        },
+        isSavingEdit: false,
+
+            loadEditData(member) {
+            this.editData = {
+                archaeological_role: member.archaeological_role || '',
+                specialization: member.specialization || '',
+                institution: member.institution || '',
+                permission_level: member.permission_level || 'read',
+                access_duration: 'no_change',
+                expires_at: member.expires_at ? member.expires_at.split('T')[0] : '',
+                notes: member.notes || '',
+                is_active: member.is_active !== false
+            };
+        },
+
+        updateEditExpiryDate() {
+            const now = new Date();
+            switch (this.editData.access_duration) {
+                case '1_month':
+                    now.setMonth(now.getMonth() + 1);
+                    this.editData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case '3_months':
+                    now.setMonth(now.getMonth() + 3);
+                    this.editData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case '6_months':
+                    now.setMonth(now.getMonth() + 6);
+                    this.editData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case '1_year':
+                    now.setFullYear(now.getFullYear() + 1);
+                    this.editData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case 'permanent':
+                case 'custom':
+                case 'no_change':
+                    // Non modificare data automaticamente
+                    break;
+            }
+        },
+
+        // ===== Invite Modal Functions =====
+        async loadAvailableUsers() {
+            try {
+                const response = await fetch('/api/v1/teams/sites/{{ site.id }}/available-users');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.availableUsers = data.available_users || [];
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+                this.availableUsers = [];
+            }
+        },
+
+        updateInviteExpiryDate() {
+            const now = new Date();
+            switch (this.inviteData.access_duration) {
+                case '1_month':
+                    now.setMonth(now.getMonth() + 1);
+                    this.inviteData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case '3_months':
+                    now.setMonth(now.getMonth() + 3);
+                    this.inviteData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case '6_months':
+                    now.setMonth(now.getMonth() + 6);
+                    this.inviteData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case '1_year':
+                    now.setFullYear(now.getFullYear() + 1);
+                    this.inviteData.expires_at = now.toISOString().split('T')[0];
+                    break;
+                case 'permanent':
+                case 'custom':
+                    // No automatic date setting
+                    break;
+            }
+        },
+        
+        async sendInvitation() {
+            this.isSendingInvite = true;
+
+            try {
+                const payload = {
+                    invite_method: this.inviteMethod,
+                    user_id: this.inviteMethod === 'existing' ? this.selectedUserId : null,
+                    ...this.inviteData
+                };
+
+                const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    this.showInviteModal = false;
+                    // Reset form
+                    this.inviteMethod = 'existing';
+                    this.selectedUserId = '';
+                    this.inviteData = {
+                        email: '',
+                        full_name: '',
+                        archaeological_role: '',
+                        specialization: '',
+                        institution: '',
+                        permission_level: 'read',
+                        access_duration: 'permanent',
+                        expires_at: '',
+                        welcome_message: ''
+                    };
+                    // Refresh team list
+                    this.refreshTeam();
+                    alert('Invito inviato con successo!');
+                } else {
+                    const error = await response.json();
+                    alert('Errore: ' + (error.detail || 'Invio fallito'));
+                }
+            } catch (error) {
+                console.error('Invite error:', error);
+                alert('Errore nell\'invio dell\'invito');
+            } finally {
+                this.isSendingInvite = false;
+            }
+        },
+        
+        async saveEditPermissions() {
+            if (!this.selectedMember) return;
+            this.isSavingEdit = true;
+
+            try {
+                const response = await fetch(`/api/v1/teams/sites/{{ site.id }}/members/${this.selectedMember.user_id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(this.editData)
+                });
+
+                if (response.ok) {
+                    // Update the member in the local array
+                    const memberIndex = this.members.findIndex(m => m.user_id === this.selectedMember.user_id);
+                    if (memberIndex !== -1) {
+                        this.members[memberIndex] = {
+                            ...this.members[memberIndex],
+                            ...this.editData,
+                            permission_level: this.editData.permission_level
+                        };
+                    }
+
+                    // Update filtered members too
+                    this.filterMembers();
+                    this.calculateStats();
+
+                    this.showEditModal = false;
+                    this.selectedMember = null;
+
+                    // Show success message
+                    alert('Permessi aggiornati con successo!');
+                } else {
+                    const error = await response.json();
+                    alert('Errore nell\'aggiornamento: ' + (error.detail || 'Errore sconosciuto'));
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('Errore nell\'aggiornamento dei permessi');
+            } finally {
+                this.isSavingEdit = false;
+            }
         }
     }));
 });
-</script>
-{% endblock %}
+    </script>
+    {% endblock %}

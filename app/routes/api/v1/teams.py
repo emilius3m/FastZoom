@@ -490,8 +490,9 @@ async def v1_get_available_users_for_invite(
         existing_members_result = await db.execute(existing_members_query)
         existing_member_ids = [row[0] for row in existing_members_result.fetchall()]
         
-        # Recupera tutti gli utenti del sistema
-        all_users_query = select(User).where(
+        all_users_query = select(User).options(
+            selectinload(User.profile)
+        ).where(
             and_(
                 User.id != current_user_id,  # Escludi se stesso
                 ~User.id.in_(existing_member_ids)  # Escludi già membri
