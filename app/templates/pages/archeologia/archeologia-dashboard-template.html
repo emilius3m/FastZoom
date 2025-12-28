@@ -5,7 +5,7 @@
 
 {% block content %}
 <div x-data="archeologiaDashboard()" x-init="init()" class="container mx-auto px-4 py-6">
-    
+
     <!-- Header con breadcrumb -->
     <div class="mb-6">
         <nav class="flex mb-4" aria-label="Breadcrumb">
@@ -23,18 +23,18 @@
                 </li>
             </ol>
         </nav>
-        
+
         <div class="flex justify-between items-center">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900">🏺 Archeologia Avanzata</h1>
                 <p class="text-xl text-gray-600 mt-1">Sistema completo di documentazione archeologica</p>
             </div>
-            
+
             <!-- Selezione sito -->
             <div class="min-w-64">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Sito Archeologico</label>
-                <select x-model="selectedSiteId" @change="loadSiteData()" 
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select x-model="selectedSiteId" @change="loadSiteData()"
+                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Seleziona sito...</option>
                     {% for site in sites %}
                     <option value="{{ site.id }}">{{ site.name }} ({{ site.code }})</option>
@@ -47,7 +47,8 @@
     <!-- Statistiche generali -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8" x-show="selectedSiteId">
         <!-- US -->
-        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500 transform hover:scale-105 transition duration-200">
+        <div
+            class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500 transform hover:scale-105 transition duration-200">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Unità Stratigrafiche</p>
@@ -61,7 +62,8 @@
         </div>
 
         <!-- Tombe -->
-        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500 transform hover:scale-105 transition duration-200">
+        <div
+            class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500 transform hover:scale-105 transition duration-200">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Tombe</p>
@@ -75,7 +77,8 @@
         </div>
 
         <!-- Reperti -->
-        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500 transform hover:scale-105 transition duration-200">
+        <div
+            class="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500 transform hover:scale-105 transition duration-200">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Reperti</p>
@@ -89,7 +92,8 @@
         </div>
 
         <!-- Campioni -->
-        <div class="bg-white p-6 rounded-lg shadow border-l-4 border-red-500 transform hover:scale-105 transition duration-200">
+        <div
+            class="bg-white p-6 rounded-lg shadow border-l-4 border-red-500 transform hover:scale-105 transition duration-200">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Campioni</p>
@@ -105,9 +109,10 @@
 
     <!-- Menu moduli -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" x-show="selectedSiteId">
-        
+
         <!-- Unità Stratigrafiche -->
-        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200 hover:shadow-lg transition duration-200">
+        <div
+            class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200 hover:shadow-lg transition duration-200">
             <div class="flex items-center mb-4">
                 <div class="p-3 bg-blue-500 rounded-lg mr-4">
                     <i class="fas fa-layer-group text-white text-xl"></i>
@@ -118,19 +123,20 @@
                 </div>
             </div>
             <div class="space-y-2">
-                <a :href="`/archeologia/us/site/${selectedSiteId}`" 
-                   class="block w-full text-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                <a :href="`/archeologia/us/site/${selectedSiteId}`"
+                    class="block w-full text-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
                     <i class="fas fa-list mr-2"></i>Gestisci US
                 </a>
-                <button @click="openCreateUSModal()" 
-                        class="block w-full text-center bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200 transition">
+                <button @click="openCreateUSModal()"
+                    class="block w-full text-center bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200 transition">
                     <i class="fas fa-plus mr-2"></i>Nuova US
                 </button>
             </div>
         </div>
 
         <!-- Tombe -->
-        <div class="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg border border-green-200 hover:shadow-lg transition duration-200">
+        <div
+            class="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg border border-green-200 hover:shadow-lg transition duration-200">
             <div class="flex items-center mb-4">
                 <div class="p-3 bg-green-500 rounded-lg mr-4">
                     <i class="fas fa-cross text-white text-xl"></i>
@@ -142,18 +148,19 @@
             </div>
             <div class="space-y-2">
                 <a :href="`/archeologia/tombe/site/${selectedSiteId}`"
-                   class="block w-full text-center bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
+                    class="block w-full text-center bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
                     <i class="fas fa-list mr-2"></i>Gestisci Tombe
                 </a>
                 <button @click="openCreateTombaModal()"
-                        class="block w-full text-center bg-green-100 text-green-700 px-4 py-2 rounded hover:bg-green-200 transition">
+                    class="block w-full text-center bg-green-100 text-green-700 px-4 py-2 rounded hover:bg-green-200 transition">
                     <i class="fas fa-plus mr-2"></i>Nuova Tomba
                 </button>
             </div>
         </div>
 
         <!-- Reperti -->
-        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border border-purple-200 hover:shadow-lg transition duration-200">
+        <div
+            class="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border border-purple-200 hover:shadow-lg transition duration-200">
             <div class="flex items-center mb-4">
                 <div class="p-3 bg-purple-500 rounded-lg mr-4">
                     <i class="fas fa-gem text-white text-xl"></i>
@@ -165,18 +172,19 @@
             </div>
             <div class="space-y-2">
                 <a :href="`/archeologia/reperti/site/${selectedSiteId}`"
-                   class="block w-full text-center bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">
+                    class="block w-full text-center bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">
                     <i class="fas fa-list mr-2"></i>Gestisci Reperti
                 </a>
                 <button @click="openCreateRepertoModal()"
-                        class="block w-full text-center bg-purple-100 text-purple-700 px-4 py-2 rounded hover:bg-purple-200 transition">
+                    class="block w-full text-center bg-purple-100 text-purple-700 px-4 py-2 rounded hover:bg-purple-200 transition">
                     <i class="fas fa-plus mr-2"></i>Nuovo Reperto
                 </button>
             </div>
         </div>
 
         <!-- Campioni -->
-        <div class="bg-gradient-to-br from-red-50 to-red-100 p-6 rounded-lg border border-red-200 hover:shadow-lg transition duration-200">
+        <div
+            class="bg-gradient-to-br from-red-50 to-red-100 p-6 rounded-lg border border-red-200 hover:shadow-lg transition duration-200">
             <div class="flex items-center mb-4">
                 <div class="p-3 bg-red-500 rounded-lg mr-4">
                     <i class="fas fa-vial text-white text-xl"></i>
@@ -188,11 +196,11 @@
             </div>
             <div class="space-y-2">
                 <a :href="`/archeologia/campioni/site/${selectedSiteId}`"
-                   class="block w-full text-center bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
+                    class="block w-full text-center bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
                     <i class="fas fa-list mr-2"></i>Gestisci Campioni
                 </a>
                 <button @click="openCreateCampioneModal()"
-                        class="block w-full text-center bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200 transition">
+                    class="block w-full text-center bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200 transition">
                     <i class="fas fa-plus mr-2"></i>Nuovo Campione
                 </button>
             </div>
@@ -201,7 +209,7 @@
 
     <!-- Strumenti avanzati -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" x-show="selectedSiteId">
-        
+
         <!-- Matrix Harris -->
         <div class="bg-white p-6 rounded-lg shadow-lg border-t-4 border-orange-500">
             <div class="flex items-center mb-4">
@@ -215,11 +223,11 @@
             </div>
             <div class="space-y-3">
                 <a :href="`/archeologia/matrix-harris/site/${selectedSiteId}`"
-                   class="block w-full text-center bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 transition">
+                    class="block w-full text-center bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 transition">
                     <i class="fas fa-eye mr-2"></i>Visualizza Matrix
                 </a>
                 <button @click="generateMatrix()"
-                        class="block w-full text-center bg-orange-100 text-orange-700 px-4 py-2 rounded hover:bg-orange-200 transition">
+                    class="block w-full text-center bg-orange-100 text-orange-700 px-4 py-2 rounded hover:bg-orange-200 transition">
                     <i class="fas fa-cogs mr-2"></i>Genera Diagramma
                 </button>
             </div>
@@ -238,11 +246,11 @@
             </div>
             <div class="space-y-3">
                 <a :href="`/archeologia/reports/site/${selectedSiteId}`"
-                   class="block w-full text-center bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">
+                    class="block w-full text-center bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">
                     <i class="fas fa-chart-bar mr-2"></i>Visualizza Report
                 </a>
                 <button @click="exportData()"
-                        class="block w-full text-center bg-indigo-100 text-indigo-700 px-4 py-2 rounded hover:bg-indigo-200 transition">
+                    class="block w-full text-center bg-indigo-100 text-indigo-700 px-4 py-2 rounded hover:bg-indigo-200 transition">
                     <i class="fas fa-download mr-2"></i>Export Dati
                 </button>
             </div>
@@ -261,11 +269,11 @@
             </div>
             <div class="space-y-3">
                 <a href="/giornale-cantiere"
-                   class="block w-full text-center bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 transition">
+                    class="block w-full text-center bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 transition">
                     <i class="fas fa-book mr-2"></i>Giornale Cantiere
                 </a>
                 <a href="/documentazione"
-                   class="block w-full text-center bg-teal-100 text-teal-700 px-4 py-2 rounded hover:bg-teal-200 transition">
+                    class="block w-full text-center bg-teal-100 text-teal-700 px-4 py-2 rounded hover:bg-teal-200 transition">
                     <i class="fas fa-images mr-2"></i>Documentazione
                 </a>
             </div>
@@ -279,17 +287,15 @@
                 <i class="fas fa-clock mr-2 text-gray-500"></i>
                 Attività Recenti
             </h3>
-            <button @click="loadRecentActivities()" 
-                    class="text-blue-600 hover:text-blue-800 text-sm">
+            <button @click="loadRecentActivities()" class="text-blue-600 hover:text-blue-800 text-sm">
                 <i class="fas fa-sync-alt mr-1"></i>Aggiorna
             </button>
         </div>
-        
+
         <div class="space-y-3">
             <template x-for="activity in recentActivities" :key="activity.id">
                 <div class="flex items-center p-3 bg-gray-50 rounded-lg">
-                    <div class="p-2 rounded-full mr-4" 
-                         :class="getActivityIconClass(activity.type)">
+                    <div class="p-2 rounded-full mr-4" :class="getActivityIconClass(activity.type)">
                         <i :class="getActivityIcon(activity.type)" class="text-white text-sm"></i>
                     </div>
                     <div class="flex-1">
@@ -306,206 +312,214 @@
     <div x-show="!selectedSiteId" class="text-center py-12">
         <i class="fas fa-excavator text-6xl text-gray-300 mb-4"></i>
         <h3 class="text-lg font-medium text-gray-900 mb-2">Seleziona un sito archeologico</h3>
-        <p class="text-gray-500">Scegli il sito dal menu a tendina per accedere agli strumenti di documentazione archeologica.</p>
+        <p class="text-gray-500">Scegli il sito dal menu a tendina per accedere agli strumenti di documentazione
+            archeologica.</p>
     </div>
 
 </div>
 
 <script>
-function archeologiaDashboard() {
-    return {
-        // Dati
-        selectedSiteId: '',
-        stats: {
-            us_total: 0,
-            tombe_total: 0,
-            reperti_total: 0,
-            campioni_total: 0
-        },
-        recentActivities: [],
-        loading: false,
-        
-        // Inizializzazione
-        async init() {
-            // Auto-seleziona primo sito se disponibile
-            const firstSite = document.querySelector('select option[value]:not([value=""])');
-            if (firstSite) {
-                this.selectedSiteId = firstSite.value;
-                await this.loadSiteData();
-            }
-        },
-        
-        // Caricamento dati sito
-        async loadSiteData() {
-            if (!this.selectedSiteId) {
-                this.resetData();
-                return;
-            }
-            
-            this.loading = true;
-            try {
-                // Carica statistiche
-                const response = await fetch(`/api/archeologia/stats/site/${this.selectedSiteId}`);
-                if (response.ok) {
-                    this.stats = await response.json();
-                }
-                
-                // Carica attività recenti
-                await this.loadRecentActivities();
-                
-            } catch (error) {
-                console.error('Errore caricamento dati sito:', error);
-                this.showNotification('Errore nel caricamento dei dati', 'error');
-            } finally {
-                this.loading = false;
-            }
-        },
-        
-        // Caricamento attività recenti (mock per ora)
-        async loadRecentActivities() {
-            // TODO: Implementare endpoint per attività recenti
-            this.recentActivities = [
-                {
-                    id: 1,
-                    type: 'us',
-                    description: 'Creata US015 - Strato di terra bruna',
-                    author: 'Mario Rossi',
-                    created_at: new Date().toISOString()
-                },
-                {
-                    id: 2,
-                    type: 'tomba',
-                    description: 'Completata scheda T003 - Sepoltura ad incinerazione',
-                    author: 'Anna Verdi',
-                    created_at: new Date(Date.now() - 3600000).toISOString()
-                },
-                {
-                    id: 3,
-                    type: 'reperto',
-                    description: 'Inventariato reperto R125 - Frammento ceramico',
-                    author: 'Luigi Bianchi',
-                    created_at: new Date(Date.now() - 7200000).toISOString()
-                }
-            ];
-        },
-        
-        // Reset dati
-        resetData() {
-            this.stats = {
+    function archeologiaDashboard() {
+        return {
+            // Dati
+            selectedSiteId: '',
+            stats: {
                 us_total: 0,
                 tombe_total: 0,
                 reperti_total: 0,
                 campioni_total: 0
-            };
-            this.recentActivities = [];
-        },
-        
-        // Modal actions (da implementare)
-        openCreateUSModal() {
-            // TODO: Implementare modal creazione US
-            this.showNotification('Modal creazione US - da implementare', 'info');
-        },
-        
-        openCreateTombaModal() {
-            // TODO: Implementare modal creazione tomba
-            this.showNotification('Modal creazione tomba - da implementare', 'info');
-        },
-        
-        openCreateRepertoModal() {
-            // TODO: Implementare modal creazione reperto
-            this.showNotification('Modal creazione reperto - da implementare', 'info');
-        },
-        
-        openCreateCampioneModal() {
-            // TODO: Implementare modal creazione campione
-            this.showNotification('Modal creazione campione - da implementare', 'info');
-        },
-        
-        // Azioni avanzate
-        async generateMatrix() {
-            if (!this.selectedSiteId) return;
-            
-            try {
-                this.showNotification('Generazione Matrix Harris in corso...', 'info');
-                // TODO: Implementare generazione matrix
-                setTimeout(() => {
-                    this.showNotification('Matrix Harris generata con successo', 'success');
-                }, 2000);
-            } catch (error) {
-                this.showNotification('Errore nella generazione della Matrix', 'error');
+            },
+            recentActivities: [],
+            loading: false,
+
+            // Inizializzazione
+            async init() {
+                // Auto-seleziona primo sito se disponibile
+                const firstSite = document.querySelector('select option[value]:not([value=""])');
+                if (firstSite) {
+                    this.selectedSiteId = firstSite.value;
+                    await this.loadSiteData();
+                }
+            },
+
+            // Caricamento dati sito
+            async loadSiteData() {
+                if (!this.selectedSiteId) {
+                    this.resetData();
+                    return;
+                }
+
+                this.loading = true;
+                try {
+                    // Carica statistiche
+                    const response = await fetch(`/api/v1/archeologia/stats/site/${this.selectedSiteId}`);
+                    if (response.ok) {
+                        this.stats = await response.json();
+                    }
+
+                    // Carica attività recenti
+                    await this.loadRecentActivities();
+
+                } catch (error) {
+                    console.error('Errore caricamento dati sito:', error);
+                    this.showNotification('Errore nel caricamento dei dati', 'error');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Caricamento attività recenti (mock per ora)
+            async loadRecentActivities() {
+                // TODO: Implementare endpoint per attività recenti
+                this.recentActivities = [
+                    {
+                        id: 1,
+                        type: 'us',
+                        description: 'Creata US015 - Strato di terra bruna',
+                        author: 'Mario Rossi',
+                        created_at: new Date().toISOString()
+                    },
+                    {
+                        id: 2,
+                        type: 'tomba',
+                        description: 'Completata scheda T003 - Sepoltura ad incinerazione',
+                        author: 'Anna Verdi',
+                        created_at: new Date(Date.now() - 3600000).toISOString()
+                    },
+                    {
+                        id: 3,
+                        type: 'reperto',
+                        description: 'Inventariato reperto R125 - Frammento ceramico',
+                        author: 'Luigi Bianchi',
+                        created_at: new Date(Date.now() - 7200000).toISOString()
+                    }
+                ];
+            },
+
+            // Reset dati
+            resetData() {
+                this.stats = {
+                    us_total: 0,
+                    tombe_total: 0,
+                    reperti_total: 0,
+                    campioni_total: 0
+                };
+                this.recentActivities = [];
+            },
+
+            // Modal actions (da implementare)
+            openCreateUSModal() {
+                // TODO: Implementare modal creazione US
+                this.showNotification('Modal creazione US - da implementare', 'info');
+            },
+
+            openCreateTombaModal() {
+                // TODO: Implementare modal creazione tomba
+                this.showNotification('Modal creazione tomba - da implementare', 'info');
+            },
+
+            openCreateRepertoModal() {
+                // TODO: Implementare modal creazione reperto
+                this.showNotification('Modal creazione reperto - da implementare', 'info');
+            },
+
+            openCreateCampioneModal() {
+                // TODO: Implementare modal creazione campione
+                this.showNotification('Modal creazione campione - da implementare', 'info');
+            },
+
+            // Azioni avanzate
+            async generateMatrix() {
+                if (!this.selectedSiteId) return;
+
+                try {
+                    this.showNotification('Generazione Matrix Harris in corso...', 'info');
+                    // TODO: Implementare generazione matrix
+                    setTimeout(() => {
+                        this.showNotification('Matrix Harris generata con successo', 'success');
+                    }, 2000);
+                } catch (error) {
+                    this.showNotification('Errore nella generazione della Matrix', 'error');
+                }
+            },
+
+            async exportData() {
+                if (!this.selectedSiteId) return;
+
+                try {
+                    this.showNotification('Export dati in corso...', 'info');
+                    // TODO: Implementare export
+                    setTimeout(() => {
+                        this.showNotification('Dati esportati con successo', 'success');
+                    }, 2000);
+                } catch (error) {
+                    this.showNotification('Errore nell\'export dei dati', 'error');
+                }
+            },
+
+            // Utility
+            getActivityIcon(type) {
+                const icons = {
+                    'us': 'fas fa-layer-group',
+                    'tomba': 'fas fa-cross',
+                    'reperto': 'fas fa-gem',
+                    'campione': 'fas fa-vial'
+                };
+                return icons[type] || 'fas fa-circle';
+            },
+
+            getActivityIconClass(type) {
+                const classes = {
+                    'us': 'bg-blue-500',
+                    'tomba': 'bg-green-500',
+                    'reperto': 'bg-purple-500',
+                    'campione': 'bg-red-500'
+                };
+                return classes[type] || 'bg-gray-500';
+            },
+
+            formatDateTime(dateString) {
+                return new Date(dateString).toLocaleString('it-IT');
+            },
+
+            showNotification(message, type = 'info') {
+                // TODO: Implementare sistema notifiche toast
+                alert(message);
             }
-        },
-        
-        async exportData() {
-            if (!this.selectedSiteId) return;
-            
-            try {
-                this.showNotification('Export dati in corso...', 'info');
-                // TODO: Implementare export
-                setTimeout(() => {
-                    this.showNotification('Dati esportati con successo', 'success');
-                }, 2000);
-            } catch (error) {
-                this.showNotification('Errore nell\'export dei dati', 'error');
-            }
-        },
-        
-        // Utility
-        getActivityIcon(type) {
-            const icons = {
-                'us': 'fas fa-layer-group',
-                'tomba': 'fas fa-cross',
-                'reperto': 'fas fa-gem',
-                'campione': 'fas fa-vial'
-            };
-            return icons[type] || 'fas fa-circle';
-        },
-        
-        getActivityIconClass(type) {
-            const classes = {
-                'us': 'bg-blue-500',
-                'tomba': 'bg-green-500',
-                'reperto': 'bg-purple-500',
-                'campione': 'bg-red-500'
-            };
-            return classes[type] || 'bg-gray-500';
-        },
-        
-        formatDateTime(dateString) {
-            return new Date(dateString).toLocaleString('it-IT');
-        },
-        
-        showNotification(message, type = 'info') {
-            // TODO: Implementare sistema notifiche toast
-            alert(message);
         }
     }
-}
 </script>
 
 <style>
-.transition { 
-    transition: all 0.2s ease-in-out; 
-}
+    .transition {
+        transition: all 0.2s ease-in-out;
+    }
 
-/* Card hover effects */
-.transform:hover {
-    transform: translateY(-2px);
-}
+    /* Card hover effects */
+    .transform:hover {
+        transform: translateY(-2px);
+    }
 
-/* Gradient backgrounds */
-.bg-gradient-to-br {
-    background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
-}
+    /* Gradient backgrounds */
+    .bg-gradient-to-br {
+        background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
+    }
 
-/* Custom animations */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+    /* Custom animations */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
 
-.fade-in {
-    animation: fadeIn 0.3s ease-out;
-}
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .fade-in {
+        animation: fadeIn 0.3s ease-out;
+    }
 </style>
 {% endblock %}

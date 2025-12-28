@@ -95,6 +95,15 @@ class GiornaleCantiereBase(BaseModel):
     
     # Descrizione attività
     descrizione_lavori: str = Field(..., min_length=10, max_length=2000, description="Descrizione dettagliata dei lavori svolti")
+    
+    # ICCD Scientific Fields
+    area_intervento: Optional[str] = Field(None, max_length=200, description="Area specifica di intervento")
+    saggio: Optional[str] = Field(None, max_length=100, description="Saggio di scavo")
+    obiettivi: Optional[str] = Field(None, description="Obiettivi giornalieri / Strategia")
+    interpretazione: Optional[str] = Field(None, description="Interpretazione archeologica")
+    campioni_prelevati: Optional[str] = Field(None, description="Campioni prelevati")
+    strutture: Optional[str] = Field(None, description="Strutture individuate")
+    
     modalita_lavorazioni: Optional[str] = Field(None, max_length=1000, description="Modalità e metodologie di lavorazione")
     attrezzatura_utilizzata: Optional[str] = Field(None, max_length=1000, description="Attrezzatura e strumenti utilizzati")
     mezzi_utilizzati: Optional[str] = Field(None, max_length=500, description="Mezzi meccanici utilizzati")
@@ -141,6 +150,12 @@ class GiornaleCantiereUpdate(BaseModel):
     temperatura: Optional[int] = Field(None, ge=-30, le=50)
     note_meteo: Optional[str] = Field(None, max_length=500)
     descrizione_lavori: Optional[str] = Field(None, min_length=10, max_length=2000)
+    area_intervento: Optional[str] = Field(None, max_length=200)
+    saggio: Optional[str] = Field(None, max_length=100)
+    obiettivi: Optional[str] = Field(None)
+    interpretazione: Optional[str] = Field(None)
+    campioni_prelevati: Optional[str] = Field(None)
+    strutture: Optional[str] = Field(None)
     modalita_lavorazioni: Optional[str] = Field(None, max_length=1000)
     attrezzatura_utilizzata: Optional[str] = Field(None, max_length=1000)
     mezzi_utilizzati: Optional[str] = Field(None, max_length=500)

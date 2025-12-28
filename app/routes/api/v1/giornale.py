@@ -115,6 +115,7 @@ from app.models.giornale_cantiere import (
     GiornaleCantiere,
     OperatoreCantiere,
     giornale_operatori_association,
+    giornale_foto_association,
     CondizioniMeteoEnum
 )
 from app.schemas.giornale_cantiere import (
@@ -300,6 +301,12 @@ async def v1_get_site_giornali(
                 "problematiche": g.problematiche,
                 "compilatore": g.compilatore or g.responsabile_nome,
                 # New fields added from the model
+                "area_intervento": g.area_intervento,
+                "saggio": g.saggio,
+                "obiettivi": g.obiettivi,
+                "interpretazione": g.interpretazione,
+                "campioni_prelevati": g.campioni_prelevati,
+                "strutture": g.strutture,
                 "temperatura": g.temperatura,
                 "temperatura_min": g.temperatura_min,
                 "temperatura_max": g.temperatura_max,
@@ -323,6 +330,19 @@ async def v1_get_site_giornali(
                 "created_at": g.created_at.isoformat() if g.created_at else None,
                 "updated_at": g.updated_at.isoformat() if g.updated_at else None,
                 "version": g.version or 1,
+                # Foto associate al giornale
+                "foto": [
+                    {
+                        "id": str(f.id),
+                        "filename": f.filename,
+                        "original_filename": f.original_filename,
+                        "thumbnail_url": f"/api/v1/photos/{f.id}/thumbnail",
+                        "full_url": f"/api/v1/photos/{f.id}/full",
+                        "title": f.title,
+                        "description": f.description,
+                    }
+                    for f in (g.foto or [])
+                ],
             }
             giornali_data.append(giornale_dict)
 
@@ -474,6 +494,12 @@ async def v1_get_cantiere_giornali(
                 "problematiche": g.problematiche,
                 "compilatore": g.compilatore or g.responsabile_nome,
                 # New fields added from the model
+                "area_intervento": g.area_intervento,
+                "saggio": g.saggio,
+                "obiettivi": g.obiettivi,
+                "interpretazione": g.interpretazione,
+                "campioni_prelevati": g.campioni_prelevati,
+                "strutture": g.strutture,
                 "temperatura": g.temperatura,
                 "temperatura_min": g.temperatura_min,
                 "temperatura_max": g.temperatura_max,
@@ -497,6 +523,19 @@ async def v1_get_cantiere_giornali(
                 "created_at": g.created_at.isoformat() if g.created_at else None,
                 "updated_at": g.updated_at.isoformat() if g.updated_at else None,
                 "version": g.version or 1,
+                # Foto associate al giornale
+                "foto": [
+                    {
+                        "id": str(f.id),
+                        "filename": f.filename,
+                        "original_filename": f.original_filename,
+                        "thumbnail_url": f"/api/v1/photos/{f.id}/thumbnail",
+                        "full_url": f"/api/v1/photos/{f.id}/full",
+                        "title": f.title,
+                        "description": f.description,
+                    }
+                    for f in (g.foto or [])
+                ],
             }
             giornali_data.append(giornale_dict)
 
@@ -575,6 +614,15 @@ async def v1_create_giornale(
             compilatore=giornale_data.get("compilatore", ""),
             temperatura_min=giornale_data.get("temperatura_min"),
             temperatura_max=giornale_data.get("temperatura_max"),
+            
+            # ICCD Scientific Fields
+            area_intervento=giornale_data.get("area_intervento"),
+            saggio=giornale_data.get("saggio"),
+            obiettivi=giornale_data.get("obiettivi"),
+            interpretazione=giornale_data.get("interpretazione"),
+            campioni_prelevati=giornale_data.get("campioni_prelevati"),
+            strutture=giornale_data.get("strutture"),
+            
             us_elaborate=giornale_data.get("us_elaborate_input", ""),  # Convert input string to database field
             attrezzatura_utilizzata=giornale_data.get("apparecchiature_input", ""),  # Convert input string to database field
             validato=False
@@ -772,6 +820,21 @@ async def v1_update_giornale(
             giornale.temperatura_min = giornale_data["temperatura_min"]
         if "temperatura_max" in giornale_data:
             giornale.temperatura_max = giornale_data["temperatura_max"]
+        
+        # ICCD Scientific Fields Update
+        if "area_intervento" in giornale_data:
+            giornale.area_intervento = giornale_data["area_intervento"]
+        if "saggio" in giornale_data:
+            giornale.saggio = giornale_data["saggio"]
+        if "obiettivi" in giornale_data:
+            giornale.obiettivi = giornale_data["obiettivi"]
+        if "interpretazione" in giornale_data:
+            giornale.interpretazione = giornale_data["interpretazione"]
+        if "campioni_prelevati" in giornale_data:
+            giornale.campioni_prelevati = giornale_data["campioni_prelevati"]
+        if "strutture" in giornale_data:
+            giornale.strutture = giornale_data["strutture"]
+            
         if "us_elaborate_input" in giornale_data:
             giornale.us_elaborate = giornale_data["us_elaborate_input"]  # Convert input string to database field
         if "apparecchiature_input" in giornale_data:
@@ -793,6 +856,67 @@ async def v1_update_giornale(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nell'aggiornamento del giornale"
+        )
+
+@router.post("/sites/{site_id}/giornali/{giornale_id}/validate", summary="Valida giornale", tags=["Giornale di Cantiere"])
+async def v1_validate_giornale(
+    site_id: UUID,
+    giornale_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Valida un giornale di cantiere, rendendolo non modificabile.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Carica giornale
+        result = await db.execute(
+            select(GiornaleCantiere).where(
+                and_(
+                    GiornaleCantiere.id == str(giornale_id),
+                    GiornaleCantiere.site_id == str(site_id)
+                )
+            )
+        )
+        giornale = result.scalar_one_or_none()
+        
+        if not giornale:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Giornale non trovato"
+            )
+            
+        if giornale.validato:
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Il giornale è già stato validato"
+            )
+        
+        # Esegui validazione
+        giornale.validato = True
+        giornale.data_validazione = datetime.now()
+        
+        await db.commit()
+        await db.refresh(giornale)
+        
+        return {
+            "id": str(giornale.id),
+            "message": "Giornale validato con successo",
+            "data_validazione": giornale.data_validazione.isoformat(),
+            "validato": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore validazione giornale: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nella validazione del giornale"
         )
 
 @router.delete("/sites/{site_id}/giornali/{giornale_id}", summary="Elimina giornale", tags=["Giornale di Cantiere"])
@@ -2127,3 +2251,187 @@ async def export_single_giornale_word(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore nella generazione del documento Word: {str(e)}"
         )
+
+
+# ===== GESTIONE FOTO GIORNALE =====
+
+@router.post("/sites/{site_id}/giornali/{giornale_id}/foto/{foto_id}", summary="Link foto a giornale", tags=["Giornale di Cantiere"])
+async def v1_link_foto_to_giornale(
+    site_id: UUID,
+    giornale_id: UUID,
+    foto_id: UUID,
+    didascalia: Optional[str] = None,
+    ordine: int = 0,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Collega una foto esistente al giornale di cantiere con didascalia opzionale.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Verifica che il giornale esista e appartenga al sito
+        result = await db.execute(
+            select(GiornaleCantiere).where(
+                and_(
+                    GiornaleCantiere.id == str(giornale_id),
+                    GiornaleCantiere.site_id == str(site_id)
+                )
+            )
+        )
+        giornale = result.scalar_one_or_none()
+        if not giornale:
+            raise HTTPException(status_code=404, detail="Giornale non trovato")
+        
+        # Verifica che la foto esista e appartenga al sito
+        from app.models.documentation_and_field import Photo
+        foto_result = await db.execute(
+            select(Photo).where(
+                and_(
+                    Photo.id == str(foto_id),
+                    Photo.site_id == str(site_id)
+                )
+            )
+        )
+        foto = foto_result.scalar_one_or_none()
+        if not foto:
+            raise HTTPException(status_code=404, detail="Foto non trovata nel sito")
+        
+        # Verifica se già collegata
+        existing = await db.execute(
+            select(giornale_foto_association).where(
+                and_(
+                    giornale_foto_association.c.giornale_id == str(giornale_id),
+                    giornale_foto_association.c.foto_id == str(foto_id)
+                )
+            )
+        )
+        if existing.first():
+            raise HTTPException(status_code=400, detail="Foto già collegata a questo giornale")
+        
+        # Crea l'associazione
+        await db.execute(
+            giornale_foto_association.insert().values(
+                giornale_id=str(giornale_id),
+                foto_id=str(foto_id),
+                didascalia=didascalia,
+                ordine=ordine
+            )
+        )
+        await db.commit()
+        
+        return {
+            "message": "Foto collegata con successo",
+            "giornale_id": str(giornale_id),
+            "foto_id": str(foto_id),
+            "didascalia": didascalia
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore collegamento foto a giornale: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nel collegamento della foto")
+
+
+@router.delete("/sites/{site_id}/giornali/{giornale_id}/foto/{foto_id}", summary="Scollega foto da giornale", tags=["Giornale di Cantiere"])
+async def v1_unlink_foto_from_giornale(
+    site_id: UUID,
+    giornale_id: UUID,
+    foto_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Scollega una foto dal giornale (non elimina la foto).
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Rimuovi l'associazione
+        result = await db.execute(
+            giornale_foto_association.delete().where(
+                and_(
+                    giornale_foto_association.c.giornale_id == str(giornale_id),
+                    giornale_foto_association.c.foto_id == str(foto_id)
+                )
+            )
+        )
+        await db.commit()
+        
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Associazione foto-giornale non trovata")
+        
+        return {
+            "message": "Foto scollegata con successo",
+            "giornale_id": str(giornale_id),
+            "foto_id": str(foto_id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore scollegamento foto da giornale: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nello scollegamento della foto")
+
+
+@router.put("/sites/{site_id}/giornali/{giornale_id}/foto/{foto_id}", summary="Aggiorna didascalia foto", tags=["Giornale di Cantiere"])
+async def v1_update_foto_didascalia(
+    site_id: UUID,
+    giornale_id: UUID,
+    foto_id: UUID,
+    update_data: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Aggiorna didascalia e ordine di una foto nel giornale.
+    """
+    try:
+        # Verifica accesso al sito
+        site_info = verify_site_access(site_id, user_sites)
+        
+        # Prepara i valori da aggiornare
+        update_values = {}
+        if "didascalia" in update_data:
+            update_values["didascalia"] = update_data["didascalia"]
+        if "ordine" in update_data:
+            update_values["ordine"] = update_data["ordine"]
+        
+        if not update_values:
+            raise HTTPException(status_code=400, detail="Nessun campo da aggiornare")
+        
+        # Aggiorna l'associazione
+        result = await db.execute(
+            giornale_foto_association.update()
+            .where(
+                and_(
+                    giornale_foto_association.c.giornale_id == str(giornale_id),
+                    giornale_foto_association.c.foto_id == str(foto_id)
+                )
+            )
+            .values(**update_values)
+        )
+        await db.commit()
+        
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Associazione foto-giornale non trovata")
+        
+        return {
+            "message": "Didascalia aggiornata con successo",
+            "giornale_id": str(giornale_id),
+            "foto_id": str(foto_id),
+            "updated_fields": list(update_values.keys())
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore aggiornamento didascalia foto: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nell'aggiornamento della didascalia")

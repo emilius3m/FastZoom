@@ -4,29 +4,31 @@
 
 {% block extra_css %}
 <style>
-/* Custom styles che integrano con Flowbite */
-.cantiere-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
+    /* Custom styles che integrano con Flowbite */
+    .cantiere-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
 
-.stat-card {
-    transition: transform 0.2s;
-}
+    .stat-card {
+        transition: transform 0.2s;
+    }
 
-.stat-card:hover {
-    transform: translateY(-2px);
-}
+    .stat-card:hover {
+        transform: translateY(-2px);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8" x-data="cantiereDetailApp()" @open-edit-giornale-modal.window="handleEditGiornaleEvent($event)">
+<div class="container mx-auto px-4 py-8" x-data="cantiereDetailApp()"
+    @open-edit-giornale-modal.window="handleEditGiornaleEvent($event)">
 
     <!-- Breadcrumb Flowbite -->
     <nav class="flex mb-6" aria-label="Breadcrumb">
         <ol class="inline-flex items-center space-x-1 md:space-x-2 rtl:space-x-reverse">
             <li class="inline-flex items-center">
-                <a href="/dashboard" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white">
+                <a href="/dashboard"
+                    class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-400 dark:hover:text-white">
                     <i class="fas fa-home w-3 h-3 me-2.5"></i>
                     Dashboard
                 </a>
@@ -34,19 +36,23 @@
             <li>
                 <div class="flex items-center">
                     <i class="fas fa-chevron-right w-3 h-3 mx-1 text-gray-400"></i>
-                    <a href="/sites/{{ site.id }}" class="ms-1 text-sm font-medium text-gray-700 hover:text-blue-600 md:ms-2 dark:text-gray-400 dark:hover:text-white">{{ site.name }}</a>
+                    <a href="/sites/{{ site.id }}"
+                        class="ms-1 text-sm font-medium text-gray-700 hover:text-blue-600 md:ms-2 dark:text-gray-400 dark:hover:text-white">{{
+                        site.name }}</a>
                 </div>
             </li>
             <li>
                 <div class="flex items-center">
                     <i class="fas fa-chevron-right w-3 h-3 mx-1 text-gray-400"></i>
-                    <a href="/sites/{{ site.id }}/cantieri" class="ms-1 text-sm font-medium text-gray-700 hover:text-blue-600 md:ms-2 dark:text-gray-400 dark:hover:text-white">Cantieri</a>
+                    <a href="/sites/{{ site.id }}/cantieri"
+                        class="ms-1 text-sm font-medium text-gray-700 hover:text-blue-600 md:ms-2 dark:text-gray-400 dark:hover:text-white">Cantieri</a>
                 </div>
             </li>
             <li aria-current="page">
                 <div class="flex items-center">
                     <i class="fas fa-chevron-right w-3 h-3 mx-1 text-gray-400"></i>
-                    <span class="ms-1 text-sm font-medium text-gray-500 md:ms-2 dark:text-gray-400">{{ cantiere.nome }}</span>
+                    <span class="ms-1 text-sm font-medium text-gray-500 md:ms-2 dark:text-gray-400">{{ cantiere.nome
+                        }}</span>
                 </div>
             </li>
         </ol>
@@ -76,36 +82,44 @@
                 </span>
 
                 <!-- Dropdown menu azioni Flowbite -->
-                <button id="dropdownMenuIconButton" data-dropdown-toggle="dropdownDots" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm" type="button">
+                <button id="dropdownMenuIconButton" data-dropdown-toggle="dropdownDots"
+                    class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm"
+                    type="button">
                     <i class="fas fa-ellipsis-v"></i>
                 </button>
 
                 <!-- Dropdown menu -->
-                <div id="dropdownDots" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600">
+                <div id="dropdownDots"
+                    class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600">
                     <ul class="py-2 text-sm text-gray-700 dark:text-gray-200">
                         <li>
-                            <a href="#" @click.prevent="openEditModal()" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+                            <a href="#" @click.prevent="openEditModal()"
+                                class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
                                 <i class="fas fa-edit mr-2"></i>Modifica Cantiere
                             </a>
                         </li>
                         <li>
-                            <a href="#" @click.prevent="exportGiornaliPDF()" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+                            <a href="#" @click.prevent="exportGiornaliPDF()"
+                                class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
                                 <i class="fas fa-file-pdf mr-2"></i>Esporta PDF
                             </a>
                         </li>
                         <li>
-                            <a href="#" @click.prevent="exportGiornaliWord()" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+                            <a href="#" @click.prevent="exportGiornaliWord()"
+                                class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
                                 <i class="fas fa-file-word mr-2"></i>Esporta Word
                             </a>
                         </li>
                         <li>
-                            <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
+                            <a href="#"
+                                class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
                                 <i class="fas fa-archive mr-2"></i>Archivia
                             </a>
                         </li>
                     </ul>
                     <div class="py-2">
-                        <a href="#" @click.prevent="deleteCantiere()" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-red-500">
+                        <a href="#" @click.prevent="deleteCantiere()"
+                            class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-red-500">
                             <i class="fas fa-trash mr-2"></i>Elimina
                         </a>
                     </div>
@@ -116,11 +130,14 @@
 
     <!-- Alert Flowbite -->
     <div x-show="alert.show" x-transition class="mb-6">
-        <div :class="alert.type === 'success' ? 'text-green-800 bg-green-50 dark:bg-gray-800 dark:text-green-400' : 'text-red-800 bg-red-50 dark:bg-gray-800 dark:text-red-400'" class="flex items-center p-4 rounded-lg" role="alert">
-            <i :class="alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'" class="fas flex-shrink-0 w-4 h-4"></i>
+        <div :class="alert.type === 'success' ? 'text-green-800 bg-green-50 dark:bg-gray-800 dark:text-green-400' : 'text-red-800 bg-red-50 dark:bg-gray-800 dark:text-red-400'"
+            class="flex items-center p-4 rounded-lg" role="alert">
+            <i :class="alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'"
+                class="fas flex-shrink-0 w-4 h-4"></i>
             <span class="sr-only" x-text="alert.type"></span>
             <div class="ms-3 text-sm font-medium" x-text="alert.message"></div>
-            <button @click="alert.show = false" type="button" class="ms-auto -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 inline-flex items-center justify-center h-8 w-8" 
+            <button @click="alert.show = false" type="button"
+                class="ms-auto -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 inline-flex items-center justify-center h-8 w-8"
                 :class="alert.type === 'success' ? 'bg-green-50 text-green-500 hover:bg-green-200 dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700' : 'bg-red-50 text-red-500 hover:bg-red-200 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700'">
                 <span class="sr-only">Chiudi</span>
                 <i class="fas fa-times w-3 h-3"></i>
@@ -195,37 +212,47 @@
     <!-- Tabs Flowbite -->
     <div class="mb-6">
         <div class="border-b border-gray-200 dark:border-gray-700">
-                <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="default-tab" data-tabs-toggle="#default-tab-content" role="tablist">
-                    <li class="me-2" role="presentation">
-                        <button class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300" id="giornali-tab" data-tabs-target="#giornali" type="button" role="tab" aria-controls="giornali" aria-selected="false">
-                            <i class="fas fa-book mr-2"></i>Giornali di Cantiere
-                        </button>
-                    </li>
-                    <li class="me-2" role="presentation">
-                        <button class="inline-block p-4 border-b-2 rounded-t-lg" id="info-tab" data-tabs-target="#info" type="button" role="tab" aria-controls="info" aria-selected="false">
-                            <i class="fas fa-info-circle mr-2"></i>Informazioni
-                        </button>
-                    </li>
-                    <li class="me-2" role="presentation">
-                        <button class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300" id="timeline-tab" data-tabs-target="#timeline" type="button" role="tab" aria-controls="timeline" aria-selected="false">
-                            <i class="fas fa-clock mr-2"></i>Timeline
-                        </button>
-                    </li>
-                    <li role="presentation">
-                        <button class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300" id="files-tab" data-tabs-target="#files" type="button" role="tab" aria-controls="files" aria-selected="false">
-                            <i class="fas fa-folder mr-2"></i>File
-                        </button>
-                    </li>
-                </ul>
-            </div>
-            <div id="default-tab-content">
-                <!-- Tab Giornali -->
-            <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="giornali" role="tabpanel" aria-labelledby="giornali-tab">
+            <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="default-tab"
+                data-tabs-toggle="#default-tab-content" role="tablist">
+                <li class="me-2" role="presentation">
+                    <button
+                        class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                        id="giornali-tab" data-tabs-target="#giornali" type="button" role="tab" aria-controls="giornali"
+                        aria-selected="false">
+                        <i class="fas fa-book mr-2"></i>Giornali di Cantiere
+                    </button>
+                </li>
+                <li class="me-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg" id="info-tab" data-tabs-target="#info"
+                        type="button" role="tab" aria-controls="info" aria-selected="false">
+                        <i class="fas fa-info-circle mr-2"></i>Informazioni
+                    </button>
+                </li>
+                <li class="me-2" role="presentation">
+                    <button
+                        class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                        id="timeline-tab" data-tabs-target="#timeline" type="button" role="tab" aria-controls="timeline"
+                        aria-selected="false">
+                        <i class="fas fa-clock mr-2"></i>Timeline
+                    </button>
+                </li>
+                <li role="presentation">
+                    <button
+                        class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                        id="files-tab" data-tabs-target="#files" type="button" role="tab" aria-controls="files"
+                        aria-selected="false">
+                        <i class="fas fa-folder mr-2"></i>File
+                    </button>
+                </li>
+            </ul>
+        </div>
+        <div id="default-tab-content">
+            <!-- Tab Giornali -->
+            <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="giornali" role="tabpanel"
+                aria-labelledby="giornali-tab">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Giornali di Cantiere</h3>
-                    <button 
-                        @click="openGiornaleModal()"
-                        type="button" 
+                    <button @click="openGiornaleModal()" type="button"
                         class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
                         <i class="fas fa-plus mr-2"></i>Nuovo Giornale
                     </button>
@@ -235,28 +262,27 @@
                 <div class="space-y-4" x-data="giornaliListApp()">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Elenco Completo Giornali</h3>
-                        <button
-                            @click="loadGiornali()"
-                            type="button"
+                        <button @click="loadGiornali()" type="button"
                             class="text-blue-600 hover:text-blue-800 dark:text-blue-400 text-sm">
                             <i class="fas fa-sync-alt mr-2"></i>Aggiorna
                         </button>
                     </div>
-                    
+
                     <!-- Loading state -->
                     <div x-show="loading" class="text-center py-8">
                         <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
                         <p class="text-gray-500 dark:text-gray-400 mt-2">Caricamento giornali...</p>
                     </div>
-                    
+
                     <!-- Error state -->
-                    <div x-show="error" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 mb-4">
+                    <div x-show="error"
+                        class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 mb-4">
                         <div class="flex">
                             <i class="fas fa-exclamation-triangle text-red-400 dark:text-red-400 mr-3 mt-1"></i>
                             <div class="text-red-700 dark:text-red-400" x-text="error"></div>
                         </div>
                     </div>
-                    
+
                     <!-- Giornali list -->
                     <div x-show="!loading && !error">
                         <template x-for="giornale in giornali" :key="giornale.id">
@@ -267,12 +293,14 @@
                                             <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
                                                 <span x-text="giornale.data"></span>
                                             </span>
-                                            <span x-show="giornale.condizioni_meteo" class="ml-3 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded dark:bg-blue-900 dark:text-blue-300">
+                                            <span x-show="giornale.condizioni_meteo"
+                                                class="ml-3 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded dark:bg-blue-900 dark:text-blue-300">
                                                 <i class="fas fa-cloud-sun mr-1"></i>
                                                 <span x-text="giornale.condizioni_meteo"></span>
                                             </span>
                                         </div>
-                                        <p class="text-gray-700 dark:text-gray-300 mb-2" x-text="giornale.descrizione_lavori || 'Nessuna descrizione'"></p>
+                                        <p class="text-gray-700 dark:text-gray-300 mb-2"
+                                            x-text="giornale.descrizione_lavori || 'Nessuna descrizione'"></p>
                                         <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
                                             <span x-show="giornale.responsabile_scavo">
                                                 <i class="fas fa-user mr-1"></i>
@@ -285,34 +313,44 @@
                                         </div>
                                     </div>
                                     <div class="flex items-center space-x-2">
-                                        <button type="button" class="text-blue-600 hover:text-blue-800 dark:text-blue-400" @click="viewGiornale(giornale)">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button type="button" class="text-green-600 hover:text-green-800 dark:text-green-400" @click="editGiornale(giornale)">
+
+                                        <button type="button"
+                                            class="text-green-600 hover:text-green-800 dark:text-green-400"
+                                            @click="editGiornale(giornale)">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <button type="button" class="text-purple-600 hover:text-purple-800 dark:text-purple-400" @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport" :title="loadingExport ? 'Generazione PDF in corso...' : 'Esporta PDF'">
-                                            <i class="fas fa-file-pdf" :class="{ 'fa-spin fa-spinner': loadingExport }"></i>
+                                        <button type="button"
+                                            class="text-purple-600 hover:text-purple-800 dark:text-purple-400"
+                                            @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport"
+                                            :title="loadingExport ? 'Generazione PDF in corso...' : 'Esporta PDF'">
+                                            <i class="fas fa-file-pdf"
+                                                :class="{ 'fa-spin fa-spinner': loadingExport }"></i>
                                         </button>
-                                        <button type="button" class="text-blue-600 hover:text-blue-800 dark:text-blue-400" @click="exportSingleGiornaleWord(giornale)" :disabled="loadingExportWord" :title="loadingExportWord ? 'Generazione Word in corso...' : 'Esporta Word'">
-                                            <i class="fas fa-file-word" :class="{ 'fa-spin fa-spinner': loadingExportWord }"></i>
+                                        <button type="button"
+                                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                                            @click="exportSingleGiornaleWord(giornale)" :disabled="loadingExportWord"
+                                            :title="loadingExportWord ? 'Generazione Word in corso...' : 'Esporta Word'">
+                                            <i class="fas fa-file-word"
+                                                :class="{ 'fa-spin fa-spinner': loadingExportWord }"></i>
                                         </button>
-                                        <button type="button" class="text-red-600 hover:text-red-800 dark:text-red-400" @click="deleteGiornale(giornale)">
+                                        <button type="button" class="text-red-600 hover:text-red-800 dark:text-red-400"
+                                            @click="deleteGiornale(giornale)">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         </template>
-                        
+
                         <!-- Empty state -->
-                        <div x-show="!loading && !error && giornali.length === 0" class="text-center py-12 bg-white dark:bg-gray-700 rounded-lg">
+                        <div x-show="!loading && !error && giornali.length === 0"
+                            class="text-center py-12 bg-white dark:bg-gray-700 rounded-lg">
                             <i class="fas fa-book text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
-                            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Nessun giornale registrato</h3>
-                            <p class="text-gray-500 dark:text-gray-400 mb-4">Inizia documentando le attività del cantiere</p>
-                            <button
-                                @click="openGiornaleModal()"
-                                type="button"
+                            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Nessun giornale
+                                registrato</h3>
+                            <p class="text-gray-500 dark:text-gray-400 mb-4">Inizia documentando le attività del
+                                cantiere</p>
+                            <button @click="openGiornaleModal()" type="button"
                                 class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
                                 <i class="fas fa-plus mr-2"></i>Crea Primo Giornale
                             </button>
@@ -323,7 +361,8 @@
             </div>
 
             <!-- Tab Informazioni -->
-            <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="info" role="tabpanel" aria-labelledby="info-tab">
+            <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="info" role="tabpanel"
+                aria-labelledby="info-tab">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Informazioni Generali -->
                     <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6">
@@ -332,12 +371,16 @@
                         </h3>
                         <dl class="space-y-3">
                             <div>
-                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile Cantiere</dt>
-                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.responsabile_cantiere or "Non specificato" }}</dd>
+                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile Cantiere
+                                </dt>
+                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.responsabile_cantiere or
+                                    "Non specificato" }}</dd>
                             </div>
                             <div>
-                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Tipologia Intervento</dt>
-                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.tipologia_intervento or "Non specificata" }}</dd>
+                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Tipologia Intervento
+                                </dt>
+                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.tipologia_intervento or
+                                    "Non specificata" }}</dd>
                             </div>
                             {% if cantiere.area_descrizione %}
                             <div>
@@ -380,8 +423,10 @@
                             {% endif %}
                             {% if cantiere.responsabile_procedimento %}
                             <div>
-                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile Procedimento</dt>
-                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.responsabile_procedimento }}</dd>
+                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Responsabile
+                                    Procedimento</dt>
+                                <dd class="text-sm text-gray-900 dark:text-white">{{ cantiere.responsabile_procedimento
+                                    }}</dd>
                             </div>
                             {% endif %}
                         </dl>
@@ -398,8 +443,10 @@
                                 <div class="flex items-center">
                                     <i class="fas fa-hashtag text-purple-600 dark:text-purple-400 mr-2"></i>
                                     <div>
-                                        <dt class="text-xs font-medium text-purple-700 dark:text-purple-300">Codice CUP</dt>
-                                        <dd class="text-sm text-purple-900 dark:text-purple-100 font-mono">{{ cantiere.codice_cup }}</dd>
+                                        <dt class="text-xs font-medium text-purple-700 dark:text-purple-300">Codice CUP
+                                        </dt>
+                                        <dd class="text-sm text-purple-900 dark:text-purple-100 font-mono">{{
+                                            cantiere.codice_cup }}</dd>
                                     </div>
                                 </div>
                             </div>
@@ -409,8 +456,10 @@
                                 <div class="flex items-center">
                                     <i class="fas fa-fingerprint text-indigo-600 dark:text-indigo-400 mr-2"></i>
                                     <div>
-                                        <dt class="text-xs font-medium text-indigo-700 dark:text-indigo-300">Codice CIG</dt>
-                                        <dd class="text-sm text-indigo-900 dark:text-indigo-100 font-mono">{{ cantiere.codice_cig }}</dd>
+                                        <dt class="text-xs font-medium text-indigo-700 dark:text-indigo-300">Codice CIG
+                                        </dt>
+                                        <dd class="text-sm text-indigo-900 dark:text-indigo-100 font-mono">{{
+                                            cantiere.codice_cig }}</dd>
                                     </div>
                                 </div>
                             </div>
@@ -420,7 +469,8 @@
                                 <div class="flex items-center">
                                     <i class="fas fa-euro-sign text-green-600 dark:text-green-400 mr-2"></i>
                                     <div>
-                                        <dt class="text-xs font-medium text-green-700 dark:text-green-300">Importo Lavori</dt>
+                                        <dt class="text-xs font-medium text-green-700 dark:text-green-300">Importo
+                                            Lavori</dt>
                                         <dd class="text-sm text-green-900 dark:text-green-100 font-semibold">
                                             €{{ "{:,.2f}".format(cantiere.importo_lavori) }}
                                         </dd>
@@ -446,7 +496,8 @@
                             <i class="fas fa-clipboard-list mr-2 text-orange-600"></i>Oggetto Appalto
                         </h3>
                         <div class="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
-                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ cantiere.oggetto_appalto }}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{
+                                cantiere.oggetto_appalto }}</p>
                         </div>
                     </div>
                     {% endif %}
@@ -464,13 +515,15 @@
                                 {% if cantiere.data_inizio_prevista %}
                                 <p class="text-sm text-blue-800 dark:text-blue-300">
                                     <i class="fas fa-calendar-plus mr-2"></i>
-                                    Inizio: {{ cantiere.data_inizio_prevista[:10] if cantiere.data_inizio_prevista is string else cantiere.data_inizio_prevista }}
+                                    Inizio: {{ cantiere.data_inizio_prevista[:10] if cantiere.data_inizio_prevista is
+                                    string else cantiere.data_inizio_prevista }}
                                 </p>
                                 {% endif %}
                                 {% if cantiere.data_fine_prevista %}
                                 <p class="text-sm text-blue-800 dark:text-blue-300 mt-1">
                                     <i class="fas fa-calendar-check mr-2"></i>
-                                    Fine: {{ cantiere.data_fine_prevista[:10] if cantiere.data_fine_prevista is string else cantiere.data_fine_prevista }}
+                                    Fine: {{ cantiere.data_fine_prevista[:10] if cantiere.data_fine_prevista is string
+                                    else cantiere.data_fine_prevista }}
                                 </p>
                                 {% endif %}
                             </div>
@@ -483,12 +536,14 @@
                             <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
                                 <p class="text-sm text-green-800 dark:text-green-300">
                                     <i class="fas fa-calendar-plus mr-2"></i>
-                                    Inizio: {{ cantiere.data_inizio_effettiva[:10] if cantiere.data_inizio_effettiva is string else cantiere.data_inizio_effettiva }}
+                                    Inizio: {{ cantiere.data_inizio_effettiva[:10] if cantiere.data_inizio_effettiva is
+                                    string else cantiere.data_inizio_effettiva }}
                                 </p>
                                 {% if cantiere.data_fine_effettiva %}
                                 <p class="text-sm text-green-800 dark:text-green-300 mt-1">
                                     <i class="fas fa-calendar-check mr-2"></i>
-                                    Fine: {{ cantiere.data_fine_effettiva[:10] if cantiere.data_fine_effettiva is string else cantiere.data_fine_effettiva }}
+                                    Fine: {{ cantiere.data_fine_effettiva[:10] if cantiere.data_fine_effettiva is string
+                                    else cantiere.data_fine_effettiva }}
                                 </p>
                                 {% else %}
                                 <p class="text-sm text-green-800 dark:text-green-300 mt-1">
@@ -504,14 +559,16 @@
             </div>
 
             <!-- Tab Timeline -->
-            <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="timeline" role="tabpanel" aria-labelledby="timeline-tab">
+            <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="timeline" role="tabpanel"
+                aria-labelledby="timeline-tab">
                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">Storia del Cantiere</h3>
 
                 <!-- Timeline Flowbite -->
                 <ol class="relative border-s border-gray-200 dark:border-gray-700">
                     {% if cantiere.created_at %}
                     <li class="mb-10 ms-6">
-                        <span class="absolute flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full -start-3 ring-8 ring-white dark:ring-gray-800 dark:bg-blue-900">
+                        <span
+                            class="absolute flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full -start-3 ring-8 ring-white dark:ring-gray-800 dark:bg-blue-900">
                             <i class="fas fa-plus w-2 h-2 text-blue-800 dark:text-blue-300"></i>
                         </span>
                         <h3 class="flex items-center mb-1 text-lg font-semibold text-gray-900 dark:text-white">
@@ -528,12 +585,14 @@
 
                     {% if cantiere.data_inizio_effettiva %}
                     <li class="mb-10 ms-6">
-                        <span class="absolute flex items-center justify-center w-6 h-6 bg-green-100 rounded-full -start-3 ring-8 ring-white dark:ring-gray-800 dark:bg-green-900">
+                        <span
+                            class="absolute flex items-center justify-center w-6 h-6 bg-green-100 rounded-full -start-3 ring-8 ring-white dark:ring-gray-800 dark:bg-green-900">
                             <i class="fas fa-play w-2 h-2 text-green-800 dark:text-green-300"></i>
                         </span>
                         <h3 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">Avvio Lavori</h3>
                         <time class="block mb-2 text-sm font-normal leading-none text-gray-400 dark:text-gray-500">
-                            {{ cantiere.data_inizio_effettiva[:10] if cantiere.data_inizio_effettiva is string else cantiere.data_inizio_effettiva }}
+                            {{ cantiere.data_inizio_effettiva[:10] if cantiere.data_inizio_effettiva is string else
+                            cantiere.data_inizio_effettiva }}
                         </time>
                         <p class="text-base font-normal text-gray-500 dark:text-gray-400">
                             Inizio effettivo dei lavori sul cantiere
@@ -543,12 +602,14 @@
 
                     {% if cantiere.data_fine_effettiva %}
                     <li class="ms-6">
-                        <span class="absolute flex items-center justify-center w-6 h-6 bg-gray-100 rounded-full -start-3 ring-8 ring-white dark:ring-gray-800 dark:bg-gray-700">
+                        <span
+                            class="absolute flex items-center justify-center w-6 h-6 bg-gray-100 rounded-full -start-3 ring-8 ring-white dark:ring-gray-800 dark:bg-gray-700">
                             <i class="fas fa-check w-2 h-2 text-gray-800 dark:text-gray-300"></i>
                         </span>
                         <h3 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">Completamento</h3>
                         <time class="block mb-2 text-sm font-normal leading-none text-gray-400 dark:text-gray-500">
-                            {{ cantiere.data_fine_effettiva[:10] if cantiere.data_fine_effettiva is string else cantiere.data_fine_effettiva }}
+                            {{ cantiere.data_fine_effettiva[:10] if cantiere.data_fine_effettiva is string else
+                            cantiere.data_fine_effettiva }}
                         </time>
                         <p class="text-base font-normal text-gray-500 dark:text-gray-400">
                             Lavori completati
@@ -559,7 +620,8 @@
             </div>
 
             <!-- Tab Files -->
-            <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="files" role="tabpanel" aria-labelledby="files-tab">
+            <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="files" role="tabpanel"
+                aria-labelledby="files-tab">
                 <div class="text-center py-12">
                     <i class="fas fa-folder-open text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
                     <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Sezione File</h3>
@@ -575,1121 +637,1151 @@
 
 
 <script>
-function cantiereDetailApp() {
-    return {
-        // Modal state for the complete modal
-        showCreateModal: false,
-        editingGiornale: false,
-        editingGiornaleData: null,
-        saving: false,
-        errorMessage: '',
-        modalMode: 'giornale', // 'giornale' or 'edit-cantiere'
-        loadingExport: false,
-        loadingExportWord: false,
-        
-        // Enhanced operator data structure
-        operatori_data: {}, // Store enhanced operator data { operatorId: { ore_lavorate, note_presenza } }
-        
-        // Form data for the complete modal
-        formData: {
-            data: new Date().toISOString().split('T')[0],
-            ora_inizio: '',
-            ora_fine: '',
-            cantiere_id: '{{ cantiere.id }}',
-            responsabile_nome: '',
-            compilatore: '',
-            condizioni_meteo: '',
-            temperatura_min: null,
-            temperatura_max: null,
-            note_meteo: '',
-            descrizione_lavori: '',
-            modalita_lavorazioni: '',
-            disposizioni_rup: '',
-            disposizioni_direttore: '',
-            sospensioni: '',
-            contestazioni: '',
-            incidenti: '',
-            sopralluoghi: '',
-            note_generali: '',
-            problematiche: '',
-            forniture: '',
-            documentazione_prodotta: '',
-            materiali_rinvenuti: '',
-            us_elaborate: '',
-            usm_elaborate: '',
-            usr_elaborate: '',
-            attrezzatura_utilizzata: '',
-            mezzi_utilizzati: '',
-            apparecchiature_input: '',
-            operatori_ids: []
-        },
+    function cantiereDetailApp() {
+        return {
+            // Modal state for the complete modal
+            showCreateModal: false,
+            editingGiornale: false,
+            editingGiornaleData: null,
+            saving: false,
+            errorMessage: '',
+            modalMode: 'giornale', // 'giornale' or 'edit-cantiere'
+            loadingExport: false,
+            loadingExportWord: false,
 
-        // Available options (these would normally be loaded from API)
-        condizioni_meteo: [
-            { value: 'Sereno', label: 'Sereno' },
-            { value: 'Nuvoloso', label: 'Nuvoloso' },
-            { value: 'Pioggia', label: 'Pioggia' },
-            { value: 'Neve', label: 'Neve' },
-            { value: 'Foglia', label: 'Foglia' }
-        ],
-        
-        cantieri_disponibili: [
-            { id: '{{ cantiere.id }}', nome: '{{ cantiere.nome }}', codice: '{{ cantiere.codice }}' }
-        ],
-        
-        operatori_disponibili: [],
+            // Enhanced operator data structure
+            operatori_data: {}, // Store enhanced operator data { operatorId: { ore_lavorate, note_presenza } }
 
-        // Alert state
-        alert: {
-            show: false,
-            type: 'success',
-            message: ''
-        },
+            // Form data for the complete modal
+            formData: {
+                data: new Date().toISOString().split('T')[0],
+                ora_inizio: '',
+                ora_fine: '',
+                cantiere_id: '{{ cantiere.id }}',
+                responsabile_nome: '',
+                compilatore: '',
+                condizioni_meteo: '',
+                temperatura_min: null,
+                temperatura_max: null,
+                note_meteo: '',
+                descrizione_lavori: '',
+                modalita_lavorazioni: '',
+                disposizioni_rup: '',
+                disposizioni_direttore: '',
+                sospensioni: '',
+                contestazioni: '',
+                incidenti: '',
+                sopralluoghi: '',
+                note_generali: '',
+                problematiche: '',
+                forniture: '',
+                documentazione_prodotta: '',
+                materiali_rinvenuti: '',
+                us_elaborate: '',
+                usm_elaborate: '',
+                usr_elaborate: '',
+                attrezzatura_utilizzata: '',
+                mezzi_utilizzati: '',
+                apparecchiature_input: '',
+                operatori_ids: []
+            },
 
-        // Init
-        init() {
-            console.log('Cantiere detail initialized');
-        },
+            // Available options (these would normally be loaded from API)
+            condizioni_meteo: [
+                { value: 'Sereno', label: 'Sereno' },
+                { value: 'Nuvoloso', label: 'Nuvoloso' },
+                { value: 'Pioggia', label: 'Pioggia' },
+                { value: 'Neve', label: 'Neve' },
+                { value: 'Foglia', label: 'Foglia' }
+            ],
 
-        // Handle event from giornaliListApp component
-        async handleEditGiornaleEvent(event) {
-            const data = event.detail;
-            this.modalMode = data.modalMode;
-            this.editingGiornale = data.editingGiornale;
-            this.editingGiornaleData = data.editingGiornaleData;
-            this.formData = data.formData;
-            
-            // Load operators before showing the modal
-            await this.loadOperatoriDisponibili();
-            
-            // Load operator data for editing after operators are loaded
-            this.loadOperatoriDataForEditing(this.editingGiornaleData);
-            
-            this.showCreateModal = true;
-        },
+            cantieri_disponibili: [
+                { id: '{{ cantiere.id }}', nome: '{{ cantiere.nome }}', codice: '{{ cantiere.codice }}' }
+            ],
 
-        // Helper methods for modal title and button text
-        getModalTitle() {
-            if (this.modalMode === 'edit-cantiere') {
-                return 'Modifica Cantiere';
-            } else {
-                return this.editingGiornale ? 'Modifica Giornale' : 'Nuovo Giornale di Cantiere';
-            }
-        },
+            operatori_disponibili: [],
 
-        getSaveButtonText() {
-            if (this.modalMode === 'edit-cantiere') {
-                return 'Salva Modifiche Cantiere';
-            } else {
-                return this.editingGiornale ? 'Salva Modifiche' : 'Crea Giornale';
-            }
-        },
+            // Alert state
+            alert: {
+                show: false,
+                type: 'success',
+                message: ''
+            },
 
-        // Modal methods
-        async openGiornaleModal() {
-            this.modalMode = 'giornale';
-            this.showCreateModal = true;
-            this.editingGiornale = false;
-            this.resetForm();
-            await this.loadOperatoriDisponibili();
-        },
+            // Init
+            init() {
+                console.log('Cantiere detail initialized');
+            },
 
-        async openEditModal() {
-            this.modalMode = 'edit-cantiere';
-            this.showCreateModal = true;
-            await this.loadCantiereData();
-            await this.loadOperatoriDisponibili();
-        },
+            // Handle event from giornaliListApp component
+            async handleEditGiornaleEvent(event) {
+                const data = event.detail;
+                this.modalMode = data.modalMode;
+                this.editingGiornale = data.editingGiornale;
+                this.editingGiornaleData = data.editingGiornaleData;
+                this.formData = data.formData;
 
-        closeModal() {
-            this.showCreateModal = false;
-            this.errorMessage = '';
-        },
+                // Load operators before showing the modal
+                await this.loadOperatoriDisponibili();
 
-        resetForm() {
-            if (this.modalMode === 'edit-cantiere') {
-                // Reset for cantiere editing
-                this.formData = {
-                    nome: '',
-                    codice: '',
-                    stato: 'pianificato',
-                    responsabile_cantiere: '',
-                    data_inizio_prevista: '',
-                    data_fine_prevista: '',
-                    descrizione: '',
-                    area_descrizione: '',
-                    tipologia_intervento: '',
-                    priorita: 3,
-                    // New fields
-                    committente: '',
-                    impresa_esecutrice: '',
-                    direttore_lavori: '',
-                    responsabile_procedimento: '',
-                    oggetto_appalto: '',
-                    codice_cup: '',
-                    codice_cig: '',
-                    importo_lavori: ''
-                };
-            } else {
-                // Reset for giornale
-                this.formData = {
-                    data: new Date().toISOString().split('T')[0],
-                    ora_inizio: '',
-                    ora_fine: '',
-                    cantiere_id: '{{ cantiere.id }}',
-                    responsabile_nome: '',
-                    compilatore: '',
-                    condizioni_meteo: '',
-                    temperatura_min: null,
-                    temperatura_max: null,
-                    note_meteo: '',
-                    descrizione_lavori: '',
-                    modalita_lavorazioni: '',
-                    disposizioni_rup: '',
-                    disposizioni_direttore: '',
-                    sospensioni: '',
-                    contestazioni: '',
-                    incidenti: '',
-                    sopralluoghi: '',
-                    note_generali: '',
-                    problematiche: '',
-                    forniture: '',
-                    documentazione_prodotta: '',
-                    materiali_rinvenuti: '',
-                    us_elaborate: '',
-                    usm_elaborate: '',
-                    usr_elaborate: '',
-                    attrezzatura_utilizzata: '',
-                    mezzi_utilizzati: '',
-                    apparecchiature_input: '',
-                    operatori_ids: []
-                };
-                
-                // Reset enhanced operator data
-                this.operatori_data = {};
-            }
-        },
+                // Load operator data for editing after operators are loaded
+                this.loadOperatoriDataForEditing(this.editingGiornaleData);
 
-        async loadCantiereData() {
-            try {
-                const response = await fetch(`/api/v1/cantieri/cantieri/{{ cantiere.id }}`);
-                
-                if (!response.ok) {
-                    throw new Error('Errore nel caricamento dei dati del cantiere');
-                }
-                
-                const cantiereData = await response.json();
-                
-                // Load cantiere data into form
-                this.formData = {
-                    nome: cantiereData.nome || '',
-                    codice: cantiereData.codice || '',
-                    stato: cantiereData.stato || 'pianificato',
-                    responsabile_cantiere: cantiereData.responsabile_cantiere || '',
-                    data_inizio_prevista: cantiereData.data_inizio_prevista || '',
-                    data_fine_prevista: cantiereData.data_fine_prevista || '',
-                    descrizione: cantiereData.descrizione || '',
-                    area_descrizione: cantiereData.area_descrizione || '',
-                    tipologia_intervento: cantiereData.tipologia_intervento || '',
-                    priorita: cantiereData.priorita || 3,
-                    // New fields
-                    committente: cantiereData.committente || '',
-                    impresa_esecutrice: cantiereData.impresa_esecutrice || '',
-                    direttore_lavori: cantiereData.direttore_lavori || '',
-                    responsabile_procedimento: cantiereData.responsabile_procedimento || '',
-                    oggetto_appalto: cantiereData.oggetto_appalto || '',
-                    codice_cup: cantiereData.codice_cup || '',
-                    codice_cig: cantiereData.codice_cig || '',
-                    importo_lavori: cantiereData.importo_lavori || ''
-                };
-                
-            } catch (error) {
-                this.showAlert('error', error.message || 'Errore nel caricamento dei dati del cantiere');
-                console.error('Error loading cantiere data:', error);
-            }
-        },
+                this.showCreateModal = true;
+            },
 
-        validateAndSave() {
-            // First check if form is valid using HTML5 validation
-            const form = document.querySelector('form');
-            if (!form.checkValidity()) {
-                // If form is invalid, let browser show validation errors
-                form.reportValidity();
-                return;
-            }
-            
-            // If form is valid, proceed with save
-            this.saveData();
-        },
-
-        async saveData() {
-            if (this.modalMode === 'edit-cantiere') {
-                await this.saveCantiere();
-            } else {
-                if (this.editingGiornale) {
-                    await this.updateGiornale();
+            // Helper methods for modal title and button text
+            getModalTitle() {
+                if (this.modalMode === 'edit-cantiere') {
+                    return 'Modifica Cantiere';
                 } else {
-                    await this.saveGiornale();
+                    return this.editingGiornale ? 'Modifica Giornale' : 'Nuovo Giornale di Cantiere';
                 }
-            }
-        },
-        
-        async updateGiornale() {
-            if (!this.formData.data) {
-                this.errorMessage = 'La data è obbligatoria';
-                return;
-            }
+            },
 
-            this.saving = true;
-            this.errorMessage = '';
-
-            try {
-                // Prepara i dati per l'API con operatori enhanced
-                const apiData = {
-                    ...this.formData,
-                    // Solo invia i campi orario se non sono vuoti
-                    ora_inizio: this.formData.ora_inizio || null,
-                    ora_fine: this.formData.ora_fine || null,
-                    // Gestisci temperature
-                    temperatura_min: this.formData.temperatura_min || null,
-                    temperatura_max: this.formData.temperatura_max || null,
-                    // Enhanced operatori structure
-                    operatori: this.getEnhancedOperatoriData()
-                };
-
-                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(apiData)
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Errore aggiornamento del giornale');
+            getSaveButtonText() {
+                if (this.modalMode === 'edit-cantiere') {
+                    return 'Salva Modifiche Cantiere';
+                } else {
+                    return this.editingGiornale ? 'Salva Modifiche' : 'Crea Giornale';
                 }
+            },
 
-                const result = await response.json();
-                
-                this.showAlert('success', 'Giornale aggiornato con successo');
-                this.closeModal();
+            // Modal methods
+            async openGiornaleModal() {
+                this.modalMode = 'giornale';
+                this.showCreateModal = true;
+                this.editingGiornale = false;
+                this.resetForm();
+                await this.loadOperatoriDisponibili();
+            },
 
-                // Ricarica pagina per mostrare le modifiche
-                setTimeout(() => location.reload(), 1500);
-            } catch (error) {
-                this.errorMessage = error.message || 'Errore durante aggiornamento del giornale';
-                console.error('Error updating giornale:', error);
-            } finally {
-                this.saving = false;
-            }
-        },
+            async openEditModal() {
+                this.modalMode = 'edit-cantiere';
+                this.showCreateModal = true;
+                await this.loadCantiereData();
+                await this.loadOperatoriDisponibili();
+            },
 
-        async saveCantiere() {
-            if (!this.formData.nome?.trim()) {
-                this.errorMessage = 'Il nome del cantiere è obbligatorio';
-                return;
-            }
+            closeModal() {
+                this.showCreateModal = false;
+                this.errorMessage = '';
+            },
 
-            if (this.formData.data_inizio_prevista && this.formData.data_fine_prevista) {
-                if (new Date(this.formData.data_inizio_prevista) > new Date(this.formData.data_fine_prevista)) {
-                    this.errorMessage = 'La data di fine deve essere successiva alla data di inizio';
+            resetForm() {
+                if (this.modalMode === 'edit-cantiere') {
+                    // Reset for cantiere editing
+                    this.formData = {
+                        nome: '',
+                        codice: '',
+                        stato: 'pianificato',
+                        responsabile_cantiere: '',
+                        data_inizio_prevista: '',
+                        data_fine_prevista: '',
+                        descrizione: '',
+                        area_descrizione: '',
+                        tipologia_intervento: '',
+                        priorita: 3,
+                        // New fields
+                        committente: '',
+                        impresa_esecutrice: '',
+                        direttore_lavori: '',
+                        responsabile_procedimento: '',
+                        oggetto_appalto: '',
+                        codice_cup: '',
+                        codice_cig: '',
+                        importo_lavori: ''
+                    };
+                } else {
+                    // Reset for giornale
+                    this.formData = {
+                        data: new Date().toISOString().split('T')[0],
+                        ora_inizio: '',
+                        ora_fine: '',
+                        cantiere_id: '{{ cantiere.id }}',
+                        responsabile_nome: '',
+                        compilatore: '',
+                        condizioni_meteo: '',
+                        temperatura_min: null,
+                        temperatura_max: null,
+                        note_meteo: '',
+                        descrizione_lavori: '',
+                        modalita_lavorazioni: '',
+                        disposizioni_rup: '',
+                        disposizioni_direttore: '',
+                        sospensioni: '',
+                        contestazioni: '',
+                        incidenti: '',
+                        sopralluoghi: '',
+                        note_generali: '',
+                        problematiche: '',
+                        forniture: '',
+                        documentazione_prodotta: '',
+                        materiali_rinvenuti: '',
+                        us_elaborate: '',
+                        usm_elaborate: '',
+                        usr_elaborate: '',
+                        attrezzatura_utilizzata: '',
+                        mezzi_utilizzati: '',
+                        apparecchiature_input: '',
+                        operatori_ids: []
+                    };
+
+                    // Reset enhanced operator data
+                    this.operatori_data = {};
+                }
+            },
+
+            async loadCantiereData() {
+                try {
+                    const response = await fetch(`/api/v1/cantieri/cantieri/{{ cantiere.id }}`);
+
+                    if (!response.ok) {
+                        throw new Error('Errore nel caricamento dei dati del cantiere');
+                    }
+
+                    const cantiereData = await response.json();
+
+                    // Load cantiere data into form
+                    this.formData = {
+                        nome: cantiereData.nome || '',
+                        codice: cantiereData.codice || '',
+                        stato: cantiereData.stato || 'pianificato',
+                        responsabile_cantiere: cantiereData.responsabile_cantiere || '',
+                        data_inizio_prevista: cantiereData.data_inizio_prevista || '',
+                        data_fine_prevista: cantiereData.data_fine_prevista || '',
+                        descrizione: cantiereData.descrizione || '',
+                        area_descrizione: cantiereData.area_descrizione || '',
+                        tipologia_intervento: cantiereData.tipologia_intervento || '',
+                        priorita: cantiereData.priorita || 3,
+                        // New fields
+                        committente: cantiereData.committente || '',
+                        impresa_esecutrice: cantiereData.impresa_esecutrice || '',
+                        direttore_lavori: cantiereData.direttore_lavori || '',
+                        responsabile_procedimento: cantiereData.responsabile_procedimento || '',
+                        oggetto_appalto: cantiereData.oggetto_appalto || '',
+                        codice_cup: cantiereData.codice_cup || '',
+                        codice_cig: cantiereData.codice_cig || '',
+                        importo_lavori: cantiereData.importo_lavori || ''
+                    };
+
+                } catch (error) {
+                    this.showAlert('error', error.message || 'Errore nel caricamento dei dati del cantiere');
+                    console.error('Error loading cantiere data:', error);
+                }
+            },
+
+            validateAndSave() {
+                // First check if form is valid using HTML5 validation
+                const form = document.querySelector('form');
+                if (!form.checkValidity()) {
+                    // If form is invalid, let browser show validation errors
+                    form.reportValidity();
                     return;
                 }
-            }
 
-            this.saving = true;
-            this.errorMessage = '';
+                // If form is valid, proceed with save
+                this.saveData();
+            },
 
-            try {
-                const response = await fetch(`/api/v1/cantieri/cantieri/{{ cantiere.id }}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(this.formData)
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Errore durante il salvataggio del cantiere');
-                }
-
-                const result = await response.json();
-                
-                this.showAlert('success', 'Cantiere aggiornato con successo');
-                this.closeModal();
-
-                // Ricarica pagina per mostrare le modifiche
-                setTimeout(() => location.reload(), 1500);
-            } catch (error) {
-                this.errorMessage = error.message || 'Errore durante il salvataggio del cantiere';
-                console.error('Error saving cantiere:', error);
-            } finally {
-                this.saving = false;
-            }
-        },
-
-        async saveGiornale() {
-            if (!this.formData.data) {
-                this.errorMessage = 'La data è obbligatoria';
-                return;
-            }
-
-            this.saving = true;
-            this.errorMessage = '';
-
-            try {
-                // Prepara i dati per l'API con operatori enhanced, gestendo campi vuoti
-                const apiData = {
-                    ...this.formData,
-                    // Solo invia i campi orario se non sono vuoti
-                    ora_inizio: this.formData.ora_inizio || null,
-                    ora_fine: this.formData.ora_fine || null,
-                    // Gestisci temperature
-                    temperatura_min: this.formData.temperatura_min || null,
-                    temperatura_max: this.formData.temperatura_max || null,
-                    // Enhanced operatori structure
-                    operatori: this.getEnhancedOperatoriData()
-                };
-
-                // Chiama API reale per salvare il giornale
-                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(apiData)
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Errore nel salvataggio del giornale');
-                }
-
-                const result = await response.json();
-                
-                this.showAlert('success', 'Giornale creato con successo');
-                this.closeModal();
-
-                // Ricarica pagina per mostrare il nuovo giornale
-                setTimeout(() => location.reload(), 1500);
-            } catch (error) {
-                this.errorMessage = error.message || 'Errore durante il salvataggio del giornale';
-                console.error('Error saving giornale:', error);
-            } finally {
-                this.saving = false;
-            }
-        },
-
-        // Delete
-        async deleteCantiere() {
-            if (!confirm('Sei sicuro di voler eliminare questo cantiere? Questa azione non può essere annullata.')) {
-                return;
-            }
-
-            this.showAlert('success', 'Cantiere eliminato');
-            setTimeout(() => {
-                window.location.href = '/sites/{{ site.id }}/cantieri';
-            }, 1500);
-        },
-
-        // Helper
-        showAlert(type, message) {
-            this.alert = { show: true, type, message };
-            setTimeout(() => {
-                this.alert.show = false;
-            }, 5000);
-        },
-
-        // Load operators for the modal
-        async loadOperatoriDisponibili() {
-            console.log('DEBUG: Inizio caricamento operatori per sito:', '{{ site.id }}');
-            
-            try {
-                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/operatori`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'include'
-                });
-                
-                console.log('DEBUG: Response status:', response.status);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('DEBUG: Operatori response:', data);
-                    
-                    // Handle site-specific response format
-                    if (data.operatori && Array.isArray(data.operatori)) {
-                        this.operatori_disponibili = data.operatori;
-                        console.log('DEBUG: Operatori caricati (site-specific):', this.operatori_disponibili.length);
-                    } else if (Array.isArray(data)) {
-                        this.operatori_disponibili = data;
-                        console.log('DEBUG: Operatori caricati (array):', this.operatori_disponibili.length);
-                    } else {
-                        console.warn('DEBUG: Formato risposta non previsto:', data);
-                        this.operatori_disponibili = [];
-                    }
+            async saveData() {
+                if (this.modalMode === 'edit-cantiere') {
+                    await this.saveCantiere();
                 } else {
-                    console.error('DEBUG: Errore caricamento operatori, status:', response.status);
-                    const errorText = await response.text();
-                    console.log('DEBUG: Error response:', errorText);
-                    
-                    // Check if it's a redirect to login page
-                    if (response.redirected && response.url.includes('/login')) {
-                        console.error('DEBUG: Redirected to login page - authentication required');
-                        window.location.href = response.url;
+                    if (this.editingGiornale) {
+                        await this.updateGiornale();
                     } else {
-                        console.error('DEBUG: Errore nel caricamento degli operatori');
-                    }
-                    this.operatori_disponibili = [];
-                }
-                
-            } catch (error) {
-                console.error('Errore caricamento operatori:', error);
-                this.operatori_disponibili = [];
-                
-                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                    console.error('DEBUG: Network error - server may be down');
-                } else {
-                    console.error('DEBUG: Errore durante il caricamento degli operatori');
-                }
-            }
-            
-            console.log('DEBUG: Fine caricamento operatori, operatori_disponibili.length:', this.operatori_disponibili.length);
-        },
-        
-        // ===== ENHANCED OPERATOR FUNCTIONS =====
-        
-        // Toggle operator selection
-        toggleOperatore(operatore) {
-            const operatoreId = operatore.id;
-            const index = this.formData.operatori_ids.indexOf(operatoreId);
-            
-            if (index === -1) {
-                // Add operator
-                this.formData.operatori_ids.push(operatoreId);
-                // Initialize enhanced data
-                if (!this.operatori_data[operatoreId]) {
-                    this.operatori_data[operatoreId] = {
-                        ore_lavorate: null,
-                        note_presenza: ''
-                    };
-                }
-            } else {
-                // Remove operator
-                this.formData.operatori_ids.splice(index, 1);
-                // Clean up enhanced data
-                delete this.operatori_data[operatoreId];
-            }
-        },
-        
-        // Check if operator is selected
-        isOperatoreSelezionato(operatoreId) {
-            return this.formData.operatori_ids.includes(operatoreId);
-        },
-        
-        // Get operator data
-        getOperatoreData(operatoreId) {
-            return this.operatori_data[operatoreId] || { ore_lavorate: null, note_presenza: '' };
-        },
-        
-        // Update operator data
-        updateOperatoreData(operatoreId, field, value) {
-            if (!this.operatori_data[operatoreId]) {
-                this.operatori_data[operatoreId] = { ore_lavorate: null, note_presenza: '' };
-            }
-            
-            if (field === 'ore_lavorate') {
-                // Convert to float and validate
-                const hours = parseFloat(value);
-                this.operatori_data[operatoreId].ore_lavorate = isNaN(hours) ? null : hours;
-            } else {
-                this.operatori_data[operatoreId][field] = value;
-            }
-        },
-        
-        // Get enhanced operatori data for API
-        getEnhancedOperatoriData() {
-            return this.formData.operatori_ids.map(operatoreId => ({
-                id: operatoreId,
-                ore_lavorate: this.operatori_data[operatoreId]?.ore_lavorate || null,
-                note_presenza: this.operatori_data[operatoreId]?.note_presenza || ''
-            }));
-        },
-        
-        // Get selected operators with their data
-        getOperatoriSelezionati() {
-            return this.operatori_disponibili.filter(operatore =>
-                this.isOperatoreSelezionato(operatore.id)
-            );
-        },
-        
-        // Get count of selected operators
-        getOperatoriSelezionatiCount() {
-            return this.formData.operatori_ids.length;
-        },
-        
-        // Load operator data for editing
-        loadOperatoriDataForEditing(giornale) {
-            if (giornale.operatori_presenti && Array.isArray(giornale.operatori_presenti)) {
-                this.formData.operatori_ids = giornale.operatori_presenti.map(op => op.id);
-                
-                // Load enhanced data
-                this.operatori_data = {};
-                giornale.operatori_presenti.forEach(op => {
-                    this.operatori_data[op.id] = {
-                        ore_lavorate: op.ore_lavorate || null,
-                        note_presenza: op.note_presenza || ''
-                    };
-                });
-            }
-        },
-        
-        // ===== PDF EXPORT FUNCTIONALITY =====
-        
-        async exportGiornaliPDF() {
-            try {
-                // Show loading indicator
-                this.showAlert('info', 'Generazione PDF in corso...');
-                
-                // Build export URL with optional filters
-                const baseUrl = `/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/export-pdf`;
-                const exportUrl = baseUrl;
-                
-                console.log('🔍 [DEBUG] Exporting giornali PDF for cantiere:', '{{ cantiere.id }}');
-                
-                // Call API to generate PDF
-                const response = await fetch(exportUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'include'
-                });
-                
-                console.log('🔍 [DEBUG] PDF export response status:', response.status);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('🔍 [DEBUG] PDF export error response:', errorText);
-                    
-                    let errorMessage = 'Errore nella generazione del PDF';
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        errorMessage = errorData.detail || errorMessage;
-                    } catch (e) {
-                        // If JSON parsing fails, use the raw text
-                        errorMessage = errorText || errorMessage;
-                    }
-                    
-                    throw new Error(errorMessage);
-                }
-                
-                // Get filename from Content-Disposition header if available
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = `Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.pdf`;
-                
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    if (filenameMatch && filenameMatch[1]) {
-                        filename = filenameMatch[1].replace(/['"]/g, '');
+                        await this.saveGiornale();
                     }
                 }
-                
-                // Convert response to blob
-                const blob = await response.blob();
-                
-                // Create download link
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                link.style.display = 'none';
-                
-                // Trigger download
-                document.body.appendChild(link);
-                link.click();
-                
-                // Clean up
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-                
-                this.showAlert('success', 'PDF generato con successo!');
-                console.log('🔍 [DEBUG] PDF download completed successfully');
-                
-            } catch (error) {
-                console.error('🔍 [DEBUG] Error exporting giornali PDF:', error);
-                this.showAlert('error', `Errore nell'esportazione PDF: ${error.message || error}`);
-            }
-        },
-        
-        // ===== WORD EXPORT FUNCTIONALITY =====
-        
-        async exportGiornaliWord() {
-            try {
-                // Show loading indicator
-                this.showAlert('info', 'Generazione documento Word in corso...');
-                
-                // Build export URL with optional filters
-                const baseUrl = `/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/export-word`;
-                const exportUrl = baseUrl;
-                
-                console.log('🔍 [DEBUG] Exporting giornali Word for cantiere:', '{{ cantiere.id }}');
-                
-                // Call API to generate Word document
-                const response = await fetch(exportUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'include'
-                });
-                
-                console.log('🔍 [DEBUG] Word export response status:', response.status);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('🔍 [DEBUG] Word export error response:', errorText);
-                    
-                    let errorMessage = 'Errore nella generazione del documento Word';
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        errorMessage = errorData.detail || errorMessage;
-                    } catch (e) {
-                        // If JSON parsing fails, use the raw text
-                        errorMessage = errorText || errorMessage;
-                    }
-                    
-                    throw new Error(errorMessage);
-                }
-                
-                // Get filename from Content-Disposition header if available
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = `Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.docx`;
-                
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    if (filenameMatch && filenameMatch[1]) {
-                        filename = filenameMatch[1].replace(/['"]/g, '');
-                    }
-                }
-                
-                // Convert response to blob
-                const blob = await response.blob();
-                
-                // Create download link
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                link.style.display = 'none';
-                
-                // Trigger download
-                document.body.appendChild(link);
-                link.click();
-                
-                // Clean up
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-                
-                this.showAlert('success', 'Documento Word generato con successo!');
-                console.log('🔍 [DEBUG] Word document download completed successfully');
-                
-            } catch (error) {
-                console.error('🔍 [DEBUG] Error exporting giornali Word:', error);
-                this.showAlert('error', `Errore nell'esportazione Word: ${error.message || error}`);
-            }
-        },
-        
-        async exportSingleGiornaleWord(giornale) {
-            try {
-                this.loadingExportWord = true;
-                this.showAlert('info', 'Generazione Word singolo giornale in corso...');
-                
-                const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-word`;
-                
-                console.log('🔍 [DEBUG] Exporting single giornale Word:', giornale.id);
-                
-                const response = await fetch(exportUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'include'
-                });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    let errorMessage = 'Errore nella generazione del Word del giornale';
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        errorMessage = errorData.detail || errorMessage;
-                    } catch (e) {
-                        errorMessage = errorText || errorMessage;
-                    }
-                    throw new Error(errorMessage);
-                }
-                
-                // Get filename from Content-Disposition header
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.docx`;
-                
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    if (filenameMatch && filenameMatch[1]) {
-                        filename = filenameMatch[1].replace(/['"]/g, '');
-                    }
-                }
-                
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                link.style.display = 'none';
-                
-                document.body.appendChild(link);
-                link.click();
-                
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-                
-                this.showAlert('success', 'Word del giornale generato con successo!');
-                
-            } catch (error) {
-                console.error('🔍 [DEBUG] Error exporting single giornale Word:', error);
-                this.showAlert('error', `Errore nell'esportazione del Word: ${error.message || error}`);
-            } finally {
-                this.loadingExportWord = false;
-            }
-        },
-        
-        async exportSingleGiornalePDF(giornale) {
-            try {
-                this.loadingExport = true;
-                this.showAlert('info', 'Generazione PDF singolo giornale in corso...');
-                
-                const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-pdf`;
-                
-                console.log('🔍 [DEBUG] Exporting single giornale PDF:', giornale.id);
-                
-                const response = await fetch(exportUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'include'
-                });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    let errorMessage = 'Errore nella generazione del PDF del giornale';
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        errorMessage = errorData.detail || errorMessage;
-                    } catch (e) {
-                        errorMessage = errorText || errorMessage;
-                    }
-                    throw new Error(errorMessage);
-                }
-                
-                // Get filename from Content-Disposition header
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.pdf`;
-                
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    if (filenameMatch && filenameMatch[1]) {
-                        filename = filenameMatch[1].replace(/['"]/g, '');
-                    }
-                }
-                
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                link.style.display = 'none';
-                
-                document.body.appendChild(link);
-                link.click();
-                
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-                
-                this.showAlert('success', 'PDF del giornale generato con successo!');
-                
-            } catch (error) {
-                console.error('🔍 [DEBUG] Error exporting single giornale PDF:', error);
-                this.showAlert('error', `Errore nell'esportazione del PDF: ${error.message || error}`);
-            } finally {
-                this.loadingExport = false;
-            }
-        },
-        
-        // ===== VALIDAZIONE FUNZIONALITY =====
-        
-        async validateGiornale() {
-            if (!this.editingGiornaleData || !this.editingGiornaleData.id) {
-                this.errorMessage = 'Nessun giornale da validare';
-                return;
-            }
+            },
 
-            try {
+            async updateGiornale() {
+                if (!this.formData.data) {
+                    this.errorMessage = 'La data è obbligatoria';
+                    return;
+                }
+
                 this.saving = true;
                 this.errorMessage = '';
 
-                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}/validate`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                try {
+                    // Prepara i dati per l'API con operatori enhanced
+                    const apiData = {
+                        ...this.formData,
+                        // Solo invia i campi orario se non sono vuoti
+                        ora_inizio: this.formData.ora_inizio || null,
+                        ora_fine: this.formData.ora_fine || null,
+                        // Gestisci temperature
+                        temperatura_min: this.formData.temperatura_min || null,
+                        temperatura_max: this.formData.temperatura_max || null,
+                        // Enhanced operatori structure
+                        operatori: this.getEnhancedOperatoriData()
+                    };
+
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(apiData)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Errore aggiornamento del giornale');
+                    }
+
+                    const result = await response.json();
+
+                    this.showAlert('success', 'Giornale aggiornato con successo');
+                    this.closeModal();
+
+                    // Ricarica pagina per mostrare le modifiche
+                    setTimeout(() => location.reload(), 1500);
+                } catch (error) {
+                    this.errorMessage = error.message || 'Errore durante aggiornamento del giornale';
+                    console.error('Error updating giornale:', error);
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            async saveCantiere() {
+                if (!this.formData.nome?.trim()) {
+                    this.errorMessage = 'Il nome del cantiere è obbligatorio';
+                    return;
+                }
+
+                if (this.formData.data_inizio_prevista && this.formData.data_fine_prevista) {
+                    if (new Date(this.formData.data_inizio_prevista) > new Date(this.formData.data_fine_prevista)) {
+                        this.errorMessage = 'La data di fine deve essere successiva alla data di inizio';
+                        return;
+                    }
+                }
+
+                this.saving = true;
+                this.errorMessage = '';
+
+                try {
+                    const response = await fetch(`/api/v1/cantieri/cantieri/{{ cantiere.id }}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(this.formData)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Errore durante il salvataggio del cantiere');
+                    }
+
+                    const result = await response.json();
+
+                    this.showAlert('success', 'Cantiere aggiornato con successo');
+                    this.closeModal();
+
+                    // Ricarica pagina per mostrare le modifiche
+                    setTimeout(() => location.reload(), 1500);
+                } catch (error) {
+                    this.errorMessage = error.message || 'Errore durante il salvataggio del cantiere';
+                    console.error('Error saving cantiere:', error);
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            async saveGiornale() {
+                if (!this.formData.data) {
+                    this.errorMessage = 'La data è obbligatoria';
+                    return;
+                }
+
+                this.saving = true;
+                this.errorMessage = '';
+
+                try {
+                    // Prepara i dati per l'API con operatori enhanced, gestendo campi vuoti
+                    const apiData = {
+                        ...this.formData,
+                        // Solo invia i campi orario se non sono vuoti
+                        ora_inizio: this.formData.ora_inizio || null,
+                        ora_fine: this.formData.ora_fine || null,
+                        // Gestisci temperature
+                        temperatura_min: this.formData.temperatura_min || null,
+                        temperatura_max: this.formData.temperatura_max || null,
+                        // Enhanced operatori structure
+                        operatori: this.getEnhancedOperatoriData()
+                    };
+
+                    // Chiama API reale per salvare il giornale
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(apiData)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Errore nel salvataggio del giornale');
+                    }
+
+                    const result = await response.json();
+
+                    this.showAlert('success', 'Giornale creato con successo');
+                    this.closeModal();
+
+                    // Ricarica pagina per mostrare il nuovo giornale
+                    setTimeout(() => location.reload(), 1500);
+                } catch (error) {
+                    this.errorMessage = error.message || 'Errore durante il salvataggio del giornale';
+                    console.error('Error saving giornale:', error);
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            // Delete
+            async deleteCantiere() {
+                if (!confirm('Sei sicuro di voler eliminare questo cantiere? Questa azione non può essere annullata.')) {
+                    return;
+                }
+
+                this.showAlert('success', 'Cantiere eliminato');
+                setTimeout(() => {
+                    window.location.href = '/sites/{{ site.id }}/cantieri';
+                }, 1500);
+            },
+
+            // Helper
+            showAlert(type, message) {
+                this.alert = { show: true, type, message };
+                setTimeout(() => {
+                    this.alert.show = false;
+                }, 5000);
+            },
+
+            // Load operators for the modal
+            async loadOperatoriDisponibili() {
+                console.log('DEBUG: Inizio caricamento operatori per sito:', '{{ site.id }}');
+
+                try {
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/operatori`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'include'
+                    });
+
+                    console.log('DEBUG: Response status:', response.status);
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('DEBUG: Operatori response:', data);
+
+                        // Handle site-specific response format
+                        if (data.operatori && Array.isArray(data.operatori)) {
+                            this.operatori_disponibili = data.operatori;
+                            console.log('DEBUG: Operatori caricati (site-specific):', this.operatori_disponibili.length);
+                        } else if (Array.isArray(data)) {
+                            this.operatori_disponibili = data;
+                            console.log('DEBUG: Operatori caricati (array):', this.operatori_disponibili.length);
+                        } else {
+                            console.warn('DEBUG: Formato risposta non previsto:', data);
+                            this.operatori_disponibili = [];
+                        }
+                    } else {
+                        console.error('DEBUG: Errore caricamento operatori, status:', response.status);
+                        const errorText = await response.text();
+                        console.log('DEBUG: Error response:', errorText);
+
+                        // Check if it's a redirect to login page
+                        if (response.redirected && response.url.includes('/login')) {
+                            console.error('DEBUG: Redirected to login page - authentication required');
+                            window.location.href = response.url;
+                        } else {
+                            console.error('DEBUG: Errore nel caricamento degli operatori');
+                        }
+                        this.operatori_disponibili = [];
+                    }
+
+                } catch (error) {
+                    console.error('Errore caricamento operatori:', error);
+                    this.operatori_disponibili = [];
+
+                    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                        console.error('DEBUG: Network error - server may be down');
+                    } else {
+                        console.error('DEBUG: Errore durante il caricamento degli operatori');
+                    }
+                }
+
+                console.log('DEBUG: Fine caricamento operatori, operatori_disponibili.length:', this.operatori_disponibili.length);
+            },
+
+            // ===== ENHANCED OPERATOR FUNCTIONS =====
+
+            // Toggle operator selection
+            toggleOperatore(operatore) {
+                const operatoreId = operatore.id;
+                const index = this.formData.operatori_ids.indexOf(operatoreId);
+
+                if (index === -1) {
+                    // Add operator
+                    this.formData.operatori_ids.push(operatoreId);
+                    // Initialize enhanced data
+                    if (!this.operatori_data[operatoreId]) {
+                        this.operatori_data[operatoreId] = {
+                            ore_lavorate: null,
+                            note_presenza: ''
+                        };
+                    }
+                } else {
+                    // Remove operator
+                    this.formData.operatori_ids.splice(index, 1);
+                    // Clean up enhanced data
+                    delete this.operatori_data[operatoreId];
+                }
+            },
+
+            // Check if operator is selected
+            isOperatoreSelezionato(operatoreId) {
+                return this.formData.operatori_ids.includes(operatoreId);
+            },
+
+            // Get operator data
+            getOperatoreData(operatoreId) {
+                return this.operatori_data[operatoreId] || { ore_lavorate: null, note_presenza: '' };
+            },
+
+            // Update operator data
+            updateOperatoreData(operatoreId, field, value) {
+                if (!this.operatori_data[operatoreId]) {
+                    this.operatori_data[operatoreId] = { ore_lavorate: null, note_presenza: '' };
+                }
+
+                if (field === 'ore_lavorate') {
+                    // Convert to float and validate
+                    const hours = parseFloat(value);
+                    this.operatori_data[operatoreId].ore_lavorate = isNaN(hours) ? null : hours;
+                } else {
+                    this.operatori_data[operatoreId][field] = value;
+                }
+            },
+
+            // Get enhanced operatori data for API
+            getEnhancedOperatoriData() {
+                return this.formData.operatori_ids.map(operatoreId => ({
+                    id: operatoreId,
+                    ore_lavorate: this.operatori_data[operatoreId]?.ore_lavorate || null,
+                    note_presenza: this.operatori_data[operatoreId]?.note_presenza || ''
+                }));
+            },
+
+            // Get selected operators with their data
+            getOperatoriSelezionati() {
+                return this.operatori_disponibili.filter(operatore =>
+                    this.isOperatoreSelezionato(operatore.id)
+                );
+            },
+
+            // Get count of selected operators
+            getOperatoriSelezionatiCount() {
+                return this.formData.operatori_ids.length;
+            },
+
+            // Load operator data for editing
+            loadOperatoriDataForEditing(giornale) {
+                if (giornale.operatori_presenti && Array.isArray(giornale.operatori_presenti)) {
+                    this.formData.operatori_ids = giornale.operatori_presenti.map(op => op.id);
+
+                    // Load enhanced data
+                    this.operatori_data = {};
+                    giornale.operatori_presenti.forEach(op => {
+                        this.operatori_data[op.id] = {
+                            ore_lavorate: op.ore_lavorate || null,
+                            note_presenza: op.note_presenza || ''
+                        };
+                    });
+                }
+            },
+
+            // ===== PDF EXPORT FUNCTIONALITY =====
+
+            async exportGiornaliPDF() {
+                try {
+                    // Show loading indicator
+                    this.showAlert('info', 'Generazione PDF in corso...');
+
+                    // Build export URL with optional filters
+                    const baseUrl = `/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/export-pdf`;
+                    const exportUrl = baseUrl;
+
+                    console.log('🔍 [DEBUG] Exporting giornali PDF for cantiere:', '{{ cantiere.id }}');
+
+                    // Call API to generate PDF
+                    const response = await fetch(exportUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'include'
+                    });
+
+                    console.log('🔍 [DEBUG] PDF export response status:', response.status);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('🔍 [DEBUG] PDF export error response:', errorText);
+
+                        let errorMessage = 'Errore nella generazione del PDF';
+                        try {
+                            const errorData = JSON.parse(errorText);
+                            errorMessage = errorData.detail || errorMessage;
+                        } catch (e) {
+                            // If JSON parsing fails, use the raw text
+                            errorMessage = errorText || errorMessage;
+                        }
+
+                        throw new Error(errorMessage);
+                    }
+
+                    // Get filename from Content-Disposition header if available
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1].replace(/['"]/g, '');
+                        }
+                    }
+
+                    // Convert response to blob
+                    const blob = await response.blob();
+
+                    // Create download link
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    link.style.display = 'none';
+
+                    // Trigger download
+                    document.body.appendChild(link);
+                    link.click();
+
+                    // Clean up
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+
+                    this.showAlert('success', 'PDF generato con successo!');
+                    console.log('🔍 [DEBUG] PDF download completed successfully');
+
+                } catch (error) {
+                    console.error('🔍 [DEBUG] Error exporting giornali PDF:', error);
+                    this.showAlert('error', `Errore nell'esportazione PDF: ${error.message || error}`);
+                }
+            },
+
+            // ===== WORD EXPORT FUNCTIONALITY =====
+
+            async exportGiornaliWord() {
+                try {
+                    // Show loading indicator
+                    this.showAlert('info', 'Generazione documento Word in corso...');
+
+                    // Build export URL with optional filters
+                    const baseUrl = `/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/export-word`;
+                    const exportUrl = baseUrl;
+
+                    console.log('🔍 [DEBUG] Exporting giornali Word for cantiere:', '{{ cantiere.id }}');
+
+                    // Call API to generate Word document
+                    const response = await fetch(exportUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'include'
+                    });
+
+                    console.log('🔍 [DEBUG] Word export response status:', response.status);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('🔍 [DEBUG] Word export error response:', errorText);
+
+                        let errorMessage = 'Errore nella generazione del documento Word';
+                        try {
+                            const errorData = JSON.parse(errorText);
+                            errorMessage = errorData.detail || errorMessage;
+                        } catch (e) {
+                            // If JSON parsing fails, use the raw text
+                            errorMessage = errorText || errorMessage;
+                        }
+
+                        throw new Error(errorMessage);
+                    }
+
+                    // Get filename from Content-Disposition header if available
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.docx`;
+
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1].replace(/['"]/g, '');
+                        }
+                    }
+
+                    // Convert response to blob
+                    const blob = await response.blob();
+
+                    // Create download link
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    link.style.display = 'none';
+
+                    // Trigger download
+                    document.body.appendChild(link);
+                    link.click();
+
+                    // Clean up
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+
+                    this.showAlert('success', 'Documento Word generato con successo!');
+                    console.log('🔍 [DEBUG] Word document download completed successfully');
+
+                } catch (error) {
+                    console.error('🔍 [DEBUG] Error exporting giornali Word:', error);
+                    this.showAlert('error', `Errore nell'esportazione Word: ${error.message || error}`);
+                }
+            },
+
+            async exportSingleGiornaleWord(giornale) {
+                try {
+                    this.loadingExportWord = true;
+                    this.showAlert('info', 'Generazione Word singolo giornale in corso...');
+
+                    const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-word`;
+
+                    console.log('🔍 [DEBUG] Exporting single giornale Word:', giornale.id);
+
+                    const response = await fetch(exportUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'include'
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        let errorMessage = 'Errore nella generazione del Word del giornale';
+                        try {
+                            const errorData = JSON.parse(errorText);
+                            errorMessage = errorData.detail || errorMessage;
+                        } catch (e) {
+                            errorMessage = errorText || errorMessage;
+                        }
+                        throw new Error(errorMessage);
+                    }
+
+                    // Get filename from Content-Disposition header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.docx`;
+
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1].replace(/['"]/g, '');
+                        }
+                    }
+
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    link.style.display = 'none';
+
+                    document.body.appendChild(link);
+                    link.click();
+
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+
+                    this.showAlert('success', 'Word del giornale generato con successo!');
+
+                } catch (error) {
+                    console.error('🔍 [DEBUG] Error exporting single giornale Word:', error);
+                    this.showAlert('error', `Errore nell'esportazione del Word: ${error.message || error}`);
+                } finally {
+                    this.loadingExportWord = false;
+                }
+            },
+
+            async exportSingleGiornalePDF(giornale) {
+                try {
+                    this.loadingExport = true;
+                    this.showAlert('info', 'Generazione PDF singolo giornale in corso...');
+
+                    const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-pdf`;
+
+                    console.log('🔍 [DEBUG] Exporting single giornale PDF:', giornale.id);
+
+                    const response = await fetch(exportUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'include'
+                    });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        let errorMessage = 'Errore nella generazione del PDF del giornale';
+                        try {
+                            const errorData = JSON.parse(errorText);
+                            errorMessage = errorData.detail || errorMessage;
+                        } catch (e) {
+                            errorMessage = errorText || errorMessage;
+                        }
+                        throw new Error(errorMessage);
+                    }
+
+                    // Get filename from Content-Disposition header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1].replace(/['"]/g, '');
+                        }
+                    }
+
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    link.style.display = 'none';
+
+                    document.body.appendChild(link);
+                    link.click();
+
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+
+                    this.showAlert('success', 'PDF del giornale generato con successo!');
+
+                } catch (error) {
+                    console.error('🔍 [DEBUG] Error exporting single giornale PDF:', error);
+                    this.showAlert('error', `Errore nell'esportazione del PDF: ${error.message || error}`);
+                } finally {
+                    this.loadingExport = false;
+                }
+            },
+
+            // ===== VALIDAZIONE FUNZIONALITY =====
+
+            async validateGiornale() {
+                if (!this.editingGiornaleData || !this.editingGiornaleData.id) {
+                    this.errorMessage = 'Nessun giornale da validare';
+                    return;
+                }
+
+                try {
+                    this.saving = true;
+                    this.errorMessage = '';
+
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}/validate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Errore durante la validazione del giornale');
+                    }
+
+                    const result = await response.json();
+
+                    // Update local data
+                    if (this.editingGiornaleData) {
+                        this.editingGiornaleData.validato = true;
+                        this.editingGiornaleData.data_validazione = result.data_validazione;
+                    }
+
+                    this.showAlert('success', 'Giornale validato con successo');
+
+                    // Update the giornale in the list if it exists
+                    const giornaliApp = document.querySelector('[x-data*="giornaliListApp"]');
+                    if (giornaliApp) {
+                        // Dispatch event to refresh the list
+                        this.$dispatch('giornale-validated', { giornaleId: this.editingGiornaleData.id });
+                    }
+
+                } catch (error) {
+                    this.errorMessage = error.message || 'Errore durante la validazione del giornale';
+                    console.error('Error validating giornale:', error);
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            // ===== FOTO DOCUMENTATION FUNCTIONS =====
+
+            async unlinkFoto(fotoId) {
+                if (!this.editingGiornaleData || !this.editingGiornaleData.id) {
+                    this.errorMessage = 'Nessun giornale selezionato';
+                    return;
+                }
+
+                if (!confirm('Sei sicuro di voler rimuovere questa foto dal giornale?')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}/foto/${fotoId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Errore durante la rimozione della foto');
+                    }
+
+                    // Remove foto from local data
+                    if (this.editingGiornaleData.foto) {
+                        this.editingGiornaleData.foto = this.editingGiornaleData.foto.filter(f => f.id !== fotoId);
+                    }
+
+                    this.showAlert('success', 'Foto rimossa con successo');
+
+                } catch (error) {
+                    this.errorMessage = error.message || 'Errore durante la rimozione della foto';
+                    console.error('Error unlinking foto:', error);
+                }
+            }
+        }
+    }
+
+    // Second Alpine.js component for giornali list
+    function giornaliListApp() {
+        return {
+            loading: false,
+            error: '',
+            giornali: [],
+
+            // Simplified modal states (removed unused modal variables)
+            // Modal states are now handled by parent component
+
+            // Init
+            init() {
+                this.loadGiornali();
+            },
+
+            // Load giornali from API
+            async loadGiornali() {
+                this.loading = true;
+                this.error = '';
+
+                console.log('🔍 DEBUG: Inizio caricamento giornali per cantiere:', '{{ cantiere.id }}', 'site:', '{{ site.id }}');
+
+                try {
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/giornali`);
+
+                    console.log('🔍 DEBUG: Response status:', response.status);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('🔍 DEBUG: Error response:', errorText);
+                        throw new Error(`Errore nel caricamento dei giornali: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    console.log('🔍 DEBUG: Response data:', data);
+                    this.giornali = data.giornali || [];
+                    console.log('🔍 DEBUG: Caricati', this.giornali.length, 'giornali');
+                } catch (error) {
+                    this.error = error.message || 'Errore nel caricamento dei giornali';
+                    console.error('🔍 DEBUG: Error loading giornali:', error);
+                } finally {
+                    this.loading = false;
+                    console.log('🔍 DEBUG: Fine caricamento giornali');
+                }
+            },
+
+
+            // Edit giornale
+            editGiornale(giornale) {
+                // Use $dispatch to communicate with parent component
+                this.$dispatch('open-edit-giornale-modal', {
+                    modalMode: 'giornale',
+                    editingGiornale: true,
+                    editingGiornaleData: giornale,
+                    formData: {
+                        data: giornale.data,
+                        ora_inizio: giornale.ora_inizio,
+                        ora_fine: giornale.ora_fine,
+                        cantiere_id: '{{ cantiere.id }}',
+                        responsabile_nome: giornale.responsabile_scavo || giornale.responsabile_nome || '',
+                        compilatore: giornale.compilatore || '',
+                        condizioni_meteo: giornale.condizioni_meteo || '',
+                        temperatura_min: giornale.temperatura_min || null,
+                        temperatura_max: giornale.temperatura_max || null,
+                        note_meteo: giornale.note_meteo || '',
+                        descrizione_lavori: giornale.descrizione_lavori || '',
+                        modalita_lavorazioni: giornale.modalita_lavorazioni || '',
+                        disposizioni_rup: giornale.disposizioni_rup || '',
+                        disposizioni_direttore: giornale.disposizioni_direttore || '',
+                        sospensioni: giornale.sospensioni || '',
+                        contestazioni: giornale.contestazioni || '',
+                        incidenti: giornale.incidenti || '',
+                        sopralluoghi: giornale.sopralluoghi || '',
+                        note_generali: giornale.note_generali || '',
+                        problematiche: giornale.problematiche || '',
+                        forniture: giornale.forniture || '',
+                        documentazione_prodotta: giornale.documentazione_prodotta || '',
+                        materiali_rinvenuti: giornale.materiali_rinvenuti || '',
+                        us_elaborate: giornale.us_elaborate || '',
+                        usm_elaborate: giornale.usm_elaborate || '',
+                        usr_elaborate: giornale.usr_elaborate || '',
+                        attrezzatura_utilizzata: giornale.attrezzatura_utilizzata || '',
+                        mezzi_utilizzati: giornale.mezzi_utilizzati || '',
+                        apparecchiature_input: giornale.attrezzatura_utilizzata ? giornale.attrezzatura_utilizzata : (giornale.apparecchiature || ''),
+                        operatori_ids: giornale.operatori_presenti ? giornale.operatori_presenti.map(op => op.id) : [],
+                        // ICCD Scientific Fields
+                        area_intervento: giornale.area_intervento || '',
+                        saggio: giornale.saggio || '',
+                        obiettivi: giornale.obiettivi || '',
+                        interpretazione: giornale.interpretazione || '',
+                        campioni_prelevati: giornale.campioni_prelevati || '',
+                        strutture: giornale.strutture || ''
                     }
                 });
+            },
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || 'Errore durante la validazione del giornale');
+
+            // Delete giornale
+            async deleteGiornale(giornale) {
+                if (!confirm(`Sei sicuro di voler eliminare il giornale del ${giornale.data}?`)) {
+                    return;
                 }
 
-                const result = await response.json();
-                
-                // Update local data
-                if (this.editingGiornaleData) {
-                    this.editingGiornaleData.validato = true;
-                    this.editingGiornaleData.data_validazione = result.data_validazione;
+                try {
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Errore nell\'eliminazione del giornale');
+                    }
+
+                    // Reload list
+                    await this.loadGiornali();
+                } catch (error) {
+                    this.error = error.message || 'Errore nell\'eliminazione del giornale';
+                    console.error('Error deleting giornale:', error);
                 }
-                
-                this.showAlert('success', 'Giornale validato con successo');
-                
-                // Update the giornale in the list if it exists
-                const giornaliApp = document.querySelector('[x-data*="giornaliListApp"]');
-                if (giornaliApp) {
-                    // Dispatch event to refresh the list
-                    this.$dispatch('giornale-validated', { giornaleId: this.editingGiornaleData.id });
-                }
-                
-            } catch (error) {
-                this.errorMessage = error.message || 'Errore durante la validazione del giornale';
-                console.error('Error validating giornale:', error);
-            } finally {
-                this.saving = false;
             }
         }
     }
-}
-
-// Second Alpine.js component for giornali list
-function giornaliListApp() {
-    return {
-        loading: false,
-        error: '',
-        giornali: [],
-        
-        // Simplified modal states (removed unused modal variables)
-        // Modal states are now handled by parent component
-        
-        // Init
-        init() {
-            this.loadGiornali();
-        },
-        
-        // Load giornali from API
-        async loadGiornali() {
-            this.loading = true;
-            this.error = '';
-            
-            console.log('🔍 DEBUG: Inizio caricamento giornali per cantiere:', '{{ cantiere.id }}', 'site:', '{{ site.id }}');
-            
-            try {
-                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/giornali`);
-                
-                console.log('🔍 DEBUG: Response status:', response.status);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('🔍 DEBUG: Error response:', errorText);
-                    throw new Error(`Errore nel caricamento dei giornali: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                console.log('🔍 DEBUG: Response data:', data);
-                this.giornali = data.giornali || [];
-                console.log('🔍 DEBUG: Caricati', this.giornali.length, 'giornali');
-            } catch (error) {
-                this.error = error.message || 'Errore nel caricamento dei giornali';
-                console.error('🔍 DEBUG: Error loading giornali:', error);
-            } finally {
-                this.loading = false;
-                console.log('🔍 DEBUG: Fine caricamento giornali');
-            }
-        },
-        
-        
-        // Edit giornale
-        editGiornale(giornale) {
-            // Use $dispatch to communicate with parent component
-            this.$dispatch('open-edit-giornale-modal', {
-                modalMode: 'giornale',
-                editingGiornale: true,
-                editingGiornaleData: giornale,
-                formData: {
-                    data: giornale.data,
-                    ora_inizio: giornale.ora_inizio,
-                    ora_fine: giornale.ora_fine,
-                    cantiere_id: '{{ cantiere.id }}',
-                    responsabile_nome: giornale.responsabile_scavo || giornale.responsabile_nome || '',
-                    compilatore: giornale.compilatore || '',
-                    condizioni_meteo: giornale.condizioni_meteo || '',
-                    temperatura_min: giornale.temperatura_min || null,
-                    temperatura_max: giornale.temperatura_max || null,
-                    note_meteo: giornale.note_meteo || '',
-                    descrizione_lavori: giornale.descrizione_lavori || '',
-                    modalita_lavorazioni: giornale.modalita_lavorazioni || '',
-                    disposizioni_rup: giornale.disposizioni_rup || '',
-                    disposizioni_direttore: giornale.disposizioni_direttore || '',
-                    sospensioni: giornale.sospensioni || '',
-                    contestazioni: giornale.contestazioni || '',
-                    incidenti: giornale.incidenti || '',
-                    sopralluoghi: giornale.sopralluoghi || '',
-                    note_generali: giornale.note_generali || '',
-                    problematiche: giornale.problematiche || '',
-                    forniture: giornale.forniture || '',
-                    documentazione_prodotta: giornale.documentazione_prodotta || '',
-                    materiali_rinvenuti: giornale.materiali_rinvenuti || '',
-                    us_elaborate: giornale.us_elaborate || '',
-                    usm_elaborate: giornale.usm_elaborate || '',
-                    usr_elaborate: giornale.usr_elaborate || '',
-                    attrezzatura_utilizzata: giornale.attrezzatura_utilizzata || '',
-                    mezzi_utilizzati: giornale.mezzi_utilizzati || '',
-                    apparecchiature_input: giornale.attrezzatura_utilizzata ? giornale.attrezzatura_utilizzata : (giornale.apparecchiature || ''),
-                    operatori_ids: giornale.operatori_presenti ? giornale.operatori_presenti.map(op => op.id) : []
-                }
-            });
-        },
-        
-        // View giornale - simplified alert version
-        viewGiornale(giornale) {
-            const details = `
-Data: ${giornale.data}
-${giornale.ora_inizio ? `Orario: ${giornale.ora_inizio} - ${giornale.ora_fine || 'in corso'}` : ''}
-${giornale.condizioni_meteo ? `Meteo: ${giornale.condizioni_meteo}` : ''}
-${giornale.descrizione_lavori ? `Lavori: ${giornale.descrizione_lavori}` : ''}
-${giornale.responsabile_scavo ? `Responsabile: ${giornale.responsabile_scavo}` : ''}
-${giornale.compilatore ? `Compilatore: ${giornale.compilatore}` : ''}
-${giornale.note_generali ? `Note: ${giornale.note_generali}` : ''}
-${giornale.problematiche ? `Problematiche: ${giornale.problematiche}` : ''}
-            `.trim();
-            
-            alert(details);
-        },
-        
-        // Delete giornale
-        async deleteGiornale(giornale) {
-            if (!confirm(`Sei sicuro di voler eliminare il giornale del ${giornale.data}?`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}`, {
-                    method: 'DELETE'
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Errore nell\'eliminazione del giornale');
-                }
-                
-                // Reload list
-                await this.loadGiornali();
-            } catch (error) {
-                this.error = error.message || 'Errore nell\'eliminazione del giornale';
-                console.error('Error deleting giornale:', error);
-            }
-        }
-    }
-}
 </script>
 {% endblock %}
 
-        
-        async exportSingleGiornalePDF(giornale) {
-            try {
-                this.loadingExport = true;
-                this.showAlert('info', 'Generazione PDF singolo giornale in corso...');
-                
-                const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-pdf`;
-                
-                console.log('🔍 [DEBUG] Exporting single giornale PDF:', giornale.id);
-                
-                const response = await fetch(exportUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'include'
-                });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    let errorMessage = 'Errore nella generazione del PDF del giornale';
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        errorMessage = errorData.detail || errorMessage;
-                    } catch (e) {
-                        errorMessage = errorText || errorMessage;
-                    }
-                    throw new Error(errorMessage);
-                }
-                
-                // Get filename from Content-Disposition header
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.pdf`;
-                
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    if (filenameMatch && filenameMatch[1]) {
-                        filename = filenameMatch[1].replace(/['"]/g, '');
-                    }
-                }
-                
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = filename;
-                link.style.display = 'none';
-                
-                document.body.appendChild(link);
-                link.click();
-                
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-                
-                this.showAlert('success', 'PDF del giornale generato con successo!');
-                
-            } catch (error) {
-                console.error('🔍 [DEBUG] Error exporting single giornale PDF:', error);
-                this.showAlert('error', `Errore nell'esportazione del PDF: ${error.message || error}`);
-            } finally {
-                this.loadingExport = false;
-            }
-        }
+
+async exportSingleGiornalePDF(giornale) {
+try {
+this.loadingExport = true;
+this.showAlert('info', 'Generazione PDF singolo giornale in corso...');
+
+const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-pdf`;
+
+console.log('🔍 [DEBUG] Exporting single giornale PDF:', giornale.id);
+
+const response = await fetch(exportUrl, {
+method: 'GET',
+headers: {
+'Content-Type': 'application/json',
+'X-Requested-With': 'XMLHttpRequest'
+},
+credentials: 'include'
+});
+
+if (!response.ok) {
+const errorText = await response.text();
+let errorMessage = 'Errore nella generazione del PDF del giornale';
+try {
+const errorData = JSON.parse(errorText);
+errorMessage = errorData.detail || errorMessage;
+} catch (e) {
+errorMessage = errorText || errorMessage;
+}
+throw new Error(errorMessage);
+}
+
+// Get filename from Content-Disposition header
+const contentDisposition = response.headers.get('Content-Disposition');
+let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+if (contentDisposition) {
+const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+if (filenameMatch && filenameMatch[1]) {
+filename = filenameMatch[1].replace(/['"]/g, '');
+}
+}
+
+const blob = await response.blob();
+const url = window.URL.createObjectURL(blob);
+const link = document.createElement('a');
+link.href = url;
+link.download = filename;
+link.style.display = 'none';
+
+document.body.appendChild(link);
+link.click();
+
+setTimeout(() => {
+document.body.removeChild(link);
+window.URL.revokeObjectURL(url);
+}, 100);
+
+this.showAlert('success', 'PDF del giornale generato con successo!');
+
+} catch (error) {
+console.error('🔍 [DEBUG] Error exporting single giornale PDF:', error);
+this.showAlert('error', `Errore nell'esportazione del PDF: ${error.message || error}`);
+} finally {
+this.loadingExport = false;
+}
+}

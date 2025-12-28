@@ -2522,7 +2522,7 @@
 
                 try {
                     const usId = this.editingUS?.id;
-                    const response = await fetch(`/api/us-export/us/${usId}/word`, {
+                    const response = await fetch(`/api/v1/us-export/us/${usId}/word`, {
                         method: 'GET',
                         headers: {
                             'X-CSRFToken': this.getCSRFToken()
@@ -2556,7 +2556,7 @@
 
                 try {
                     const usmId = this.editingUSM?.id;
-                    const response = await fetch(`/api/us-export/usm/${usmId}/word`, {
+                    const response = await fetch(`/api/v1/us-export/usm/${usmId}/word`, {
                         method: 'GET',
                         headers: {
                             'X-CSRFToken': this.getCSRFToken()

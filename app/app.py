@@ -518,23 +518,19 @@ async def logout_endpoint(request: Request, response: Response, db: AsyncSession
             detail="Logout failed"
         )
 
-# DASHBOARD UNIFICATO - Supporto per vecchia e nuova interfaccia
+# DASHBOARD
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_view(
     request: Request,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session),
-    view: str = None  # Parameter to switch between 'unified' and 'classic' view
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Dashboard unificata con supporto per template classico e nuovo
+    Dashboard principale del sistema archeologico.
     Include tutte le variabili necessarie per auth_navigation.html
     """
     try:
-        # Determine which template to use
-        use_unified = view == 'unified' or view is None  # Default to unified
-        
         # Ottieni informazioni utente dal database
         user = await db.execute(select(User).where(User.id == current_user_id))
         user = user.scalar_one_or_none()
@@ -571,11 +567,11 @@ async def dashboard_view(
         # CSRF opzionale
         csrf_token, signed_token, csrf_instance = _csrf_tokens_optional()
 
-        # Prepare base context
-        base_context = {
+        # Prepare context
+        context = {
             "request": request,
-            "title": "Dashboard Unificata | Sistema Archeologico" if use_unified else "Dashboard | Sistema Archeologico",
-            "message": "Benvenuto nel Sistema Archeologico Unificato" if use_unified else "Benvenuto nel Sistema Archeologico",
+            "title": "Dashboard | Sistema Archeologico",
+            "message": "Benvenuto nel Sistema Archeologico",
             
             # VARIABILI RICHIESTE DA auth_navigation.html
             "sites": user_sites,
@@ -589,37 +585,16 @@ async def dashboard_view(
             "current_user": user,
             "user_profile": user_profile,
             "csrf_token": csrf_token,
-            "use_unified": use_unified
-        }
-        
-        # Debug logging for site selector
-        logger.info(f"🐛 DEBUG Dashboard: sites_count={len(user_sites)}, sites={user_sites}")
-        if user_sites:
-            for site in user_sites:
-                logger.info(f"🐛 DEBUG Dashboard: Site - ID: {site.get('site_id')}, Name: {site.get('site_name')}, Permission: {site.get('permission_level')}")
-
-        # Add unified-specific context
-        if use_unified:
-            unified_context = {
-                **base_context,
-                # Additional data for unified dashboard
-                "unified_stats": {
-                    "sites_count": len(user_sites),
-                    "photos_count": photos_count,
-                    "documents_count": documents_count,
-                    "users_count": users_count
-                }
+            "unified_stats": {
+                "sites_count": len(user_sites),
+                "photos_count": photos_count,
+                "documents_count": documents_count,
+                "users_count": users_count
             }
-            
-            template_name = "pages/unified/dashboard.html"
-            context = unified_context
-        else:
-            # Classic dashboard context
-            template_name = "pages/dashboard.html"
-            context = base_context
+        }
 
-        logger.info(f"Dashboard rendered: user_id={current_user_id}, sites={len(user_sites)}, unified={use_unified}")
-        response = templates.TemplateResponse(template_name, context)
+        logger.info(f"Dashboard rendered: user_id={current_user_id}, sites={len(user_sites)}")
+        response = templates.TemplateResponse("pages/unified/dashboard.html", context)
         
         # Se CSRF disponibile, imposta cookie firmato
         if csrf_instance and signed_token:
@@ -633,19 +608,6 @@ async def dashboard_view(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore interno dashboard"
         )
-
-# DASHBOARD UNIFICATA (esplicita)
-@app.get("/dashboard/unified", response_class=HTMLResponse)
-async def dashboard_unified_view(
-    request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Dashboard unificata esplicita
-    """
-    return await dashboard_view(request, current_user_id, user_sites, db, view='unified')
 
 # 📊 PERFORMANCE DASHBOARD - Dashboard per monitoring performance
 @app.get("/performance-dashboard", response_class=HTMLResponse)

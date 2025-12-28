@@ -606,6 +606,75 @@
                         </p>
                     </div>
 
+                    <!-- Documentazione Scientifica ICCD -->
+                    <div class="mb-8">
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                            <i class="fas fa-microscope mr-2 text-purple-600"></i>
+                            Documentazione Scientifica (ICCD)
+                        </h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Area di Intervento
+                                </label>
+                                <input type="text" name="area_intervento" x-model="formData.area_intervento"
+                                    placeholder="Es: Settore A, Area 5, Trincea Nord..."
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Saggio
+                                </label>
+                                <input type="text" name="saggio" x-model="formData.saggio"
+                                    placeholder="Es: Saggio 1, Saggio A..."
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Obiettivi della Giornata
+                            </label>
+                            <textarea name="obiettivi" x-model="formData.obiettivi" rows="2"
+                                placeholder="Obiettivi e strategia di scavo per la giornata..."
+                                class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Interpretazione Archeologica
+                            </label>
+                            <textarea name="interpretazione" x-model="formData.interpretazione" rows="3"
+                                placeholder="Interpretazione dei dati e delle evidenze emerse durante la giornata..."
+                                class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Campioni Prelevati
+                                </label>
+                                <textarea name="campioni_prelevati" x-model="formData.campioni_prelevati" rows="2"
+                                    placeholder="Es: Carbone per C14, Campione terreno per analisi..."
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Strutture Individuate
+                                </label>
+                                <textarea name="strutture" x-model="formData.strutture" rows="2"
+                                    placeholder="Es: Muro USM102, Pavimentazione US45..."
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            Campi per la documentazione scientifica secondo gli standard ICCD
+                        </p>
+                    </div>
+
                     <!-- Operatori Presenti -->
                     <div class="mb-8">
                         <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
@@ -785,6 +854,58 @@
                                     Una volta validato, il giornale può essere esportato con firma digitale.
                                 </p>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Foto Documentation -->
+                    <div class="mb-8" x-show="editingGiornale">
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                            <i class="fas fa-camera mr-2 text-indigo-600"></i>
+                            Documentazione Fotografica
+                            <span class="ml-2 text-sm font-normal text-gray-500"
+                                x-text="'(' + (editingGiornaleData?.foto?.length || 0) + ' foto)'"></span>
+                        </h4>
+
+                        <!-- Existing linked photos -->
+                        <div class="mb-4" x-show="editingGiornaleData?.foto?.length > 0">
+                            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                <template x-for="foto in (editingGiornaleData?.foto || [])" :key="foto.id">
+                                    <div
+                                        class="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                                        <img :src="foto.thumbnail_url" :alt="foto.title || foto.filename"
+                                            class="w-full h-24 object-cover">
+                                        <div
+                                            class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-center justify-center">
+                                            <button type="button" @click="unlinkFoto(foto.id)"
+                                                class="opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                                title="Rimuovi foto">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                        <div class="p-1 text-xs text-gray-600 dark:text-gray-400 truncate"
+                                            x-text="foto.title || foto.filename"></div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Empty state -->
+                        <div x-show="!editingGiornaleData?.foto?.length"
+                            class="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                            <i class="fas fa-image text-4xl text-gray-300 dark:text-gray-600 mb-2"></i>
+                            <p class="text-gray-500 dark:text-gray-400">Nessuna foto collegata a questo giornale</p>
+                        </div>
+
+                        <!-- Add photos link -->
+                        <div class="mt-4 flex items-center gap-2">
+                            <a :href="'/sites/' + siteId + '/photos'" target="_blank"
+                                class="inline-flex items-center px-3 py-2 text-sm bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition">
+                                <i class="fas fa-plus mr-2"></i>
+                                Vai all'archivio foto per collegare immagini
+                            </a>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                (Usa gli endpoint API per collegare foto esistenti)
+                            </p>
                         </div>
                     </div>
 

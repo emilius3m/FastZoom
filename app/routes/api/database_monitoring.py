@@ -5,7 +5,7 @@ from app.services.database_pool_monitor import get_pool_monitor
 from app.core.security import get_current_user_id
 from loguru import logger
 
-router = APIRouter(prefix="/api/database", tags=["database_monitoring"])
+router = APIRouter(prefix="", tags=["database_monitoring"])
 
 @router.get("/pool/status")
 async def get_pool_status(

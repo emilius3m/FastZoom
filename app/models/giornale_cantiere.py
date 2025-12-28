@@ -40,6 +40,18 @@ giornale_operatori_association = Table(
 )
 
 
+# ===== TABELLA ASSOCIATIVA GIORNALE-FOTO =====
+giornale_foto_association = Table(
+    'giornale_foto_associations',
+    Base.metadata,
+    Column('giornale_id', String(36), ForeignKey('giornali_cantiere.id', ondelete='CASCADE'), primary_key=True),
+    Column('foto_id', String(36), ForeignKey('photos.id', ondelete='CASCADE'), primary_key=True),
+    Column('didascalia', Text, nullable=True, comment="Didascalia/commento specifico per questa foto nel giornale"),
+    Column('ordine', Integer, default=0, comment="Ordine di visualizzazione"),
+    Column('created_at', DateTime, server_default=func.now())
+)
+
+
 # ===== MODELLO OPERATORE DI CANTIERE =====
 class OperatoreCantiere(Base):
     """
@@ -144,6 +156,11 @@ class GiornaleCantiere(Base):
     note_meteo = Column(Text, nullable=True)
     compilatore = Column(String(200), nullable=True)  # Nome del compilatore del giornale
     
+    # ===== LOCALIZZAZIONE E STRATEGIA (ICCD) =====
+    area_intervento = Column(String(200), nullable=True)  # Area specifica di intervento
+    saggio = Column(String(100), nullable=True)  # Saggio di scavo
+    obiettivi = Column(Text, nullable=True)  # Obiettivi giornalieri / Strategia
+    
     # ===== DESCRIZIONE ATTIVITÀ =====
     descrizione_lavori = Column(Text, nullable=False)
     modalita_lavorazioni = Column(Text, nullable=True)
@@ -161,6 +178,11 @@ class GiornaleCantiere(Base):
     # Materiali rinvenuti
     materiali_rinvenuti = Column(Text, nullable=True)
     # Es: "Ceramica romana (frr. 15), Monete (n.3), Ossa animali"
+    
+    # Interpretazione e risultati scientifici
+    interpretazione = Column(Text, nullable=True)  # Interpretazione archeologica giornaliera
+    campioni_prelevati = Column(Text, nullable=True)  # Campioni prelevati (terra, carbone, ecc.)
+    strutture = Column(Text, nullable=True)  # Strutture individuate/lavorate
     
     # Documentazione grafica e fotografica prodotta
     documentazione_prodotta = Column(Text, nullable=True)
@@ -219,6 +241,13 @@ class GiornaleCantiere(Base):
         "OperatoreCantiere",
         secondary=giornale_operatori_association,
         back_populates="giornali"
+    )
+    
+    # Relazione many-to-many con foto (usa sistema foto esistente)
+    foto = relationship(
+        "Photo",
+        secondary=giornale_foto_association,
+        lazy="selectin"
     )
     
     def __repr__(self):

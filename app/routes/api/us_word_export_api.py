@@ -25,7 +25,7 @@ from app.core.security import get_current_user_id_with_blacklist, get_current_us
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria, USFile
 from app.services.us_file_service import USFileService
 
-router = APIRouter(prefix="/api/us-export", tags=["us-export"])
+router = APIRouter(prefix="", tags=["us-export"])
 
 # Path ai template .docx con placeholder
 TEMPLATES_DIR = Path("app/templates/word")

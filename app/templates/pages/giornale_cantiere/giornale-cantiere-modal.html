@@ -1,11 +1,12 @@
 <!-- app/templates/pages/giornale_cantiere/modal_create.html -->
 <!-- Modal Creazione/Modifica Giornale -->
-<div x-show="showCreateModal" x-cloak 
-     class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
-     @click.self="showCreateModal = false">
+<div x-show="showCreateModal" x-cloak
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto"
+    @click.self="showCreateModal = false">
     <div class="bg-white rounded-lg max-w-6xl w-full mx-4 my-8 max-h-[95vh] overflow-y-auto">
         <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-            <h3 class="text-xl font-semibold" x-text="editingGiornale ? 'Modifica Giornale' : 'Nuovo Giornale di Cantiere'"></h3>
+            <h3 class="text-xl font-semibold"
+                x-text="editingGiornale ? 'Modifica Giornale' : 'Nuovo Giornale di Cantiere'"></h3>
             <button @click="showCreateModal = false" class="text-gray-400 hover:text-gray-600">
                 <i class="fas fa-times text-xl"></i>
             </button>
@@ -19,17 +20,17 @@
                         Data <span class="text-red-500">*</span>
                     </label>
                     <input type="date" x-model="form.data" required
-                           class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Ora Inizio</label>
                     <input type="time" x-model="form.ora_inizio"
-                           class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Ora Fine</label>
                     <input type="time" x-model="form.ora_fine"
-                           class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
             </div>
 
@@ -42,7 +43,7 @@
                             Condizioni Meteo <span class="text-red-500">*</span>
                         </label>
                         <select x-model="form.condizioni_meteo" required
-                                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">Seleziona condizioni</option>
                             {% for condition in condizioni_meteo %}
                             <option value="{{ condition.value }}">{{ condition.label }}</option>
@@ -52,17 +53,17 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Temperatura Minima (°C)</label>
                         <input type="number" x-model="form.temperatura_min" min="-30" max="50"
-                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Temperatura Massima (°C)</label>
                         <input type="number" x-model="form.temperatura_max" min="-30" max="50"
-                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Note Meteo</label>
                         <input type="text" x-model="form.note_meteo" placeholder="Note aggiuntive..."
-                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
             </div>
@@ -73,9 +74,8 @@
                 <div class="max-h-32 overflow-y-auto border border-gray-300 rounded-md p-2">
                     {% for operatore in operatori %}
                     <label class="flex items-center p-2 hover:bg-gray-50 rounded">
-                        <input type="checkbox" :value="'{{ operatore.id }}'" 
-                               x-model="form.operatori_ids"
-                               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <input type="checkbox" :value="'{{ operatore.id }}'" x-model="form.operatori_ids"
+                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                         <span class="ml-2 text-sm">
                             <span class="font-medium">{{ operatore.nome_completo }}</span>
                             <span class="text-gray-500">({{ operatore.qualifica }})</span>
@@ -95,30 +95,30 @@
                             Descrizione Lavori <span class="text-red-500">*</span>
                         </label>
                         <textarea x-model="form.descrizione_lavori" required rows="4"
-                                  placeholder="Descrizione dettagliata delle attività svolte durante la giornata..."
-                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                            placeholder="Descrizione dettagliata delle attività svolte durante la giornata..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                     </div>
-                    
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Modalità Lavorazioni</label>
                             <textarea x-model="form.modalita_lavorazioni" rows="3"
-                                      placeholder="Metodologie e tecniche utilizzate..."
-                                      class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                                placeholder="Metodologie e tecniche utilizzate..."
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Attrezzatura Utilizzata</label>
                             <textarea x-model="form.attrezzatura_utilizzata" rows="3"
-                                      placeholder="Strumenti e attrezzature utilizzate..."
-                                      class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                                placeholder="Strumenti e attrezzature utilizzate..."
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                         </div>
                     </div>
-                    
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Mezzi Utilizzati</label>
-                        <input type="text" x-model="form.mezzi_utilizzati" 
-                               placeholder="es: Escavatore, Pala meccanica, Dumper..."
-                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" x-model="form.mezzi_utilizzati"
+                            placeholder="es: Escavatore, Pala meccanica, Dumper..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
             </div>
@@ -132,36 +132,80 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">US Elaborate</label>
-                        <input type="text" x-model="form.us_elaborate" 
-                               placeholder="es: US001, US002, US003"
-                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" x-model="form.us_elaborate" placeholder="es: US001, US002, US003"
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">USM Elaborate</label>
-                        <input type="text" x-model="form.usm_elaborate" 
-                               placeholder="es: USM010, USM011"
-                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" x-model="form.usm_elaborate" placeholder="es: USM010, USM011"
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">USR Elaborate</label>
-                        <input type="text" x-model="form.usr_elaborate" 
-                               placeholder="es: USR005, USR006"
-                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" x-model="form.usr_elaborate" placeholder="es: USR005, USR006"
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
-                
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Materiali Rinvenuti</label>
                         <textarea x-model="form.materiali_rinvenuti" rows="3"
-                                  placeholder="es: Ceramica romana (frr. 15), Monete (n.3), Ossa animali..."
-                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                            placeholder="es: Ceramica romana (frr. 15), Monete (n.3), Ossa animali..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Documentazione Prodotta</label>
                         <textarea x-model="form.documentazione_prodotta" rows="3"
-                                  placeholder="es: Pianta US001 1:20, Sezioni A-A' e B-B', Foto nn. 150-175..."
-                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                            placeholder="es: Pianta US001 1:20, Sezioni A-A' e B-B', Foto nn. 150-175..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Campi ICCD Giornale di Scavo -->
+            <div class="mb-6">
+                <h4 class="text-lg font-medium text-gray-900 mb-3">
+                    <i class="fas fa-microscope mr-2 text-purple-600"></i>
+                    Documentazione Scientifica (ICCD)
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Area di Intervento</label>
+                        <input type="text" x-model="form.area_intervento"
+                            placeholder="es: Settore A, Area 5, Trincea Nord..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Saggio</label>
+                        <input type="text" x-model="form.saggio" placeholder="es: Saggio 1, Saggio A..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Obiettivi della Giornata</label>
+                    <textarea x-model="form.obiettivi" rows="2"
+                        placeholder="Obiettivi e strategia di scavo per la giornata..."
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Interpretazione Archeologica</label>
+                    <textarea x-model="form.interpretazione" rows="3"
+                        placeholder="Interpretazione dei dati e delle evidenze emerse durante la giornata..."
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Campioni Prelevati</label>
+                        <textarea x-model="form.campioni_prelevati" rows="2"
+                            placeholder="es: Carbone per C14, Campione terreno per analisi..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Strutture Individuate</label>
+                        <textarea x-model="form.strutture" rows="2"
+                            placeholder="es: Muro USM102, Pavimentazione US45..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                     </div>
                 </div>
             </div>
@@ -176,22 +220,22 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Sopralluoghi e Visite</label>
                         <textarea x-model="form.sopralluoghi" rows="2"
-                                  placeholder="es: Sopralluogo Soprintendenza ore 10:30 - Dott.ssa Rossi"
-                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                            placeholder="es: Sopralluogo Soprintendenza ore 10:30 - Dott.ssa Rossi"
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                     </div>
-                    
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Disposizioni RUP</label>
                             <textarea x-model="form.disposizioni_rup" rows="2"
-                                      placeholder="Disposizioni del Responsabile Unico del Procedimento..."
-                                      class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                                placeholder="Disposizioni del Responsabile Unico del Procedimento..."
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Disposizioni Direttore</label>
                             <textarea x-model="form.disposizioni_direttore" rows="2"
-                                      placeholder="Disposizioni del Direttore Lavori/Scientifico..."
-                                      class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                                placeholder="Disposizioni del Direttore Lavori/Scientifico..."
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                         </div>
                     </div>
                 </div>
@@ -207,20 +251,18 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Contestazioni</label>
                         <textarea x-model="form.contestazioni" rows="3"
-                                  placeholder="Eventuali contestazioni o dispute..."
-                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                            placeholder="Eventuali contestazioni o dispute..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Sospensioni</label>
-                        <textarea x-model="form.sospensioni" rows="3"
-                                  placeholder="Sospensioni e motivazioni..."
-                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                        <textarea x-model="form.sospensioni" rows="3" placeholder="Sospensioni e motivazioni..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Incidenti</label>
-                        <textarea x-model="form.incidenti" rows="3"
-                                  placeholder="Incidenti o problemi riscontrati..."
-                                  class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                        <textarea x-model="form.incidenti" rows="3" placeholder="Incidenti o problemi riscontrati..."
+                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                     </div>
                 </div>
             </div>
@@ -232,8 +274,8 @@
                     Forniture e Materiali Consegnati
                 </label>
                 <textarea x-model="form.forniture" rows="2"
-                          placeholder="Materiali e forniture consegnati in cantiere..."
-                          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    placeholder="Materiali e forniture consegnati in cantiere..."
+                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
             </div>
 
             <!-- Pulsanti azione -->
@@ -242,20 +284,20 @@
                     <i class="fas fa-info-circle mr-1"></i>
                     I campi contrassegnati con <span class="text-red-500">*</span> sono obbligatori
                 </div>
-                
+
                 <div class="flex gap-3">
-                    <button type="button" @click="showCreateModal = false" 
-                            class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition">
+                    <button type="button" @click="showCreateModal = false"
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition">
                         <i class="fas fa-times mr-2"></i>Annulla
                     </button>
-                    
-                    <button type="button" @click="saveDraft()" 
-                            class="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-md hover:bg-yellow-200 transition">
+
+                    <button type="button" @click="saveDraft()"
+                        class="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-md hover:bg-yellow-200 transition">
                         <i class="fas fa-save mr-2"></i>Salva Bozza
                     </button>
-                    
-                    <button type="submit" 
-                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+
+                    <button type="submit"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
                         <i class="fas fa-check mr-2"></i>
                         <span x-text="editingGiornale ? 'Aggiorna' : 'Crea Giornale'"></span>
                     </button>
@@ -266,55 +308,55 @@
 </div>
 
 <script>
-// Funzioni aggiuntive per il modal
-function modalFunctions() {
-    return {
-        async saveGiornale() {
-            try {
-                const url = this.editingGiornale
-                    ? `/api/v1/giornale/sites/${this.siteId}/giornali/${this.editingGiornale.id}`
-                    : `/api/v1/giornale/sites/${this.siteId}/giornali`;
-                
-                const method = this.editingGiornale ? 'PUT' : 'POST';
-                const data = this.editingGiornale ? this.form : { ...this.form, site_id: '{{ site.id }}' };
+    // Funzioni aggiuntive per il modal
+    function modalFunctions() {
+        return {
+            async saveGiornale() {
+                try {
+                    const url = this.editingGiornale
+                        ? `/api/v1/giornale/sites/${this.siteId}/giornali/${this.editingGiornale.id}`
+                        : `/api/v1/giornale/sites/${this.siteId}/giornali`;
 
-                const response = await fetch(url, {
-                    method,
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify(data)
-                });
+                    const method = this.editingGiornale ? 'PUT' : 'POST';
+                    const data = this.editingGiornale ? this.form : { ...this.form, site_id: '{{ site.id }}' };
 
-                if (response.ok) {
-                    this.showCreateModal = false;
-                    this.resetForm();
-                    await this.loadGiornali();
-                    
-                    // Notifica successo
-                    const action = this.editingGiornale ? 'aggiornato' : 'creato';
-                    this.showNotification(`Giornale ${action} con successo`, 'success');
-                } else {
-                    const error = await response.json();
-                    this.showNotification('Errore: ' + (error.detail || 'Errore sconosciuto'), 'error');
+                    const response = await fetch(url, {
+                        method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    if (response.ok) {
+                        this.showCreateModal = false;
+                        this.resetForm();
+                        await this.loadGiornali();
+
+                        // Notifica successo
+                        const action = this.editingGiornale ? 'aggiornato' : 'creato';
+                        this.showNotification(`Giornale ${action} con successo`, 'success');
+                    } else {
+                        const error = await response.json();
+                        this.showNotification('Errore: ' + (error.detail || 'Errore sconosciuto'), 'error');
+                    }
+                } catch (error) {
+                    console.error('Errore:', error);
+                    this.showNotification('Errore nella comunicazione con il server', 'error');
                 }
-            } catch (error) {
-                console.error('Errore:', error);
-                this.showNotification('Errore nella comunicazione con il server', 'error');
+            },
+
+            async saveDraft() {
+                // Implementa salvataggio bozza se necessario
+                this.showNotification('Bozza salvata (funzionalità da implementare)', 'info');
+            },
+
+            showNotification(message, type = 'info') {
+                // Implementa sistema notifiche toast
+                // Per ora usa alert semplice
+                alert(message);
             }
-        },
-
-        async saveDraft() {
-            // Implementa salvataggio bozza se necessario
-            this.showNotification('Bozza salvata (funzionalità da implementare)', 'info');
-        },
-
-        showNotification(message, type = 'info') {
-            // Implementa sistema notifiche toast
-            // Per ora usa alert semplice
-            alert(message);
         }
     }
-}
 </script>

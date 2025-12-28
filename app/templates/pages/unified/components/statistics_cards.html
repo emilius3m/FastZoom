@@ -8,7 +8,8 @@
             </div>
             <div class="ml-4">
                 <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Siti Accessibili</p>
-                <p class="text-2xl font-semibold text-gray-900 dark:text-white" x-text="overviewStats.sites_count || 0"></p>
+                <p class="text-2xl font-semibold text-gray-900 dark:text-white" x-text="overviewStats.sites_count || 0">
+                </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     <template x-if="overviewStats.sites_count > 1">
                         <span x-text="overviewStats.sites_count + ' siti attivi'"></span>
@@ -19,64 +20,6 @@
                     <template x-if="overviewStats.sites_count === 0">
                         <span>Nessun sito</span>
                     </template>
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- US/USM Count Card -->
-    <div class="stat-card overview bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div class="flex items-center">
-            <div class="p-3 rounded-full bg-orange-100 dark:bg-orange-900">
-                <i class="fas fa-layer-group text-orange-600 dark:text-orange-300"></i>
-            </div>
-            <div class="ml-4">
-                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">US/USM</p>
-                <p class="text-2xl font-semibold text-gray-900 dark:text-white" x-text="overviewStats.us_usm_count || 0"></p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <template x-if="overviewStats.us_usm_count > 1">
-                        <span x-text="overviewStats.us_usm_count + ' unità stratigrafiche'"></span>
-                    </template>
-                    <template x-if="overviewStats.us_usm_count === 1">
-                        <span>1 unità stratigrafica</span>
-                    </template>
-                    <template x-if="overviewStats.us_usm_count === 0">
-                        <span>Nessuna US/USM</span>
-                    </template>
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- System Status Card -->
-    <div class="stat-card overview bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div class="flex items-center">
-            <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-900">
-                <i class="fas fa-heartbeat text-purple-600 dark:text-purple-300"></i>
-            </div>
-            <div class="ml-4">
-                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Stato Sistema</p>
-                <p class="text-2xl font-semibold text-gray-900 dark:text-white">
-                    <span class="flex items-center">
-                        <template x-if="systemStatus?.database">
-                            <i :class="['fas', systemStatus.database.icon, 'mr-2', systemStatus.database.class]" x-text="systemStatus.database.text"></i>
-                        </template>
-                        <template x-if="!systemStatus?.database">
-                            <i class="fas fa-question-circle mr-2 text-gray-600 dark:text-gray-400" x-text="'Caricamento...'"></i>
-                        </template>
-                    </span>
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <span class="flex items-center">
-                        <template x-if="systemStatus?.storage">
-                            <i :class="['fas', systemStatus.storage.icon, 'mr-1', 'text-sm', systemStatus.storage.class]"></i>
-                            <span :class="systemStatus.storage.class" x-text="systemStatus.storage.text"></span>
-                        </template>
-                        <template x-if="!systemStatus?.storage">
-                            <i class="fas fa-question-circle mr-1 text-sm text-gray-600 dark:text-gray-400"></i>
-                            <span class="text-gray-600 dark:text-gray-400" x-text="'Caricamento...'"></span>
-                        </template>
-                    </span>
                 </p>
             </div>
         </div>

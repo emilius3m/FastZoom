@@ -24,9 +24,10 @@ from app.models.sites import ArchaeologicalSite
 from app.models import User
 
 # Import modelli archeologia avanzata
+from app.models.stratigraphy import UnitaStratigrafica
+from app.models.archaeological_records import SchedaTomba, InventarioReperto, CampioneScientifico
 from app.models.archeologia_avanzata import (
-    UnitaStratigrafica, SchedaTomba, InventarioReperto, 
-    MaterialeArcheologico, CampioneScientifico,
+    MaterialeArcheologico,
     TipoUS, TipoTomba, TipoMateriale, TipoCampione, StatoConservazione
 )
 
@@ -40,7 +41,7 @@ from app.schemas.archeologia_avanzata import (
     USFilter, TombaFilter, RepertoFilter, CampioneFilter
 )
 
-router = APIRouter(prefix="/api/archeologia", tags=["archeologia-avanzata"])
+router = APIRouter(prefix="", tags=["archeologia-avanzata"])
 
 
 # ===== GESTIONE UNITÀ STRATIGRAFICHE =====
