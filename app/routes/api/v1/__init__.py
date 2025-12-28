@@ -30,6 +30,11 @@ from app.routes.api.v1.harris_matrix_mapping import router as harris_matrix_mapp
 from app.routes.api.v1.ocr_us_import import router as ocr_us_import_router
 from app.routes.api.v1.ocr_debug import router as ocr_debug_router
 
+# Migrated from v0
+from app.routes.api.us_word_export_api import router as us_word_export_router
+from app.routes.api.database_monitoring import router as database_monitoring_router
+from app.routes.api.archeologia_avanzata import router as archeologia_avanzata_router
+
 # Router principale API v1
 api_v1_router = APIRouter(
     prefix="/api/v1",
@@ -72,6 +77,11 @@ from app.routes.api.v1.iccd_records import iccd_router
 api_v1_router.include_router(form_schemas_router)
 api_v1_router.include_router(plans_router)
 api_v1_router.include_router(iccd_router)
+
+# Migrated from v0
+api_v1_router.include_router(us_word_export_router, prefix="/us-export", tags=["US Word Export"])
+api_v1_router.include_router(database_monitoring_router, prefix="/database", tags=["Database Monitoring"])
+api_v1_router.include_router(archeologia_avanzata_router, prefix="/archeologia", tags=["Archeologia Avanzata"])
 
 # Esporta il router principale
 __all__ = ["api_v1_router"]

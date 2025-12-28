@@ -1,9 +1,7 @@
 import asyncio
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse ,Response
-from fastapi.middleware import Middleware
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
 from loguru import logger
 from typing import List, Dict, Any
@@ -36,40 +34,15 @@ from fastapi_csrf_protect import CsrfProtect
 from fastapi import APIRouter, Request, Form
 from app.core.csrf_settings import CsrfSettings, _csrf_tokens_optional
 from app.templates import templates
-# VECCHIO ADMIN ROUTER - Migrato in API v1
-# from app.routes.admin import admin_router
-# 🔧 NUOVO IMPORT - Router Sites
+
 from app.routes.sites_router import sites_router
-# 🔧 NUOVO IMPORT - Router Photos (senza prefisso /sites) - MOVED TO API v1
-# from app.routes.photos_router import photos_router  # REMOVED - moved to api/v1/photos.py
-# 🔧 NUOVO IMPORT - Router Form Schemas
-# from app.routes.api.form_schemas import form_schemas_router
-# from app.routes.api.documents import documents_router  # NUOVO
-from app.routes.view.documentation import documentation_router
-# 🗺️ NUOVO IMPORT - Router Archaeological Plans API
-# from app.routes.api.archaeological_plans import plans_router as archaeological_plans_router
-# 🏺 NUOVO IMPORT - Router ICCD Records API
-# from app.routes.api.iccd_records import iccd_router
-# 🏺 NUOVO IMPORT - Router ICCD API (draft)
-#from app.routes.iccd_api import router as iccd_api_router
-# 🌍 NUOVO IMPORT - Router Geographic Maps API (DEPRECATED)
-# from app.routes.api.geographic_maps import geographic_maps_router
-# 📡 NUOVO IMPORT - Router WebSocket Notifications
 from app.routes.api.notifications_ws import notifications_router
-# 🌐 NUOVO IMPORT - Router WebSocket Globale con token-based authentication
-#from app.routes.api.notifications_global_ws import global_notifications_router
-# 🆕 NUOVO IMPORT - Router Unified Dashboard API
-#from app.routes.api.unified_dashboard import router as unified_dashboard_router
-# 🗄️ NUOVO IMPORT - Router Database Monitoring API
-from app.routes.api.database_monitoring import router as database_monitoring_router
 # 📋 NUOVO IMPORT - Router Queue Monitoring API
 from app.routes.api.queue_monitoring import queue_monitoring_router
 # 📊 NUOVO IMPORT - Router Performance Monitoring API
 from app.routes.api.performance_monitoring import router as performance_monitoring_router
-from app.routes import photo_metadata
+
 from app.routes.view.us import us_view_router
-from app.routes.api.us_word_export_api import router as us_word_export_router
-# from app.routes.api.us_files import router as us_files_router
 
 
 
@@ -195,13 +168,11 @@ def get_csrf_config():
 # Static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Include route API - DEPRECATED: Removed old auth.py router, now using API v1
-
 # 🆕 NUOVO: Includi router API v1 riorganizzato con backward compatibility
 from app.routes.api.v1 import api_v1_router
 app.include_router(
     api_v1_router,
-    tags=["API v1 - Riorganizzata"],
+    tags=["API v1"],
     responses={404: {"description": "Not found"}}
 )
 
@@ -235,12 +206,8 @@ app.add_middleware(
 # 📊 NUOVO: Aggiungi Performance Tracking Middleware
 app.add_middleware(RequestCountMiddleware)
 app.add_middleware(PerformanceTrackingMiddleware)
-#app.add_middleware(SecurityHeadersMiddleware)
 
 # Add queue middleware (order matters - queue middleware should be before status middleware)
-from app.core.config import get_settings
-settings = get_settings()
-
 if settings.queue_enabled:
     # Import RequestPriority enum for queue configuration
     from app.services.request_queue_service import RequestPriority
@@ -313,49 +280,12 @@ app.include_router(
 )
 
 
-# Include admin routes
-#####app.include_router(admin_router, tags=["Administration"])
 # 🏛️ INCLUSIONE ROUTER SITES - CONFIGURAZIONE PRINCIPALE
 app.include_router(
     sites_router,
-    # prefix="/sites" # Già definito nel router stesso
     tags=["sites"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
-
-# 🖼️ INCLUSIONE ROUTER PHOTOS - Endpoints foto senza prefisso /sites - MOVED TO API v1
-# app.include_router(
-#     photos_router,
-#     tags=["photos"],
-#     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-# )  # REMOVED - moved to api/v1/photos.py
-
-# 📋 INCLUSIONE ROUTER FORM SCHEMAS - Endpoints per form builder
-# app.include_router(
-#     form_schemas_router,
-#     tags=["form-schemas"],
-#     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-# )
-# app.include_router(
-#     documents_router,
-#     tags=["documents"],
-#     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-# )
-
-
-# 🗺️ INCLUSIONE ROUTER ARCHAEOLOGICAL PLANS - API per piante archeologiche
-# app.include_router(
-#     archaeological_plans_router,
-#     tags=["archaeological_plans"],
-#     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-# )
-
-# 🏺 INCLUSIONE ROUTER ICCD - API per schede ICCD standard
-# app.include_router(
-#     iccd_router,
-#     tags=["iccd-catalogation"],
-#     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-# )
 
 try:
     from app.routes.view.giornale_cantiere import router as giornale_cantiere_view_router
@@ -388,32 +318,15 @@ if VIEW_REDIRECT_EXISTS:
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
-# Import delle nuove routes archeologia
-try:
-    from app.routes.api.archeologia_avanzata import router as archeologia_api_router
-    ARCHEOLOGIA_API_EXISTS = True
-except ImportError:
-    logger.warning("Archeologia avanzata API route not found")
-    ARCHEOLOGIA_API_EXISTS = False
-
+# Import delle routes archeologia view
 try:
     import importlib
     archeologia_view_module = importlib.import_module('app.routes.view.archeologia-view-routes')
     archeologia_view_router = archeologia_view_module.router
-
     ARCHEOLOGIA_VIEW_EXISTS = True
 except ImportError:
     logger.warning("Archeologia avanzata view route not found")
     ARCHEOLOGIA_VIEW_EXISTS = False
-
-
-# Registra archeologia routes
-if ARCHEOLOGIA_API_EXISTS:
-    app.include_router(
-        archeologia_api_router,
-        tags=["archeologia-api"],
-        dependencies=[Depends(get_current_user_id_with_blacklist)]
-    )
 
 if ARCHEOLOGIA_VIEW_EXISTS:
     app.include_router(
@@ -422,21 +335,13 @@ if ARCHEOLOGIA_VIEW_EXISTS:
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
-# 📡 INCLUSIONE ROUTER WEBSOCKET NOTIFICATIONS - WebSocket per notifiche real-time
+# 📡 INCLUSIONE ROUTER WEBSOCKET NOTIFICATIONS
 app.include_router(
     notifications_router,
     tags=["websocket-notifications"]
 )
 
-
-# 🗄️ INCLUSIONE ROUTER DATABASE MONITORING - API per monitoring connection pool
-app.include_router(
-    database_monitoring_router,
-    tags=["database-monitoring"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]
-)
-
-# 📋 INCLUSIONE ROUTER QUEUE MONITORING - API per monitoring request queue
+# 📋 INCLUSIONE ROUTER QUEUE MONITORING
 app.include_router(
     queue_monitoring_router,
     tags=["queue-monitoring"],
@@ -444,7 +349,7 @@ app.include_router(
     dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
 
-# 📊 INCLUSIONE ROUTER PERFORMANCE MONITORING - API per monitoring performance
+# 📊 INCLUSIONE ROUTER PERFORMANCE MONITORING
 app.include_router(
     performance_monitoring_router,
     tags=["performance-monitoring"],
@@ -452,30 +357,13 @@ app.include_router(
     dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
 
-
-# 📄 INCLUSIONE ROUTER US/USM WORD EXPORT - Export Word per US/USM
-app.include_router(
-    us_word_export_router,
-    tags=["us-word-export"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]
-)
-
-# 📈 INCLUSIONE ROUTER ANALYTICS - API per statistiche dashboard
+# 📈 INCLUSIONE ROUTER ANALYTICS
 from app.routes.api.analytics import router as analytics_router
 app.include_router(
     analytics_router,
     tags=["analytics"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
-
-# 📎 INCLUSIONE ROUTER US/USM FILES - Gestione file US/USM
-# app.include_router(
-#     us_files_router,
-#     tags=["us-files"],
-#     dependencies=[Depends(get_current_user_id_with_blacklist)]  # Autenticazione con blacklist
-# )
-
-
 
 # Include route view condizionali
 if LOGIN_ROUTE_EXISTS:
@@ -746,19 +634,6 @@ async def dashboard_view(
             detail="Errore interno dashboard"
         )
 
-# DASHBOARD CLASSICA (per retrocompatibilità)
-@app.get("/dashboard/classic", response_class=HTMLResponse)
-async def dashboard_classic_view(
-    request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Dashboard classica per retrocompatibilità
-    """
-    return await dashboard_view(request, current_user_id, user_sites, db, view='classic')
-
 # DASHBOARD UNIFICATA (esplicita)
 @app.get("/dashboard/unified", response_class=HTMLResponse)
 async def dashboard_unified_view(
@@ -959,20 +834,7 @@ async def site_dashboard(
         "site": site_info,
         "user_id": str(current_user_id),
         "permission": site_info.get("permission_level", "read"),
-        "system": "archaeological_catalog"
     }
-
-@app.get("/health")
-async def health_check():
-    """Health check per monitoraggio sistema"""
-    return {
-        "status": "ok",
-        "system": "archaeological_catalog",
-        "version": "1.0.0",
-        "timestamp": "2025-09-19 20:43",
-        "multi_site_enabled": getattr(settings, 'site_selection_enabled', True)
-    }
-
 
 
 # BACKWARD COMPATIBILITY ROUTE FOR LEGACY AUTH ENDPOINT
