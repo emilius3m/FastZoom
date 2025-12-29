@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from uuid import UUID
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id, get_current_user_sites_with_blacklist
@@ -13,6 +13,9 @@ from app.models.sites import ArchaeologicalSite
 from app.models import UserSitePermission
 from app.models import User
 from app.templates import templates
+
+# Import centralized permission dependencies
+from app.routes.view.view_dependencies import get_site_read_access, get_site_write_access
 
 iccd_router = APIRouter(tags=["iccd"])
 
@@ -22,52 +25,23 @@ async def site_iccd_redirect(site_id: UUID):
     return RedirectResponse(url=f"/sites/{site_id}/iccd/hierarchy", status_code=302)
 
 
-async def get_current_user_with_context(current_user_id: UUID, db: AsyncSession):
-    """Recupera informazioni utente corrente"""
-    user_query = select(User).where(User.id == str(current_user_id))
-    user = await db.execute(user_query)
-    return user.scalar_one_or_none()
-
-
 @iccd_router.get("/sites/{site_id}/iccd/hierarchy", response_class=HTMLResponse)
 async def site_iccd_hierarchy(
         request: Request,
         site_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id),
+        site_access: Tuple = Depends(get_site_read_access),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Sistema gerarchico ICCD completo del sito archeologico."""
-
-    # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
-    site = await db.execute(site_query)
-    site = site.scalar_one_or_none()
-
-    if not site:
-        raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
-
-    # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
-        )
-    )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
-
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
-        )
-
-    if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-
-    current_user = await get_current_user_with_context(current_user_id, db)
+    
+    # Unpack site access tuple (site, permission, user, is_superuser)
+    site, permission, current_user, is_superuser = site_access
+    
+    # Compute permissions
+    can_read = is_superuser or permission.can_read()
+    can_write = is_superuser or permission.can_write()
+    can_admin = is_superuser or permission.can_admin()
 
     # Prepara context per il template
     context = {
@@ -75,15 +49,16 @@ async def site_iccd_hierarchy(
         "site": site,
         "user_permission": permission,
         "current_user": current_user,
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin(),
-        "can_delete": permission.can_admin(),  # Only admins can delete
+        "is_superuser": is_superuser,
+        "can_read": can_read,
+        "can_write": can_write,
+        "can_admin": can_admin,
+        "can_delete": can_admin,  # Only admins can delete
         "sites": user_sites,
         "sites_count": len(user_sites),
         "current_site_name": site.name if site else None,
         "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user",
+        "user_type": "superuser" if is_superuser else "user",
         "current_page": "iccd_hierarchy",
         # Informazioni specifiche per il template ICCD hierarchy
         "hierarchy_data": None,  # Placeholder per dati gerarchici futuri
@@ -98,41 +73,19 @@ async def site_iccd_hierarchy(
 async def site_iccd_records_list(
         request: Request,
         site_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id),
+        site_access: Tuple = Depends(get_site_read_access),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Lista schede ICCD del sito archeologico."""
-
-    # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
-    site = await db.execute(site_query)
-    site = site.scalar_one_or_none()
-
-    if not site:
-        raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
-
-    # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
-        )
-    )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
-
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
-        )
-
-    if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-
-    current_user = await get_current_user_with_context(current_user_id, db)
+    
+    # Unpack site access tuple (site, permission, user, is_superuser)
+    site, permission, current_user, is_superuser = site_access
+    
+    # Compute permissions
+    can_read = is_superuser or permission.can_read()
+    can_write = is_superuser or permission.can_write()
+    can_admin = is_superuser or permission.can_admin()
 
     # Prepara context per il template
     context = {
@@ -140,14 +93,15 @@ async def site_iccd_records_list(
         "site": site,
         "user_permission": permission,
         "current_user": current_user,
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin(),
+        "is_superuser": is_superuser,
+        "can_read": can_read,
+        "can_write": can_write,
+        "can_admin": can_admin,
         "sites": user_sites,
         "sites_count": len(user_sites),
         "current_site_name": site.name if site else None,
         "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user",
+        "user_type": "superuser" if is_superuser else "user",
         "current_page": "iccd_records",
     }
 
@@ -159,41 +113,19 @@ async def new_iccd_record(
         request: Request,
         site_id: UUID,
         schema_type: str,
-        current_user_id: UUID = Depends(get_current_user_id),
+        site_access: Tuple = Depends(get_site_write_access),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Form per creare nuova scheda ICCD."""
-
-    # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
-    site = await db.execute(site_query)
-    site = site.scalar_one_or_none()
-
-    if not site:
-        raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
-
-    # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
-        )
-    )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
-
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
-        )
-
-    if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
-
-    current_user = await get_current_user_with_context(current_user_id, db)
+    
+    # Unpack site access tuple (site, permission, user, is_superuser)
+    site, permission, current_user, is_superuser = site_access
+    
+    # Compute permissions
+    can_read = is_superuser or permission.can_read()
+    can_write = is_superuser or permission.can_write()
+    can_admin = is_superuser or permission.can_admin()
 
     # Initialize empty record data for new records
     record_data = {
@@ -230,14 +162,15 @@ async def new_iccd_record(
         "record_id": None,
         "edit_mode": False,
         "schema_type": schema_type,
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin(),
+        "is_superuser": is_superuser,
+        "can_read": can_read,
+        "can_write": can_write,
+        "can_admin": can_admin,
         "sites": user_sites,
         "sites_count": len(user_sites),
         "current_site_name": site.name if site else None,
         "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user",
+        "user_type": "superuser" if is_superuser else "user",
         "current_page": "iccd_new",
     }
 
@@ -249,41 +182,19 @@ async def view_iccd_record(
         request: Request,
         site_id: UUID,
         record_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id),
+        site_access: Tuple = Depends(get_site_read_access),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Visualizza scheda ICCD specifica."""
-
-    # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
-    site = await db.execute(site_query)
-    site = site.scalar_one_or_none()
-
-    if not site:
-        raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
-
-    # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
-        )
-    )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
-
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
-        )
-
-    if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-
-    current_user = await get_current_user_with_context(current_user_id, db)
+    
+    # Unpack site access tuple (site, permission, user, is_superuser)
+    site, permission, current_user, is_superuser = site_access
+    
+    # Compute permissions
+    can_read = is_superuser or permission.can_read()
+    can_write = is_superuser or permission.can_write()
+    can_admin = is_superuser or permission.can_admin()
 
     # Recupera record ICCD dal database
     try:
@@ -329,14 +240,15 @@ async def view_iccd_record(
         "current_user": current_user,
         "record": record_data,
         "record_id": str(record_id),
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin(),
+        "is_superuser": is_superuser,
+        "can_read": can_read,
+        "can_write": can_write,
+        "can_admin": can_admin,
         "sites": user_sites,
         "sites_count": len(user_sites),
         "current_site_name": site.name if site else None,
         "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user",
+        "user_type": "superuser" if is_superuser else "user",
         "current_page": "iccd_view",
     }
 
@@ -348,41 +260,19 @@ async def edit_iccd_record(
         request: Request,
         site_id: UUID,
         record_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id),
+        site_access: Tuple = Depends(get_site_write_access),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Form per modificare scheda ICCD esistente."""
-
-    # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
-    site = await db.execute(site_query)
-    site = site.scalar_one_or_none()
-
-    if not site:
-        raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
-
-    # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
-        )
-    )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
-
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
-        )
-
-    if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
-
-    current_user = await get_current_user_with_context(current_user_id, db)
+    
+    # Unpack site access tuple (site, permission, user, is_superuser)
+    site, permission, current_user, is_superuser = site_access
+    
+    # Compute permissions
+    can_read = is_superuser or permission.can_read()
+    can_write = is_superuser or permission.can_write()
+    can_admin = is_superuser or permission.can_admin()
 
     # Recupera record ICCD dal database
     try:
@@ -430,15 +320,16 @@ async def edit_iccd_record(
         "record_id": str(record_id),
         "edit_mode": True,
         "schema_type": record_data["schema_type"],
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin(),
-        "can_delete": permission.can_admin(),  # Only admins can delete
+        "is_superuser": is_superuser,
+        "can_read": can_read,
+        "can_write": can_write,
+        "can_admin": can_admin,
+        "can_delete": can_admin,  # Only admins can delete
         "sites": user_sites,
         "sites_count": len(user_sites),
         "current_site_name": site.name if site else None,
         "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user",
+        "user_type": "superuser" if is_superuser else "user",
         "current_page": "iccd_edit",
     }
 
