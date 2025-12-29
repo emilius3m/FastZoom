@@ -13,17 +13,13 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from app.core.config import settings
 
-# Optional import for pool monitor to avoid circular imports
-try:
-    from app.services.database_pool_monitor import initialize_pool_monitor
-    POOL_MONITOR_AVAILABLE = True
-except ImportError:
-    POOL_MONITOR_AVAILABLE = False
-    logger.warning("Database pool monitor not available due to circular import")
+# Pool monitor lazy initialization flag
+_pool_monitor = None
+_pool_monitor_initialized = False
 
-# Log database configuration for debugging
-logger.info(f"Database URL: {settings.database_url}")
-logger.info(f"Database pool configuration - Size: {settings.db_pool_size}, Max Overflow: {settings.db_max_overflow}")
+# Log database configuration for debugging (only visible in DEBUG mode)
+logger.debug(f"Database URL: {settings.database_url}")
+logger.debug(f"Database pool configuration - Size: {settings.db_pool_size}, Max Overflow: {settings.db_max_overflow}")
 
 # SQLite WAL mode configuration for better concurrent access
 @event.listens_for(Engine, "connect")
@@ -76,13 +72,28 @@ async_session_maker = AsyncSessionLocal
 # Additional alias for compatibility with middleware
 async_session_factory = AsyncSessionLocal
 
-# Initialize the connection pool monitor if available
-if POOL_MONITOR_AVAILABLE:
-    pool_monitor = initialize_pool_monitor(engine)
-    logger.info("Database connection pool monitor initialized")
-else:
-    pool_monitor = None
-    logger.info("Database connection pool monitor skipped due to import constraints")
+def get_pool_monitor():
+    """
+    Lazy initialization of the database pool monitor.
+    This avoids import order issues by deferring the import until first access.
+    """
+    global _pool_monitor, _pool_monitor_initialized
+    
+    if not _pool_monitor_initialized:
+        _pool_monitor_initialized = True
+        try:
+            from app.services.database_pool_monitor import initialize_pool_monitor
+            _pool_monitor = initialize_pool_monitor(engine)
+            logger.info("Database connection pool monitor initialized (lazy)")
+        except ImportError as e:
+            logger.debug(f"Pool monitor not available: {e}")
+            _pool_monitor = None
+    
+    return _pool_monitor
+
+# Backward compatibility: pool_monitor as a property-like access
+# (for code that accesses engine.pool_monitor directly)
+pool_monitor = None  # Will be populated on first get_pool_monitor() call
 
 # Dependency FastAPI - centralized for all routes
 async def get_async_session() -> AsyncSession:
@@ -98,5 +109,6 @@ __all__ = [
     'async_session_factory',     # Additional compatibility alias
     'get_async_session',         # FastAPI dependency
     'set_sqlite_pragma',         # WAL mode event listener
-    'pool_monitor',              # Connection pool monitor
+    'get_pool_monitor',          # Lazy pool monitor getter (preferred)
+    'pool_monitor',              # Connection pool monitor (backward compat)
 ]

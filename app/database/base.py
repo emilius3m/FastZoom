@@ -85,10 +85,10 @@ from app.core.config import settings
 # This eliminates duplicate engines and ensures consistent WAL mode configuration
 from app.database.engine import engine, AsyncSessionLocal, async_session_maker
 
-# DEBUG: Log centralized engine usage
+# DEBUG: Log centralized engine usage (only visible in DEBUG mode)
 from loguru import logger
-logger.info(f"[DEBUG] Using centralized engine for model initialization: {settings.database_url}")
-logger.info(f"[DEBUG] Centralized async session maker available for model initialization")
+logger.debug(f"Using centralized engine for model initialization: {settings.database_url}")
+logger.debug(f"Centralized async session maker available for model initialization")
 
 # Note: The main application now uses the centralized engine from app.database.engine
 # This ensures all database connections use the same WAL mode configuration

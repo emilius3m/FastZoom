@@ -656,11 +656,8 @@ async def logout_user_safely(db, user_id, token_jti, ip_address=None):
 # ===== IMPORT LOGGING =====
 from loguru import logger
 
-logger.info(f"FastZoom Models v{MODELS_VERSION} loaded - {MODELS_COUNT} models available")
-logger.info("✅ RIPRISTINATI: PermissionLevel + UserActivity + TokenBlacklist")
-logger.info("✅ RIPRISTINATI: PhotoType + MaterialType + ConservationStatus")
-logger.info("🔒 Sistema autenticazione JWT completo e sicuro")
-logger.info("🏛️ Enum archeologici completi per classificazione standard")
+logger.debug(f"FastZoom Models v{MODELS_VERSION} loaded - {MODELS_COUNT} models available")
+
 
 # ===== COMPATIBILITY =====
 # Alias per compatibilità con codice esistente
@@ -670,7 +667,7 @@ logger.info("🏛️ Enum archeologici completi per classificazione standard")
 try:
     _validation_result = validate_all_models_complete()
     if _validation_result['valid']:
-        logger.info("🎉 TUTTI I MODELLI VALIDATI CORRETTAMENTE!")
+        logger.debug("TUTTI I MODELLI VALIDATI CORRETTAMENTE!")
     else:
         logger.warning(f"⚠️ Validation issues: {_validation_result['issues']}")
 except Exception as e:
