@@ -134,8 +134,8 @@ def setup_logging(
     # Intercept standard logging
     setup_logging_interception()
     
-    logger.info(f"Logging initialized with level: {log_level}")
-    logger.info(f"Log file: {log_file}")
+    logger.debug(f"Logging initialized: level={log_level}, file={log_file}")
+
 
 
 def setup_logging_interception() -> None:

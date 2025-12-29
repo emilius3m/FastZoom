@@ -195,7 +195,7 @@ class PhotoMetadataService:
             if hasattr(Image, 'preinit'):
                 Image.preinit()
 
-            logger.info(f"PIL limits configured: MAX_IMAGE_PIXELS increased from {old_limit} to {Image.MAX_IMAGE_PIXELS}")
+            logger.debug(f"PIL limits configured: MAX_IMAGE_PIXELS increased from {old_limit} to {Image.MAX_IMAGE_PIXELS}")
 
         except Exception as e:
             logger.warning(f"Could not configure PIL limits: {e}")

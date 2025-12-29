@@ -22,13 +22,12 @@ async def create_db_and_tables():
     # IMPORTANTE: Inizializza tutti i modelli PRIMA di creare le tabelle
     from app.database.base import init_models
     init_models()
-    logger.info("📦 Models initialized")
+    logger.debug("Models initialized")
     
     # Crea tutte le tabelle
     async with engine.begin() as conn:
-        logger.info("🗄️  Creating database tables...")
         await conn.run_sync(Base.metadata.create_all)
-        logger.info("✅ Database tables created successfully")
+        logger.debug("Database tables created")
     
     # Crea superuser predefinito se non esiste
     async with async_session_maker() as session:
@@ -64,15 +63,10 @@ async def create_db_and_tables():
             session.add(profile)
             await session.commit()
             
-            logger.info("👤 Superuser created successfully:")
-            logger.info(f"   📧 Email: {user.email}")
-            logger.info(f"   🔑 Password: password123")
-            logger.info(f"   🔐 Is Superuser: {user.is_superuser}")
+            logger.debug(f"Superuser created: {user.email}")
             
         else:
-            logger.info("⚠️  Superuser already exists:")
-            logger.info(f"   📧 Email: {existing_user.email}")
-            logger.info(f"   🔑 Password: password123 (if unchanged)")
+            logger.debug(f"Superuser exists: {existing_user.email}")
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """Dependency per ottenere sessione database asincrona"""

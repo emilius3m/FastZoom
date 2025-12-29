@@ -16,7 +16,7 @@ from app.database.engine import (
     pool_monitor
 )
 
-logger.info("Database session module importing from centralized engine.py")
+logger.debug("Database session module importing from centralized engine.py")
 
 # Base dichiarativa per modelli, se non già altrove
 Base = declarative_base()

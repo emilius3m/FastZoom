@@ -56,8 +56,8 @@ from app.utils.unit_id_normalizer import create_graph_node_id, normalize_unit_id
 from app.utils.constants import RELATIONSHIP_INVERSES, get_inverse_relationship
 
 
-# Log at startup for debugging
-logger.info(f"[RELATIONSHIP INVERSES] Loaded from constants.py with {len(RELATIONSHIP_INVERSES)} relationship types")
+# Log at startup for debugging (only visible in DEBUG mode)
+logger.debug(f"[RELATIONSHIP INVERSES] Loaded from constants.py with {len(RELATIONSHIP_INVERSES)} relationship types")
 
 
 class HarrisMatrixService:

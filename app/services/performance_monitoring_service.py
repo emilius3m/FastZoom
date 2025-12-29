@@ -263,8 +263,11 @@ class PerformanceMonitoringService:
                 metric_type=alert_config["metric"],
                 threshold=alert_config["threshold"],
                 operator=alert_config["operator"],
-                message=alert_config["message"]
+                message=alert_config["message"],
+                _silent=True  # Don't log individual alerts
             )
+        
+        logger.debug(f"Initialized {len(default_alerts)} default performance alerts")
     
     async def start_monitoring(self):
         """Start the performance monitoring service"""
@@ -279,7 +282,7 @@ class PerformanceMonitoringService:
         self.alert_task = asyncio.create_task(self._alert_check_loop())
         self.cleanup_task = asyncio.create_task(self._cleanup_loop())
         
-        logger.info("🔍 Performance monitoring service started")
+        logger.debug("Performance monitoring service started")
     
     async def stop_monitoring(self):
         """Stop the performance monitoring service"""
@@ -637,7 +640,8 @@ class PerformanceMonitoringService:
         metric_type: MetricType,
         threshold: float,
         operator: str,
-        message: str
+        message: str,
+        _silent: bool = False
     ) -> PerformanceAlert:
         """Create a new performance alert"""
         alert = PerformanceAlert(
@@ -650,7 +654,8 @@ class PerformanceMonitoringService:
         )
         
         self.alerts[alert_id] = alert
-        logger.info(f"Created alert: {alert_id} - {message}")
+        if not _silent:
+            logger.debug(f"Created alert: {alert_id} - {message}")
         
         return alert
     

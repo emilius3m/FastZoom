@@ -141,7 +141,7 @@ class DeepZoomBackgroundService:
             
         self._running = True
         self._worker_task = asyncio.create_task(self._process_queue_worker())
-        logger.info("🚀 Deep zoom background processor started")
+        logger.debug("Deep zoom background processor started")
 
     async def stop_background_processor(self):
         """Stop the background processor worker"""

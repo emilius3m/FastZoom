@@ -143,10 +143,7 @@ class ArchaeologicalMinIOService:
         secret_key = config_settings.active_minio_secret_key
         secure = config_settings.active_minio_secure
         
-        logger.info(f"Creating MinIO client with profile '{config_settings.minio_config_profile}'")
-        logger.info(f"MinIO endpoint: {minio_url}")
-        logger.info(f"MinIO bucket: {config_settings.active_minio_bucket}")
-        logger.info(f"MinIO secure: {secure}")
+        logger.debug(f"MinIO config - profile: {config_settings.minio_config_profile}, endpoint: {minio_url}, bucket: {config_settings.active_minio_bucket}, secure: {secure}")
 
         # Fallback a environment variables se settings non disponibili
         if not all([minio_url, access_key, secret_key]):
@@ -156,12 +153,15 @@ class ArchaeologicalMinIOService:
             secret_key = os.getenv("MINIO_SECRET_KEY", "")
             secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
 
-        return Minio(
+        client = Minio(
             endpoint=minio_url,
             access_key=access_key,
             secret_key=secret_key,
             secure=secure
         )
+        
+        logger.info(f"MinIO client initialized (profile: {config_settings.minio_config_profile})")
+        return client
 
     def _is_storage_full_error(self, error: Exception) -> bool:
         """Check se errore è storage full"""

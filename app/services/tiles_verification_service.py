@@ -68,7 +68,7 @@ class TilesVerificationService:
             
         self._running = True
         self._verification_task = asyncio.create_task(self._periodic_verification_worker())
-        logger.info("🔍 Tiles verification service started")
+        logger.debug("Tiles verification service started")
     
     async def stop_periodic_verification(self):
         """Stop the periodic verification service"""

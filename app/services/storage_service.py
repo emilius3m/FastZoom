@@ -18,7 +18,7 @@ class StorageService:
 
     def __init__(self):
         # Don't store settings as instance variables to ensure dynamic profile changes
-        logger.info("MinIO Storage service initialized (profile-based)")
+        logger.debug("MinIO Storage service initialized (profile-based)")
     
     @property
     def bucket_name(self) -> str:

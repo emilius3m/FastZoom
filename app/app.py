@@ -10,7 +10,6 @@ from uuid import UUID
 # Initialize Loguru logging system BEFORE any other imports
 from app.core.logging import setup_logging
 setup_logging()
-logger.info("🚀 FastZoom application starting - Loguru logging initialized")
 
 
 # IMPORT MANCANTI - Aggiungi questi:
@@ -54,12 +53,7 @@ except ImportError:
     logger.warning("Login view route not found")
     LOGIN_ROUTE_EXISTS = False
 
-try:
-    from app.routes.view.user import user_view_route
-    USER_ROUTE_EXISTS = True
-except ImportError:
-    logger.warning("User view route not found")
-    USER_ROUTE_EXISTS = False
+
 
 try:
     from app.routes.view.geographic_map import geographic_map_router
@@ -96,12 +90,7 @@ except ImportError:
     logger.warning("Documentation view route not found")
     DOCUMENTATION_ROUTE_EXISTS = False
 
-try:
-    from app.routes.view.archaeological_plans import archaeological_plans_view_router
-    ARCHAEOLOGICAL_PLANS_ROUTE_EXISTS = True
-except ImportError:
-    logger.warning("Archaeological plans view route not found")
-    ARCHAEOLOGICAL_PLANS_ROUTE_EXISTS = False
+
 
 try:
     from app.routes.view.iccd import iccd_router
@@ -127,10 +116,7 @@ except ImportError:
 # Configurazione
 settings = get_settings()
 
-# Log startup information
-logger.info(f"🔧 Creating FastAPI application with title: Archaeological Catalog API")
-logger.info(f"📋 Environment: {getattr(settings, 'environment', 'development')}")
-logger.info(f"🗄️ Database URL configured: {'✅' if hasattr(settings, 'database_url') else '❌'}")
+
 
 # Configurazione FastAPI con Swagger UI personalizzato
 app = FastAPI(
@@ -156,9 +142,8 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# Log FastAPI app creation success
-logger.info("✅ FastAPI application instance created successfully")
-logger.info(f"📚 Documentation available at: /docs and /redoc")
+# Log FastAPI app creation (single compact message)
+logger.info(f"🚀 FastZoom API initialized (env: {getattr(settings, 'environment', 'development')}, docs: /docs)")
 
 # 🆕 NUOVO: CSRF Protection per forms HTMX
 @CsrfProtect.load_config
@@ -318,22 +303,7 @@ if VIEW_REDIRECT_EXISTS:
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
-# Import delle routes archeologia view
-try:
-    import importlib
-    archeologia_view_module = importlib.import_module('app.routes.view.archeologia-view-routes')
-    archeologia_view_router = archeologia_view_module.router
-    ARCHEOLOGIA_VIEW_EXISTS = True
-except ImportError:
-    logger.warning("Archeologia avanzata view route not found")
-    ARCHEOLOGIA_VIEW_EXISTS = False
 
-if ARCHEOLOGIA_VIEW_EXISTS:
-    app.include_router(
-        archeologia_view_router,
-        tags=["Pages", "Archeologia"],
-        dependencies=[Depends(get_current_user_id_with_blacklist)]
-    )
 
 # 📡 INCLUSIONE ROUTER WEBSOCKET NOTIFICATIONS
 app.include_router(
@@ -369,8 +339,7 @@ app.include_router(
 if LOGIN_ROUTE_EXISTS:
     app.include_router(login_view_route, tags=["Pages", "Authentication"])
 
-if USER_ROUTE_EXISTS:
-    app.include_router(user_view_route, tags=["Pages", "User Management"])
+
 if GEOGRAPHIC_MAP_ROUTE_EXISTS:
     app.include_router(
         geographic_map_router,
@@ -399,17 +368,7 @@ if DOCUMENTATION_ROUTE_EXISTS:
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
 
-if ARCHAEOLOGICAL_PLANS_ROUTE_EXISTS:
-    app.include_router(
-        archaeological_plans_router,
-        tags=["Archaeological Plans"],
-        dependencies=[Depends(get_current_user_id_with_blacklist)]
-    )
-    app.include_router(
-        archaeological_plans_view_router,
-        tags=["Pages", "Archaeological Plans View"],
-        dependencies=[Depends(get_current_user_id_with_blacklist)]
-    )
+
 
 if PHOTOS_ROUTE_EXISTS:
     app.include_router(
@@ -920,98 +879,67 @@ async def on_shutdown():
 async def on_startup():
     """Inizializzazione sistema archeologico"""
     try:
-        logger.info("🚀 Starting FastZoom application startup sequence...")
-        logger.info("📊 Loguru logging system is active - all startup events will be captured")
+        logger.info("🚀 FastZoom starting...")
         
-        # Initialize models first to ensure proper relationship mapping
+        # Initialize database
         from app.database.base import init_models
         init_models()
-        logger.info("✅ Database models initialized")
-        
         await create_db_and_tables()
-        logger.info("✅ Database tables created/verified")
         
-        # Avvia il servizio di background processing per deep zoom tiles con error handling migliorato
-        logger.info("🔄 Starting DeepZoom background processor...")
+        # Start background services
+        services_started = []
+        
+        # DeepZoom background processor
         try:
             from app.services.deep_zoom_background_service import deep_zoom_background_service
-            
             if not deep_zoom_background_service._running:
                 await deep_zoom_background_service.start_background_processor()
-                
-                # Verify service status
-                queue_status = await deep_zoom_background_service.get_queue_status()
-                logger.info(f"📊 DeepZoom service status: {queue_status}")
-                logger.info("✅ DeepZoom background processor started successfully")
-            else:
-                logger.info("ℹ️ DeepZoom background processor already running")
-                
-        except Exception as deepzoom_error:
-            logger.error(f"❌ Failed to start DeepZoom background processor: {deepzoom_error}")
-            logger.warning("⚠️ Application will continue but DeepZoom tiles processing may not work")
-            # Continue with application startup despite DeepZoom failure
+                services_started.append("DeepZoom")
+        except Exception as e:
+            logger.warning(f"DeepZoom service failed: {e}")
         
-        # Avvia il servizio di verifica periodica tiles
-        logger.info("🔄 Starting tiles verification service...")
+        # Tiles verification service
         try:
             from app.services.tiles_verification_service import tiles_verification_service
             await tiles_verification_service.start_periodic_verification()
-            logger.info("✅ Tiles verification service started")
-        except Exception as tiles_error:
-            logger.error(f"❌ Failed to start tiles verification service: {tiles_error}")
-            logger.warning("⚠️ Application will continue but tiles verification may not work")
+            services_started.append("TilesVerification")
+        except Exception as e:
+            logger.warning(f"Tiles verification failed: {e}")
         
-        # Avvia il servizio di monitoring delle performance
-        logger.info("🔄 Starting performance monitoring service...")
+        # Performance monitoring service
         try:
             from app.services.performance_monitoring_service import performance_monitoring_service
             await performance_monitoring_service.start_monitoring()
-            logger.info("✅ Performance monitoring service started")
-        except Exception as perf_error:
-            logger.error(f"❌ Failed to start performance monitoring service: {perf_error}")
-            logger.warning("⚠️ Application will continue but performance monitoring may not work")
+            services_started.append("PerformanceMonitor")
+        except Exception as e:
+            logger.warning(f"Performance monitoring failed: {e}")
         
-        # Initialize queue service and register handlers
+        # Request queue service
         if settings.queue_enabled:
-            logger.info("🔄 Starting request queue service...")
             try:
                 from app.services.request_queue_service import request_queue_service
                 await request_queue_service.start()
-
-                # CRITICAL: Wait a moment for service to fully start
                 await asyncio.sleep(0.1)
-
-                # Register queue handlers AFTER service is started
+                
                 from app.middleware.queue_middleware import register_queue_handlers
                 register_queue_handlers()
-
-                # Register photo upload handler
+                
                 from app.routes.api.sites_photos import process_queued_upload
                 request_queue_service.register_handler('POST_/api/site/{site_id}/photos/upload', process_queued_upload)
-
-                # Register bulk upload handler
+                
                 from app.middleware.queue_middleware import bulk_upload_request_handler
                 request_queue_service.register_handler('POST_/api/site/{site_id}/photos/bulk-upload', bulk_upload_request_handler)
-
-                # Register deep zoom processing handler
+                
                 from app.services.deep_zoom_background_service import deep_zoom_background_service
                 if hasattr(deep_zoom_background_service, 'process_queued_deep_zoom'):
                     request_queue_service.register_handler('POST_/api/site/{site_id}/photos/deep-zoom/start-background', deep_zoom_background_service.process_queued_deep_zoom)
-
-                logger.info(f"✅ Request queue service started with {len(request_queue_service.request_handlers)} handlers")
-            except Exception as queue_error:
-                logger.error(f"❌ Failed to start request queue service: {queue_error}")
-                logger.warning("⚠️ Application will continue but request queue may not work")
+                
+                services_started.append(f"RequestQueue({len(request_queue_service.request_handlers)}h)")
+            except Exception as e:
+                logger.warning(f"Request queue failed: {e}")
         
-        museum_name = getattr(settings, 'museum_name', 'Museo Archeologico')
-        logger.info(f"🏺 {museum_name} - Sistema Archeologico avviato")
-        logger.info(f"🔐 Cookie-based authentication enabled")
-        logger.info(f"📊 Admin routes enabled")
-        logger.info(f"🚀 Deep zoom background processor started")
-        logger.info(f"🔍 Tiles verification service started")
-        if settings.queue_enabled:
-            logger.info(f"📋 Request queue system enabled")
-        logger.info("✅ FastZoom application initialization completed successfully")
+        logger.debug(f"Background services: {', '.join(services_started)}")
+        logger.info(f"✅ FastZoom ready ({len(services_started)} services)")
         
     except Exception as e:
         logger.error(f"❌ Critical error during application startup: {e}")
