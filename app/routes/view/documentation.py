@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from uuid import UUID
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from loguru import logger
 
 from app.database.db import get_async_session
@@ -23,6 +23,9 @@ from app.services.view_helpers import (
     get_form_schemas_safe,
     get_base_template_context
 )
+
+# Import centralized permission dependency
+from app.routes.view.view_dependencies import get_site_read_access
 
 documentation_router = APIRouter(prefix="/view", tags=["documentation"])
 
@@ -45,41 +48,14 @@ def _map_us_file_category(file_type: str) -> str:
 async def site_documentation(
         request: Request,
         site_id: UUID,
-        current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+        site_access: Tuple = Depends(get_site_read_access),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ):
     """Gestione documentazione e rapporti del sito"""
-
-    # Verifica esistenza sito
-    site_query = select(ArchaeologicalSite).where(ArchaeologicalSite.id == str(site_id))
-    site = await db.execute(site_query)
-    site = site.scalar_one_or_none()
-
-    if not site:
-        raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
-
-    # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
-        )
-    )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
-
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
-        )
-
-    if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-
-    current_user = await get_current_user_with_profile(current_user_id, db)
+    
+    # Unpack site access tuple (site, permission, user, is_superuser)
+    site, permission, current_user, is_superuser = site_access
 
     # Recupera documenti del sito (inclusi US/USM)
     try:
