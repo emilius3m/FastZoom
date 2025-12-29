@@ -697,4 +697,4 @@ def setup_middleware(app, config: dict = None):
     # 6. Request ID (ultimo - eseguito per primo)
     app.add_middleware(RequestIDMiddleware)
     
-    logger.info("✅ Middleware configured successfully")
+    logger.debug("Middleware configured")

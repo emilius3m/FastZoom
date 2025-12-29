@@ -34,7 +34,7 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
     cursor.execute("PRAGMA temp_store=MEMORY")      # Store temp tables in memory
     cursor.execute("PRAGMA mmap_size=268435456")    # 256MB memory-mapped I/O
     cursor.close()
-    logger.info("SQLite WAL mode enabled with comprehensive optimizations (WAL, FK, cache, mmap)")
+    logger.debug("SQLite WAL mode enabled with comprehensive optimizations")
 
 # Create the single async engine with comprehensive WAL mode configuration
 engine = create_async_engine(
