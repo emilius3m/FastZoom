@@ -53,21 +53,25 @@ async def dashboard_view(
     user = await get_current_user_with_profile(current_user_id, db)
 
     # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
+    # Superuser bypassa il controllo permessi (get_base_template_context gestisce i permessi)
+    permission = None
+    if not (user and user.is_superuser):
+        # Utente normale - verifica permessi espliciti
+        permission_query = select(UserSitePermission).where(
+            and_(
+                UserSitePermission.user_id == str(current_user_id),
+                UserSitePermission.site_id == str(site_id),
+                UserSitePermission.is_active == True
+            )
         )
-    )
-    permission_result = await db.execute(permission_query)
-    permission = permission_result.scalar_one_or_none()
+        permission_result = await db.execute(permission_query)
+        permission = permission_result.scalar_one_or_none()
 
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
-        )
+        if not permission:
+            raise HTTPException(
+                status_code=403,
+                detail="Non hai i permessi per accedere a questo sito archeologico"
+            )
 
     # Raccogli tutti i dati necessari per il template
     stats = await get_site_statistics(db, site_id)

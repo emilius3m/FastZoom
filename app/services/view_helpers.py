@@ -279,10 +279,11 @@ async def get_base_template_context(
     # Context utente base
     user_context = await prepare_user_context(current_user_id, db, user_sites)
     
-    # Permessi
-    can_read = permission.can_read() if permission else False
-    can_write = permission.can_write() if permission else False
-    can_admin = permission.can_admin() if permission else False
+    # Permessi - superuser ha sempre tutti i permessi
+    is_superuser = user_context.get("is_superuser", False)
+    can_read = is_superuser or (permission.can_read() if permission else False)
+    can_write = is_superuser or (permission.can_write() if permission else False)
+    can_admin = is_superuser or (permission.can_admin() if permission else False)
     
     # Context completo
     context = {

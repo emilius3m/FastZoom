@@ -242,7 +242,7 @@ if settings.queue_enabled:
 # Setup tutti i middleware in una riga
 setup_middleware(app, {
     'enable_rate_limit': True,
-    'requests_per_minute': 100,
+    'requests_per_minute': 500,
     'enable_audit': True,
     'enable_cors': True,
     'cors_origins': ["http://localhost:3000", "http://localhost:8000"],
@@ -532,8 +532,14 @@ async def dashboard_view(
     """
     try:
         # Ottieni informazioni utente dal database
-        user = await db.execute(select(User).where(User.id == current_user_id))
+        user = await db.execute(select(User).where(User.id == str(current_user_id)))
         user = user.scalar_one_or_none()
+        
+        # Debug: log user info
+        if user:
+            logger.info(f"Dashboard: Found user {user.email}, is_superuser={user.is_superuser}")
+        else:
+            logger.warning(f"Dashboard: User not found for id={current_user_id}")
 
         # Ottieni profilo utente
         user_profile_result = await db.execute(
@@ -593,7 +599,7 @@ async def dashboard_view(
             }
         }
 
-        logger.info(f"Dashboard rendered: user_id={current_user_id}, sites={len(user_sites)}")
+        logger.info(f"Dashboard rendered: user_id={current_user_id}, sites={len(user_sites)}, is_superuser={user.is_superuser if user else False}")
         response = templates.TemplateResponse("pages/unified/dashboard.html", context)
         
         # Se CSRF disponibile, imposta cookie firmato
@@ -620,12 +626,12 @@ async def performance_dashboard_view(
     """Dashboard per monitoring delle performance del sistema"""
     try:
         # Ottieni informazioni utente dal database
-        user = await db.execute(select(User).where(User.id == current_user_id))
+        user = await db.execute(select(User).where(User.id == str(current_user_id)))
         user = user.scalar_one_or_none()
 
         # Ottieni profilo utente
         user_profile_result = await db.execute(
-            select(UserProfile).where(UserProfile.user_id == current_user_id)
+            select(UserProfile).where(UserProfile.user_id == str(current_user_id))
         )
         user_profile = user_profile_result.scalar_one_or_none()
 
@@ -718,7 +724,7 @@ async def debug_sites(
     try:
         # Ottieni informazioni utente
         from app.services.auth_service import AuthService
-        user_result = await db.execute(select(User).where(User.id == current_user_id))
+        user_result = await db.execute(select(User).where(User.id == str(current_user_id)))
         user = user_result.scalar_one_or_none()
         
         # Debug sites from dependency vs direct service call

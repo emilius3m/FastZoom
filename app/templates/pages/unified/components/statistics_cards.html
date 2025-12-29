@@ -1,35 +1,4 @@
-<!-- Statistics Cards Grid -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-    <!-- Sites Card -->
-    <div class="stat-card overview bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div class="flex items-center">
-            <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900">
-                <i class="fas fa-map-marker-alt text-blue-600 dark:text-blue-300"></i>
-            </div>
-            <div class="ml-4">
-                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Siti Accessibili</p>
-                <p class="text-2xl font-semibold text-gray-900 dark:text-white" x-text="overviewStats.sites_count || 0">
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <template x-if="overviewStats.sites_count > 1">
-                        <span x-text="overviewStats.sites_count + ' siti attivi'"></span>
-                    </template>
-                    <template x-if="overviewStats.sites_count === 1">
-                        <span>1 sito attivo</span>
-                    </template>
-                    <template x-if="overviewStats.sites_count === 0">
-                        <span>Nessun sito</span>
-                    </template>
-                </p>
-            </div>
-        </div>
-    </div>
-
-</div>
-
-<!-- Additional Statistics Row (Context-aware) -->
-<div x-show="activeTab === 'overview'" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-
-
-
+<!-- Statistics Cards Grid - Empty, sites count now in tab header -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" x-show="false">
+    <!-- Cards removed - sites count now displayed in Panoramica tab -->
 </div>

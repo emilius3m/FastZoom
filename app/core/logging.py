@@ -106,8 +106,8 @@ def setup_logging(
         format=console_format,
         level=log_level,
         colorize=enable_colors,
-        backtrace=True,
-        diagnose=True,
+        backtrace=False,  # Ridotto per meno verbosità
+        diagnose=False,   # Disabilita annotazioni variabili
     )
     
     # Create logs directory if it doesn't exist
@@ -126,8 +126,8 @@ def setup_logging(
         rotation=log_rotation,
         retention=log_retention,
         compression="zip",
-        backtrace=True,
-        diagnose=True,
+        backtrace=False,  # Ridotto per meno verbosità
+        diagnose=False,   # Disabilita annotazioni variabili
         encoding="utf-8",
     )
     
