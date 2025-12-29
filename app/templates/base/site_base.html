@@ -277,6 +277,11 @@
   <script type="text/javascript" src="/static/js/components.js"></script>
   <script type="text/javascript" src="/static/js/theme.js"></script>
 
+  <!-- Token auto-refresh (only for authenticated users) -->
+  {% if current_user or user %}
+  <script type="text/javascript" src="/static/js/token_refresh.js"></script>
+  {% endif %}
+
   <!-- Additional scripts from child templates -->
   {% block additional_scripts %}{% endblock %}
 

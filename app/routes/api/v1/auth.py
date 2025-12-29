@@ -142,10 +142,10 @@ async def v1_login(
                 # They can access admin or need site assignment from admin
                 sites_data = []
         
-        # Crea token JWT multi-sito
+        # Crea token JWT compatto
         token = SecurityService.create_site_aware_token(
             user_id=user.id,
-            sites_data=sites_data
+            is_superuser=user.is_superuser
         )
         
         # Imposta cookie di autenticazione con logging dettagliato
@@ -379,15 +379,17 @@ async def v1_refresh_token(
                 detail="Utente disabilitato"
             )
         
-        # Genera nuovo access token (mantieni stesso jti per revoca)
+        # Genera nuovo access token con NUOVO JTI (non riutilizzare quello del refresh!)
+        # Questo è importante per la sicurezza: ogni token deve avere JTI univoco
         new_access_token = SecurityService.create_access_token({
             "sub": str(user.id),
             "username": user.username,
             "email": user.email,
-            "jti": jti
+            "su": user.is_superuser
+            # JTI viene generato automaticamente da create_access_token
         })
         
-        logger.info(f"Access token rinnovato per {user.email}")
+        logger.info(f"Access token rinnovato per {user.email} (nuovo JTI)")
         
         return RefreshResponse(
             access_token=new_access_token,
@@ -530,10 +532,10 @@ async def v1_oauth2_token(
                 # Site-specific access control happens at the resource level, not at authentication level
                 sites_data = []
         
-        # Crea token JWT multi-sito
+        # Crea token JWT compatto
         token = SecurityService.create_site_aware_token(
             user_id=user.id,
-            sites_data=sites_data
+            is_superuser=user.is_superuser
         )
         
         logger.info("Token created successfully")

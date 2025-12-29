@@ -49,29 +49,31 @@ async def site_photos(
     if not site:
         raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
 
-    # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
-        )
-    )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
-
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
-        )
-
-    if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
-
-
-    
+    # Get current user first to check superuser
     current_user = await get_current_user_with_context(current_user_id, db)
+    is_superuser = current_user and current_user.is_superuser
+
+    # Verifica permessi utente - superuser bypassa il controllo
+    permission = None
+    if not is_superuser:
+        permission_query = select(UserSitePermission).where(
+            and_(
+                UserSitePermission.user_id == str(current_user_id),
+                UserSitePermission.site_id == str(site_id),
+                UserSitePermission.is_active == True
+            )
+        )
+        permission = await db.execute(permission_query)
+        permission = permission.scalar_one_or_none()
+
+        if not permission:
+            raise HTTPException(
+                status_code=403,
+                detail="Non hai i permessi per accedere a questo sito archeologico"
+            )
+
+        if not permission.can_read():
+            raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
     
 
 
@@ -98,22 +100,27 @@ async def site_photos(
     photos = photos_result.scalars().all()
     categories = categories_result.all()
 
-    # Prepara context per il template
+    # Prepara context per il template - gestisce superuser con permission None
+    can_read = is_superuser or (permission.can_read() if permission else False)
+    can_write = is_superuser or (permission.can_write() if permission else False)
+    can_admin = is_superuser or (permission.can_admin() if permission else False)
+    
     context = {
         "request": request,
         "site": site,
         "user_permission": permission,
         "current_user": current_user,
         "user": current_user,  # Add user for profile modal compatibility
-        "can_read": permission.can_read(),
-        "can_write": permission.can_write(),
-        "can_admin": permission.can_admin(),
+        "is_superuser": is_superuser,
+        "can_read": can_read,
+        "can_write": can_write,
+        "can_admin": can_admin,
         "sites": user_sites,
         "sites_count": len(user_sites),
         "current_site_name": site.name if site else None,
         "user_email": current_user.email if current_user else None,
-        "user_type": "superuser" if current_user and current_user.is_superuser else "user",
-        "user_role": permission.permission_level if permission else "none",
+        "user_type": "superuser" if is_superuser else "user",
+        "user_role": permission.permission_level if permission else ("admin" if is_superuser else "none"),
         "current_page": "photos",
         "photos": [photo.to_dict() for photo in photos],
         "current_page_num": page,
