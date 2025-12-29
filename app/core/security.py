@@ -82,19 +82,27 @@ class SecurityService:
     @staticmethod
     def create_site_aware_token(
         user_id: UUID,
-        sites_data: List[Dict[str, Any]],
-        expires_delta: Optional[timedelta] = None
+        sites_data: List[Dict[str, Any]] = None,  # Now optional, not stored in token
+        expires_delta: Optional[timedelta] = None,
+        is_superuser: bool = False
     ) -> str:
         """
-        Crea JWT con informazioni sui siti accessibili e JTI per blacklist
+        Crea JWT leggero senza dati ridondanti.
+        
+        NOTA: I siti accessibili NON sono più nel token.
+        Vengono recuperati dal database in tempo reale per evitare:
+        - Token troppo grandi
+        - Dati obsoleti nel token
+        - Problemi di sicurezza
 
         Args:
             user_id: ID utente
-            sites_data: Lista siti con permessi [{id, name, permission_level}]
+            sites_data: DEPRECATO - ignorato, mantenuto per backward compatibility
             expires_delta: Durata custom del token
+            is_superuser: Flag superuser per controlli rapidi
 
         Returns:
-            Token JWT multi-sito
+            Token JWT compatto
         """
         now = SecurityService._get_current_utc()
         
@@ -103,14 +111,14 @@ class SecurityService:
         else:
             expire = now + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
 
+        # Payload minimale - solo info essenziali
         payload = {
             "sub": str(user_id),
             "exp": expire,
             "iat": now,
             "jti": SecurityService._generate_jti(),
-            "sites": sites_data,
-            "multi_site_enabled": True,
-            "app_context": "archaeological_catalog"
+            "type": "access",
+            "su": is_superuser  # Flag compatto per superuser
         }
 
         return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -565,3 +573,167 @@ async def debug_current_token(request: Request) -> Dict[str, Any]:
         }
     except Exception as e:
         return {"error": str(e), "success": False}
+
+
+# ============================================================================
+# DEPENDENCY CENTRALIZZATA CON SUPERUSER BYPASS
+# ============================================================================
+
+async def get_current_user_with_superuser_check(
+    request: Request,
+    db: AsyncSession = Depends(get_async_session)
+) -> User:
+    """
+    Dependency: ottiene l'utente corrente dal database con controllo blacklist.
+    Ritorna l'oggetto User completo per verifiche successive.
+    """
+    token_payload = await get_current_user_token_with_blacklist(request, db)
+    user_id_str = token_payload.get("sub")
+    
+    try:
+        user_id = UUID(user_id_str)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="ID utente non valido nel token"
+        )
+    
+    result = await db.execute(select(User).where(User.id == str(user_id)))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    
+    return user
+
+
+async def require_site_permission(
+    site_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_async_session),
+    required_permission: str = "read"
+) -> Dict[str, Any]:
+    """
+    Dependency centralizzata per verificare permessi sito con SUPERUSER BYPASS.
+    
+    IMPORTANTE: I superuser hanno accesso automatico a TUTTI i siti senza
+    necessità di record UserSitePermission espliciti.
+    
+    Args:
+        site_id: ID del sito da accedere
+        request: Request FastAPI
+        db: Sessione database
+        required_permission: Permesso minimo richiesto ("read", "write", "admin")
+    
+    Returns:
+        Dict con:
+            - user: Oggetto User corrente
+            - permission: Oggetto UserSitePermission (None per superuser)
+            - is_superuser: True se l'utente è superuser
+            - can_read: True se può leggere
+            - can_write: True se può scrivere
+            - can_admin: True se può amministrare
+    
+    Raises:
+        HTTPException 403: Se l'utente non ha i permessi richiesti
+    """
+    from app.models import UserSitePermission
+    from sqlalchemy import and_
+    
+    # Ottieni utente corrente
+    user = await get_current_user_with_superuser_check(request, db)
+    is_superuser = user.is_superuser
+    
+    # SUPERUSER BYPASS: accesso automatico a tutti i siti
+    if is_superuser:
+        logger.debug(f"Superuser {user.email} accessing site {site_id} - BYPASS")
+        return {
+            "user": user,
+            "permission": None,
+            "is_superuser": True,
+            "can_read": True,
+            "can_write": True,
+            "can_admin": True
+        }
+    
+    # Utente normale: verifica permesso esplicito
+    permission_query = select(UserSitePermission).where(
+        and_(
+            UserSitePermission.user_id == str(user.id),
+            UserSitePermission.site_id == str(site_id),
+            UserSitePermission.is_active == True
+        )
+    )
+    result = await db.execute(permission_query)
+    permission = result.scalar_one_or_none()
+    
+    if not permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Non hai i permessi per accedere a questo sito archeologico"
+        )
+    
+    # Verifica permesso richiesto
+    can_read = permission.can_read() if permission else False
+    can_write = permission.can_write() if permission else False
+    can_admin = permission.can_admin() if permission else False
+    
+    permission_map = {
+        "read": can_read,
+        "write": can_write,
+        "admin": can_admin
+    }
+    
+    if not permission_map.get(required_permission, False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permesso '{required_permission}' richiesto per questa operazione"
+        )
+    
+    return {
+        "user": user,
+        "permission": permission,
+        "is_superuser": False,
+        "can_read": can_read,
+        "can_write": can_write,
+        "can_admin": can_admin
+    }
+
+
+def create_site_permission_dependency(required_permission: str = "read"):
+    """
+    Factory per creare dependency di permesso sito.
+    
+    Usage in route:
+        @router.get("/{site_id}/photos")
+        async def get_photos(
+            site_id: UUID,
+            auth: Dict = Depends(create_site_permission_dependency("read"))
+        ):
+            user = auth["user"]
+            can_write = auth["can_write"]
+            ...
+    """
+    async def _dependency(
+        site_id: UUID,
+        request: Request,
+        db: AsyncSession = Depends(get_async_session)
+    ) -> Dict[str, Any]:
+        return await require_site_permission(site_id, request, db, required_permission)
+    
+    return _dependency
+
+
+# Dependency pre-costruite per comodità
+site_read_permission = create_site_permission_dependency("read")
+site_write_permission = create_site_permission_dependency("write")
+site_admin_permission = create_site_permission_dependency("admin")

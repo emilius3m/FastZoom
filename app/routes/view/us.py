@@ -43,25 +43,31 @@ async def us_usm_view(
     if not site:
         raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
 
-    # Verifica permessi utente
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
-        )
-    )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
+    # Get user first to check superuser status
+    user = await get_current_user_with_profile(current_user_id, db)
+    is_superuser = user and user.is_superuser
 
-    if not permission:
-        raise HTTPException(
-            status_code=403,
-            detail="Non hai i permessi per accedere a questo sito archeologico"
+    # Verifica permessi utente - superuser bypassa il controllo
+    permission = None
+    if not is_superuser:
+        permission_query = select(UserSitePermission).where(
+            and_(
+                UserSitePermission.user_id == str(current_user_id),
+                UserSitePermission.site_id == str(site_id),
+                UserSitePermission.is_active == True
+            )
         )
+        permission = await db.execute(permission_query)
+        permission = permission.scalar_one_or_none()
 
-    if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
+        if not permission:
+            raise HTTPException(
+                status_code=403,
+                detail="Non hai i permessi per accedere a questo sito archeologico"
+            )
+
+        if not permission.can_read():
+            raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
 
     # Prepara context per il template usando la funzione helper unificata
     context = await get_base_template_context(
@@ -69,7 +75,7 @@ async def us_usm_view(
     )
     context.update({
         "site_id": str(site_id),
-        "user_role": permission.permission_level if permission else "none"
+        "user_role": permission.permission_level if permission else ("admin" if is_superuser else "none")
     })
 
     return templates.TemplateResponse("pages/us/index.html", context)

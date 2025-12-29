@@ -4,11 +4,49 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from uuid import UUID
+from loguru import logger
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_id_with_blacklist
-from app.models import ArchaeologicalSite
+from app.models import ArchaeologicalSite, User
 from app.models import UserSitePermission
+
+
+class SuperuserPermission:
+    """
+    Virtual permission class for superusers.
+    Provides full access to all sites without needing explicit UserSitePermission records.
+    Implements the same interface as UserSitePermission for compatibility.
+    """
+    permission_level = 'admin'
+    site_role = 'superuser'
+    is_active = True
+    expires_at = None
+    
+    def can_read(self) -> bool:
+        return True
+    
+    def can_write(self) -> bool:
+        return True
+    
+    def can_admin(self) -> bool:
+        return True
+    
+    def is_valid(self) -> bool:
+        return True
+    
+    def is_expired(self) -> bool:
+        return False
+    
+    def has_permission(self, perm: str) -> bool:
+        return True
+    
+    def has_permission_level(self, level: str) -> bool:
+        return True
+    
+    @property
+    def permission_display_name(self) -> str:
+        return 'Superadmin'
 
 
 def normalize_site_id(site_id_input):
@@ -58,13 +96,21 @@ def normalize_site_id(site_id_input):
         return None
 
 
+async def _get_user_for_superuser_check(current_user_id: UUID, db: AsyncSession) -> User:
+    """Helper to get user object for superuser check"""
+    result = await db.execute(select(User).where(User.id == str(current_user_id)))
+    return result.scalar_one_or_none()
+
+
 async def get_site_access_by_id(
     site_id: UUID,
     current_user_id: UUID,
     db: AsyncSession
 ) -> tuple[ArchaeologicalSite, UserSitePermission]:
     """
-    Get site access by UUID - helper function for cases where we already have a UUID
+    Get site access by UUID - helper function for cases where we already have a UUID.
+    
+    SUPERUSER BYPASS: Superusers get automatic access to all sites.
     """
     # Use normalized string for database queries
     normalized_site_id = str(site_id)
@@ -76,6 +122,12 @@ async def get_site_access_by_id(
     
     if not site:
         raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
+    
+    # Check if user is superuser
+    user = await _get_user_for_superuser_check(current_user_id, db)
+    if user and user.is_superuser:
+        logger.debug(f"Superuser {user.email} accessing site {site_id} via get_site_access_by_id - BYPASS")
+        return site, SuperuserPermission()
     
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
@@ -107,7 +159,11 @@ async def get_site_access(
         current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
 ) -> tuple[ArchaeologicalSite, UserSitePermission]:
-    """Verifica accesso utente al sito e restituisce sito e permessi"""
+    """
+    Verifica accesso utente al sito e restituisce sito e permessi.
+    
+    SUPERUSER BYPASS: Superusers get automatic access to all sites.
+    """
     
     # Use normalized string for database queries
     normalized_site_id = str(site_id)
@@ -119,6 +175,12 @@ async def get_site_access(
 
     if not site:
         raise HTTPException(status_code=404, detail="Sito archeologico non trovato")
+
+    # Check if user is superuser
+    user = await _get_user_for_superuser_check(current_user_id, db)
+    if user and user.is_superuser:
+        logger.debug(f"Superuser {user.email} accessing site {site_id} via get_site_access - BYPASS")
+        return site, SuperuserPermission()
 
     # Verifica permessi utente
     permission_query = select(UserSitePermission).where(
