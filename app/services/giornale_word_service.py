@@ -458,6 +458,39 @@ class GiornaleWordGeneratorV2:
             for run in desc_p.runs:
                 run.font.size = Pt(9)
         
+        # Campi ICCD specialistici
+        if giornale.get('area_intervento'):
+            area_p = doc.add_paragraph()
+            area_run = area_p.add_run("Area di intervento: ")
+            area_run.bold = True
+            area_p.add_run(giornale['area_intervento'])
+            for run in area_p.runs:
+                run.font.size = Pt(9)
+        
+        if giornale.get('saggio'):
+            saggio_p = doc.add_paragraph()
+            saggio_run = saggio_p.add_run("Saggio: ")
+            saggio_run.bold = True
+            saggio_p.add_run(giornale['saggio'])
+            for run in saggio_p.runs:
+                run.font.size = Pt(9)
+        
+        if giornale.get('obiettivi'):
+            obj_p = doc.add_paragraph()
+            obj_run = obj_p.add_run("Obiettivi: ")
+            obj_run.bold = True
+            obj_p.add_run(giornale['obiettivi'])
+            for run in obj_p.runs:
+                run.font.size = Pt(9)
+        
+        if giornale.get('interpretazione'):
+            interp_p = doc.add_paragraph()
+            interp_run = interp_p.add_run("Interpretazione: ")
+            interp_run.bold = True
+            interp_p.add_run(giornale['interpretazione'])
+            for run in interp_p.runs:
+                run.font.size = Pt(9)
+        
         if giornale.get('modalita_lavorazioni'):
             mod_p = doc.add_paragraph()
             mod_run = mod_p.add_run("Modalità di lavorazione: ")
@@ -649,6 +682,59 @@ class GiornaleWordGeneratorV2:
             label_run = label_para.runs[0]
             label_run.font.bold = True
             label_run.font.size = Pt(8)
+
+        doc.add_paragraph()
+
+        # ===== SEZIONE 12: DOCUMENTAZIONE FOTOGRAFICA =====
+        foto_list = giornale.get('foto', [])
+        if foto_list:
+            self._add_section_heading(doc, "12. DOCUMENTAZIONE FOTOGRAFICA")
+            
+            # Conteggio foto
+            p = doc.add_paragraph()
+            p_run = p.add_run(f"Numero foto collegate: {len(foto_list)}")
+            p_run.bold = True
+            p_run.font.size = Pt(9)
+            
+            doc.add_paragraph()
+            
+            # Aggiungi ogni foto
+            for idx, foto in enumerate(foto_list, 1):
+                try:
+                    # Titolo/didascalia foto
+                    title = foto.get('title') or foto.get('filename') or f'Foto {idx}'
+                    foto_heading = doc.add_paragraph()
+                    foto_heading_run = foto_heading.add_run(f"Foto {idx}: {title}")
+                    foto_heading_run.bold = True
+                    foto_heading_run.font.size = Pt(10)
+                    foto_heading_run.font.color.rgb = self.COLOR_ACCENT
+                    
+                    # Inserisci immagine se disponibile
+                    image_bytes = foto.get('_image_bytes')
+                    if image_bytes:
+                        try:
+                            image_stream = io.BytesIO(image_bytes)
+                            doc.add_picture(image_stream, width=Inches(5.0))
+                            image_stream.close()
+                        except Exception as e:
+                            logger.warning(f"Could not insert image {idx}: {e}")
+                            doc.add_paragraph(f"[Errore inserimento immagine: {str(e)}]")
+                    else:
+                        doc.add_paragraph("[Immagine non disponibile]")
+                    
+                    # Descrizione aggiuntiva se presente
+                    if foto.get('description'):
+                        desc_p = doc.add_paragraph()
+                        desc_run = desc_p.add_run(foto['description'])
+                        desc_run.font.italic = True
+                        desc_run.font.size = Pt(8)
+                        desc_run.font.color.rgb = self.COLOR_GREY
+                    
+                    doc.add_paragraph()  # Spacer
+                    
+                except Exception as e:
+                    logger.error(f"Error adding photo {idx} to Word: {e}")
+                    doc.add_paragraph(f"[Errore inserimento foto {idx}: {str(e)}]")
 
     def _add_signature_page(self, doc, cantiere_info, site_info):
         """Pagina finale con firme"""
