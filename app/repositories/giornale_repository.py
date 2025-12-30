@@ -13,6 +13,19 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session, GiornaleCantiere)
 
+    async def get_with_relations(self, giornale_id: UUID) -> Optional[GiornaleCantiere]:
+        """Get giornale with all relations eager loaded (for use in sync contexts like PDF generation)"""
+        id_str = str(giornale_id) if isinstance(giornale_id, UUID) else giornale_id
+        query = select(GiornaleCantiere).where(GiornaleCantiere.id == id_str).options(
+            selectinload(GiornaleCantiere.site),
+            selectinload(GiornaleCantiere.responsabile),
+            selectinload(GiornaleCantiere.operatori),
+            selectinload(GiornaleCantiere.foto),
+            selectinload(GiornaleCantiere.cantiere),
+        )
+        result = await self.db_session.execute(query)
+        return result.scalar_one_or_none()
+
     async def get_site_giornali(
         self,
         site_id: UUID,

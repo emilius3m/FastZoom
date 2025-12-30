@@ -3,6 +3,7 @@ from uuid import UUID
 from datetime import date, time
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_
 
 from app.repositories.giornale_repository import GiornaleRepository
 from app.models.giornale_cantiere import GiornaleCantiere
@@ -123,7 +124,8 @@ class GiornaleService:
 
     async def get_giornale(self, site_id: UUID, giornale_id: UUID) -> Dict[str, Any]:
         """Recupera singolo giornale formato"""
-        giornale = await self.repository.get(giornale_id)
+        # Use get_with_relations to eager load all relationships for PDF/sync contexts
+        giornale = await self.repository.get_with_relations(giornale_id)
         if not giornale or str(giornale.site_id) != str(site_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -284,6 +286,11 @@ class GiornaleService:
             update_dict["attrezzatura_utilizzata"] = update_dict.pop("apparecchiature_input")
         if "us_elaborate_input" in update_dict:
             update_dict["us_elaborate"] = update_dict.pop("us_elaborate_input")
+
+        # Convert list fields to comma-separated strings for SQLite
+        for list_field in ["us_elaborate", "usm_elaborate", "usr_elaborate"]:
+            if list_field in update_dict and isinstance(update_dict[list_field], list):
+                update_dict[list_field] = ", ".join(update_dict[list_field]) if update_dict[list_field] else ""
 
         # Cleanup fields we processed manually
         for field in ["operatori", "id", "site_id"]:

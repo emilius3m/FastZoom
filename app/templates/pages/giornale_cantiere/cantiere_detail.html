@@ -797,6 +797,12 @@
                 message: ''
             },
 
+            // Photo selector state
+            showPhotoSelector: false,
+            availablePhotos: [],
+            loadingPhotos: false,
+            photoSearchQuery: '',
+
             // Init
             init() {
                 console.log('Cantiere detail initialized');
@@ -1659,6 +1665,7 @@
                 try {
                     const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}/foto/${fotoId}`, {
                         method: 'DELETE',
+                        credentials: 'same-origin',
                         headers: {
                             'Content-Type': 'application/json',
                         }
@@ -1680,6 +1687,106 @@
                     this.errorMessage = error.message || 'Errore durante la rimozione della foto';
                     console.error('Error unlinking foto:', error);
                 }
+            },
+
+            // Toggle photo selector panel
+            async togglePhotoSelector() {
+                this.showPhotoSelector = !this.showPhotoSelector;
+                if (this.showPhotoSelector && this.availablePhotos.length === 0) {
+                    await this.loadAvailablePhotos();
+                }
+            },
+
+            // Load available photos from site archive
+            async loadAvailablePhotos() {
+                this.loadingPhotos = true;
+                try {
+                    const searchParam = this.photoSearchQuery ? `&search=${encodeURIComponent(this.photoSearchQuery)}` : '';
+                    const response = await fetch(`/api/v1/sites/{{ site.id }}/photos?sort_by=created_desc${searchParam}`);
+
+                    if (!response.ok) {
+                        throw new Error('Errore nel caricamento delle foto');
+                    }
+
+                    const photos = await response.json();
+                    // Limit to first 30 photos for performance
+                    this.availablePhotos = (photos || []).slice(0, 30);
+
+                } catch (error) {
+                    console.error('Error loading available photos:', error);
+                    this.availablePhotos = [];
+                } finally {
+                    this.loadingPhotos = false;
+                }
+            },
+
+            // Search available photos
+            async searchAvailablePhotos() {
+                await this.loadAvailablePhotos();
+            },
+
+            // Link a photo to the current giornale
+            async linkPhoto(photo) {
+                if (!this.editingGiornaleData || !this.editingGiornaleData.id) {
+                    this.errorMessage = 'Nessun giornale selezionato';
+                    console.error('linkPhoto: editingGiornaleData or id is missing', this.editingGiornaleData);
+                    return;
+                }
+
+                // Check if already linked
+                if (this.isPhotoLinked(photo.id)) {
+                    return;
+                }
+
+                const giornaleId = this.editingGiornaleData.id;
+                const photoId = photo.id;
+                const siteId = '{{ site.id }}';
+
+                // Build the URL properly
+                const url = `/api/v1/giornale/sites/${siteId}/giornali/${giornaleId}/foto/${photoId}`;
+                console.log('linkPhoto: calling API:', url);
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Errore durante il collegamento della foto');
+                    }
+
+                    // Add photo to local data
+                    if (!this.editingGiornaleData.foto) {
+                        this.editingGiornaleData.foto = [];
+                    }
+
+                    // Add the photo with necessary display info
+                    this.editingGiornaleData.foto.push({
+                        id: photo.id,
+                        title: photo.title || photo.filename,
+                        filename: photo.filename,
+                        thumbnail_url: photo.thumbnail_url || `/api/v1/photos/${photo.id}/thumbnail`
+                    });
+
+                    this.showAlert('success', 'Foto collegata con successo');
+
+                } catch (error) {
+                    this.errorMessage = error.message || 'Errore durante il collegamento della foto';
+                    console.error('Error linking foto:', error);
+                }
+            },
+
+            // Check if a photo is already linked
+            isPhotoLinked(photoId) {
+                if (!this.editingGiornaleData || !this.editingGiornaleData.foto) {
+                    return false;
+                }
+                return this.editingGiornaleData.foto.some(f => f.id === photoId);
             }
         }
     }

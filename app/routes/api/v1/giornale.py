@@ -1044,6 +1044,43 @@ async def export_single_giornale_pdf(
                 "responsabile_procedimento": ""
             }
 
+        # Pre-load photo bytes for PDF embedding
+        from app.services.archaeological_minio_service import archaeological_minio_service
+        
+        foto_list = giornale_dict.get("foto", [])
+        for foto in foto_list:
+            try:
+                # Try thumbnail first, then full image
+                thumbnail_url = foto.get("thumbnail_url", "")
+                if thumbnail_url and "/thumbnail" in thumbnail_url:
+                    # Extract photo_id from thumbnail URL like /api/v1/photos/{id}/thumbnail
+                    photo_id = foto.get("id")
+                    if photo_id:
+                        # Query the photo from database to get actual path
+                        from app.models.documentation_and_field import Photo
+                        from sqlalchemy import select
+                        
+                        result = await db.execute(select(Photo).where(Photo.id == str(photo_id)))
+                        photo_obj = result.scalar_one_or_none()
+                        
+                        if photo_obj:
+                            # Try thumbnail path first
+                            path_to_load = photo_obj.thumbnail_path or photo_obj.filepath
+                            if path_to_load:
+                                # Remove sites/ prefix if present for MinIO
+                                if path_to_load.startswith("sites/"):
+                                    path_to_load = path_to_load[6:]
+                                
+                                try:
+                                    image_bytes = await archaeological_minio_service.get_file(path_to_load)
+                                    if image_bytes and isinstance(image_bytes, bytes):
+                                        foto["_image_bytes"] = image_bytes
+                                        logger.debug(f"Loaded image bytes for photo {photo_id}")
+                                except Exception as e:
+                                    logger.warning(f"Could not load image for photo {photo_id}: {e}")
+            except Exception as e:
+                logger.warning(f"Error pre-loading photo bytes: {e}")
+
         # Genera PDF
         from app.services.giornale_pdf_service import generate_giornale_pdf_quick
         pdf_content = generate_giornale_pdf_quick([giornale_dict], cantiere_info, site_info)

@@ -484,8 +484,26 @@ class GiornalePDFGeneratorV2:
         story.append(Paragraph(meteo_text, self.styles['BodyText']))
         story.append(Spacer(1, 0.3*cm))
 
-        # ===== SEZIONE 3: DESCRIZIONE LAVORI =====
-        story.append(Paragraph("3. DESCRIZIONE LAVORI", self.styles['SectionHeading']))
+        # ===== SEZIONE 3: LOCALIZZAZIONE E AREA DI INTERVENTO =====
+        if giornale.get('area_intervento') or giornale.get('saggio'):
+            story.append(Paragraph("3. LOCALIZZAZIONE E AREA DI INTERVENTO", self.styles['SectionHeading']))
+            
+            if giornale.get('area_intervento'):
+                story.append(Paragraph(f"<b>Area di Intervento:</b> {giornale['area_intervento']}",
+                                      self.styles['BodyText']))
+            if giornale.get('saggio'):
+                story.append(Paragraph(f"<b>Saggio:</b> {giornale['saggio']}",
+                                      self.styles['BodyText']))
+            story.append(Spacer(1, 0.3*cm))
+
+        # ===== SEZIONE 4: OBIETTIVI E STRATEGIA =====
+        if giornale.get('obiettivi'):
+            story.append(Paragraph("4. OBIETTIVI E STRATEGIA", self.styles['SectionHeading']))
+            story.append(Paragraph(giornale['obiettivi'], self.styles['BodyText']))
+            story.append(Spacer(1, 0.3*cm))
+
+        # ===== SEZIONE 5: DESCRIZIONE LAVORI =====
+        story.append(Paragraph("5. DESCRIZIONE LAVORI", self.styles['SectionHeading']))
         
         if giornale.get('descrizione_lavori'):
             story.append(Paragraph(giornale['descrizione_lavori'], self.styles['BodyText']))
@@ -533,7 +551,7 @@ class GiornalePDFGeneratorV2:
         usr_list = giornale.get('usr_elaborate', []) or []
         
         if us_list or usm_list or usr_list:
-            story.append(Paragraph("5. UNITÀ STRATIGRAFICHE ELABORATE", self.styles['SectionHeading']))
+            story.append(Paragraph("7. UNITÀ STRATIGRAFICHE ELABORATE", self.styles['SectionHeading']))
             
             if us_list:
                 story.append(Paragraph(f"<b>US:</b> {', '.join(str(u) for u in us_list)}", 
@@ -546,19 +564,102 @@ class GiornalePDFGeneratorV2:
                                       self.styles['BodyText']))
             story.append(Spacer(1, 0.3*cm))
 
-        # ===== SEZIONE 6: MATERIALI RINVENUTI =====
+        # ===== SEZIONE 8: INTERPRETAZIONE E RISULTATI SCIENTIFICI =====
+        if giornale.get('interpretazione') or giornale.get('campioni_prelevati') or giornale.get('strutture'):
+            story.append(Paragraph("8. RISULTATI SCIENTIFICI", self.styles['SectionHeading']))
+            
+            if giornale.get('interpretazione'):
+                story.append(Paragraph(f"<b>Interpretazione:</b> {giornale['interpretazione']}",
+                                      self.styles['BodyText']))
+            if giornale.get('campioni_prelevati'):
+                story.append(Paragraph(f"<b>Campioni Prelevati:</b> {giornale['campioni_prelevati']}",
+                                      self.styles['BodyText']))
+            if giornale.get('strutture'):
+                story.append(Paragraph(f"<b>Strutture:</b> {giornale['strutture']}",
+                                      self.styles['BodyText']))
+            story.append(Spacer(1, 0.3*cm))
+
+        # ===== SEZIONE 9: MATERIALI RINVENUTI =====
         if giornale.get('materiali_rinvenuti'):
-            story.append(Paragraph("6. MATERIALI RINVENUTI", self.styles['SectionHeading']))
+            story.append(Paragraph("9. MATERIALI RINVENUTI", self.styles['SectionHeading']))
             story.append(Paragraph(giornale['materiali_rinvenuti'], self.styles['BodyText']))
             story.append(Spacer(1, 0.3*cm))
 
-        # ===== SEZIONE 7: DOCUMENTAZIONE PRODOTTA =====
+        # ===== SEZIONE 10: DOCUMENTAZIONE PRODOTTA =====
         if giornale.get('documentazione_prodotta'):
-            story.append(Paragraph("7. DOCUMENTAZIONE PRODOTTA", self.styles['SectionHeading']))
+            story.append(Paragraph("10. DOCUMENTAZIONE PRODOTTA", self.styles['SectionHeading']))
             story.append(Paragraph(giornale['documentazione_prodotta'], self.styles['BodyText']))
             story.append(Spacer(1, 0.3*cm))
 
-        # ===== SEZIONE 8: DISPOSIZIONI E ORDINI =====
+        # ===== SEZIONE 11: FOTO COLLEGATE =====
+        foto_list = giornale.get('foto', [])
+        if foto_list:
+            story.append(Paragraph("11. DOCUMENTAZIONE FOTOGRAFICA", self.styles['SectionHeading']))
+            story.append(Paragraph(f"<b>Foto collegate:</b> {len(foto_list)}", self.styles['BodyText']))
+            story.append(Spacer(1, 0.2*cm))
+            
+            # Create a grid of photos
+            photo_items = []
+            for foto in foto_list:
+                try:
+                    # Get photo bytes from pre-loaded data if available
+                    photo_bytes = foto.get('_image_bytes')
+                    
+                    if photo_bytes:
+                        # Create image from bytes
+                        img_buffer = io.BytesIO(photo_bytes)
+                        img = Image(img_buffer, width=4*cm, height=3*cm)
+                        img.hAlign = 'CENTER'
+                        
+                        # Caption
+                        caption = foto.get('title') or foto.get('description') or foto.get('original_filename', 'Foto')
+                        caption_para = Paragraph(f"<font size='7'>{caption[:30]}{'...' if len(caption) > 30 else ''}</font>", 
+                                                self.styles['BodyText'])
+                        
+                        photo_items.append([img, caption_para])
+                    else:
+                        # Fallback: just show the filename/title
+                        title = foto.get('title') or foto.get('original_filename') or 'Foto'
+                        photo_items.append([Paragraph(f"📷 {title}", self.styles['BodyText']), Paragraph("", self.styles['BodyText'])])
+                        
+                except Exception as e:
+                    logger.warning(f"Errore caricamento foto per PDF: {e}")
+                    title = foto.get('title') or foto.get('original_filename') or 'Foto'
+                    photo_items.append([Paragraph(f"📷 {title}", self.styles['BodyText']), Paragraph("", self.styles['BodyText'])])
+            
+            # Display photos in table grid (3 columns)
+            if photo_items:
+                # Organize into rows of 3
+                rows = []
+                for i in range(0, len(photo_items), 3):
+                    row = []
+                    for j in range(3):
+                        if i + j < len(photo_items):
+                            row.append(photo_items[i + j])
+                        else:
+                            row.append([Paragraph("", self.styles['BodyText']), Paragraph("", self.styles['BodyText'])])
+                    rows.append([item[0] for item in row])  # Images row
+                    rows.append([item[1] for item in row])  # Captions row
+                
+                if rows:
+                    photo_table = Table(rows, colWidths=[5.5*cm, 5.5*cm, 5.5*cm])
+                    photo_table.setStyle(TableStyle([
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 0), (-1, -1), 4),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                    ]))
+                    story.append(photo_table)
+            
+            story.append(Spacer(1, 0.3*cm))
+
+        # ===== SEZIONE 12: FORNITURE =====
+        if giornale.get('forniture'):
+            story.append(Paragraph("12. FORNITURE E MATERIALI", self.styles['SectionHeading']))
+            story.append(Paragraph(giornale['forniture'], self.styles['BodyText']))
+            story.append(Spacer(1, 0.3*cm))
+
+        # ===== SEZIONE 13: DISPOSIZIONI E ORDINI =====
         disposizioni = []
         if giornale.get('disposizioni_rup'):
             disposizioni.append(("RUP", giornale['disposizioni_rup']))
@@ -566,12 +667,12 @@ class GiornalePDFGeneratorV2:
             disposizioni.append(("Direttore Lavori", giornale['disposizioni_direttore']))
         
         if disposizioni:
-            story.append(Paragraph("8. DISPOSIZIONI E ORDINI", self.styles['SectionHeading']))
+            story.append(Paragraph("13. DISPOSIZIONI E ORDINI", self.styles['SectionHeading']))
             for label, val in disposizioni:
                 story.append(Paragraph(f"<b>{label}:</b> {val}", self.styles['BodyText']))
             story.append(Spacer(1, 0.3*cm))
 
-        # ===== SEZIONE 9: EVENTI PARTICOLARI =====
+        # ===== SEZIONE 14: EVENTI PARTICOLARI =====
         eventi = []
         if giornale.get('sospensioni'):
             eventi.append(("Sospensioni", giornale['sospensioni']))
@@ -583,14 +684,14 @@ class GiornalePDFGeneratorV2:
             eventi.append(("Problematiche", giornale['problematiche']))
         
         if eventi:
-            story.append(Paragraph("9. EVENTI PARTICOLARI", self.styles['SectionHeading']))
+            story.append(Paragraph("14. EVENTI PARTICOLARI", self.styles['SectionHeading']))
             for label, val in eventi:
                 story.append(Paragraph(f"<b>{label}:</b> {val}", self.styles['BodyText']))
             story.append(Spacer(1, 0.3*cm))
 
-        # ===== SEZIONE 10: NOTE E OSSERVAZIONI =====
+        # ===== SEZIONE 15: NOTE E OSSERVAZIONI =====
         if giornale.get('note_generali') or giornale.get('sopralluoghi'):
-            story.append(Paragraph("10. NOTE E OSSERVAZIONI", self.styles['SectionHeading']))
+            story.append(Paragraph("15. NOTE E OSSERVAZIONI", self.styles['SectionHeading']))
             
             if giornale.get('note_generali'):
                 story.append(Paragraph(giornale['note_generali'], self.styles['BodyText']))
@@ -600,8 +701,8 @@ class GiornalePDFGeneratorV2:
                                       self.styles['BodyText']))
             story.append(Spacer(1, 0.3*cm))
 
-        # ===== SEZIONE 11: VALIDAZIONE =====
-        story.append(Paragraph("11. STATO VALIDAZIONE", self.styles['SectionHeading']))
+        # ===== SEZIONE 16: VALIDAZIONE =====
+        story.append(Paragraph("16. STATO VALIDAZIONE", self.styles['SectionHeading']))
         
         val_data = [
             ["Validato:", "✓ SI" if giornale.get('validato') else "✗ NO"],

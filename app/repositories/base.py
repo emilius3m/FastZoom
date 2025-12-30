@@ -26,7 +26,9 @@ class BaseRepository(Generic[ModelType]):
 
     async def get(self, id: UUID) -> Optional[ModelType]:
         """Get a record by ID."""
-        query = select(self.model).where(self.model.id == id)
+        # Convert UUID to string for SQLite compatibility (models use String(36) for ID)
+        id_str = str(id) if isinstance(id, UUID) else id
+        query = select(self.model).where(self.model.id == id_str)
         result = await self.db_session.execute(query)
         return result.scalar_one_or_none()
 
