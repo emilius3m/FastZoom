@@ -260,14 +260,14 @@
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ora
                                     Inizio</label>
                                 <input type="time" name="ora_inizio" x-model="formData.ora_inizio"
-                                    class="w-auto max-w-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                             </div>
 
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ora
                                     Fine</label>
                                 <input type="time" name="ora_fine" x-model="formData.ora_fine"
-                                    class="w-auto max-w-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                             </div>
                         </div>
 
@@ -341,7 +341,7 @@
                                     Min (°C)</label>
                                 <input type="number" name="temperatura_min" x-model="formData.temperatura_min" min="-30"
                                     max="50"
-                                    class="w-auto max-w-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                             </div>
 
                             <div>
@@ -350,7 +350,7 @@
                                     Max (°C)</label>
                                 <input type="number" name="temperatura_max" x-model="formData.temperatura_max" min="-30"
                                     max="50"
-                                    class="w-auto max-w-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
                             </div>
                         </div>
                     </div>
@@ -726,7 +726,7 @@
                                                         max="999.99" placeholder="8.00"
                                                         x-model="getOperatoreData(operatore.id).ore_lavorate"
                                                         @input="updateOperatoreData(operatore.id, 'ore_lavorate', $event.target.value)"
-                                                        class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm">
+                                                        class="w-20 max-w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm">
                                                     <span
                                                         class="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">ore</span>
                                                 </div>
@@ -858,54 +858,63 @@
                     </div>
 
                     <!-- Foto Documentation -->
-                    <div class="mb-8" x-show="editingGiornale">
+                    <div class="mb-8">
                         <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
                             <i class="fas fa-camera mr-2 text-indigo-600"></i>
                             Documentazione Fotografica
-                            <span class="ml-2 text-sm font-normal text-gray-500"
+                            <span class="ml-2 text-sm font-normal text-gray-500" x-show="editingGiornale"
                                 x-text="'(' + (editingGiornaleData?.foto?.length || 0) + ' foto)'"></span>
                         </h4>
 
-                        <!-- Existing linked photos -->
-                        <div class="mb-4" x-show="editingGiornaleData?.foto?.length > 0">
-                            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                <template x-for="foto in (editingGiornaleData?.foto || [])" :key="foto.id">
-                                    <div
-                                        class="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
-                                        <img :src="foto.thumbnail_url" :alt="foto.title || foto.filename"
-                                            class="w-full h-24 object-cover">
-                                        <div
-                                            class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-center justify-center">
-                                            <button type="button" @click="unlinkFoto(foto.id)"
-                                                class="opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-red-500 text-white rounded-full hover:bg-red-600"
-                                                title="Rimuovi foto">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </div>
-                                        <div class="p-1 text-xs text-gray-600 dark:text-gray-400 truncate"
-                                            x-text="foto.title || foto.filename"></div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-
-                        <!-- Empty state -->
-                        <div x-show="!editingGiornaleData?.foto?.length"
-                            class="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                            <i class="fas fa-image text-4xl text-gray-300 dark:text-gray-600 mb-2"></i>
-                            <p class="text-gray-500 dark:text-gray-400">Nessuna foto collegata a questo giornale</p>
-                        </div>
-
-                        <!-- Add photos link -->
-                        <div class="mt-4 flex items-center gap-2">
-                            <a :href="'/sites/' + siteId + '/photos'" target="_blank"
-                                class="inline-flex items-center px-3 py-2 text-sm bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition">
-                                <i class="fas fa-plus mr-2"></i>
-                                Vai all'archivio foto per collegare immagini
-                            </a>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                (Usa gli endpoint API per collegare foto esistenti)
+                        <!-- New entry message -->
+                        <div x-show="!editingGiornale"
+                            class="text-center py-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                            <i class="fas fa-info-circle text-3xl text-blue-400 dark:text-blue-500 mb-3"></i>
+                            <p class="text-gray-600 dark:text-gray-400 font-medium">Salva prima il giornale</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                                Dopo il salvataggio potrai collegare le foto dalla sezione modifica.
                             </p>
+                        </div>
+
+                        <!-- Existing linked photos (only in edit mode) -->
+                        <div x-show="editingGiornale">
+                            <div class="mb-4" x-show="editingGiornaleData?.foto?.length > 0">
+                                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                    <template x-for="foto in (editingGiornaleData?.foto || [])" :key="foto.id">
+                                        <div
+                                            class="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                                            <img :src="foto.thumbnail_url" :alt="foto.title || foto.filename"
+                                                class="w-full h-24 object-cover">
+                                            <div
+                                                class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-center justify-center">
+                                                <button type="button" @click="unlinkFoto(foto.id)"
+                                                    class="opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                                    title="Rimuovi foto">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                            <div class="p-1 text-xs text-gray-600 dark:text-gray-400 truncate"
+                                                x-text="foto.title || foto.filename"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Empty state for edit mode -->
+                            <div x-show="!editingGiornaleData?.foto?.length"
+                                class="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                                <i class="fas fa-image text-4xl text-gray-300 dark:text-gray-600 mb-2"></i>
+                                <p class="text-gray-500 dark:text-gray-400">Nessuna foto collegata a questo giornale</p>
+                            </div>
+
+                            <!-- Add photos link -->
+                            <div class="mt-4 flex items-center gap-2">
+                                <a href="/sites/{{ site.id }}/photos" target="_blank"
+                                    class="inline-flex items-center px-3 py-2 text-sm bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition">
+                                    <i class="fas fa-external-link-alt mr-2"></i>
+                                    Vai all'archivio foto
+                                </a>
+                            </div>
                         </div>
                     </div>
 
