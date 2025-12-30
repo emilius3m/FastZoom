@@ -226,7 +226,11 @@ async def site_operatori_view(
             
             # Site-specific context
             "site_id": str(site_id),
-            "site": site_info,
+            "site": {
+                "id": site_info["site_id"],
+                "name": site_info["site_name"],
+                **site_info
+            },
             "site_info": site_info,
             "site_name": site_info["site_name"],
             "site_code": site_info.get("code", ""),
