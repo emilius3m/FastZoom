@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID
 from datetime import date
-from sqlalchemy import select, and_, desc, delete
+from sqlalchemy import select, and_, or_, desc, delete
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +45,17 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
                     query = query.where(GiornaleCantiere.validato.is_(True))
                 elif filters["stato"] == "in_attesa":
                     query = query.where(GiornaleCantiere.validato.is_(False))
+
+            if filters.get("q"):
+                search_term = f"%{filters['q']}%"
+                query = query.where(
+                    or_(
+                        GiornaleCantiere.descrizione_lavori.ilike(search_term),
+                        GiornaleCantiere.responsabile_nome.ilike(search_term),
+                        GiornaleCantiere.compilatore.ilike(search_term),
+                        GiornaleCantiere.note_generali.ilike(search_term)
+                    )
+                )
 
         # Eager loading
         query = query.options(

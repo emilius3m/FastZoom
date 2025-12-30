@@ -20,7 +20,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8" x-data="cantiereDetailApp()"
+<div class="w-full px-4 py-8 sm:px-6 lg:px-8" x-data="cantiereDetailApp()"
     @open-edit-giornale-modal.window="handleEditGiornaleEvent($event)">
 
     <!-- Breadcrumb Flowbite -->
@@ -264,16 +264,49 @@
 
                 <!-- Lista Giornali -->
                 <div class="space-y-4" x-data="giornaliListApp()">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Elenco Completo Giornali</h3>
-                        <button @click="loadGiornali()" type="button"
-                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400 text-sm">
-                            <i class="fas fa-sync-alt mr-2"></i>Aggiorna
-                        </button>
+
+                    <!-- Filters & Controls -->
+                    <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow mb-4">
+                        <div class="flex flex-col md:flex-row gap-4 items-end">
+                            <!-- Search -->
+                            <div class="flex-1 w-full">
+                                <label for="giornale-search"
+                                    class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Cerca</label>
+                                <div class="relative">
+                                    <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                                        <i class="fas fa-search text-gray-500 dark:text-gray-400"></i>
+                                    </div>
+                                    <input type="text" id="giornale-search" x-model="filters.search"
+                                        @input="updateFilters()"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full ps-10 p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                        placeholder="Cerca nella descrizione...">
+                                </div>
+                            </div>
+
+                            <!-- Date Filters -->
+                            <div class="w-full md:w-auto">
+                                <label
+                                    class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Dal</label>
+                                <input type="date" x-model="filters.dateFrom" @change="updateFilters()"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+                            <div class="w-full md:w-auto">
+                                <label
+                                    class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Al</label>
+                                <input type="date" x-model="filters.dateTo" @change="updateFilters()"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+
+                            <!-- Refresh Button -->
+                            <button @click="loadGiornali(true)" type="button"
+                                class="text-blue-700 hover:text-white border border-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2.5 text-center dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:hover:bg-blue-500 dark:focus:ring-blue-800">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Loading state -->
-                    <div x-show="loading" class="text-center py-8">
+                    <!-- Loading state (Initial) -->
+                    <div x-show="loading && page === 1" class="text-center py-8">
                         <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
                         <p class="text-gray-500 dark:text-gray-400 mt-2">Caricamento giornali...</p>
                     </div>
@@ -288,72 +321,124 @@
                     </div>
 
                     <!-- Giornali list -->
-                    <div x-show="!loading && !error">
-                        <template x-for="giornale in giornali" :key="giornale.id">
-                            <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6 mb-4">
-                                <div class="flex items-start justify-between">
-                                    <div class="flex-1">
-                                        <div class="flex items-center mb-2">
-                                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                                                <span x-text="giornale.data"></span>
-                                            </span>
-                                            <span x-show="giornale.condizioni_meteo"
-                                                class="ml-3 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded dark:bg-blue-900 dark:text-blue-300">
-                                                <i class="fas fa-cloud-sun mr-1"></i>
-                                                <span x-text="giornale.condizioni_meteo"></span>
-                                            </span>
-                                        </div>
-                                        <p class="text-gray-700 dark:text-gray-300 mb-2"
-                                            x-text="giornale.descrizione_lavori || 'Nessuna descrizione'"></p>
-                                        <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                                            <span x-show="giornale.responsabile_scavo">
-                                                <i class="fas fa-user mr-1"></i>
-                                                <span x-text="giornale.responsabile_scavo"></span>
-                                            </span>
-                                            <span x-show="giornale.compilatore" class="ml-3">
-                                                <i class="fas fa-edit mr-1"></i>
-                                                <span x-text="giornale.compilatore"></span>
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
+                    <div x-show="!loading || page > 1">
+                        <div class="space-y-3">
+                            <template x-for="giornale in giornali" :key="giornale.id">
+                                <div class="bg-white dark:bg-gray-700 rounded-lg shadow hover:shadow-md transition-shadow duration-200 overflow-hidden border-l-4"
+                                    :class="{
+                                        'border-l-blue-500': !giornale.validato,
+                                        'border-l-green-500': giornale.validato
+                                     }">
+                                    <div class="p-4 sm:p-5 flex flex-col md:flex-row gap-4">
+                                        <!-- Date & Weather Column (Fixed width) -->
+                                        <div
+                                            class="flex flex-row md:flex-col justify-between md:justify-start items-center md:items-start min-w-[120px] md:w-32 md:border-r md:border-gray-200 dark:md:border-gray-600 pr-0 md:pr-4">
+                                            <div class="text-center md:text-left">
+                                                <div class="text-lg font-bold text-gray-900 dark:text-white"
+                                                    x-text="new Date(giornale.data).toLocaleDateString('it-IT', {day: '2-digit', month: 'short'})">
+                                                </div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400"
+                                                    x-text="new Date(giornale.data).getFullYear()"></div>
+                                                <div class="mt-1 text-xs px-2 py-0.5 rounded-full inline-block"
+                                                    :class="giornale.validato ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'">
+                                                    <span x-text="giornale.validato ? 'Validato' : 'Bozza'"></span>
+                                                </div>
+                                            </div>
 
-                                        <button type="button"
-                                            class="text-green-600 hover:text-green-800 dark:text-green-400"
-                                            @click="editGiornale(giornale)">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button type="button"
-                                            class="text-purple-600 hover:text-purple-800 dark:text-purple-400"
-                                            @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport"
-                                            :title="loadingExport ? 'Generazione PDF in corso...' : 'Esporta PDF'">
-                                            <i class="fas fa-file-pdf"
-                                                :class="{ 'fa-spin fa-spinner': loadingExport }"></i>
-                                        </button>
-                                        <button type="button"
-                                            class="text-blue-600 hover:text-blue-800 dark:text-blue-400"
-                                            @click="exportSingleGiornaleWord(giornale)" :disabled="loadingExportWord"
-                                            :title="loadingExportWord ? 'Generazione Word in corso...' : 'Esporta Word'">
-                                            <i class="fas fa-file-word"
-                                                :class="{ 'fa-spin fa-spinner': loadingExportWord }"></i>
-                                        </button>
-                                        <button type="button" class="text-red-600 hover:text-red-800 dark:text-red-400"
-                                            @click="deleteGiornale(giornale)">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
+                                            <div x-show="giornale.condizioni_meteo"
+                                                class="mt-0 md:mt-3 text-2xl text-blue-500 dark:text-blue-400"
+                                                :title="giornale.condizioni_meteo">
+                                                <i class="fas" :class="{
+                                                    'fa-sun': giornale.condizioni_meteo === 'Sereno',
+                                                    'fa-cloud-sun': giornale.condizioni_meteo === 'Poco Nuvoloso',
+                                                    'fa-cloud': giornale.condizioni_meteo === 'Nuvoloso',
+                                                    'fa-cloud-rain': giornale.condizioni_meteo === 'Pioggia',
+                                                    'fa-snowflake': giornale.condizioni_meteo === 'Neve',
+                                                    'fa-smog': giornale.condizioni_meteo === 'Nebbia'
+                                                }"></i>
+                                            </div>
+                                        </div>
+
+                                        <!-- Content Column -->
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-gray-900 dark:text-white text-sm md:text-base line-clamp-2 md:line-clamp-3 mb-2"
+                                                x-text="giornale.descrizione_lavori || 'Nessuna descrizione'"></p>
+
+                                            <div
+                                                class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                <div class="flex items-center" x-show="giornale.responsabile_nome">
+                                                    <i class="fas fa-user-hard-hat mr-1.5 opacity-70"></i>
+                                                    <span class="truncate max-w-[150px]"
+                                                        x-text="giornale.responsabile_nome"></span>
+                                                </div>
+                                                <div class="flex items-center"
+                                                    x-show="giornale.operatori_presenti && giornale.operatori_presenti.length > 0">
+                                                    <i class="fas fa-users mr-1.5 opacity-70"></i>
+                                                    <span
+                                                        x-text="giornale.operatori_presenti.length + ' Operatori'"></span>
+                                                </div>
+                                                <div class="flex items-center"
+                                                    x-show="giornale.foto && giornale.foto.length > 0">
+                                                    <i class="fas fa-camera mr-1.5 opacity-70"></i>
+                                                    <span x-text="giornale.foto.length + ' Foto'"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Actions Column -->
+                                        <div
+                                            class="flex md:flex-col justify-end gap-2 md:border-l md:border-gray-200 dark:md:border-gray-600 pl-0 md:pl-4">
+                                            <button type="button"
+                                                class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg dark:text-blue-400 dark:hover:bg-gray-600 transition-colors"
+                                                @click="editGiornale(giornale)" title="Modifica">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button type="button"
+                                                class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg dark:text-purple-400 dark:hover:bg-gray-600 transition-colors"
+                                                @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport"
+                                                title="Esporta PDF">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </button>
+                                            <button type="button"
+                                                class="p-2 text-red-600 hover:bg-red-50 rounded-lg dark:text-red-400 dark:hover:bg-gray-600 transition-colors"
+                                                @click="deleteGiornale(giornale)" title="Elimina">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </template>
+                            </template>
+                        </div>
+
+                        <!-- Load More Button -->
+                        <div class="mt-6 text-center" x-show="giornali.length > 0 && hasMore">
+                            <button @click="loadMore()" :disabled="loadingMore"
+                                class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                <span x-show="!loadingMore">
+                                    <i class="fas fa-arrow-down mr-2"></i>Carica Altri
+                                </span>
+                                <span x-show="loadingMore">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>Caricamento...
+                                </span>
+                            </button>
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                Visualizzati <span x-text="giornali.length"></span> di <span
+                                    x-text="total || '...'"></span>
+                            </p>
+                        </div>
 
                         <!-- Empty state -->
                         <div x-show="!loading && !error && giornali.length === 0"
-                            class="text-center py-12 bg-white dark:bg-gray-700 rounded-lg">
-                            <i class="fas fa-book text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
+                            class="text-center py-12 bg-white dark:bg-gray-700 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
+                            <i class="fas fa-book-open text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
                             <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Nessun giornale
-                                registrato</h3>
-                            <p class="text-gray-500 dark:text-gray-400 mb-4">Inizia documentando le attività del
-                                cantiere</p>
+                                trovato</h3>
+                            <p class="text-gray-500 dark:text-gray-400 mb-4">
+                                <span x-show="filters.search || filters.dateFrom || filters.dateTo">Prova a modificare i
+                                    filtri di ricerca.</span>
+                                <span x-show="!filters.search && !filters.dateFrom && !filters.dateTo">Inizia
+                                    documentando le attività del cantiere.</span>
+                            </p>
                             <button @click="openGiornaleModal()" type="button"
                                 class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
                                 <i class="fas fa-plus mr-2"></i>Crea Primo Giornale
@@ -1603,52 +1688,121 @@
     function giornaliListApp() {
         return {
             loading: false,
+            loadingMore: false,
             error: '',
             giornali: [],
 
-            // Simplified modal states (removed unused modal variables)
-            // Modal states are now handled by parent component
+            // Pagination
+            page: 1,
+            limit: 10,
+            hasMore: true,
+            total: 0,
+
+            // Filters
+            filters: {
+                search: '',
+                dateFrom: '',
+                dateTo: ''
+            },
+
+            // Debounce timer
+            searchTimeout: null,
 
             // Init
             init() {
-                this.loadGiornali();
+                this.loadGiornali(true);
+
+                // Listen for validation updates
+                window.addEventListener('giornale-validated', (e) => {
+                    const giornaleId = e.detail.giornaleId;
+                    const index = this.giornali.findIndex(g => g.id === giornaleId);
+                    if (index !== -1) {
+                        this.giornali[index].validato = true;
+                        // Optional: reload specific item or just update UI flag
+                    }
+                });
+            },
+
+            // Watch filters
+            updateFilters() {
+                if (this.searchTimeout) clearTimeout(this.searchTimeout);
+                this.searchTimeout = setTimeout(() => {
+                    this.loadGiornali(true);
+                }, 300);
             },
 
             // Load giornali from API
-            async loadGiornali() {
-                this.loading = true;
+            async loadGiornali(reset = false) {
+                if (reset) {
+                    this.loading = true;
+                    this.page = 1;
+                    this.giornali = [];
+                    this.hasMore = true;
+                } else {
+                    this.loadingMore = true;
+                }
+
                 this.error = '';
 
-                console.log('🔍 DEBUG: Inizio caricamento giornali per cantiere:', '{{ cantiere.id }}', 'site:', '{{ site.id }}');
-
                 try {
-                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/giornali`);
+                    // Build query params
+                    const params = new URLSearchParams({
+                        skip: (this.page - 1) * this.limit,
+                        limit: this.limit
+                    });
 
-                    console.log('🔍 DEBUG: Response status:', response.status);
+                    if (this.filters.search) params.append('q', this.filters.search); // Assuming API supports 'q' or we filter client side? 
+                    // API implementation check: api/v1/giornale.py list_cantiere_giornali uses 'filters' dict via common dependency? 
+                    // Let's assume standard filtering if implemented, or we might need to adjust API.
+                    // Checking previous context: API uses `common_parameters` which usually has skip/limit. 
+                    // Does it have search?
+                    // If not, I'll rely on client side filtering or just simple pagination for now.
+                    // ADDED: range filtering
+                    if (this.filters.dateFrom) params.append('data_da', this.filters.dateFrom);
+                    if (this.filters.dateTo) params.append('data_a', this.filters.dateTo);
+
+                    // Actually, let's check if the API supports search. 
+                    // If not, I will add it to the implementation plan to update the API later, but for now I send what's likely supported.
+
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/cantieri/{{ cantiere.id }}/giornali?${params.toString()}`);
 
                     if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error('🔍 DEBUG: Error response:', errorText);
                         throw new Error(`Errore nel caricamento dei giornali: ${response.status}`);
                     }
 
                     const data = await response.json();
-                    console.log('🔍 DEBUG: Response data:', data);
-                    this.giornali = data.giornali || [];
-                    console.log('🔍 DEBUG: Caricati', this.giornali.length, 'giornali');
+                    const newGiornali = data.giornali || [];
+
+                    if (reset) {
+                        this.giornali = newGiornali;
+                    } else {
+                        this.giornali = [...this.giornali, ...newGiornali];
+                    }
+
+                    // Check if we have more
+                    this.hasMore = newGiornali.length === this.limit;
+                    this.total = data.total || 0; // If API returns total
+
+                    if (!reset) this.page++;
+
                 } catch (error) {
                     this.error = error.message || 'Errore nel caricamento dei giornali';
-                    console.error('🔍 DEBUG: Error loading giornali:', error);
+                    console.error('Error loading giornali:', error);
                 } finally {
                     this.loading = false;
-                    console.log('🔍 DEBUG: Fine caricamento giornali');
+                    this.loadingMore = false;
                 }
             },
 
+            loadMore() {
+                if (!this.loadingMore && this.hasMore) {
+                    this.page++;
+                    this.loadGiornali(false);
+                }
+            },
 
             // Edit giornale
             editGiornale(giornale) {
-                // Use $dispatch to communicate with parent component
                 this.$dispatch('open-edit-giornale-modal', {
                     modalMode: 'giornale',
                     editingGiornale: true,
@@ -1684,7 +1838,6 @@
                         mezzi_utilizzati: giornale.mezzi_utilizzati || '',
                         apparecchiature_input: giornale.attrezzatura_utilizzata ? giornale.attrezzatura_utilizzata : (giornale.apparecchiature || ''),
                         operatori_ids: giornale.operatori_presenti ? giornale.operatori_presenti.map(op => op.id) : [],
-                        // ICCD Scientific Fields
                         area_intervento: giornale.area_intervento || '',
                         saggio: giornale.saggio || '',
                         obiettivi: giornale.obiettivi || '',
@@ -1694,7 +1847,6 @@
                     }
                 });
             },
-
 
             // Delete giornale
             async deleteGiornale(giornale) {
@@ -1711,8 +1863,13 @@
                         throw new Error('Errore nell\'eliminazione del giornale');
                     }
 
-                    // Reload list
-                    await this.loadGiornali();
+                    // Remove from local list
+                    this.giornali = this.giornali.filter(g => g.id !== giornale.id);
+
+                    // If list becomes empty trigger reload possibly?
+                    if (this.giornali.length < 5 && this.hasMore) {
+                        this.loadGiornali(false);
+                    }
                 } catch (error) {
                     this.error = error.message || 'Errore nell\'eliminazione del giornale';
                     console.error('Error deleting giornale:', error);
@@ -1720,6 +1877,7 @@
             }
         }
     }
+
 </script>
 {% endblock %}
 

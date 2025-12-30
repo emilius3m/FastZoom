@@ -202,6 +202,7 @@ async def v1_get_cantiere_giornali(
     data_a: Optional[date] = Query(None),
     responsabile: Optional[str] = Query(None),
     stato: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
@@ -215,7 +216,8 @@ async def v1_get_cantiere_giornali(
             "data_a": data_a,
             "responsabile": responsabile,
             "stato": stato,
-            "cantiere_id": cantiere_id
+            "cantiere_id": cantiere_id,
+            "q": q
         }
         
         service = GiornaleService(db)
