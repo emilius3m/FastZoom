@@ -15,6 +15,7 @@ from datetime import datetime
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.database.db import get_async_session
+from app.services.giornale_service import GiornaleService
 
 router = APIRouter()
 
@@ -128,51 +129,9 @@ from sqlalchemy import select, func, and_, or_, desc, distinct
 from sqlalchemy.orm import selectinload
 
 
-# ===== HELPER FUNCTION FOR ENHANCED OPERATOR DATA =====
+# Helper removed - moved to Repository
 
-async def _get_enhanced_operator_data(db: AsyncSession, giornale_id: str, operatori_list: List) -> List[Dict[str, Any]]:
-    """
-    Helper function to fetch enhanced operator data including hours worked and presence notes
-    from the giornale_operatori association table.
-    
-    Args:
-        db: Database session
-        giornale_id: ID of the giornale
-        operatori_list: List of operator objects from the relationship
-    
-    Returns:
-        Enhanced operator data with hours and notes
-    """
-    enhanced_operatori = []
-    
-    for op in operatori_list:
-        # Query the association table to get enhanced data for this operator in this giornale
-        association_result = await db.execute(
-            select(giornale_operatori_association.c.ore_lavorate,
-                   giornale_operatori_association.c.note_presenza)
-            .where(
-                and_(
-                    giornale_operatori_association.c.giornale_id == str(giornale_id),
-                    giornale_operatori_association.c.operatore_id == str(op.id)
-                )
-            )
-        )
-        association_data = association_result.first()
-        
-        operator_dict = {
-            "id": str(op.id),
-            "nome": op.nome,
-            "cognome": op.cognome,
-            "ruolo": op.ruolo,
-            "qualifica": op.qualifica,
-            "ore_lavorate": float(association_data.ore_lavorate) if association_data and association_data.ore_lavorate is not None else None,
-            "note_presenza": association_data.note_presenza if association_data else None,
-        }
-        enhanced_operatori.append(operator_dict)
-    
-    return enhanced_operatori
-
-@router.get("/sites/{site_id}", summary="Lista giornali sito", tags=["Giornale di Cantiere"])
+@router.get("/sites/{site_id}/giornali", summary="Lista giornali sito", tags=["Giornale di Cantiere"])
 async def v1_get_site_giornali(
     site_id: UUID,
     skip: int = Query(0, ge=0),
@@ -188,18 +147,6 @@ async def v1_get_site_giornali(
 ):
     """
     Recupera tutti i giornali di cantiere di un sito con filtri avanzati.
-    
-    🔧 ENHANCED: Improved error handling and comprehensive logging
-    
-    Args:
-        site_id: ID del sito archeologico
-        skip: Numero di record da saltare (paginazione)
-        limit: Numero massimo di record da restituire
-        data_da: Filtra giornali da questa data
-        data_a: Filtra giornali fino a questa data
-        responsabile: Filtra per nome responsabile
-        stato: Filtra per stato (validato/in_attesa)
-        cantiere_id: Filtra per cantiere specifico
     """
     try:
         # Validate user_sites before proceeding
@@ -212,145 +159,21 @@ async def v1_get_site_giornali(
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
 
-        # Query base
-        site_id_str = str(site_id)
-        query = select(GiornaleCantiere).where(GiornaleCantiere.site_id == site_id_str)
+        filters = {
+            "data_da": data_da,
+            "data_a": data_a,
+            "responsabile": responsabile,
+            "stato": stato,
+            "cantiere_id": cantiere_id
+        }
         
-        # Filtra per cantiere specifico se specificato
-        if cantiere_id:
-            query = query.where(GiornaleCantiere.cantiere_id == str(cantiere_id))
+        service = GiornaleService(db)
+        result = await service.list_giornali(site_id, skip, limit, filters)
 
-        # Applica filtri
-        if data_da:
-            query = query.where(GiornaleCantiere.data >= data_da)
-        if data_a:
-            query = query.where(GiornaleCantiere.data <= data_a)
-        if responsabile:
-            query = query.where(
-                GiornaleCantiere.responsabile_nome.ilike(f"%{responsabile}%")
-            )
-        if stato:
-            if stato == "validato":
-                query = query.where(GiornaleCantiere.validato.is_(True))
-            elif stato == "in_attesa":
-                query = query.where(GiornaleCantiere.validato.is_(False))
-
-        # Load relationships (rimosso cantiere per evitare problemi di import)
-        query = query.options(
-            selectinload(GiornaleCantiere.site),
-            selectinload(GiornaleCantiere.responsabile),
-            selectinload(GiornaleCantiere.operatori),
-        )
-        
-        # Ordinamento e paginazione
-        query = query.order_by(
-            desc(GiornaleCantiere.data), desc(GiornaleCantiere.created_at)
-        )
-        query = query.offset(skip).limit(limit)
-
-        result = await db.execute(query)
-        giornali = result.scalars().all()
-
-        # Prepara dati di risposta
-        giornali_data = []
-        for g in giornali:
-            # Gestione cantiere senza relazione diretta
-            cantiere_info = None
-            if g.cantiere_id:
-                # Query separata per ottenere informazioni del cantiere se necessario
-                from app.models.cantiere import Cantiere
-                cantiere_result = await db.execute(
-                    select(Cantiere).where(Cantiere.id == g.cantiere_id)  # 🔥 FIX: Direct string-to-string comparison for SQLite compatibility
-                )
-                cantiere = cantiere_result.scalar_one_or_none()
-                if cantiere:
-                    cantiere_info = {
-                        "id": str(cantiere.id),
-                        "nome": cantiere.nome,
-                        "codice": cantiere.codice,
-                        # Campi per il giornale dei lavori
-                        "committente": cantiere.committente,
-                        "impresa_esecutrice": cantiere.impresa_esecutrice,
-                        "direttore_lavori": cantiere.direttore_lavori,
-                        "responsabile_procedimento": cantiere.responsabile_procedimento,
-                        "oggetto_appalto": cantiere.oggetto_appalto,
-                        # Campi opzionali
-                        "codice_cup": cantiere.codice_cup,
-                        "codice_cig": cantiere.codice_cig,
-                        "importo_lavori": float(cantiere.importo_lavori) if cantiere.importo_lavori else None
-                    }
-            
-            giornale_dict = {
-                "id": str(g.id),
-                "data": g.data.isoformat() if g.data else None,
-                "ora_inizio": g.ora_inizio.strftime("%H:%M") if g.ora_inizio else None,
-                "ora_fine": g.ora_fine.strftime("%H:%M") if g.ora_fine else None,
-                "responsabile_scavo": g.responsabile_nome
-                or (g.responsabile.email if g.responsabile else None),
-                "descrizione_lavori": g.descrizione_lavori,
-                "condizioni_meteo": g.condizioni_meteo,
-                "stato": "validato" if g.validato else "in_attesa",
-                "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
-                "us_elaborate_input": g.us_elaborate if g.us_elaborate else "",
-                "usm_elaborate": g.get_usm_list() if hasattr(g, "get_usm_list") else [],
-                "usr_elaborate": g.usr_elaborate.split(",") if g.usr_elaborate else [],
-                "cantiere_id": str(g.cantiere_id) if g.cantiere_id else None,
-                "cantiere": cantiere_info,
-                "operatori_presenti": await _get_enhanced_operator_data(db, g.id, g.operatori or []),
-                "note_generali": g.note_generali,
-                "problematiche": g.problematiche,
-                "compilatore": g.compilatore or g.responsabile_nome,
-                # New fields added from the model
-                "area_intervento": g.area_intervento,
-                "saggio": g.saggio,
-                "obiettivi": g.obiettivi,
-                "interpretazione": g.interpretazione,
-                "campioni_prelevati": g.campioni_prelevati,
-                "strutture": g.strutture,
-                "temperatura": g.temperatura,
-                "temperatura_min": g.temperatura_min,
-                "temperatura_max": g.temperatura_max,
-                "note_meteo": g.note_meteo,
-                "modalita_lavorazioni": g.modalita_lavorazioni,
-                "attrezzatura_utilizzata": g.attrezzatura_utilizzata,
-                "apparecchiature_input": g.attrezzatura_utilizzata,  # Alias for frontend compatibility
-                "mezzi_utilizzati": g.mezzi_utilizzati,
-                "materiali_rinvenuti": g.materiali_rinvenuti,
-                "documentazione_prodotta": g.documentazione_prodotta,
-                "sopralluoghi": g.sopralluoghi,
-                "disposizioni_rup": g.disposizioni_rup,
-                "disposizioni_direttore": g.disposizioni_direttore,
-                "contestazioni": g.contestazioni,
-                "sospensioni": g.sospensioni,
-                "incidenti": g.incidenti,
-                "forniture": g.forniture,
-                "data_validazione": g.data_validazione.isoformat() if g.data_validazione else None,
-                "firma_digitale_hash": g.firma_digitale_hash,
-                "allegati_paths": g.allegati_paths,
-                "created_at": g.created_at.isoformat() if g.created_at else None,
-                "updated_at": g.updated_at.isoformat() if g.updated_at else None,
-                "version": g.version or 1,
-                # Foto associate al giornale
-                "foto": [
-                    {
-                        "id": str(f.id),
-                        "filename": f.filename,
-                        "original_filename": f.original_filename,
-                        "thumbnail_url": f"/api/v1/photos/{f.id}/thumbnail",
-                        "full_url": f"/api/v1/photos/{f.id}/full",
-                        "title": f.title,
-                        "description": f.description,
-                    }
-                    for f in (g.foto or [])
-                ],
-            }
-            giornali_data.append(giornale_dict)
-
-        # 🔍 DEBUG: Prepare successful response with logging
-        response_data = {
+        return {
             "site_id": str(site_id),
-            "giornali": giornali_data,
-            "count": len(giornali_data),
+            "giornali": result["data"],
+            "count": result["count"],
             "site_info": site_info,
             "filters_applied": {
                 "data_da": data_da.isoformat() if data_da else None,
@@ -360,21 +183,16 @@ async def v1_get_site_giornali(
                 "cantiere_id": str(cantiere_id) if cantiere_id else None
             }
         }
-        
-        return response_data
-        
     except HTTPException:
-        # Re-raise HTTP exceptions (like 404 from verify_site_access)
         raise
     except Exception as e:
         logger.error(f"Errore recupero giornali sito {site_id}: {str(e)}")
-        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore nel recupero dei giornali: {str(e)}",
         )
- 
-@router.get("/sites/{site_id}/cantieri/{cantiere_id}/giornali", summary="Lista giornali cantiere", tags=["Giornale di Cantiere"])
+
+@router.get("/sites/{site_id}/cantieri/{cantiere_id}/giornali", summary="Giornali cantiere", tags=["Giornale di Cantiere"])
 async def v1_get_cantiere_giornali(
     site_id: UUID,
     cantiere_id: UUID,
@@ -388,162 +206,26 @@ async def v1_get_cantiere_giornali(
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
-    """
-    Recupera tutti i giornali di un cantiere specifico con filtri avanzati.
-    
-    Args:
-        site_id: ID del sito archeologico
-        cantiere_id: ID del cantiere specifico
-        skip: Numero di record da saltare (paginazione)
-        limit: Numero massimo di record da restituire
-        data_da: Filtra giornali da questa data
-        data_a: Filtra giornali fino a questa data
-        responsabile: Filtra per nome responsabile
-        stato: Filtra per stato (validato/in_attesa)
-    """
+    """Recupera giornali di un cantiere specifico"""
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
-
-        # Query base per il cantiere specifico
-        query = select(GiornaleCantiere).where(
-            and_(
-                GiornaleCantiere.site_id == str(site_id),
-                GiornaleCantiere.cantiere_id == str(cantiere_id)
-            )
-        )
-
-        # Applica filtri
-        if data_da:
-            query = query.where(GiornaleCantiere.data >= data_da)
-        if data_a:
-            query = query.where(GiornaleCantiere.data <= data_a)
-        if responsabile:
-            query = query.where(
-                GiornaleCantiere.responsabile_nome.ilike(f"%{responsabile}%")
-            )
-        if stato:
-            if stato == "validato":
-                query = query.where(GiornaleCantiere.validato.is_(True))
-            elif stato == "in_attesa":
-                query = query.where(GiornaleCantiere.validato.is_(False))
-
-        # Load relationships
-        query = query.options(
-            selectinload(GiornaleCantiere.site),
-            selectinload(GiornaleCantiere.responsabile),
-            selectinload(GiornaleCantiere.operatori),
-        )
         
-        # Ordinamento e paginazione
-        query = query.order_by(
-            desc(GiornaleCantiere.data), desc(GiornaleCantiere.created_at)
-        )
-        query = query.offset(skip).limit(limit)
-
-        result = await db.execute(query)
-        giornali = result.scalars().all()
-
-        # Prepara dati di risposta
-        giornali_data = []
-        for g in giornali:
-            # Gestione cantiere senza relazione diretta
-            cantiere_info = None
-            if g.cantiere_id:
-                # Query separata per ottenere informazioni del cantiere se necessario
-                from app.models.cantiere import Cantiere
-                cantiere_result = await db.execute(
-                    select(Cantiere).where(Cantiere.id == g.cantiere_id)  # 🔥 FIX: Direct string-to-string comparison for SQLite compatibility
-                )
-                cantiere = cantiere_result.scalar_one_or_none()
-                if cantiere:
-                    cantiere_info = {
-                        "id": str(cantiere.id),
-                        "nome": cantiere.nome,
-                        "codice": cantiere.codice,
-                        # Campi per il giornale dei lavori
-                        "committente": cantiere.committente,
-                        "impresa_esecutrice": cantiere.impresa_esecutrice,
-                        "direttore_lavori": cantiere.direttore_lavori,
-                        "responsabile_procedimento": cantiere.responsabile_procedimento,
-                        "oggetto_appalto": cantiere.oggetto_appalto,
-                        # Campi opzionali
-                        "codice_cup": cantiere.codice_cup,
-                        "codice_cig": cantiere.codice_cig,
-                        "importo_lavori": float(cantiere.importo_lavori) if cantiere.importo_lavori else None
-                    }
-             
-            giornale_dict = {
-                "id": str(g.id),
-                "data": g.data.isoformat() if g.data else None,
-                "ora_inizio": g.ora_inizio.strftime("%H:%M") if g.ora_inizio else None,
-                "ora_fine": g.ora_fine.strftime("%H:%M") if g.ora_fine else None,
-                "responsabile_scavo": g.responsabile_nome
-                or (g.responsabile.email if g.responsabile else None),
-                "descrizione_lavori": g.descrizione_lavori,
-                "condizioni_meteo": g.condizioni_meteo,
-                "stato": "validato" if g.validato else "in_attesa",
-                "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
-                "us_elaborate_input": g.us_elaborate if g.us_elaborate else "",
-                "usm_elaborate": g.get_usm_list() if hasattr(g, "get_usm_list") else [],
-                "usr_elaborate": g.usr_elaborate.split(",") if g.usr_elaborate else [],
-                "cantiere_id": str(g.cantiere_id) if g.cantiere_id else None,
-                "cantiere": cantiere_info,
-                "operatori_presenti": await _get_enhanced_operator_data(db, g.id, g.operatori or []),
-                "note_generali": g.note_generali,
-                "problematiche": g.problematiche,
-                "compilatore": g.compilatore or g.responsabile_nome,
-                # New fields added from the model
-                "area_intervento": g.area_intervento,
-                "saggio": g.saggio,
-                "obiettivi": g.obiettivi,
-                "interpretazione": g.interpretazione,
-                "campioni_prelevati": g.campioni_prelevati,
-                "strutture": g.strutture,
-                "temperatura": g.temperatura,
-                "temperatura_min": g.temperatura_min,
-                "temperatura_max": g.temperatura_max,
-                "note_meteo": g.note_meteo,
-                "modalita_lavorazioni": g.modalita_lavorazioni,
-                "attrezzatura_utilizzata": g.attrezzatura_utilizzata,
-                "apparecchiature_input": g.attrezzatura_utilizzata,  # Alias for frontend compatibility
-                "mezzi_utilizzati": g.mezzi_utilizzati,
-                "materiali_rinvenuti": g.materiali_rinvenuti,
-                "documentazione_prodotta": g.documentazione_prodotta,
-                "sopralluoghi": g.sopralluoghi,
-                "disposizioni_rup": g.disposizioni_rup,
-                "disposizioni_direttore": g.disposizioni_direttore,
-                "contestazioni": g.contestazioni,
-                "sospensioni": g.sospensioni,
-                "incidenti": g.incidenti,
-                "forniture": g.forniture,
-                "data_validazione": g.data_validazione.isoformat() if g.data_validazione else None,
-                "firma_digitale_hash": g.firma_digitale_hash,
-                "allegati_paths": g.allegati_paths,
-                "created_at": g.created_at.isoformat() if g.created_at else None,
-                "updated_at": g.updated_at.isoformat() if g.updated_at else None,
-                "version": g.version or 1,
-                # Foto associate al giornale
-                "foto": [
-                    {
-                        "id": str(f.id),
-                        "filename": f.filename,
-                        "original_filename": f.original_filename,
-                        "thumbnail_url": f"/api/v1/photos/{f.id}/thumbnail",
-                        "full_url": f"/api/v1/photos/{f.id}/full",
-                        "title": f.title,
-                        "description": f.description,
-                    }
-                    for f in (g.foto or [])
-                ],
-            }
-            giornali_data.append(giornale_dict)
-
+        filters = {
+            "data_da": data_da,
+            "data_a": data_a,
+            "responsabile": responsabile,
+            "stato": stato,
+            "cantiere_id": cantiere_id
+        }
+        
+        service = GiornaleService(db)
+        result = await service.list_giornali(site_id, skip, limit, filters)
+        
         return {
             "site_id": str(site_id),
             "cantiere_id": str(cantiere_id),
-            "giornali": giornali_data,
-            "count": len(giornali_data),
+            "giornali": result["data"],
+            "count": result["count"],
             "site_info": site_info,
             "filters_applied": {
                 "data_da": data_da.isoformat() if data_da else None,
@@ -552,14 +234,11 @@ async def v1_get_cantiere_giornali(
                 "stato": stato
             }
         }
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        from loguru import logger
         logger.error(f"Errore recupero giornali cantiere {cantiere_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel recupero dei giornali del cantiere",
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sites/{site_id}/giornali", summary="Crea nuovo giornale", tags=["Giornale di Cantiere"])
 async def v1_create_giornale(
@@ -571,125 +250,23 @@ async def v1_create_giornale(
 ):
     """
     Crea un nuovo giornale di cantiere per un sito specifico.
-    
-    🔥 NUOVA VALIDAZIONE: Verifica che gli operatori possano lavorare solo su cantieri del loro sito.
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
-        
-        # 🔥 NUOVA VALIDAZIONE: Verifica che il cantiere appartenga al sito specificato
-        cantiere_id = giornale_data.get("cantiere_id")
-        if cantiere_id:
-            from app.models.cantiere import Cantiere
-            cantiere_result = await db.execute(
-                select(Cantiere).where(
-                    and_(
-                        Cantiere.id == str(cantiere_id),  # 🔥 FIX: Convert UUID to string for SQLite compatibility
-                        Cantiere.site_id == str(site_id)  # 🔥 CRUCIALE: Il cantiere deve appartenere al sito
-                    )
-                )
-            )
-            cantiere = cantiere_result.scalar_one_or_none()
-            
-            if not cantiere:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Il cantiere {cantiere_id} non appartiene al sito {site_id}"
-                )
-        
-        # Crea nuovo giornale
-        nuovo_giornale = GiornaleCantiere(
-            site_id=str(site_id),  # Convert UUID to string for SQLite compatibility
-            cantiere_id=str(UUID(cantiere_id)) if cantiere_id else None,
-            data=date.fromisoformat(giornale_data.get("data")) if giornale_data.get("data") else date.today(),
-            ora_inizio=time.fromisoformat(giornale_data["ora_inizio"]) if giornale_data.get("ora_inizio") else None,
-            ora_fine=time.fromisoformat(giornale_data["ora_fine"]) if giornale_data.get("ora_fine") else None,
-            descrizione_lavori=giornale_data.get("descrizione_lavori", ""),
-            condizioni_meteo=giornale_data.get("condizioni_meteo"),
-            note_generali=giornale_data.get("note_generali", ""),
-            problematiche=giornale_data.get("problematiche", ""),
-            responsabile_id=str(current_user_id),  # Convert UUID to string for SQLite compatibility
-            responsabile_nome=giornale_data.get("responsabile_nome", ""),
-            compilatore=giornale_data.get("compilatore", ""),
-            temperatura_min=giornale_data.get("temperatura_min"),
-            temperatura_max=giornale_data.get("temperatura_max"),
-            
-            # ICCD Scientific Fields
-            area_intervento=giornale_data.get("area_intervento"),
-            saggio=giornale_data.get("saggio"),
-            obiettivi=giornale_data.get("obiettivi"),
-            interpretazione=giornale_data.get("interpretazione"),
-            campioni_prelevati=giornale_data.get("campioni_prelevati"),
-            strutture=giornale_data.get("strutture"),
-            
-            us_elaborate=giornale_data.get("us_elaborate_input", ""),  # Convert input string to database field
-            attrezzatura_utilizzata=giornale_data.get("apparecchiature_input", ""),  # Convert input string to database field
-            validato=False
-        )
-        
-        db.add(nuovo_giornale)
-        await db.commit()
-        await db.refresh(nuovo_giornale)
-        
-        # 🔥 NUOVA VALIDAZIONE: Verifica che gli operatori possano lavorare su questo sito
-        operatori_data = giornale_data.get("operatori", [])  # Enhanced structure with hours and notes
-        if operatori_data:
-            for operatore_info in operatori_data:
-                op_id = operatore_info.get("id")
-                ore_lavorate = operatore_info.get("ore_lavorate")
-                note_presenza = operatore_info.get("note_presenza")
-                
-                # Validate hours worked
-                if ore_lavorate is not None and (not isinstance(ore_lavorate, (int, float)) or ore_lavorate < 0):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Ore lavorate non valide per operatore {op_id}: deve essere un numero positivo"
-                    )
-                
-                # Verifica che l'operatore esista e sia assegnato a questo sito
-                operatore_result = await db.execute(
-                    select(OperatoreCantiere).where(
-                        and_(
-                            OperatoreCantiere.id == str(op_id),
-                            OperatoreCantiere.site_id == str(site_id)  # 🔥 CRUCIALE: L'operatore deve essere assegnato al sito
-                        )
-                    )
-                )
-                operatore = operatore_result.scalar_one_or_none()
-                
-                if not operatore:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"L'operatore {op_id} non è assegnato al sito {site_id} e non può lavorare su questo giornale"
-                    )
-                
-                # Aggiungi l'operatore al giornale con enhanced data
-                await db.execute(
-                    giornale_operatori_association.insert().values(
-                        giornale_id=str(nuovo_giornale.id),  # Convert UUID to string
-                        operatore_id=str(UUID(op_id)),  # Convert UUID to string
-                        ore_lavorate=float(ore_lavorate) if ore_lavorate is not None else None,
-                        note_presenza=note_presenza
-                    )
-                )
-            await db.commit()
+        service = GiornaleService(db)
+        nuovo_giornale = await service.create_giornale(site_id, giornale_data, current_user_id)
         
         return {
             "id": str(nuovo_giornale.id),
-            "message": "Giornale creato con successo con validazione operatori-sito",
+            "message": "Giornale creato con successo",
             "site_info": site_info,
-            "operatori_validati": len(operatori_data) if operatori_data else 0
+            "operatori_validati": len(giornale_data.get("operatori", []))
         }
-        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Errore creazione giornale: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nella creazione del giornale"
-        )
+        raise HTTPException(status_code=500, detail="Errore nella creazione del giornale")
 
 @router.put("/sites/{site_id}/giornali/{giornale_id}", summary="Aggiorna giornale", tags=["Giornale di Cantiere"])
 async def v1_update_giornale(
@@ -702,161 +279,23 @@ async def v1_update_giornale(
 ):
     """
     Aggiorna un giornale di cantiere esistente.
-    
-    🔥 NUOVA VALIDAZIONE: Verifica che cantieri e operatori appartengano al sito.
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
-        
-        # Carica giornale esistente
-        result = await db.execute(
-            select(GiornaleCantiere).where(
-                and_(
-                    GiornaleCantiere.id == str(giornale_id),
-                    GiornaleCantiere.site_id == str(site_id)
-                )
-            )
-        )
-        giornale = result.scalar_one_or_none()
-        
-        if not giornale:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Giornale non trovato"
-            )
-        
-        # 🔥 NUOVA VALIDAZIONE: Verifica che il cantiere appartenga al sito
-        if "cantiere_id" in giornale_data and giornale_data["cantiere_id"]:
-            from app.models.cantiere import Cantiere
-            cantiere_result = await db.execute(
-                select(Cantiere).where(
-                    and_(
-                        Cantiere.id == str(giornale_data["cantiere_id"]),  # 🔥 FIX: Convert UUID to string for SQLite compatibility
-                        Cantiere.site_id == str(site_id)  # 🔥 CRUCIALE: Il cantiere deve appartenere al sito
-                    )
-                )
-            )
-            cantiere = cantiere_result.scalar_one_or_none()
-            
-            if not cantiere:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Il cantiere {giornale_data['cantiere_id']} non appartiene al sito {site_id}"
-                )
-        
-        # 🔥 NUOVA VALIDAZIONE: Verifica che gli operatori possano lavorare su questo sito
-        if "operatori" in giornale_data:
-            operatori_data = giornale_data["operatori"]
-            if operatori_data:
-                # Rimuovi vecchie associazioni
-                await db.execute(
-                    giornale_operatori_association.delete().where(
-                        giornale_operatori_association.c.giornale_id == str(giornale_id)  # 🔥 FIX: Convert UUID to string for SQLite compatibility
-                    )
-                )
-                
-                # Aggiungi nuove associazioni con validazione
-                for operatore_info in operatori_data:
-                    op_id = operatore_info.get("id")
-                    ore_lavorate = operatore_info.get("ore_lavorate")
-                    note_presenza = operatore_info.get("note_presenza")
-                    
-                    # Validate hours worked
-                    if ore_lavorate is not None and (not isinstance(ore_lavorate, (int, float)) or ore_lavorate < 0):
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Ore lavorate non valide per operatore {op_id}: deve essere un numero positivo"
-                        )
-                    
-                    operatore_result = await db.execute(
-                        select(OperatoreCantiere).where(
-                            and_(
-                                OperatoreCantiere.id == str(op_id),
-                                OperatoreCantiere.site_id == str(site_id)  # 🔥 CRUCIALE: L'operatore deve essere assegnato al sito
-                            )
-                        )
-                    )
-                    operatore = operatore_result.scalar_one_or_none()
-                    
-                    if not operatore:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"L'operatore {op_id} non è assegnato al sito {site_id}"
-                        )
-                    
-                    # Aggiungi l'operatore al giornale con enhanced data
-                    await db.execute(
-                        giornale_operatori_association.insert().values(
-                            giornale_id=str(giornale_id),  # Convert UUID to string
-                            operatore_id=str(UUID(op_id)),  # Convert UUID to string
-                            ore_lavorate=float(ore_lavorate) if ore_lavorate is not None else None,
-                            note_presenza=note_presenza
-                        )
-                    )
-        
-        # Aggiorna campi base
-        if "data" in giornale_data:
-            giornale.data = date.fromisoformat(giornale_data["data"])
-        if "ora_inizio" in giornale_data:
-            giornale.ora_inizio = time.fromisoformat(giornale_data["ora_inizio"]) if giornale_data["ora_inizio"] else None
-        if "ora_fine" in giornale_data:
-            giornale.ora_fine = time.fromisoformat(giornale_data["ora_fine"]) if giornale_data["ora_fine"] else None
-        if "cantiere_id" in giornale_data:
-            giornale.cantiere_id = str(UUID(giornale_data["cantiere_id"])) if giornale_data["cantiere_id"] else None
-        if "descrizione_lavori" in giornale_data:
-            giornale.descrizione_lavori = giornale_data["descrizione_lavori"]
-        if "condizioni_meteo" in giornale_data:
-            giornale.condizioni_meteo = giornale_data["condizioni_meteo"]
-        if "note_generali" in giornale_data:
-            giornale.note_generali = giornale_data["note_generali"]
-        if "problematiche" in giornale_data:
-            giornale.problematiche = giornale_data["problematiche"]
-        if "responsabile_nome" in giornale_data:
-            giornale.responsabile_nome = giornale_data["responsabile_nome"]
-        if "compilatore" in giornale_data:
-            giornale.compilatore = giornale_data["compilatore"]
-        if "temperatura_min" in giornale_data:
-            giornale.temperatura_min = giornale_data["temperatura_min"]
-        if "temperatura_max" in giornale_data:
-            giornale.temperatura_max = giornale_data["temperatura_max"]
-        
-        # ICCD Scientific Fields Update
-        if "area_intervento" in giornale_data:
-            giornale.area_intervento = giornale_data["area_intervento"]
-        if "saggio" in giornale_data:
-            giornale.saggio = giornale_data["saggio"]
-        if "obiettivi" in giornale_data:
-            giornale.obiettivi = giornale_data["obiettivi"]
-        if "interpretazione" in giornale_data:
-            giornale.interpretazione = giornale_data["interpretazione"]
-        if "campioni_prelevati" in giornale_data:
-            giornale.campioni_prelevati = giornale_data["campioni_prelevati"]
-        if "strutture" in giornale_data:
-            giornale.strutture = giornale_data["strutture"]
-            
-        if "us_elaborate_input" in giornale_data:
-            giornale.us_elaborate = giornale_data["us_elaborate_input"]  # Convert input string to database field
-        if "apparecchiature_input" in giornale_data:
-            giornale.attrezzatura_utilizzata = giornale_data["apparecchiature_input"]  # Convert input string to database field
-        
-        await db.commit()
-        
+        service = GiornaleService(db)
+        giornale = await service.update_giornale(site_id, giornale_id, giornale_data)
+
         return {
             "id": str(giornale.id),
-            "message": "Giornale aggiornato con successo con validazione operatori-sito",
+            "message": "Giornale aggiornato con successo",
             "site_info": site_info,
-            "operatori_validati": len(operatori_data) if "operatori" in giornale_data else 0
+            "operatori_validati": len(giornale_data.get("operatori", [])) if "operatori" in giornale_data else 0
         }
-        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Errore aggiornamento giornale: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nell'aggiornamento del giornale"
-        )
+        raise HTTPException(status_code=500, detail="Errore nell'aggiornamento del giornale")
 
 @router.post("/sites/{site_id}/giornali/{giornale_id}/validate", summary="Valida giornale", tags=["Giornale di Cantiere"])
 async def v1_validate_giornale(
@@ -870,38 +309,9 @@ async def v1_validate_giornale(
     Valida un giornale di cantiere, rendendolo non modificabile.
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
-        
-        # Carica giornale
-        result = await db.execute(
-            select(GiornaleCantiere).where(
-                and_(
-                    GiornaleCantiere.id == str(giornale_id),
-                    GiornaleCantiere.site_id == str(site_id)
-                )
-            )
-        )
-        giornale = result.scalar_one_or_none()
-        
-        if not giornale:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Giornale non trovato"
-            )
-            
-        if giornale.validato:
-             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Il giornale è già stato validato"
-            )
-        
-        # Esegui validazione
-        giornale.validato = True
-        giornale.data_validazione = datetime.now()
-        
-        await db.commit()
-        await db.refresh(giornale)
+        service = GiornaleService(db)
+        giornale = await service.validate_giornale(site_id, giornale_id)
         
         return {
             "id": str(giornale.id),
@@ -909,15 +319,11 @@ async def v1_validate_giornale(
             "data_validazione": giornale.data_validazione.isoformat(),
             "validato": True
         }
-        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Errore validazione giornale: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nella validazione del giornale"
-        )
+        raise HTTPException(status_code=500, detail="Errore nella validazione del giornale")
 
 @router.delete("/sites/{site_id}/giornali/{giornale_id}", summary="Elimina giornale", tags=["Giornale di Cantiere"])
 async def v1_delete_giornale(
@@ -931,50 +337,19 @@ async def v1_delete_giornale(
     Elimina un giornale di cantiere.
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
-        
-        # Carica giornale
-        result = await db.execute(
-            select(GiornaleCantiere).where(
-                and_(
-                    GiornaleCantiere.id == str(giornale_id),
-                    GiornaleCantiere.site_id == str(site_id)
-                )
-            )
-        )
-        giornale = result.scalar_one_or_none()
-        
-        if not giornale:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Giornale non trovato"
-            )
-        
-        # Rimuovi associazioni operatori
-        await db.execute(
-            giornale_operatori_association.delete().where(
-                giornale_operatori_association.c.giornale_id == str(giornale_id)  # 🔥 FIX: Convert UUID to string for SQLite compatibility
-            )
-        )
-        
-        # Elimina giornale
-        await db.delete(giornale)
-        await db.commit()
+        service = GiornaleService(db)
+        await service.delete_giornale(site_id, giornale_id)
         
         return {
             "message": "Giornale eliminato con successo",
             "site_info": site_info
         }
-        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Errore eliminazione giornale: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nell'eliminazione del giornale"
-        )
+        raise HTTPException(status_code=500, detail="Errore nell'eliminazione del giornale")
 
 # MIGRATION HELPER
 
@@ -1026,136 +401,31 @@ async def v1_get_site_operatori(
 ):
     """
     Recupera tutti gli operatori assegnati a un sito archeologico specifico.
-    
-    🔥 NUOVA LOGICA: Restituisce SOLO gli operatori con site_id == site_id.
-    Gli operatori possono lavorare solo su cantieri del loro sito di assegnazione.
-    
-    Args:
-        site_id: ID del sito archeologico
-        skip: Numero di record da saltare (paginazione)
-        limit: Numero massimo di record da restituire
-        search: Testo di ricerca per nome, cognome o codice fiscale
-        ruolo: Filtra per ruolo dell'operatore
-        specializzazione: Filtra per specializzazione
-        stato: Filtra per stato (attivo/inattivo)
-    
-    Returns:
-        Lista degli operatori assegnati a questo sito con metadati
     """
-    from app.models.giornale_cantiere import (
-        GiornaleCantiere,
-        OperatoreCantiere,
-        giornale_operatori_association
-    )
-    from sqlalchemy import select, func, or_, and_
-    from sqlalchemy.orm import selectinload
-    
     try:
-        # 🐛 DEBUG LOG: Inizio funzione
-        from loguru import logger
-        logger.info(f"🐛 [DEBUG] v1_get_site_operatori - site_id={site_id}, type={type(site_id)}")
-        logger.info(f"🐛 [DEBUG] site_id str representation: {str(site_id)}")
-        
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
-        logger.info(f"🐛 [DEBUG] site_info: {site_info}")
         
-        # 🔥 NUOVA LOGICA: Query solo per operatori assegnati a questo sito
-        site_id_str = str(site_id)
-        logger.info(f"🐛 [DEBUG] site_id_str per query: {site_id_str}")
-        query = select(OperatoreCantiere).where(OperatoreCantiere.site_id == site_id_str)
-        
-        # Applica filtri aggiuntivi
-        if search:
-            search_pattern = f"%{search}%"
-            query = query.where(
-                or_(
-                    OperatoreCantiere.nome.ilike(search_pattern),
-                    OperatoreCantiere.cognome.ilike(search_pattern),
-                    OperatoreCantiere.codice_fiscale.ilike(search_pattern),
-                )
-            )
-        if ruolo:
-            query = query.where(OperatoreCantiere.ruolo == ruolo)
-        if specializzazione:
-            query = query.where(OperatoreCantiere.specializzazione == specializzazione)
-        if stato:
-            query = query.where(OperatoreCantiere.is_active == (stato == "attivo"))
-        
-        query = query.order_by(OperatoreCantiere.cognome, OperatoreCantiere.nome)
-        query = query.offset(skip).limit(limit)
-        
-        result = await db.execute(query)
-        operatori = result.scalars().all()
-        logger.info(f"🐛 [DEBUG] Trovati {len(operatori)} operatori per il sito")
-        
-        # Conteggio giornali per ogni operatore in questo sito
-        operatori_data = []
-        for i, op in enumerate(operatori):
-            logger.info(f"🐛 [DEBUG] Operatore {i+1}: id={op.id}, type={type(op.id)}, str={str(op.id)}")
-            logger.info(f"🐛 [DEBUG] Operatore {i+1}: nome={op.nome} {op.cognome}")
-            logger.info(f"🐛 [DEBUG] Operatore {i+1}: site_id={op.site_id}, type={type(op.site_id)}")
-            
-            # Query per contare i giornali di questo sito dove questo operatore ha lavorato
-            # Convert both values to strings for consistent comparison
-            op_id_str = str(op.id)
-            logger.info(f"🐛 [DEBUG] op_id_str: {op_id_str}")
-            
-            logger.info(f"🐛 [DEBUG] Eseguendo query per contare giornali dell'operatore...")
-            giornali_count_result = await db.execute(
-                select(func.count(GiornaleCantiere.id))
-                .join(giornale_operatori_association, GiornaleCantiere.id == giornale_operatori_association.c.giornale_id)
-                .where(
-                    and_(
-                        GiornaleCantiere.site_id == site_id_str,
-                        giornale_operatori_association.c.operatore_id == op_id_str  # Convert UUID to string for comparison
-                    )
-                )
-            )
-            giornali_count = giornali_count_result.scalar() or 0
-            logger.info(f"🐛 [DEBUG] Operatore {i+1}: trovati {giornali_count} giornali")
-           
-            operatori_data.append({
-                "id": str(op.id),
-                "nome": op.nome,
-                "cognome": op.cognome,
-                "codice_fiscale": op.codice_fiscale,
-                "email": op.email,
-                "telefono": op.telefono,
-                "ruolo": op.ruolo,
-                "specializzazione": op.specializzazione,
-                "qualifiche": op.qualifica.split(",") if op.qualifica else [],
-                "stato": "attivo" if op.is_active else "inattivo",
-                "ore_totali": op.ore_totali or 0,
-                "giornali_count": giornali_count,
-                "site_id": str(op.site_id),  # 🔥 NUOVO: Include il site_id dell'operatore
-                "note": op.note,
-                "assigned_to_site": True,  # 🔥 NUOVO: Indica che l'operatore è assegnato a questo sito
-                "can_work_on_site": op.site_id == str(site_id),  # 🔥 NUOVO: Verifica se può lavorare su questo sito
-            })
-        
-        logger.info(f"🐛 [DEBUG] Preparando risposta finale con {len(operatori_data)} operatori")
-        response_data = {
-            "site_id": str(site_id),
-            "operatori": operatori_data,
-            "count": len(operatori_data),
-            "site_info": site_info,
-            "filters_applied": {
-                "search": search,
-                "ruolo": ruolo,
-                "specializzazione": specializzazione,
-                "stato": stato
-            }
+        filters = {
+            "search": search,
+            "ruolo": ruolo,
+            "specializzazione": specializzazione,
+            "stato": stato
         }
-        logger.info(f"🐛 [DEBUG] Risposta preparata con successo")
-        return response_data
         
+        service = GiornaleService(db)
+        result = await service.list_site_operators(site_id, skip, limit, filters)
+        
+        return {
+            "site_id": str(site_id),
+            "operatori": result["data"],
+            "count": result["count"],
+            "site_info": site_info,
+            "filters_applied": filters
+        }
+    except HTTPException:
+        raise
     except Exception as e:
-        from loguru import logger
-        logger.error(f"🐛 [DEBUG] Errore recupero operatori sito {site_id}: {str(e)}")
-        logger.error(f"🐛 [DEBUG] Tipo di errore: {type(e)}")
-        import traceback
-        logger.error(f"🐛 [DEBUG] Stack trace completo: {traceback.format_exc()}")
+        logger.error(f"Errore recupero operatori sito {site_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nel recupero degli operatori del sito",
@@ -1629,160 +899,56 @@ async def export_giornali_pdf(
 ):
     """
     Esporta tutti i giornali di un cantiere in formato PDF conforme allo standard italiano.
-    
-    Il PDF generato segue il formato del giornale dei lavori standard con:
-    - Intestazione con OGGETTO, COMMITTENTE, IMPRESA
-    - Pagine multiple con paginazione
-    - Voci giornaliere con data, meteo, temperatura
-    - Descrizione lavori e eventi speciali
-    - Elenco operatori con ore lavorate
-    - Mezzi e attrezzature utilizzate
-    - Sezioni firme
-    
-    Args:
-        site_id: ID del sito archeologico
-        cantiere_id: ID del cantiere specifico
-        data_da: Filtra giornali da questa data (opzionale)
-        data_a: Filtra giornali fino a questa data (opzionale)
-        include_allegati: Include riferimenti agli allegati (default: False)
-        
-    Returns:
-        Response: PDF file download
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
         
-        # Carica tutti i giornali del cantiere con filtri opzionali
-        query = select(GiornaleCantiere).where(
-            and_(
-                GiornaleCantiere.site_id == str(site_id),
-                GiornaleCantiere.cantiere_id == str(cantiere_id)
-            )
-        )
+        service = GiornaleService(db)
+        filters = {
+            "cantiere_id": str(cantiere_id),
+            "data_da": data_da,
+            "data_a": data_a
+        }
         
-        # Applica filtri data se specificati
-        if data_da:
-            query = query.where(GiornaleCantiere.data >= data_da)
-        if data_a:
-            query = query.where(GiornaleCantiere.data <= data_a)
+        # Fetch data via service (unlimited limit for export)
+        result = await service.list_giornali(site_id, skip=0, limit=10000, filters=filters)
+        giornali_data = result["data"]
         
-        # Load relationships
-        query = query.options(
-            selectinload(GiornaleCantiere.site),
-            selectinload(GiornaleCantiere.responsabile),
-            selectinload(GiornaleCantiere.operatori),
-        )
-        
-        # Ordina per data
-        query = query.order_by(GiornaleCantiere.data, GiornaleCantiere.created_at)
-        
-        result = await db.execute(query)
-        giornali = result.scalars().all()
-        
-        if not giornali:
+        if not giornali_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Nessun giornale trovato per il periodo specificato"
             )
-        
-        # Carica informazioni del cantiere
-        from app.models.cantiere import Cantiere
-        cantiere_result = await db.execute(
-            select(Cantiere).where(
-                and_(
-                    Cantiere.id == str(cantiere_id),
-                    Cantiere.site_id == str(site_id)
-                )
-            )
-        )
-        cantiere = cantiere_result.scalar_one_or_none()
-        
-        if not cantiere:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cantiere non trovato"
-            )
-        
-        # Prepara dati per PDF
-        giornali_data = []
-        for g in giornali:
-            # Ottieni dati operatori enhanced
-            operatori_enhanced = await _get_enhanced_operator_data(db, g.id, g.operatori or [])
             
-            giornale_dict = {
-                "data": g.data.isoformat() if g.data else None,
-                "ora_inizio": g.ora_inizio.strftime("%H:%M") if g.ora_inizio else None,
-                "ora_fine": g.ora_fine.strftime("%H:%M") if g.ora_fine else None,
-                "responsabile_scavo": g.responsabile_nome or (g.responsabile.email if g.responsabile else None),
-                "compilatore": g.compilatore or g.responsabile_nome,
-                "condizioni_meteo": g.condizioni_meteo,
-                "temperatura": g.temperatura,
-                "temperatura_min": g.temperatura_min,
-                "temperatura_max": g.temperatura_max,
-                "note_meteo": g.note_meteo,
-                "descrizione_lavori": g.descrizione_lavori,
-                "modalita_lavorazioni": g.modalita_lavorazioni,
-                "attrezzatura_utilizzata": g.attrezzatura_utilizzata,
-                "mezzi_utilizzati": g.mezzi_utilizzati,
-                "materiali_rinvenuti": g.materiali_rinvenuti,
-                "documentazione_prodotta": g.documentazione_prodotta,
-                "sopralluoghi": g.sopralluoghi,
-                "disposizioni_rup": g.disposizioni_rup,
-                "disposizioni_direttore": g.disposizioni_direttore,
-                "contestazioni": g.contestazioni,
-                "sospensioni": g.sospensioni,
-                "incidenti": g.incidenti,
-                "forniture": g.forniture,
-                "note_generali": g.note_generali,
-                "problematiche": g.problematiche,
-                "operatori_presenti": operatori_enhanced,
-                "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
-                "usm_elaborate": g.get_usm_list() if hasattr(g, "get_usm_list") else [],
-                "usr_elaborate": g.usr_elaborate.split(",") if g.usr_elaborate else [],
-                "validato": g.validato,
-                "data_validazione": g.data_validazione.isoformat() if g.data_validazione else None,
-                "created_at": g.created_at.isoformat() if g.created_at else None,
-                "updated_at": g.updated_at.isoformat() if g.updated_at else None,
-            }
-            
-            # Includi allegati se richiesto
-            if include_allegati and g.allegati_paths:
-                try:
-                    import json
-                    allegati = json.loads(g.allegati_paths)
-                    giornale_dict["allegati_paths"] = allegati
-                except:
-                    giornale_dict["allegati_paths"] = []
-            
-            giornali_data.append(giornale_dict)
-        
-        # Prepara informazioni cantiere
-        cantiere_info = {
-            "nome": cantiere.nome,
-            "codice": cantiere.codice,
-            "descrizione": cantiere.descrizione or "",
-            "oggetto_appalto": cantiere.oggetto_appalto or "",
-            "committente": cantiere.committente or "",
-            "impresa_esecutrice": cantiere.impresa_esecutrice or "",
-            "direttore_lavori": cantiere.direttore_lavori or "",
-            "responsabile_procedimento": cantiere.responsabile_procedimento or "",
-        }
-        
-        # Importa servizio PDF
-        from app.services.giornale_pdf_service import generate_giornale_pdf_quick
-        
+        # Get cantiere info from first record
+        cantiere_info = giornali_data[0].get("cantiere")
+        if not cantiere_info:
+             # Fallback if somehow missing
+             from app.models.cantiere import Cantiere
+             c_res = await db.execute(select(Cantiere).where(Cantiere.id == str(cantiere_id)))
+             c = c_res.scalar_one_or_none()
+             if not c:
+                 raise HTTPException(status_code=404, detail="Cantiere non trovato")
+             cantiere_info = {"nome": c.nome, "codice": c.codice} # Minimal fallback
+
+        # Process attachments if requested
+        if include_allegati:
+            import json
+            for g in giornali_data:
+                if g.get("allegati_paths"):
+                    try:
+                        g["allegati_paths"] = json.loads(g["allegati_paths"])
+                    except:
+                        g["allegati_paths"] = []
+                        
         # Genera PDF
-        logger.info(f"Generating PDF for cantiere {cantiere.nome} with {len(giornali_data)} giornali")
+        from app.services.giornale_pdf_service import generate_giornale_pdf_quick
+        logger.info(f"Generating PDF for cantiere {cantiere_info.get('nome')} with {len(giornali_data)} giornali")
         pdf_content = generate_giornale_pdf_quick(giornali_data, cantiere_info, site_info)
         
-        # Prepara nome file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Giornale_{cantiere.nome.replace(' ', '_')}_{timestamp}.pdf"
+        filename = f"Giornale_{cantiere_info.get('nome', 'Cantiere').replace(' ', '_')}_{timestamp}.pdf"
         
-        logger.info(f"PDF generated successfully: {len(pdf_content)} bytes")
-        
-        # Return PDF response
         return Response(
             content=pdf_content,
             media_type="application/pdf",
@@ -1791,13 +957,10 @@ async def export_giornali_pdf(
                 "Content-Length": str(len(pdf_content))
             }
         )
-        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error generating giornale PDF: {str(e)}")
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore nella generazione del PDF: {str(e)}"
@@ -1813,109 +976,35 @@ async def export_single_giornale_pdf(
 ):
     """
     Esporta un singolo giornale in formato PDF.
-    
-    Args:
-        site_id: ID del sito archeologico
-        giornale_id: ID del giornale specifico
-        
-    Returns:
-        Response: PDF file download
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
+        service = GiornaleService(db)
         
-        # Carica giornale specifico
-        result = await db.execute(
-            select(GiornaleCantiere).where(
-                and_(
-                    GiornaleCantiere.id == str(giornale_id),
-                    GiornaleCantiere.site_id == str(site_id)
-                )
-            ).options(
-                selectinload(GiornaleCantiere.site),
-                selectinload(GiornaleCantiere.responsabile),
-                selectinload(GiornaleCantiere.operatori),
-                selectinload(GiornaleCantiere.cantiere)
-            )
-        )
-        giornale = result.scalar_one_or_none()
+        # Fetch formatted giornale
+        giornale_dict = await service.get_giornale(site_id, giornale_id)
         
-        if not giornale:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Giornale non trovato"
-            )
-        
-        # Carica informazioni cantiere
-        cantiere = giornale.cantiere
-        
-        # Prepara dati per PDF
-        operatori_enhanced = await _get_enhanced_operator_data(db, giornale.id, giornale.operatori or [])
-        
-        giornale_dict = {
-            "data": giornale.data.isoformat() if giornale.data else None,
-            "ora_inizio": giornale.ora_inizio.strftime("%H:%M") if giornale.ora_inizio else None,
-            "ora_fine": giornale.ora_fine.strftime("%H:%M") if giornale.ora_fine else None,
-            "responsabile_scavo": giornale.responsabile_nome or (giornale.responsabile.email if giornale.responsabile else None),
-            "compilatore": giornale.compilatore or giornale.responsabile_nome,
-            "condizioni_meteo": giornale.condizioni_meteo,
-            "temperatura": giornale.temperatura,
-            "temperatura_min": giornale.temperatura_min,
-            "temperatura_max": giornale.temperatura_max,
-            "note_meteo": giornale.note_meteo,
-            "descrizione_lavori": giornale.descrizione_lavori,
-            "modalita_lavorazioni": giornale.modalita_lavorazioni,
-            "attrezzatura_utilizzata": giornale.attrezzatura_utilizzata,
-            "mezzi_utilizzati": giornale.mezzi_utilizzati,
-            "materiali_rinvenuti": giornale.materiali_rinvenuti,
-            "documentazione_prodotta": giornale.documentazione_prodotta,
-            "sopralluoghi": giornale.sopralluoghi,
-            "disposizioni_rup": giornale.disposizioni_rup,
-            "disposizioni_direttore": giornale.disposizioni_direttore,
-            "contestazioni": giornale.contestazioni,
-            "sospensioni": giornale.sospensioni,
-            "incidenti": giornale.incidenti,
-            "forniture": giornale.forniture,
-            "note_generali": giornale.note_generali,
-            "problematiche": giornale.problematiche,
-            "operatori_presenti": operatori_enhanced,
-            "us_elaborate": giornale.get_us_list() if hasattr(giornale, "get_us_list") else [],
-            "usm_elaborate": giornale.get_usm_list() if hasattr(giornale, "get_usm_list") else [],
-            "usr_elaborate": giornale.usr_elaborate.split(",") if giornale.usr_elaborate else [],
-            "validato": giornale.validato,
-            "data_validazione": giornale.data_validazione.isoformat() if giornale.data_validazione else None,
-            "created_at": giornale.created_at.isoformat() if giornale.created_at else None,
-            "updated_at": giornale.updated_at.isoformat() if giornale.updated_at else None,
-        }
-        
-        # Prepara informazioni cantiere
-        cantiere_info = {
-            "nome": cantiere.nome if cantiere else "Cantiere Sconosciuto",
-            "codice": cantiere.codice if cantiere else "",
-            "descrizione": cantiere.descrizione or "" if cantiere else "",
-            "oggetto_appalto": cantiere.oggetto_appalto or "" if cantiere else "",
-            "committente": cantiere.committente or "" if cantiere else "",
-            "impresa_esecutrice": cantiere.impresa_esecutrice or "" if cantiere else "",
-            "direttore_lavori": cantiere.direttore_lavori or "" if cantiere else "",
-            "responsabile_procedimento": cantiere.responsabile_procedimento or "" if cantiere else "",
-        }
-        
-        # Importa servizio PDF
-        from app.services.giornale_pdf_service import generate_giornale_pdf_quick
-        
+        cantiere_info = giornale_dict.get("cantiere")
+        if not cantiere_info:
+             # Fallback
+             cantiere_info = {
+                "nome": "Cantiere Sconosciuto",
+                "codice": "",
+                "descrizione": "",
+                "oggetto_appalto": "",
+                "committente": "",
+                "impresa_esecutrice": "",
+                "direttore_lavori": "",
+                "responsabile_procedimento": ""
+            }
+
         # Genera PDF
-        logger.info(f"Generating PDF for single giornale {giornale_id}")
+        from app.services.giornale_pdf_service import generate_giornale_pdf_quick
         pdf_content = generate_giornale_pdf_quick([giornale_dict], cantiere_info, site_info)
         
-        # Prepara nome file
-        data_giornale = giornale.data.strftime("%d_%m_%Y") if giornale.data else "sdata"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Giornale_{cantiere_info['nome'].replace(' ', '_')}_{data_giornale}_{timestamp}.pdf"
+        filename = f"Giornale_{timestamp}.pdf"
         
-        logger.info(f"Single giornale PDF generated successfully: {len(pdf_content)} bytes")
-        
-        # Return PDF response
         return Response(
             content=pdf_content,
             media_type="application/pdf",
@@ -1924,13 +1013,10 @@ async def export_single_giornale_pdf(
                 "Content-Length": str(len(pdf_content))
             }
         )
-        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error generating single giornale PDF: {str(e)}")
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore nella generazione del PDF: {str(e)}"
@@ -1951,154 +1037,50 @@ async def export_giornali_word(
 ):
     """
     Esporta tutti i giornali di un cantiere in formato Word (.docx).
-    
-    Il documento Word generato segue lo stesso formato del giornale dei lavori standard
-    con la possibilità di essere modificato e personalizzato dall'utente.
-    
-    Args:
-        site_id: ID del sito archeologico
-        cantiere_id: ID del cantiere specifico
-        data_da: Filtra giornali da questa data (opzionale)
-        data_a: Filtra giornali fino a questa data (opzionale)
-        include_allegati: Include riferimenti agli allegati (default: False)
-        
-    Returns:
-        Response: Word (.docx) file download
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
+        service = GiornaleService(db)
+        filters = {
+            "cantiere_id": str(cantiere_id),
+            "data_da": data_da,
+            "data_a": data_a
+        }
         
-        # Carica tutti i giornali del cantiere con filtri opzionali
-        query = select(GiornaleCantiere).where(
-            and_(
-                GiornaleCantiere.site_id == str(site_id),
-                GiornaleCantiere.cantiere_id == str(cantiere_id)
-            )
-        )
+        result = await service.list_giornali(site_id, skip=0, limit=10000, filters=filters)
+        giornali_data = result["data"]
         
-        # Applica filtri data se specificati
-        if data_da:
-            query = query.where(GiornaleCantiere.data >= data_da)
-        if data_a:
-            query = query.where(GiornaleCantiere.data <= data_a)
-        
-        # Load relationships
-        query = query.options(
-            selectinload(GiornaleCantiere.site),
-            selectinload(GiornaleCantiere.responsabile),
-            selectinload(GiornaleCantiere.operatori),
-        )
-        
-        # Ordina per data
-        query = query.order_by(GiornaleCantiere.data, GiornaleCantiere.created_at)
-        
-        result = await db.execute(query)
-        giornali = result.scalars().all()
-        
-        if not giornali:
+        if not giornali_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Nessun giornale trovato per il periodo specificato"
             )
-        
-        # Carica informazioni del cantiere
-        from app.models.cantiere import Cantiere
-        cantiere_result = await db.execute(
-            select(Cantiere).where(
-                and_(
-                    Cantiere.id == str(cantiere_id),
-                    Cantiere.site_id == str(site_id)
-                )
-            )
-        )
-        cantiere = cantiere_result.scalar_one_or_none()
-        
-        if not cantiere:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cantiere non trovato"
-            )
-        
-        # Prepara dati per Word (stessi dati del PDF)
-        giornali_data = []
-        for g in giornali:
-            # Ottieni dati operatori enhanced
-            operatori_enhanced = await _get_enhanced_operator_data(db, g.id, g.operatori or [])
             
-            giornale_dict = {
-                "data": g.data.isoformat() if g.data else None,
-                "ora_inizio": g.ora_inizio.strftime("%H:%M") if g.ora_inizio else None,
-                "ora_fine": g.ora_fine.strftime("%H:%M") if g.ora_fine else None,
-                "responsabile_scavo": g.responsabile_nome or (g.responsabile.email if g.responsabile else None),
-                "compilatore": g.compilatore or g.responsabile_nome,
-                "condizioni_meteo": g.condizioni_meteo,
-                "temperatura": g.temperatura,
-                "temperatura_min": g.temperatura_min,
-                "temperatura_max": g.temperatura_max,
-                "note_meteo": g.note_meteo,
-                "descrizione_lavori": g.descrizione_lavori,
-                "modalita_lavorazioni": g.modalita_lavorazioni,
-                "attrezzatura_utilizzata": g.attrezzatura_utilizzata,
-                "mezzi_utilizzati": g.mezzi_utilizzati,
-                "materiali_rinvenuti": g.materiali_rinvenuti,
-                "documentazione_prodotta": g.documentazione_prodotta,
-                "sopralluoghi": g.sopralluoghi,
-                "disposizioni_rup": g.disposizioni_rup,
-                "disposizioni_direttore": g.disposizioni_direttore,
-                "contestazioni": g.contestazioni,
-                "sospensioni": g.sospensioni,
-                "incidenti": g.incidenti,
-                "forniture": g.forniture,
-                "note_generali": g.note_generali,
-                "problematiche": g.problematiche,
-                "operatori_presenti": operatori_enhanced,
-                "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
-                "usm_elaborate": g.get_usm_list() if hasattr(g, "get_usm_list") else [],
-                "usr_elaborate": g.usr_elaborate.split(",") if g.usr_elaborate else [],
-                "validato": g.validato,
-                "data_validazione": g.data_validazione.isoformat() if g.data_validazione else None,
-                "created_at": g.created_at.isoformat() if g.created_at else None,
-                "updated_at": g.updated_at.isoformat() if g.updated_at else None,
-            }
-            
-            # Includi allegati se richiesto
-            if include_allegati and g.allegati_paths:
-                try:
-                    import json
-                    allegati = json.loads(g.allegati_paths)
-                    giornale_dict["allegati_paths"] = allegati
-                except:
-                    giornale_dict["allegati_paths"] = []
-            
-            giornali_data.append(giornale_dict)
-        
-        # Prepara informazioni cantiere
-        cantiere_info = {
-            "nome": cantiere.nome,
-            "codice": cantiere.codice,
-            "descrizione": cantiere.descrizione or "",
-            "oggetto_appalto": cantiere.oggetto_appalto or "",
-            "committente": cantiere.committente or "",
-            "impresa_esecutrice": cantiere.impresa_esecutrice or "",
-            "direttore_lavori": cantiere.direttore_lavori or "",
-            "responsabile_procedimento": cantiere.responsabile_procedimento or "",
-        }
-        
-        # Importa servizio Word
+        cantiere_info = giornali_data[0].get("cantiere")
+        if not cantiere_info:
+             # Fallback
+             from app.models.cantiere import Cantiere
+             c_res = await db.execute(select(Cantiere).where(Cantiere.id == str(cantiere_id)))
+             c = c_res.scalar_one_or_none()
+             if not c:
+                 raise HTTPException(status_code=404, detail="Cantiere non trovato")
+             cantiere_info = {"nome": c.nome, "codice": c.codice}
+
+        if include_allegati:
+            import json
+            for g in giornali_data:
+                if g.get("allegati_paths"):
+                    try:
+                        g["allegati_paths"] = json.loads(g["allegati_paths"])
+                    except:
+                        g["allegati_paths"] = []
+
         from app.services.giornale_word_service import generate_giornale_word_quick
-        
-        # Genera Word
-        logger.info(f"Generating Word document for cantiere {cantiere.nome} with {len(giornali_data)} giornali")
         word_content = generate_giornale_word_quick(giornali_data, cantiere_info, site_info)
         
-        # Prepara nome file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Giornale_{cantiere.nome.replace(' ', '_')}_{timestamp}.docx"
+        filename = f"Giornale_{cantiere_info.get('nome', 'Cantiere').replace(' ', '_')}_{timestamp}.docx"
         
-        logger.info(f"Word document generated successfully: {len(word_content)} bytes")
-        
-        # Return Word response
         return Response(
             content=word_content,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -2107,13 +1089,10 @@ async def export_giornali_word(
                 "Content-Length": str(len(word_content))
             }
         )
-        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error generating giornale Word document: {str(e)}")
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore nella generazione del documento Word: {str(e)}"
@@ -2129,109 +1108,32 @@ async def export_single_giornale_word(
 ):
     """
     Esporta un singolo giornale in formato Word (.docx).
-    
-    Args:
-        site_id: ID del sito archeologico
-        giornale_id: ID del giornale specifico
-        
-    Returns:
-        Response: Word (.docx) file download
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
+        service = GiornaleService(db)
         
-        # Carica giornale specifico
-        result = await db.execute(
-            select(GiornaleCantiere).where(
-                and_(
-                    GiornaleCantiere.id == str(giornale_id),
-                    GiornaleCantiere.site_id == str(site_id)
-                )
-            ).options(
-                selectinload(GiornaleCantiere.site),
-                selectinload(GiornaleCantiere.responsabile),
-                selectinload(GiornaleCantiere.operatori),
-                selectinload(GiornaleCantiere.cantiere)
-            )
-        )
-        giornale = result.scalar_one_or_none()
+        giornale_dict = await service.get_giornale(site_id, giornale_id)
         
-        if not giornale:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Giornale non trovato"
-            )
-        
-        # Carica informazioni cantiere
-        cantiere = giornale.cantiere
-        
-        # Prepara dati per Word (stessi dati del PDF)
-        operatori_enhanced = await _get_enhanced_operator_data(db, giornale.id, giornale.operatori or [])
-        
-        giornale_dict = {
-            "data": giornale.data.isoformat() if giornale.data else None,
-            "ora_inizio": giornale.ora_inizio.strftime("%H:%M") if giornale.ora_inizio else None,
-            "ora_fine": giornale.ora_fine.strftime("%H:%M") if giornale.ora_fine else None,
-            "responsabile_scavo": giornale.responsabile_nome or (giornale.responsabile.email if giornale.responsabile else None),
-            "compilatore": giornale.compilatore or giornale.responsabile_nome,
-            "condizioni_meteo": giornale.condizioni_meteo,
-            "temperatura": giornale.temperatura,
-            "temperatura_min": giornale.temperatura_min,
-            "temperatura_max": giornale.temperatura_max,
-            "note_meteo": giornale.note_meteo,
-            "descrizione_lavori": giornale.descrizione_lavori,
-            "modalita_lavorazioni": giornale.modalita_lavorazioni,
-            "attrezzatura_utilizzata": giornale.attrezzatura_utilizzata,
-            "mezzi_utilizzati": giornale.mezzi_utilizzati,
-            "materiali_rinvenuti": giornale.materiali_rinvenuti,
-            "documentazione_prodotta": giornale.documentazione_prodotta,
-            "sopralluoghi": giornale.sopralluoghi,
-            "disposizioni_rup": giornale.disposizioni_rup,
-            "disposizioni_direttore": giornale.disposizioni_direttore,
-            "contestazioni": giornale.contestazioni,
-            "sospensioni": giornale.sospensioni,
-            "incidenti": giornale.incidenti,
-            "forniture": giornale.forniture,
-            "note_generali": giornale.note_generali,
-            "problematiche": giornale.problematiche,
-            "operatori_presenti": operatori_enhanced,
-            "us_elaborate": giornale.get_us_list() if hasattr(giornale, "get_us_list") else [],
-            "usm_elaborate": giornale.get_usm_list() if hasattr(giornale, "get_usm_list") else [],
-            "usr_elaborate": giornale.usr_elaborate.split(",") if giornale.usr_elaborate else [],
-            "validato": giornale.validato,
-            "data_validazione": giornale.data_validazione.isoformat() if giornale.data_validazione else None,
-            "created_at": giornale.created_at.isoformat() if giornale.created_at else None,
-            "updated_at": giornale.updated_at.isoformat() if giornale.updated_at else None,
-        }
-        
-        # Prepara informazioni cantiere
-        cantiere_info = {
-            "nome": cantiere.nome if cantiere else "Cantiere Sconosciuto",
-            "codice": cantiere.codice if cantiere else "",
-            "descrizione": cantiere.descrizione or "" if cantiere else "",
-            "oggetto_appalto": cantiere.oggetto_appalto or "" if cantiere else "",
-            "committente": cantiere.committente or "" if cantiere else "",
-            "impresa_esecutrice": cantiere.impresa_esecutrice or "" if cantiere else "",
-            "direttore_lavori": cantiere.direttore_lavori or "" if cantiere else "",
-            "responsabile_procedimento": cantiere.responsabile_procedimento or "" if cantiere else "",
-        }
-        
-        # Importa servizio Word
+        cantiere_info = giornale_dict.get("cantiere")
+        if not cantiere_info:
+             cantiere_info = {
+                "nome": "Cantiere Sconosciuto",
+                "codice": "",
+                "descrizione": "",
+                "oggetto_appalto": "",
+                "committente": "",
+                "impresa_esecutrice": "",
+                "direttore_lavori": "",
+                "responsabile_procedimento": ""
+            }
+
         from app.services.giornale_word_service import generate_giornale_word_quick
-        
-        # Genera Word
-        logger.info(f"Generating Word document for single giornale {giornale_id}")
         word_content = generate_giornale_word_quick([giornale_dict], cantiere_info, site_info)
         
-        # Prepara nome file
-        data_giornale = giornale.data.strftime("%d_%m_%Y") if giornale.data else "sdata"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Giornale_{cantiere_info['nome'].replace(' ', '_')}_{data_giornale}_{timestamp}.docx"
+        filename = f"Giornale_{timestamp}.docx"
         
-        logger.info(f"Single giornale Word document generated successfully: {len(word_content)} bytes")
-        
-        # Return Word response
         return Response(
             content=word_content,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -2240,13 +1142,10 @@ async def export_single_giornale_word(
                 "Content-Length": str(len(word_content))
             }
         )
-        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error generating single giornale Word document: {str(e)}")
-        import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore nella generazione del documento Word: {str(e)}"
@@ -2270,58 +1169,9 @@ async def v1_link_foto_to_giornale(
     Collega una foto esistente al giornale di cantiere con didascalia opzionale.
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
-        
-        # Verifica che il giornale esista e appartenga al sito
-        result = await db.execute(
-            select(GiornaleCantiere).where(
-                and_(
-                    GiornaleCantiere.id == str(giornale_id),
-                    GiornaleCantiere.site_id == str(site_id)
-                )
-            )
-        )
-        giornale = result.scalar_one_or_none()
-        if not giornale:
-            raise HTTPException(status_code=404, detail="Giornale non trovato")
-        
-        # Verifica che la foto esista e appartenga al sito
-        from app.models.documentation_and_field import Photo
-        foto_result = await db.execute(
-            select(Photo).where(
-                and_(
-                    Photo.id == str(foto_id),
-                    Photo.site_id == str(site_id)
-                )
-            )
-        )
-        foto = foto_result.scalar_one_or_none()
-        if not foto:
-            raise HTTPException(status_code=404, detail="Foto non trovata nel sito")
-        
-        # Verifica se già collegata
-        existing = await db.execute(
-            select(giornale_foto_association).where(
-                and_(
-                    giornale_foto_association.c.giornale_id == str(giornale_id),
-                    giornale_foto_association.c.foto_id == str(foto_id)
-                )
-            )
-        )
-        if existing.first():
-            raise HTTPException(status_code=400, detail="Foto già collegata a questo giornale")
-        
-        # Crea l'associazione
-        await db.execute(
-            giornale_foto_association.insert().values(
-                giornale_id=str(giornale_id),
-                foto_id=str(foto_id),
-                didascalia=didascalia,
-                ordine=ordine
-            )
-        )
-        await db.commit()
+        service = GiornaleService(db)
+        await service.link_photo(site_id, giornale_id, foto_id, didascalia, ordine)
         
         return {
             "message": "Foto collegata con successo",
@@ -2329,7 +1179,6 @@ async def v1_link_foto_to_giornale(
             "foto_id": str(foto_id),
             "didascalia": didascalia
         }
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -2350,29 +1199,15 @@ async def v1_unlink_foto_from_giornale(
     Scollega una foto dal giornale (non elimina la foto).
     """
     try:
-        # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
-        
-        # Rimuovi l'associazione
-        result = await db.execute(
-            giornale_foto_association.delete().where(
-                and_(
-                    giornale_foto_association.c.giornale_id == str(giornale_id),
-                    giornale_foto_association.c.foto_id == str(foto_id)
-                )
-            )
-        )
-        await db.commit()
-        
-        if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Associazione foto-giornale non trovata")
+        service = GiornaleService(db)
+        await service.unlink_photo(site_id, giornale_id, foto_id)
         
         return {
             "message": "Foto scollegata con successo",
             "giornale_id": str(giornale_id),
             "foto_id": str(foto_id)
         }
-        
     except HTTPException:
         raise
     except Exception as e:

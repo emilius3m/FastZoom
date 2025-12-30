@@ -269,7 +269,7 @@
 
   <!-- Main content area with responsive layout support -->
   <main
-    class="pt-20 {% if layout_type == 'sidebar' %}flex-1 p-4 pt-20{% if site and (site.id is defined or site.site_id is defined) %} sm:ml-64{% endif %}{% else %}min-h-screen{% endif %}">
+    class="pt-20 w-full {% if layout_type == 'sidebar' %}flex-1 pt-20{% if site and (site.id is defined or site.site_id is defined) %} sm:ml-64{% endif %}{% else %}min-h-screen{% endif %}">
     {% block content %}{% endblock %}
   </main>
 
