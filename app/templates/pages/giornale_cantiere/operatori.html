@@ -206,24 +206,28 @@
 
                     <!-- Informazioni base -->
                     <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        <div x-show="operatore.codice_fiscale" class="flex items-center">
-                            <i class="fas fa-id-card mr-2 text-gray-400"></i>
-                            <span x-text="operatore.codice_fiscale"></span>
+                        <div class="flex items-center">
+                            <i class="fas fa-id-card mr-2 text-gray-400 w-4 text-center"></i>
+                            <span x-text="operatore.codice_fiscale || '-'"
+                                :class="{'text-gray-400': !operatore.codice_fiscale}"></span>
                         </div>
 
-                        <div x-show="operatore.email" class="flex items-center">
-                            <i class="fas fa-envelope mr-2 text-gray-400"></i>
-                            <span x-text="operatore.email"></span>
+                        <div class="flex items-center">
+                            <i class="fas fa-envelope mr-2 text-gray-400 w-4 text-center"></i>
+                            <span x-text="operatore.email || '-'" :class="{'text-gray-400': !operatore.email}"></span>
                         </div>
 
-                        <div x-show="operatore.telefono" class="flex items-center">
-                            <i class="fas fa-phone mr-2 text-gray-400"></i>
-                            <span x-text="operatore.telefono"></span>
+                        <div class="flex items-center">
+                            <i class="fas fa-phone mr-2 text-gray-400 w-4 text-center"></i>
+                            <span x-text="operatore.telefono || '-'"
+                                :class="{'text-gray-400': !operatore.telefono}"></span>
                         </div>
 
-                        <div x-show="operatore.specializzazione" class="flex items-center">
-                            <i class="fas fa-star mr-2 text-gray-400"></i>
-                            <span x-text="formatSpecializzazione(operatore.specializzazione)"></span>
+                        <div class="flex items-center">
+                            <i class="fas fa-star mr-2 text-gray-400 w-4 text-center"></i>
+                            <span
+                                x-text="operatore.specializzazione ? formatSpecializzazione(operatore.specializzazione) : '-'"
+                                :class="{'text-gray-400': !operatore.specializzazione}"></span>
                         </div>
                     </div>
 
@@ -263,10 +267,7 @@
 
                     <!-- Azioni -->
                     <div class="flex gap-2">
-                        <button @click="viewOperatore(operatore)"
-                            class="flex-1 bg-blue-100 text-blue-700 px-3 py-2 text-sm rounded hover:bg-blue-200 transition">
-                            <i class="fas fa-eye mr-1"></i>Visualizza
-                        </button>
+
                         <button @click="editOperatore(operatore)"
                             class="flex-1 bg-gray-100 text-gray-700 px-3 py-2 text-sm rounded hover:bg-gray-200 transition">
                             <i class="fas fa-edit mr-1"></i>Modifica
@@ -321,9 +322,13 @@
                         <div class="flex items-start mb-4">
                             <div class="flex-1">
                                 <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white"
-                                    x-text="modalMode === 'create' ? 'Nuovo Operatore' : 'Modifica Operatore'"></h3>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Inserisci i dati dell'operatore
-                                    di cantiere</p>
+                                    x-text="modalMode === 'create' ? 'Nuovo Operatore' : (modalMode === 'edit' ? 'Modifica Operatore' : 'Dettagli Operatore')">
+                                </h3>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    <span x-show="modalMode !== 'view'">Inserisci i dati dell'operatore di
+                                        cantiere</span>
+                                    <span x-show="modalMode === 'view'">Visualizza i dettagli dell'operatore</span>
+                                </p>
                             </div>
                             <button type="button" @click="closeModal()"
                                 class="text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400">
@@ -335,16 +340,16 @@
                             <!-- Nome -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nome *</label>
-                                <input type="text" x-model="formData.nome" required
-                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="text" x-model="formData.nome" required :disabled="modalMode === 'view'"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:bg-gray-100 dark:disabled:bg-gray-800">
                             </div>
 
                             <!-- Cognome -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cognome
                                     *</label>
-                                <input type="text" x-model="formData.cognome" required
-                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="text" x-model="formData.cognome" required :disabled="modalMode === 'view'"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:bg-gray-100 dark:disabled:bg-gray-800">
                             </div>
 
                             <!-- Codice Fiscale -->
@@ -352,7 +357,8 @@
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Codice
                                     Fiscale</label>
                                 <input type="text" x-model="formData.codice_fiscale" maxlength="16"
-                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    :disabled="modalMode === 'view'"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:bg-gray-100 dark:disabled:bg-gray-800">
                             </div>
 
                             <!-- Qualifica -->
@@ -360,14 +366,15 @@
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Qualifica
                                     *</label>
                                 <input type="text" x-model="formData.qualifica" required
-                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                    :disabled="modalMode === 'view'"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:bg-gray-100 dark:disabled:bg-gray-800">
                             </div>
 
                             <!-- Ruolo -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ruolo</label>
-                                <select x-model="formData.ruolo"
-                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <select x-model="formData.ruolo" :disabled="modalMode === 'view'"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:bg-gray-100 dark:disabled:bg-gray-800">
                                     <option value="">Seleziona ruolo</option>
                                     <option value="responsabile_scavo">Responsabile Scavo</option>
                                     <option value="assistente">Assistente</option>
@@ -381,8 +388,8 @@
                             <div>
                                 <label
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300">Specializzazione</label>
-                                <select x-model="formData.specializzazione"
-                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <select x-model="formData.specializzazione" :disabled="modalMode === 'view'"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:bg-gray-100 dark:disabled:bg-gray-800">
                                     <option value="">Seleziona specializzazione</option>
                                     <option value="ceramica">Ceramica</option>
                                     <option value="numismatica">Numismatica</option>
@@ -397,23 +404,23 @@
                             <!-- Email -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
-                                <input type="email" x-model="formData.email"
-                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="email" x-model="formData.email" :disabled="modalMode === 'view'"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:bg-gray-100 dark:disabled:bg-gray-800">
                             </div>
 
                             <!-- Telefono -->
                             <div>
                                 <label
                                     class="block text-sm font-medium text-gray-700 dark:text-gray-300">Telefono</label>
-                                <input type="tel" x-model="formData.telefono"
-                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <input type="tel" x-model="formData.telefono" :disabled="modalMode === 'view'"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:bg-gray-100 dark:disabled:bg-gray-800">
                             </div>
 
                             <!-- Stato -->
                             <div class="md:col-span-2">
                                 <label class="flex items-center">
-                                    <input type="checkbox" x-model="formData.is_active"
-                                        class="rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                    <input type="checkbox" x-model="formData.is_active" :disabled="modalMode === 'view'"
+                                        class="rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 disabled:opacity-60">
                                     <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Operatore attivo</span>
                                 </label>
                             </div>
@@ -421,8 +428,8 @@
                             <!-- Note -->
                             <div class="md:col-span-2">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Note</label>
-                                <textarea x-model="formData.note" rows="3"
-                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+                                <textarea x-model="formData.note" rows="3" :disabled="modalMode === 'view'"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:bg-gray-100 dark:disabled:bg-gray-800"></textarea>
                             </div>
                         </div>
 
@@ -433,7 +440,7 @@
                     </div>
 
                     <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button type="submit" :disabled="saving"
+                        <button type="submit" :disabled="saving" x-show="modalMode !== 'view'"
                             class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fas fa-spinner fa-spin mr-2" x-show="saving"></i>
                             <span
@@ -441,7 +448,7 @@
                         </button>
                         <button type="button" @click="closeModal()" :disabled="saving"
                             class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                            Annulla
+                            <span x-text="modalMode === 'view' ? 'Chiudi' : 'Annulla'"></span>
                         </button>
                     </div>
                 </form>
@@ -591,18 +598,22 @@
             console.warn('DEBUG: Formato risposta non previsto:', data);
             this.operatoriList = [];
         }
+
+        // Recalculate stats after loading data
+        this.loadStats();
+
     } else {
         console.error('Errore caricamento operatori:', response.statusText);
         this.operatoriList = [];
     }
                 
-            } catch (error) {
+    } catch (error) {
         console.error('Errore caricamento operatori:', error);
         this.operatoriList = [];
     } finally {
         this.loading = false;
     }
-        },
+    },
 
     // Modal management
     openCreateModal() {
@@ -697,23 +708,7 @@
     }
         },
 
-    viewOperatore(operatore) {
-        // Populate form with operator data for viewing
-        this.formData = {
-            nome: operatore.nome,
-            cognome: operatore.cognome,
-            codice_fiscale: operatore.codice_fiscale || '',
-            qualifica: operatore.qualifica,
-            ruolo: operatore.ruolo || '',
-            specializzazione: operatore.specializzazione || '',
-            email: operatore.email || '',
-            telefono: operatore.telefono || '',
-            is_active: operatore.stato === 'attivo',
-            note: operatore.note || ''
-        };
-        this.modalMode = 'view';
-        this.showModal = true;
-    },
+
 
     editOperatore(operatore) {
         this.modalMode = 'edit';
@@ -735,7 +730,12 @@
     },
         
         async exportOperatori() {
-        alert('Export operatori - da implementare');
+        const siteId = '{{ site_id | default('null') | safe }}';
+        if (siteId && siteId !== 'null' && siteId !== 'None') {
+            window.location.href = `/api/v1/giornale/sites/${siteId}/operatori/export-pdf`;
+        } else {
+            alert('Errore: Nessun sito selezionato per l\'esportazione.');
+        }
     },
 
         // Filtri

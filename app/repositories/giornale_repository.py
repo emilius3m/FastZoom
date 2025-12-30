@@ -185,8 +185,16 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
         """
         from sqlalchemy import func, or_
         
-        # Base query
-        query = select(OperatoreCantiere).where(OperatoreCantiere.site_id == str(site_id))
+        # Custom query with hours calculation
+        query = select(
+            OperatoreCantiere,
+            func.coalesce(func.sum(giornale_operatori_association.c.ore_lavorate), 0).label('total_hours')
+        ).outerjoin(
+            giornale_operatori_association,
+            OperatoreCantiere.id == giornale_operatori_association.c.operatore_id
+        ).where(
+            OperatoreCantiere.site_id == str(site_id)
+        )
         
         if filters:
              if filters.get("search"):
@@ -205,8 +213,12 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
              if filters.get("stato"):
                  query = query.where(OperatoreCantiere.is_active == (filters["stato"] == "attivo"))
 
+        # Group by operator to calculate sum correctly
+        query = query.group_by(OperatoreCantiere.id)
+
         # Count total before pagination
-        count_query = select(func.count()).select_from(query.subquery())
+        subquery = query.subquery()
+        count_query = select(func.count()).select_from(subquery)
         count_result = await self.db_session.execute(count_query)
         total_count = count_result.scalar() or 0
 
@@ -215,9 +227,10 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
         query = query.offset(skip).limit(limit)
         
         result = await self.db_session.execute(query)
-        operatori = result.scalars().all()
+        # Result returns tuples (OperatoreCantiere, total_hours)
+        operators_with_stats = result.all()
         
-        return operatori, total_count
+        return operators_with_stats, total_count
 
     async def count_operator_giornali(self, site_id: UUID, operator_id: UUID) -> int:
         """Counts how many journals in the site the operator worked on"""

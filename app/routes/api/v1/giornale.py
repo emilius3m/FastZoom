@@ -431,6 +431,49 @@ async def v1_get_site_operatori(
             detail="Errore nel recupero degli operatori del sito",
         )
 
+@router.get("/sites/{site_id}/operatori/export-pdf", summary="Esporta Operatori in PDF", tags=["Giornale di Cantiere - Export"])
+async def export_site_operatori_pdf(
+    site_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Esporta la lista degli operatori del sito in formato PDF.
+    """
+    try:
+        site_info = verify_site_access(site_id, user_sites)
+        
+        service = GiornaleService(db)
+        # Fetch all operators (unlimited)
+        result = await service.list_site_operators(site_id, skip=0, limit=10000)
+        operatori_data = result["data"]
+        
+        from app.services.giornale_pdf_service import generate_operatori_pdf_quick
+        pdf_content = generate_operatori_pdf_quick(operatori_data, site_info)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        site_name_safe = site_info.get('name', 'Sito').replace(' ', '_')
+        filename = f"Operatori_{site_name_safe}_{timestamp}.pdf"
+        
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(pdf_content))
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore generazione PDF operatori: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nella generazione del PDF: {str(e)}"
+        )
+
+
 @router.post("/sites/{site_id}/operatori", summary="Crea nuovo operatore", tags=["Giornale di Cantiere"])
 async def v1_create_operatore(
     site_id: UUID,
@@ -438,6 +481,7 @@ async def v1_create_operatore(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
+
 ):
     """
     Crea un nuovo operatore di cantiere assegnato a un sito specifico.

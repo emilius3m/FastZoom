@@ -352,10 +352,10 @@ class GiornaleService:
 
     async def list_site_operators(self, site_id: UUID, skip: int = 0, limit: int = 20, filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """List operators with stats"""
-        operators, total = await self.repository.get_operators_with_stats(site_id, skip, limit, filters)
+        operators_with_stats, total = await self.repository.get_operators_with_stats(site_id, skip, limit, filters)
         
         operators_data = []
-        for op in operators:
+        for op, hours in operators_with_stats:
             giornali_count = await self.repository.count_operator_giornali(site_id, op.id)
             
             operators_data.append({
@@ -367,9 +367,10 @@ class GiornaleService:
                 "telefono": op.telefono,
                 "ruolo": op.ruolo,
                 "specializzazione": op.specializzazione,
+                "qualifica": op.qualifica,
                 "qualifiche": op.qualifica.split(",") if op.qualifica else [],
                 "stato": "attivo" if op.is_active else "inattivo",
-                "ore_totali": op.ore_totali or 0,
+                "ore_totali": float(hours) if hours else 0,
                 "giornali_count": giornali_count,
                 "site_id": str(op.site_id),
                 "note": op.note,

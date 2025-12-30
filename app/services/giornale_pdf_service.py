@@ -761,6 +761,120 @@ class GiornalePDFGeneratorV2:
             return f"{priorita}/5 - BASSA"
 
 
+    def generate_operatori_pdf(self,
+                              operatori: List[Dict[str, Any]],
+                              site_info: Dict[str, Any]) -> bytes:
+        """
+        Genera PDF lista operatori del sito
+        """
+        try:
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                topMargin=1.5*cm,
+                bottomMargin=1.5*cm,
+                leftMargin=2*cm,
+                rightMargin=2*cm,
+                title=f"Lista Operatori - {site_info.get('name', 'Sito Archeologico')}"
+            )
+
+            story = []
+
+            # --- Header ---
+            story.append(Paragraph("LISTA OPERATORI DI CANTIERE", self.styles['MainTitle']))
+            story.append(Paragraph(f"Sito: {site_info.get('name', 'N/D')}", self.styles['Subtitle']))
+            story.append(Spacer(1, 0.5*cm))
+            
+            story.append(HRFlowable(width="100%", thickness=1, color=self.COLORS['accent']))
+            story.append(Spacer(1, 0.8*cm))
+
+            # --- Info Generali ---
+            info_data = [
+                ["Data Estrazione:", datetime.now().strftime('%d/%m/%Y %H:%M')],
+                ["Totale Operatori:", str(len(operatori))],
+                ["Operatori Attivi:", str(len([op for op in operatori if op.get('stato') == 'attivo']))]
+            ]
+            
+            info_table = Table(info_data, colWidths=[4*cm, 8*cm])
+            info_table.setStyle(TableStyle([
+                ('TEXTCOLOR', (0, 0), (0, -1), self.COLORS['header_bg']),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ]))
+            story.append(info_table)
+            story.append(Spacer(1, 1*cm))
+
+            # --- Tabella Operatori ---
+            if operatori:
+                headers = ["Cognome e Nome", "Ruolo/Specializzazione", "Ore Tot.", "Stato", "Note"]
+                table_data = [headers]
+                
+                for op in operatori:
+                    nome_completo = f"{op.get('cognome', '')} {op.get('nome', '')}".strip()
+                    ruolo_spec = f"{op.get('ruolo', '')}"
+                    if op.get('specializzazione'):
+                        ruolo_spec += f"\n{op.get('specializzazione')}"
+                    
+                    row = [
+                        Paragraph(nome_completo, self.styles['BodyText']),
+                        Paragraph(ruolo_spec, self.styles['BodyText']),
+                        str(op.get('ore_totali', 0)),
+                        op.get('stato', 'N/D').upper(),
+                        Paragraph(op.get('note', '') or '-', self.styles['BodyText'])
+                    ]
+                    table_data.append(row)
+
+                # Calcola larghezze colonne
+                col_widths = [5*cm, 5*cm, 2*cm, 2*cm, 3*cm]
+                
+                table = Table(table_data, colWidths=col_widths, repeatRows=1)
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), self.COLORS['accent']),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+                    
+                    # Corpo tabella
+                    ('GRID', (0, 0), (-1, -1), 0.5, self.COLORS['border']),
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 1), (-1, -1), 9),
+                    ('ALIGN', (0, 1), (1, -1), 'LEFT'),   # Nomi e Ruoli a sx
+                    ('ALIGN', (2, 1), (3, -1), 'CENTER'), # Ore e Stato al centro
+                    ('VALIGN', (0, 1), (-1, -1), 'TOP'),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.COLORS['light_grey']]),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ]))
+                
+                story.append(table)
+            else:
+                story.append(Paragraph("Nessun operatore trovato.", self.styles['BodyText']))
+
+            # --- Footer ---
+            story.append(Spacer(1, 1*cm))
+            footer_text = f"Documento generato il {datetime.now().strftime('%d/%m/%Y')}"
+            story.append(Paragraph(footer_text, self.styles['PageNum']))
+
+            doc.build(story)
+
+            buffer.seek(0)
+            pdf_bytes = buffer.getvalue()
+            buffer.close()
+
+            return pdf_bytes
+
+        except Exception as e:
+            logger.error(f"✗ Errore generazione PDF operatori: {e}")
+            raise
+
+
 # Istanza globale
 _pdf_generator = GiornalePDFGeneratorV2()
 
@@ -770,3 +884,8 @@ def generate_giornale_pdf_quick(giornali: List[Dict[str, Any]],
                                 site_info: Dict[str, Any]) -> bytes:
     """Funzione di utilità - Genera PDF rapidamente"""
     return _pdf_generator.generate_giornale_pdf(giornali, cantiere_info, site_info)
+
+def generate_operatori_pdf_quick(operatori: List[Dict[str, Any]],
+                               site_info: Dict[str, Any]) -> bytes:
+    """Funzione di utilità - Genera PDF operatori rapidamente"""
+    return _pdf_generator.generate_operatori_pdf(operatori, site_info)
