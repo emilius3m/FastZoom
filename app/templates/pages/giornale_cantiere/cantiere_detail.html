@@ -400,6 +400,12 @@
                                                 <i class="fas fa-file-pdf"></i>
                                             </button>
                                             <button type="button"
+                                                class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg dark:text-indigo-400 dark:hover:bg-gray-600 transition-colors"
+                                                @click="exportSingleGiornaleWord(giornale)"
+                                                :disabled="loadingExportWord" title="Esporta Word">
+                                                <i class="fas fa-file-word"></i>
+                                            </button>
+                                            <button type="button"
                                                 class="p-2 text-red-600 hover:bg-red-50 rounded-lg dark:text-red-400 dark:hover:bg-gray-600 transition-colors"
                                                 @click="deleteGiornale(giornale)" title="Elimina">
                                                 <i class="fas fa-trash"></i>

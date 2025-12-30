@@ -1064,8 +1064,8 @@ async def export_single_giornale_pdf(
                         photo_obj = result.scalar_one_or_none()
                         
                         if photo_obj:
-                            # Try thumbnail path first
-                            path_to_load = photo_obj.thumbnail_path or photo_obj.filepath
+                            # Use original file for higher quality
+                            path_to_load = photo_obj.filepath or photo_obj.thumbnail_path
                             if path_to_load:
                                 # Remove sites/ prefix if present for MinIO
                                 if path_to_load.startswith("sites/"):
@@ -1103,6 +1103,119 @@ async def export_single_giornale_pdf(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore nella generazione del PDF: {str(e)}"
+        )
+
+
+@router.get("/sites/{site_id}/giornali/{giornale_id}/export-word", summary="Esporta Singolo Giornale in Word", tags=["Giornale di Cantiere - Export"])
+async def export_single_giornale_word(
+    site_id: UUID,
+    giornale_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Esporta un singolo giornale in formato Word (DOCX).
+    """
+    try:
+        site_info = verify_site_access(site_id, user_sites)
+        service = GiornaleService(db)
+        
+        # Fetch formatted giornale
+        giornale_dict = await service.get_giornale(site_id, giornale_id)
+        
+        cantiere_info = giornale_dict.get("cantiere")
+        if not cantiere_info:
+             cantiere_info = {
+                "nome": "Cantiere Sconosciuto",
+                "codice": "",
+            }
+
+        # Pre-load photo bytes for Word embedding
+        from app.services.archaeological_minio_service import archaeological_minio_service
+        
+        foto_list = giornale_dict.get("foto", [])
+        for foto in foto_list:
+            try:
+                # Try thumbnail first, then full image
+                thumbnail_url = foto.get("thumbnail_url", "")
+                if thumbnail_url and "/thumbnail" in thumbnail_url:
+                    photo_id = foto.get("id")
+                    if photo_id:
+                        from app.models.documentation_and_field import Photo
+                        from sqlalchemy import select
+                        
+                        result = await db.execute(select(Photo).where(Photo.id == str(photo_id)))
+                        photo_obj = result.scalar_one_or_none()
+                        
+                        if photo_obj:
+                            # Use original file for higher quality
+                            path_to_load = photo_obj.filepath or photo_obj.thumbnail_path
+                            if path_to_load:
+                                if path_to_load.startswith("sites/"):
+                                    path_to_load = path_to_load[6:]
+                                
+                                try:
+                                    image_bytes = await archaeological_minio_service.get_file(path_to_load)
+                                    if image_bytes and isinstance(image_bytes, bytes):
+                                        foto["_image_bytes"] = image_bytes
+                                        logger.debug(f"Loaded image bytes for photo {photo_id}")
+                                except Exception as e:
+                                    logger.warning(f"Could not load image for photo {photo_id}: {e}")
+            except Exception as e:
+                logger.warning(f"Error pre-loading photo bytes for Word: {e}")
+
+        # Genera Word
+        from app.services.giornale_word_export import create_giornale_word_from_template
+        import os
+        
+        # Template path (hardcoded to standard location)
+        template_path = os.path.join("app", "templates", "word", "Giornale_Template_con_Placeholder.code.docx")
+        if not os.path.exists(template_path):
+             # Fallback to standard name
+             template_path = os.path.join("app", "templates", "word", "US_Template_con_Placeholder.docx")
+        
+        # Temp output dir
+        import tempfile
+        output_dir = tempfile.gettempdir()
+        
+        # Add site_info to export_data as expected by exporter
+        export_data = {
+            "single_giornale": True,
+            "giornale": giornale_dict,
+            "site_info": site_info
+        }
+        
+        word_path = create_giornale_word_from_template(export_data, template_path, output_dir)
+        
+        # Read file bytes
+        with open(word_path, "rb") as f:
+            word_content = f.read()
+            
+        # Clean up
+        try:
+            os.remove(word_path)
+        except:
+            pass
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Giornale_{timestamp}.docx"
+        
+        return Response(
+            content=word_content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(word_content))
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating single giornale DOCX: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Errore nella generazione del documento Word: {str(e)}"
         )
 
 # ===== WORD EXPORT ENDPOINTS =====
