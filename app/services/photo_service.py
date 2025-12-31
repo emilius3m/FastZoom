@@ -14,7 +14,7 @@ from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 import piexif
 from loguru import logger
-from fastapi import UploadFile, HTTPException
+from fastapi import UploadFile
 
 # ORIENTATION constant - handle different PIL versions
 try:
@@ -45,19 +45,13 @@ except ImportError:
     logger.warning("minio not available")
 
 
-class PhotoServiceError(Exception):
-    """Eccezione base per errori del servizio foto"""
-    pass
-
-
-class ImageProcessingError(PhotoServiceError):
-    """Errore durante l'elaborazione dell'immagine"""
-    pass
-
-
-class StorageError(PhotoServiceError):
-    """Errore durante le operazioni di storage"""
-    pass
+# Import domain exceptions
+from app.core.domain_exceptions import (
+    PhotoServiceError,
+    ImageProcessingError,
+    StorageError,
+    StorageFullError,
+)
 
 
 def handle_photo_service_errors(operation_name: str) -> Callable:
@@ -776,16 +770,12 @@ class PhotoMetadataService:
         except StorageFullError as e:
             # Storage full anche dopo cleanup automatico
             logger.error(f"Cannot upload thumbnail, storage full: {e}")
-            raise HTTPException(
-                status_code=507,
-                detail=f"Storage insufficient. Freed {e.freed_space_mb}MB but not enough"
-            )
+            # Re-raise domain exception - will be handled by centralized handler
+            raise
         except StorageError as e:
             logger.error(f"Storage error uploading thumbnail: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail="Storage error during thumbnail upload"
-            )
+            # Re-raise domain exception - will be handled by centralized handler
+            raise
 
     async def _generate_thumbnail(self, image_data: bytes) -> bytes:
         """Genera thumbnail da dati immagine"""

@@ -3,15 +3,21 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status
 from loguru import logger
 
 from app.models import User
 from app.models.sites import ArchaeologicalSite, SiteStatusEnum
 from app.models import UserSitePermission, PermissionLevel
+from app.models import TokenBlacklist
 from app.core.security import SecurityService
 from app.services.site_service import SiteService
 from app.core.config import get_settings
+from app.core.domain_exceptions import (
+    NoSiteAccessError,
+    UserInactiveError,
+    TokenInvalidError,
+    TokenExpiredError,
+)
 
 settings = get_settings()
 
@@ -446,9 +452,12 @@ class AuthService:
                                 "reason": "no_site_permissions"
                             }
                         )
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Utente non ha accesso a nessun sito archeologico"
+                        raise NoSiteAccessError(
+                            "Utente non ha accesso a nessun sito archeologico",
+                            details={
+                                "user_id": str(user.id),
+                                "user_email": user.email
+                            }
                         )
                 
                 logger.debug(
@@ -504,8 +513,8 @@ class AuthService:
                 
                 return login_response
                 
-            except HTTPException:
-                # Re-raise HTTP exceptions without modification
+            except (NoSiteAccessError, UserInactiveError):
+                # Re-raise domain exceptions without modification
                 raise
             except Exception as e:
                 logger.error(
@@ -587,9 +596,9 @@ class AuthService:
                             "reason": "user_not_found_or_inactive"
                         }
                     )
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Utente non più attivo"
+                    raise UserInactiveError(
+                        "Utente non più attivo",
+                        details={"user_id": user_id_str}
                     )
                 
                 logger.success(
@@ -605,17 +614,9 @@ class AuthService:
                 
                 return payload
                 
-            except HTTPException as e:
-                logger.warning(
-                    "HTTP exception during token validation",
-                    extra={
-                        "status_code": e.status_code,
-                        "detail": e.detail,
-                        "exception_type": type(e).__name__
-                    }
-                )
-                # Token scaduto o non valido
-                raise e
+            except (UserInactiveError, TokenInvalidError):
+                # Re-raise domain exceptions
+                raise
             except Exception as e:
                 logger.error(
                     "Unexpected error during token validation",
@@ -626,9 +627,9 @@ class AuthService:
                     },
                     exc_info=True
                 )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token validation failed"
+                raise TokenInvalidError(
+                    "Token validation failed",
+                    details={"error": str(e)}
                 )
 
     @logger.catch(
@@ -761,3 +762,191 @@ class AuthService:
                     exc_info=True
                 )
                 raise
+    
+    @logger.catch(
+        reraise=True,
+        message="Failed to refresh access token",
+        level="ERROR"
+    )
+    @staticmethod
+    async def refresh_access_token(
+        db: AsyncSession,
+        refresh_token: str
+    ) -> Dict[str, Any]:
+        """
+        Refresh access token using refresh token.
+        
+        Args:
+            db: Database session
+            refresh_token: Refresh token string
+            
+        Returns:
+            Dictionary with new access token and metadata
+            
+        Raises:
+            TokenInvalidError: If refresh token is invalid
+            UserInactiveError: If user is inactive
+        """
+        with logger.contextualize(
+            operation="refresh_access_token",
+            has_refresh_token=bool(refresh_token)
+        ):
+            try:
+                # Decode refresh token
+                payload = SecurityService.decode_token(refresh_token)
+                
+                # Verify it's a refresh token
+                if payload.get("type") != "refresh":
+                    raise TokenInvalidError(
+                        "Token non valido. Usa un refresh token.",
+                        details={"token_type": payload.get("type")}
+                    )
+                
+                # Check if token is blacklisted
+                jti = payload.get("jti")
+                if jti:
+                    blacklisted = await db.execute(
+                        select(TokenBlacklist).where(TokenBlacklist.token_jti == jti)
+                    )
+                    if blacklisted.scalar_one_or_none():
+                        raise TokenInvalidError(
+                            "Token revocato. Esegui nuovo login.",
+                            details={"jti": jti}
+                        )
+                
+                # Extract user_id
+                user_id = payload.get("sub")
+                if not user_id:
+                    raise TokenInvalidError("Token non valido - missing user_id")
+                
+                # Verify user exists and is active
+                result = await db.execute(select(User).where(User.id == user_id))
+                user = result.scalar_one_or_none()
+                
+                if not user:
+                    raise TokenInvalidError(
+                        "Utente non trovato",
+                        details={"user_id": user_id}
+                    )
+                
+                if not user.is_active:
+                    raise UserInactiveError(
+                        "Utente disabilitato",
+                        details={"user_id": user_id}
+                    )
+                
+                # Generate new access token with new JTI
+                new_access_token = SecurityService.create_access_token({
+                    "sub": str(user.id),
+                    "username": user.username,
+                    "email": user.email,
+                    "su": user.is_superuser
+                })
+                
+                logger.success(
+                    "Access token refreshed successfully",
+                    extra={
+                        "user_id": str(user.id),
+                        "user_email": user.email
+                    }
+                )
+                
+                return {
+                    "access_token": new_access_token,
+                    "token_type": "bearer",
+                    "user_id": str(user.id),
+                    "user_email": user.email
+                }
+                
+            except (TokenInvalidError, UserInactiveError):
+                # Re-raise domain exceptions
+                raise
+            except Exception as e:
+                logger.error(
+                    "Error refreshing access token",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
+                raise TokenInvalidError(
+                    f"Refresh token non valido: {str(e)}",
+                    details={"error": str(e)}
+                )
+    
+    @logger.catch(
+        reraise=True,
+        message="Failed to logout user",
+        level="ERROR"
+    )
+    @staticmethod
+    async def logout(
+        db: AsyncSession,
+        token: str
+    ) -> Dict[str, Any]:
+        """
+        Logout user by blacklisting token.
+        
+        Args:
+            db: Database session
+            token: Access token to invalidate
+            
+        Returns:
+            Dictionary with logout status
+        """
+        with logger.contextualize(
+            operation="logout",
+            has_token=bool(token)
+        ):
+            try:
+                # Extract user_id from token for blacklist
+                try:
+                    payload = SecurityService.verify_token(token)
+                    user_id = UUID(payload.get("sub"))
+                    
+                    # Blacklist the token
+                    await SecurityService.blacklist_token(token, db, user_id, "user_logout")
+                    
+                    logger.info(
+                        "Token blacklisted successfully",
+                        extra={
+                            "user_id": str(user_id),
+                            "reason": "user_logout"
+                        }
+                    )
+                    
+                    return {
+                        "success": True,
+                        "user_id": str(user_id),
+                        "message": "Logout successful"
+                    }
+                    
+                except Exception as e:
+                    logger.warning(
+                        "Could not blacklist token during logout",
+                        extra={
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        }
+                    )
+                    # Continue with logout even if blacklisting fails
+                    return {
+                        "success": True,
+                        "message": "Logout successful (token blacklisting skipped)"
+                    }
+                    
+            except Exception as e:
+                logger.error(
+                    "Error during logout",
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    },
+                    exc_info=True
+                )
+                # Don't fail logout - return success anyway
+                return {
+                    "success": True,
+                    "message": "Logout completed with warnings"
+                }

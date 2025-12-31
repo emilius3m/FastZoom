@@ -23,9 +23,26 @@ from app.models import User, UserActivity, TokenBlacklist
 # Get settings instance
 settings = get_settings()
 
+# Import dependency injection providers
+from app.core.dependencies import (
+    get_database_session,
+    get_auth_service,
+    get_user_service,
+    get_services
+)
+
 # Import existing auth dependencies and functions
 from app.services.auth_service import AuthService
+from app.services.user_service import UserService
 from app.core.security import SecurityService
+
+# Import domain exceptions
+from app.core.domain_exceptions import (
+    InvalidCredentialsError,
+    UserInactiveError,
+    ResourceAlreadyExistsError,
+    ValidationError,
+)
 from app.models.user_profiles import UserProfile as UserProfileModelDB
 from app.routes.view.view_crud import SQLAlchemyCRUD
 from fastapi import Depends, Form, Body
@@ -95,7 +112,8 @@ async def v1_login(
     response: Response,
     email: str = Form(),
     password: str = Form(),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session),
+    auth_service: AuthService = Depends(get_auth_service)
 ):
     """
     Login endpoint con redirect intelligente multi-sito.
@@ -106,8 +124,8 @@ async def v1_login(
     - 0 siti: errore accesso negato
     """
     try:
-        # Autentica utente
-        user = await AuthService.authenticate_user(db, email, password)
+        # Autentica utente using dependency injection
+        user = await auth_service.authenticate_user(db, email, password)
         
         if not user:
             # Risposta HTML per errore autenticazione
@@ -126,7 +144,7 @@ async def v1_login(
         await user.update_last_login(db)
 
         # Ottieni siti accessibili per l'utente
-        sites_data = await AuthService.get_user_sites_with_permissions(db, user.id)
+        sites_data = await auth_service.get_user_sites_with_permissions(db, user.id)
         logger.info(f"User sites: {len(sites_data) if sites_data else 0}")
 
         # 🔧 FIX: Allow authentication without blocking on site permissions
@@ -200,7 +218,8 @@ async def v1_login(
 async def v1_login_json(
     credentials: LoginRequest,
     request: Request,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session),
+    auth_service: AuthService = Depends(get_auth_service)
 ):
     """
     Login endpoint per API/script Python con risposta JSON.
@@ -223,8 +242,8 @@ async def v1_login_json(
     try:
         logger.info(f"🐛 [DEBUG] Starting JSON login for: {credentials.username}")
         
-        # Autentica utente
-        user = await AuthService.authenticate_user(db, credentials.username, credentials.password)
+        # Autentica utente using dependency injection
+        user = await auth_service.authenticate_user(db, credentials.username, credentials.password)
         logger.info(f"🐛 [DEBUG] User authenticated: {user is not None}")
         
         if not user:
@@ -269,7 +288,7 @@ async def v1_login_json(
         
         # Ottieni siti utente
         logger.info(f"🐛 [DEBUG] Getting user sites for: {user.id}")
-        user_sites = await AuthService.get_user_sites_with_permissions(db, user.id)
+        user_sites = await auth_service.get_user_sites_with_permissions(db, user.id)
         logger.info(f"🐛 [DEBUG] User sites retrieved: {len(user_sites) if user_sites else 0}")
         
         logger.info(f"Login API riuscito per {user.email} da {request.client.host}")
@@ -313,7 +332,8 @@ async def v1_login_json(
 )
 async def v1_refresh_token(
     refresh_request: RefreshRequest,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session),
+    auth_service: AuthService = Depends(get_auth_service)
 ):
     """
     Rinnova access token usando refresh token.
@@ -333,67 +353,14 @@ async def v1_refresh_token(
     ```
     """
     try:
-        # Decodifica refresh token
-        payload = SecurityService.decode_token(refresh_request.refresh_token)
+        # Use AuthService to handle all refresh logic
+        result = await auth_service.refresh_access_token(db, refresh_request.refresh_token)
         
-        # Verifica che sia refresh token
-        if payload.get("type") != "refresh":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token non valido. Usa un refresh token."
-            )
-        
-        # Verifica blacklist
-        jti = payload.get("jti")
-        if jti:
-            blacklisted = await db.execute(
-                select(TokenBlacklist).where(TokenBlacklist.token_jti == jti)
-            )
-            if blacklisted.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token revocato. Esegui nuovo login."
-                )
-        
-        # Estrai user_id
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token non valido"
-            )
-        
-        # Verifica che utente esista e sia attivo
-        result = await db.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Utente non trovato"
-            )
-        
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Utente disabilitato"
-            )
-        
-        # Genera nuovo access token con NUOVO JTI (non riutilizzare quello del refresh!)
-        # Questo è importante per la sicurezza: ogni token deve avere JTI univoco
-        new_access_token = SecurityService.create_access_token({
-            "sub": str(user.id),
-            "username": user.username,
-            "email": user.email,
-            "su": user.is_superuser
-            # JTI viene generato automaticamente da create_access_token
-        })
-        
-        logger.info(f"Access token rinnovato per {user.email} (nuovo JTI)")
+        logger.info(f"Access token refreshed for user {result['user_id']}")
         
         return RefreshResponse(
-            access_token=new_access_token,
-            token_type="bearer",
+            access_token=result["access_token"],
+            token_type=result["token_type"],
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )
         
@@ -411,9 +378,10 @@ async def v1_register(
     request: Request,
     response: Response,
     data: dict = Body(...),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session),
+    user_service: UserService = Depends(get_user_service)
 ):
-    """Register endpoint per nuovi utenti (JSON API)"""
+    """Register endpoint per nuovi utenti (JSON API) - using UserService"""
     try:
         # Debug: log incoming data
         logger.info(f"Registration request data: {data}")
@@ -423,63 +391,25 @@ async def v1_register(
         first_name = data.get("first_name")
         last_name = data.get("last_name")
 
-        if not email or not password:
-            return JSONResponse(
-                status_code=422,
-                content={"detail": "Email and password are required"}
-            )
-
-        # Check if user already exists
-        existing_user = await db.execute(
-            select(User).where(User.email == email)
-        )
-        if existing_user.scalar_one_or_none():
-            return JSONResponse(
-                status_code=400,
-                content={"detail": "Un account con questa email è già registrato."}
-            )
-
-        # Hash password
-        hashed_password = SecurityService.get_password_hash(password)
-
-        # Generate default values for required fields if not provided
-        if not first_name:
-            first_name = email.split("@")[0].capitalize()
-        if not last_name:
-            last_name = "User"
-        
-        full_name = f"{first_name} {last_name}"
-
-        # Create new user
-        user = User(
-            id=str(uuid4()),  # Convert UUID to string for SQLite compatibility
+        # Use UserService for registration (includes validation and exception handling)
+        user = await user_service.register_user(
+            db=db,
             email=email,
-            username=email.split("@")[0],  # Generate username from email
-            hashed_password=hashed_password,
-            is_active=True,
-            is_superuser=False,
-            is_verified=False  # Require admin verification or email confirmation
-        )
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-        
-        # Create user profile with first_name and last_name
-        profile = UserProfileModelDB(
-            user_id=user.id,
+            password=password,
             first_name=first_name,
             last_name=last_name
         )
-        db.add(profile)
-        await db.commit()
 
         logger.info(f"User registered successfully: {user.id}")
 
         return JSONResponse(
             status_code=201,
-            content={"message": "User created successfully"}
+            content={"message": "User created successfully", "user_id": str(user.id)}
         )
 
+    except (ValidationError, ResourceAlreadyExistsError) as e:
+        # Domain exceptions will be handled by centralized handler
+        raise
     except Exception as e:
         logger.error(f"Registration error: {e}")
         return JSONResponse(
@@ -492,14 +422,15 @@ async def v1_oauth2_token(
     request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session),
+    auth_service: AuthService = Depends(get_auth_service)
 ):
     """Endpoint OAuth2 standard per login JavaScript/API"""
     try:
         logger.info(f"OAuth2 login attempt: {form_data.username}")
         
         # Autentica utente (OAuth2 usa 'username' ma accetta email)
-        user = await AuthService.authenticate_user(db, form_data.username, form_data.password)
+        user = await auth_service.authenticate_user(db, form_data.username, form_data.password)
         
         if not user:
             logger.info("Authentication failed: user not found or invalid password")
@@ -514,7 +445,7 @@ async def v1_oauth2_token(
         await user.update_last_login(db)
 
         # Ottieni siti per l'utente usando il metodo unificato
-        sites_data = await AuthService.get_user_sites_with_permissions(db, user.id)
+        sites_data = await auth_service.get_user_sites_with_permissions(db, user.id)
 
         logger.info(f"Sites found: {len(sites_data) if sites_data else 0}")
 
@@ -581,7 +512,7 @@ async def v1_select_site(
     site_id: UUID = Form(),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Selezione sito specifico dopo login multi-sito"""
     try:
@@ -647,7 +578,12 @@ async def v1_select_site(
         )
 
 @router.post("/logout", summary="Logout", tags=["Authentication"])
-async def v1_logout(request: Request, response: Response, db: AsyncSession = Depends(get_async_session)):
+async def v1_logout(
+    request: Request, 
+    response: Response, 
+    db: AsyncSession = Depends(get_database_session),
+    auth_service: AuthService = Depends(get_auth_service)
+):
     """Logout dell'utente corrente"""
     logger.info("Logout endpoint called")
     # DEBUG: stampa l'origine della richiesta
@@ -660,26 +596,20 @@ async def v1_logout(request: Request, response: Response, db: AsyncSession = Dep
     Logout utente - invalida token server-side, rimuove cookie e redirect a login
     """
     try:
-        # Ottieni il token dal cookie prima di eliminarlo
+        # Ottieni il token dal cookie
         access_token_cookie = request.cookies.get("access_token")
 
-        # Se c'è un token, invalidalo server-side
+        # Se c'è un token, usa AuthService per invalidarlo
         if access_token_cookie:
             token = access_token_cookie.replace("Bearer ", "")
-
-            # Ottieni l'ID utente dal token per la blacklist
-            try:
-                payload = await SecurityService.verify_token(token, db)
-                user_id = UUID(payload.get("sub"))
-
-                # Invalida il token server-side
-                await SecurityService.blacklist_token(token, db, user_id, "user_logout")
-
-                logger.info(f"Token invalidated for user: {user_id}")
-
-            except Exception as e:
-                logger.warning(f"Could not invalidate token: {e}")
-                # Continua comunque con il logout
+            
+            # Use AuthService to handle token blacklisting
+            logout_result = await auth_service.logout(db, token)
+            
+            if logout_result.get("success"):
+                logger.info(f"Token invalidated successfully: {logout_result.get('message')}")
+            else:
+                logger.warning(f"Token invalidation had issues: {logout_result.get('message')}")
 
         # IMPORTANTE: Usa gli STESSI attributi usati per impostare il cookie
         logger.info(f"🍪 [COOKIE_DELETE] Deleting cookies in v1_logout")
@@ -738,62 +668,22 @@ async def v1_update_user(
     address: str = Form(None),
     phone: str = Form(None),
     company: str = Form(None),
-    db: AsyncSession = Depends(get_async_session),
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+    db: AsyncSession = Depends(get_database_session),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_service: UserService = Depends(get_user_service)
 ):
-    """API endpoint to update user profile information"""
+    """API endpoint to update user profile information - using UserService"""
     try:
         # Convert string user_id to UUID
         try:
             target_user_id = UUID(user_id)
         except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid user ID format"
-            )
+            raise ValidationError("Invalid user ID format", field="user_id")
 
-        # DEBUG: Log authorization check details
-        logger.info(f"🔍 [AUTH_DEBUG] Profile update attempt:")
-        logger.info(f"🔍 [AUTH_DEBUG] Target user_id from URL: {target_user_id} (type: {type(target_user_id)})")
-        logger.info(f"🔍 [AUTH_DEBUG] Current user_id from token: {current_user_id} (type: {type(current_user_id)})")
-        
-        # DEBUG: Check token extraction
-        try:
-            from app.core.security import _extract_token_from_request
-            token = _extract_token_from_request(request)
-            logger.info(f"🔍 [AUTH_DEBUG] Token extracted successfully: {token[:50]}...")
-        except Exception as e:
-            logger.error(f"🔍 [AUTH_DEBUG] Token extraction failed: {e}")
-
-        # Get current user from database to check superuser status
-        result = await db.execute(select(User).where(User.id == str(current_user_id)))
-        current_user = result.scalar_one_or_none()
-        
+        # Get current user to check superuser status
+        current_user = await user_service.get_user_by_id(db, current_user_id)
         if not current_user:
-            logger.error(f"🔍 [AUTH_DEBUG] User not found in database: {current_user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
-            )
-        
-        logger.info(f"🔍 [AUTH_DEBUG] Current user from DB: {current_user.id} (type: {type(current_user.id)})")
-        logger.info(f"🔍 [AUTH_DEBUG] Current user is_superuser: {current_user.is_superuser}")
-        
-        # Convert both to UUID for proper comparison
-        current_user_uuid = UUID(str(current_user.id))
-        logger.info(f"🔍 [AUTH_DEBUG] Current user UUID: {current_user_uuid} (type: {type(current_user_uuid)})")
-        logger.info(f"🔍 [AUTH_DEBUG] Target user UUID: {target_user_id} (type: {type(target_user_id)})")
-        logger.info(f"🔍 [AUTH_DEBUG] IDs match: {target_user_id == current_user_uuid}")
-
-        # Check permissions: allow self-update or superuser
-        if target_user_id != current_user_uuid and not current_user.is_superuser:
-            logger.error(f"🔍 [AUTH_DEBUG] Authorization FAILED: {target_user_id} != {current_user_uuid} and not superuser")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to update this user profile"
-            )
-        
-        logger.info(f"🔍 [AUTH_DEBUG] Authorization PASSED")
+            raise InvalidCredentialsError("User not found")
 
         # Sanitize input data using nh3
         sanitized_data = {}
@@ -812,55 +702,36 @@ async def v1_update_user(
         for field, value in form_data.items():
             if value is not None and value != "":
                 if field == "date_of_birth" and value:
-                    # Handle date parsing
                     try:
                         sanitized_data[field] = datetime.strptime(value, "%Y-%m-%d")
                     except ValueError:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Invalid date format. Use YYYY-MM-DD"
-                        )
+                        raise ValidationError("Invalid date format. Use YYYY-MM-DD", field="date_of_birth")
                 else:
-                    # Sanitize string fields
                     sanitized_data[field] = nh3.clean(str(value))
 
-        # Check if user already has a profile
-        existing_profile = await user_profile_crud.read_by_column(db, "user_id", target_user_id)
+        # Use UserService for profile update (handles permissions)
+        updated_profile = await user_service.update_user_profile(
+            db=db,
+            user_id=target_user_id,
+            current_user_id=current_user_id,
+            is_superuser=current_user.is_superuser,
+            profile_data=sanitized_data
+        )
 
-        if existing_profile is None:
-            # Create new UserProfile
-            new_profile = await user_profile_crud.create({
-                "user_id": str(target_user_id),  # Convert UUID to string for SQLite compatibility
-                **sanitized_data
-            }, db)
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "User profile updated successfully",
+                "profile_id": str(updated_profile.id),
+                "user_id": str(target_user_id)
+            }
+        )
 
-            return JSONResponse(
-                status_code=status.HTTP_201_CREATED,
-                content={
-                    "message": "User profile created successfully",
-                    "profile_id": str(new_profile.id),
-                    "user_id": str(target_user_id)
-                }
-            )
-
-        else:
-            # Update existing user profile
-            updated_profile = await user_profile_crud.update(
-                db, existing_profile.id, sanitized_data
-            )
-
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={
-                    "message": "User profile updated successfully",
-                    "profile_id": str(updated_profile.id),
-                    "user_id": str(target_user_id)
-                }
-            )
-
-    except HTTPException:
+    except (ValidationError, InvalidCredentialsError) as e:
+        # Domain exceptions will be handled by centralized handler
         raise
     except Exception as e:
+        logger.error(f"Error updating user profile: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update user profile: {str(e)}"
@@ -881,7 +752,7 @@ async def v1_debug_cookie_test(request: Request):
 @router.get("/debug/token-test", summary="Debug Token Test", tags=["Authentication - Debug"])
 async def v1_debug_token_test(
     request: Request,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Test parsing token dal cookie"""
     try:
@@ -908,30 +779,3 @@ async def v1_debug_token_test(
             "raw_cookie": access_token_cookie
         }
 
-# MIGRATION HELPER
-
-@router.get("/migration/help", summary="Aiuto migrazione API", tags=["Authentication - Migration"])
-async def migration_help():
-    """
-    Fornisce informazioni sulla migrazione dalla vecchia alla nuova API structure.
-    """
-    return {
-        "migration_guide": {
-            "old_endpoints": {
-                "/auth/login": "/api/v1/auth/login",
-                "/auth/register": "/api/v1/auth/register",
-                "/auth/token": "/api/v1/auth/token",
-                "/auth/select-site": "/api/v1/auth/select-site",
-                "/auth/logout": "/api/v1/auth/logout",
-                "/auth/me": "/api/v1/auth/me"
-            },
-            "changes": [
-                "Standardizzazione URL patterns",
-                "Agregazione endpoints per dominio",
-                "Headers di deprecazione automatici",
-                "Documentazione migliorata"
-            ],
-            "deadline": "2025-12-31",
-            "action_required": "Aggiornare client applications per usare nuovi endpoints"
-        }
-    }

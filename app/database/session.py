@@ -24,4 +24,7 @@ Base = declarative_base()
 # Maintain backward compatibility - re-export everything
 # This ensures existing imports continue to work
 
+# Backward compatibility alias for old imports
+get_db = get_async_session
+
 # Dependency FastAPI - imported from engine.py

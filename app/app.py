@@ -11,6 +11,9 @@ from uuid import UUID
 from app.core.logging import setup_logging
 setup_logging()
 
+# Register centralized exception handlers
+from app.core.exception_handlers import register_exception_handlers
+
 
 # IMPORT MANCANTI - Aggiungi questi:
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -125,6 +128,8 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    # Legacy exception handler kept for backward compatibility
+    # New domain exceptions are handled by centralized handlers
     exception_handlers={HTTPException: http_exception_handler},
     swagger_ui_parameters={
         "deepLinking": True,
@@ -141,6 +146,9 @@ app = FastAPI(
     },
     openapi_url="/openapi.json"
 )
+
+# Register centralized exception handlers for domain exceptions
+register_exception_handlers(app)
 
 # Log FastAPI app creation (single compact message)
 logger.info(f"🚀 FastZoom API initialized (env: {getattr(settings, 'environment', 'development')}, docs: /docs)")
