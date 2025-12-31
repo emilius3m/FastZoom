@@ -175,46 +175,7 @@ class SecurityService:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-    @staticmethod
-    def get_sites_from_token(token_payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Estrae informazioni siti dal payload JWT"""
-        return token_payload.get("sites", [])
 
-    @staticmethod
-    def verify_site_access_in_token(
-        token_payload: Dict[str, Any],
-        site_id: UUID,
-        required_permission: PermissionLevel = PermissionLevel.READ
-    ) -> bool:
-        """
-        Verifica accesso a sito specifico dal token
-
-        Args:
-            token_payload: Payload JWT decodificato
-            site_id: ID sito da verificare
-            required_permission: Permesso minimo richiesto
-
-        Returns:
-            True se autorizzato
-        """
-        sites = SecurityService.get_sites_from_token(token_payload)
-        
-        # Cerca sito nel token
-        site_info = next(
-            (site for site in sites if site.get("site_id") == str(site_id)),
-            None
-        )
-
-        if not site_info:
-            return False
-
-        # Verifica permesso usando gerarchia globale
-        user_level = PERMISSION_HIERARCHY.get(
-            site_info.get("permission_level", "").lower(), 0
-        )
-        required_level = PERMISSION_HIERARCHY.get(required_permission.value.lower(), 0)
-        
-        return user_level >= required_level
 
     @staticmethod
     async def blacklist_token(
@@ -393,12 +354,7 @@ async def get_current_user_id(request: Request) -> UUID:
         )
 
 
-async def get_current_user_sites(request: Request) -> List[Dict[str, Any]]:
-    """
-    Dependency: ottiene siti accessibili dal token
-    """
-    token_payload = await get_current_user_token(request)
-    return SecurityService.get_sites_from_token(token_payload)
+
 
 
 # DEPENDENCY: Con blacklist check (per endpoint protetti)
@@ -519,42 +475,10 @@ async def get_current_user_id_header(
         )
 
 
-async def get_current_user_sites_header(
-    token_payload: Dict[str, Any] = Depends(get_current_user_token_header)
-) -> List[Dict[str, Any]]:
-    """Dependency: ottiene siti dal token nell'header"""
-    return SecurityService.get_sites_from_token(token_payload)
 
 
-# Dependency factory per accesso a sito specifico
-def require_site_access(
-    site_id: UUID,
-    required_permission: PermissionLevel = PermissionLevel.READ
-):
-    """
-    Dependency factory: verifica accesso a sito specifico
-    
-    Usage:
-        @app.get("/site/{site_id}/photos")
-        async def get_photos(
-            authorized: bool = Depends(require_site_access(site_id, PermissionLevel.READ))
-        ):
-            ...
-    """
-    async def _verify_access(request: Request) -> bool:
-        token_payload = await get_current_user_token(request)
-        
-        if not SecurityService.verify_site_access_in_token(
-            token_payload, site_id, required_permission
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Accesso negato al sito {site_id}: permesso {required_permission.value} richiesto"
-            )
-        
-        return True
-    
-    return _verify_access
+
+
 
 
 # Debug utility
