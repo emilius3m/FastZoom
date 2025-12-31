@@ -21,6 +21,7 @@ def normalize_uuid_string(uuid_str: str) -> str:
     return uuid_str
 
 from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.services.us_file_service import USFileService
 from app.services.photo_serving_service import photo_serving_service

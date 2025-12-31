@@ -7,7 +7,7 @@ from uuid import UUID
 import json
 import asyncio
 
-from app.core.security import get_current_user_id, get_current_user_sites, get_current_user_token, SecurityService
+from app.core.security import get_current_user_id, get_current_user_token, SecurityService
 
 notifications_router = APIRouter()
 
@@ -349,8 +349,9 @@ async def websocket_notifications(
         # Verifica autenticazione tramite cookie
         try:
             from fastapi import Request
-            from app.database.db import get_async_session
+            from app.database.db import get_async_session, async_session_maker
             from sqlalchemy.ext.asyncio import AsyncSession
+            from app.services.auth_service import AuthService
 
             # Crea un request fittizio usando i cookie del WebSocket
             # WebSocket eredita automaticamente i cookie dal browser
@@ -372,26 +373,28 @@ async def websocket_notifications(
             if is_superuser:
                 logger.debug(f"Superuser accessing site {site_id_str} via WebSocket - BYPASS granted")
             else:
-                # For regular users, verify site access
-                user_sites = await get_current_user_sites(fake_request)
+                # For regular users, verify site access from DATABASE
+                # Fetch user sites from database instead of token (sites no longer in JWT)
+                async with async_session_maker() as db:
+                    user_sites = await AuthService.get_user_sites_with_permissions(db, user_id)
 
-                # Verifica accesso al sito specifico
-                site_info = next(
-                    (site for site in user_sites if site.get("site_id") == site_id_str),
-                    None
-                )
+                    # Verifica accesso al sito specifico
+                    site_info = next(
+                        (site for site in user_sites if site.get("site_id") == site_id_str),
+                        None
+                    )
 
-                if not site_info:
-                    try:
-                        await websocket.send_json({
-                            "type": "error",
-                            "message": f"Accesso negato al sito {site_id_str}"
-                        })
-                    except Exception:
-                        pass  # WebSocket might already be closed
-                    finally:
-                        await notification_manager.disconnect(websocket, site_id_str)
-                    return
+                    if not site_info:
+                        try:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": f"Accesso negato al sito {site_id_str}"
+                            })
+                        except Exception:
+                            pass  # WebSocket might already be closed
+                        finally:
+                            await notification_manager.disconnect(websocket, site_id_str)
+                        return
 
         except Exception as e:
             try:

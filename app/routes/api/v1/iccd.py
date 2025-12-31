@@ -14,7 +14,13 @@ from pydantic import BaseModel
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
-from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError,
+    SiteNotFoundError
+)
 
 # Import existing ICCD functions for backward compatibility
 from app.routes.api.iccd_records import (
@@ -41,10 +47,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     )
     
     if not site_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied"
-        )
+        raise SiteNotFoundError(str(site_id))
     
     return site_info
 
@@ -55,7 +58,7 @@ async def v1_get_iccd_hierarchy(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera gerarchia completa ICCD per sito.
@@ -71,7 +74,7 @@ async def v1_create_iccd_record(
     request: Request,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Crea nuova scheda ICCD con gestione gerarchia.
@@ -81,10 +84,7 @@ async def v1_create_iccd_record(
     
     # Verifica permessi di creazione
     if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per creare schede ICCD"
-        )
+        raise InsufficientPermissionsError("Creazione schede ICCD richiede permessi editor o admin")
     
     return await create_iccd_record_api__site_id__api_iccd_records_post(
         site_id, request, current_user_id, user_sites, db
@@ -96,7 +96,7 @@ async def v1_get_authority_files(
     authority_type: Optional[str] = None,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera authority files per un sito.
@@ -113,7 +113,7 @@ async def v1_get_authority_files(
 @router.get("/legacy/iccd/{site_id}/hierarchy", summary="[DEPRECATED] Gerarchia ICCD legacy", tags=["ICCD Cataloging - Legacy"])
 async def legacy_get_iccd_hierarchy(
     site_id: UUID,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     ⚠️ DEPRECATED: Gerarchia ICCD endpoint legacy.

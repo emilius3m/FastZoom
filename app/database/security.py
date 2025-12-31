@@ -427,7 +427,7 @@ current_active_user = get_current_active_user
 async def require_superuser(
     request: Request,
     current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),  # Uses local db-backed version
     db: AsyncSession = Depends(get_async_session)
 ) -> tuple[User, dict]:
     """

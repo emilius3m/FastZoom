@@ -8,12 +8,17 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import JSONResponse, Response
 from uuid import UUID
 from typing import List, Dict, Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
-from pydantic import BaseModel
+from app.database.session import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError,
+    SiteNotFoundError
+)
 
 # Dependencies
-from app.core.security import get_current_user_id, get_current_user_sites
+from app.core.security import get_current_user_id, get_current_user_sites_with_blacklist
 from app.database.session import get_async_session
 from app.models import Photo
 
@@ -101,8 +106,8 @@ async def verify_photo_access(photo_id: UUID, user_sites: List[Dict[str, Any]], 
 async def v1_get_photo_metadata(
     photo_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
-    db: AsyncSession = Depends(get_async_session)
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera metadati completi di una foto.
@@ -120,7 +125,7 @@ async def v1_update_photo_metadata(
     photo_id: UUID,
     metadata_data: PhotoMetadataUpdate,
     current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -155,7 +160,7 @@ async def v1_update_photo_metadata(
 async def v1_clear_photo_metadata(
     photo_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -179,7 +184,7 @@ async def v1_clear_photo_metadata(
 async def v1_bulk_update_metadata(
     bulk_data: BulkMetadataUpdate,
     current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -249,7 +254,7 @@ async def v1_search_by_metadata(
     limit: int = 50,
     offset: int = 0,
     current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -322,7 +327,7 @@ async def v1_search_by_metadata(
 async def v1_get_metadata_summary(
     photo_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
-    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_async_session)
 ):
     """

@@ -33,6 +33,13 @@ from app.core.security import (
     SecurityService
 )
 from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError,
+    SiteNotFoundError
+)
 from app.models import User, UserSitePermission, PermissionLevel, Photo
 from app.models.user_profiles import UserProfile
 from app.models.sites import ArchaeologicalSite
@@ -235,7 +242,7 @@ def site_to_dict(site: ArchaeologicalSite, users_count: int = 0, photos_count: i
 @router.get("/stats")
 async def get_stats(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Statistiche dashboard admin"""
     await verify_admin_access(current_user_id, db)
@@ -316,7 +323,7 @@ async def get_stats(
 @router.get("/sites")
 async def list_sites(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     search: Optional[str] = Query(None),
     region: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
@@ -396,7 +403,7 @@ async def list_sites(
 async def get_site(
     site_id: str,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Dettagli sito"""
     await verify_admin_access(current_user_id, db)
@@ -446,7 +453,7 @@ async def get_site(
 async def create_site(
     site_data: SiteCreate,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Crea sito"""
     await verify_admin_access(current_user_id, db)
@@ -498,7 +505,7 @@ async def update_site(
     site_id: str,
     site_data: SiteUpdate,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Aggiorna sito"""
     await verify_admin_access(current_user_id, db)
@@ -561,7 +568,7 @@ async def update_site(
 async def toggle_site_status(
     site_id: str,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Toggle stato sito"""
     await verify_admin_access(current_user_id, db)
@@ -595,7 +602,7 @@ async def delete_site(
     site_id: str,
     request: Request,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Elimina sito (richiede password)"""
     user = await verify_admin_access(current_user_id, db)
@@ -654,7 +661,7 @@ async def delete_site(
 async def get_site_users(
     site_id: str,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Lista utenti per sito"""
     await verify_admin_access(current_user_id, db)
@@ -781,7 +788,7 @@ async def add_site_user(
     site_id: str,
     user_data: SiteUserAdd,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Aggiungi utente a sito"""
     await verify_admin_access(current_user_id, db)
@@ -850,7 +857,7 @@ async def remove_site_user(
     site_id: str,
     user_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Rimuovi utente da sito"""
     await verify_admin_access(current_user_id, db)
@@ -885,7 +892,7 @@ async def remove_site_user(
 @router.get("/users")
 async def list_users(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     search: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
     is_superuser: Optional[bool] = Query(None),
@@ -989,7 +996,7 @@ async def list_users(
 async def get_user(
     user_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Dettagli utente"""
     await verify_admin_access(current_user_id, db)
@@ -1040,7 +1047,7 @@ async def get_user(
 async def create_user(
     user_data: UserCreate,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Crea utente"""
     await verify_admin_access(current_user_id, db)
@@ -1107,7 +1114,7 @@ async def update_user(
     user_id: UUID,
     user_data: UserUpdate,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Aggiorna utente"""
     await verify_admin_access(current_user_id, db)
@@ -1180,7 +1187,7 @@ async def update_user(
 async def toggle_user_status(
     user_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Toggle stato utente"""
     await verify_admin_access(current_user_id, db)
@@ -1216,7 +1223,7 @@ async def toggle_user_status(
 async def delete_user(
     user_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Soft delete utente"""
     await verify_admin_access(current_user_id, db)
@@ -1255,7 +1262,7 @@ async def add_user_permission(
     user_id: str,
     permission_data: PermissionCreate,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Aggiungi permesso a utente"""
     await verify_admin_access(current_user_id, db)
@@ -1377,7 +1384,7 @@ async def delete_user_permission(
     user_id: str,
     permission_id: str,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Elimina permesso utente"""
     await verify_admin_access(current_user_id, db)
@@ -1449,7 +1456,7 @@ async def delete_user_permission_direct(
     user_id: str,
     permission_id: str,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Elimina permesso utente (DELETE diretto)"""
     await verify_admin_access(current_user_id, db)
@@ -1522,7 +1529,7 @@ async def delete_user_permission_direct(
 @router.get("/permissions")
 async def list_permissions(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     is_active: Optional[bool] = Query(None),
     offset: int = Query(0, ge=0),
     limit: int = Query(25, ge=1, le=100)
@@ -1598,7 +1605,7 @@ async def list_permissions(
 async def delete_permission(
     permission_id: str,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Elimina permesso"""
     await verify_admin_access(current_user_id, db)

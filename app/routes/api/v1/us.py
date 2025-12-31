@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from loguru import logger
 
 from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
 from app.core.security import (
     get_current_user_id_with_blacklist,
     get_current_user_sites_with_blacklist,

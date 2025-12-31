@@ -302,7 +302,7 @@ async def stream_photo_from_minio(
         site_id: UUID,
         photo_id: UUID,
         site_access: tuple = Depends(get_site_access),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session)
 ):
     """Stream foto - CONSOLIDATED"""
     site, permission = site_access
@@ -322,7 +322,7 @@ async def search_photos_by_metadata(
         excavation_area: Optional[str] = None,
         chronology_period: Optional[str] = None,
         site_access: tuple = Depends(get_site_access),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session)
 ):
     """Cerca foto per metadati archeologici"""
     site, permission = site_access

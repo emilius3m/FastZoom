@@ -15,7 +15,13 @@ from datetime import datetime, timedelta
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
-from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError,
+    SiteNotFoundError
+)
 
 # Import existing monitoring functions for backward compatibility
 from app.routes.api.database_monitoring import (
@@ -88,10 +94,7 @@ def add_deprecation_headers(response: Response, new_endpoint: str):
 def verify_admin_access(user_sites: List[Dict[str, Any]]) -> bool:
     """Verifica che l'utente abbia privilegi di amministrazione"""
     if not user_sites:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accesso negato - nessun sito accessibile"
-        )
+        raise InsufficientPermissionsError("Accesso monitoring richiede privilegi amministrativi")
     
     # Verifica se è superutente o ha permessi admin su qualche sito
     is_admin = any(
@@ -100,10 +103,7 @@ def verify_admin_access(user_sites: List[Dict[str, Any]]) -> bool:
     )
     
     if not is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accesso negato - privilegi insufficienti per monitoring"
-        )
+        raise InsufficientPermissionsError("Privilegi insufficienti per accesso monitoring")
     
     return True
 
@@ -383,7 +383,7 @@ async def v1_record_custom_metric(
 
 @router.get("/legacy/database/status", summary="[DEPRECATED] Status database legacy", tags=["Database Monitoring - Legacy"])
 async def legacy_get_database_status(
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     ⚠️ DEPRECATED: Status database endpoint legacy.

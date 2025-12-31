@@ -20,6 +20,13 @@ import asyncio
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError,
+    SiteNotFoundError
+)
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus, UserActivity
 
 # Services
@@ -70,10 +77,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     )
 
     if not site_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied"
-        )
+        raise SiteNotFoundError(str(site_id))
 
     return site_info
 
@@ -91,7 +95,7 @@ async def get_deep_zoom_info(
     deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni informazioni deep zoom per una foto"""
     # Verify site access
@@ -128,7 +132,7 @@ async def get_deep_zoom_tile(
     deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni singolo tile deep zoom con supporto formato dinamico (jpg/png) e logging dettagliato"""
     import time
@@ -373,7 +377,7 @@ async def get_deep_zoom_tile_jpg(
     deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Legacy endpoint per tile JPG"""
     return await get_deep_zoom_tile(site_id, photo_id, level, x, y, "jpg", current_user_id, user_sites, db)
@@ -391,7 +395,7 @@ async def get_deep_zoom_tile_png(
     deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Legacy endpoint per tile PNG"""
     return await get_deep_zoom_tile(site_id, photo_id, level, x, y, "png", current_user_id, user_sites, db)
@@ -413,7 +417,7 @@ async def get_public_deep_zoom_tile(
     format: str,
     request: Request,
     deep_zoom_service: DeepZoomMinIOServiceDep,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Public tile endpoint that uses browser session context instead of JWT headers.
@@ -834,7 +838,7 @@ async def process_deep_zoom(
     deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Processa foto esistente per generare deep zoom tiles"""
     # Verify site access
@@ -905,7 +909,7 @@ async def get_deep_zoom_processing_status(
     deep_zoom_service: DeepZoomMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni status di elaborazione deep zoom per una foto"""
     # Verify site access
@@ -948,7 +952,7 @@ async def get_processing_queue_status(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Endpoint per controllare lo stato della coda di processamento
@@ -1028,7 +1032,7 @@ async def process_missing_tiles(
     storage_service: ArchaeologicalMinIOServiceDep,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Avvia la generazione manuale dei tiles per una foto specifica
@@ -1168,7 +1172,7 @@ async def verify_and_repair_tiles(
     auto_repair: bool = True,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Verifica lo stato dei tiles per una foto e avvia automaticamente la generazione se mancanti
@@ -1341,7 +1345,7 @@ async def get_batch_tiles_status(
     offset: int = 0,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Ottieni lo stato dei tiles per un batch di foto
@@ -1457,7 +1461,7 @@ async def batch_repair_tiles(
     force_repair: bool = False,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Avvia la riparazione batch dei tiles per più foto
@@ -1645,7 +1649,7 @@ async def trigger_manual_verification(
     site_id: Optional[UUID] = None,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Avvia manualmente la verifica dei tiles per un sito specifico o per tutti i siti
@@ -1716,7 +1720,7 @@ async def configure_verification_service(
     site_id: UUID = None,  # Required for permission check
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Configura le impostazioni del servizio di verifica periodica dei tiles
@@ -1797,7 +1801,7 @@ async def start_verification_service(
     site_id: UUID,  # Required for permission check
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Avvia il servizio di verifica periodica dei tiles"""
     # Verify site access and admin permissions
@@ -1850,7 +1854,7 @@ async def stop_verification_service(
     site_id: UUID,  # Required for permission check
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ferma il servizio di verifica periodica dei tiles"""
     # Verify site access and admin permissions
@@ -1909,7 +1913,7 @@ async def v1_batch_process_deepzoom(
     background_tasks: BackgroundTasks = BackgroundTasks(),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Processa multiple foto per deep zoom in batch.
@@ -2069,7 +2073,7 @@ async def get_background_queue_status(
 async def reset_background_service(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Reset the background service - emergency recovery option.

@@ -7,9 +7,7 @@ from uuid import UUID
 import json
 import asyncio
 
-from app.core.security import SecurityService, get_current_user_sites, get_current_user_id
-from app.database.db import get_async_session
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.security import SecurityService
 
 # Import the existing notification manager
 from app.routes.api.notifications_ws import NotificationManager, notification_manager
@@ -72,14 +70,34 @@ async def websocket_global_notifications(
             fake_request = FakeRequest(token)
             
             # Ottieni database session usando la funzione corretta
-            from app.database.db import AsyncSessionLocal
-            async with AsyncSessionLocal() as db:
+            from app.database.db import async_session_maker
+            from app.services.auth_service import AuthService
+            async with async_session_maker() as db:
                 # Verifica il token e ottieni informazioni utente
                 payload = await SecurityService.verify_token(token, db)
                 user_id = payload.get("sub")
-                user_sites = await get_current_user_sites(fake_request, db)
                 
-                if not user_id or not user_sites:
+                # Fetch user sites from database (not from token - sites no longer in JWT)
+                if not user_id:
+                    try:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": "Autenticazione fallita"
+                        })
+                    except Exception:
+                        pass
+                    await websocket.close(code=4003, reason="Authentication failed")
+                    return
+                
+                try:
+                    from uuid import UUID
+                    user_uuid = UUID(user_id)
+                    user_sites = await AuthService.get_user_sites_with_permissions(db, user_uuid)
+                except Exception as e:
+                    logger.error(f"Error fetching user sites: {e}")
+                    user_sites = []
+                
+                if not user_sites:
                     try:
                         await websocket.send_json({
                             "type": "error",

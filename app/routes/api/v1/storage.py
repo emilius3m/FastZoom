@@ -13,7 +13,13 @@ from loguru import logger
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
-from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError,
+    SiteNotFoundError
+)
 
 router = APIRouter()
 
@@ -32,10 +38,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     )
     
     if not site_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied"
-        )
+        raise SiteNotFoundError(str(site_id))
     
     return site_info
 
@@ -46,7 +49,7 @@ async def v1_get_site_storage_stats(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Ottieni statistiche storage del sito con gestione avanzata.
@@ -71,7 +74,7 @@ async def v1_check_storage_health(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Controlla lo stato di salute dello storage MinIO.

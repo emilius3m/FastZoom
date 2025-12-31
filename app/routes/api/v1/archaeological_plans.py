@@ -15,6 +15,7 @@ import json
 from loguru import logger
 
 from app.database.session import get_async_session
+from app.core.dependencies import get_database_session
 from app.core.security import get_current_user_id
 from app.models.sites import ArchaeologicalSite
 from app.models import UserSitePermission
@@ -29,7 +30,7 @@ plans_router = APIRouter(prefix="/archaeological-plan", tags=["Archaeological Pl
 async def get_site_access_for_plans(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ) -> tuple[ArchaeologicalSite, UserSitePermission]:
     """Verifica accesso utente al sito per operazioni su piante"""
     
@@ -72,7 +73,7 @@ async def get_site_access_for_plans(
 async def get_site_plans(
     site_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni tutte le piante archeologiche di un sito"""
     site, permission = site_access
@@ -121,7 +122,7 @@ async def upload_archaeological_plan(
     is_primary: bool = Form(False),
     site_access: tuple = Depends(get_site_access_for_plans),
     current_user_id: UUID = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Carica una nuova pianta archeologica"""
     site, permission = site_access
@@ -209,7 +210,7 @@ async def update_archaeological_plan(
     plan_id: UUID,
     plan_data: dict,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Aggiorna una pianta archeologica"""
     site, permission = site_access
@@ -284,7 +285,7 @@ async def delete_archaeological_plan(
     site_id: UUID,
     plan_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Elimina una pianta archeologica (soft delete)"""
     site, permission = site_access
@@ -338,7 +339,7 @@ async def get_plan_details(
     site_id: UUID,
     plan_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni dettagli di una pianta specifica"""
     site, permission = site_access
@@ -386,7 +387,7 @@ async def get_plan_image(
     site_id: UUID,
     plan_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni immagine della pianta"""
     site, permission = site_access
@@ -500,7 +501,7 @@ async def get_plan_excavation_units(
     site_id: UUID,
     plan_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni tutte le unità di scavo di una pianta"""
     site, permission = site_access
@@ -534,7 +535,7 @@ async def create_excavation_unit(
     unit_data: dict,
     site_access: tuple = Depends(get_site_access_for_plans),
     current_user_id: UUID = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Crea una nuova unità di scavo"""
     site, permission = site_access
@@ -610,7 +611,7 @@ async def update_excavation_unit(
     unit_id: str,
     unit_data: dict,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Aggiorna una unità di scavo"""
     site, permission = site_access
@@ -688,7 +689,7 @@ async def delete_excavation_unit(
     plan_id: UUID,
     unit_id: str,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Elimina una unità di scavo"""
     site, permission = site_access
@@ -735,7 +736,7 @@ async def get_plan_archaeological_data(
     site_id: UUID,
     plan_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni tutti i dati archeologici georeferenziati di una pianta"""
     site, permission = site_access
@@ -780,7 +781,7 @@ async def create_archaeological_data(
     data_payload: dict,
     site_access: tuple = Depends(get_site_access_for_plans),
     current_user_id: UUID = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Crea un nuovo punto dati archeologico georeferenziato"""
     site, permission = site_access
@@ -855,7 +856,7 @@ async def update_archaeological_data(
     data_id: UUID,
     data_payload: dict,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Aggiorna un dato archeologico georeferenziato"""
     site, permission = site_access
@@ -927,7 +928,7 @@ async def delete_archaeological_data(
     plan_id: UUID,
     data_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Elimina un dato archeologico georeferenziato"""
     site, permission = site_access
@@ -973,7 +974,7 @@ async def delete_archaeological_data(
 async def get_data_collection_modules(
     site_id: UUID,
     site_access: tuple = Depends(get_site_access_for_plans),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni moduli di raccolta dati disponibili per il sito"""
     site, permission = site_access
