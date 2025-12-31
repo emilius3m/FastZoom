@@ -90,6 +90,54 @@ def get_user_service() -> UserService:
     return UserService
 
 
+from app.services.site_stats_service import SiteStatsService
+
+
+def get_site_stats_service() -> SiteStatsService:
+    """
+    Provide SiteStatsService instance.
+    
+    SiteStatsService is stateless and uses static methods.
+    
+    Returns:
+        SiteStatsService instance
+    """
+    return SiteStatsService
+
+
+# Photo services
+from app.services.photos.upload_service import PhotoUploadService
+from app.services.photos.query_service import PhotoQueryService
+from app.services.photos.bulk_service import PhotoBulkService
+from app.services.photos.deletion_service import PhotoDeletionService
+from app.services.photos.deepzoom_service import PhotoDeepZoomService
+
+
+def get_photo_upload_service() -> PhotoUploadService:
+    """Provide PhotoUploadService instance."""
+    return PhotoUploadService()
+
+
+def get_photo_query_service() -> PhotoQueryService:
+    """Provide PhotoQueryService instance."""
+    return PhotoQueryService()
+
+
+def get_photo_bulk_service() -> PhotoBulkService:
+    """Provide PhotoBulkService instance."""
+    return PhotoBulkService()
+
+
+def get_photo_deletion_service() -> PhotoDeletionService:
+    """Provide PhotoDeletionService instance."""
+    return PhotoDeletionService()
+
+
+def get_photo_deepzoom_service() -> PhotoDeepZoomService:
+    """Provide PhotoDeepZoomService instance."""
+    return PhotoDeepZoomService()
+
+
 # ============================================================================
 # Service Providers - Stateful Services (with dependencies)
 # ============================================================================

@@ -36,6 +36,93 @@ class PhotoUploadService:
         self.min_dimension_for_tiles = 2000  # Minimum dimension for deep zoom tiles
         self.debug_mode = False  # Riabilita validazione storage
 
+    def prepare_upload_from_form_data(
+        self,
+        form_data: Dict[str, Any]
+    ) -> Tuple[PhotoUploadRequest, Dict[str, Any]]:
+        """
+        Prepare and validate upload data from form fields.
+        
+        Consolidates form data validation and metadata preparation logic
+        that was previously scattered in the route layer.
+        
+        Args:
+            form_data: Dictionary containing form fields from the upload request
+            
+        Returns:
+            Tuple of (validated_pydantic_request, raw_metadata_dict)
+            
+        Raises:
+            HTTPException: If validation fails with detailed error information
+        """
+        from fastapi import HTTPException, status
+        
+        # Parse tags from JSON string if present
+        tags_list = []
+        if form_data.get("tags"):
+            try:
+                tags_list = json.loads(form_data["tags"])
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse tags JSON: {form_data['tags']}")
+                tags_list = []
+        
+        # Build metadata dictionary from form fields
+        metadata_dict = {
+            'title': form_data.get('title', f"Upload {form_data.get('photo_count', 'N')} photos"),
+            'description': form_data.get('description', ''),
+            'photographer': form_data.get('photographer', ''),
+            'photo_type': form_data.get('photo_type'),
+            'inventory_number': form_data.get('inventory_number'),
+            'excavation_area': form_data.get('excavation_area'),
+            'stratigraphic_unit': form_data.get('stratigraphic_unit'),
+            'material': form_data.get('material'),
+            'photo_date': form_data.get('photo_date'),
+            'keywords': tags_list,
+            'use_queue': form_data.get('use_queue', False),
+            'priority': form_data.get('priority', 'normal')
+        }
+        
+        # Remove None and empty string values to avoid validation issues
+        metadata_dict = {k: v for k, v in metadata_dict.items() if v is not None and v != ''}
+        
+        logger.debug(f"📋 Metadata prepared from form: {list(metadata_dict.keys())}")
+        
+        # Validate with Pydantic schema
+        try:
+            upload_request = PhotoUploadRequest(**metadata_dict)
+            logger.info(
+                "Form data validated successfully",
+                photo_type=upload_request.photo_type,
+                inventory_number=upload_request.inventory_number
+            )
+            return upload_request, metadata_dict
+            
+        except Exception as validation_error:
+            logger.error(f"Pydantic validation failed: {validation_error}")
+            
+            # Extract detailed validation errors and make them JSON serializable
+            validation_errors = None
+            if hasattr(validation_error, 'errors'):
+                try:
+                    validation_errors = validation_error.errors()
+                    # Ensure all values are JSON serializable
+                    if validation_errors:
+                        validation_errors = json.loads(json.dumps(validation_errors, default=str))
+                except Exception as json_error:
+                    logger.warning(f"Failed to serialize validation errors: {json_error}")
+                    validation_errors = [{"msg": str(validation_error), "type": "validation_error"}]
+            
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "message": "Metadata validation failed",
+                    "validation_errors": validation_errors,
+                    "error_type": type(validation_error).__name__,
+                    "received_metadata": metadata_dict
+                }
+            )
+
+
     async def process_photo_upload(
         self,
         site_id: UUID,

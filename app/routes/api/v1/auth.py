@@ -248,18 +248,11 @@ async def v1_login_json(
         
         if not user:
             # Skip logging failed login attempts without user_id to avoid NOT NULL constraint
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Username o password non corretti",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise InvalidCredentialsError("Username o password non corretti")
         
         # Verifica utente attivo
         if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Utente disabilitato. Contatta l'amministratore."
-            )
+            raise UserInactiveError("Utente disabilitato. Contatta l'amministratore.")
         
         # Genera JWT tokens
         jti = str(uuid4())  # Unique token ID per revoca
@@ -310,7 +303,8 @@ async def v1_login_json(
             }
         )
     
-    except HTTPException:
+    except (InvalidCredentialsError, UserInactiveError, TokenInvalidError, TokenExpiredError):
+        # Re-raise domain exceptions
         raise
     except Exception as e:
         logger.error(f"🐛 [DEBUG] Errore login JSON: {str(e)}")
@@ -364,14 +358,12 @@ async def v1_refresh_token(
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )
         
-    except HTTPException:
+    except (InvalidCredentialsError, UserInactiveError, TokenInvalidError, TokenExpiredError):
+        # Re-raise domain exceptions
         raise
     except Exception as e:
         logger.error(f"Errore refresh token: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Refresh token non valido: {str(e)}"
-        )
+        raise TokenInvalidError(f"Refresh token non valido: {str(e)}")
 
 @router.post("/register", summary="Registra nuovo utente", tags=["Authentication"])
 async def v1_register(
@@ -434,10 +426,7 @@ async def v1_oauth2_token(
         
         if not user:
             logger.info("Authentication failed: user not found or invalid password")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Incorrect username or password"
-            )
+            raise InvalidCredentialsError("Incorrect username or password")
         
         logger.info(f"User authenticated: {user.id}, superuser: {user.is_superuser}")
 
@@ -493,8 +482,8 @@ async def v1_oauth2_token(
         response.status_code = 204
         return None
         
-    except HTTPException as e:
-        logger.error(f"HTTP Exception in OAuth2 login: {e.detail}")
+    except (InvalidCredentialsError, UserInactiveError, TokenInvalidError, TokenExpiredError):
+        # Re-raise domain exceptions - they will be converted to HTTP responses by exception handler
         raise
     except Exception as e:
         logger.error(f"OAuth2 login error: {str(e)}")

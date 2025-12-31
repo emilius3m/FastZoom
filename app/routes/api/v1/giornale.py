@@ -14,7 +14,13 @@ from datetime import datetime
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
-from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    SiteNotFoundError,
+    InsufficientPermissionsError,
+    ValidationError as DomainValidationError,
+    ResourceNotFoundError
+)
 from app.services.giornale_service import GiornaleService
 
 router = APIRouter()
@@ -80,10 +86,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
     normalized_site_id = normalize_site_id(str(site_id))
     if not normalized_site_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"ID sito non valido: {site_id}"
-        )
+        raise SiteNotFoundError(str(site_id), details={"reason": "invalid_site_id_format"})
     
     # Enhanced matching with multiple format variations
     site_info = None
@@ -103,9 +106,9 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     
     if not site_info:
         logger.warning(f"Site access denied: site_id={site_id}, user has {len(user_sites)} accessible sites")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied. User has access to {len(user_sites)} sites."
+        raise InsufficientPermissionsError(
+            f"Access denied to site {site_id}",
+            details={"user_accessible_sites": len(user_sites)}
         )
     
     logger.debug(f"Site access verified: {site_info.get('site_name', 'Unknown')}")
@@ -143,7 +146,7 @@ async def v1_get_site_giornali(
     cantiere_id: Optional[UUID] = Query(None),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera tutti i giornali di cantiere di un sito con filtri avanzati.
@@ -151,9 +154,8 @@ async def v1_get_site_giornali(
     try:
         # Validate user_sites before proceeding
         if not user_sites:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User has no accessible sites. Please contact administrator."
+            raise InsufficientPermissionsError(
+                "User has no accessible sites. Please contact administrator."
             )
         
         # Verifica accesso al sito
@@ -183,7 +185,7 @@ async def v1_get_site_giornali(
                 "cantiere_id": str(cantiere_id) if cantiere_id else None
             }
         }
-    except HTTPException:
+    except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError):
         raise
     except Exception as e:
         logger.error(f"Errore recupero giornali sito {site_id}: {str(e)}")
@@ -205,7 +207,7 @@ async def v1_get_cantiere_giornali(
     q: Optional[str] = Query(None),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Recupera giornali di un cantiere specifico"""
     try:
@@ -236,7 +238,7 @@ async def v1_get_cantiere_giornali(
                 "stato": stato
             }
         }
-    except HTTPException:
+    except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError):
         raise
     except Exception as e:
         logger.error(f"Errore recupero giornali cantiere {cantiere_id}: {str(e)}")
@@ -248,7 +250,7 @@ async def v1_create_giornale(
     giornale_data: Dict[str, Any],
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Crea un nuovo giornale di cantiere per un sito specifico.
@@ -264,7 +266,7 @@ async def v1_create_giornale(
             "site_info": site_info,
             "operatori_validati": len(giornale_data.get("operatori", []))
         }
-    except HTTPException:
+    except (InsufficientPermissionsError, SiteNotFoundError, DomainValidationError):
         raise
     except Exception as e:
         logger.error(f"Errore creazione giornale: {str(e)}")
@@ -277,7 +279,7 @@ async def v1_update_giornale(
     giornale_data: Dict[str, Any],
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Aggiorna un giornale di cantiere esistente.
@@ -293,7 +295,7 @@ async def v1_update_giornale(
             "site_info": site_info,
             "operatori_validati": len(giornale_data.get("operatori", [])) if "operatori" in giornale_data else 0
         }
-    except HTTPException:
+    except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError, DomainValidationError):
         raise
     except Exception as e:
         logger.error(f"Errore aggiornamento giornale: {str(e)}")
@@ -305,7 +307,7 @@ async def v1_validate_giornale(
     giornale_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Valida un giornale di cantiere, rendendolo non modificabile.
@@ -321,7 +323,7 @@ async def v1_validate_giornale(
             "data_validazione": giornale.data_validazione.isoformat(),
             "validato": True
         }
-    except HTTPException:
+    except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError):
         raise
     except Exception as e:
         logger.error(f"Errore validazione giornale: {str(e)}")
@@ -333,7 +335,7 @@ async def v1_delete_giornale(
     giornale_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Elimina un giornale di cantiere.
@@ -347,7 +349,7 @@ async def v1_delete_giornale(
             "message": "Giornale eliminato con successo",
             "site_info": site_info
         }
-    except HTTPException:
+    except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError):
         raise
     except Exception as e:
         logger.error(f"Errore eliminazione giornale: {str(e)}")
@@ -399,7 +401,7 @@ async def v1_get_site_operatori(
     stato: Optional[str] = Query(None),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera tutti gli operatori assegnati a un sito archeologico specifico.
@@ -424,7 +426,7 @@ async def v1_get_site_operatori(
             "site_info": site_info,
             "filters_applied": filters
         }
-    except HTTPException:
+    except (InsufficientPermissionsError, SiteNotFoundError):
         raise
     except Exception as e:
         logger.error(f"Errore recupero operatori sito {site_id}: {str(e)}")
@@ -438,7 +440,7 @@ async def export_site_operatori_pdf(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Esporta la lista degli operatori del sito in formato PDF.
@@ -466,7 +468,7 @@ async def export_site_operatori_pdf(
                 "Content-Length": str(len(pdf_content))
             }
         )
-    except HTTPException:
+    except (InsufficientPermissionsError, SiteNotFoundError):
         raise
     except Exception as e:
         logger.error(f"Errore generazione PDF operatori: {str(e)}")
@@ -482,7 +484,7 @@ async def v1_create_operatore(
     operatore_data: Dict[str, Any],
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 
 ):
     """
@@ -533,7 +535,7 @@ async def v1_update_operatore(
     operatore_id: UUID,
     operatore_data: Dict[str, Any],
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Aggiorna un operatore di cantiere esistente.
@@ -546,10 +548,7 @@ async def v1_update_operatore(
         operatore = result.scalar_one_or_none()
         
         if not operatore:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Operatore non trovato"
-            )
+            raise ResourceNotFoundError("OperatoreCantiere", str(operatore_id))
         
         # Aggiorna campi
         if "nome" in operatore_data:
@@ -580,7 +579,7 @@ async def v1_update_operatore(
             "message": "Operatore aggiornato con successo"
         }
         
-    except HTTPException:
+    except (ResourceNotFoundError):
         raise
     except Exception as e:
         logger.error(f"Errore aggiornamento operatore: {str(e)}")
@@ -594,7 +593,7 @@ async def v1_update_operatore(
 async def v1_get_general_stats(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera statistiche generali per tutti i siti accessibili.
@@ -700,7 +699,7 @@ async def v1_get_site_stats(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera statistiche per un sito specifico.
@@ -749,7 +748,7 @@ async def v1_get_site_stats(
             "site_info": site_info
         }
         
-    except HTTPException:
+    except (InsufficientPermissionsError, SiteNotFoundError):
         raise
     except Exception as e:
         from loguru import logger
@@ -762,7 +761,7 @@ async def v1_get_site_stats(
 @router.get("/stats/operatori", summary="Statistiche operatori", tags=["Giornale di Cantiere - Stats"])
 async def v1_get_operatori_stats(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera statistiche generali per gli operatori.
@@ -822,7 +821,7 @@ async def v1_get_all_operatori(
     site_id: Optional[UUID] = Query(None, description="Filtra operatori per sito specifico"),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera tutti gli operatori disponibili nel sistema.
@@ -941,7 +940,7 @@ async def export_giornali_pdf(
     include_allegati: bool = Query(False, description="Includi riferimenti allegati"),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Esporta tutti i giornali di un cantiere in formato PDF conforme allo standard italiano.
@@ -1018,7 +1017,7 @@ async def export_single_giornale_pdf(
     giornale_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Esporta un singolo giornale in formato PDF.
@@ -1117,7 +1116,7 @@ async def export_giornali_word(
     include_allegati: bool = Query(False, description="Includi riferimenti allegati"),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Esporta tutti i giornali di un cantiere in formato Word (.docx).
@@ -1220,7 +1219,7 @@ async def export_single_giornale_word(
     giornale_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Esporta un singolo giornale in formato Word (.docx).
@@ -1314,7 +1313,7 @@ async def v1_link_foto_to_giornale(
     ordine: int = 0,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Collega una foto esistente al giornale di cantiere con didascalia opzionale.
@@ -1344,7 +1343,7 @@ async def v1_unlink_foto_from_giornale(
     foto_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Scollega una foto dal giornale (non elimina la foto).
@@ -1374,7 +1373,7 @@ async def v1_update_foto_didascalia(
     update_data: Dict[str, Any],
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Aggiorna didascalia e ordine di una foto nel giornale.

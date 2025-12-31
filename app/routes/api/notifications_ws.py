@@ -7,7 +7,7 @@ from uuid import UUID
 import json
 import asyncio
 
-from app.core.security import get_current_user_id, get_current_user_sites, SecurityService
+from app.core.security import get_current_user_id, get_current_user_sites, get_current_user_token, SecurityService
 
 notifications_router = APIRouter()
 
@@ -363,25 +363,35 @@ async def websocket_notifications(
 
             # Verifica autenticazione usando le dipendenze esistenti
             user_id = await get_current_user_id(fake_request)
-            user_sites = await get_current_user_sites(fake_request)
+            
+            # Get token payload to check for superuser status
+            token_payload = await get_current_user_token(fake_request)
+            is_superuser = token_payload.get("su", False)
+            
+            # SUPERUSER BYPASS: superusers have automatic access to all sites
+            if is_superuser:
+                logger.debug(f"Superuser accessing site {site_id_str} via WebSocket - BYPASS granted")
+            else:
+                # For regular users, verify site access
+                user_sites = await get_current_user_sites(fake_request)
 
-            # Verifica accesso al sito specifico
-            site_info = next(
-                (site for site in user_sites if site.get("site_id") == site_id_str),
-                None
-            )
+                # Verifica accesso al sito specifico
+                site_info = next(
+                    (site for site in user_sites if site.get("site_id") == site_id_str),
+                    None
+                )
 
-            if not site_info:
-                try:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": f"Accesso negato al sito {site_id_str}"
-                    })
-                except Exception:
-                    pass  # WebSocket might already be closed
-                finally:
-                    await notification_manager.disconnect(websocket, site_id_str)
-                return
+                if not site_info:
+                    try:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"Accesso negato al sito {site_id_str}"
+                        })
+                    except Exception:
+                        pass  # WebSocket might already be closed
+                    finally:
+                        await notification_manager.disconnect(websocket, site_id_str)
+                    return
 
         except Exception as e:
             try:
@@ -395,6 +405,7 @@ async def websocket_notifications(
                 notification_manager.mark_connection_dead(websocket)
                 await notification_manager.disconnect(websocket, site_id_str)
             return
+
 
         # Connetti WebSocket dopo autenticazione
         await notification_manager.connect(websocket, site_id_str)

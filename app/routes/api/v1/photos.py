@@ -12,7 +12,14 @@ from pathlib import Path
 import json
 import asyncio
 
-from app.database.session import get_async_session
+from app.core.dependencies import (
+    get_database_session,
+    get_photo_upload_service,
+    get_photo_query_service,
+    get_photo_bulk_service,
+    get_photo_deletion_service,
+    get_photo_deepzoom_service
+)
 from app.core.security import get_current_user_id
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 from app.models import UserActivity
@@ -43,6 +50,12 @@ from app.services.photos.deepzoom_service import PhotoDeepZoomService
 # Import schemi Pydantic
 from app.schemas.photos import PhotoUploadRequest, BulkUpdateRequest, BulkDeleteRequest, PhotoQueryFilters
 
+# Import domain exceptions
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError
+)
 
 # Export as 'router' for consistency with other API v1 modules
 router = APIRouter()
@@ -54,13 +67,13 @@ async def get_photo_thumbnail_simple(
         photo_id: UUID,
         site_access: tuple = Depends(get_photo_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session)
 ):
     """Serve thumbnail foto - CONSOLIDATED"""
     site, permission = site_access
     
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi richiesti")
+        raise InsufficientPermissionsError("Permessi richiesti")
         
     return await photo_serving_service.serve_photo_thumbnail(photo_id, db)
 
@@ -70,13 +83,13 @@ async def get_photo_full_simple(
         photo_id: UUID,
         site_access: tuple = Depends(get_photo_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session)
 ):
     """Serve immagine completa - CONSOLIDATED"""
     site, permission = site_access
     
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi richiesti")
+        raise InsufficientPermissionsError("Permessi richiesti")
         
     return await photo_serving_service.serve_photo_full(photo_id, db)
 
@@ -86,13 +99,13 @@ async def download_photo_simple(
         photo_id: UUID,
         site_access: tuple = Depends(get_photo_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session)
 ):
     """Scarica file originale foto - CONSOLIDATED"""
     site, permission = site_access
     
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi richiesti")
+        raise InsufficientPermissionsError("Permessi richiesti")
         
     return await photo_serving_service.serve_photo_download(photo_id, db)
 
@@ -143,21 +156,22 @@ async def get_site_photos_api(
 
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session),
+        query_service: PhotoQueryService = Depends(get_photo_query_service)
 ):
     """API avanzata per ottenere foto del sito con filtri archeologici completi - MODULAR SERVICE VERSION"""
 
     site, permission = site_access
 
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi richiesti")
+        raise InsufficientPermissionsError("Permessi richiesti")
 
     # Handle site_id normalization
     if isinstance(site_id, str):
         from app.routes.api.dependencies import normalize_site_id
         normalized_site_id = normalize_site_id(site_id)
         if not normalized_site_id:
-            raise HTTPException(status_code=404, detail="ID sito non valido")
+            raise ResourceNotFoundError("ArchaeologicalSite", site_id)
     else:
         normalized_site_id = str(site_id)
 
@@ -192,8 +206,7 @@ async def get_site_photos_api(
         sort_by=sort_by
     )
 
-    # Use modular query service
-    query_service = PhotoQueryService()
+    # Use modular query service (injected via dependency)
     general_photos, us_photos = await query_service.query_site_photos(
         site_id=normalized_site_id,
         filters=query_filters,
@@ -220,10 +233,11 @@ async def upload_photos(
     tags: Optional[str] = Form(None),  # JSON string
     site_access: tuple = Depends(get_site_access),
     current_user_id: UUID = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session),
+    upload_service: PhotoUploadService = Depends(get_photo_upload_service)
 ):
     """
-    Upload foto al sito archeologico con metadati come campi separati - FIXED VERSION
+    Upload foto al sito archeologico con metadati come campi separati - REFACTORED VERSION
     
     Args:
         site_id: UUID del sito archeologico
@@ -243,79 +257,36 @@ async def upload_photos(
     site, permission = site_access
 
     if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+        raise InsufficientPermissionsError("Permessi di scrittura richiesti")
 
     logger.info(f"📥 Received {len(photos)} files for upload")
     
-    # Parse tags se presente
-    tags_list = []
-    if tags:
-        try:
-            tags_list = json.loads(tags)
-        except:
-            tags_list = []
-    
-    # Costruisci metadata dict dai campi del form
-    metadata_dict = {
-        'title': f"Upload {len(photos)} photos",
-        'description': description or '',
-        'photographer': '',
-        'photo_type': photo_type,
+    # Prepare form data for service validation
+    form_data = {
+        'photo_count': len(photos),
         'inventory_number': inventory_number,
         'excavation_area': excavation_area,
         'stratigraphic_unit': stratigraphic_unit,
         'material': material,
+        'photo_type': photo_type,
         'photo_date': photo_date,
-        'keywords': tags_list,
-        'use_queue': False,
-        'priority': 'normal'
+        'description': description,
+        'tags': tags
     }
     
-    # Remove None values to avoid validation issues
-    metadata_dict = {k: v for k, v in metadata_dict.items() if v is not None and v != ''}
+    # Use PhotoUploadService to validate and prepare metadata (injected via dependency)
+    upload_request, raw_metadata = upload_service.prepare_upload_from_form_data(form_data)
     
-    logger.info(f"📋 Metadata prepared: {list(metadata_dict.keys())}")
-
-    # Validate with Pydantic schema
-    try:
-        upload_request = PhotoUploadRequest(**metadata_dict)
-        logger.info("PhotoUploadRequest validated successfully",
-                   photo_type=upload_request.photo_type,
-                   inventory_number=upload_request.inventory_number)
-    except Exception as validation_error:
-        logger.error(f"Pydantic validation failed: {validation_error}")
-        
-        # Extract detailed validation errors and make them JSON serializable
-        validation_errors = None
-        if hasattr(validation_error, 'errors'):
-            try:
-                validation_errors = validation_error.errors()
-                # Ensure all values in validation errors are JSON serializable
-                if validation_errors:
-                    validation_errors = json.loads(json.dumps(validation_errors, default=str))
-            except Exception as json_error:
-                logger.warning(f"Failed to serialize validation errors: {json_error}")
-                validation_errors = [{"msg": str(validation_error), "type": "validation_error"}]
-        
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message": "Metadata validation failed",
-                "validation_errors": validation_errors,
-                "error_type": type(validation_error).__name__,
-                "received_metadata": metadata_dict
-            }
-        )
-
-    # Use modular upload service with raw metadata for better compatibility
-    upload_service = PhotoUploadService()
+    logger.info(f"✅ Validation successful, processing upload")
+    
+    # Process upload using the service
     result = await upload_service.process_photo_upload(
         site_id=site_id,
         user_id=current_user_id,
         photos=photos,
         upload_request=upload_request,
         db=db,
-        raw_metadata=metadata_dict
+        raw_metadata=raw_metadata
     )
 
     # 🔧 FIX: Commit esplicito per rendere i dati visibili ad altre sessioni
@@ -323,6 +294,7 @@ async def upload_photos(
     logger.info("✅ Database changes committed - data now visible to all sessions")
 
     return result
+
 
 
 @router.get("/sites/{site_id}/photos/{photo_id}/stream")
@@ -356,7 +328,7 @@ async def search_photos_by_metadata(
     site, permission = site_access
 
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi richiesti")
+        raise InsufficientPermissionsError("Permessi richiesti")
 
     # Use injected storage service for metadata search with proper error handling
     storage = ArchaeologicalMinIOServiceDep()
@@ -386,13 +358,14 @@ async def update_photo(
         request: Request,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session),
+        bulk_service: PhotoBulkService = Depends(get_photo_bulk_service)
 ):
     """Aggiorna metadati foto archeologica - MODULAR SERVICE VERSION"""
     site, permission = site_access
 
     if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+        raise InsufficientPermissionsError("Permessi di scrittura richiesti")
 
     try:
         update_data = await request.json()
@@ -402,8 +375,7 @@ async def update_photo(
         raise HTTPException(status_code=400, detail=f"Invalid JSON data: {str(e)}")
 
     try:
-        # Use modular update logic from bulk service (single update mode)
-        bulk_service = PhotoBulkService()
+        # Use modular update logic from bulk service (single update mode) - injected via dependency
         return await bulk_service.update_single_photo(
             site_id=str(site_id),
             photo_id=str(photo_id),
@@ -425,16 +397,16 @@ async def delete_photo(
         photo_id: UUID,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session),
+        deletion_service: PhotoDeletionService = Depends(get_photo_deletion_service)
 ):
     """Elimina foto dal sito archeologico - PROTETTO contro eliminazione foto US - MODULAR SERVICE VERSION"""
     site, permission = site_access
 
     if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+        raise InsufficientPermissionsError("Permessi di scrittura richiesti")
 
-    # Use modular deletion service
-    deletion_service = PhotoDeletionService()
+    # Use modular deletion service (injected via dependency)
     return await deletion_service.delete_single_photo(
         site_id=str(site_id),
         photo_id=photo_id,
@@ -448,7 +420,8 @@ async def bulk_delete_photos(
         delete_data: dict,
         normalized_site_id: str = Depends(get_normalized_site_id),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session),
+        bulk_service: PhotoBulkService = Depends(get_photo_bulk_service)
 ):
     """Elimina più foto in blocco - PROTETTO contro eliminazione foto US - MODULAR SERVICE VERSION"""
     # The dependency handles both normalization and site access verification
@@ -460,8 +433,7 @@ async def bulk_delete_photos(
             photo_ids=delete_data.get("photo_ids", [])
         )
 
-        # Use modular bulk service
-        bulk_service = PhotoBulkService()
+        # Use modular bulk service (injected via dependency)
         return await bulk_service.bulk_delete_photos(
             site_id=normalized_site_id,
             delete_request=bulk_delete_request,
@@ -483,17 +455,17 @@ async def start_deep_zoom_background_processor(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session),
+        deepzoom_service: PhotoDeepZoomService = Depends(get_photo_deepzoom_service)
 ):
     """Avvia il processore background per deep zoom tiles - MODULAR SERVICE VERSION"""
     site, permission = site_access
 
     if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+        raise InsufficientPermissionsError("Permessi di scrittura richiesti")
 
     try:
-        # Use modular deep zoom service
-        deepzoom_service = PhotoDeepZoomService()
+        # Use modular deep zoom service (injected via dependency)
         return await deepzoom_service.start_background_processor(
             site_id=str(site_id),
             current_user_id=current_user_id
@@ -512,17 +484,17 @@ async def stop_deep_zoom_background_processor(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session),
+        deepzoom_service: PhotoDeepZoomService = Depends(get_photo_deepzoom_service)
 ):
     """Ferma il processore background per deep zoom tiles - MODULAR SERVICE VERSION"""
     site, permission = site_access
 
     if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+        raise InsufficientPermissionsError("Permessi di scrittura richiesti")
 
     try:
-        # Use modular deep zoom service
-        deepzoom_service = PhotoDeepZoomService()
+        # Use modular deep zoom service (injected via dependency)
         return await deepzoom_service.stop_background_processor(
             site_id=str(site_id),
             current_user_id=current_user_id
@@ -540,17 +512,17 @@ async def stop_deep_zoom_background_processor(
 async def get_deep_zoom_background_status(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session),
+        deepzoom_service: PhotoDeepZoomService = Depends(get_photo_deepzoom_service)
 ):
     """Ottieni lo stato del processore background per deep zoom tiles - MODULAR SERVICE VERSION"""
     site, permission = site_access
 
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
+        raise InsufficientPermissionsError("Permessi di lettura richiesti")
 
     try:
-        # Use modular deep zoom service
-        deepzoom_service = PhotoDeepZoomService()
+        # Use modular deep zoom service (injected via dependency)
         return await deepzoom_service.get_background_status(
             site_id=str(site_id)
         )
@@ -568,17 +540,17 @@ async def get_photo_deep_zoom_task_status(
         site_id: UUID,
         photo_id: UUID,
         site_access: tuple = Depends(get_site_access),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session),
+        deepzoom_service: PhotoDeepZoomService = Depends(get_photo_deepzoom_service)
 ):
     """Ottieni lo stato del task di processing per una foto specifica - MODULAR SERVICE VERSION"""
     site, permission = site_access
 
     if not permission.can_read():
-        raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
+        raise InsufficientPermissionsError("Permessi di lettura richiesti")
 
     try:
-        # Use modular deep zoom service
-        deepzoom_service = PhotoDeepZoomService()
+        # Use modular deep zoom service (injected via dependency)
         return await deepzoom_service.get_photo_task_status(
             site_id=str(site_id),
             photo_id=photo_id
@@ -598,13 +570,14 @@ async def bulk_update_photos(
         update_data: dict,
         site_access: tuple = Depends(get_site_access),
         current_user_id: UUID = Depends(get_current_user_id),
-        db: AsyncSession = Depends(get_async_session)
+        db: AsyncSession = Depends(get_database_session),
+        bulk_service: PhotoBulkService = Depends(get_photo_bulk_service)
 ):
     """Aggiorna più foto in blocco con supporto completo per metadati archeologici - MODULAR SERVICE VERSION"""
     site, permission = site_access
 
     if not permission.can_write():
-        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+        raise InsufficientPermissionsError("Permessi di scrittura richiesti")
 
     try:
         # Prepare bulk update request using Pydantic schema
@@ -615,8 +588,7 @@ async def bulk_update_photos(
             remove_tags=update_data.get("remove_tags", [])
         )
 
-        # Use modular bulk service
-        bulk_service = PhotoBulkService()
+        # Use modular bulk service (injected via dependency)
         return await bulk_service.bulk_update_photos(
             site_id=str(site_id),
             update_request=bulk_update_request,
