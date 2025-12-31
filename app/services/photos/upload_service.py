@@ -5,8 +5,9 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, BinaryIO
 from uuid import UUID
+from io import BytesIO
 
 from fastapi import HTTPException, status, UploadFile
 from fastapi.responses import JSONResponse
@@ -127,7 +128,7 @@ class PhotoUploadService:
         self,
         site_id: UUID,
         user_id: UUID,
-        photos: List[UploadFile],
+        photos: List[Tuple[bytes, str, str]],  # (file_data, filename, content_type)
         upload_request: PhotoUploadRequest,
         db: AsyncSession,
         raw_metadata: Optional[Dict[str, Any]] = None
@@ -135,6 +136,12 @@ class PhotoUploadService:
         """
         Main entry point for photo upload processing.
         Handles queue detection, storage checks, and coordinate processing.
+        
+        Args:
+            photos: List of tuples (file_data, filename, content_type)
+                   - file_data: bytes of the file
+                   - filename: original filename
+                   - content_type: MIME type
         """
         
         # Check if we should use queue based on system load or explicit request
@@ -174,7 +181,7 @@ class PhotoUploadService:
         self,
         site_id: UUID,
         user_id: UUID,
-        photos: List[UploadFile],
+        photos: List[Tuple[bytes, str, str]],  # (file_data, filename, content_type)
         upload_request: PhotoUploadRequest,
         db: AsyncSession,
         raw_metadata: Optional[Dict[str, Any]] = None
@@ -233,7 +240,7 @@ class PhotoUploadService:
             # Prepare and return response
             return self._prepare_upload_response(uploaded_photos, failed_photos, photos_needing_tiles)
 
-    async def _validate_and_prepare_storage(self, photos: List[UploadFile]):
+    async def _validate_and_prepare_storage(self, photos: List[Tuple[bytes, str, str]]):
         """Validate files and ensure storage is ready."""
         if self.debug_mode:
             logger.warning("🚨 DEBUG MODE: Skipping storage validation to identify hang point")
@@ -369,7 +376,7 @@ class PhotoUploadService:
 
     async def _process_photos_parallel_or_sequential(
         self,
-        photos: List[UploadFile],
+        photos: List[Tuple[bytes, str, str]],  # (file_data, filename, content_type)
         site_id: UUID,
         user_id: UUID,
         archaeological_metadata: Dict[str, Any],
@@ -384,26 +391,27 @@ class PhotoUploadService:
         logger.info(f"🔄 Processing {len(photos)} photos sequentially (SQLite mode)")
         results = []
         
-        for i, photo in enumerate(photos, 1):
-            logger.debug(f"📸 Processing photo {i}/{len(photos)}: {photo.filename}")
+        for i, photo_tuple in enumerate(photos, 1):
+            file_data, filename, content_type = photo_tuple
+            logger.debug(f"📸 Processing photo {i}/{len(photos)}: {filename}")
             
             try:
                 result = await self._process_single_photo(
-                    photo,
+                    photo_tuple,
                     site_id,
                     user_id,
                     archaeological_metadata,
                     db
                 )
                 results.append(result)
-                logger.info(f"✅ Photo {i}/{len(photos)} completed: {photo.filename}")
+                logger.info(f"✅ Photo {i}/{len(photos)} completed: {filename}")
                 
                 # CRITICAL: Small delay between photos for SQLite write lock release
                 if i < len(photos):
                     await asyncio.sleep(0.15)  # 150ms delay
                     
             except Exception as e:
-                logger.error(f"❌ Failed to process {photo.filename}: {str(e)}")
+                logger.error(f"❌ Failed to process {filename}: {str(e)}")
                 results.append(e)
                 # Continue processing remaining photos
                 continue
@@ -413,7 +421,7 @@ class PhotoUploadService:
 
     async def _process_single_photo(
         self,
-        file: UploadFile,
+        photo_tuple: Tuple[bytes, str, str],  # (file_data, filename, content_type)
         site_id: UUID,
         user_id: UUID,
         archaeological_metadata: Dict[str, Any],
@@ -426,35 +434,39 @@ class PhotoUploadService:
         import time
         start_time = time.time()
         
+        # Unpack the tuple
+        file_data, filename, content_type = photo_tuple
+        
         photo_record = None
-        filename = None
+        uploaded_filename = None
         file_path = None
         
         with logger.contextualize(
             operation="process_single_photo",
             site_id=str(site_id),
             user_id=str(user_id),
-            filename=file.filename
+            filename=filename
         ):
             try:
                 logger.info("Starting single photo processing")
                 
                 # 1. Save file to storage (outside transaction)
-                filename, file_path, file_size = await storage_service.save_upload_file(
-                    file, str(site_id), str(user_id)
+                # Create a BytesIO object for the storage service
+                file_like = BytesIO(file_data)
+                uploaded_filename, file_path, file_size = await storage_service.save_file_bytes(
+                    file_like, filename, str(site_id), str(user_id)
                 )
 
-                # 2. Extract metadata from uploaded file (outside transaction)
-                await file.seek(0)  # Reset file pointer
-                exif_data, metadata = await photo_metadata_service.extract_metadata_from_file(
-                    file, filename
+                # 2. Extract metadata from bytes (outside transaction)
+                exif_data, metadata = await photo_metadata_service.extract_metadata_from_bytes(
+                    file_data, filename
                 )
 
                 # ✅ CRITICAL FIX: Create photo record with better error handling
                 try:
                     photo_record = await photo_metadata_service.create_photo_record(
-                        filename=filename,
-                        original_filename=file.filename,
+                        filename=uploaded_filename,
+                        original_filename=filename,
                         file_path=file_path,
                         file_size=file_size,
                         site_id=str(site_id),
@@ -467,14 +479,14 @@ class PhotoUploadService:
                     if stratigraphic_unit_value:
                         logger.info(f"🔧 PHOTO STRATIGRAPHIC_UNIT REGISTRATION: {stratigraphic_unit_value}")
                         logger.info(f"🔧 PHOTO ID: {photo_record.id if photo_record else 'unknown'}")
-                        logger.info(f"🔧 PHOTO FILENAME: {filename}")
+                        logger.info(f"🔧 PHOTO FILENAME: {uploaded_filename}")
                     logger.debug(f"✅ Photo record created successfully: {photo_record.id if photo_record else 'unknown'}")
                 except Exception as create_error:
                     logger.error(
                         "❌ PHOTO RECORD CREATION FAILED",
                         error=str(create_error),
                         error_type=type(create_error).__name__,
-                        filename=filename,
+                        filename=uploaded_filename,
                         site_id=str(site_id),
                         user_id=str(user_id),
                         metadata_keys=list(metadata.keys()) if metadata else [],
@@ -528,9 +540,9 @@ class PhotoUploadService:
                 
                 # 5. Generate thumbnail (outside main transaction)
                 try:
-                    await file.seek(0)
-                    thumbnail_path = await photo_metadata_service.generate_thumbnail_from_file(
-                        file, str(photo_record.id)
+                    # Generate thumbnail from bytes
+                    thumbnail_path = await photo_metadata_service.create_and_upload_thumbnail(
+                        str(photo_record.id), file_data, str(site_id)
                     )
                     
                     if thumbnail_path:
@@ -554,10 +566,10 @@ class PhotoUploadService:
                         user_id=str(user_id),
                         site_id=str(site_id),
                         activity_type="UPLOAD",
-                        activity_desc=f"Caricata foto: {file.filename}",
+                        activity_desc=f"Caricata foto: {filename}",
                         extra_data=json.dumps({
                             "photo_id": str(photo_record.id),
-                            "filename": filename,
+                            "filename": uploaded_filename,
                             "file_size": file_size
                         })
                     )
@@ -587,7 +599,8 @@ class PhotoUploadService:
                 # per evitare lazy loading issues con SQLite
                 return {
                     "photo_id": str(photo_record.id),
-                    "filename": filename,
+                    "filename": uploaded_filename,
+                    "original_filename": filename,
                     "file_size": file_size,
                     "file_path": file_path,
                     "metadata": {
@@ -639,7 +652,7 @@ class PhotoUploadService:
                     f"❌ UNEXPECTED ERROR: {type(photo_error).__name__}: {str(photo_error)}"
                 )
                 logger.error(
-                    f"Context - File: {file.filename if file else 'Unknown'}, "
+                    f"Context - File: {filename}, "
                     f"Path: {file_path if file_path else 'Unknown'}, "
                     f"Size: {file_size if 'file_size' in locals() else 'Unknown'}"
                 )
@@ -675,7 +688,7 @@ class PhotoUploadService:
 
     def _filter_upload_results(
         self,
-        photos: List[UploadFile],
+        photos: List[Tuple[bytes, str, str]],  # (file_data, filename, content_type)
         upload_results: List
     ) -> Tuple[List[Dict], List[Dict]]:
         """Filter and categorize upload results into successes and failures."""
@@ -684,14 +697,17 @@ class PhotoUploadService:
         failed_photos = []
 
         for i, result in enumerate(upload_results):
+            photo_tuple = photos[i]
+            _, filename, _ = photo_tuple  # Extract filename from tuple
+            
             if isinstance(result, Exception):
                 error_msg = str(result)
                 if "database" in error_msg.lower() and (
                         "lock" in error_msg.lower() or "conflict" in error_msg.lower()):
-                    error_msg = f"Database conflict during photo {photos[i].filename} processing: {error_msg}"
-                logger.error("Upload task failed", filename=photos[i].filename, error=error_msg)
+                    error_msg = f"Database conflict during photo {filename} processing: {error_msg}"
+                logger.error("Upload task failed", filename=filename, error=error_msg)
                 failed_photos.append({
-                    "filename": photos[i].filename,
+                    "filename": filename,
                     "error": error_msg
                 })
             elif result is not None:
@@ -699,7 +715,7 @@ class PhotoUploadService:
             else:
                 # None result indicates a failed upload that was handled gracefully
                 failed_photos.append({
-                    "filename": photos[i].filename,
+                    "filename": filename,
                     "error": "Processing failed but was handled gracefully"
                 })
 

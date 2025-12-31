@@ -29,6 +29,7 @@ from app.routes.api.v1.harris_matrix import router as harris_matrix_router
 from app.routes.api.v1.harris_matrix_mapping import router as harris_matrix_mapping_router
 from app.routes.api.v1.ocr_us_import import router as ocr_us_import_router
 from app.routes.api.v1.ocr_debug import router as ocr_debug_router
+from app.routes.api.v1.tus_uploads import router as tus_uploads_router
 
 # Migrated from v0
 from app.routes.api.us_word_export_api import router as us_word_export_router
@@ -68,6 +69,7 @@ api_v1_router.include_router(admin_router, prefix="/admin", tags=["Administratio
 api_v1_router.include_router(unified_router, prefix="/unified", tags=["Unified Dashboard"])
 api_v1_router.include_router(ocr_us_import_router, prefix="/ocr", tags=["OCR US Import"])
 api_v1_router.include_router(ocr_debug_router, tags=["OCR Debug"])
+api_v1_router.include_router(tus_uploads_router, tags=["TUS Uploads"])
 
 # Moved routers from V0
 from app.routes.api.v1.form_schemas import form_schemas_router

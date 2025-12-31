@@ -139,21 +139,29 @@ class SecurityService:
             HTTPException: Se token non valido o nella blacklist
         """
         try:
+            # Log token preview for debugging (first 10 chars)
+            token_preview = token[:10] + "..." if len(token) > 10 else token
+            logger.debug(f"Verifying token: {token_preview}")
+            
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id: str = payload.get("sub")
             token_jti: str = payload.get("jti")
 
             if user_id is None:
+                logger.warning(f"Token validation failed: missing subject in payload")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Token non valido: missing subject",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
+            logger.debug(f"Token validated successfully for user: {user_id}")
+
             # Controlla blacklist solo se DB disponibile e JTI presente
             if db and token_jti:
                 from app.models import TokenBlacklist
                 if await TokenBlacklist.is_token_blacklisted(db, token_jti):
+                    logger.warning(f"Token {token_jti} is blacklisted for user {user_id}")
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="Token invalidato",
@@ -163,12 +171,28 @@ class SecurityService:
             return payload
 
         except jwt.ExpiredSignatureError:
+            logger.warning("Token validation failed: signature expired")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token scaduto",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        except jwt.PyJWTError:
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"Token validation failed: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token non valido",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except jwt.PyJWTError as e:
+            logger.error(f"JWT decode error: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token non valido",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error during token verification: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token non valido",

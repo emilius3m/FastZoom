@@ -219,6 +219,11 @@ class InvalidImageError(PhotoServiceError):
     pass
 
 
+class FileUploadError(PhotoServiceError):
+    """Error uploading file."""
+    pass
+
+
 # ============================================================================
 # Site Management Exceptions
 # ============================================================================

@@ -659,17 +659,22 @@ class DeepZoomMinIOService:
         archaeological_metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        DEPRECATED: Mantiene compatibilità per chiamate esistenti
-        Usa schedule_tiles_generation_background invece per performance
+        DEPRECATED: Use bytes-based methods instead.
+        Maintained for backward compatibility.
+        
+        Args:
+            original_file: FastAPI UploadFile (deprecated)
+        
+        Recommendation: Use _process_tiles_background with bytes directly
         """
-        logger.warning("Using deprecated synchronous tile processing. Consider using background processing.")
+        logger.warning("process_and_upload_tiles is deprecated. Use bytes-based methods instead.")
         
         try:
-            # Leggi contenuto file
+            # Read bytes and delegate to bytes-based method
             content = await original_file.read()
             await original_file.seek(0)
             
-            # Processa in background (ma aspetta per compatibilità)
+            # Processa in background (ma asp etta per compatibilità)
             return await self._process_tiles_background(photo_id, content, site_id, archaeological_metadata)
             
         except Exception as e:
@@ -678,18 +683,43 @@ class DeepZoomMinIOService:
 
     async def generate_tiles_in_memory(self, original_file: UploadFile) -> Tuple[Dict[int, Dict[str, bytes]], int, int]:
         """
-        Genera tiles deep zoom in memoria senza salvare su disco
+        DEPRECATED: Use generate_tiles_from_bytes() instead.
+        Maintained for backward compatibility only.
+        
+        Args:
+            original_file: FastAPI UploadFile (deprecated)
+            
+        Returns:
+            Tuple[Dict[level, Dict[tile_coords, tile_data]], original_width, original_height]
+            
+        Recommendation: Use generate_tiles_from_bytes(file_data: bytes) instead
+        """
+        logger.warning("generate_tiles_in_memory is deprecated. Use generate_tiles_from_bytes instead.")
+        
+        try:
+            # Read bytes and delegate to bytes-based method
+            content = await original_file.read()
+            await original_file.seek(0)  # Reset for other uses
+            
+            return await self.generate_tiles_from_bytes(content)
 
+        except Exception as e:
+            logger.error(f"Tile generation failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Tile generation failed: {str(e)}")
+
+    async def generate_tiles_from_bytes(self, file_data: bytes) -> Tuple[Dict[int, Dict[str, bytes]], int, int]:
+        """
+        Generate deep zoom tiles from raw bytes (framework-agnostic).
+        
+        Args:
+            file_data: Raw image bytes
+            
         Returns:
             Tuple[Dict[level, Dict[tile_coords, tile_data]], original_width, original_height]
         """
         try:
-            # Carica immagine in memoria
-            content = await original_file.read()
-            await original_file.seek(0)  # Reset per altri usi
-
-            # Usa BytesIO invece di file temporaneo per evitare problemi di permessi
-            image = Image.open(io.BytesIO(content))
+            # Use BytesIO to work with image bytes
+            image = Image.open(io.BytesIO(file_data))
 
             # FIXED: Gestione formato basata su immagine originale + trasparenza
             original_format = image.format.lower() if image.format else 'jpg'

@@ -261,6 +261,11 @@ async def upload_photos(
 
     logger.info(f"📥 Received {len(photos)} files for upload")
     
+    # Convert UploadFile to bytes at the HTTP boundary using FileAdapter
+    from app.core.file_utils import FileAdapter
+    photo_tuples = await FileAdapter.adapt_multiple_upload_files(photos)
+    logger.debug(f"✅ Converted {len(photo_tuples)} files to bytes tuples")
+    
     # Prepare form data for service validation
     form_data = {
         'photo_count': len(photos),
@@ -279,11 +284,11 @@ async def upload_photos(
     
     logger.info(f"✅ Validation successful, processing upload")
     
-    # Process upload using the service
+    # Process upload using the service with bytes tuples
     result = await upload_service.process_photo_upload(
         site_id=site_id,
         user_id=current_user_id,
-        photos=photos,
+        photos=photo_tuples,  # Pass bytes tuples instead of UploadFile
         upload_request=upload_request,
         db=db,
         raw_metadata=raw_metadata

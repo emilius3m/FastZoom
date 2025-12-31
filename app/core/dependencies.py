@@ -22,6 +22,7 @@ from app.services.auth_service import AuthService
 from app.services.site_service import SiteService
 from app.services.photo_service import PhotoMetadataService
 from app.services.user_service import UserService
+from app.services.dashboard_service import DashboardService
 
 
 # ============================================================================
@@ -103,6 +104,11 @@ def get_site_stats_service() -> SiteStatsService:
         SiteStatsService instance
     """
     return SiteStatsService
+
+
+def get_dashboard_service() -> DashboardService:
+    """Get DashboardService instance."""
+    return DashboardService()
 
 
 # Photo services

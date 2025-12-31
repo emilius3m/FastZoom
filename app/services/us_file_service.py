@@ -98,7 +98,42 @@ class USFileService:
         user_id: UUID,
         metadata: Optional[Dict[str, Any]] = None
     ) -> USFile:
-        """Upload file per US con validazione e storage MinIO"""
+        """
+        DEPRECATED: Use upload_us_file_bytes() instead.
+        Maintained for backward compatibility.
+        
+        Args:
+            file: FastAPI UploadFile (deprecated)
+            
+        Recommendation: Use upload_us_file_bytes(file_data: bytes, filename, content_type, ...) instead
+        """
+        logger.warning("upload_us_file is deprecated. Use upload_us_file_bytes instead.")
+        
+        # Read bytes and delegate to bytes-based method
+        file_content = await file.read()
+        await file.seek(0)
+        
+        return await self.upload_us_file_bytes(
+            us_id=us_id,
+            file_data=file_content,
+            filename=file.filename,
+            content_type=file.content_type or "application/octet-stream",
+            file_type=file_type,
+            user_id=user_id,
+            metadata=metadata
+        )
+
+    async def upload_us_file_bytes(
+        self,
+        us_id: UUID,
+        file_data: bytes,
+        filename: str,
+        content_type: str,
+        file_type: str,
+        user_id: UUID,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> USFile:
+        """Upload file per US con validazione e storage MinIO (framework-agnostic)"""
         
         # Validazione tipo file
         if file_type not in self.SUPPORTED_FILE_TYPES:
@@ -109,19 +144,14 @@ class USFileService:
         
         # Validazione mimetype
         file_config = self.SUPPORTED_FILE_TYPES[file_type]
-        if file.content_type not in file_config['mimetypes']:
+        if content_type not in file_config['mimetypes']:
             raise HTTPException(
                 status_code=400,
-                detail=f"Formato non supportato per {file_type}: {file.content_type}"
+                detail=f"Formato non supportato per {file_type}: {content_type}"
             )
         
         # Validazione dimensione
-        file_size = 0
-        await file.seek(0)
-        content = await file.read()
-        file_size = len(content)
-        await file.seek(0)  # Reset per upload
-        
+        file_size = len(file_data)
         max_size = file_config['max_size_mb'] * 1024 * 1024
         if file_size > max_size:
             raise HTTPException(
@@ -130,7 +160,6 @@ class USFileService:
             )
         
         # Verifica esistenza US con normalizzazione UUID per compatibilità
-        # Prova prima con l'UUID normalizzato, poi con fallback multi-livello
         us_id_str = str(us_id)
         normalized_us_id = self._normalize_us_id(us_id)
         
@@ -145,25 +174,21 @@ class USFileService:
         us = us_result.scalar_one_or_none()
         
         if not us:
-            logger.error(f"US non trovata con ID: {us_id} (normalizzato: {normalized_us_id}, senza trattini: {us_id_str.replace('-', '')})")
+            logger.error(f"US non trovata con ID: {us_id}")
             raise HTTPException(status_code=404, detail="US non trovata")
         
         try:
-            # Read file content once
-            await file.seek(0)
-            file_content = await file.read()
-            actual_filesize = len(file_content)
-            await file.seek(0)  # Reset for potential re-read
+            actual_filesize = len(file_data)
 
             # Prepara metadati file
             file_metadata = metadata or {}
 
             # Estrai metadati immagine se applicabile
-            if file.content_type.startswith('image/'):
+            if content_type.startswith('image/'):
                 try:
                     from PIL import Image
                     import io
-                    image = Image.open(io.BytesIO(file_content))
+                    image = Image.open(io.BytesIO(file_data))
                     file_metadata.update({
                         'width': image.width,
                         'height': image.height,
@@ -174,13 +199,13 @@ class USFileService:
 
             # Generate unique filename
             from uuid import uuid4
-            file_extension = Path(file.filename).suffix.lower()
+            file_extension = Path(filename).suffix.lower()
             unique_filename = f"{str(us.site_id)}_{str(user_id)}_{uuid4().hex[:8]}{file_extension}"
 
             # Upload file to appropriate MinIO bucket based on file type
             from app.services.archaeological_minio_service import archaeological_minio_service
 
-            if file_type == 'documento' or file.content_type == 'application/pdf':
+            if file_type == 'documento' or content_type == 'application/pdf':
                 # Upload document to documents bucket
                 document_metadata = {
                     'document_type': file_type,
@@ -188,18 +213,17 @@ class USFileService:
                     'author': file_metadata.get('photographer', ''),
                     'date': str(file_metadata.get('photo_date')) if file_metadata.get('photo_date') else None,
                     'file_size': actual_filesize,
-                    'original_filename': file.filename,
-                    'content_type': file.content_type
+                    'original_filename': filename,
+                    'content_type': content_type
                 }
                 upload_url = await archaeological_minio_service.upload_document(
-                    file_content,
+                    file_data,
                     unique_filename,
                     str(us.site_id),
                     document_metadata
                 )
-                # Parse filepath from URL: minio://bucket/path -> bucket/path
                 if upload_url.startswith("minio://"):
-                    filepath = upload_url[8:]  # Remove "minio://"
+                    filepath = upload_url[8:]
                 else:
                     filepath = f"{archaeological_minio_service.buckets['documents']}/{str(us.site_id)}/{unique_filename}"
             else:
@@ -243,30 +267,29 @@ class USFileService:
                     'usage_rights': '',
                     'validation_notes': '',
                     'file_size': actual_filesize,
-                    'original_filename': file.filename,
-                    'content_type': file.content_type
+                    'original_filename': filename,
+                    'content_type': content_type
                 }
                 upload_url = await archaeological_minio_service.upload_photo_with_metadata(
-                    file_content,
+                    file_data,
                     unique_filename,
                     str(us.site_id),
                     photo_metadata
                 )
-                # Parse filepath from URL: minio://bucket/path -> bucket/path
                 if upload_url.startswith("minio://"):
-                    filepath = upload_url[8:]  # Remove "minio://"
+                    filepath = upload_url[8:]
                 else:
                     filepath = f"{archaeological_minio_service.buckets['photos']}/{str(us.site_id)}/{unique_filename}"
 
             # Crea record USFile
             us_file = USFile(
-                id=safe_uuid_str(uuid.uuid4()),  # Generate and convert UUID to string
-                site_id=safe_uuid_str(us.site_id),  # Convert site_id to string
+                id=safe_uuid_str(uuid.uuid4()),
+                site_id=safe_uuid_str(us.site_id),
                 filename=unique_filename,
-                original_filename=file.filename,
+                original_filename=filename,
                 filepath=filepath,
                 filesize=actual_filesize,
-                mimetype=file.content_type,
+                mimetype=content_type,
                 file_category='disegno' if file_type in ['pianta', 'sezione', 'prospetto'] else file_type,
                 title=file_metadata.get('title', ''),
                 description=file_metadata.get('description', ''),
@@ -286,12 +309,12 @@ class USFileService:
             )
            
             self.db.add(us_file)
-            await self.db.flush()  # Per ottenere ID
+            await self.db.flush()
            
             # Crea associazione US-File
             association_stmt = us_files_association.insert().values(
                 us_id=safe_uuid_str(us_id),
-                file_id=safe_uuid_str(us_file.id),  # Convert file_id to string
+                file_id=safe_uuid_str(us_file.id),
                 file_type=file_type,
                 ordine=file_metadata.get('ordine', 0)
             )
@@ -300,7 +323,7 @@ class USFileService:
             await self.db.commit()
            
             # Avvia deep zoom per immagini grandi
-            if (file.content_type.startswith('image/') and 
+            if (content_type.startswith('image/') and 
                 file_metadata.get('width', 0) > 2000 and 
                 file_metadata.get('height', 0) > 2000):
                
@@ -310,19 +333,14 @@ class USFileService:
                
                 # Avvia processing deep zoom in background
                 try:
-                    # Carica il contenuto del file per il deep zoom
-                    from app.services.archaeological_minio_service import archaeological_minio_service
-                    file_content = await archaeological_minio_service.get_file(f"minio://{archaeological_minio_service.buckets['photos']}/{filepath}")
-                   
-                    # Schedula generazione tiles in background
+                    # Usa file_data già disponibile per il deep zoom
                     deep_zoom_service = get_deep_zoom_minio_service()
                     await deep_zoom_service.schedule_tiles_generation_async(
-                        str(us_file.id), file_content, str(us.site_id)
+                        str(us_file.id), file_data, str(us.site_id)
                     )
                     logger.info(f"Deep zoom schedulato per US file {us_file.id}")
                 except Exception as e:
                     logger.warning(f"Impossibile schedulare deep zoom per US file {us_file.id}: {e}")
-                    # Non bloccare l'upload se il deep zoom fallisce
            
             logger.info(f"File {file_type} caricato per US {us.us_code}: {unique_filename}")
             return us_file

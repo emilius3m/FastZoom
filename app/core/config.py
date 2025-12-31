@@ -86,6 +86,14 @@ class Settings(BaseSettings):
     auto_metadata_extraction: bool = True
     photos_per_page: int = 24
     upload_dir: str = "app/static/uploads"
+    
+    # TusPy Configuration - Resumable uploads
+    tus_enabled: bool = True
+    tus_upload_dir: str = "app/static/tus_uploads"
+    tus_max_size: int = 1073741824  # 1GB in bytes
+    tus_chunk_size: int = 5242880  # 5MB chunks
+    tus_expiration_hours: int = 24  # Cleanup incomplete uploads after 24h
+    tus_allowed_extensions: str = "jpg,jpeg,png,tiff,raw,dng,pdf,doc,docx"
 
     # Sistema Museale
     museum_name: str = "Direzione Regionale Museale"

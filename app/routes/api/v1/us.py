@@ -1,16 +1,13 @@
 """
 API v1 - US/USM Units Management
 Endpoints per gestione Unità Stratigrafiche e Murarie.
-Implementa backward compatibility con avvisi di deprecazione.
+Thin wrappers delegating to USService for business logic.
 """
 
 from typing import List, Dict, Any, Optional
 from uuid import UUID
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc
-from sqlalchemy.orm import selectinload
 from pydantic import ValidationError
 from loguru import logger
 
@@ -26,10 +23,18 @@ from app.schemas.us import (
     USMCreate, USMUpdate, USMOut
 )
 from app.routes.api.v1.ocr_us_import import router as ocr_us_import_router
+from app.services.us_service import USService
+from app.core.domain_exceptions import (
+    ValidationError as DomainValidationError,
+    ResourceNotFoundError,
+    InsufficientPermissionsError
+)
+from sqlalchemy import select, desc
 
 router = APIRouter()
 
 async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> bool:
+    """Verify user has access to site"""
     return any(s["site_id"] == str(site_id) for s in user_sites)
 
 # ------- US CRUD - V1 ENDPOINTS -------
@@ -49,85 +54,17 @@ async def v1_create_us(
     Endpoint: /api/v1/us/sites/{site_id}/us
     """
     try:
-        logger.info(f"Creating US with payload: {payload.model_dump()}")
-        
-        # Override site_id from URL parameter
-        payload_dict = payload.model_dump(exclude_unset=True)
-        payload_dict['site_id'] = site_id
-        
+        # Verify site access
         if not await verify_site_access(site_id, user_sites):
             raise HTTPException(status_code=403, detail="Accesso negato al sito")
         
-        # Handle date fields
-        date_fields = ['data_rilevamento', 'data_rielaborazione']
-        for field in date_fields:
-            if field in payload_dict and isinstance(payload_dict[field], str):
-                try:
-                    from datetime import datetime
-                    payload_dict[field] = datetime.strptime(payload_dict[field], '%Y-%m-%d').date()
-                except ValueError:
-                    pass  # Keep original value if parsing fails
-        
-        # Handle numeric fields
-        if 'anno' in payload_dict and payload_dict['anno'] is not None:
-            try:
-                payload_dict['anno'] = int(payload_dict['anno'])
-            except (ValueError, TypeError):
-                pass
-        
-        # Ensure site_id is a valid UUID and convert to string for SQLite compatibility
-        if 'site_id' in payload_dict:
-            if isinstance(payload_dict['site_id'], str):
-                try:
-                    # Validate UUID format but keep as string for SQLite
-                    UUID(payload_dict['site_id'])
-                except (ValueError, TypeError):
-                    raise DomainValidationError("site_id non è un UUID valido")
-            elif isinstance(payload_dict['site_id'], UUID):
-                # Convert UUID object to string for SQLite compatibility
-                payload_dict['site_id'] = str(payload_dict['site_id'])
-        
-        # Validate us_code format
-        if 'us_code' in payload_dict:
-            import re
-            us_code_pattern = re.compile(r'^US\d{3,4}$')
-            if not us_code_pattern.match(payload_dict['us_code']):
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"us_code '{payload_dict['us_code']}' non è valido. Deve essere nel formato US seguito da 3-4 cifre (es: US001, US0001)"
-                )
-        
-        # Validate date fields
-        date_fields = ['data_rilevamento', 'data_rielaborazione']
-        for field in date_fields:
-            if field in payload_dict and payload_dict[field] is not None:
-                if isinstance(payload_dict[field], str):
-                    if not payload_dict[field].strip():
-                        # Empty string is OK, just set to None
-                        payload_dict[field] = None
-                    else:
-                        try:
-                            from datetime import datetime
-                            payload_dict[field] = datetime.strptime(payload_dict[field], '%Y-%m-%d').date()
-                        except ValueError:
-                            raise HTTPException(
-                                status_code=422,
-                                detail=f"Campo '{field}': '{payload_dict[field]}' non è una data valida. Usare formato YYYY-MM-DD (es: 2025-01-15)"
-                            )
-        
-        # Add user_id for created_by field (convert UUID to string for SQLite compatibility)
-        payload_dict['created_by'] = str(user_id)
-        payload_dict['updated_by'] = str(user_id)
-        
-        us = UnitaStratigrafica(**payload_dict)
-        db.add(us)
-        await db.commit()
-        await db.refresh(us)
+        # Delegate to service
+        us = await USService.create_us(db, payload, site_id, user_id)
         return us
         
-    except ValidationError as e:
+    except DomainValidationError as e:
         logger.error(f"Validation error creating US: {e}")
-        raise HTTPException(status_code=422, detail=f"Errore di validazione: {e}")
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error creating US: {e}")
         raise HTTPException(status_code=500, detail=f"Errore interno del server: {str(e)}")
@@ -135,106 +72,27 @@ async def v1_create_us(
 @router.get("/sites/{site_id}/us/{us_id}", response_model=USOut, summary="Get US by ID", tags=["US/USM Units"])
 async def v1_get_us(
     site_id: UUID,
-    us_id: str,  # Accept as string to handle both formats
+    us_id: str,
     db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    """
-    Get a specific US by ID for the specified site.
-    
-    Endpoint: /api/v1/us/sites/{site_id}/us/{us_id}
-    """
-    # Normalize UUID - handle both with and without hyphens
+    """Get a specific US by ID for the specified site."""
     try:
-        # If us_id doesn't have hyphens, try to format it as a proper UUID
-        if '-' not in us_id and len(us_id) == 32:
-            # Format: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
-            normalized_us_id = f"{us_id[0:8]}-{us_id[8:12]}-{us_id[12:16]}-{us_id[16:20]}-{us_id[20:32]}"
-            us_id_uuid = UUID(normalized_us_id)
-            logger.info(f"🔧 [US_GET] Normalized UUID from {us_id} to {normalized_us_id}")
-        else:
-            # Try to parse as-is (with hyphens)
-            us_id_uuid = UUID(us_id)
-            normalized_us_id = str(us_id_uuid)
-    except (ValueError, TypeError) as e:
-        logger.error(f"❌ [US_GET] Invalid UUID format: {us_id} - Error: {e}")
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "Invalid UUID format",
-                "message": f"L'ID US '{us_id}' non è un UUID valido",
-                "us_id": us_id,
-                "debug_info": "UUID must be in standard format (with or without hyphens)"
-            }
-        )
-    
-    # DEBUG LOGGING: Log request details
-    logger.info(f"🔍 [US_GET] Request received - Site ID: {site_id}, US ID: {normalized_us_id}")
-    logger.info(f"🔍 [US_GET] User has access to {len(user_sites)} sites")
-    
-    # Log user accessible sites for debugging
-    if user_sites:
-        logger.debug(f"🔍 [US_GET] Accessible sites: {[s['site_id'] for s in user_sites]}")
-    else:
-        logger.warning(f"⚠️  [US_GET] User has NO accessible sites - this is likely the root cause of 404 errors")
-    
-    # Check site access first (before database query for better performance)
-    site_access = await verify_site_access(site_id, user_sites)
-    logger.info(f"🔍 [US_GET] Site access check result: {site_access}")
-    
-    if not site_access:
-        logger.error(f"❌ [US_GET] ACCESS DENIED - User does not have access to site {site_id}")
-        logger.error(f"❌ [US_GET] Available sites: {[s['site_id'] for s in user_sites]}")
-        logger.error(f"❌ [US_GET] Requested site: {site_id}")
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": "Access denied",
-                "message": f"Non hai i permessi per accedere al sito {site_id}",
-                "site_id": str(site_id),
-                "accessible_sites": [s["site_id"] for s in user_sites],
-                "debug_info": "User lacks site permissions - contact administrator"
-            }
-        )
-    
-    # Query US from database
-    logger.info(f"🔍 [US_GET] Querying US {normalized_us_id} from database...")
-    result = await db.execute(
-        select(UnitaStratigrafica).where(UnitaStratigrafica.id == str(us_id_uuid))
-    )
-    us = result.scalar_one_or_none()
-    
-    if not us:
-        logger.error(f"❌ [US_GET] US NOT FOUND - US {normalized_us_id} does not exist in database")
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "error": "US not found",
-                "message": f"L'Unità Stratigrafica {normalized_us_id} non esiste nel database",
-                "us_id": normalized_us_id,
-                "debug_info": "US ID not found in database"
-            }
-        )
-    
-    logger.info(f"🔍 [US_GET] US found - Site ID: {us.site_id}, US Code: {us.us_code}")
-    
-    # Check if US belongs to requested site
-    if us.site_id != str(site_id):
-        logger.error(f"❌ [US_GET] SITE MISMATCH - US {normalized_us_id} belongs to site {us.site_id}, not {site_id}")
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "error": "US not found for this site",
-                "message": f"L'US {normalized_us_id} appartiene al sito {us.site_id}, non al sito {site_id}",
-                "us_id": normalized_us_id,
-                "requested_site_id": str(site_id),
-                "actual_site_id": us.site_id,
-                "debug_info": "US exists but belongs to different site"
-            }
-        )
-    
-    logger.success(f"✅ [US_GET] SUCCESS - US {normalized_us_id} retrieved successfully")
-    return us
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Accesso negato al sito")
+        
+        us = await USService.get_us(db, us_id, site_id)
+        return us
+        
+    except DomainValidationError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=422, detail=str(e))
+    except ResourceNotFoundError as e:
+        logger.error(f"US not found: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/sites/{site_id}/us", response_model=List[USOut], summary="List US for site", tags=["US/USM Units"])
 async def v1_list_us(
@@ -242,7 +100,6 @@ async def v1_list_us(
     search: Optional[str] = Query(None, description="Ricerca testuale generica"),
     da: Optional[str] = Query(None, description="Data rilevamento DA (YYYY-MM-DD)"),
     a: Optional[str] = Query(None, description="Data rilevamento A (YYYY-MM-DD)"),
-    # Advanced filters
     us_code: Optional[str] = Query(None, description="Codice US (es: US001)"),
     tipo: Optional[str] = Query(None, description="Tipo US: positiva o negativa"),
     periodo: Optional[str] = Query(None, description="Periodo cronologico"),
@@ -257,228 +114,73 @@ async def v1_list_us(
     db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    """
-    List US units for the specified site with optional filtering.
-    
-    Endpoint: /api/v1/us/sites/{site_id}/us
-    
-    Advanced filters:
-    - us_code: Filter by US code (partial match)
-    - tipo: Filter by type (positiva/negativa)
-    - periodo: Filter by period (partial match)
-    - fase: Filter by phase (partial match)
-    - definizione: Filter by definition (partial match)
-    - localita: Filter by locality (partial match)
-    - area_struttura: Filter by area/structure (partial match)
-    - affidabilita: Filter by reliability (exact match)
-    - responsabile: Filter by responsible person (partial match)
-    - da/a: Filter by survey date range
-    """
-    if not await verify_site_access(site_id, user_sites):
-        raise HTTPException(status_code=403, detail="Accesso negato al sito")
-    
-    q = select(UnitaStratigrafica).where(UnitaStratigrafica.site_id == str(site_id))
-    
-    # Generic text search (searches in descrizione, us_code, definizione)
-    if search:
-        like = f"%{search}%"
-        from sqlalchemy import or_
-        q = q.where(or_(
-            UnitaStratigrafica.descrizione.ilike(like),
-            UnitaStratigrafica.us_code.ilike(like),
-            UnitaStratigrafica.definizione.ilike(like),
-            UnitaStratigrafica.localita.ilike(like)
-        ))
-    
-    # Advanced filters
-    if us_code:
-        q = q.where(UnitaStratigrafica.us_code.ilike(f"%{us_code}%"))
-    
-    if tipo:
-        q = q.where(UnitaStratigrafica.tipo == tipo)
-    
-    if periodo:
-        q = q.where(UnitaStratigrafica.periodo.ilike(f"%{periodo}%"))
-    
-    if fase:
-        q = q.where(UnitaStratigrafica.fase.ilike(f"%{fase}%"))
-    
-    if definizione:
-        q = q.where(UnitaStratigrafica.definizione.ilike(f"%{definizione}%"))
-    
-    if localita:
-        q = q.where(UnitaStratigrafica.localita.ilike(f"%{localita}%"))
-    
-    if area_struttura:
-        q = q.where(UnitaStratigrafica.area_struttura.ilike(f"%{area_struttura}%"))
-    
-    if affidabilita:
-        q = q.where(UnitaStratigrafica.affidabilita_stratigrafica == affidabilita)
-    
-    if responsabile:
-        q = q.where(UnitaStratigrafica.responsabile_compilazione.ilike(f"%{responsabile}%"))
-    
-    # Date range filter
-    if da:
-        try:
-            from datetime import datetime
-            date_from = datetime.strptime(da, "%Y-%m-%d").date()
-            q = q.where(UnitaStratigrafica.data_rilevamento >= date_from)
-        except ValueError:
-            pass  # Invalid date format, skip filter
-    
-    if a:
-        try:
-            from datetime import datetime
-            date_to = datetime.strptime(a, "%Y-%m-%d").date()
-            q = q.where(UnitaStratigrafica.data_rilevamento <= date_to)
-        except ValueError:
-            pass  # Invalid date format, skip filter
-    
-    q = q.order_by(desc(UnitaStratigrafica.created_at)).offset(skip).limit(limit)
-    rows = (await db.execute(q)).scalars().all()
-    return rows
+    """List US units for the specified site with optional filtering."""
+    try:
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Accesso negato al sito")
+        
+        rows = await USService.list_us(
+            db, site_id, search=search, da=da, a=a,
+            us_code=us_code, tipo=tipo, periodo=periodo, fase=fase,
+            definizione=definizione, localita=localita, area_struttura=area_struttura,
+            affidabilita=affidabilita, responsabile=responsabile,
+            skip=skip, limit=limit
+        )
+        return rows
+        
+    except Exception as e:
+        logger.error(f"Error listing US: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/sites/{site_id}/us/{us_id}", response_model=USOut, summary="Update US", tags=["US/USM Units"])
 async def v1_update_us(
     site_id: UUID,
-    us_id: str,  # Accept as string to handle both formats
+    us_id: str,
     payload: USUpdate,
     db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    """
-    Update a specific US for the specified site.
-    
-    Endpoint: /api/v1/us/sites/{site_id}/us/{us_id}
-    """
-    # Normalize UUID - handle both with and without hyphens
+    """Update a specific US for the specified site."""
     try:
-        # If us_id doesn't have hyphens, try to format it as a proper UUID
-        if '-' not in us_id and len(us_id) == 32:
-            # Format: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
-            normalized_us_id = f"{us_id[0:8]}-{us_id[8:12]}-{us_id[12:16]}-{us_id[16:20]}-{us_id[20:32]}"
-            us_id_uuid = UUID(normalized_us_id)
-            logger.info(f"🔧 [US_UPDATE] Normalized UUID from {us_id} to {normalized_us_id}")
-        else:
-            # Try to parse as-is (with hyphens)
-            us_id_uuid = UUID(us_id)
-            normalized_us_id = str(us_id_uuid)
-    except (ValueError, TypeError) as e:
-        logger.error(f"❌ [US_UPDATE] Invalid UUID format: {us_id} - Error: {e}")
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "Invalid UUID format",
-                "message": f"L'ID US '{us_id}' non è un UUID valido",
-                "us_id": us_id,
-                "debug_info": "UUID must be in standard format (with or without hyphens)"
-            }
-        )
-    
-    try:
-        logger.info(f"Updating US {normalized_us_id} with payload: {payload.model_dump()}")
-        
-        result = await db.execute(select(UnitaStratigrafica).where(UnitaStratigrafica.id == str(us_id_uuid)))
-        us = result.scalar_one_or_none()
-        if not us:
-            raise HTTPException(status_code=404, detail="US non trovata")
         if not await verify_site_access(site_id, user_sites):
             raise HTTPException(status_code=403, detail="Accesso negato al sito")
-        if us.site_id != str(site_id):
-            raise HTTPException(status_code=404, detail="US non trovata per questo sito")
         
-        # Process payload to ensure proper data types
-        payload_dict = payload.model_dump(exclude_unset=True)
-        
-        # Handle date fields
-        date_fields = ['data_rilevamento', 'data_rielaborazione']
-        for field in date_fields:
-            if field in payload_dict and payload_dict[field] is not None:
-                if isinstance(payload_dict[field], str):
-                    if not payload_dict[field].strip():
-                        payload_dict[field] = None
-                    else:
-                        try:
-                            from datetime import datetime
-                            payload_dict[field] = datetime.strptime(payload_dict[field], '%Y-%m-%d').date()
-                        except ValueError:
-                            raise HTTPException(
-                                status_code=422,
-                                detail=f"Campo '{field}': '{payload_dict[field]}' non è una data valida. Usare formato YYYY-MM-DD (es: 2025-01-15)"
-                            )
-        
-        # Handle numeric fields
-        if 'anno' in payload_dict and payload_dict['anno'] is not None:
-            try:
-                payload_dict['anno'] = int(payload_dict['anno'])
-            except (ValueError, TypeError):
-                pass
-        
-        # Update all fields
-        for k, v in payload_dict.items():
-            setattr(us, k, v)
-        
-        await db.commit()
-        await db.refresh(us)
-        logger.info(f"US {us_id} updated successfully")
+        us = await USService.update_us(db, us_id, payload, site_id)
         return us
         
-    except ValidationError as e:
-        logger.error(f"Validation error updating US: {e}")
-        raise HTTPException(status_code=422, detail=f"Errore di validazione: {e}")
+    except DomainValidationError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=422, detail=str(e))
+    except ResourceNotFoundError as e:
+        logger.error(f"US not found: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error updating US: {e}")
-        logger.exception("Full traceback:")
-        raise HTTPException(status_code=500, detail=f"Errore interno del server: {str(e)}")
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/sites/{site_id}/us/{us_id}", status_code=204, summary="Delete US", tags=["US/USM Units"])
 async def v1_delete_us(
     site_id: UUID,
-    us_id: str,  # Accept as string to handle both formats
+    us_id: str,
     db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
-    """
-    Delete a specific US for the specified site.
-    
-    Endpoint: /api/v1/us/sites/{site_id}/us/{us_id}
-    """
-    # Normalize UUID - handle both with and without hyphens
+    """Delete a specific US for the specified site."""
     try:
-        # If us_id doesn't have hyphens, try to format it as a proper UUID
-        if '-' not in us_id and len(us_id) == 32:
-            # Format: 209a6c63f1f1483cac15c81041c03149 -> 209a6c63-f1f1-483c-ac15-c81041c03149
-            normalized_us_id = f"{us_id[0:8]}-{us_id[8:12]}-{us_id[12:16]}-{us_id[16:20]}-{us_id[20:32]}"
-            us_id_uuid = UUID(normalized_us_id)
-            logger.info(f"🔧 [US_DELETE] Normalized UUID from {us_id} to {normalized_us_id}")
-        else:
-            # Try to parse as-is (with hyphens)
-            us_id_uuid = UUID(us_id)
-            normalized_us_id = str(us_id_uuid)
-    except (ValueError, TypeError) as e:
-        logger.error(f"❌ [US_DELETE] Invalid UUID format: {us_id} - Error: {e}")
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "Invalid UUID format",
-                "message": f"L'ID US '{us_id}' non è un UUID valido",
-                "us_id": us_id,
-                "debug_info": "UUID must be in standard format (with or without hyphens)"
-            }
-        )
-    
-    result = await db.execute(select(UnitaStratigrafica).where(UnitaStratigrafica.id == str(us_id_uuid)))
-    us = result.scalar_one_or_none()
-    if not us:
-        raise HTTPException(status_code=404, detail="US non trovata")
-    if not await verify_site_access(site_id, user_sites):
-        raise HTTPException(status_code=403, detail="Accesso negato al sito")
-    if us.site_id != str(site_id):
-        raise HTTPException(status_code=404, detail="US non trovata per questo sito")
-    await db.delete(us)
-    await db.commit()
-    return
+        if not await verify_site_access(site_id, user_sites):
+            raise HTTPException(status_code=403, detail="Accesso negato al sito")
+        
+        await USService.delete_us(db, us_id, site_id)
+        return
+        
+    except ResourceNotFoundError as e:
+        logger.error(f"US not found: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ------- USM CRUD - V1 ENDPOINTS -------
 
 # ------- USM CRUD - V1 ENDPOINTS -------
 

@@ -1,7 +1,7 @@
 # app/services/storage_service.py - GESTIONE STORAGE MINIO CORRETTA
 
 import io
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, BinaryIO
 from uuid import uuid4
 from pathlib import Path
 from fastapi import UploadFile, HTTPException
@@ -93,6 +93,80 @@ class StorageService:
                     'file_size': file_size,
                     'original_filename': file.filename,
                     'content_type': file.content_type or 'application/octet-stream'
+                }
+            )
+
+            # Parse actual object name from returned URL
+            if photo_url.startswith("minio://"):
+                parsed = photo_url.replace("minio://", "").split("/", 1)
+                bucket = parsed[0]
+                actual_object_name = parsed[1] if len(parsed) > 1 else unique_filename
+            else:
+                actual_object_name = minio_object_name
+
+            logger.info(f"File uploaded to Archaeological MinIO: {actual_object_name} ({file_size} bytes)")
+
+            # Return actual stored path for DB consistency
+            return unique_filename, actual_object_name, file_size
+
+        except Exception as e:
+            logger.warning(f"Archaeological MinIO upload failed: {e}, falling back to local storage")
+            # Fallback a storage locale
+            return await self._save_file_locally_from_content(
+                file_content, site_id, user_id, unique_filename, f"storage/site/{site_id}/{unique_filename}"
+            )
+
+    async def save_file_bytes(
+            self,
+            file_stream: BinaryIO,
+            filename: str,
+            site_id: str,
+            user_id: str,
+            content_type: str = "application/octet-stream"
+    ) -> Tuple[str, str, int]:
+        """
+        Salva file da bytes/BinaryIO su MinIO (framework-agnostic version)
+        Returns: Tuple[unique_filename, minio_path, file_size]
+        
+        Args:
+            file_stream: BinaryIO stream with file content
+            filename: Original filename
+            site_id: Site ID
+            user_id: User ID uploading the file
+            content_type: MIME type of the file
+        """
+        # Assicurati che il bucket esista
+        await self.ensure_bucket_exists()
+
+        # Read bytes from stream
+        if isinstance(file_stream, io.BytesIO):
+            file_content = file_stream.getvalue()
+        else:
+            file_content = file_stream.read()
+            
+        file_size = len(file_content)
+
+        if file_size == 0:
+            raise HTTPException(status_code=400, detail="File vuoto")
+
+        # Genera nome file univoco
+        file_extension = Path(filename).suffix.lower()
+        unique_filename = f"{site_id}_{user_id}_{uuid4().hex[:8]}{file_extension}"
+
+        # Path MinIO senza prefisso "sites/"
+        minio_object_name = f"{site_id}/{unique_filename}"
+
+        # Salva file su MinIO archeologico
+        try:
+            # Usa il servizio archeologico per upload con metadati
+            photo_url = await archaeological_minio_service.upload_photo_with_metadata(
+                file_content,
+                unique_filename,
+                site_id,
+                {
+                    'file_size': file_size,
+                    'original_filename': filename,
+                    'content_type': content_type
                 }
             )
 

@@ -137,17 +137,16 @@ class FileUtils:
     """Utility class per operazioni comuni sui file"""
 
     @staticmethod
-    async def create_temp_file_from_upload(file: UploadFile) -> str:
-        """Crea file temporaneo da UploadFile"""
-        if not file.filename:
+    def create_temp_file_from_bytes(file_data: bytes, filename: str) -> str:
+        """Crea file temporaneo da bytes"""
+        if not filename:
             raise ImageProcessingError("Nome file mancante")
+        
+        if len(file_data) == 0:
+            raise ImageProcessingError("Contenuto file vuoto")
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
-            content = await file.read()
-            if len(content) == 0:
-                raise ImageProcessingError("Contenuto file vuoto")
-
-            tmp_file.write(content)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp_file:
+            tmp_file.write(file_data)
             return tmp_file.name
 
     @staticmethod
@@ -228,19 +227,19 @@ class PhotoMetadataService:
             logger.error(f"Errore estrazione metadati da {filename}: {e}")
             return {}, {}
 
-    async def extract_metadata_from_file(
+    async def extract_metadata_from_bytes(
             self,
-            file: UploadFile,
+            file_data: bytes,
             filename: str
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
-        Estrae metadati direttamente da file UploadFile
+        Estrae metadati da bytes dell'immagine
         Returns: Tuple[exif_data, photo_metadata]
         """
         temp_file_path = None
         try:
             # Crea file temporaneo
-            temp_file_path = await FileUtils.create_temp_file_from_upload(file)
+            temp_file_path = FileUtils.create_temp_file_from_bytes(file_data, filename)
 
             # Estrai metadati dal file temporaneo
             exif_data, metadata = await self.extract_metadata(temp_file_path, filename)
@@ -836,20 +835,20 @@ class PhotoMetadataService:
             if temp_file_path:
                 FileUtils.cleanup_temp_file(temp_file_path)
 
-    async def validate_image_file(self, file: UploadFile) -> Tuple[bool, str]:
-        """Valida se il file è un'immagine supportata"""
+    async def validate_image_bytes(self, file_data: bytes, filename: str) -> Tuple[bool, str]:
+        """Valida se i bytes sono un'immagine supportata"""
         try:
-            if not file.filename:
+            if not filename:
                 return False, "Nome file mancante"
 
-            extension = Path(file.filename).suffix.lower()
+            extension = Path(filename).suffix.lower()
             if extension not in self.supported_formats:
                 return False, f"Formato {extension} non supportato"
 
             # Verifica che sia effettivamente un'immagine
             temp_file_path = None
             try:
-                temp_file_path = await FileUtils.create_temp_file_from_upload(file)
+                temp_file_path = FileUtils.create_temp_file_from_bytes(file_data, filename)
 
                 with Image.open(temp_file_path) as img:
                     # Se arriviamo qui, è un'immagine valida

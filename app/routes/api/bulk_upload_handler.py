@@ -53,16 +53,13 @@ async def process_queued_bulk_upload(payload: Dict[str, Any]) -> Dict[str, Any]:
                 # Extract metadata from the actual file
                 file_metadata = {}
                 try:
-                    # Create a file-like object from the permanent path for metadata extraction
+                    # Read file as bytes for metadata extraction
                     async with aiofiles.open(permanent_path, 'rb') as f:
-                        # Create a simple file-like object for metadata extraction
-                        from io import BytesIO
                         content = await f.read()
-                        file_like = BytesIO(content)
-                        file_like.filename = temp_file['original_filename']
-
-                        exif_data, extracted_metadata = await photo_metadata_service.extract_metadata_from_file(
-                            file_like, temp_file['filename']
+                        
+                        # Use refactored bytes-based method
+                        exif_data, extracted_metadata = await photo_metadata_service.extract_metadata_from_bytes(
+                            content, temp_file['original_filename']
                         )
                         file_metadata = extracted_metadata
                 except Exception as metadata_error:
