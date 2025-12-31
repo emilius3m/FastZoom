@@ -12,7 +12,13 @@ from loguru import logger
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
-from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError,
+    SiteNotFoundError
+)
 
 router = APIRouter()
 
@@ -67,10 +73,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     # Normalizza l'ID del sito per supportare sia UUID che hash esadecimali
     normalized_site_id = normalize_site_id(str(site_id))
     if not normalized_site_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"ID sito non valido: {site_id}"
-        )
+        raise SiteNotFoundError(str(site_id))
     
     site_info = None
     for site in user_sites:
@@ -88,10 +91,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
             break
     
     if not site_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied. User has access to {len(user_sites)} sites."
-        )
+        raise SiteNotFoundError(str(site_id))
     
     return site_info
 
@@ -112,7 +112,7 @@ async def v1_get_cantieri_sito_direct(
     stato: Optional[str] = Query(None),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera tutti i cantieri di un sito archeologico.
@@ -201,7 +201,7 @@ async def v1_get_cantieri_sito(
     stato: Optional[str] = Query(None),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera tutti i cantieri di un sito archeologico.
@@ -338,7 +338,7 @@ async def v1_create_cantiere(
     cantiere_data: Dict[str, Any],
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Crea un nuovo cantiere per un sito archeologico.
@@ -394,17 +394,15 @@ async def v1_create_cantiere(
         
     except Exception as e:
         logger.error(f"Errore creazione cantiere: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nella creazione del cantiere"
-        )
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/cantieri/{cantiere_id}", summary="Dettaglio cantiere", tags=["Cantieri"])
 async def v1_get_cantiere_detail(
     cantiere_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera i dettagli di un cantiere specifico.
@@ -455,10 +453,8 @@ async def v1_get_cantiere_detail(
     except Exception as e:
         from loguru import logger
         logger.error(f"Errore dettaglio cantiere {cantiere_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel caricamento del cantiere"
-        )
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.put("/cantieri/{cantiere_id}", summary="Aggiorna cantiere", tags=["Cantieri"])
 async def v1_update_cantiere(
@@ -466,7 +462,7 @@ async def v1_update_cantiere(
     cantiere_data: Dict[str, Any],
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Aggiorna un cantiere esistente.
@@ -569,17 +565,15 @@ async def v1_update_cantiere(
     except Exception as e:
         from loguru import logger
         logger.error(f"Errore aggiornamento cantiere {cantiere_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nell'aggiornamento del cantiere"
-        )
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.delete("/cantieri/{cantiere_id}", summary="Elimina cantiere", tags=["Cantieri"])
 async def v1_delete_cantiere(
     cantiere_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Elimina un cantiere (soft delete).
@@ -609,10 +603,7 @@ async def v1_delete_cantiere(
         giornali_count = giornali_count_result.scalar() or 0
         
         if giornali_count > 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Impossibile eliminare il cantiere: ci sono {giornali_count} giornali associati"
-            )
+            raise DomainValidationError(f"Impossibile eliminare il cantiere: ci sono {giornali_count} giornali associati")
         
         # Soft delete
         cantiere.is_active = False
@@ -628,16 +619,14 @@ async def v1_delete_cantiere(
     except Exception as e:
         from loguru import logger
         logger.error(f"Errore eliminazione cantiere {cantiere_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nell'eliminazione del cantiere"
-        )
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/stats/cantieri", summary="Statistiche cantieri", tags=["Cantieri - Stats"])
 async def v1_get_cantieri_stats(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera statistiche generali per i cantieri dell'utente.
@@ -693,17 +682,15 @@ async def v1_get_cantieri_stats(
     except Exception as e:
         from loguru import logger
         logger.error(f"Errore statistiche cantieri: {str(e)}")
-        raise HTTPException(
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel calcolo delle statistiche cantieri"
-        )
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/sites/{site_id}/stats/cantieri", summary="Statistiche cantieri sito", tags=["Cantieri - Stats"])
 async def v1_get_site_cantieri_stats(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera statistiche per i cantieri di un sito specifico.
@@ -784,7 +771,5 @@ async def v1_get_site_cantieri_stats(
     except Exception as e:
         from loguru import logger
         logger.error(f"Errore statistiche cantieri sito {site_id}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore nel calcolo delle statistiche cantieri del sito"
-        )
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")

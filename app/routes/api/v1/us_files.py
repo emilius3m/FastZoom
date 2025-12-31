@@ -48,7 +48,7 @@ async def upload_us_file(
     photo_date: Optional[str] = Form(None),
     ordine: int = Form(0),
     is_published: bool = Form(False),
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -120,7 +120,7 @@ async def upload_usm_file(
     photo_date: Optional[str] = Form(None),
     ordine: int = Form(0),
     is_published: bool = Form(False),
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -177,7 +177,7 @@ async def upload_usm_file(
 async def get_us_files(
     us_id: str,
     file_type: Optional[str] = None,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Ottieni tutti i file di una US, opzionalmente filtrati per tipo"""
@@ -209,7 +209,7 @@ async def get_us_files(
 async def get_usm_files(
     usm_id: str,
     file_type: Optional[str] = None,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Ottieni file USM"""
@@ -240,7 +240,7 @@ async def get_usm_files(
 @router.get("/us/{us_id}/files/summary")
 async def get_us_files_summary(
     us_id: str,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Riassunto file US raggruppati per tipo"""
@@ -273,7 +273,7 @@ async def get_us_files_summary(
 @router.get("/usm/{usm_id}/files/summary")
 async def get_usm_files_summary(
     usm_id: str,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Riassunto file USM raggruppati per tipo"""
@@ -300,7 +300,7 @@ async def get_usm_files_summary(
 @router.get("/{file_id}/view")
 async def view_us_file(
     file_id: str,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Visualizza file US/USM (stream per immagini)"""
@@ -406,7 +406,7 @@ async def view_us_file(
 @router.get("/{file_id}/thumbnail")
 async def get_us_file_thumbnail(
     file_id: str,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Ottieni thumbnail file US/USM"""
@@ -535,7 +535,7 @@ async def get_us_file_thumbnail(
 @router.get("/{file_id}/download")
 async def download_us_file(
     file_id: str,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Download file US/USM"""
@@ -645,7 +645,7 @@ async def download_us_file(
 async def update_us_file_metadata(
     file_id: str,
     metadata: Dict[str, Any],
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -681,7 +681,7 @@ async def update_us_file_metadata(
 async def delete_us_file(
     us_id: str,
     file_id: str,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -716,7 +716,7 @@ async def delete_us_file(
 async def delete_usm_file(
     usm_id: str,
     file_id: str,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -765,7 +765,7 @@ async def get_supported_file_types():
 async def get_next_file_order(
     us_id: str,
     file_type: str,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """Ottieni prossimo numero d'ordine per tipo file in US"""
     

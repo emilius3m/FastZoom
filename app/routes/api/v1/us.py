@@ -38,7 +38,7 @@ async def v1_create_us(
     site_id: UUID,
     request: Request,
     payload: USCreate,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -81,7 +81,7 @@ async def v1_create_us(
                     # Validate UUID format but keep as string for SQLite
                     UUID(payload_dict['site_id'])
                 except (ValueError, TypeError):
-                    raise HTTPException(status_code=422, detail="site_id non è un UUID valido")
+                    raise DomainValidationError("site_id non è un UUID valido")
             elif isinstance(payload_dict['site_id'], UUID):
                 # Convert UUID object to string for SQLite compatibility
                 payload_dict['site_id'] = str(payload_dict['site_id'])
@@ -135,7 +135,7 @@ async def v1_create_us(
 async def v1_get_us(
     site_id: UUID,
     us_id: str,  # Accept as string to handle both formats
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -253,7 +253,7 @@ async def v1_list_us(
     responsabile: Optional[str] = Query(None, description="Responsabile compilazione"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -343,7 +343,7 @@ async def v1_update_us(
     site_id: UUID,
     us_id: str,  # Accept as string to handle both formats
     payload: USUpdate,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -435,7 +435,7 @@ async def v1_update_us(
 async def v1_delete_us(
     site_id: UUID,
     us_id: str,  # Accept as string to handle both formats
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -486,7 +486,7 @@ async def v1_create_usm(
     site_id: UUID,
     request: Request,
     payload: USMCreate,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
@@ -600,7 +600,7 @@ async def v1_create_usm(
 async def v1_get_usm(
     site_id: UUID,
     usm_id: str,  # Accept as string to handle both formats
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -682,7 +682,7 @@ async def v1_list_usm(
     a: Optional[str] = Query(None, description="Data rilevamento A (YYYY-MM-DD)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -772,7 +772,7 @@ async def v1_update_usm(
     site_id: UUID,
     usm_id: str,  # Accept as string to handle both formats
     payload: USMUpdate,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -889,7 +889,7 @@ async def v1_update_usm(
 async def v1_delete_usm(
     site_id: UUID,
     usm_id: str,  # Accept as string to handle both formats
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -972,7 +972,7 @@ async def migration_help():
 async def bulk_create_from_matrix(
     site_id: UUID,
     payload: Dict[str, Any],  # nodes e edges dal frontend
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_database_session),
     user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):

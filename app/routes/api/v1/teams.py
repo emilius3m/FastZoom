@@ -17,7 +17,13 @@ from datetime import datetime, timezone
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
-from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError,
+    SiteNotFoundError
+)
 
 # Models
 from app.models import User, UserSitePermission, PermissionLevel, UserActivity
@@ -54,10 +60,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     )
     
     if not site_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied"
-        )
+        raise SiteNotFoundError(str(site_id))
     
     return site_info
 
@@ -94,7 +97,7 @@ async def v1_get_site_team_members(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera tutti i membri del team di un sito.
@@ -164,7 +167,7 @@ async def v1_invite_team_member(
     invite_data: TeamInvite,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Invita un nuovo utente al team del sito.
@@ -173,10 +176,7 @@ async def v1_invite_team_member(
     
     # Verifica permessi di admin
     if site_info.get("permission_level") not in ["admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo gli amministratori possono invitare membri al team"
-        )
+        raise InsufficientPermissionsError("Solo gli amministratori possono invitare membri al team")
     
     try:
         # Verifica che l'utente esista
@@ -185,7 +185,7 @@ async def v1_invite_team_member(
         user = user_result.scalar_one_or_none()
         
         if not user:
-            raise HTTPException(status_code=404, detail="Utente non trovato")
+            raise ResourceNotFoundError("Utente", invite_data.email)
         
         # Verifica che l'utente non sia già nel team
         existing_permission_query = select(UserSitePermission).where(
@@ -198,7 +198,7 @@ async def v1_invite_team_member(
         existing_permission = existing_permission.scalar_one_or_none()
         
         if existing_permission:
-            raise HTTPException(status_code=400, detail="L'utente è già membro del team")
+            raise DomainValidationError("L'utente è già membro del team")
         
         # Crea nuova permission
         new_permission = UserSitePermission(
@@ -244,7 +244,7 @@ async def v1_update_team_member(
     member_data: TeamMemberUpdate,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Aggiorna i permessi di un membro del team.
@@ -253,10 +253,7 @@ async def v1_update_team_member(
     
     # Verifica permessi di admin
     if site_info.get("permission_level") not in ["admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo gli amministratori possono modificare i permessi"
-        )
+        raise InsufficientPermissionsError("Solo gli amministratori possono modificare i permessi")
     
     try:
         # Recupera il membro del team
@@ -317,7 +314,7 @@ async def v1_remove_team_member(
     user_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Rimuove un membro dal team del sito.
@@ -326,10 +323,7 @@ async def v1_remove_team_member(
     
     # Verifica permessi di admin
     if site_info.get("permission_level") not in ["admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo gli amministratori possono rimuovere membri dal team"
-        )
+        raise InsufficientPermissionsError("Solo gli amministratori possono rimuovere membri dal team")
     
     try:
         # Recupera il membro del team
@@ -360,10 +354,7 @@ async def v1_remove_team_member(
             admin_count = len(admin_count.scalars().all())
             
             if admin_count == 0:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Non è possibile rimuovere l'ultimo amministratore del sito"
-                )
+                raise DomainValidationError("Non è possibile rimuovere l'ultimo amministratore del sito")
         
         # Rimuovi il membro
         await db.delete(member)
@@ -396,7 +387,7 @@ async def v1_get_team_member(
     user_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera i dettagli di un singolo membro del team.
@@ -468,7 +459,7 @@ async def v1_get_available_users_for_invite(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera utenti disponibili per l'invito al team.
@@ -477,10 +468,7 @@ async def v1_get_available_users_for_invite(
     
     # Verifica permessi di admin
     if site_info.get("permission_level") not in ["admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo gli amministratori possono invitare membri"
-        )
+        raise InsufficientPermissionsError("Solo gli amministratori possono invitare membri")
     
     try:
         # Recupera utenti non ancora membri del team

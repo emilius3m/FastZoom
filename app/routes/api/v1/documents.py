@@ -18,7 +18,13 @@ import json
 
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
-from app.database.db import get_async_session
+from app.core.dependencies import get_database_session
+from app.core.domain_exceptions import (
+    InsufficientPermissionsError,
+    ResourceNotFoundError,
+    ValidationError as DomainValidationError,
+    SiteNotFoundError
+)
 
 # Import services for direct implementation
 from app.services.archaeological_minio_service import archaeological_minio_service
@@ -59,10 +65,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     )
     
     if not site_info:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Sito {site_id} non trovato o access denied"
-        )
+        raise SiteNotFoundError(str(site_id))
     
     return site_info
 
@@ -77,7 +80,7 @@ async def v1_get_site_documents(
     offset: int = 0,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera tutti i documenti del sito con filtri opzionali.
@@ -165,7 +168,7 @@ async def v1_upload_document(
     is_public: bool = Form(True),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Upload nuovo documento al sito archeologico.
@@ -177,10 +180,7 @@ async def v1_upload_document(
     
     # Verifica permessi di upload
     if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per upload documenti sul sito {site_id}"
-        )
+        raise InsufficientPermissionsError("Upload documenti richiede permessi editor o admin")
     
     # Simula request form data
     class MockRequest:
@@ -319,7 +319,7 @@ async def v1_get_document(
     document_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Recupera dettagli completi di un documento specifico.
@@ -377,7 +377,7 @@ async def v1_update_document(
     file: Optional[UploadFile] = File(None),
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Aggiorna documento esistente con metadati e/o file.
@@ -387,10 +387,7 @@ async def v1_update_document(
     
     # Verifica permessi di modifica
     if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per modificare documenti sul sito {site_id}"
-        )
+        raise InsufficientPermissionsError("Modifica documenti richiede permessi editor o admin")
     
     # Simula request form data
     class MockRequest:
@@ -435,7 +432,7 @@ async def v1_update_document(
             # Validate file
             file_size = await archaeological_minio_service._get_file_size(file)
             if file_size > 52428800:  # 50MB
-                raise HTTPException(status_code=400, detail="File troppo grande (max 50MB)")
+                raise DomainValidationError("File troppo grande (max 50MB)")
 
             # Read file content
             content = await file.read()
@@ -514,7 +511,7 @@ async def v1_delete_document(
     document_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Elimina documento (soft delete).
@@ -526,10 +523,7 @@ async def v1_delete_document(
     
     # Verifica permessi di eliminazione
     if site_info.get("permission_level") not in ["admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Permessi insufficienti per eliminare documenti dal sito {site_id}"
-        )
+        raise InsufficientPermissionsError("Eliminazione documenti richiede permessi admin")
     
     # Direct implementation
     try:
@@ -614,7 +608,7 @@ async def v1_download_document(
     document_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Download file originale del documento.
@@ -649,7 +643,7 @@ async def v1_download_document(
             
             if not file_data:
                 logger.error(f"File data is empty for document: {doc.filepath}")
-                raise HTTPException(status_code=404, detail="File vuoto su storage")
+                raise ResourceNotFoundError("File storage", doc.filepath)
 
             return StreamingResponse(
                 iter([file_data]),
@@ -679,7 +673,7 @@ async def legacy_get_site_documents(
     request: Request,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     ⚠️ DEPRECATED: Lista documenti sito endpoint legacy.
@@ -743,7 +737,7 @@ async def v1_get_documents_count(
     site_id: UUID,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Get documents count for a specific site.
@@ -777,7 +771,7 @@ async def v1_get_documents_count(
 async def v1_get_unified_documents_count(
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_database_session)
 ):
     """
     Get total documents count for the current user across all accessible sites.
