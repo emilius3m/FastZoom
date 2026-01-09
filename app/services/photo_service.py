@@ -23,6 +23,9 @@ except ImportError:
     # Fallback for older PIL versions
     ORIENTATION = 274
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.tus_service import tus_upload_service
+
 # 🔧 CORREZIONE: Import del modello Photo corretto
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 
@@ -776,6 +779,107 @@ class PhotoMetadataService:
             # Re-raise domain exception - will be handled by centralized handler
             raise
 
+    async def process_tus_upload(
+        self,
+        db: AsyncSession,
+        upload_id: str,
+        site_id: str,
+        user_id: str,
+        metadata: Dict[str, Any] = None
+    ) -> Photo:
+        """
+        Processa un upload TUS completato:
+        1. Recupera il file dalla directory temporanea TUS
+        2. Carica su MinIO (originale + thumbnail)
+        3. Crea record nel DB
+        4. Elimina file temporaneo TUS
+        """
+        if metadata is None:
+            metadata = {}
+
+        temp_path = None
+        try:
+            # 1. Recupera path file TUS
+            if not await tus_upload_service.is_upload_complete(upload_id):
+                 raise PhotoServiceError(f"Upload TUS {upload_id} non completato")
+            
+            temp_path = await tus_upload_service.get_upload_file_path(upload_id)
+            
+            if not temp_path.exists():
+                raise PhotoServiceError(f"File TUS non trovato: {upload_id}")
+                
+            file_size = temp_path.stat().st_size
+            filename = metadata.get('filename', f"upload_{upload_id}.jpg")
+            
+            # Leggi contenuto file
+            import aiofiles
+            async with aiofiles.open(temp_path, 'rb') as f:
+                file_data = await f.read()
+
+            # 2. Estrai Metadati e Prepara Dati
+            # Estrazione metadati archeologici dal form (passati come dict in metadata['archaeological_metadata'])
+            arch_metadata = metadata.get('archaeological_metadata', {})
+            
+            # Estrazione metadati tecnici dall'immagine
+            photo_metadata_service = PhotoMetadataService()
+            exif_data, tech_metadata = await photo_metadata_service.extract_metadata_from_bytes(file_data, filename)
+
+            # 3. Upload su MinIO (Thumbnail + Originale)
+            photo_uuid = str(uuid4())
+            
+            # Genera e carica thumbnail
+            try:
+                await self.create_and_upload_thumbnail(photo_uuid, file_data, site_id)
+            except Exception as e:
+                logger.warning(f"Errore creazione thumbnail per TUS upload {upload_id}: {e}")
+                # Non bloccante, continuiamo
+
+            # Carica foto originale
+            if HAS_MINIO:
+                # Unisci metadati tecnici e archeologici per MinIO
+                full_metadata = {**arch_metadata, **tech_metadata}
+                
+                # Upload su MinIO
+                minio_url = await archaeological_minio_service.upload_photo_with_metadata(
+                    photo_data=file_data,
+                    photo_id=f"{photo_uuid}{Path(filename).suffix}",
+                    site_id=site_id,
+                    archaeological_metadata=full_metadata
+                )
+                file_path_db = minio_url  # es. minio://bucket/site/photo.jpg
+            else:
+                # Fallback locale (non raccomandato ma supportato)
+                # Qui potremmo spostare il file invece di rileggerlo, ma per consistenza con minio usiamo Bytes
+                # Per ora assumiamo MinIO presente come da requisiti
+                raise PhotoServiceError("MinIO storage service required for TUS processing")
+
+            # 4. Crea Record DB
+            photo = await self.create_photo_record(
+                filename=f"{photo_uuid}{Path(filename).suffix}",
+                original_filename=filename,
+                file_path=file_path_db,
+                file_size=file_size,
+                site_id=site_id,
+                uploaded_by=user_id,
+                metadata=tech_metadata,
+                archaeological_metadata=arch_metadata
+            )
+            
+            db.add(photo)
+            await db.commit()
+            await db.refresh(photo)
+            
+            # 5. Cleanup TUS
+            # Importante: Cancelliamo da TUS solo se tutto è andato a buon fine
+            await tus_upload_service.delete_upload(upload_id)
+            logger.info(f"TUS upload {upload_id} processed successfully -> Photo {photo.id}")
+            
+            return photo
+
+        except Exception as e:
+            logger.error(f"Error processing TUS upload {upload_id}: {e}")
+            raise PhotoServiceError(f"Failed to process TUS upload: {str(e)}")
+
     async def _generate_thumbnail(self, image_data: bytes) -> bytes:
         """Genera thumbnail da dati immagine"""
         try:
@@ -970,3 +1074,5 @@ class PhotoMetadataService:
 
 # Istanza globale
 photo_metadata_service = PhotoMetadataService()
+
+photo_service = photo_metadata_service

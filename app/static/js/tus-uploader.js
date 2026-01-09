@@ -1,60 +1,22 @@
 /**
  * TUS Upload Client for FastZoom Archaeological System
  * Handles resumable file uploads with progress tracking
+ * 
+ * note: Authentication is handled automatically via HttpOnly cookies (credentials: 'include')
  */
 
 class TusUploader {
     /**
      * @param {Object} config - Configuration object
      * @param {string} config.endpoint - TUS endpoint URL (e.g., '/api/v1/tus/uploads')
-     * @param {Function} config.getAuthToken - Function that returns the auth token
      * @param {number} config.chunkSize - Chunk size in bytes (default: 5MB)
      * @param {number} config.retryDelays - Array of retry delays in ms
      */
     constructor(config) {
         this.endpoint = config.endpoint || '/api/v1/tus/uploads';
-        this.getAuthToken = config.getAuthToken || (() => this.getTokenFromCookie());
         this.chunkSize = config.chunkSize || 5 * 1024 * 1024; // 5MB default
         this.retryDelays = config.retryDelays || [0, 1000, 3000, 5000, 10000];
         this.uploads = new Map(); // Track active uploads
-    }
-
-    /**
-     * Get auth token from cookie
-     */
-    getTokenFromCookie() {
-        const cookies = document.cookie.split(';');
-        console.log('All cookies:', document.cookie);
-        
-        for (let cookie of cookies) {
-            const [name, value] = cookie.trim().split('=');
-            console.log(`Checking cookie: ${name} = ${value}`);
-            
-            if (name === 'access_token') {
-                let token = value;
-                // Remove Bearer prefix if present
-                if (token.startsWith('Bearer ')) {
-                    token = token.substring(7);
-                }
-                // Handle URL-encoded Bearer prefix
-                if (token.startsWith('Bearer%20')) {
-                    token = token.substring(10);
-                }
-                console.log('Found token:', token.substring(0, 20) + '...');
-                return token;
-            }
-        }
-        
-        console.warn('No access_token cookie found');
-        return null;
-    }
-
-    /**
-     * Check if user is authenticated
-     */
-    isAuthenticated() {
-        const token = this.getAuthToken();
-        return token !== null && token !== undefined && token !== '';
     }
 
     /**
@@ -102,9 +64,14 @@ class TusUploader {
             // Start uploading chunks
             await this.uploadChunks(controller, options);
 
+            // Process the uploaded file (bridge to MinIO/DB)
+            console.log('Upload complete, triggering processing...');
+            const serverUploadId = uploadUrl.split('/').pop();
+            const processResult = await this.processUpload(serverUploadId, metadata);
+
             // Success
             if (options.onSuccess) {
-                options.onSuccess(uploadId, uploadUrl);
+                options.onSuccess(uploadId, uploadUrl, processResult);
             }
 
             return controller;
@@ -118,17 +85,45 @@ class TusUploader {
     }
 
     /**
+     * Process completed upload
+     */
+    async processUpload(uploadId, metadata) {
+        // Extract site_id and other metadata
+        const payload = {
+            upload_id: uploadId,
+            site_id: metadata.site_id, // Ensure this maps correctly from options.metadata
+            archaeological_metadata: {
+                ...metadata,
+                site_id: undefined, // Remove from nested dict to avoid duplication
+                filename: undefined,
+                filetype: undefined,
+                size: undefined
+            }
+        };
+
+        const response = await fetch('/api/v1/photos/from-tus', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload),
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Processing failed: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        return await response.json();
+    }
+
+    /**
      * Create upload session
      */
     async createUpload(fileSize, metadata) {
-        const token = await this.getAuthToken();
-        
-        if (!token) {
-            throw new Error('No authentication token available. Please login first.');
-        }
-        
-        console.log('Creating upload with token:', token.substring(0, 20) + '...');
-        
+        console.log('Creating upload with cookies (HttpOnly mode)');
+
         // Encode metadata as base64
         const encodedMetadata = Object.entries(metadata)
             .map(([key, value]) => {
@@ -138,21 +133,20 @@ class TusUploader {
             .join(',');
 
         const headers = {
-            'Authorization': `Bearer ${token}`,
             'Upload-Length': String(fileSize),
             'Upload-Metadata': encodedMetadata,
             'Tus-Resumable': '1.0.0'
         };
-        
+
         console.log('Request headers:', headers);
 
         const response = await fetch(this.endpoint, {
             method: 'POST',
-            headers: headers
+            headers: headers,
+            credentials: 'include'  // Send HttpOnly cookies automatically
         });
 
         console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -202,10 +196,10 @@ class TusUploader {
                 if (controller.retryCount < this.retryDelays.length) {
                     const delay = this.retryDelays[controller.retryCount];
                     controller.retryCount++;
-                    
+
                     console.warn(`Upload chunk failed, retrying in ${delay}ms...`, error);
                     await this.sleep(delay);
-                    
+
                     // Re-check offset from server
                     offset = await this.getOffset(uploadUrl);
                     controller.offset = offset;
@@ -224,14 +218,12 @@ class TusUploader {
      * Get current upload offset from server
      */
     async getOffset(uploadUrl) {
-        const token = await this.getAuthToken();
-
         const response = await fetch(uploadUrl, {
             method: 'HEAD',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Tus-Resumable': '1.0.0'
-            }
+            },
+            credentials: 'include'  // Send HttpOnly cookies automatically
         });
 
         if (!response.ok) {
@@ -246,17 +238,15 @@ class TusUploader {
      * Upload a single chunk
      */
     async uploadChunk(uploadUrl, chunkData, offset) {
-        const token = await this.getAuthToken();
-
         const response = await fetch(uploadUrl, {
             method: 'PATCH',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Upload-Offset': String(offset),
                 'Content-Type': 'application/offset+octet-stream',
                 'Tus-Resumable': '1.0.0'
             },
-            body: chunkData
+            body: chunkData,
+            credentials: 'include'  // Send HttpOnly cookies automatically
         });
 
         if (!response.ok) {
@@ -306,17 +296,16 @@ class TusUploader {
         const controller = this.uploads.get(uploadId);
         if (controller) {
             controller.isAborted = true;
-            
+
             // Delete upload on server
             if (controller.uploadUrl) {
                 try {
-                    const token = await this.getAuthToken();
                     await fetch(controller.uploadUrl, {
                         method: 'DELETE',
                         headers: {
-                            'Authorization': `Bearer ${token}`,
                             'Tus-Resumable': '1.0.0'
-                        }
+                        },
+                        credentials: 'include'
                     });
                 } catch (error) {
                     console.error('Failed to delete upload:', error);
@@ -337,13 +326,10 @@ class TusUploader {
         }
 
         try {
-            const token = await this.getAuthToken();
             const progressUrl = `${controller.uploadUrl}/progress`;
-            
+
             const response = await fetch(progressUrl, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                credentials: 'include'
             });
 
             if (!response.ok) {
@@ -374,13 +360,6 @@ class TusUploader {
      */
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
-    }
-}
-
-// Export for use in modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = TusUploader;
-}        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 

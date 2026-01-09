@@ -279,3 +279,31 @@ async def get_photo_site_access(
     
     # Usa la funzione esistente per verificare l'accesso al sito della foto
     return await get_site_access(photo.site_id, current_user_id, db)
+
+
+from typing import Dict
+
+def site_write_permission(
+    site_access: tuple = Depends(get_site_access)
+) -> Dict:
+    """
+    Dependency che verifica i permessi di scrittura sul sito.
+    Ritorna un dizionario con site, permission e user (per compatibilità).
+    
+    Usa get_site_access che già gestisce superuser bypass.
+    """
+    site, permission = site_access
+    
+    if not permission.can_write():
+        raise HTTPException(
+            status_code=403,
+            detail="Permessi di scrittura richiesti per questa operazione"
+        )
+        
+    return {
+        "site": site,
+        "permission": permission,
+        # Hack per compatibilità con codice che si aspetta 'user' nel dict auth
+        # In futuro dovremmo refactorizzare per usare direttamente current_user_id
+        "user": type('obj', (object,), {'id': permission.user_id}) if hasattr(permission, 'user_id') else None
+    }

@@ -54,8 +54,13 @@ from app.schemas.photos import PhotoUploadRequest, BulkUpdateRequest, BulkDelete
 from app.core.domain_exceptions import (
     InsufficientPermissionsError,
     ResourceNotFoundError,
-    ValidationError as DomainValidationError
+    ValidationError as DomainValidationError,
+    PhotoServiceError,
+    ResourceAlreadyExistsError
 )
+
+from app.services.photo_service import photo_service
+from app.schemas.photos import PhotoResponse
 
 # Export as 'router' for consistency with other API v1 modules
 router = APIRouter()
@@ -108,6 +113,44 @@ async def download_photo_simple(
         raise InsufficientPermissionsError("Permessi richiesti")
         
     return await photo_serving_service.serve_photo_download(photo_id, db)
+
+
+from fastapi import Body
+from app.routes.api.dependencies import site_write_permission
+
+@router.post("/from-tus", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
+async def process_tus_upload(
+    upload_id: str = Body(..., embed=True),
+    site_id: UUID = Body(..., embed=True),
+    archaeological_metadata: Optional[Dict[str, Any]] = Body(default={}, embed=True),
+    db: AsyncSession = Depends(get_database_session),
+    auth: Dict = Depends(site_write_permission)
+):
+    """
+    Processa un upload TUS completato e lo trasforma in una foto.
+    """
+    try:
+        user_id = auth["user"].id
+        
+        metadata = {
+            "archaeological_metadata": archaeological_metadata,
+        }
+        
+        photo = await photo_service.process_tus_upload(
+            db=db,
+            upload_id=upload_id,
+            site_id=str(site_id),
+            user_id=str(user_id),
+            metadata=metadata
+        )
+        
+        return photo
+        
+    except PhotoServiceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error processing TUS upload: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process upload")
 
 
 @router.get("/sites/{site_id}/photos")

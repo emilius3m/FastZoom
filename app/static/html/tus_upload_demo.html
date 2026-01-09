@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -40,6 +41,16 @@
             color: #666;
             margin-bottom: 30px;
             font-size: 14px;
+        }
+
+        .auth-note {
+            background: #e1f5fe;
+            border-left: 4px solid #01579b;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #01579b;
         }
 
         .upload-area {
@@ -191,10 +202,16 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>🚀 TUS Upload Demo</h1>
         <p class="subtitle">Resumable file uploads for FastZoom Archaeological System</p>
+
+        <div class="auth-note">
+            ℹ️ <strong>Authentication:</strong> Make sure you're logged in. The system uses secure HttpOnly cookies for
+            authentication.
+        </div>
 
         <div class="upload-area" id="uploadArea">
             <div class="upload-icon">📁</div>
@@ -206,8 +223,7 @@
             </div>
         </div>
 
-        <input type="file" id="fileInput" class="file-input" 
-               accept=".jpg,.jpeg,.png,.tiff,.pdf,.doc,.docx">
+        <input type="file" id="fileInput" class="file-input" accept=".jpg,.jpeg,.png,.tiff,.pdf,.doc,.docx">
 
         <div id="fileInfo" style="display: none;" class="file-info">
             <div class="file-info-item">
@@ -254,78 +270,20 @@
 
     <script src="/static/js/tus-uploader.js"></script>
     <script>
-        // Check authentication status on page load
-        function checkAuthentication() {
-            const cookies = document.cookie.split(';');
-            let hasToken = false;
-            
-            for (let cookie of cookies) {
-                const [name, value] = cookie.trim().split('=');
-                if (name === 'access_token' && value) {
-                    hasToken = true;
-                    break;
-                }
-            }
-            
-            if (!hasToken) {
-                // Show authentication required message
-                const container = document.querySelector('.container');
-                container.innerHTML = `
-                    <div style="text-align: center; padding: 40px;">
-                        <div style="font-size: 48px; margin-bottom: 20px;">🔐</div>
-                        <h1 style="color: #333; margin-bottom: 20px;">Authentication Required</h1>
-                        <p style="color: #666; margin-bottom: 30px; line-height: 1.6;">
-                            You need to be logged in to use the TUS upload demo.<br>
-                            Please login first to get an authentication token.
-                        </p>
-                        <a href="/login" class="btn" style="display: inline-block; text-decoration: none;">
-                            Go to Login
-                        </a>
-                        <div style="margin-top: 20px;">
-                            <button onclick="checkAuthentication()" class="btn btn-secondary">
-                                🔄 Check Again
-                            </button>
-                        </div>
-                    </div>
-                `;
-                return false;
-            }
-            return true;
-        }
-
-        // Initialize TUS uploader only if authenticated
+        // Initialize TUS uploader (authentication handled by HttpOnly cookies)
         let uploader = null;
         let selectedFile = null;
         let currentUpload = null;
 
         function initializeUploader() {
-            if (!checkAuthentication()) {
-                return;
-            }
-
+            // Note: Authentication is handled automatically via HttpOnly cookies
+            // The browser will send the access_token cookie with each request
             uploader = new TusUploader({
                 endpoint: '/api/v1/tus/uploads',
-                getAuthToken: () => {
-                    // Get token from cookie
-                    const cookies = document.cookie.split(';');
-                    for (let cookie of cookies) {
-                        const [name, value] = cookie.trim().split('=');
-                        if (name === 'access_token') {
-                            let token = value;
-                            // Remove Bearer prefix if present
-                            if (token.startsWith('Bearer ')) {
-                                token = token.substring(7);
-                            }
-                            // Handle URL-encoded Bearer prefix
-                            if (token.startsWith('Bearer%20')) {
-                                token = token.substring(10);
-                            }
-                            return token;
-                        }
-                    }
-                    return null;
-                }
+                chunkSize: 5 * 1024 * 1024  // 5MB chunks
             });
+
+            console.log('TUS Uploader initialized with cookie-based authentication');
         }
 
         // Initialize on page load
@@ -379,31 +337,25 @@
         // Handle file selection
         function handleFileSelect(file) {
             selectedFile = file;
-            
+
             // Update UI
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('fileSize').textContent = formatBytes(file.size);
             document.getElementById('fileType').textContent = file.type || 'Unknown';
-            
+
             fileInfo.style.display = 'block';
             uploadBtn.disabled = false;
-            
+
             showStatus('File selected. Click Upload to start.', 'info');
         }
 
         // Upload button
         uploadBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
-            
-            // Check authentication before upload
-            if (!uploader || !checkAuthentication()) {
-                showStatus('❌ Please login first before uploading', 'error');
-                return;
-            }
-            
+
             uploadBtn.disabled = true;
             progressContainer.style.display = 'block';
-            
+
             try {
                 currentUpload = await uploader.upload(selectedFile, {
                     metadata: {
@@ -490,4 +442,5 @@
         }
     </script>
 </body>
+
 </html>
