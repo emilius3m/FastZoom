@@ -116,22 +116,39 @@ async def download_photo_simple(
 
 
 from fastapi import Body
-from app.routes.api.dependencies import site_write_permission
+from app.models import UserSitePermission
+from sqlalchemy import select, and_, or_, func
 
 @router.post("/photos/from-tus", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
 async def process_tus_upload(
-    upload_id: str = Body(..., embed=True),
-    site_id: UUID = Body(..., embed=True),
-    archaeological_metadata: Optional[Dict[str, Any]] = Body(default={}, embed=True),
+    upload_id: str = Body(...),
+    site_id: str = Body(...),
+    archaeological_metadata: Optional[Dict[str, Any]] = Body(default={}),
     db: AsyncSession = Depends(get_database_session),
-    auth: Dict = Depends(site_write_permission)
+    current_user_id: UUID = Depends(get_current_user_id)
 ):
     """
     Processa un upload TUS completato e lo trasforma in una foto.
     """
+    # Manual permission check since site_id comes from body, not path
+    permission_query = select(UserSitePermission).where(
+        and_(
+            UserSitePermission.user_id == str(current_user_id),
+            UserSitePermission.site_id == site_id,
+            UserSitePermission.is_active == True,
+            or_(
+                UserSitePermission.expires_at.is_(None),
+                UserSitePermission.expires_at > func.now()
+            )
+        )
+    )
+    permission = await db.execute(permission_query)
+    permission = permission.scalar_one_or_none()
+    
+    if not permission or not permission.can_write():
+        raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
+    
     try:
-        user_id = auth["user"].id
-        
         metadata = {
             "archaeological_metadata": archaeological_metadata,
         }
@@ -139,8 +156,8 @@ async def process_tus_upload(
         photo = await photo_service.process_tus_upload(
             db=db,
             upload_id=upload_id,
-            site_id=str(site_id),
-            user_id=str(user_id),
+            site_id=site_id,
+            user_id=str(current_user_id),
             metadata=metadata
         )
         

@@ -453,8 +453,8 @@ class PhotoResponse(BaseModel):
     width: Optional[int]
     height: Optional[int]
     file_size: Optional[int]
-    created_at: Optional[str]
-    updated_at: Optional[str]
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
     
     # URLs
     thumbnail_url: str
@@ -472,10 +472,11 @@ class PhotoResponse(BaseModel):
     # Additional metadata
     tags: List[str] = Field(default_factory=list)
     photographer: Optional[str]
-    photo_date: Optional[str]
+    photo_date: Optional[datetime]
     has_deep_zoom: bool = False
     
     class Config:
+        from_attributes = True
         schema_extra = {
             "example": {
                 "id": "550e8400-e29b-41d4-a716-446655440000",

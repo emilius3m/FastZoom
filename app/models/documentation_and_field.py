@@ -295,7 +295,7 @@ class Photo(Base, SiteMixin, UserMixin):
     )
 
     def __repr__(self):
-        return f"<Photo(filename={self.filename}, site={self.site.name if self.site else 'N/A'})>"
+        return f"<Photo(id={self.id}, filename={self.filename}, site_id={self.site_id})>"
     
     @property
     def has_coordinates(self) -> bool:
@@ -306,6 +306,23 @@ class Photo(Base, SiteMixin, UserMixin):
     def is_deepzoom_ready(self) -> bool:
         """Controlla se deep zoom è pronto"""
         return self.deepzoom_status == 'completed'
+
+    # ===== URL PROPERTIES FOR PYDANTIC =====
+    @property
+    def thumbnail_url(self) -> str:
+        return f"/api/v1/photos/{self.id}/thumbnail"
+
+    @property
+    def full_url(self) -> str:
+        return f"/api/v1/photos/{self.id}/full"
+
+    @property
+    def download_url(self) -> str:
+        return f"/api/v1/photos/{self.id}/download"
+
+    @property
+    def file_url(self) -> str:
+        return f"/api/v1/photos/{self.id}/view"
     
     # ===== METODI PER PhotoType =====
     
