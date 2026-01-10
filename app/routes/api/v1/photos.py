@@ -118,7 +118,7 @@ async def download_photo_simple(
 from fastapi import Body
 from app.routes.api.dependencies import site_write_permission
 
-@router.post("/from-tus", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/photos/from-tus", response_model=PhotoResponse, status_code=status.HTTP_201_CREATED)
 async def process_tus_upload(
     upload_id: str = Body(..., embed=True),
     site_id: UUID = Body(..., embed=True),

@@ -48,8 +48,16 @@ async def create_tus_upload(
             import base64
             pairs = upload_metadata.split(",")
             for pair in pairs:
+                pair = pair.strip()
+                if not pair:
+                    continue
+                    
                 if " " in pair:
-                    key, encoded_value = pair.strip().split(" ", 1)
+                    parts = pair.split(" ", 1)
+                    if len(parts) != 2:
+                        continue
+                        
+                    key, encoded_value = parts
                     try:
                         value = base64.b64decode(encoded_value).decode("utf-8")
                         metadata[key] = value
