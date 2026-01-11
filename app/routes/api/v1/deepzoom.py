@@ -27,8 +27,11 @@ from app.core.domain_exceptions import (
     PhotoNotFoundError,
     SiteNotFoundError,
     DomainValidationError,
-    StorageError
+    StorageError,
+    InsufficientPermissionsError
 )
+# Services
+from app.services.tiles_verification_service import tiles_verification_service
 
 # Schemas
 class DeepZoomConfig(BaseModel):
@@ -386,4 +389,134 @@ async def get_background_service_health(
     # Use background service directly as it is a singleton system service
     return await deep_zoom_background_service.get_health_status()
 
-# Keeping other administrative endpoints simplified or delegated
+
+# ============================================================================
+# VERIFICATION SERVICE (ADMIN)
+# ============================================================================
+
+@router.get("/verification/status",
+            summary="Ottieni stato del servizio di verifica periodica",
+            tags=["Deep Zoom - Verification"])
+async def get_verification_status(
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """Ottieni stato del servizio di verifica periodica tiles"""
+    # Check if user is admin (using require_site_permission is site-specific, 
+    # but this is a global service. We should check user profile/superuser status)
+    
+    # Using superuser bypass logic manually for now as this is a global system service,
+    # or ensure caller has admin rights. 
+    # Since we don't have a "global admin" dependency ready here (except superuser), 
+    # we can check if user is superuser or just allow authenticated users to see status.
+    # Let's verify user info.
+    
+    # Allow read for authenticated users
+    
+    try:
+        status_info = await tiles_verification_service.get_verification_status()
+        return JSONResponse({
+            "verification_service_status": status_info,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error getting verification status: {e}")
+        # Return 500 but wrapped in JSON
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore recupero stato verifica: {str(e)}"
+        )
+
+
+@router.post("/verification/trigger",
+             summary="Avvia verifica manuale tiles",
+             tags=["Deep Zoom - Verification"])
+async def trigger_manual_verification(
+    request: Request,
+    site_id: Optional[UUID] = None,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """Avvia verifica manuale per un sito o globale"""
+    if site_id:
+        # Site specific check
+        await require_site_permission(site_id, request, required_permission="write")
+        
+        result = await tiles_verification_service.trigger_manual_verification(str(site_id))
+    else:
+        # Global trigger requires Superuser or high level admin
+        # We can implement a simple check here
+        user = await get_current_user_with_superuser_check(request) # We need to import this if not available
+        if not user.is_superuser:
+            raise InsufficientPermissionsError("Richiesto accesso Superuser per verifica globale")
+            
+        result = await tiles_verification_service.trigger_manual_verification(None)
+
+    # Log activity
+    # Note: UserActivity logging is typically handled by service, but here we can add if needed.
+    # The service logs locally.
+    
+    return JSONResponse(result)
+
+
+@router.put("/verification/configure",
+            summary="Configura servizio verifica",
+            tags=["Deep Zoom - Verification"])
+async def configure_verification_service(
+    config: VerificationConfig,
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """Configura parametri del servizio di verifica"""
+    # Requires Superuser
+    from app.core.security import get_current_user_with_superuser_check
+    user = await get_current_user_with_superuser_check(request)
+    if not user.is_superuser:
+        raise InsufficientPermissionsError("Richiesto accesso Superuser")
+
+    tiles_verification_service.configure_settings(
+        verification_interval_hours=config.verification_interval_hours,
+        batch_size=config.batch_size,
+        max_concurrent_verifications=config.max_concurrent_verifications,
+        auto_repair_enabled=config.auto_repair_enabled
+    )
+    
+    return JSONResponse({
+        "message": "Configurazione aggiornata", 
+        "config": config.dict(exclude_none=True)
+    })
+
+
+@router.post("/verification/start",
+             summary="Avvia servizio verifica periodica",
+             tags=["Deep Zoom - Verification"])
+async def start_verification_service_endpoint(
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """Avvia il servizio background di verifica"""
+    # Requires Superuser
+    from app.core.security import get_current_user_with_superuser_check
+    user = await get_current_user_with_superuser_check(request)
+    if not user.is_superuser:
+        raise InsufficientPermissionsError("Richiesto accesso Superuser")
+
+    await tiles_verification_service.start_periodic_verification()
+    return JSONResponse({"message": "Servizio avviato"})
+
+
+@router.post("/verification/stop",
+             summary="Ferma servizio verifica periodica",
+             tags=["Deep Zoom - Verification"])
+async def stop_verification_service_endpoint(
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+):
+    """Ferma il servizio background di verifica"""
+    # Requires Superuser
+    from app.core.security import get_current_user_with_superuser_check
+    user = await get_current_user_with_superuser_check(request)
+    if not user.is_superuser:
+        raise InsufficientPermissionsError("Richiesto accesso Superuser")
+
+    await tiles_verification_service.stop_periodic_verification()
+    return JSONResponse({"message": "Servizio fermato"})

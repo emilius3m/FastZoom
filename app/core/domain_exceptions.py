@@ -225,6 +225,17 @@ class FileUploadError(PhotoServiceError):
 
 
 # ============================================================================
+# Photo Service Exceptions
+# ============================================================================
+
+class PhotoNotFoundError(ResourceNotFoundError):
+    """Photo not found."""
+    
+    def __init__(self, photo_id: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__("Photo", photo_id, details)
+
+
+# ============================================================================
 # Site Management Exceptions
 # ============================================================================
 
@@ -320,6 +331,20 @@ class StaleReferenceError(HarrisMatrixException):
 
 
 # ============================================================================
+# Domain Validation Exception (for backward compatibility)
+# ============================================================================
+
+class DomainValidationError(ValidationError):
+    """
+    Domain-specific validation error.
+    
+    This is kept for backward compatibility but new code should use
+    more specific exception types.
+    """
+    pass
+
+
+# ============================================================================
 # Business Logic Exception (for backward compatibility)
 # ============================================================================
 
@@ -353,6 +378,7 @@ EXCEPTION_STATUS_CODES = {
     
     # Not Found (404)
     ResourceNotFoundError: 404,
+    PhotoNotFoundError: 404,
     SiteNotFoundError: 404,
     StorageNotFoundError: 404,
     
@@ -362,6 +388,7 @@ EXCEPTION_STATUS_CODES = {
     
     # Validation (422)
     ValidationError: 422,
+    DomainValidationError: 422,
     InvalidInputError: 422,
     MissingRequiredFieldError: 422,
     InvalidStratigraphicRelation: 422,
