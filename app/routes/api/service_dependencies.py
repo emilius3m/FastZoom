@@ -12,6 +12,10 @@ from app.core.exceptions import (
     StorageError, StorageFullError, StorageTemporaryError,
     StorageConnectionError, StorageNotFoundError, StorageValidationError
 )
+from app.services.deep_zoom_service import DeepZoomService
+from app.database.db import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 
 # Singleton instances for dependency injection
@@ -140,3 +144,15 @@ async def convert_storage_error_to_http_exception(error: Exception, operation_na
 ArchaeologicalMinIOServiceDep = Annotated[ArchaeologicalMinIOService, Depends(get_archaeological_minio_service)]
 PhotoServiceDep = Annotated[PhotoService, Depends(get_photo_service)]
 DeepZoomMinIOServiceDep = Annotated[DeepZoomMinIOService, Depends(get_deep_zoom_minio_service)]
+
+
+def get_deep_zoom_service(
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    minio_service: Annotated[DeepZoomMinIOService, Depends(get_deep_zoom_minio_service)],
+    storage_service: Annotated[ArchaeologicalMinIOService, Depends(get_archaeological_minio_service)]
+) -> DeepZoomService:
+    """Get DeepZoomService with injected dependencies"""
+    return DeepZoomService(db, minio_service, storage_service)
+
+
+DeepZoomServiceDep = Annotated[DeepZoomService, Depends(get_deep_zoom_service)]
