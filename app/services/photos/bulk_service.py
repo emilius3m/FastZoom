@@ -515,6 +515,20 @@ class PhotoBulkService:
             await db.commit()
             self.logger.info(f"Bulk delete transaction committed successfully for {deleted_count} photos")
             
+            # Send WebSocket notifications for each deleted photo
+            try:
+                from app.routes.api.notifications_ws import notification_manager
+                for photo in photos:
+                    await notification_manager.broadcast_photo_deleted(
+                        site_id=site_id,
+                        photo_id=str(photo.id),
+                        photo_filename=photo.filename,
+                        user_id=str(current_user_id)
+                    )
+                self.logger.info(f"WebSocket notifications sent for {deleted_count} deleted photos")
+            except Exception as ws_error:
+                self.logger.warning(f"Failed to send WebSocket notifications for bulk delete: {ws_error}")
+            
         except Exception as e:
             self.logger.error(f"Bulk delete transaction error: {e}")
             await db.rollback()

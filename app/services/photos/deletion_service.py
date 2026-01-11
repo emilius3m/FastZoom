@@ -133,6 +133,19 @@ class PhotoDeletionService:
             
             self.logger.info(f"Photo {photo.id} deleted successfully with storage cleanup")
             
+            # Send WebSocket notification for photo deletion
+            try:
+                from app.routes.api.notifications_ws import notification_manager
+                await notification_manager.broadcast_photo_deleted(
+                    site_id=site_id,
+                    photo_id=str(photo.id),
+                    photo_filename=photo_filename,
+                    user_id=str(current_user_id)
+                )
+                self.logger.info(f"WebSocket notification sent for photo deletion: {photo.id}")
+            except Exception as ws_error:
+                self.logger.warning(f"Failed to send WebSocket notification for photo deletion: {ws_error}")
+            
             return {
                 "message": "Foto eliminata con successo",
                 "photo_id": str(photo.id),

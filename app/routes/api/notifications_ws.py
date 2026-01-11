@@ -284,6 +284,25 @@ class NotificationManager:
 
         await self.send_notification(site_id, notification)
 
+    async def broadcast_photo_deleted(
+        self,
+        site_id: str,
+        photo_id: str,
+        photo_filename: str = None,
+        user_id: str = None
+    ):
+        """Invia notifica eliminazione foto"""
+        notification = {
+            'type': 'photo_deleted',
+            'site_id': site_id,
+            'photo_id': photo_id,
+            'photo_filename': photo_filename,
+            'user_id': user_id,
+            'timestamp': str(asyncio.get_event_loop().time())
+        }
+
+        await self.send_notification(site_id, notification)
+
 # Istanza globale del manager
 notification_manager = NotificationManager()
 
