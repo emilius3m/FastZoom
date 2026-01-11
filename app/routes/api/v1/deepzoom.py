@@ -19,6 +19,7 @@ from app.core.security import (
     SecurityService,
     get_current_user_id
 )
+from app.models.deepzoom_enums import DeepZoomStatus
 from app.routes.api.service_dependencies import DeepZoomServiceDep
 from app.services.deep_zoom_background_service import deep_zoom_background_service
 from app.core.domain_exceptions import (
@@ -252,7 +253,7 @@ async def get_processing_queue_status(
     
     batch_data = await deep_zoom_service.get_batch_status(str(site_id), limit=50)
     
-    processing_photos = [p for p in batch_data['photos'] if p['status'] in ['processing', 'scheduled', 'pending']]
+    processing_photos = [p for p in batch_data['photos'] if p['status'] in [DeepZoomStatus.PROCESSING.value, DeepZoomStatus.SCHEDULED.value, 'pending']]
     
     return JSONResponse({
         "site_id": str(site_id),
@@ -362,9 +363,9 @@ async def v1_batch_process_deepzoom(
                 current_user_id, 
                 force_reprocess=batch_request.force_reprocess
             )
-            results.append({"photo_id": str(photo_id), "status": "started", "result": res})
+            results.append({"photo_id": str(photo_id), "status": DeepZoomStatus.SCHEDULED.value, "result": res})
         except Exception as e:
-            results.append({"photo_id": str(photo_id), "status": "error", "error": str(e)})
+            results.append({"photo_id": str(photo_id), "status": DeepZoomStatus.ERROR.value, "error": str(e)})
 
     return {
         "batch_id": f"batch_{site_id}_{current_user_id}_{len(batch_request.photo_ids)}",

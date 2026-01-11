@@ -66,13 +66,9 @@ from app.models import Photo
 from sqlalchemy import select
 
 
-class ProcessingStatus(Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    UPLOADING = "uploading"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    RETRYING = "retrying"
+from app.models.deepzoom_enums import DeepZoomStatus
+
+
 
 
 @dataclass
@@ -85,7 +81,7 @@ class TileProcessingTask:
     archaeological_metadata: Optional[Dict[str, Any]] = None
     retry_count: int = 0
     max_retries: int = 3
-    status: ProcessingStatus = ProcessingStatus.PENDING
+    status: DeepZoomStatus = DeepZoomStatus.SCHEDULED
     error_message: Optional[str] = None
     created_at: datetime = None
     started_at: Optional[datetime] = None
@@ -181,7 +177,7 @@ class DeepZoomBackgroundService:
             # Verifica se il task è già in coda o in elaborazione
             if photo_id in self.processing_tasks:
                 existing_task = self.processing_tasks[photo_id]
-                if existing_task.status in [ProcessingStatus.PENDING, ProcessingStatus.PROCESSING, ProcessingStatus.RETRYING]:
+                if existing_task.status in [DeepZoomStatus.SCHEDULED, DeepZoomStatus.PROCESSING, DeepZoomStatus.RETRYING]:
                     logger.info(f"🔄 Task already scheduled/processing for photo {photo_id}")
                     return {
                         'photo_id': photo_id,
@@ -437,7 +433,7 @@ class DeepZoomBackgroundService:
             # Verifica se il task è già in coda o in elaborazione
             if photo_id in self.processing_tasks:
                 existing_task = self.processing_tasks[photo_id]
-                if existing_task.status in [ProcessingStatus.PENDING, ProcessingStatus.PROCESSING, ProcessingStatus.RETRYING]:
+                if existing_task.status in [DeepZoomStatus.SCHEDULED, DeepZoomStatus.PROCESSING, DeepZoomStatus.RETRYING]:
                     logger.info(f"🔧 SNAPSHOT-BASED: Task already scheduled/processing for photo {photo_id}")
                     return {
                         'photo_id': photo_id,
@@ -536,7 +532,7 @@ class DeepZoomBackgroundService:
             async with self._processing_lock:
                 for photo_id, task in self.processing_tasks.items():
                     # Check if task has been running too long
-                    if task.status == ProcessingStatus.PROCESSING and task.started_at:
+                    if task.status == DeepZoomStatus.PROCESSING and task.started_at:
                         processing_time = (current_time - task.started_at).total_seconds()
                         if processing_time > self.task_timeout_seconds:
                             stuck_tasks.append((photo_id, task, processing_time))
@@ -560,7 +556,7 @@ class DeepZoomBackgroundService:
             logger.warning(f"🧹 [STUCK TASK] Cleaning up stuck task for photo {photo_id} ({processing_time:.1f}s)")
             
             # Move task to failed status
-            task.status = ProcessingStatus.FAILED
+            task.status = DeepZoomStatus.FAILED
             task.error_message = f"Task stuck for {processing_time:.1f}s, cleaned up automatically"
             task.completed_at = datetime.now()
             
@@ -594,7 +590,7 @@ class DeepZoomBackgroundService:
             if task.retry_count < task.max_retries:
                 logger.info(f"🔄 [STUCK TASK] Re-queuing photo {photo_id} for retry")
                 task.retry_count += 1
-                task.status = ProcessingStatus.RETRYING
+                task.status = DeepZoomStatus.RETRYING
                 task.started_at = None  # Reset start time
                 
                 # Re-add to queue after a delay
@@ -639,7 +635,7 @@ class DeepZoomBackgroundService:
                 logger.warning(f"Task {task.photo_id} no longer in processing tasks, skipping")
                 return
             
-            task.status = ProcessingStatus.PROCESSING
+            task.status = DeepZoomStatus.PROCESSING
             task.started_at = datetime.now()
             
             # 🔧 SNAPSHOT-BASED: Determine data source and log accordingly
@@ -691,7 +687,7 @@ class DeepZoomBackgroundService:
                 )
                 
                 total_tiles = self._count_total_tiles(tiles_data)
-                task.status = ProcessingStatus.UPLOADING
+                task.status = DeepZoomStatus.UPLOADING
                 await self._update_processing_status(task, "uploading", 10, total_tiles, len(tiles_data))
                 
                 # Send intermediate notification for uploading stage
@@ -703,7 +699,7 @@ class DeepZoomBackgroundService:
                 )
                 
                 # Create metadata
-                task.status = ProcessingStatus.COMPLETED
+                task.status = DeepZoomStatus.COMPLETED
                 await self._update_processing_status(task, "finalizing", 90)
                 
                 # Send intermediate notification for finalizing stage
@@ -715,7 +711,7 @@ class DeepZoomBackgroundService:
                 
                 # Mark as completed
                 task.completed_at = datetime.now()
-                task.status = ProcessingStatus.COMPLETED
+                task.status = DeepZoomStatus.COMPLETED
                 
                 # Update database with completion (CRITICAL: Always update for completion status)
                 # Even in snapshot mode, we need to update the database with completion status
@@ -797,7 +793,7 @@ class DeepZoomBackgroundService:
                 # Check if we should retry
                 if task.retry_count < task.max_retries:
                     task.retry_count += 1
-                    task.status = ProcessingStatus.RETRYING
+                    task.status = DeepZoomStatus.RETRYING
                     
                     # Exponential backoff
                     delay = min(300, 30 * (2 ** task.retry_count))  # Max 5 minutes
@@ -815,7 +811,7 @@ class DeepZoomBackgroundService:
                     
                 else:
                     # Max retries exceeded, mark as failed
-                    task.status = ProcessingStatus.FAILED
+                    task.status = DeepZoomStatus.FAILED
                     task.completed_at = datetime.now()
                     
                     # Update database with failed status (CRITICAL: Always update for failed status)
@@ -2576,7 +2572,7 @@ class DeepZoomBackgroundService:
             # Check for stuck tasks
             stuck_tasks = []
             for photo_id, task in self.processing_tasks.items():
-                if task.status == ProcessingStatus.PROCESSING and task.started_at:
+                if task.status == DeepZoomStatus.PROCESSING and task.started_at:
                     processing_time = (current_time - task.started_at).total_seconds()
                     if processing_time > self.task_timeout_seconds:
                         stuck_tasks.append({
@@ -2673,7 +2669,7 @@ class DeepZoomBackgroundService:
                 # Move processing tasks to failed
                 failed_count = len(self.processing_tasks)
                 for photo_id, task in self.processing_tasks.items():
-                    task.status = ProcessingStatus.FAILED
+                    task.status = DeepZoomStatus.FAILED
                     task.error_message = "Service reset - task marked as failed"
                     task.completed_at = datetime.now()
                     self.failed_tasks[photo_id] = task

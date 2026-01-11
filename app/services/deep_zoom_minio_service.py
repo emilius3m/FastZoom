@@ -11,6 +11,7 @@ from fastapi import UploadFile, HTTPException, BackgroundTasks
 
 from PIL import Image
 import math
+from app.models.deepzoom_enums import DeepZoomStatus
 
 # Import diretto evitato per evitare circular import
 # Il servizio archeologico verrà passato come parametro o usato tramite import locale
@@ -53,7 +54,7 @@ class DeepZoomMinIOService:
                 status = {
                     "photo_id": photo_id,
                     "site_id": site_id,
-                    "status": "processing",
+                    "status": DeepZoomStatus.PROCESSING.value,
                     "progress": 0,
                     "total_tiles": 0,
                     "completed_tiles": 0,
@@ -151,7 +152,7 @@ class DeepZoomMinIOService:
             return {
                 'photo_id': photo_id,
                 'site_id': site_id,
-                'status': 'scheduled',
+                'status': DeepZoomStatus.SCHEDULED.value,
                 'message': 'Deep zoom tiles generation scheduled in background',
                 'scheduled_at': scheduled_at
             }
@@ -213,7 +214,7 @@ class DeepZoomMinIOService:
             return {
                 'photo_id': photo_id,
                 'site_id': site_id,
-                'status': 'scheduled',
+                'status': DeepZoomStatus.SCHEDULED.value,
                 'message': 'Deep zoom tiles generation scheduled asynchronously',
                 'scheduled_at': scheduled_at
             }
@@ -298,7 +299,7 @@ class DeepZoomMinIOService:
                             await notification_manager.broadcast_tiles_progress(
                                 site_id=site_id,
                                 photo_id=photo_id,
-                                status='processing',
+                                status=DeepZoomStatus.PROCESSING.value,
                                 progress=0,
                                 photo_filename=filename,
                                 current_photo=idx,
@@ -340,7 +341,7 @@ class DeepZoomMinIOService:
                             await notification_manager.broadcast_tiles_progress(
                                 site_id=site_id,
                                 photo_id=photo_id,
-                                status='completed',
+                                status=DeepZoomStatus.COMPLETED.value,
                                 progress=100,
                                 photo_filename=filename,
                                 tile_count=tile_count,
@@ -364,9 +365,9 @@ class DeepZoomMinIOService:
                         )
                         
                         # Update database with failed status
-                        await self._update_photo_database_status(photo_id, "failed")
+                        await self._update_photo_database_status(photo_id, DeepZoomStatus.FAILED.value)
                         await self._update_processing_status(
-                            photo_id, site_id, "failed", 0, error=str(e)
+                            photo_id, site_id, DeepZoomStatus.FAILED.value, 0, error=str(e)
                         )
                         
                         # Invia notifica errore
@@ -374,7 +375,7 @@ class DeepZoomMinIOService:
                             await notification_manager.broadcast_tiles_progress(
                                 site_id=site_id,
                                 photo_id=photo_id,
-                                status='failed',
+                                status=DeepZoomStatus.FAILED.value,
                                 progress=0,
                                 photo_filename=filename,
                                 current_photo=idx,
@@ -426,9 +427,9 @@ class DeepZoomMinIOService:
             
         except Exception as e:
             logger.error(f"❌ Background file loading failed for photo {photo_id}: {e}")
-            await self._update_photo_database_status(photo_id, "failed")
+            await self._update_photo_database_status(photo_id, DeepZoomStatus.FAILED.value)
             await self._update_processing_status(
-                photo_id, site_id, "failed", 0, error=f"File loading failed: {str(e)}"
+                photo_id, site_id, DeepZoomStatus.FAILED.value, 0, error=f"File loading failed: {str(e)}"
             )
 
     @logger.catch(
@@ -465,10 +466,10 @@ class DeepZoomMinIOService:
                 )
                 
                 # 1. Update database status to "processing"
-                await self._update_photo_database_status(photo_id, "processing")
+                await self._update_photo_database_status(photo_id, DeepZoomStatus.PROCESSING.value)
                 
                 # 2. Aggiorna status a "processing"
-                await self._update_processing_status(photo_id, site_id, "processing", 0)
+                await self._update_processing_status(photo_id, site_id, DeepZoomStatus.PROCESSING.value, 0)
                 
                 # 2. Genera tiles in memoria
                 tiles_data, original_width, original_height = await self._generate_tiles_from_bytes(
@@ -489,7 +490,7 @@ class DeepZoomMinIOService:
                     }
                 )
                 
-                await self._update_processing_status(photo_id, site_id, "uploading", 10, total_tiles, levels_count)
+                await self._update_processing_status(photo_id, site_id, DeepZoomStatus.UPLOADING.value, 10, total_tiles, levels_count)
                 
                 # 3. Upload tiles con progress tracking
                 completed_tiles = 0
@@ -543,7 +544,7 @@ class DeepZoomMinIOService:
                     progress = 10 + int((completed_tiles / total_tiles) * 80)  # 10-90%
                     
                     await self._update_processing_status(
-                        photo_id, site_id, "uploading", progress, total_tiles, levels_count, completed_tiles
+                        photo_id, site_id, DeepZoomStatus.UPLOADING.value, progress, total_tiles, levels_count, completed_tiles
                     )
                     
                     if completed_tiles % 50 == 0:  # Log every 50 tiles to reduce noise
@@ -571,7 +572,7 @@ class DeepZoomMinIOService:
                     )
 
                 # 4. Crea metadata finale
-                await self._update_processing_status(photo_id, site_id, "finalizing", 90)
+                await self._update_processing_status(photo_id, site_id, DeepZoomStatus.FINALIZING.value, 90)
                 
                 metadata_url = await self._create_and_upload_metadata(
                     photo_id, site_id, tiles_data, archaeological_metadata, original_width, original_height
@@ -581,7 +582,7 @@ class DeepZoomMinIOService:
                 final_status = {
                     "photo_id": photo_id,
                     "site_id": site_id,
-                    "status": "completed",
+                    "status": DeepZoomStatus.COMPLETED.value,
                     "progress": 100,
                     "total_tiles": total_tiles,
                     "completed_tiles": len(successful_uploads),
@@ -602,7 +603,7 @@ class DeepZoomMinIOService:
                 # Update database with completion status
                 await self._update_photo_database_status(
                     photo_id,
-                    "completed",
+                    DeepZoomStatus.COMPLETED.value,
                     tile_count=len(successful_uploads),
                     levels=len(tiles_data)
                 )
@@ -634,12 +635,12 @@ class DeepZoomMinIOService:
                 )
                 
                 # Update database with failed status
-                await self._update_photo_database_status(photo_id, "failed")
+                await self._update_photo_database_status(photo_id, DeepZoomStatus.FAILED.value)
                 
                 # Aggiorna status a "failed"
                 try:
                     await self._update_processing_status(
-                        photo_id, site_id, "failed", 0, error=str(e)
+                        photo_id, site_id, DeepZoomStatus.FAILED.value, 0, error=str(e)
                     )
                 except Exception as status_error:
                     logger.error(
@@ -1776,19 +1777,19 @@ class DeepZoomMinIOService:
                         # Update status
                         photo.deepzoom_status = status
                         
-                        if status == "completed":
+                        if status == DeepZoomStatus.COMPLETED.value:
                             photo.has_deep_zoom = True
                             photo.deep_zoom_processed_at = datetime.now()
                             if tile_count is not None:
                                 photo.tile_count = tile_count
                             if levels is not None:
                                 photo.max_zoom_level = levels
-                        elif status == "failed":
+                        elif status in [DeepZoomStatus.FAILED.value, DeepZoomStatus.ERROR.value]:
                             photo.has_deep_zoom = False
                             photo.deep_zoom_processed_at = datetime.now()
-                        elif status == "processing":
+                        elif status == DeepZoomStatus.PROCESSING.value:
                             # Set processing status
-                            photo.deepzoom_status = "processing"
+                            photo.deepzoom_status = DeepZoomStatus.PROCESSING.value
                         
                         await db.commit()
                         logger.info(f"Updated photo {photo_id} deep zoom status to: {status}")
@@ -1996,7 +1997,7 @@ class DeepZoomMinIOService:
             try:
                 await self._update_photo_database_status(
                     photo_id,
-                    "completed",
+                    DeepZoomStatus.COMPLETED.value,
                     tile_count=tiles_data['total_tiles'],
                     levels=levels
                 )

@@ -18,6 +18,7 @@ from app.models import Photo
 from app.services.deep_zoom_background_service import deep_zoom_background_service
 from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
 from app.services.archaeological_minio_service import archaeological_minio_service
+from app.models.deepzoom_enums import DeepZoomStatus
 
 
 class VerificationStatus(Enum):
@@ -412,7 +413,7 @@ class TilesVerificationService:
         """Verify if a single photo has tiles"""
         try:
             # Check if tiles are already marked as available in database
-            if photo.has_deep_zoom and photo.deepzoom_status == 'completed':
+            if photo.has_deep_zoom and photo.deepzoom_status == DeepZoomStatus.COMPLETED.value:
                 # Verify tiles actually exist in storage
                 deep_zoom_service = get_deep_zoom_minio_service()
                 tile_info = await deep_zoom_service.get_deep_zoom_info(site_id, str(photo.id))
@@ -421,13 +422,13 @@ class TilesVerificationService:
             
             # Check if there's a processing task
             task_status = await deep_zoom_background_service.get_task_status(str(photo.id))
-            if task_status and task_status['status'] in ['pending', 'processing', 'retrying']:
+            if task_status and task_status['status'] in [DeepZoomStatus.SCHEDULED.value, DeepZoomStatus.PROCESSING.value, DeepZoomStatus.RETRYING.value]:
                 return True  # Consider as "has tiles" since processing is underway
             
             # Check processing status
             deep_zoom_service = get_deep_zoom_minio_service()
             processing_status = await deep_zoom_service.get_processing_status(site_id, str(photo.id))
-            if processing_status and processing_status.get('status') in ['processing', 'uploading']:
+            if processing_status and processing_status.get('status') in [DeepZoomStatus.PROCESSING.value, DeepZoomStatus.UPLOADING.value]:
                 return True
             
             # Check if tiles exist in storage
@@ -517,7 +518,7 @@ class TilesVerificationService:
                 photo_record = photo_result.scalar_one_or_none()
                 
                 if photo_record:
-                    photo_record.deepzoom_status = 'scheduled'
+                    photo_record.deepzoom_status = DeepZoomStatus.SCHEDULED.value
                     await db.commit()
             
             logger.info(f"Auto-repair scheduled for photo {photo.id}")

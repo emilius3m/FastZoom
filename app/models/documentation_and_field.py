@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, date, time
 from enum import Enum as PyEnum
 from typing import Optional, List, Dict, Any
+from app.models.deepzoom_enums import DeepZoomStatus
 
 from sqlalchemy import (
     Column, String, Text, Boolean, DateTime, Date, Time, ForeignKey,
@@ -258,7 +259,7 @@ class Photo(Base, SiteMixin, UserMixin):
     
     # ===== DEEP ZOOM INTEGRATION =====
     has_deep_zoom = Column(Boolean, default=False)
-    deepzoom_status = Column(String(20), default='none')  # none, scheduled, processing, completed, error
+    deepzoom_status = Column(String(20), default=DeepZoomStatus.NONE.value)  # none, scheduled, processing, completed, error
     deepzoom_processed_at = Column(DateTime, nullable=True)
     tile_count = Column(Integer, default=0)
     max_zoom_level = Column(Integer, default=0)
@@ -305,7 +306,7 @@ class Photo(Base, SiteMixin, UserMixin):
     @property
     def is_deepzoom_ready(self) -> bool:
         """Controlla se deep zoom è pronto"""
-        return self.deepzoom_status == 'completed'
+        return self.deepzoom_status == DeepZoomStatus.COMPLETED.value
 
     # ===== URL PROPERTIES FOR PYDANTIC =====
     @property

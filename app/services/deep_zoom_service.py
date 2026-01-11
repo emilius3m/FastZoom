@@ -12,6 +12,7 @@ from loguru import logger
 from app.models import Photo, UserActivity
 from app.services.deep_zoom_minio_service import DeepZoomMinIOService
 from app.services.deep_zoom_background_service import deep_zoom_background_service
+from app.models.deepzoom_enums import DeepZoomStatus
 from app.services.archaeological_minio_service import ArchaeologicalMinIOService
 from app.core.domain_exceptions import (
     ResourceNotFoundError,
@@ -109,7 +110,7 @@ class DeepZoomService:
         # Check if already done or processing unless forced
         if not force_reprocess:
              task_status = await deep_zoom_background_service.get_task_status(photo_id)
-             if task_status and task_status['status'] in ['pending', 'processing']:
+             if task_status and task_status['status'] in [DeepZoomStatus.SCHEDULED.value, DeepZoomStatus.PROCESSING.value]:
                  raise DomainValidationError(f"Processing already in progress for photo {photo_id}")
 
         try:
@@ -141,7 +142,7 @@ class DeepZoomService:
         )
 
         # Update DB status
-        photo.deepzoom_status = 'scheduled'
+        photo.deepzoom_status = DeepZoomStatus.SCHEDULED.value
         # Commit potentially done here or by caller. 
         # Ideally Service handles unit of work if it owns it.
         # We will add an activity log.
@@ -178,14 +179,14 @@ class DeepZoomService:
         message = ""
         repair_needed = False
 
-        if task_status and task_status['status'] in ['pending', 'processing', 'retrying']:
-            status_code = "processing"
+        if task_status and task_status['status'] in [DeepZoomStatus.SCHEDULED.value, DeepZoomStatus.PROCESSING.value, DeepZoomStatus.RETRYING.value]:
+            status_code = DeepZoomStatus.PROCESSING.value
             message = f"Processing in progress ({task_status['status']})"
         elif tile_info and tile_info.get('available', False):
             status_code = "complete"
             message = "Tiles available and valid"
-        elif processing_status and processing_status.get('status') == 'failed':
-            status_code = "failed"
+        elif processing_status and processing_status.get('status') == DeepZoomStatus.FAILED.value:
+            status_code = DeepZoomStatus.FAILED.value
             message = f"Previous processing failed: {processing_status.get('error')}"
             repair_needed = True
         else:
@@ -263,11 +264,11 @@ class DeepZoomService:
                 p_status = photo.deepzoom_status
             
             # Simple mapping
-            if p_status in ['pending', 'processing']:
+            if p_status in [DeepZoomStatus.SCHEDULED.value, DeepZoomStatus.PROCESSING.value]:
                 status_counts['processing'] += 1
-            elif p_status == 'completed':
+            elif p_status == DeepZoomStatus.COMPLETED.value:
                 status_counts['complete'] += 1
-            elif p_status == 'failed':
+            elif p_status in [DeepZoomStatus.FAILED.value, DeepZoomStatus.ERROR.value]:
                  status_counts['failed'] += 1
             else:
                  status_counts['missing'] += 1
