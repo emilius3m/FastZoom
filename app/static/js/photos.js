@@ -23,18 +23,18 @@ const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/tiff', 'image/webp
 // Utility function to format file size
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 // Utility function to format date
 function formatDate(dateString) {
     if (!dateString) return 'N/A';
-    
+
     try {
         const date = new Date(dateString);
         return date.toLocaleDateString('it-IT', {
@@ -66,7 +66,7 @@ function photosManager() {
         viewMode: 'grid',
         selectedPhotos: [],
         userRole: window.userRole || 'user',
-        
+
         // Multi-edit state
         get isMultipleSelection() {
             return this.selectedPhotos.length > 1;
@@ -130,14 +130,14 @@ function photosManager() {
             search: '',
             photo_type: '',
             material: '',
-            
+
             // Archaeological context
             excavation_area: '',
             stratigraphic_unit: '',
             chronology_period: '',
             object_type: '',
             conservation_status: '',
-            
+
             // Status filters
             is_published: null,
             is_validated: null,
@@ -145,7 +145,7 @@ function photosManager() {
             has_inventory: null,
             has_description: null,
             has_photographer: null,
-            
+
             // Date ranges
             upload_date_from: '',
             upload_date_to: '',
@@ -153,7 +153,7 @@ function photosManager() {
             photo_date_to: '',
             find_date_from: '',
             find_date_to: '',
-            
+
             // Dimension filters
             min_width: '',
             max_width: '',
@@ -161,11 +161,11 @@ function photosManager() {
             max_height: '',
             min_file_size_mb: '',
             max_file_size_mb: '',
-            
+
             // Sorting
             sortBy: 'created_desc'
         },
-        
+
         // UI state
         showAdvancedFilters: false,
         availableTags: [],
@@ -213,7 +213,7 @@ function photosManager() {
                 await this.loadPhotos();
                 this.updateStatistics();
                 this.extractAvailableTags();
-                
+
                 // Don't call applyFilters here since loadPhotos already sets the photos
                 // and we want to show all photos initially
                 this.filteredPhotos = this.photos;
@@ -230,7 +230,7 @@ function photosManager() {
 
                 // Ensure grid view is displayed by default
                 this.ensureGridView();
-                
+
                 // Connect WebSocket for real-time notifications
                 this.connectWebSocket();
 
@@ -246,7 +246,7 @@ function photosManager() {
             } catch (error) {
                 console.error('Errore durante inizializzazione:', error);
                 this.showAlertMessage(`Errore durante il caricamento delle foto: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
-                
+
                 // Ensure data consistency even on error
                 try {
                     this.updateStatistics();
@@ -267,10 +267,10 @@ function photosManager() {
             // Create a timeout controller to prevent hanging requests
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-            
+
             try {
                 console.log('Loading photos from API...');
-                
+
                 const response = await fetch(`/api/v1/sites/${this.getCurrentSiteId()}/photos`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -292,7 +292,7 @@ function photosManager() {
                     }, 2000);
                     throw new Error('Errore di autenticazione: sessione scaduta');
                 }
-                
+
                 if (response.status === 403) {
                     console.error('Authorization error (403): Insufficient permissions');
                     this.showAlertMessage('Non hai i permessi per visualizzare queste foto.');
@@ -321,7 +321,7 @@ function photosManager() {
             } catch (error) {
                 // Clear the timeout if there's an error
                 clearTimeout(timeoutId);
-                
+
                 // Handle timeout specifically
                 if (error.name === 'AbortError') {
                     console.error('Request timeout: The server took too long to respond');
@@ -330,7 +330,7 @@ function photosManager() {
                     console.error('Errore nel caricamento foto:', error);
                     this.showAlertMessage('Impossibile caricare le foto. Riprova più tardi.');
                 }
-                
+
                 // Set empty array as fallback
                 this.photos = [];
                 throw error;
@@ -345,7 +345,7 @@ function photosManager() {
         updateStatistics() {
             this.totalPhotos = this.photos.length;
             this.totalSize = this.photos.reduce((sum, photo) => sum + ((photo && photo.file_size) || 0), 0);
-            
+
             // Fix for "Invalid Date" issue - ensure we only process valid dates
             const photosWithDates = this.photos.filter(p => p && p.upload_date);
             this.lastUpload = photosWithDates.length > 0 ?
@@ -366,29 +366,29 @@ function photosManager() {
         // Advanced Filtering with Backend API
         async applyFilters() {
             this.isLoading = true;
-            
+
             // Create a timeout controller to prevent hanging requests
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-            
+
             try {
                 console.log('Applying filters and fetching photos...');
-                
+
                 // Build query parameters from active filters
                 const params = new URLSearchParams();
-                
+
                 // Basic filters
                 if (this.filters.search?.trim()) params.append('search', this.filters.search.trim());
                 if (this.filters.photo_type) params.append('photo_type', this.filters.photo_type);
                 if (this.filters.material) params.append('material', this.filters.material);
-                
+
                 // Archaeological context
                 if (this.filters.excavation_area?.trim()) params.append('excavation_area', this.filters.excavation_area.trim());
                 if (this.filters.stratigraphic_unit?.trim()) params.append('stratigraphic_unit', this.filters.stratigraphic_unit.trim());
                 if (this.filters.chronology_period?.trim()) params.append('chronology_period', this.filters.chronology_period.trim());
                 if (this.filters.object_type?.trim()) params.append('object_type', this.filters.object_type.trim());
                 if (this.filters.conservation_status) params.append('conservation_status', this.filters.conservation_status);
-                
+
                 // Status filters
                 if (this.filters.is_published === true) params.append('is_published', 'true');
                 if (this.filters.is_validated === true) params.append('is_validated', 'true');
@@ -396,7 +396,7 @@ function photosManager() {
                 if (this.filters.has_inventory === true) params.append('has_inventory', 'true');
                 if (this.has_description === true) params.append('has_description', 'true');
                 if (this.filters.has_photographer === true) params.append('has_photographer', 'true');
-                
+
                 // Date ranges
                 if (this.filters.upload_date_from) params.append('upload_date_from', this.filters.upload_date_from);
                 if (this.filters.upload_date_to) params.append('upload_date_to', this.filters.upload_date_to);
@@ -404,7 +404,7 @@ function photosManager() {
                 if (this.filters.photo_date_to) params.append('photo_date_to', this.filters.photo_date_to);
                 if (this.filters.find_date_from) params.append('find_date_from', this.filters.find_date_from);
                 if (this.filters.find_date_to) params.append('find_date_to', this.filters.find_date_to);
-                
+
                 // Dimension filters
                 if (this.filters.min_width) params.append('min_width', this.filters.min_width);
                 if (this.filters.max_width) params.append('max_width', this.filters.max_width);
@@ -412,14 +412,14 @@ function photosManager() {
                 if (this.filters.max_height) params.append('max_height', this.filters.max_height);
                 if (this.filters.min_file_size_mb) params.append('min_file_size_mb', this.filters.min_file_size_mb);
                 if (this.filters.max_file_size_mb) params.append('max_file_size_mb', this.filters.max_file_size_mb);
-                
+
                 // Sorting
                 if (this.filters.sortBy) params.append('sort_by', this.filters.sortBy);
-                
+
                 // Fetch filtered photos from API
                 const queryString = params.toString();
                 const url = `/api/v1/sites/${this.getCurrentSiteId()}/photos${queryString ? '?' + queryString : ''}`;
-                
+
                 const response = await fetch(url, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -427,31 +427,31 @@ function photosManager() {
                     },
                     signal: controller.signal
                 });
-                
+
                 // Clear the timeout since the request completed
                 clearTimeout(timeoutId);
-                
+
                 // Enhanced error handling for filters with toast system
                 if (!response.ok) {
                     let errorMessage = `Errore nell'applicazione dei filtri: ${response.status} ${response.statusText}`;
                     let errorType = 'error';
-                    
+
                     if (response.status === 401) {
                         errorMessage = 'Sessione scaduta. Effettua nuovamente il login.';
                         errorType = 'auth';
-                        
+
                         if (window.toastSystem) {
                             window.toastSystem.showAuthError(errorMessage);
                         }
-                        
+
                         setTimeout(() => {
                             window.location.href = '/login';
                         }, 3000);
-                        
+
                     } else if (response.status === 403) {
                         errorMessage = 'Non hai i permessi per applicare questi filtri.';
                         errorType = 'permission';
-                        
+
                         if (window.toastSystem) {
                             window.toastSystem.showError(errorMessage, {
                                 title: 'Errore di Autorizzazione',
@@ -461,11 +461,11 @@ function photosManager() {
                                 }
                             });
                         }
-                        
+
                     } else if (response.status >= 500) {
                         errorMessage = 'Errore del server durante l\'applicazione dei filtri. Riprova più tardi.';
                         errorType = 'server';
-                        
+
                         if (window.toastSystem) {
                             window.toastSystem.showNetworkError(new Error(errorMessage), {
                                 retryHandler: () => this.applyFilters()
@@ -481,24 +481,24 @@ function photosManager() {
                             });
                         }
                     }
-                    
+
                     console.error('API Error:', response.status, errorMessage);
                     throw new Error(`Errore API ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const data = await response.json();
                 this.photos = Array.isArray(data) ? data.filter(photo => photo && photo.id) : [];
                 this.filteredPhotos = this.photos;
                 this.currentPage = 1;
                 this.updatePagination();
                 this.updateStatistics();
-                
+
                 console.log(`Filters applied: ${this.filteredPhotos.length} photos found`);
-                
+
             } catch (error) {
                 // Clear the timeout if there's an error
                 clearTimeout(timeoutId);
-                
+
                 // Handle timeout specifically
                 if (error.name === 'AbortError') {
                     console.error('Request timeout: The server took too long to respond');
@@ -507,7 +507,7 @@ function photosManager() {
                     console.error('Error applying filters:', error);
                     this.showAlertMessage('Errore nell\'applicazione dei filtri. Riprova più tardi.');
                 }
-                
+
                 // Ensure we have valid arrays even on error
                 if (!Array.isArray(this.photos)) {
                     this.photos = [];
@@ -584,7 +584,7 @@ function photosManager() {
                 min_file_size_mb: 'Size min',
                 max_file_size_mb: 'Size max'
             };
-            
+
             Object.keys(this.filters).forEach(key => {
                 const value = this.filters[key];
                 if (value && value !== '' && value !== null && key !== 'sortBy') {
@@ -595,7 +595,7 @@ function photosManager() {
                     });
                 }
             });
-            
+
             return filtersList;
         },
 
@@ -615,7 +615,7 @@ function photosManager() {
         setDatePreset(preset) {
             const now = new Date();
             let startDate;
-            
+
             switch (preset) {
                 case 'today':
                     startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -630,7 +630,7 @@ function photosManager() {
                     startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
                     break;
             }
-            
+
             if (startDate) {
                 this.filters.upload_date_from = startDate.toISOString().split('T')[0];
                 this.filters.upload_date_to = now.toISOString().split('T')[0];
@@ -686,7 +686,7 @@ function photosManager() {
             const selectablePhotoIds = this.filteredPhotos
                 .filter(photo => photo && photo.id && photo.source_type !== 'us_file')
                 .map(photo => photo.id);
-            
+
             this.selectedPhotos = selectablePhotoIds;
             console.log(`Selected ${this.selectedPhotos.length} photos`);
         },
@@ -743,12 +743,12 @@ function photosManager() {
             // Initialize OpenSeadragon immediately
             this.$nextTick(async () => {
                 await this.switchToOpenSeadragon();
-                
+
                 // Emit event to notify OpenSeadragon component of photo change
                 this.$dispatch('current-photo-changed', {
                     photo: this.currentPhoto
                 });
-                
+
                 // Focus management after initialization
                 const closeButton = document.querySelector('[aria-label="Chiudi modal"]');
                 if (closeButton) {
@@ -808,7 +808,7 @@ function photosManager() {
                 console.error('switchToOpenSeadragon: Failed to initialize OpenSeadragon:', error);
                 this.osdError = true;
                 this.osdErrorMessage = error.message || 'Errore inizializzazione del visualizzatore';
-                
+
                 // Non usiamo fallback - tutte le immagini devono funzionare con OpenSeadragon
                 // Se fallisce, mostriamo l'errore ma manteniamo il tentativo
                 console.warn('OpenSeadragon initialization failed but no fallback will be used');
@@ -819,23 +819,16 @@ function photosManager() {
         },
 
         async initOpenSeadragon() {
-            console.log('initOpenSeadragon: Function called successfully!');
-
             // Load OpenSeadragon if not available
             if (typeof OpenSeadragon === 'undefined') {
-                console.log('Loading OpenSeadragon script...');
                 await this.loadOpenSeadragonScript();
             }
 
             // Check if photo has deep zoom support
-            console.log('Getting deep zoom info...');
             const deepZoomInfo = await this.getDeepZoomInfo();
-            console.log('Deep zoom info received:', deepZoomInfo);
 
             let tileSource;
             if (deepZoomInfo && deepZoomInfo.available && deepZoomInfo.levels > 0) {
-                console.log('Using deep zoom tiles with levels:', deepZoomInfo.levels);
-                
                 // Use OpenSeadragon's built-in TileSource format
                 tileSource = {
                     width: deepZoomInfo.width,
@@ -844,16 +837,16 @@ function photosManager() {
                     tileOverlap: deepZoomInfo.overlap || 0,
                     minLevel: 0,
                     maxLevel: deepZoomInfo.levels - 1,
-                    getTileUrl: function(level, x, y) {
+                    getTileUrl: function (level, x, y) {
                         // Use the current site and photo IDs from the context
                         const siteId = window.photosManagerInstance?.getCurrentSiteId();
                         const photoId = window.photosManagerInstance?.currentPhoto?.id;
-                        
+
                         if (!siteId || !photoId) {
                             console.error('Site ID or Photo ID not available for tile URL generation');
                             return '';
                         }
-                        
+
                         // Use tile format from deep zoom info (PNG for transparent images, JPG for others)
                         const tileFormat = deepZoomInfo.tile_format || 'jpg';
                         const extension = tileFormat === 'png' ? 'png' : 'jpg';
@@ -863,8 +856,7 @@ function photosManager() {
                     }
                 };
             } else {
-                console.log('Using simple image with OpenSeadragon (no tiles available)');
-                // SEMPRE usiamo OpenSeadragon, anche senza tiles
+                // No tiles available - use simple image
                 tileSource = {
                     type: 'image',
                     url: this.currentPhoto.file_url,
@@ -873,37 +865,21 @@ function photosManager() {
                 };
             }
 
-            console.log('Final tile source:', tileSource);
-
             // Create OpenSeadragon viewer
             const container = document.getElementById('openseadragon-container');
             if (!container) {
                 throw new Error('Container OpenSeadragon non trovato');
             }
 
-            // Store FAB container before clearing
+            // Store and restore FAB container
             const fabContainer = document.getElementById('osd-fab-container');
-            let fabHTML = '';
-            if (fabContainer) {
-                fabHTML = fabContainer.outerHTML;
-                console.log('Preserved FAB container HTML:', fabHTML.substring(0, 100) + '...');
-            }
-
-            // Clear container but preserve FAB container
-            container.innerHTML = '';
-            
-            // Restore FAB container if it was preserved
-            if (fabHTML) {
-                container.innerHTML = fabHTML;
-                console.log('Restored FAB container to container');
-            }
-            
-            console.log('Container cleared, creating OpenSeadragon viewer...');
+            const fabHTML = fabContainer ? fabContainer.outerHTML : '';
+            container.innerHTML = fabHTML;
 
             // Detect if image might have transparency (PNG format)
             const hasTransparency = this.currentPhoto.filename.toLowerCase().endsWith('.png');
             const backgroundColor = hasTransparency ? '#ffffff' : '#000000';
-            
+
             try {
                 this.osdViewer = OpenSeadragon({
                     element: container,
@@ -941,7 +917,6 @@ function photosManager() {
                     }
                 });
 
-                console.log('OpenSeadragon instance created:', this.osdViewer);
 
                 // Wait for viewer to be ready
                 return new Promise((resolve, reject) => {
@@ -955,22 +930,17 @@ function photosManager() {
                     }, 15000);
 
                     this.osdViewer.addHandler('open', () => {
-                        console.log('OpenSeadragon viewer opened successfully');
                         if (!resolved) {
                             resolved = true;
                             clearTimeout(timeoutId);
-                            
+
                             // Initialize FAB controls after OpenSeadragon is ready
-                            // Use a longer delay to ensure DOM is fully updated
                             setTimeout(() => {
-                                const managerInstance = window.photosManagerInstance;
-                                if (managerInstance && managerInstance.initializeFABControls) {
-                                    managerInstance.initializeFABControls();
-                                } else {
-                                    console.warn('photosManagerInstance not available for FAB initialization');
+                                if (window.photosManagerInstance?.initializeFABControls) {
+                                    window.photosManagerInstance.initializeFABControls();
                                 }
-                            }, 200); // Increased delay to 200ms
-                            
+                            }, 200);
+
                             resolve();
                         }
                     });
@@ -980,19 +950,14 @@ function photosManager() {
                         if (!resolved) {
                             resolved = true;
                             clearTimeout(timeoutId);
-                            reject(new Error('Impossibile aprire immagine: ' + event.message ));
+                            reject(new Error('Impossibile aprire immagine: ' + event.message));
                         }
                     });
 
                     this.osdViewer.addHandler('tile-load-failed', (event) => {
-                        console.warn('Tile load failed:', event);
-                        // Non facciamo fallback - registriamo solo l'errore
+                        // Track tile failures
                         if (!this.osdTileFailureCount) this.osdTileFailureCount = 0;
                         this.osdTileFailureCount++;
-                        
-                        if (this.osdTileFailureCount > 10) {
-                            console.warn('Many tile failures, but continuing with OpenSeadragon');
-                        }
                     });
 
                     this.osdViewer.addHandler('tile-loaded', (event) => {
@@ -1012,209 +977,80 @@ function photosManager() {
         // Initialize FAB Controls
         initializeFABControls() {
             console.log('Initializing FAB controls...');
-            
+
             // Wait for DOM to be ready with retry mechanism
             this.initializeFABControlsWithRetry(0);
         },
-        
+
         // Initialize FAB Controls with retry mechanism
         initializeFABControlsWithRetry(attempt) {
-            const maxRetries = 10;
+            const maxRetries = 5;
             const retryDelay = 100;
-            
-            // Try multiple selector strategies to find the FAB container
-            let fabContainer = document.getElementById('osd-fab-container');
-            
-            // If not found by ID, try by class name
-            if (!fabContainer) {
-                fabContainer = document.querySelector('.osd-fab-container');
-            }
-            
-            // If still not found, try within the OpenSeadragon container
+
+            // Find FAB container
+            let fabContainer = document.getElementById('osd-fab-container') ||
+                document.querySelector('.osd-fab-container');
+
+            // Create dynamically if not found
             if (!fabContainer) {
                 const osdContainer = document.getElementById('openseadragon-container');
                 if (osdContainer) {
-                    fabContainer = osdContainer.querySelector('#osd-fab-container') ||
-                                   osdContainer.querySelector('.osd-fab-container');
-                }
-            }
-            
-            // If still not found, create the FAB container dynamically
-            if (!fabContainer) {
-                const osdContainer = document.getElementById('openseadragon-container');
-                if (osdContainer) {
-                    console.log('Creating FAB container dynamically...');
                     fabContainer = this.createFABContainer(osdContainer);
                 }
             }
-            
+
             if (!fabContainer) {
                 if (attempt < maxRetries) {
-                    console.log(`FAB container not found, retrying (${attempt + 1}/${maxRetries})...`);
-                    setTimeout(() => {
-                        this.initializeFABControlsWithRetry(attempt + 1);
-                    }, retryDelay);
-                    return;
-                } else {
-                    console.error('FAB container not found after', maxRetries, 'attempts');
-                    console.log('Debug: Available containers:', {
-                        osdContainer: !!document.getElementById('openseadragon-container'),
-                        fabContainer: !!document.getElementById('osd-fab-container'),
-                        fabContainerByClass: !!document.querySelector('.osd-fab-container')
-                    });
-                    return;
+                    setTimeout(() => this.initializeFABControlsWithRetry(attempt + 1), retryDelay);
                 }
-            }
-            
-            console.log('FAB container found, proceeding with initialization...');
-            console.log('FAB container element:', fabContainer);
-            console.log('FAB container parent:', fabContainer.parentElement);
-            console.log('FAB container display style:', window.getComputedStyle(fabContainer).display);
-            
-            // Check if already initialized
-            if (fabContainer.dataset.initialized === 'true') {
-                console.log('FAB controls already initialized, skipping...');
                 return;
             }
-            
-            // Show FAB container with animation
-            console.log('Setting FAB container display to flex');
+
+            // Skip if already initialized
+            if (fabContainer.dataset.initialized === 'true') return;
+
+            // Show FAB container
             fabContainer.style.display = 'flex';
             fabContainer.style.visibility = 'visible';
             fabContainer.dataset.initialized = 'true';
-            
-            // Force a reflow to ensure the container is visible
-            fabContainer.offsetHeight;
-            console.log('FAB container is now visible:', fabContainer.style.display);
-            
-            // Get buttons
-            const zoomInBtn = document.getElementById('osd-zoom-in');
-            const zoomOutBtn = document.getElementById('osd-zoom-out');
-            const resetBtn = document.getElementById('osd-reset-view');
-            const rotateLeftBtn = document.getElementById('osd-rotate-left');
-            const rotateRightBtn = document.getElementById('osd-rotate-right');
-            const fullscreenBtn = document.getElementById('osd-fullscreen');
-            
-            // Debug: Log which buttons were found
-            console.log('FAB Buttons found:', {
-                zoomInBtn: !!zoomInBtn,
-                zoomOutBtn: !!zoomOutBtn,
-                resetBtn: !!resetBtn,
-                rotateLeftBtn: !!rotateLeftBtn,
-                rotateRightBtn: !!rotateRightBtn,
-                fullscreenBtn: !!fullscreenBtn
-            });
-            
+
             // Store reference for cleanup
-            this.fabControls = {
-                container: fabContainer,
-                buttons: [zoomInBtn, zoomOutBtn, resetBtn, rotateLeftBtn, rotateRightBtn, fullscreenBtn]
+            this.fabControls = { container: fabContainer };
+
+            // Define button actions
+            const actions = {
+                'osd-zoom-in': () => this.zoomIn(),
+                'osd-zoom-out': () => this.zoomOut(),
+                'osd-reset-view': () => this.resetView(),
+                'osd-rotate-left': () => this.rotateLeft(),
+                'osd-rotate-right': () => this.rotateRight(),
+                'osd-fullscreen': () => this.toggleFullscreen()
             };
-            
-            // Add event listeners
-            if (zoomInBtn) {
-                console.log('Adding zoomIn event listener');
-                zoomInBtn.addEventListener('click', (e) => {
-                    console.log('Zoom in button clicked');
-                    e.preventDefault();
-                    this.zoomIn();
-                });
-                zoomInBtn.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        this.zoomIn();
-                    }
-                });
-            } else {
-                console.error('Zoom in button not found!');
-            }
-            
-            if (zoomOutBtn) {
-                console.log('Adding zoomOut event listener');
-                zoomOutBtn.addEventListener('click', (e) => {
-                    console.log('Zoom out button clicked');
-                    e.preventDefault();
-                    this.zoomOut();
-                });
-                zoomOutBtn.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        this.zoomOut();
-                    }
-                });
-            }
-            
-            if (resetBtn) {
-                resetBtn.addEventListener('click', (e) => {
-                    console.log('Reset view button clicked');
-                    e.preventDefault();
-                    this.resetView();
-                });
-                resetBtn.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        this.resetView();
-                    }
-                });
-            }
-            
-            if (rotateLeftBtn) {
-                rotateLeftBtn.addEventListener('click', (e) => {
-                    console.log('Rotate left button clicked');
-                    e.preventDefault();
-                    this.rotateLeft();
-                });
-                rotateLeftBtn.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        this.rotateLeft();
-                    }
-                });
-            }
-            
-            if (rotateRightBtn) {
-                rotateRightBtn.addEventListener('click', (e) => {
-                    console.log('Rotate right button clicked');
-                    e.preventDefault();
-                    this.rotateRight();
-                });
-                rotateRightBtn.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        this.rotateRight();
-                    }
-                });
-            }
-            
-            if (fullscreenBtn) {
-                fullscreenBtn.addEventListener('click', (e) => {
-                    console.log('Fullscreen button clicked');
-                    e.preventDefault();
-                    this.toggleFullscreen();
-                });
-                fullscreenBtn.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        this.toggleFullscreen();
-                    }
-                })
-            }
-            
+
+            // Add event listeners for each button
+            Object.entries(actions).forEach(([id, action]) => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.addEventListener('click', (e) => { e.preventDefault(); action(); });
+                    btn.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); action(); }
+                    });
+                }
+            });
+
             // Add keyboard shortcuts
             this.addKeyboardShortcuts();
-            
-            console.log('FAB controls initialized successfully');
         },
-        
+
         // Create FAB Container dynamically if missing
         createFABContainer(osdContainer) {
             console.log('Creating FAB container dynamically...');
-            
+
             if (!osdContainer) {
                 console.error('Cannot create FAB container: OpenSeadragon container not found');
                 return null;
             }
-            
+
             // Create the FAB container div
             const fabContainer = document.createElement('div');
             fabContainer.id = 'osd-fab-container';
@@ -1222,7 +1058,7 @@ function photosManager() {
             fabContainer.style.display = 'flex';
             fabContainer.style.visibility = 'visible';
             fabContainer.dataset.initialized = 'false';
-            
+
             // Create all FAB buttons
             const buttonsHTML = `
                 <!-- Zoom In Button -->
@@ -1291,16 +1127,16 @@ function photosManager() {
                     <span class="osd-fab-tooltip">Fullscreen (F)</span>
                 </button>
             `;
-            
+
             fabContainer.innerHTML = buttonsHTML;
-            
+
             // Append to OpenSeadragon container
             osdContainer.appendChild(fabContainer);
-            
+
             console.log('FAB container created and appended successfully');
             return fabContainer;
         },
-        
+
         // FAB Control Functions
         zoomIn() {
             if (this.osdViewer) {
@@ -1308,21 +1144,21 @@ function photosManager() {
                 this.addRippleEffect('osd-zoom-in');
             }
         },
-        
+
         zoomOut() {
             if (this.osdViewer) {
                 this.osdViewer.viewport.zoomBy(0.67);
                 this.addRippleEffect('osd-zoom-out');
             }
         },
-        
+
         resetView() {
             if (this.osdViewer) {
                 this.osdViewer.viewport.goHome();
                 this.addRippleEffect('osd-reset-view');
             }
         },
-        
+
         rotateLeft() {
             if (this.osdViewer) {
                 const currentRotation = this.osdViewer.viewport.getRotation();
@@ -1330,7 +1166,7 @@ function photosManager() {
                 this.addRippleEffect('osd-rotate-left');
             }
         },
-        
+
         rotateRight() {
             if (this.osdViewer) {
                 const currentRotation = this.osdViewer.viewport.getRotation();
@@ -1338,7 +1174,7 @@ function photosManager() {
                 this.addRippleEffect('osd-rotate-right');
             }
         },
-        
+
         toggleFullscreen() {
             const container = document.getElementById('openseadragon-container');
             if (!document.fullscreenElement) {
@@ -1350,47 +1186,23 @@ function photosManager() {
             }
             this.addRippleEffect('osd-fullscreen');
         },
-        
+
         // Add ripple effect to buttons
         addRippleEffect(buttonId) {
             const button = document.getElementById(buttonId);
             if (!button) return;
-            
+
             // Create ripple element
             const ripple = document.createElement('span');
-            ripple.style.position = 'absolute';
-            ripple.style.borderRadius = '50%';
-            ripple.style.background = 'rgba(255, 255, 255, 0.5)';
-            ripple.style.width = '20px';
-            ripple.style.height = '20px';
-            ripple.style.top = '50%';
-            ripple.style.left = '50%';
-            ripple.style.transform = 'translate(-50%, -50%) scale(0)';
-            ripple.style.animation = 'ripple 0.6s ease-out';
-            ripple.style.pointerEvents = 'none';
-            
-            // Add ripple animation
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes ripple {
-                    to {
-                        transform: translate(-50%, -50%) scale(4);
-                        opacity: 0;
-                    }
-                }
-            `;
-            document.head.appendChild(style);
-            
+            ripple.className = 'osd-ripple';
             button.appendChild(ripple);
-            
+
             // Remove ripple after animation
             setTimeout(() => {
-                if (ripple.parentNode) {
-                    ripple.parentNode.removeChild(ripple);
-                }
+                ripple.remove();
             }, 600);
         },
-        
+
         // Keyboard shortcuts
         addKeyboardShortcuts() {
             this.keyboardHandler = (e) => {
@@ -1398,8 +1210,8 @@ function photosManager() {
                 if (!this.showPhotoModal || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                     return;
                 }
-                
-                switch(e.key.toLowerCase()) {
+
+                switch (e.key.toLowerCase()) {
                     case '+':
                     case '=':
                     case '_':
@@ -1433,36 +1245,36 @@ function photosManager() {
                         break;
                 }
             };
-            
+
             document.addEventListener('keydown', this.keyboardHandler);
         },
-        
+
         // Cleanup FAB controls
         cleanupFABControls() {
             console.log('Cleaning up FAB controls...');
-            
+
             // Hide container and reset initialization flag
             if (this.fabControls && this.fabControls.container) {
                 this.fabControls.container.style.display = 'none';
                 this.fabControls.container.dataset.initialized = 'false';
             }
-            
+
             // Also try to reset the main container
             const fabContainer = document.getElementById('osd-fab-container');
             if (fabContainer) {
                 fabContainer.style.display = 'none';
                 fabContainer.dataset.initialized = 'false';
             }
-            
+
             // Remove keyboard shortcuts
             if (this.keyboardHandler) {
                 document.removeEventListener('keydown', this.keyboardHandler);
                 this.keyboardHandler = null;
             }
-            
+
             // Clear references
             this.fabControls = null;
-            
+
             console.log('FAB controls cleaned up');
         },
 
@@ -1475,7 +1287,7 @@ function photosManager() {
                 // Get current site ID from URL or global variable
                 const siteId = this.getCurrentSiteId();
                 console.log('Getting deep zoom info for:', siteId, this.currentPhoto.id);
-                
+
                 const response = await fetch(`/api/v1/deepzoom/sites/${this.getCurrentSiteId()}/photos/${this.currentPhoto.id}/info`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -1493,7 +1305,7 @@ function photosManager() {
                     }, 2000);
                     throw new Error('Errore di autenticazione: sessione scaduta');
                 }
-                
+
                 if (response.status === 403) {
                     console.error('Authorization error (403): Insufficient permissions');
                     this.showAlertMessage('Non hai i permessi per visualizzare le informazioni Deep Zoom di questa foto.');
@@ -1503,13 +1315,13 @@ function photosManager() {
                 if (response.ok) {
                     const data = await response.json();
                     console.log('Deep zoom response:', data);
-                    
+
                     // Check if deep zoom is actually available
                     if (data.available === false || data.levels === 0 || data.total_tiles === 0) {
                         console.log('Deep zoom tiles not available for this photo');
                         return null;
                     }
-                    
+
                     return data;
                 } else if (response.status === 404) {
                     console.log('Deep zoom info not found for this photo');
@@ -1605,14 +1417,14 @@ function photosManager() {
                 this.imageError = false;
                 // Initialize OpenSeadragon for new photo
                 this.switchToOpenSeadragon();
-                
+
                 // Emit event to notify OpenSeadragon component of photo change
                 this.$nextTick(() => {
                     this.$dispatch('current-photo-changed', {
                         photo: this.currentPhoto
                     });
                 });
-                
+
                 // Update URL
                 const url = new URL(window.location);
                 url.searchParams.set('photo', this.currentPhoto.id);
@@ -1621,12 +1433,12 @@ function photosManager() {
                 // Initialize OpenSeadragon for new photo
                 this.$nextTick(async () => {
                     await this.switchToOpenSeadragon();
-                    
+
                     // Emit event to notify OpenSeadragon component of photo change
                     this.$dispatch('current-photo-changed', {
                         photo: this.currentPhoto
                     });
-                    
+
                     // Focus management after initialization
                     const closeButton = document.querySelector('[aria-label=\"Chiudi modal\"]');
                     if (closeButton) {
@@ -1847,7 +1659,7 @@ function photosManager() {
                 await this.saveSinglePhotoEdit(metadata);
             }
         },
-        
+
         // Single photo edit method
         async saveSinglePhotoEdit(metadata) {
             if (!this.selectedPhoto || !this.selectedPhoto.id || !metadata) {
@@ -1880,7 +1692,7 @@ function photosManager() {
                     }, 2000);
                     throw new Error('Errore di autenticazione: sessione scaduta');
                 }
-                
+
                 if (response.status === 403) {
                     console.error('Authorization error (403): Insufficient permissions');
                     this.showAlertMessage('Non hai i permessi per modificare questa foto.');
@@ -1919,7 +1731,7 @@ function photosManager() {
                 this.isSaving = false;
             }
         },
-        
+
         // Bulk edit method
         async saveBulkEdit(metadata) {
             if (!this.selectedPhotos.length || !metadata) {
@@ -1971,7 +1783,7 @@ function photosManager() {
                     }, 2000);
                     throw new Error('Errore di autenticazione: sessione scaduta');
                 }
-                
+
                 if (response.status === 403) {
                     console.error('Authorization error (403): Insufficient permissions');
                     this.showAlertMessage('Non hai i permessi per modificare queste foto.');
@@ -1991,7 +1803,7 @@ function photosManager() {
                 await this.loadPhotos();
                 this.updateStatistics();
                 this.extractAvailableTags();
-                
+
                 // Don't call applyFilters here since loadPhotos already sets the photos
                 // and we want to show all photos after bulk edit
                 this.filteredPhotos = this.photos;
@@ -2009,32 +1821,32 @@ function photosManager() {
                 this.isSaving = false;
             }
         },
-        
+
         // Bulk Delete Methods
         confirmBulkDelete() {
             if (!this.selectedPhotos || this.selectedPhotos.length === 0) {
                 this.showAlertMessage('Nessuna foto selezionata per l\'eliminazione.');
                 return;
             }
-            
+
             // Show confirmation dialog with count
             const confirmMessage = `Sei sicuro di voler eliminare ${this.selectedPhotos.length} foto? Questa azione è irreversibile.`;
-            
+
             if (confirm(confirmMessage)) {
                 this.executeBulkDelete();
             }
         },
-        
+
         async executeBulkDelete() {
             if (!this.selectedPhotos || this.selectedPhotos.length === 0) {
                 return;
             }
-            
+
             this.isBulkDeleting = true;
-            
+
             try {
                 console.log(`Starting bulk delete for ${this.selectedPhotos.length} photos`);
-                
+
                 const response = await fetch(`/api/v1/sites/${this.getCurrentSiteId()}/photos/bulk-delete`, {
                     method: 'POST',
                     headers: {
@@ -2046,7 +1858,7 @@ function photosManager() {
                         confirm: true
                     })
                 });
-                
+
                 // Handle authentication errors
                 if (response.status === 401) {
                     console.error('Authentication error (401): Token expired or invalid');
@@ -2056,38 +1868,38 @@ function photosManager() {
                     }, 2000);
                     throw new Error('Errore di autenticazione: sessione scaduta');
                 }
-                
+
                 if (response.status === 403) {
                     console.error('Authorization error (403): Insufficient permissions');
                     this.showAlertMessage('Non hai i permessi per eliminare queste foto.');
                     throw new Error('Errore di autorizzazione: permessi insufficienti');
                 }
-                
+
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error('API Error:', response.status, errorText);
                     this.showAlertMessage(`Errore durante l'eliminazione di massa: ${response.status} ${response.statusText}`);
                     throw new Error(`Errore durante l'eliminazione: ${response.status} ${response.statusText}`);
                 }
-                
+
                 const result = await response.json();
                 console.log('Bulk delete result:', result);
-                
+
                 // Refresh data to reflect changes
                 await this.loadPhotos();
                 this.updateStatistics();
                 this.extractAvailableTags();
-                
+
                 // Update filtered photos
                 this.filteredPhotos = this.photos;
                 this.updatePagination();
-                
+
                 // Show success message
                 this.showAlertMessage(`${this.selectedPhotos.length} foto eliminate con successo!`);
-                
+
                 // Clear selection
                 this.selectedPhotos = [];
-                
+
             } catch (error) {
                 console.error('Errore durante l\'eliminazione di massa:', error);
                 this.showAlertMessage(`Errore durante l'eliminazione: ${error.message || 'Errore sconosciuto'}. Riprova più tardi.`);
@@ -2095,7 +1907,7 @@ function photosManager() {
                 this.isBulkDeleting = false;
             }
         },
-        
+
         // Legacy savePhotoEdit method for backward compatibility
         async savePhotoEdit() {
             console.warn('savePhotoEdit: This method is deprecated, use savePhotoEditWithMetadata instead');
@@ -2147,7 +1959,7 @@ function photosManager() {
                     }, 2000);
                     throw new Error('Errore di autenticazione: sessione scaduta');
                 }
-                
+
                 if (response.status === 403) {
                     console.error('Authorization error (403): Insufficient permissions');
                     this.showAlertMessage('Non hai i permessi per eliminare questa foto.');
@@ -2205,10 +2017,10 @@ function photosManager() {
         // Close photo modal
         closePhotoModal() {
             console.log('closePhotoModal called');
-            
+
             // Cleanup FAB controls before closing
             this.cleanupFABControls();
-            
+
             // Reset states
             this.showPhotoModal = false;
             this.currentPhoto = null;
@@ -2239,7 +2051,7 @@ function photosManager() {
             console.log('showAlertMessage called:', message);
             this.alertMessage = message;
             this.showAlert = true;
-            
+
             // Auto-hide after 5 seconds
             setTimeout(() => {
                 this.showAlert = false;
@@ -2249,14 +2061,14 @@ function photosManager() {
         // Open Upload Modal - Metodo corretto per inizializzare il componente upload
         openUploadModal() {
             console.log('openUploadModal called - initializing upload component');
-            
+
             // Try to get the upload component from the DOM
             const uploadElement = document.querySelector('[x-data*=\"photoUploadComponent\"]');
-            
+
             if (uploadElement) {
                 // Get the Alpine.js component data
                 const uploadComponent = Alpine.$data(uploadElement);
-                
+
                 if (uploadComponent && uploadComponent.openModal) {
                     console.log('Found upload component, calling openModal()');
                     uploadComponent.openModal();
@@ -2275,10 +2087,10 @@ function photosManager() {
         // Initialize deep zoom status checking
         async initializeDeepZoomStatus() {
             console.log('Initializing deep zoom status checking...');
-            
+
             // Check for photos that might be stuck in processing state
             this.cleanupStuckProcessingPhotos();
-            
+
             // Start periodic checking
             this.startCleanupTimer();
         },
@@ -2286,16 +2098,16 @@ function photosManager() {
         // Clean up photos stuck in processing state
         cleanupStuckProcessingPhotos() {
             console.log('Cleaning up stuck processing photos...');
-            
+
             const stuckPhotos = this.photos.filter(photo =>
                 photo && photo.deepzoom_status === 'processing' &&
                 photo.updated_at &&
                 new Date(photo.updated_at) < new Date(Date.now() - 30 * 60 * 1000) // 30 minutes ago
             );
-            
+
             if (stuckPhotos.length > 0) {
                 console.log(`Found ${stuckPhotos.length} photos stuck in processing state:`, stuckPhotos);
-                
+
                 // Update local state to show them as failed
                 stuckPhotos.forEach(photo => {
                     const index = this.photos.findIndex(p => p && p.id === photo.id);
@@ -2304,7 +2116,7 @@ function photosManager() {
                         this.photos[index].deepzoom_error = 'Processing timeout - please try again';
                     }
                 });
-                
+
                 this.updateStatistics();
                 this.showAlertMessage(`Rilevate ${stuckPhotos.length} foto bloccate in elaborazione. Riprova l'upload.`);
             }
@@ -2313,7 +2125,7 @@ function photosManager() {
         // Start cleanup timer
         startCleanupTimer() {
             console.log('Starting cleanup timer...');
-            
+
             // Check every 5 minutes
             setInterval(() => {
                 this.cleanupStuckProcessingPhotos();
@@ -2329,10 +2141,10 @@ function photosManager() {
         wsReconnectTimer: null,
         wsAuthFailed: false,
         photosBeingProcessed: new Set(),
-        
+
         // FIXED: Add cleanup timer reference
         cleanupTimer: null,
-        
+
         connectWebSocket() {
             const siteId = this.getCurrentSiteId();
             if (!siteId) {
@@ -2413,7 +2225,7 @@ function photosManager() {
                         return;
                     }
                 };
-                
+
                 this.ws.onerror = (error) => {
                     console.error('❌ WebSocket error:', error);
                     this.wsConnected = false;
@@ -2441,7 +2253,7 @@ function photosManager() {
                         }
                     }, delay);
                 };
-                
+
             } catch (error) {
                 console.error('Failed to create WebSocket:', error);
             }
@@ -2475,21 +2287,21 @@ function photosManager() {
         // Handle photo upload notifications
         handlePhotoUploadedNotification(data) {
             console.log('Photo uploaded notification:', data);
-            
+
             if (data.photo && data.photo.id) {
                 // Add new photo to the list
                 this.photos.unshift(data.photo);
-                
+
                 // Update filtered photos if no filters are active
                 if (this.getActiveFiltersCount() === 0) {
                     this.filteredPhotos = this.photos;
                     this.updatePagination();
                 }
-                
+
                 // Update statistics
                 this.updateStatistics();
                 this.extractAvailableTags();
-                
+
                 // Show success message
                 this.showAlertMessage(`Nuova foto "${data.photo.filename}" caricata con successo!`);
             }
@@ -2498,29 +2310,29 @@ function photosManager() {
         // Handle photo update notifications
         handlePhotoUpdatedNotification(data) {
             console.log('Photo updated notification:', data);
-            
+
             if (data.photo && data.photo.id) {
                 // Update existing photo in the list
                 const index = this.photos.findIndex(p => p && p.id === data.photo.id);
                 if (index !== -1) {
                     this.photos[index] = { ...this.photos[index], ...data.photo };
-                    
+
                     // Update current photo if it's the one being edited
                     if (this.currentPhoto && this.currentPhoto.id === data.photo.id) {
                         this.currentPhoto = { ...this.currentPhoto, ...data.photo };
                     }
-                    
+
                     // Update filtered photos if needed
                     const filteredIndex = this.filteredPhotos.findIndex(p => p && p.id === data.photo.id);
                     if (filteredIndex !== -1) {
                         this.filteredPhotos[filteredIndex] = { ...this.filteredPhotos[filteredIndex], ...data.photo };
                     }
                 }
-                
+
                 // Update statistics and tags
                 this.updateStatistics();
                 this.extractAvailableTags();
-                
+
                 // Show success message
                 this.showAlertMessage(`Foto "${data.photo.filename}" aggiornata con successo!`);
             }
@@ -2529,24 +2341,24 @@ function photosManager() {
         // Handle photo deletion notifications
         handlePhotoDeletedNotification(data) {
             console.log('Photo deleted notification:', data);
-            
+
             if (data.photo_id) {
                 // Remove photo from all arrays
                 this.photos = this.photos.filter(p => p && p.id !== data.photo_id);
                 this.filteredPhotos = this.filteredPhotos.filter(p => p && p.id !== data.photo_id);
                 this.paginatedPhotos = this.paginatedPhotos.filter(p => p && p.id !== data.photo_id);
-                
+
                 // Remove from selection
                 this.selectedPhotos = this.selectedPhotos.filter(id => id !== data.photo_id);
-                
+
                 // Update statistics and pagination
                 this.updateStatistics();
                 this.updatePagination();
                 this.extractAvailableTags();
-                
+
                 // Show success message
                 this.showAlertMessage('Foto eliminata con successo!');
-                
+
                 // Close modal if the deleted photo was being viewed
                 if (this.currentPhoto && this.currentPhoto.id === data.photo_id) {
                     this.closePhotoModal();
@@ -2592,7 +2404,7 @@ function photosManager() {
                     this.photos[index].deepzoom_status = data.status;
                     this.photos[index].deepzoom_progress = data.progress || 0;
                     this.photos[index].deepzoom_error = data.error || null;
-                    
+
                     // IMPORTANT: Update has_deep_zoom when status is completed
                     if (data.status === 'completed') {
                         this.photos[index].has_deep_zoom = true;
@@ -2603,7 +2415,7 @@ function photosManager() {
                         this.currentPhoto.deepzoom_status = data.status;
                         this.currentPhoto.deepzoom_progress = data.progress || 0;
                         this.currentPhoto.deepzoom_error = data.error || null;
-                        
+
                         // IMPORTANT: Update has_deep_zoom for current photo too
                         if (data.status === 'completed') {
                             this.currentPhoto.has_deep_zoom = true;
@@ -2616,7 +2428,7 @@ function photosManager() {
                         this.filteredPhotos[filteredIndex].deepzoom_status = data.status;
                         this.filteredPhotos[filteredIndex].deepzoom_progress = data.progress || 0;
                         this.filteredPhotos[filteredIndex].deepzoom_error = data.error || null;
-                        
+
                         // IMPORTANT: Update has_deep_zoom in filtered photos too
                         if (data.status === 'completed') {
                             this.filteredPhotos[filteredIndex].has_deep_zoom = true;
@@ -2629,7 +2441,7 @@ function photosManager() {
                         this.paginatedPhotos[paginatedIndex].deepzoom_status = data.status;
                         this.paginatedPhotos[paginatedIndex].deepzoom_progress = data.progress || 0;
                         this.paginatedPhotos[paginatedIndex].deepzoom_error = data.error || null;
-                        
+
                         // IMPORTANT: Update has_deep_zoom in paginated photos too
                         if (data.status === 'completed') {
                             this.paginatedPhotos[paginatedIndex].has_deep_zoom = true;
@@ -2668,7 +2480,7 @@ function photosManager() {
             if (this.wsHeartbeatInterval) {
                 clearInterval(this.wsHeartbeatInterval);
             }
-            
+
             // Send ping every 30 seconds
             this.wsHeartbeatInterval = setInterval(() => {
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -2685,7 +2497,7 @@ function photosManager() {
                 }
             }, 30000);
         },
-        
+
         disconnectWebSocket() {
             // Clear any pending reconnection timer
             if (this.wsReconnectTimer) {
@@ -2715,13 +2527,13 @@ function photosManager() {
         // Fallback share method for browsers that don't support Web Share API
         fallbackShare(url) {
             console.log('Using fallback share method');
-            
+
             // Create a temporary input to copy the URL
             const input = document.createElement('input');
             input.value = url;
             document.body.appendChild(input);
             input.select();
-            
+
             try {
                 document.execCommand('copy');
                 this.showAlertMessage('Link copiato negli appunti!');
@@ -2736,27 +2548,27 @@ function photosManager() {
         // Function to refresh photos after upload (called by upload component)
         async refreshPhotos(uploadedFileIds = []) {
             console.log('refreshPhotos called with uploaded file IDs:', uploadedFileIds);
-            
+
             try {
                 // Reload photos from server
                 await this.loadPhotos();
-                
+
                 // Update filtered photos to show all photos
                 this.filteredPhotos = this.photos;
-                
+
                 // Update statistics and pagination
                 this.updateStatistics();
                 this.extractAvailableTags();
                 this.updatePagination();
-                
+
                 // Show success message
                 const message = uploadedFileIds.length > 0
                     ? `${uploadedFileIds.length} nuove foto caricate con successo!`
                     : 'Foto caricate con successo!';
                 this.showAlertMessage(message);
-                
+
                 console.log('Photos refreshed successfully after upload');
-                
+
             } catch (error) {
                 console.error('Error refreshing photos after upload:', error);
                 this.showAlertMessage('Errore nell\'aggiornamento della lista foto. Ricarica la pagina.');
@@ -2769,12 +2581,12 @@ function photosManager() {
 // Initialize the photos manager when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing Photos Manager...');
-    
+
     // Wait for Alpine.js to be available
     if (typeof Alpine !== 'undefined') {
         Alpine.data('photosManager', photosManager);
         console.log('Photos Manager initialized successfully');
-        
+
         // Make refreshPhotos function globally available for upload component
         // Wait a bit for the instance to be created
         setTimeout(() => {
@@ -2792,7 +2604,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Make editPhoto and confirmDeletePhoto globally accessible for HTML templates
-window.editPhoto = function(photo) {
+window.editPhoto = function (photo) {
     if (window.photosManagerInstance) {
         return window.photosManagerInstance.editPhoto(photo);
     } else {
@@ -2801,7 +2613,7 @@ window.editPhoto = function(photo) {
     }
 };
 
-window.confirmDeletePhoto = function(photo) {
+window.confirmDeletePhoto = function (photo) {
     if (window.photosManagerInstance) {
         return window.photosManagerInstance.confirmDeletePhoto(photo);
     } else {
@@ -2820,7 +2632,7 @@ const fabStyles = `
 /* Flowbite-style Controls for OpenSeadragon */
 .osd-fab-container {
     position: fixed;
-    bottom: 24px;
+    bottom: 120px;  /* Increased from 24px to clear bottom navigation */
     right: 24px;
     z-index: 1000;
     display: flex;
@@ -2960,6 +2772,27 @@ const fabStyles = `
 .osd-fab:focus-visible {
     outline: 2px solid #3b82f6;
     outline-offset: 2px;
+}
+
+/* Ripple effect */
+.osd-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    width: 20px;
+    height: 20px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    animation: ripple 0.6s ease-out;
+    pointer-events: none;
+}
+
+@keyframes ripple {
+    to {
+        transform: translate(-50%, -50%) scale(4);
+        opacity: 0;
+    }
 }
 
 /* Mobile responsive */
