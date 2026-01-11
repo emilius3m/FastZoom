@@ -20,7 +20,7 @@ from fastapi import Depends
 from app.database.session import get_db
 from app.services.auth_service import AuthService
 from app.services.site_service import SiteService
-from app.services.photo_service import PhotoMetadataService
+from app.services.photos import PhotoProcessingService as PhotoMetadataService
 from app.services.user_service import UserService
 from app.services.dashboard_service import DashboardService
 
@@ -74,9 +74,10 @@ def get_photo_metadata_service() -> PhotoMetadataService:
     Provide PhotoMetadataService instance.
     
     Returns:
-        PhotoMetadataService instance
+        PhotoMetadataService (PhotoProcessingService) singleton
     """
-    return PhotoMetadataService()
+    from app.services.photos import photo_processing_service
+    return photo_processing_service
 
 
 def get_user_service() -> UserService:

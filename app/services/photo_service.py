@@ -153,6 +153,20 @@ class FileUtils:
             return tmp_file.name
 
     @staticmethod
+    async def create_temp_file_from_upload(file: UploadFile) -> str:
+        """Crea file temporaneo da UploadFile"""
+        content = await file.read()
+        await file.seek(0)  # Reset pointer for potential reuse
+        
+        if len(content) == 0:
+            raise ImageProcessingError("File vuoto")
+        
+        suffix = Path(file.filename).suffix if file.filename else '.tmp'
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            tmp_file.write(content)
+            return tmp_file.name
+
+    @staticmethod
     def cleanup_temp_file(file_path: str):
         """Pulisce file temporaneo"""
         try:
@@ -162,11 +176,8 @@ class FileUtils:
             logger.warning(f"Errore pulizia file temporaneo {file_path}: {e}")
 
 
-class PhotoService:
-    """Servizio per gestione foto con storage centralizzato"""
-
-    def __init__(self, archaeological_minio_service):
-        self.storage = archaeological_minio_service
+# NOTE: PhotoService class removed - was empty/unused
+# All functionality is in PhotoMetadataService (to be refactored)
 
 
 class PhotoMetadataService:
@@ -475,13 +486,11 @@ class PhotoMetadataService:
         if archaeological_metadata is None:
             archaeological_metadata = {}
 
-        # 🔧 CORREZIONE: Keep UUIDs as strings for SQLite compatibility
-        # The Photo model uses String(36) for UUID fields, so we must pass strings
-        # not UUID objects to avoid "type 'UUID' is not supported" error
-        from uuid import UUID
-        if isinstance(site_id, (UUID, object)):
+        # Keep UUIDs as strings for SQLite compatibility
+        # The Photo model uses String(36) for UUID fields
+        if not isinstance(site_id, str):
             site_id = str(site_id)
-        if isinstance(uploaded_by, (UUID, object)):
+        if not isinstance(uploaded_by, str):
             uploaded_by = str(uploaded_by)
 
         # Crea record foto
@@ -1121,9 +1130,34 @@ class PhotoMetadataService:
                 'metadata_url': None,
                 'deep_zoom_error': str(e)
             }
+# =============================================================================
+# BACKWARD COMPATIBILITY EXPORTS
+# =============================================================================
+# This file is DEPRECATED. Please import from app.services.photos instead.
+#
+# Old imports (still work):
+#   from app.services.photo_service import photo_service
+#   from app.services.photo_service import photo_metadata_service
+#   from app.services.photo_service import PhotoMetadataService
+#   from app.services.photo_service import PhotoService
+#
+# New imports (preferred):
+#   from app.services.photos import photo_processing_service
+#   from app.services.photos import PhotoProcessingService
+#   from app.services.photos import photo_metadata_extractor
+#   from app.services.photos import thumbnail_service
+#   from app.services.photos import photo_record_service
 
+# Import from new modular services
+from app.services.photos import (
+    photo_processing_service,
+    PhotoProcessingService,
+    ImageUtils,
+    FileUtils,
+)
 
-# Istanza globale
-photo_metadata_service = PhotoMetadataService()
-
-photo_service = photo_metadata_service
+# Backward compatibility aliases
+photo_metadata_service = photo_processing_service
+photo_service = photo_processing_service
+PhotoMetadataService = PhotoProcessingService
+PhotoService = PhotoProcessingService  # The old empty class is now the processing service

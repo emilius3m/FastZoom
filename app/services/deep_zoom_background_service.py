@@ -1275,6 +1275,14 @@ class DeepZoomBackgroundService:
                             if self.format == 'png':
                                 tile.save(tile_buffer, format='PNG', optimize=True)
                             else:
+                                # JPEG does not support alpha channel - convert RGBA to RGB
+                                if tile.mode == 'RGBA':
+                                    # Create white background and paste image on it
+                                    rgb_tile = Image.new('RGB', tile.size, (255, 255, 255))
+                                    rgb_tile.paste(tile, mask=tile.split()[3])  # Use alpha as mask
+                                    tile = rgb_tile
+                                elif tile.mode != 'RGB':
+                                    tile = tile.convert('RGB')
                                 tile.save(tile_buffer, format='JPEG', quality=85, optimize=True)
                             tile_data = tile_buffer.getvalue()
                             encoding_time = time.time() - encoding_start_time
