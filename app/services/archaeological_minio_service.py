@@ -7,7 +7,7 @@ import os
 import random
 import time
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, AsyncGenerator
 from uuid import UUID
 from pathlib import Path
 from loguru import logger
@@ -1120,6 +1120,72 @@ class ArchaeologicalMinIOService:
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise StorageNotFoundError(f"File non trovato: {object_path}")
+
+    async def get_file_stream(self, object_path: str, chunk_size: int = 64 * 1024) -> AsyncGenerator[bytes, None]:
+        """
+        Ottieni stream di un file da MinIO per StreamingResponse.
+        Restituisce un generatore asincrono che legge il file a blocchi senza caricarlo tutto in RAM.
+        NOTA: Questa funzione è awaitable e restituisce il generatore.
+        """
+        try:
+            logger.debug(f"Streaming file from MinIO: {object_path}")
+            bucket, object_name = self._parse_minio_path(object_path)
+            
+            # 1. Ottieni l'oggetto response da MinIO con retry logic
+            retry_handler = RetryWithJitter(max_retries=3, base_delay=0.5, max_delay=5.0)
+            
+            async def get_object_with_retry():
+                return await asyncio.to_thread(
+                    self._client.get_object,
+                    bucket_name=bucket,
+                    object_name=object_name
+                )
+            
+            response = await retry_handler.execute_with_retry(
+                get_object_with_retry,
+                f"get_object stream for {object_path}"
+            )
+            
+            # 2. Definisci il generatore interno
+            async def stream_generator():
+                try:
+                    while True:
+                        # Leggi un blocco di dati (operazione bloccante eseguita in thread)
+                        try:
+                            chunk = await asyncio.to_thread(response.read, chunk_size)
+                        except Exception as read_err:
+                            logger.error(f"Error reading stream chunk from {object_path}: {read_err}")
+                            raise
+                            
+                        if not chunk:
+                            break
+                        yield chunk
+                finally:
+                    # Assicura la chiusura della connessione
+                    response.close()
+                    response.release_conn()
+                    logger.debug(f"Stream closed for {object_path}")
+            
+            # 3. Restituisci il generatore (avviandolo)
+            return stream_generator()
+
+        except S3Error as e:
+            # Gestione esplicita errori S3/MinIO
+            if e.code == 'NoSuchKey':
+                logger.debug(f"File not found in MinIO: {object_path}")
+                raise StorageNotFoundError(f"File non trovato: {object_path}")
+            elif e.code == 'AccessDenied':
+                logger.warning(f"Access denied to MinIO object: {object_path}")
+                raise StorageError(f"Accesso negato: {object_path}")
+            else:
+                logger.error(f"MinIO S3Error streaming {object_path}: {e.code} - {e.message}")
+                raise StorageError(f"Errore MinIO: {e.message}")
+        except StorageNotFoundError:
+            # Re-raise domain exceptions
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error streaming file {object_path}: {e}")
+            raise StorageError(f"Errore nello streaming del file: {str(e)}")
 
     async def remove_file(self, object_path: str) -> bool:
         """Rimuovi file da MinIO"""

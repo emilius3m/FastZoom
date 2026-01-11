@@ -54,18 +54,15 @@ class PhotoServingService:
             clean_path = PhotoServingService.clean_minio_path(file_path)
             logger.info(f"Attempting to retrieve file from Archaeological MinIO: {clean_path}")
 
-            file_data = await archaeological_minio_service.get_file(clean_path)
-
-            if file_data and isinstance(file_data, bytes):
-                logger.info(f"Successfully retrieved file from Archaeological MinIO: {clean_path}")
-                return StreamingResponse(
-                    io.BytesIO(file_data),
-                    media_type=mime_type,
-                    headers={"Cache-Control": "public, max-age=3600"}
-                )
-            else:
-                logger.warning(f"Archaeological MinIO returned invalid data for {clean_path}: {type(file_data)}")
-                raise HTTPException(status_code=404, detail="File data non valido")
+            # Use new streaming method
+            file_stream = await archaeological_minio_service.get_file_stream(clean_path)
+            
+            logger.info(f"Successfully initiated file stream from Archaeological MinIO: {clean_path}")
+            return StreamingResponse(
+                file_stream,
+                media_type=mime_type,
+                headers={"Cache-Control": "public, max-age=3600"}
+            )
 
         except HTTPException:
             raise
@@ -227,21 +224,18 @@ class PhotoServingService:
                         clean_path = PhotoServingService.clean_minio_path(photo.filepath)
                         logger.info(f"Attempting to download from Archaeological MinIO: {clean_path}")
 
-                        file_data = await archaeological_minio_service.get_file(clean_path)
-
-                        if file_data and isinstance(file_data, bytes):
-                            logger.info(f"Successfully downloading file from Archaeological MinIO for photo {photo_id}")
-                            return StreamingResponse(
-                                io.BytesIO(file_data),
-                                media_type=photo.mime_type or "image/jpeg",
-                                headers={
-                                    "Content-Disposition": f"attachment; filename=\"{filename}\"",
-                                    "Cache-Control": "private, max-age=0"
-                                }
-                            )
-                        else:
-                            logger.warning(f"Archaeological MinIO returned invalid data for download {clean_path}")
-                            raise HTTPException(status_code=404, detail="File data non valido")
+                        # Use streaming for download too
+                        file_stream = await archaeological_minio_service.get_file_stream(clean_path)
+                        
+                        logger.info(f"Successfully initiated download stream from Archaeological MinIO for photo {photo_id}")
+                        return StreamingResponse(
+                            file_stream,
+                            media_type=photo.mime_type or "image/jpeg",
+                            headers={
+                                "Content-Disposition": f"attachment; filename=\"{filename}\"",
+                                "Cache-Control": "private, max-age=0"
+                            }
+                        )
 
                     except HTTPException:
                         raise

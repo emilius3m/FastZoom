@@ -222,47 +222,9 @@
     </div>
 
     <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6">
 
-        <!-- Column 1: Quick Actions -->
-        <div>
-            <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
-                <div class="px-4 py-5 sm:p-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">Azioni Rapide</h3>
-                    <div class="grid grid-cols-2 gap-3">
-                        <a href="/view/{{ site.id }}/photos"
-                            class="inline-flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-lg text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                            <i class="fas fa-images mr-2 text-blue-500"></i>
-                            Foto
-                        </a>
-                        <a href="/view/{{ site.id }}/documentation"
-                            class="inline-flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-lg text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                            <i class="fas fa-file-alt mr-2 text-green-500"></i>
-                            Documenti
-                        </a>
-                        <a href="/view/{{ site.id }}/us"
-                            class="inline-flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-lg text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                            <i class="fas fa-layer-group mr-2 text-orange-500"></i>
-                            US/USM
-                        </a>
-                        <a href="/view/{{ site.id }}/giornale"
-                            class="inline-flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-lg text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                            <i class="fas fa-hard-hat mr-2 text-yellow-500"></i>
-                            Giornali
-                        </a>
-                        {% if can_admin %}
-                        <a href="/view/{{ site.id }}/team"
-                            class="inline-flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-lg text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                            <i class="fas fa-users mr-2 text-purple-500"></i>
-                            Team
-                        </a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Column 2: Recent Activities -->
+        <!-- Recent Activities -->
         <div class="bg-white dark:bg-gray-800 shadow rounded-lg h-fit">
             <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">Attività Recenti</h3>
