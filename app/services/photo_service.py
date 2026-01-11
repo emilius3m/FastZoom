@@ -454,7 +454,8 @@ class PhotoMetadataService:
             site_id: Union[str, 'UUID'],  # 🔧 CORREZIONE: Supporto UUID
             uploaded_by: Union[str, 'UUID'],  # 🔧 CORREZIONE: Supporto UUID
             metadata: Dict[str, Any] = None,
-            archaeological_metadata: Dict[str, Any] = None  # 🔧 AGGIUNTA: Metadati archeologici separati
+            archaeological_metadata: Dict[str, Any] = None,  # 🔧 AGGIUNTA: Metadati archeologici separati
+            thumbnail_path: Optional[str] = None  # 🔧 AGGIUNTA: Path thumbnail
     ) -> Photo:
         """
         Crea record Photo con metadati estratti
@@ -488,6 +489,7 @@ class PhotoMetadataService:
             "filename": filename,
             "original_filename": original_filename,
             "filepath": file_path,  # Fixed: use 'filepath' instead of 'file_path'
+            "thumbnail_path": thumbnail_path,  # 🔧 AGGIUNTA: Path thumbnail
             "file_size": file_size,
             "mime_type": self._guess_mime_type(filename),
             "site_id": site_id,
@@ -563,6 +565,7 @@ class PhotoMetadataService:
                     "filename": filename,
                     "original_filename": original_filename,
                     "filepath": file_path,
+                    "thumbnail_path": thumbnail_path,
                     "file_size": file_size,
                     "site_id": site_id,
                     "uploaded_by": uploaded_by,
@@ -828,8 +831,9 @@ class PhotoMetadataService:
             photo_uuid = str(uuid4())
             
             # Genera e carica thumbnail
+            thumbnail_url = None
             try:
-                await self.create_and_upload_thumbnail(photo_uuid, file_data, site_id)
+                thumbnail_url = await self.create_and_upload_thumbnail(photo_uuid, file_data, site_id)
             except Exception as e:
                 logger.warning(f"Errore creazione thumbnail per TUS upload {upload_id}: {e}")
                 # Non bloccante, continuiamo
@@ -862,7 +866,8 @@ class PhotoMetadataService:
                 site_id=site_id,
                 uploaded_by=user_id,
                 metadata=tech_metadata,
-                archaeological_metadata=arch_metadata
+                archaeological_metadata=arch_metadata,
+                thumbnail_path=thumbnail_url  # 🔧 AGGIUNTA: Passa thumbnail path
             )
             
             db.add(photo)
