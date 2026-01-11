@@ -17,8 +17,11 @@ from app.core.security import (
     require_site_permission,
     get_current_user_token_with_blacklist,
     SecurityService,
-    get_current_user_id
+    get_current_user_id,
+    get_current_user_with_superuser_check
 )
+from app.database.db import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.deepzoom_enums import DeepZoomStatus
 from app.routes.api.service_dependencies import DeepZoomServiceDep
 from app.services.deep_zoom_background_service import deep_zoom_background_service
@@ -72,7 +75,7 @@ async def get_deep_zoom_info(
 ):
     """Ottieni informazioni deep zoom per una foto"""
     # Verify read permissions using centralized dependency
-    await require_site_permission(site_id, request, required_permission="read")
+    await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="read")
 
     # Get info via service
     deep_zoom_info = await deep_zoom_service.get_deep_zoom_info(str(site_id), str(photo_id))
@@ -95,7 +98,7 @@ async def get_deep_zoom_tile(
 ):
     """Ottieni singolo tile deep zoom"""
     # Verify read permissions
-    await require_site_permission(site_id, request, required_permission="read")
+    await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="read")
 
     # Validate format
     if format not in ['jpg', 'png', 'jpeg']:
@@ -153,7 +156,7 @@ async def get_public_deep_zoom_tile(
     # 3. Check Permissions (implicitly uses current_user_id from request context in require_site_permission)
     # We pass 'read' requirement.
     # Note: require_site_permission internally fetches user from token/db.
-    await require_site_permission(site_id, request, required_permission="read")
+    await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="read")
 
     # 4. Fetch Tile
     tile_content = await deep_zoom_service.get_tile_content(str(site_id), str(photo_id), level, x, y)
@@ -188,7 +191,7 @@ async def process_deep_zoom(
 ):
     """Processa foto esistente per generare deep zoom tiles"""
     # Verify write permissions
-    await require_site_permission(site_id, request, required_permission="write")
+    await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="write")
 
     result = await deep_zoom_service.process_photo(
         str(site_id), 
@@ -216,7 +219,7 @@ async def get_deep_zoom_processing_status(
 ):
     """Ottieni status di elaborazione deep zoom per una foto"""
     # Verify read permissions
-    await require_site_permission(site_id, request, required_permission="read")
+    await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="read")
 
     status_info = await deep_zoom_service.get_processing_status(str(site_id), str(photo_id))
     return JSONResponse(status_info)
@@ -233,7 +236,7 @@ async def get_processing_queue_status(
 ):
     """Endpoint per controllare lo stato della coda di processamento"""
     # Verify read permissions
-    await require_site_permission(site_id, request, required_permission="read")
+    await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="read")
     
     # Leverages the batch status method which does a similar listing
     # Or we can keep utilizing the background service direct dependency if strictly needed for specific queue metrics
@@ -279,7 +282,7 @@ async def process_missing_tiles(
 ):
     """Avvia la generazione manuale dei tiles per una foto specifica"""
     # Verify write permissions
-    await require_site_permission(site_id, request, required_permission="write")
+    await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="write")
 
     result = await deep_zoom_service.process_missing_tiles(str(site_id), str(photo_id), current_user_id)
     return JSONResponse(result)
@@ -300,7 +303,7 @@ async def verify_and_repair_tiles(
     # Verify read permissions (repair needs write, but verify only read)
     # If auto_repair is True, we check write permission inside
     
-    perms = await require_site_permission(site_id, request, required_permission="read")
+    perms = await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="read")
     can_write = perms.get("can_write", False) or perms.get("is_superuser", False)
     
     if auto_repair and not can_write:
@@ -326,7 +329,7 @@ async def get_batch_tiles_status(
 ):
     """Ottieni lo stato dei tiles per un batch di foto"""
     # Verify read permissions
-    await require_site_permission(site_id, request, required_permission="read")
+    await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="read")
 
     result = await deep_zoom_service.get_batch_status(str(site_id), limit, offset)
     return JSONResponse(result)
@@ -348,7 +351,7 @@ async def v1_batch_process_deepzoom(
 ):
     """Processa multiple foto per deep zoom in batch."""
     # Verify write/admin permissions (batch usually requires higher privs or at least write)
-    await require_site_permission(site_id, request, required_permission="write")
+    await require_site_permission(site_id, request, db=deep_zoom_service.db, required_permission="write")
 
     if len(batch_request.photo_ids) > 50:
         raise HTTPException(status_code=400, detail="Maximum 50 photos per batch request")
@@ -435,18 +438,19 @@ async def get_verification_status(
 async def trigger_manual_verification(
     request: Request,
     site_id: Optional[UUID] = None,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """Avvia verifica manuale per un sito o globale"""
     if site_id:
         # Site specific check
-        await require_site_permission(site_id, request, required_permission="write")
+        await require_site_permission(site_id, request, db=db, required_permission="write")
         
         result = await tiles_verification_service.trigger_manual_verification(str(site_id))
     else:
         # Global trigger requires Superuser or high level admin
         # We can implement a simple check here
-        user = await get_current_user_with_superuser_check(request) # We need to import this if not available
+        user = await get_current_user_with_superuser_check(request, db=db) # We need to import this if not available
         if not user.is_superuser:
             raise InsufficientPermissionsError("Richiesto accesso Superuser per verifica globale")
             
@@ -465,12 +469,12 @@ async def trigger_manual_verification(
 async def configure_verification_service(
     config: VerificationConfig,
     request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """Configura parametri del servizio di verifica"""
     # Requires Superuser
-    from app.core.security import get_current_user_with_superuser_check
-    user = await get_current_user_with_superuser_check(request)
+    user = await get_current_user_with_superuser_check(request, db=db)
     if not user.is_superuser:
         raise InsufficientPermissionsError("Richiesto accesso Superuser")
 
@@ -492,12 +496,12 @@ async def configure_verification_service(
              tags=["Deep Zoom - Verification"])
 async def start_verification_service_endpoint(
     request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """Avvia il servizio background di verifica"""
     # Requires Superuser
-    from app.core.security import get_current_user_with_superuser_check
-    user = await get_current_user_with_superuser_check(request)
+    user = await get_current_user_with_superuser_check(request, db=db)
     if not user.is_superuser:
         raise InsufficientPermissionsError("Richiesto accesso Superuser")
 
@@ -510,12 +514,12 @@ async def start_verification_service_endpoint(
              tags=["Deep Zoom - Verification"])
 async def stop_verification_service_endpoint(
     request: Request,
-    current_user_id: UUID = Depends(get_current_user_id_with_blacklist)
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """Ferma il servizio background di verifica"""
     # Requires Superuser
-    from app.core.security import get_current_user_with_superuser_check
-    user = await get_current_user_with_superuser_check(request)
+    user = await get_current_user_with_superuser_check(request, db=db)
     if not user.is_superuser:
         raise InsufficientPermissionsError("Richiesto accesso Superuser")
 
