@@ -879,6 +879,52 @@ class PhotoMetadataService:
             await tus_upload_service.delete_upload(upload_id)
             logger.info(f"TUS upload {upload_id} processed successfully -> Photo {photo.id}")
             
+            # 6. Schedule Deep Zoom tile generation for large images
+            try:
+                # Check if image is large enough for deep zoom
+                width = tech_metadata.get('width', 0)
+                height = tech_metadata.get('height', 0)
+                max_dimension = max(width, height) if width and height else 0
+                
+                min_dimension_for_tiles = 2000  # Same threshold as standard upload
+                
+                if max_dimension > min_dimension_for_tiles:
+                    logger.info(f"TUS upload {photo.id}: Scheduling deep zoom tiles ({width}x{height})")
+                    
+                    # Update deepzoom_status to scheduled
+                    photo.deepzoom_status = 'scheduled'
+                    await db.commit()
+                    
+                    # Import and use the background service
+                    from app.services.deep_zoom_background_service import deep_zoom_background_service
+                    
+                    # Create photo snapshot for tile processing
+                    photo_snapshot = {
+                        'id': str(photo.id),
+                        'site_id': site_id,
+                        'file_path': file_path_db,
+                        'width': width,
+                        'height': height,
+                        'filename': filename,
+                        'file_size': file_size,
+                        'archaeological_metadata': arch_metadata,
+                        'needs_tiles': True
+                    }
+                    
+                    # Schedule batch processing with snapshot
+                    await deep_zoom_background_service.schedule_batch_processing_with_snapshots(
+                        photo_snapshots=[photo_snapshot],
+                        site_id=site_id
+                    )
+                    
+                    logger.info(f"TUS upload {photo.id}: Deep zoom tiles scheduled successfully")
+                else:
+                    logger.debug(f"TUS upload {photo.id}: Image too small for deep zoom ({max_dimension}px < {min_dimension_for_tiles}px)")
+                    
+            except Exception as tiles_error:
+                # Don't fail the upload if tile scheduling fails
+                logger.warning(f"TUS upload {photo.id}: Failed to schedule deep zoom tiles: {tiles_error}")
+            
             return photo
 
         except Exception as e:
