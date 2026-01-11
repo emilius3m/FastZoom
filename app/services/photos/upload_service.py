@@ -19,7 +19,7 @@ from sqlalchemy import select
 from app.database.engine import AsyncSessionLocal as async_session_maker
 from app.models import Photo, UserActivity
 from app.services.storage_service import storage_service
-from app.services.photo_service import photo_metadata_service
+from app.services.photos import photo_processing_service as photo_metadata_service
 from app.services.storage_management_service import storage_management_service
 from app.services.deep_zoom_background_service import deep_zoom_background_service
 from app.schemas.photos import PhotoUploadRequest

@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from app.services.archaeological_minio_service import ArchaeologicalMinIOService
-from app.services.photo_service import PhotoService
+from app.services.photos import PhotoProcessingService as PhotoService
 from app.services.deep_zoom_minio_service import DeepZoomMinIOService
 from app.core.exceptions import (
     StorageError, StorageFullError, StorageTemporaryError,
@@ -21,11 +21,10 @@ def get_archaeological_minio_service() -> ArchaeologicalMinIOService:
     return ArchaeologicalMinIOService()
 
 
-def get_photo_service(
-    storage: Annotated[ArchaeologicalMinIOService, Depends(get_archaeological_minio_service)]
-) -> PhotoService:
-    """Get PhotoService with injected storage dependency"""
-    return PhotoService(archaeological_minio_service=storage)
+def get_photo_service() -> PhotoService:
+    """Get PhotoService (PhotoProcessingService) singleton"""
+    from app.services.photos import photo_processing_service
+    return photo_processing_service
 
 
 def get_deep_zoom_minio_service(

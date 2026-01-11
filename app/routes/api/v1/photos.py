@@ -26,7 +26,7 @@ from app.models import UserActivity
 from app.models import USFile
 from app.routes.api.dependencies import get_site_access, get_photo_site_access, get_normalized_site_id
 from app.services.storage_service import storage_service
-from app.services.photo_service import photo_metadata_service
+from app.services.photos import photo_processing_service as photo_metadata_service
 from app.services.deep_zoom_background_service import deep_zoom_background_service
 from app.services.storage_management_service import storage_management_service
 from app.services.photo_serving_service import photo_serving_service
@@ -59,7 +59,7 @@ from app.core.domain_exceptions import (
     ResourceAlreadyExistsError
 )
 
-from app.services.photo_service import photo_service
+from app.services.photos import photo_processing_service as photo_service
 from app.schemas.photos import PhotoResponse
 
 # Export as 'router' for consistency with other API v1 modules
