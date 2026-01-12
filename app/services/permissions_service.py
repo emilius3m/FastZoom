@@ -178,8 +178,17 @@ class PermissionsService:
         site_id: UUID,
         required_level: PermissionLevel = PermissionLevel.READ
     ) -> bool:
-        """Verifica se un utente può accedere a un sito con il livello richiesto"""
+        """Verifica se un utente può accedere a un sito con il livello richiesto. Include check superuser."""
         
+        # 1. Check Superuser
+        user_query = select(User).where(User.id == str(user_id))
+        result = await db.execute(user_query)
+        user = result.scalar_one_or_none()
+        
+        if user and user.is_superuser:
+            return True
+        
+        # 2. Check Permissions
         permissions = await PermissionsService.get_user_permissions(
             db, user_id, site_id, active_only=True
         )

@@ -8,7 +8,7 @@
     x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
     x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
     x-transition:leave-end="opacity-0" data-upload-url="/api/v1/sites/{{ site.id }}/photos/upload"
-    data-site-id="{{ site.id }}" data-allowed-types="image/*" data-max-file-size="50MB" data-max-files="100"
+    data-site-id="{{ site.id }}" data-allowed-types="image/*" data-max-file-size="10GB" data-max-files="100"
     data-success-callback="refreshPhotos" data-error-callback="showUploadError" data-custom-styles="default"
     data-show-archaeological-fields="true" x-init="initializeUploadComponent($el)">
 
