@@ -31,7 +31,7 @@ class PhotoUpload {
             uploadUrl: options.uploadUrl || this.getDefaultUploadUrl(),
             siteId: options.siteId || this.getCurrentSiteId(),
             allowedTypes: options.allowedTypes || 'image/*',
-            maxFileSize: options.maxFileSize || '50MB',
+            maxFileSize: options.maxFileSize || '10GB',
             maxFiles: options.maxFiles || 100,
             onSuccess: options.onSuccess || null,
             onError: options.onError || null,
