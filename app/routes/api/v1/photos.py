@@ -23,7 +23,7 @@ from app.core.dependencies import (
 from app.core.security import get_current_user_id
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 from app.models import UserActivity
-from app.models import USFile
+from app.models import USFile, User
 from app.routes.api.dependencies import get_site_access, get_photo_site_access, get_normalized_site_id
 from app.services.storage_service import storage_service
 from app.services.photos import photo_processing_service as photo_metadata_service
@@ -131,21 +131,14 @@ async def process_tus_upload(
     Processa un upload TUS completato e lo trasforma in una foto.
     """
     # Manual permission check since site_id comes from body, not path
-    permission_query = select(UserSitePermission).where(
-        and_(
-            UserSitePermission.user_id == str(current_user_id),
-            UserSitePermission.site_id == site_id,
-            UserSitePermission.is_active == True,
-            or_(
-                UserSitePermission.expires_at.is_(None),
-                UserSitePermission.expires_at > func.now()
-            )
-        )
-    )
-    permission = await db.execute(permission_query)
-    permission = permission.scalar_one_or_none()
+    from app.services.permissions_service import PermissionsService
+    from app.models import PermissionLevel
     
-    if not permission or not permission.can_write():
+    can_write = await PermissionsService.user_can_access_site(
+        db, current_user_id, site_id, required_level=PermissionLevel.WRITE
+    )
+    
+    if not can_write:
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")
     
     try:

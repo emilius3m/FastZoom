@@ -12,11 +12,12 @@
     data-success-callback="refreshPhotos" data-error-callback="showUploadError" data-custom-styles="default"
     data-show-archaeological-fields="true" x-init="initializeUploadComponent($el)">
 
-    <div class="relative top-20 mx-auto p-5 border shadow-lg rounded-md bg-white dark:bg-gray-800 max-w-4xl max-h-[90vh] overflow-y-auto"
+    <div class="relative top-5 mx-auto border shadow-lg rounded-md bg-white dark:bg-gray-800 max-w-7xl h-[90vh] flex flex-col"
         :class="modalSizeClasses" data-theme="currentTheme">
 
-        <!-- Header -->
-        <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+        <!-- Header (Fixed) -->
+        <div
+            class="flex-none px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h3 class="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
                 <svg class="w-6 h-6 mr-2 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor"
                     viewBox="0 0 24 24">
@@ -35,234 +36,288 @@
             </button>
         </div>
 
-        <!-- Upload Instructions -->
-        <div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg">
-            <h4 class="font-medium text-blue-800 dark:text-blue-200 mb-2 flex items-center">
-                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                        clip-rule="evenodd"></path>
-                </svg>
-                Istruzioni Upload
-            </h4>
-            <ul class="text-sm text-blue-700 dark:text-blue-300 space-y-1 ml-7">
-                <li>• Formati supportati: <span x-text="config.allowedTypes"></span></li>
-                <li>• Dimensione massima per file: <span x-text="config.maxFileSize"></span></li>
-                <li>• Massimo <span x-text="config.maxFiles"></span> files per upload</li>
-                <li x-show="config.showArchaeologicalFields">• Compila i metadati archeologici per migliorare la
-                    catalogazione</li>
-            </ul>
-        </div>
+        <!-- Main Content Area (Scrollable / Split) -->
+        <div class="flex-1 overflow-hidden flex flex-col md:flex-row">
 
-        <!-- Upload Area -->
-        <div class="mb-6" x-show="!isUploading">
-            <div @dragover.prevent="dragActive = true" @dragleave.prevent="dragActive = false"
-                @drop.prevent="handleDrop($event)"
-                class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center transition-colors"
-                :class="{'border-blue-500 bg-blue-50 dark:bg-blue-900': dragActive}">
-                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
-                    </path>
-                </svg>
-                <p class="text-lg font-medium text-gray-900 dark:text-white mb-2" x-text="uploadAreaTitle"></p>
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Trascina i file qui o
-                    <label for="fileInput" class="text-blue-600 dark:text-blue-400 hover:text-blue-500 cursor-pointer">
-                        clicca per selezionarli
-                    </label>
-                </p>
-                <input type="file" id="fileInput" multiple x-ref="fileInput" :accept="config.allowedTypes"
-                    @change="handleFileSelect($event)" class="hidden">
-            </div>
-        </div>
+            <!-- LEFT COLUMN: File Upload & List -->
+            <div
+                class="w-full md:w-5/12 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
 
-        <!-- File List Preview -->
-        <div x-show="files.length > 0" class="mb-6">
-            <div class="flex items-center justify-between mb-4">
-                <h4 class="font-medium text-gray-900 dark:text-white">File Selezionati (<span
-                        x-text="files.length"></span>)</h4>
-                <button @click="clearFiles()" class="text-sm text-red-600 dark:text-red-400 hover:text-red-500">
-                    Rimuovi tutti
-                </button>
-            </div>
-            <div class="space-y-2 max-h-60 overflow-y-auto">
-                <template x-for="(file, index) in files" :key="index">
-                    <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <div class="flex items-center space-x-3">
-                            <div class="flex-shrink-0">
-                                <img :src="file.preview" :alt="file.name" class="h-10 w-10 object-cover rounded">
-                            </div>
-                            <div>
-                                <p class="text-sm font-medium text-gray-900 dark:text-white" x-text="file.name"></p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400" x-text="formatFileSize(file.size)">
-                                </p>
-                            </div>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <span x-show="file.error" class="text-xs text-red-600 dark:text-red-400"
-                                x-text="file.error"></span>
-                            <button @click="removeFile(index)" class="text-red-500 hover:text-red-600">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
+                <!-- Upload Zone -->
+                <div class="p-4 flex-none">
+                    <div x-show="!isUploading">
+                        <div @dragover.prevent="dragActive = true" @dragleave.prevent="dragActive = false"
+                            @drop.prevent="handleDrop($event)"
+                            class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center transition-colors bg-white dark:bg-gray-800"
+                            :class="{'border-blue-500 bg-blue-50 dark:bg-blue-900': dragActive}">
+                            <svg class="mx-auto h-10 w-10 text-gray-400 mb-2" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                                </path>
+                            </svg>
+                            <p class="text-sm font-medium text-gray-900 dark:text-white mb-1">Trascina foto qui</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">oppure</p>
+                            <label for="fileInput"
+                                class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Seleziona File
+                            </label>
+                            <input type="file" id="fileInput" multiple x-ref="fileInput" :accept="config.allowedTypes"
+                                @change="handleFileSelect($event)" class="hidden">
                         </div>
                     </div>
-                </template>
-            </div>
-        </div>
 
-        <!-- Archaeological Metadata Form -->
-        <div x-show="config.showArchaeologicalFields && files.length > 0" class="mb-6">
-            <div class="border-t pt-6">
-                <h4 class="font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                    <svg class="w-5 h-5 mr-2 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
-                        </path>
-                    </svg>
-                    Metadati Archeologici (applicati a tutte le foto)
-                </h4>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">N.
-                            Inventario</label>
-                        <input type="text" x-model="metadata.inventory_number" placeholder="es: INV-2023-001"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Area di
-                            Scavo</label>
-                        <input type="text" x-model="metadata.excavation_area" placeholder="es: Area A, Settore 3"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unità
-                            Stratigrafica</label>
-                        <input type="text" x-model="metadata.stratigraphic_unit" placeholder="es: US 101, US 205"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Materiale</label>
-                        <select x-model="metadata.material"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                            <option value="">Seleziona materiale...</option>
-                            <option value="ceramic">Ceramica</option>
-                            <option value="bronze">Bronzo</option>
-                            <option value="iron">Ferro</option>
-                            <option value="stone">Pietra</option>
-                            <option value="marble">Marmo</option>
-                            <option value="glass">Vetro</option>
-                            <option value="bone">Osso</option>
-                            <option value="wood">Legno</option>
-                            <option value="gold">Oro</option>
-                            <option value="silver">Argento</option>
-                            <option value="terracotta">Terracotta</option>
-                            <option value="mosaic">Mosaico</option>
-                            <option value="other">Altro</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo Foto</label>
-                        <select x-model="metadata.photo_type"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                            <option value="">Seleziona tipo...</option>
-                            <option value="general_view">Vista Generale</option>
-                            <option value="detail">Dettaglio</option>
-                            <option value="section">Sezione</option>
-                            <option value="before_restoration">Pre-Restauro</option>
-                            <option value="after_restoration">Post-Restauro</option>
-                            <option value="excavation_progress">Avanzamento Scavo</option>
-                            <option value="stratigraphy">Stratigrafia</option>
-                            <option value="find_context">Contesto Rinvenimento</option>
-                            <option value="laboratory">Laboratorio</option>
-                            <option value="archive">Archivio</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data
-                            Scatto</label>
-                        <input type="date" x-model="metadata.photo_date"
-                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <!-- Progress Bar (Visible only during upload) -->
+                    <div x-show="isUploading" class="mt-4">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Upload in corso...</span>
+                            <span class="text-sm text-gray-600 dark:text-gray-400" x-text="uploadProgress + '%'"></span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                :style="`width: ${uploadProgress}%`"></div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="mt-4">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
-                    <textarea x-model="metadata.description" rows="3"
-                        placeholder="Descrizione dettagliata del contenuto fotografico..."
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
-                </div>
-
-                <div class="mt-4">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tag (separati da
-                        virgola)</label>
-                    <input type="text" x-model="tagsInput" @input="updateTags()"
-                        placeholder="es: ceramica, romano, ritrovamento, area A"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                </div>
-            </div>
-        </div>
-
-        <!-- Upload Progress -->
-        <div x-show="isUploading" class="mb-6">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Caricamento in corso...</span>
-                <span class="text-sm text-gray-600 dark:text-gray-400" x-text="uploadProgress + '%'"></span>
-            </div>
-            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    :style="`width: ${uploadProgress}%`"></div>
-            </div>
-
-            <!-- Individual file progress -->
-            <div x-show="uploadDetails.length > 0" class="mt-4 space-y-2">
-                <template x-for="detail in uploadDetails" :key="detail.index">
-                    <div class="flex items-center justify-between text-sm">
-                        <span class="truncate flex-1" x-text="detail.fileName"></span>
-                        <span x-show="detail.status === 'uploading'" class="text-blue-600 dark:text-blue-400">
-                            <span x-text="detail.progress + '%'"></span>
-                        </span>
-                        <span x-show="detail.status === 'completed'" class="text-green-600 dark:text-green-400">✓</span>
-                        <span x-show="detail.status === 'error'" class="text-red-600 dark:text-red-400">✗</span>
+                <!-- File List (Scrollable) -->
+                <div class="flex-1 overflow-y-auto px-4 pb-4">
+                    <div x-show="files.length === 0"
+                        class="h-full flex flex-col items-center justify-center text-gray-400 opacity-50 space-y-2">
+                        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
+                            </path>
+                        </svg>
+                        <span class="text-sm">Nessuna foto selezionata</span>
                     </div>
-                </template>
+
+                    <div x-show="files.length > 0">
+                        <div
+                            class="flex items-center justify-between mb-2 sticky top-0 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur py-2 z-10">
+                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">File in coda (<span
+                                    x-text="files.length"></span>)</h4>
+                            <button @click="clearFiles()"
+                                class="text-xs text-red-600 hover:text-red-700 font-medium">Svuota tutto</button>
+                        </div>
+
+                        <div class="space-y-2">
+                            <template x-for="(file, index) in files" :key="index">
+                                <div
+                                    class="flex items-center p-2 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 shadow-sm">
+                                    <img :src="file.preview"
+                                        class="h-10 w-10 object-cover rounded flex-none bg-gray-100">
+                                    <div class="ml-3 flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate"
+                                            x-text="file.name"></p>
+                                        <div
+                                            class="flex items-center text-xs text-gray-500 dark:text-gray-400 space-x-2">
+                                            <span x-text="formatFileSize(file.size)"></span>
+
+                                            <!-- Status Indicators -->
+                                            <span x-show="isUploading && uploadDetails[index]?.status === 'pending'"
+                                                class="text-gray-400">In attesa...</span>
+                                            <span x-show="isUploading && uploadDetails[index]?.status === 'uploading'"
+                                                class="text-blue-500"
+                                                x-text="uploadDetails[index]?.progress + '%'"></span>
+                                            <span x-show="uploadDetails[index]?.status === 'completed'"
+                                                class="text-green-600 font-bold">Completato</span>
+                                            <span x-show="uploadDetails[index]?.status === 'error'"
+                                                class="text-red-600 font-bold">Errore</span>
+                                        </div>
+                                    </div>
+                                    <button @click="removeFile(index)" x-show="!isUploading"
+                                        class="ml-2 text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd"
+                                                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                                clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Metadata Form -->
+            <div class="w-full md:w-7/12 flex flex-col h-full overflow-hidden bg-white dark:bg-gray-800">
+                <div class="flex-1 overflow-y-auto p-6">
+
+                    <!-- Instructions (Compact) -->
+                    <div
+                        class="mb-6 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-lg flex items-start">
+                        <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 flex-none mt-0.5" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div class="text-sm text-blue-800 dark:text-blue-200">
+                            I metadati inseriti qui verranno applicati a <strong>tutte</strong> le foto caricate in
+                            questa sessione. Compila i campi comuni (es. Area, Data) prima di caricare.
+                        </div>
+                    </div>
+
+                    <div x-show="config.showArchaeologicalFields" class="space-y-6">
+                        <!-- Section Title -->
+                        <div class="flex items-center pb-2 border-b border-gray-100 dark:border-gray-700">
+                            <svg class="w-5 h-5 mr-2 text-amber-600 dark:text-amber-400" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                                </path>
+                            </svg>
+                            <h4 class="font-medium text-gray-900 dark:text-white">Dati Archeologici</h4>
+                        </div>
+
+                        <!-- Form Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            <!-- Left Sub-col -->
+                            <div class="space-y-4">
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">N.
+                                        Inventario</label>
+                                    <input type="text" x-model="metadata.inventory_number"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white"
+                                        placeholder="es. INV-2024-001">
+                                </div>
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Area
+                                        di Scavo</label>
+                                    <input type="text" x-model="metadata.excavation_area"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white"
+                                        placeholder="es. Saggio A">
+                                </div>
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">U.S.
+                                        / Contesto</label>
+                                    <input type="text" x-model="metadata.stratigraphic_unit"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white"
+                                        placeholder="es. US 104">
+                                </div>
+                            </div>
+
+                            <!-- Right Sub-col -->
+                            <div class="space-y-4">
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Data
+                                        Scatto</label>
+                                    <input type="date" x-model="metadata.photo_date"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white">
+                                </div>
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Materiale</label>
+                                    <select x-model="metadata.material"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white">
+                                        <option value="">-- Seleziona --</option>
+                                        <option value="ceramic">Ceramica</option>
+                                        <option value="bronze">Bronzo</option>
+                                        <option value="iron">Ferro</option>
+                                        <option value="stone">Pietra</option>
+                                        <option value="marble">Marmo</option>
+                                        <option value="glass">Vetro</option>
+                                        <option value="bone">Osso</option>
+                                        <option value="wood">Legno</option>
+                                        <option value="gold">Oro</option>
+                                        <option value="silver">Argento</option>
+                                        <option value="terracotta">Terracotta</option>
+                                        <option value="mosaic">Mosaico</option>
+                                        <option value="other">Altro</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label
+                                        class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Tipo
+                                        Foto</label>
+                                    <select x-model="metadata.photo_type"
+                                        class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white">
+                                        <option value="">-- Seleziona --</option>
+                                        <option value="general_view">Vista Generale</option>
+                                        <option value="detail">Dettaglio</option>
+                                        <option value="section">Sezione</option>
+                                        <option value="before_restoration">Pre-Restauro</option>
+                                        <option value="after_restoration">Post-Restauro</option>
+                                        <option value="excavation_progress">Avanzamento Scavo</option>
+                                        <option value="stratigraphy">Stratigrafia</option>
+                                        <option value="find_context">Contesto Rinvenimento</option>
+                                        <option value="laboratory">Laboratorio</option>
+                                        <option value="archive">Archivio</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <label
+                                class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Descrizione</label>
+                            <textarea x-model="metadata.description" rows="3"
+                                class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white"
+                                placeholder="Descrizione dettagliata..."></textarea>
+                        </div>
+
+                        <div>
+                            <label
+                                class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Tags</label>
+                            <input type="text" x-model="tagsInput" @input="updateTags()"
+                                class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white"
+                                placeholder="Separati da virgola (es. ceramica, frammento)">
+                            <div class="mt-2 flex flex-wrap gap-1">
+                                <template x-for="tag in metadata.tags" :key="tag">
+                                    <span
+                                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                        <span x-text="tag"></span>
+                                    </span>
+                                </template>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Action Buttons -->
-        <div class="flex justify-between items-center pt-6 border-t border-gray-200 dark:border-gray-700">
+        <!-- Footer (Fixed) -->
+        <div
+            class="flex-none bg-gray-50 dark:bg-gray-800 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div class="flex items-center">
                 <input type="checkbox" id="useTus" x-model="useTus"
                     class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                <label for="useTus" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-                    Usa High-Speed Upload (TUS)
-                    <span class="text-xs text-gray-500 block">Più veloce e affidabile per file grandi</span>
+                <label for="useTus" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                    High-Speed Upload (TUS)
                 </label>
             </div>
 
             <div class="flex space-x-3">
                 <button @click="closeModal()" x-show="!isUploading"
-                    class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                    Annulla
+                    class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
+                    Chiudi
                 </button>
-                <button @click="startUpload()" x-show="!isUploading && files.length > 0" :disabled="files.length === 0"
-                    class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
-                    <span x-show="files.length <= 1">Carica Foto</span>
-                    <span x-show="files.length > 1">Carica <span x-text="files.length"></span> Foto</span>
+                <button @click="startUpload()" x-show="!isUploading" :disabled="files.length === 0"
+                    :class="files.length === 0 ? 'opacity-50 cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 shadow-sm'"
+                    class="px-5 py-2 border border-transparent rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform active:scale-95 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    <span x-text="files.length > 1 ? `Carica ${files.length} Foto` : 'Carica Foto'"></span>
+                </button>
+
+                <!-- Cancel button during upload -->
+                <button @click="isUploading = false; closeModal()" x-show="isUploading"
+                    class="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                    Annulla Upload
                 </button>
             </div>
         </div>
+
     </div>
+
 </div>
 
 <!-- SCRIPT per il componente upload -->
