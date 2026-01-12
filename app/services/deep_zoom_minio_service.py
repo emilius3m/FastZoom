@@ -965,402 +965,63 @@ class DeepZoomMinIOService:
             return None
 
     async def get_tile_content(self, site_id: str, photo_id: str, level: int, x: int, y: int) -> Optional[bytes]:
-        """Ottieni contenuto diretto del tile invece di URL presigned con logging dettagliato"""
-        import time
-        start_time = time.time()
-        
+        """
+        Ottieni contenuto diretto del tile invece di URL presigned.
+        OTTIMIZZATO PER PERFORMANCE: Rimosso ogni controllo di metadati o listing file.
+        Tenta direttamente il recupero del file supportando JPG e PNG.
+        """
         tile_coords = f"{x}_{y}"
         
-        with logger.contextualize(
-            operation="get_tile_content",
-            site_id=site_id,
-            photo_id=photo_id,
-            level=level,
-            x=x,
-            y=y,
-            tile_coords=tile_coords
-        ):
-            logger.info(
-                "🔍 TILE REQUEST STARTED",
-                extra={
-                    "site_id": site_id,
-                    "photo_id": photo_id,
-                    "level": level,
-                    "coordinates": f"{x}_{y}",
-                    "tile_coords": tile_coords,
-                    "request_timestamp": datetime.now().isoformat()
-                }
-            )
+        # Performance optimization: Don't excessively context log every single tile hit
+        # Only log on error or if specifically debugging
+        
+        try:
+            # Import locale per evitare circular import
+            storage_service = self.storage
+            import asyncio
+            from minio.error import S3Error
+
+            # Standard extensions to try
+            # Optimization: could cache format per photo_id in a LRU cache if needed
+            extensions_to_try = ['jpg', 'png']
             
-            # FIXED: Try both formats systematically instead of relying on metadata
-            extensions_to_try = ['png', 'jpg']
-            
-            try:
-                # Import locale per evitare circular import
-                # Use self.storage instead of direct import to avoid circular imports
-                storage_service = self.storage
-                import asyncio
-                from minio.error import S3Error
+            for extension in extensions_to_try:
+                object_name = f"{site_id}/tiles/{photo_id}/{level}/{tile_coords}.{extension}"
                 
-                # ENHANCED: Check if this photo has incomplete tiles before attempting retrieval
-                metadata_check_start = time.time()
-                tile_info = await self.get_deep_zoom_info(site_id, photo_id)
-                metadata_check_time = time.time() - metadata_check_start
-            
-                logger.info(
-                    "📋 TILE METADATA CHECK",
-                    extra={
-                        "photo_id": photo_id,
-                        "metadata_available": tile_info is not None,
-                        "tiles_available": tile_info.get('available', False) if tile_info else False,
-                        "metadata_check_time_ms": round(metadata_check_time * 1000, 2),
-                        "tile_info": tile_info
-                    }
-                )
-            
-                if tile_info and tile_info.get('available', False):
-                    expected_total_tiles = tile_info.get('total_tiles', 0)
-                    expected_levels = tile_info.get('levels', 0)
-                    tile_format = tile_info.get('tile_format', 'unknown')
-                    
-                    logger.info(
-                        "📊 TILE METADATA DETAILS",
-                        extra={
-                            "photo_id": photo_id,
-                            "expected_total_tiles": expected_total_tiles,
-                            "expected_levels": expected_levels,
-                            "tile_format": tile_format,
-                            "tile_size": tile_info.get('tile_size', 'unknown'),
-                            "dimensions": f"{tile_info.get('width', 0)}x{tile_info.get('height', 0)}"
-                        }
-                    )
-                    
-                    # Quick check: if we expect many tiles but can't find the requested one,
-                    # there might be a generation issue
-                    if expected_total_tiles > 10:  # Arbitrary threshold for "should have many tiles"
-                        # Check how many tiles actually exist at this level
-                        completeness_check_start = time.time()
-                        try:
-                            prefix = f"{site_id}/tiles/{photo_id}/{level}/"
-                            
-                            logger.debug(
-                                "🔍 CHECKING TILE COMPLETENESS",
-                                extra={
-                                    "photo_id": photo_id,
-                                    "level": level,
-                                    "prefix": prefix,
-                                    "expected_total_tiles": expected_total_tiles
-                                }
-                            )
-                            
-                            def _count_tiles_at_level():
-                                return list(storage_service._client.list_objects(
-                                    bucket_name=storage_service.buckets['tiles'],
-                                    prefix=prefix,
-                                    recursive=False
-                                ))
-                            
-                            objects_at_level = await asyncio.to_thread(_count_tiles_at_level)
-                            actual_tiles_at_level = [obj for obj in objects_at_level if not obj.is_dir]
-                            completeness_check_time = time.time() - completeness_check_start
-                            
-                            logger.info(
-                                "📈 TILE LEVEL COMPLETENESS CHECK",
-                                extra={
-                                    "photo_id": photo_id,
-                                    "level": level,
-                                    "actual_tiles_at_level": len(actual_tiles_at_level),
-                                    "completeness_check_time_ms": round(completeness_check_time * 1000, 2),
-                                    "prefix": prefix
-                                }
-                            )
-                            
-                            if len(actual_tiles_at_level) == 0:
-                                logger.error(
-                                    f"🚨 CRITICAL: No tiles found at level {level} for photo {photo_id}",
-                                    extra={
-                                        "photo_id": photo_id,
-                                        "level": level,
-                                        "expected_total_tiles": expected_total_tiles,
-                                        "expected_levels": expected_levels,
-                                        "severity": "CRITICAL"
-                                    }
-                                )
-                                logger.error(
-                                    f"🔍 This indicates incomplete tile generation. Expected levels: {expected_levels}",
-                                    extra={
-                                        "photo_id": photo_id,
-                                        "diagnosis": "incomplete_tile_generation",
-                                        "recommendation": "regenerate_all_tiles"
-                                    }
-                                )
-                                
-                                # Try to find any tiles at all for this photo
-                                all_prefix = f"{site_id}/tiles/{photo_id}/"
-                                
-                                def _count_all_tiles():
-                                    return list(storage_service._client.list_objects(
-                                        bucket_name=storage_service.buckets['tiles'],
-                                        prefix=all_prefix,
-                                        recursive=True
-                                    ))
-                                
-                                all_objects = await asyncio.to_thread(_count_all_tiles)
-                                all_tiles = [obj for obj in all_objects if not obj.is_dir and obj.object_name.endswith(('.png', '.jpg'))]
-                                
-                                logger.error(
-                                    f"📊 ACTUAL TILE COUNT: {len(all_tiles)} tiles found vs {expected_total_tiles} expected",
-                                    extra={
-                                        "photo_id": photo_id,
-                                        "actual_tiles": len(all_tiles),
-                                        "expected_tiles": expected_total_tiles,
-                                        "completion_percentage": round((len(all_tiles) / expected_total_tiles * 100), 2) if expected_total_tiles > 0 else 0
-                                    }
-                                )
-                                
-                                if len(all_tiles) < expected_total_tiles * 0.1:  # Less than 10% of expected tiles
-                                    logger.error(
-                                        f"🔴 SEVERE: Photo {photo_id} has incomplete tile generation ({len(all_tiles)}/{expected_total_tiles} tiles)",
-                                        extra={
-                                            "photo_id": photo_id,
-                                            "severity": "SEVERE",
-                                            "actual_tiles": len(all_tiles),
-                                            "expected_tiles": expected_total_tiles,
-                                            "completion_percentage": round((len(all_tiles) / expected_total_tiles * 100), 2),
-                                            "recommendation": "regenerate_all_tiles"
-                                        }
-                                    )
-                                    logger.error(
-                                        f"💡 RECOMMENDATION: Regenerate all tiles for this photo",
-                                        extra={
-                                            "photo_id": photo_id,
-                                            "action": "regenerate_tiles",
-                                            "priority": "high"
-                                        }
-                                    )
-                                    return None
-                            
-                            elif len(actual_tiles_at_level) < 4:  # Very few tiles at this level
-                                logger.warning(
-                                    f"⚠️ WARNING: Only {len(actual_tiles_at_level)} tiles found at level {level} for photo {photo_id}",
-                                    extra={
-                                        "photo_id": photo_id,
-                                        "level": level,
-                                        "actual_tiles": len(actual_tiles_at_level),
-                                        "severity": "WARNING",
-                                        "diagnosis": "partial_tile_generation"
-                                    }
-                                )
-                                logger.warning(
-                                    f"🔍 This might indicate partial tile generation",
-                                    extra={
-                                        "photo_id": photo_id,
-                                        "diagnosis": "partial_tile_generation",
-                                        "recommendation": "verify_tile_generation"
-                                    }
-                                )
-                        
-                        except Exception as check_error:
-                            logger.warning(
-                                f"Could not verify tile completeness for photo {photo_id}: {check_error}",
-                                extra={
-                                    "photo_id": photo_id,
-                                    "error": str(check_error),
-                                    "error_type": type(check_error).__name__
-                                }
-                            )
-            
-                # Try to get the requested tile
-                for attempt_idx, extension in enumerate(extensions_to_try, 1):
-                    object_name = f"{site_id}/tiles/{photo_id}/{level}/{tile_coords}.{extension}"
-                    retrieval_start = time.time()
-                    
-                    logger.info(
-                        f"🎯 TILE RETRIEVAL ATTEMPT {attempt_idx}/{len(extensions_to_try)}",
-                        extra={
-                            "photo_id": photo_id,
-                            "level": level,
-                            "coordinates": f"{x}_{y}",
-                            "extension": extension,
-                            "object_name": object_name,
-                            "attempt": attempt_idx,
-                            "total_attempts": len(extensions_to_try)
-                        }
+                try:
+                    # Direct MinIO access via thread pool for async compatibility
+                    tile_data = await asyncio.to_thread(
+                        storage_service._client.get_object,
+                        bucket_name=storage_service.buckets['tiles'],
+                        object_name=object_name
                     )
                     
                     try:
-                        tile_data = await asyncio.to_thread(
-                            storage_service._client.get_object,
-                            bucket_name=storage_service.buckets['tiles'],
-                            object_name=object_name
-                        )
-                        
-                        # Read the content
                         content = tile_data.read()
+                        return content
+                    finally:
                         tile_data.close()
                         tile_data.release_conn()
-                        retrieval_time = time.time() - retrieval_start
-                        total_time = time.time() - start_time
-                        
-                        logger.success(
-                            f"✅ TILE RETRIEVAL SUCCESS",
-                            extra={
-                                "photo_id": photo_id,
-                                "level": level,
-                                "coordinates": f"{x}_{y}",
-                                "extension": extension,
-                                "object_name": object_name,
-                                "content_size_bytes": len(content),
-                                "retrieval_time_ms": round(retrieval_time * 1000, 2),
-                                "total_time_ms": round(total_time * 1000, 2),
-                                "attempt": attempt_idx,
-                                "bucket": storage_service.buckets['tiles']
-                            }
-                        )
-                        return content
-                        
-                    except S3Error as e:
-                        retrieval_time = time.time() - retrieval_start
-                        if e.code == 'NoSuchKey':
-                            logger.debug(
-                                f"🔍 TILE NOT FOUND with format .{extension} for photo {photo_id}",
-                                extra={
-                                    "photo_id": photo_id,
-                                    "level": level,
-                                    "coordinates": f"{x}_{y}",
-                                    "extension": extension,
-                                    "object_name": object_name,
-                                    "error_code": e.code,
-                                    "error_message": str(e),
-                                    "retrieval_time_ms": round(retrieval_time * 1000, 2),
-                                    "attempt": attempt_idx
-                                }
-                            )
-                            continue  # Try next format
-                        else:
-                            logger.warning(
-                                f"⚠️ MINIO ERROR accessing tile {object_name}: {e}",
-                                extra={
-                                    "photo_id": photo_id,
-                                    "level": level,
-                                    "coordinates": f"{x}_{y}",
-                                    "extension": extension,
-                                    "object_name": object_name,
-                                    "error_code": e.code,
-                                    "error_message": str(e),
-                                    "error_type": type(e).__name__,
-                                    "retrieval_time_ms": round(retrieval_time * 1000, 2),
-                                    "attempt": attempt_idx,
-                                    "bucket": storage_service.buckets['tiles']
-                                }
-                            )
-                            continue
-                
-                # If we get here, no format worked - provide enhanced error information
-                total_time = time.time() - start_time
-                
-                logger.error(
-                    f"❌ TILE NOT FOUND IN ANY FORMAT",
-                    extra={
-                        "photo_id": photo_id,
-                        "level": level,
-                        "coordinates": f"{x}_{y}",
-                        "tile_coords": tile_coords,
-                        "total_time_ms": round(total_time * 1000, 2),
-                        "formats_tried": extensions_to_try,
-                        "attempts_made": len(extensions_to_try),
-                        "severity": "ERROR"
-                    }
-                )
-                
-                # ENHANCED: Provide helpful diagnostic information
-                if tile_info and tile_info.get('available', False):
-                    expected_total_tiles = tile_info.get('total_tiles', 0)
-                    expected_levels = tile_info.get('levels', 0)
-                    
-                    logger.error(
-                        f"📊 TILE METADATA VS REALITY MISMATCH",
-                        extra={
-                            "photo_id": photo_id,
-                            "expected_total_tiles": expected_total_tiles,
-                            "expected_levels": expected_levels,
-                            "requested_tile": f"{tile_coords} at level {level}",
-                            "diagnosis": "tile_missing_despite_metadata",
-                            "severity": "HIGH"
-                        }
-                    )
-                    
-                    logger.error(
-                        f"🔍 REQUESTED TILE ANALYSIS",
-                        extra={
-                            "photo_id": photo_id,
-                            "requested_level": level,
-                            "requested_coordinates": tile_coords,
-                            "missing_tile": f"{level}/{tile_coords}",
-                            "status": "missing"
-                        }
-                    )
-                    
-                    logger.error(
-                        f"💡 POSSIBLE CAUSES ANALYSIS",
-                        extra={
-                            "photo_id": photo_id,
-                            "possible_causes": [
-                                "incomplete_tile_generation_process",
-                                "tile_generation_interrupted",
-                                "upload_to_minio_failed",
-                                "corrupted_metadata",
-                                "storage_access_issues"
-                            ],
-                            "recommendation": "regenerate_tiles_for_photo"
-                        }
-                    )
-                    
-                    logger.error(
-                        f"💡 RECOMMENDATION: Regenerate tiles for photo {photo_id}",
-                        extra={
-                            "photo_id": photo_id,
-                            "action": "regenerate_tiles",
-                            "priority": "high",
-                            "reason": "tiles_missing_despite_metadata"
-                        }
-                    )
-                
-                return None
-                
-            except Exception as e:
-                total_time = time.time() - start_time
-                
-                logger.error(
-                    f"💥 CRITICAL TILE RETRIEVAL ERROR",
-                    extra={
-                        "photo_id": photo_id,
-                        "level": level,
-                        "coordinates": f"{x}_{y}",
-                        "tile_coords": tile_coords,
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                        "total_time_ms": round(total_time * 1000, 2),
-                        "severity": "CRITICAL"
-                    }
-                )
-                
-                import traceback
-                logger.error(
-                    f"📋 TILE RETRIEVAL ERROR TRACEBACK",
-                    extra={
-                        "photo_id": photo_id,
-                        "level": level,
-                        "coordinates": f"{x}_{y}",
-                        "traceback": traceback.format_exc(),
-                        "error_details": {
-                            "error": str(e),
-                            "error_type": type(e).__name__,
-                            "module": type(e).__module__ if hasattr(type(e), '__module__') else 'unknown'
-                        }
-                    }
-                )
-                return None
+
+                except S3Error as e:
+                    if e.code == 'NoSuchKey':
+                        # Normal case if format doesn't match or tile missing
+                        continue
+                    else:
+                        logger.warning(f"MinIO error retrieving tile {object_name}: {e}")
+                        continue
+                except Exception as e:
+                    logger.warning(f"Error retrieving tile {object_name}: {e}")
+                    continue
+
+            # If we reach here, tile was not found in any format
+            # Log only as debug to avoid flooding logs during zooming on missing areas
+            logger.debug(f"Tile {tile_coords} at level {level} not found for photo {photo_id}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Critical error in get_tile_content for {photo_id}: {e}")
+            return None
 
     async def get_deep_zoom_info(self, site_id: str, photo_id: str) -> Optional[Dict[str, Any]]:
         """Ottieni informazioni deep zoom per una foto"""
