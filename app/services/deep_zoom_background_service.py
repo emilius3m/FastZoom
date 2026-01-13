@@ -790,15 +790,15 @@ class DeepZoomBackgroundService:
                         "tile_size": str(self.tile_size)
                     }
                     
+                    # Construct object_name: site_id/tiles/photo_id/level/col_row.format
+                    object_name = f"{task.site_id}/tiles/{task.photo_id}/{level}/{col}_{row}.{self.format}"
+                    
                     await self.storage.upload_deep_zoom_tile(
+                        tile_data=tile_data,
                         site_id=task.site_id,
-                        photo_id=task.photo_id,
-                        level=level,
-                        x=int(col),
-                        y=int(row),
-                        content=tile_data,
+                        object_name=object_name,
                         content_type=f"image/{self.format}",
-                        metadata=metadata
+                        tile_metadata=metadata
                     )
                     return True
                 except Exception as e:

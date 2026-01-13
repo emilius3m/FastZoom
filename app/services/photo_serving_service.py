@@ -26,12 +26,36 @@ class PhotoServingService:
     def clean_minio_path(file_path: str) -> str:
         """
         🔧 FUNZIONE DI SUPPORTO: Pulisce path per compatibilità MinIO
-        Rimuove prefisso "sites/" se presente
+        - Rimuove prefisso "sites/" se presente
+        - Estrae object_name da URL completi (http://host:port/bucket/object_name)
         """
-        if file_path and file_path.startswith("sites/"):
+        if not file_path:
+            return file_path
+            
+        # Handle full URLs (http://localhost:9000/bucket/object_name)
+        if file_path.startswith('http://') or file_path.startswith('https://'):
+            import re
+            # Extract everything after the bucket name
+            # URL format: http://host:port/bucket_name/object_path
+            # We need to extract bucket_name and object_path
+            match = re.match(r'https?://[^/]+/([^/]+)/(.+)$', file_path)
+            if match:
+                bucket_name = match.group(1)
+                object_path = match.group(2)
+                # Return bucket/object format for get_file_stream
+                cleaned = f"{bucket_name}/{object_path}"
+                logger.debug(f"Cleaned URL path: '{file_path}' -> '{cleaned}'")
+                return cleaned
+            else:
+                logger.warning(f"Could not parse URL path: {file_path}")
+                return file_path
+        
+        # Handle "sites/" prefix
+        if file_path.startswith("sites/"):
             cleaned = file_path[6:]  # Rimuove "sites/"
             logger.debug(f"Cleaned path: '{file_path}' -> '{cleaned}'")
             return cleaned
+            
         return file_path
 
     @staticmethod

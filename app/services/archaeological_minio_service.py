@@ -823,7 +823,30 @@ class ArchaeologicalMinIOService(FileStorageInterface):
         return result_url
 
     def _parse_minio_path(self, path: str) -> Tuple[str, str]:
-        """Parse minio://bucket/object path or legacy path format"""
+        """Parse minio://bucket/object path, full URLs, or legacy path format"""
+        # Handle full URLs (http://localhost:9000/bucket/object_name)
+        if path.startswith('http://') or path.startswith('https://'):
+            import re
+            # URL format: http://host:port/bucket_name/object_path
+            match = re.match(r'https?://[^/]+/([^/]+)/(.+)$', path)
+            if match:
+                bucket_name = match.group(1)
+                object_path = match.group(2)
+                # Map known bucket names
+                if bucket_name == 'archaeological-photos':
+                    return self.buckets['photos'], object_path
+                elif bucket_name == 'thumbnails':
+                    return self.buckets['thumbnails'], object_path
+                elif bucket_name == 'deep-zoom-tiles':
+                    return self.buckets['tiles'], object_path
+                elif bucket_name == 'archaeological-documents':
+                    return self.buckets['documents'], object_path
+                else:
+                    return bucket_name, object_path
+            else:
+                logger.warning(f"Could not parse URL path: {path}")
+                # Fall through to other parsing methods
+        
         if path.startswith('minio://'):
             path = path[8:]  # Remove minio://
             parts = path.split('/', 1)
