@@ -209,7 +209,10 @@ class PhotoProcessingService:
                 raise PhotoServiceError(f"TUS file not found: {upload_id}")
                 
             file_size = temp_path.stat().st_size
-            filename = metadata.get('filename', f"upload_{upload_id}.jpg")
+            
+            # Get original filename from TUS metadata
+            tus_metadata = await self.tus_service.get_upload_metadata(upload_id)
+            filename = tus_metadata.get('filename', f"upload_{upload_id}.jpg")
             
             # Read file content
             async with aiofiles.open(temp_path, 'rb') as f:

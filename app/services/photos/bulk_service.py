@@ -556,18 +556,22 @@ class PhotoBulkService:
                     self.logger.warning(f"Error deleting file {photo_path}: {e}")
             
             # Delete thumbnail from MinIO
-            if thumbnail_path and thumbnail_path.startswith("thumbnails/"):
-                try:
-                    success = await archaeological_minio_service.remove_object_from_bucket(
-                        archaeological_minio_service.buckets["thumbnails"],
-                        thumbnail_path
-                    )
-                    if success:
-                        self.logger.info(f"Thumbnail deleted from MinIO: {thumbnail_path}")
-                    else:
-                        self.logger.warning(f"Could not delete thumbnail: {thumbnail_path}")
-                except Exception as e:
-                    self.logger.warning(f"Error deleting thumbnail {thumbnail_path}: {e}")
+            # Handle both relative paths (thumbnails/...) and full URLs (http://...thumbnails/...)
+            if thumbnail_path:
+                should_delete_thumbnail = (
+                    thumbnail_path.startswith("thumbnails/") or
+                    "/thumbnails/" in thumbnail_path
+                )
+                if should_delete_thumbnail:
+                    try:
+                        # Use remove_file which can parse URLs via _parse_minio_path
+                        success = await archaeological_minio_service.remove_file(thumbnail_path)
+                        if success:
+                            self.logger.info(f"Thumbnail deleted from MinIO: {thumbnail_path}")
+                        else:
+                            self.logger.warning(f"Could not delete thumbnail: {thumbnail_path}")
+                    except Exception as e:
+                        self.logger.warning(f"Error deleting thumbnail {thumbnail_path}: {e}")
             
             # NUOVO: Delete Deep Zoom tiles from MinIO
             if photo.has_deep_zoom:

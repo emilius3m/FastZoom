@@ -34,7 +34,8 @@ class PhotoUploadService:
     def __init__(self):
         self.parallel_processing_threshold = 3  # Files count to trigger parallel vs sequential
         self.max_file_size_mb = 10000  # Maximum file size limit (10GB)
-        self.min_dimension_for_tiles = 2000  # Minimum dimension for deep zoom tiles
+        from app.services.photos.config import MIN_DIMENSION_FOR_TILES
+        self.min_dimension_for_tiles = MIN_DIMENSION_FOR_TILES  # Centralized config
         self.debug_mode = False  # Riabilita validazione storage
 
     def prepare_upload_from_form_data(

@@ -217,8 +217,21 @@ class TusUploadService:
             upload_path = self.upload_dir / upload_id
             metadata_path = self.metadata_dir / f"{upload_id}.json"
             
-            if upload_path.exists():
-                upload_path.unlink()
+            # On Windows, file handles may not be released immediately
+            # Retry deletion with exponential backoff
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    if upload_path.exists():
+                        upload_path.unlink()
+                    break
+                except PermissionError as e:
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(0.5 * (attempt + 1))  # 0.5s, 1s, 1.5s
+                        logger.debug(f"Retry {attempt + 1}/{max_retries} deleting {upload_id}")
+                    else:
+                        logger.warning(f"Could not delete TUS file after {max_retries} attempts: {upload_id}")
+                        # Continue anyway - file will be cleaned up by expiration
             
             if metadata_path.exists():
                 metadata_path.unlink()
@@ -227,7 +240,8 @@ class TusUploadService:
             
         except Exception as e:
             logger.error(f"Error deleting upload {upload_id}: {e}")
-            raise StorageError(f"Failed to delete upload: {str(e)}")
+            # Don't raise - allow processing to continue even if temp file cleanup fails
+            logger.warning(f"Upload processing will continue, temp file {upload_id} will be cleaned up later")
     
     async def cleanup_expired_uploads(self) -> int:
         """

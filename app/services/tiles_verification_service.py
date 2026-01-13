@@ -412,6 +412,18 @@ class TilesVerificationService:
     async def _verify_single_photo(self, site_id: str, photo: Photo) -> bool:
         """Verify if a single photo has tiles"""
         try:
+            # Skip small images - they don't need Deep Zoom tiles
+            # Use centralized threshold from config
+            from app.services.photos.config import MIN_DIMENSION_FOR_TILES
+            
+            photo_width = getattr(photo, 'width', None) or 0
+            photo_height = getattr(photo, 'height', None) or 0
+            max_dimension = max(photo_width, photo_height)
+            
+            if max_dimension > 0 and max_dimension < MIN_DIMENSION_FOR_TILES:
+                # Small image - doesn't need tiles, consider as "has tiles" (nothing to repair)
+                return True
+            
             # Check if tiles are already marked as available in database
             if photo.has_deep_zoom and photo.deepzoom_status == DeepZoomStatus.COMPLETED.value:
                 # Verify tiles actually exist in storage
@@ -487,10 +499,27 @@ class TilesVerificationService:
     async def _repair_single_photo(self, site_id: str, photo: Photo) -> bool:
         """Repair tiles for a single photo"""
         try:
+            # Extract object_name from filepath (may be full URL or relative path)
+            raw_filepath = photo.filepath
+            bucket_name = archaeological_minio_service.buckets['photos']
+            
+            # If filepath is a full URL, extract just the object name
+            if raw_filepath and (raw_filepath.startswith('http://') or raw_filepath.startswith('https://')):
+                import re
+                match = re.search(rf'/({bucket_name}|archaeological-photos)/(.+)$', raw_filepath)
+                if match:
+                    object_name = match.group(2)
+                else:
+                    # Fallback: extract path after bucket name
+                    parts = raw_filepath.split('/archaeological-photos/')
+                    object_name = parts[-1] if len(parts) > 1 else raw_filepath
+            else:
+                object_name = raw_filepath
+            
             # Load original file content
             original_file_content = await archaeological_minio_service.get_file(
-                bucket=archaeological_minio_service.buckets['photos'],
-                object_name=photo.filepath
+                bucket=bucket_name,
+                object_name=object_name
             )
             
             # Prepare archaeological metadata

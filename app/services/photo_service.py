@@ -895,7 +895,8 @@ class PhotoMetadataService:
                 height = tech_metadata.get('height', 0)
                 max_dimension = max(width, height) if width and height else 0
                 
-                min_dimension_for_tiles = 2000  # Same threshold as standard upload
+                from app.services.photos.config import MIN_DIMENSION_FOR_TILES
+                min_dimension_for_tiles = MIN_DIMENSION_FOR_TILES
                 
                 if max_dimension > min_dimension_for_tiles:
                     logger.info(f"TUS upload {photo.id}: Scheduling deep zoom tiles ({width}x{height})")
@@ -1068,8 +1069,9 @@ class PhotoMetadataService:
                         width, height = img.size
                         max_dimension = max(width, height)
 
-                        # Genera deep zoom solo per immagini > 2000px
-                        should_generate_deep_zoom = max_dimension > 2000
+                        # Genera deep zoom solo per immagini > MIN_DIMENSION_FOR_TILES
+                        from app.services.photos.config import MIN_DIMENSION_FOR_TILES
+                        should_generate_deep_zoom = max_dimension > MIN_DIMENSION_FOR_TILES
                 except Exception as e:
                     logger.warning(f"Could not determine image dimensions: {e}")
                     should_generate_deep_zoom = False
