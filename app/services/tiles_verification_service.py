@@ -488,7 +488,10 @@ class TilesVerificationService:
         """Repair tiles for a single photo"""
         try:
             # Load original file content
-            original_file_content = await archaeological_minio_service.get_file(photo.filepath)
+            original_file_content = await archaeological_minio_service.get_file(
+                bucket=archaeological_minio_service.buckets['photos'],
+                object_name=photo.filepath
+            )
             
             # Prepare archaeological metadata
             archaeological_metadata = {

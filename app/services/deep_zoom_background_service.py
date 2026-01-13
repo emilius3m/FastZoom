@@ -11,60 +11,16 @@ from loguru import logger
 from dataclasses import dataclass
 from enum import Enum
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
 from uuid import UUID
-
-# UUID normalization function (local copy to avoid circular imports)
-def normalize_site_id(site_id: str) -> Optional[str]:
-    """
-    Normalizza l'ID del sito per supportare diversi formati.
-    
-    Supporta:
-    - UUID standard con trattini: eb8d88e1-74e3-46d3-8e86-81f926c01cab
-    - Hash esadecimali senza trattini: eeedd3ceda34bf3b47d749a971b22ba
-    
-    Returns:
-        str: L'ID normalizzato o None se non valido
-    """
-    if not site_id:
-        return None
-    
-    # Rimuovi spazi bianchi
-    site_id = site_id.strip()
-    
-    # Se è un UUID standard con trattini, valida e restituiscilo
-    if '-' in site_id:
-        try:
-            # Crea un oggetto UUID per validare il formato e normalizzare a lowercase
-            uuid_obj = uuid.UUID(site_id)
-            # Restituisci la stringa normalizzata in lowercase
-            return str(uuid_obj)
-        except (ValueError, AttributeError):
-            return None
-    
-    # Se è un hash esadecimale senza trattini
-    if len(site_id) == 32:
-        try:
-            # Verifica che sia esadecimale
-            int(site_id, 16)
-            # Converti in formato UUID standard (inserisci trattini)
-            uuid_formatted = f"{site_id[0:8]}-{site_id[8:12]}-{site_id[12:16]}-{site_id[16:20]}-{site_id[20:32]}"
-            # Valida il formato UUID risultante
-            uuid.UUID(uuid_formatted)
-            return uuid_formatted
-        except (ValueError, AttributeError):
-            return None
-    
-    # Altri formati non supportati
-    return None
-
-from PIL import Image
+from app.routes.api.dependencies import normalize_site_id
 import math
 
-from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
-from app.models import Photo
-from sqlalchemy import select
-
+from app.core.interfaces.storage import FileStorageInterface
+from app.core.interfaces.image import ImageProcessorInterface
+from app.repositories.photo_repository import PhotoRepository
+from app.database.session import AsyncSessionLocal
+from app.services.archaeological_minio_service import archaeological_minio_service
+from app.services.deep_zoom.image_processor import DeepZoomImageProcessor
 
 from app.models.deepzoom_enums import DeepZoomStatus
 
@@ -95,9 +51,14 @@ class TileProcessingTask:
 
 
 class DeepZoomBackgroundService:
-    """Background processing service for deep zoom tiles with retry mechanism"""
+    """Background processing service for deep zoom tiles with retry mechanism (Clean Architecture)"""
     
-    def __init__(self):
+    def __init__(
+        self,
+        storage_service: Optional[FileStorageInterface] = None,
+        image_processor: Optional[ImageProcessorInterface] = None,
+        session_factory = None
+    ):
         self.tile_size = 256
         self.overlap = 0
         self.format = 'jpg'
@@ -109,6 +70,11 @@ class DeepZoomBackgroundService:
         self.failed_tasks = {}
         self._worker_task = None
         self._running = False
+        
+        # Dependency Injection
+        self.storage = storage_service or archaeological_minio_service
+        self.image_processor = image_processor or DeepZoomImageProcessor()
+        self.session_factory = session_factory or AsyncSessionLocal
         
         # CRITICO: Locks per task deduplication e concorrenza
         self._processing_lock = asyncio.Lock()
@@ -351,7 +317,32 @@ class DeepZoomBackgroundService:
                 
                 # Load file content from MinIO using snapshot file_path
                 from app.services.archaeological_minio_service import archaeological_minio_service
-                original_file_content = await archaeological_minio_service.get_file(photo_snapshot['file_path'])
+                
+                # Extract object_name from file_path (may be full URL or relative path)
+                raw_file_path = photo_snapshot['file_path']
+                bucket_name = archaeological_minio_service.buckets['photos']
+                
+                # If file_path is a full URL, extract just the object name
+                if raw_file_path.startswith('http://') or raw_file_path.startswith('https://'):
+                    # URL format: http://host:port/bucket/object_name
+                    # Extract everything after the bucket name
+                    import re
+                    match = re.search(rf'/{bucket_name}/(.+)$', raw_file_path)
+                    if match:
+                        object_name = match.group(1)
+                    else:
+                        # Fallback: try to extract path after last occurrence of bucket name
+                        parts = raw_file_path.split(f'/{bucket_name}/')
+                        object_name = parts[-1] if len(parts) > 1 else raw_file_path
+                else:
+                    object_name = raw_file_path
+                
+                logger.debug(f"🔧 SNAPSHOT-BASED: Extracted object_name '{object_name}' from file_path '{raw_file_path}'")
+                
+                original_file_content = await archaeological_minio_service.get_file(
+                    bucket=bucket_name,
+                    object_name=object_name
+                )
                 
                 # 🔧 VALIDATION: Basic content validation before scheduling
                 if not original_file_content or len(original_file_content) < 100:
@@ -489,7 +480,7 @@ class DeepZoomBackgroundService:
             }
 
     async def _process_queue_worker(self):
-        """Background worker that processes the queue with stuck task detection"""
+        """Background worker that processes the queue with stuck task detection (Clean Architecture)"""
         logger.info("🔄 Background queue worker started")
         
         # Create semaphore to limit concurrent processing
@@ -623,790 +614,155 @@ class DeepZoomBackgroundService:
             await self._process_single_task(task)
 
     async def _process_single_task(self, task: TileProcessingTask):
-        """Process a single photo's tiles with proper locking using snapshot data"""
+        """Process a single photo's tiles with proper locking using dependency injection"""
         
-        # CRITICO: Ottieni lock per questo photo_id per evitare duplicati
+        # Lock per task
         if task.photo_id not in self._task_locks:
             self._task_locks[task.photo_id] = asyncio.Lock()
         
         async with self._task_locks[task.photo_id]:
-            # Verifica doppio check con lock acquisito
+            # Double check
             if task.photo_id not in self.processing_tasks:
-                logger.warning(f"Task {task.photo_id} no longer in processing tasks, skipping")
                 return
             
             task.status = DeepZoomStatus.PROCESSING
             task.started_at = datetime.now()
             
-            # 🔧 SNAPSHOT-BASED: Determine data source and log accordingly
-            use_snapshot = False
-            photo_data = {}
-            
-            if hasattr(task, 'snapshot_data') and task.snapshot_data:
-                use_snapshot = True
-                photo_data = task.snapshot_data
-                logger.info(f"🔧 SNAPSHOT-BASED: Processing photo {task.photo_id} using snapshot data")
-                
-                # Validate required snapshot fields
-                required_fields = ['file_path', 'width', 'height']
-                missing_fields = [field for field in required_fields if field not in photo_data]
-                
-                if missing_fields:
-                    logger.warning(f"🔧 SNAPSHOT-BASED: Missing required fields in snapshot for {task.photo_id}: {missing_fields}")
-                    use_snapshot = False
-                    photo_data = {}
-                    
-                    # 🔧 SNAPSHOT-BASED: Validate additional optional fields for better error handling
-                    if task.snapshot_data:
-                        optional_fields = ['file_path', 'width', 'height', 'filename']
-                        available_fields = [field for field in optional_fields if field in task.snapshot_data]
-                        logger.info(f"🔧 SNAPSHOT-BASED: Available snapshot fields for {task.photo_id}: {available_fields}")
-                else:
-                    logger.info(f"🔄 Processing photo {task.photo_id} using traditional database queries")
-            
             try:
-                logger.info(f"🔄 Processing tiles for photo {task.photo_id} (attempt {task.retry_count + 1}) - {'SNAPSHOT' if use_snapshot else 'DATABASE'}")
+                logger.info(f"🔄 Processing tiles for photo {task.photo_id} (attempt {task.retry_count + 1})")
                 
-                # 🔧 SNAPSHOT-BASED: Skip database update for processing status
-                # Status is tracked via MinIO metadata for snapshot-based processing
-                if use_snapshot:
-                    logger.debug(f"🔧 SNAPSHOT-BASED: Skipping database update for 'processing' status")
-                else:
-                    # Legacy path: Update database for processing status
-                    await self._update_photo_database_status(task.photo_id, "processing")
-                
+                await self._update_photo_database_status(task.photo_id, "processing")
                 await self._update_processing_status(task, "processing", 0)
                 
-                # Send intermediate notification for processing start
-                await self._send_processing_notification(task, "processing", 5)
-                
-                # 🔧 SNAPSHOT-BASED: Generate tiles with memory-efficient processing
-                # Use snapshot data if available, otherwise fall back to traditional method
-                tiles_data, original_width, original_height = await self._generate_tiles_memory_efficient(
-                    task.original_file_content, task.photo_id, task.site_id, photo_data if use_snapshot else None
+                # 1. Generate tiles using ImageProcessor
+                tiles_data, original_width, original_height = await self._generate_tiles(
+                    task.original_file_content, task.photo_id, task.site_id
                 )
                 
                 total_tiles = self._count_total_tiles(tiles_data)
                 task.status = DeepZoomStatus.UPLOADING
                 await self._update_processing_status(task, "uploading", 10, total_tiles, len(tiles_data))
                 
-                # Send intermediate notification for uploading stage
-                await self._send_processing_notification(task, "uploading", 10, total_tiles, len(tiles_data))
-                
-                # Upload tiles with concurrent control
+                # 2. Upload tiles using StorageInterface
                 completed_tiles = await self._upload_tiles_concurrent(
                     task, tiles_data, total_tiles
                 )
                 
-                # Create metadata
+                # 3. Create metadata
                 task.status = DeepZoomStatus.COMPLETED
-                await self._update_processing_status(task, "finalizing", 90)
-                
-                # Send intermediate notification for finalizing stage
-                await self._send_processing_notification(task, "finalizing", 90, completed_tiles, len(tiles_data))
-                
                 metadata_url = await self._create_and_upload_metadata(
                     task, tiles_data, original_width, original_height
                 )
                 
-                # Mark as completed
+                # 4. Finalize
                 task.completed_at = datetime.now()
                 task.status = DeepZoomStatus.COMPLETED
                 
-                # Update database with completion (CRITICAL: Always update for completion status)
-                # Even in snapshot mode, we need to update the database with completion status
-                # so that the UI shows the correct deepzoom_status
                 await self._update_photo_database_status(
                     task.photo_id,
                     "completed",
                     tile_count=completed_tiles,
                     levels=len(tiles_data),
-                    use_snapshot=use_snapshot
+                    max_zoom_level=len(tiles_data)
                 )
                 
-                # Update final status
-                final_status = {
-                    "photo_id": task.photo_id,
-                    "site_id": task.site_id,
-                    "status": "completed",
-                    "progress": 100,
-                    "total_tiles": total_tiles,
-                    "completed_tiles": completed_tiles,
-                    "levels": len(tiles_data),
-                    "tile_size": self.tile_size,
-                    "tile_format": self.format,
-                    "width": original_width,
-                    "height": original_height,
-                    "metadata_url": metadata_url,
-                    "started": task.started_at.isoformat(),
-                    "completed": task.completed_at.isoformat(),
-                    "archaeological_metadata": task.archaeological_metadata or {}
-                }
-                
-                await self._update_processing_status_full(task, final_status)
-                
-                # Move to completed tasks
-                self.completed_tasks[task.photo_id] = task
+                # Cleanup
                 if task.photo_id in self.processing_tasks:
                     del self.processing_tasks[task.photo_id]
-                
-                # Rimuovi da tracking con lock
-                async with self._processing_lock:
-                    self._processing_photo_ids.discard(task.photo_id)
-                
-                # Clean up batch context
+                self.completed_tasks[task.photo_id] = task
+                self._processing_photo_ids.discard(task.photo_id)
                 self._cleanup_batch_context(task.site_id, task.photo_id)
-                
-                # Update success counter
                 self.total_tasks_processed += 1
                 
-                logger.info(f"✅ Completed tile processing for photo {task.photo_id}: {completed_tiles} tiles")
-                
-                # Get photo filename for notification
-                photo_filename = None
-                try:
-                    from app.services.archaeological_minio_service import archaeological_minio_service
-                    if hasattr(task, 'file_path') and task.file_path:
-                        # Extract filename from path
-                        photo_filename = task.file_path.split('/')[-1]
-                except Exception:
-                    pass
-                
-                # Send WebSocket notification with actual data
-                await self._send_completion_notification(
-                    task,
-                    True,
-                    tile_count=completed_tiles,
-                    levels=len(tiles_data),
-                    photo_filename=photo_filename
-                )
-                
+                logger.success(f"✅ Deep Zoom processing completed for {task.photo_id}")
+                await self._send_completion_notification(task, True, completed_tiles)
+
             except Exception as e:
-                # FIX: task is a dataclass object, not a dict - access attributes directly
-                photoid = task.photo_id if hasattr(task, 'photo_id') else 'unknown'
-                logger.error(f"❌ Failed to process tiles for photo {photoid}: {e}")
+                logger.error(f"❌ Processing failed for {task.photo_id}: {e}")
                 import traceback
-                logger.error(f"❌ Error traceback:\n{traceback.format_exc()}")
-
-                task.error_message = str(e)
+                logger.error(traceback.format_exc())
                 
-                # Check if we should retry
+                task.error_message = str(e)
+                # Retry logic
                 if task.retry_count < task.max_retries:
-                    task.retry_count += 1
-                    task.status = DeepZoomStatus.RETRYING
-                    
-                    # Exponential backoff
-                    delay = min(300, 30 * (2 ** task.retry_count))  # Max 5 minutes
-                    logger.info(f"🔄 Retrying photo {task.photo_id} in {delay}s (attempt {task.retry_count})")
-                    
-                    await asyncio.sleep(delay)
-                    
-                    # Re-queue for retry
-                    await self.task_queue.put(task)
-                    
-                    # Update status
-                    await self._update_processing_status(
-                        task, "retrying", 0, error=f"Retry {task.retry_count}/{task.max_retries}: {str(e)}"
-                    )
-                    
+                     task.retry_count += 1
+                     task.status = DeepZoomStatus.RETRYING
+                     task.started_at = None
+                     # Re-queue
+                     await asyncio.sleep(10)
+                     await self.task_queue.put(task)
+                     self.processing_tasks[task.photo_id] = task
                 else:
-                    # Max retries exceeded, mark as failed
-                    task.status = DeepZoomStatus.FAILED
-                    task.completed_at = datetime.now()
-                    
-                    # Update database with failed status (CRITICAL: Always update for failed status)
-                    # Even in snapshot mode, we need to update the database with failed status
-                    # so that the UI shows the correct deepzoom_status
-                    await self._update_photo_database_status(
-                        task.photo_id,
-                        "failed",
-                        use_snapshot=use_snapshot
-                    )
-                    await self._update_processing_status(
-                        task, "failed", 0, error=f"Failed after {task.max_retries} retries: {str(e)}"
-                    )
-                    
-                    # Move to failed tasks
-                    self.failed_tasks[task.photo_id] = task
-                    if task.photo_id in self.processing_tasks:
+                     task.status = DeepZoomStatus.FAILED
+                     await self._update_photo_database_status(task.photo_id, "failed")
+                     self.failed_tasks[task.photo_id] = task
+                     if task.photo_id in self.processing_tasks:
                         del self.processing_tasks[task.photo_id]
-                    
-                    # Rimuovi da tracking con lock
-                    async with self._processing_lock:
-                        self._processing_photo_ids.discard(task.photo_id)
-                    
-                    # Clean up batch context
-                    self._cleanup_batch_context(task.site_id, task.photo_id)
-                    
-                    logger.error(f"💀 Permanently failed processing for photo {task.photo_id}")
-                    
-                    # Send WebSocket notification
-                    await self._send_completion_notification(task, False)
+                     self._processing_photo_ids.discard(task.photo_id)
+                     self._cleanup_batch_context(task.site_id, task.photo_id)
+                     self.total_tasks_failed += 1
+                     
+                     await self._send_completion_notification(task, False)
 
-    async def _generate_tiles_memory_efficient(
+
+
+    async def _generate_tiles(
         self,
         content: bytes,
         photo_id: str,
-        site_id: str,
-        snapshot_data: Optional[Dict[str, Any]] = None
+        site_id: str
     ) -> Tuple[Dict[int, Dict[str, bytes]], int, int]:
-        """Generate tiles with memory-efficient processing using snapshot data when available"""
+        """Generate tiles using injected ImageProcessor"""
         
-        # Use asyncio.to_thread to move CPU-intensive work off event loop
-        return await asyncio.to_thread(
-            self._generate_tiles_sync, content, photo_id, site_id, snapshot_data
-        )
-
+        return await asyncio.to_thread(self._generate_tiles_sync, content, photo_id, site_id)
+        
     def _generate_tiles_sync(
         self,
         content: bytes,
         photo_id: str,
-        site_id: str,
-        snapshot_data: Optional[Dict[str, Any]] = None
+        site_id: str
     ) -> Tuple[Dict[int, Dict[str, bytes]], int, int]:
-        """Synchronous tile generation (runs in thread pool) using snapshot data when available with detailed debugging"""
-        import time
-        generation_start_time = time.time()
         
-        with logger.contextualize(
-            operation="generate_tiles_sync",
-            photo_id=photo_id,
-            site_id=site_id,
-            tile_size=self.tile_size,
-            format=self.format,
-            service="deep_zoom_background_service"
-        ):
-            try:
-                # 🔧 SNAPSHOT-BASED: Log data source
-                use_snapshot = bool(snapshot_data)
-                logger.info(
-                    "🔧 TILE GENERATION STARTED",
-                    extra={
-                        "photo_id": photo_id,
-                        "site_id": site_id,
-                        "use_snapshot": use_snapshot,
-                        "content_size_bytes": len(content),
-                        "tile_size": self.tile_size,
-                        "generation_start_time": datetime.now().isoformat(),
-                        "data_source": "snapshot" if use_snapshot else "traditional"
-                    }
-                )
-                
-                # 🔧 VALIDATION: Validate content before processing
-                validation_start_time = time.time()
-                if not content:
-                    logger.error(
-                        "❌ IMAGE CONTENT VALIDATION FAILED",
-                        extra={
-                            "photo_id": photo_id,
-                            "site_id": site_id,
-                            "error": "empty_content",
-                            "content_size": 0,
-                            "validation_time_ms": round((time.time() - validation_start_time) * 1000, 2)
-                        }
-                    )
-                    raise ValueError("Image content is empty")
-                
-                if len(content) < 100:  # Most valid images are larger than 100 bytes
-                    logger.error(
-                        "❌ IMAGE CONTENT VALIDATION FAILED",
-                        extra={
-                            "photo_id": photo_id,
-                            "site_id": site_id,
-                            "error": "content_too_small",
-                            "content_size": len(content),
-                            "validation_time_ms": round((time.time() - validation_start_time) * 1000, 2)
-                        }
-                    )
-                    raise ValueError(f"Image content too small: {len(content)} bytes")
-                
-                # 🔧 VALIDATION: Log content details for debugging
-                content_preview = content[:50] if len(content) >= 50 else content
-                logger.debug(
-                    "🔧 IMAGE CONTENT ANALYSIS",
-                    extra={
-                        "photo_id": photo_id,
-                        "site_id": site_id,
-                        "content_size": len(content),
-                        "content_preview": content_preview.hex() if isinstance(content_preview, bytes) else str(content_preview),
-                        "validation_time_ms": round((time.time() - validation_start_time) * 1000, 2)
-                    }
-                )
-                
-                # 🔧 VALIDATION: Check common image format signatures
-                format_detection_start_time = time.time()
-                detected_format = "unknown"
-                if len(content) >= 4:
-                    # JPEG: FF D8 FF
-                    if content[0:2] == b'\xFF\xD8' and content[2] == 0xFF:
-                        detected_format = "jpeg"
-                        logger.debug(
-                            "🔧 IMAGE FORMAT DETECTED: JPEG",
-                            extra={
-                                "photo_id": photo_id,
-                                "site_id": site_id,
-                                "detected_format": "jpeg",
-                                "signature": content[0:4].hex(),
-                                "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
-                            }
-                        )
-                    # PNG: 89 50 4E 47
-                    elif content[0:4] == b'\x89PNG':
-                        detected_format = "png"
-                        logger.debug(
-                            "🔧 IMAGE FORMAT DETECTED: PNG",
-                            extra={
-                                "photo_id": photo_id,
-                                "site_id": site_id,
-                                "detected_format": "png",
-                                "signature": content[0:8].hex(),
-                                "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
-                            }
-                        )
-                    # WEBP: 52 49 46 46 ... 57 45 42 50
-                    elif content[0:4] == b'RIFF' and len(content) >= 12 and content[8:12] == b'WEBP':
-                        detected_format = "webp"
-                        logger.debug(
-                            "🔧 IMAGE FORMAT DETECTED: WEBP",
-                            extra={
-                                "photo_id": photo_id,
-                                "site_id": site_id,
-                                "detected_format": "webp",
-                                "signature": content[0:12].hex(),
-                                "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
-                            }
-                        )
-                    else:
-                        logger.warning(
-                            "⚠️ UNKNOWN IMAGE FORMAT",
-                            extra={
-                                "photo_id": photo_id,
-                                "site_id": site_id,
-                                "detected_format": "unknown",
-                                "first_8_bytes": content[:8].hex(),
-                                "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
-                            }
-                        )
-                else:
-                    logger.warning(
-                        "⚠️ CONTENT TOO SMALL FOR FORMAT DETECTION",
-                        extra={
-                            "photo_id": photo_id,
-                            "site_id": site_id,
-                            "content_size": len(content),
-                            "format_detection_time_ms": round((time.time() - format_detection_start_time) * 1000, 2)
-                        }
-                    )
-                
-                # 🔧 VALIDATION: Try to open image with better error handling
-                image_loading_start_time = time.time()
-                try:
-                    # Create BytesIO object and reset position
-                    image_buffer = io.BytesIO(content)
-                    image_buffer.seek(0)
+        if not self.image_processor or not self.image_processor.validate_image(content):
+            raise ValueError("Invalid image content or missing processor")
+            
+        image = self.image_processor.open_image(content)
+        width, height = self.image_processor.get_dimensions(image)
+        
+        max_dim = max(width, height)
+        levels = math.ceil(math.log2(max_dim)) + 1
+        
+        tiles_data = {}
+        
+        for level in range(levels):
+            level_tiles = {}
+            scale = 2 ** (levels - 1 - level)
+            level_w = max(1, width // scale)
+            level_h = max(1, height // scale)
+            
+            for y in range(0, level_h, self.tile_size):
+                for x in range(0, level_w, self.tile_size):
+                    col = x // self.tile_size
+                    row = y // self.tile_size
                     
-                    # Open image with explicit format validation
-                    image = Image.open(image_buffer)
+                    # Using processor level semantics (0=full res in logic, but wait...)
+                    # My processor resize_for_tile uses 'level' as reduction power.
+                    # Service uses 'level' as 0=smallest.
+                    # Reduction power = levels - 1 - level.
+                    reduction_level = levels - 1 - level
                     
-                    # Verify image can be loaded
-                    image.verify()  # Verify without loading pixel data
-                    
-                    # Reopen after verify (verify() closes the file)
-                    image_buffer.seek(0)
-                    image = Image.open(image_buffer)
-                    
-                    image_loading_time = time.time() - image_loading_start_time
-                    
-                    logger.success(
-                        "✅ IMAGE VALIDATION SUCCESSFUL",
-                    extra={
-                        "photo_id": photo_id,
-                        "site_id": site_id,
-                        "image_size": f"{image.width}x{image.height}",
-                        "image_mode": image.mode,
-                        "image_format": image.format,
-                        "detected_format": detected_format,
-                        "image_loading_time_ms": round(image_loading_time * 1000, 2),
-                        "total_validation_time_ms": round((time.time() - validation_start_time) * 1000, 2)
-                    }
-                )
-                
-                except Exception as img_error:
-                    image_loading_time = time.time() - image_loading_start_time
-                    
-                    logger.error(
-                        "❌ IMAGE VALIDATION FAILED",
-                        extra={
-                            "photo_id": photo_id,
-                            "site_id": site_id,
-                            "error": str(img_error),
-                            "error_type": type(img_error).__name__,
-                            "content_size": len(content),
-                            "detected_format": detected_format,
-                            "image_loading_time_ms": round(image_loading_time * 1000, 2),
-                            "total_validation_time_ms": round((time.time() - validation_start_time) * 1000, 2),
-                            "content_preview": content[:100].hex()
-                        }
+                    tile_bytes = self.image_processor.resize_for_tile(
+                        image, self.tile_size, self.overlap,
+                        reduction_level,
+                        col, row
                     )
                     
-                    import traceback
-                    logger.error(
-                        "📋 IMAGE VALIDATION ERROR TRACEBACK",
-                        extra={
-                            "photo_id": photo_id,
-                            "site_id": site_id,
-                            "traceback": traceback.format_exc(),
-                            "error_details": {
-                                "error": str(img_error),
-                                "error_type": type(img_error).__name__,
-                                "module": type(img_error).__module__ if hasattr(type(img_error), '__module__') else 'unknown'
-                            }
-                        }
-                    )
-                    
-                    raise ValueError(f"Invalid image content: {str(img_error)}")
-                
-                # Determine format based on image
-                format_determination_start_time = time.time()
-                original_format = image.format.lower() if image.format else 'jpg'
-                original_has_transparency = image.mode in ('RGBA', 'LA') or 'transparency' in image.info
-                
-                if original_format == 'png' or original_has_transparency:
-                    self.format = 'png'
-                    format_reason = "png_format_or_transparency"
-                    if image.mode != 'RGBA':
-                        image = image.convert('RGBA')
-                        conversion_performed = "RGB_to_RGBA"
-                    else:
-                        conversion_performed = "none"
-                else:
-                    self.format = 'jpg'
-                    format_reason = "jpg_format_no_transparency"
-                    if image.mode == 'RGBA':
-                        background = Image.new('RGB', image.size, (255, 255, 255))
-                        background.paste(image, mask=image.split()[-1])
-                        image = background
-                        conversion_performed = "RGBA_to_RGB"
-                    elif image.mode != 'RGB':
-                        image = image.convert('RGB')
-                        conversion_performed = f"{image.mode}_to_RGB"
-                    else:
-                        conversion_performed = "none"
-                
-                format_determination_time = time.time() - format_determination_start_time
-                
-                logger.info(
-                    "🎨 TILE FORMAT DETERMINED",
-                    extra={
-                        "photo_id": photo_id,
-                        "site_id": site_id,
-                        "original_image_format": original_format,
-                        "original_image_mode": image.mode,
-                        "has_transparency": original_has_transparency,
-                        "selected_tile_format": self.format,
-                        "format_reason": format_reason,
-                        "conversion_performed": conversion_performed,
-                        "final_image_mode": image.mode,
-                        "format_determination_time_ms": round(format_determination_time * 1000, 2)
-                    }
-                )
-
-                # 🔧 SNAPSHOT-BASED: Use dimensions from snapshot if available, otherwise from image
-                dimension_resolution_start_time = time.time()
-                if snapshot_data and 'width' in snapshot_data and 'height' in snapshot_data:
-                    original_width = snapshot_data['width']
-                    original_height = snapshot_data['height']
-                    dimension_source = "snapshot"
-                    
-                    logger.debug(
-                        "🔧 DIMENSIONS FROM SNAPSHOT",
-                        extra={
-                            "photo_id": photo_id,
-                            "site_id": site_id,
-                            "snapshot_width": original_width,
-                            "snapshot_height": original_height,
-                            "dimension_source": "snapshot"
-                        }
-                    )
-                    
-                    # Validate that snapshot dimensions match actual image dimensions
-                    if abs(image.width - original_width) > 5 or abs(image.height - original_height) > 5:
-                        logger.warning(
-                            "⚠️ DIMENSION MISMATCH DETECTED",
-                            extra={
-                                "photo_id": photo_id,
-                                "site_id": site_id,
-                                "snapshot_width": original_width,
-                                "snapshot_height": original_height,
-                                "actual_width": image.width,
-                                "actual_height": image.height,
-                                "width_diff": abs(image.width - original_width),
-                                "height_diff": abs(image.height - original_height),
-                                "dimension_source": "fallback_to_actual"
-                            }
-                        )
-                        # Use actual image dimensions as fallback
-                        original_width = image.width
-                        original_height = image.height
-                        dimension_source = "actual_image_fallback"
-                        
-                        logger.info(
-                            "🔄 USING ACTUAL IMAGE DIMENSIONS",
-                            extra={
-                                "photo_id": photo_id,
-                                "site_id": site_id,
-                                "final_width": original_width,
-                                "final_height": original_height,
-                                "dimension_source": dimension_source
-                            }
-                        )
-                    else:
-                        logger.info(
-                            "✅ SNAPSHOT DIMENSIONS VALIDATED",
-                            extra={
-                                "photo_id": photo_id,
-                                "site_id": site_id,
-                                "final_width": original_width,
-                                "final_height": original_height,
-                                "dimension_source": dimension_source
-                            }
-                        )
-                else:
-                    original_width = image.width
-                    original_height = image.height
-                    dimension_source = "actual_image"
-                    
-                    logger.debug(
-                        "🔄 USING ACTUAL IMAGE DIMENSIONS",
-                        extra={
-                            "photo_id": photo_id,
-                            "site_id": site_id,
-                            "final_width": original_width,
-                            "final_height": original_height,
-                            "dimension_source": dimension_source
-                        }
-                    )
-                
-                dimension_resolution_time = time.time() - dimension_resolution_start_time
-
-                # Calculate levels
-                level_calculation_start_time = time.time()
-                max_dimension = max(image.size)
-                levels = math.ceil(math.log2(max_dimension)) + 1
-                level_calculation_time = time.time() - level_calculation_start_time
-                
-                logger.info(
-                    "📐 TILE PYRAMID CALCULATED",
-                    extra={
-                        "photo_id": photo_id,
-                        "site_id": site_id,
-                        "image_width": image.width,
-                        "image_height": image.height,
-                        "max_dimension": max_dimension,
-                        "calculated_levels": levels,
-                        "tile_size": self.tile_size,
-                        "level_calculation_time_ms": round(level_calculation_time * 1000, 2),
-                        "dimension_resolution_time_ms": round(dimension_resolution_time * 1000, 2)
-                    }
-                )
-
-                tiles_data = {}
-                total_tiles_generated = 0
-                tile_generation_start_time = time.time()
-
-                # Generate tiles for each level
-                for level in range(levels):
-                    level_start_time = time.time()
-                    level_tiles = {}
-
-                    # Calculate dimensions for this level
-                    scale = 2 ** (levels - 1 - level)
-                    level_width = max(1, image.width // scale)
-                    level_height = max(1, image.height // scale)
-
-                    logger.debug(
-                        f"🔍 PROCESSING LEVEL {level}",
-                        extra={
-                            "photo_id": photo_id,
-                            "site_id": site_id,
-                            "level": level,
-                            "scale_factor": scale,
-                            "level_width": level_width,
-                            "level_height": level_height,
-                            "tiles_in_level_x": math.ceil(level_width / self.tile_size),
-                            "tiles_in_level_y": math.ceil(level_height / self.tile_size)
-                        }
-                    )
-
-                    # Create resized image for this level
-                    resize_start_time = time.time()
-                    level_image = image.resize((level_width, level_height), Image.Resampling.LANCZOS)
-                    resize_time = time.time() - resize_start_time
-
-                    # Generate tiles for this level
-                    tiles_in_level = 0
-                    for y in range(0, level_height, self.tile_size):
-                        for x in range(0, level_width, self.tile_size):
-                            tile_start_time = time.time()
-                            
-                            # Extract tile
-                            tile_box = (x, y, min(x + self.tile_size, level_width), min(y + self.tile_size, level_height))
-                            tile = level_image.crop(tile_box)
-
-                            # Pad tile if needed
-                            padding_performed = False
-                            if tile.size[0] < self.tile_size or tile.size[1] < self.tile_size:
-                                padding_performed = True
-                                if original_has_transparency:
-                                    padded_tile = Image.new('RGBA', (self.tile_size, self.tile_size), (255, 255, 255, 0))
-                                    padded_tile.paste(tile, (0, 0), tile if tile.mode == 'RGBA' else None)
-                                else:
-                                    padded_tile = Image.new('RGB', (self.tile_size, self.tile_size), (255, 255, 255))
-                                    padded_tile.paste(tile, (0, 0))
-                                tile = padded_tile
-
-                            # Convert to bytes
-                            encoding_start_time = time.time()
-                            tile_buffer = io.BytesIO()
-                            if self.format == 'png':
-                                tile.save(tile_buffer, format='PNG', optimize=True)
-                            else:
-                                # JPEG does not support alpha channel - convert RGBA to RGB
-                                if tile.mode == 'RGBA':
-                                    # Create white background and paste image on it
-                                    rgb_tile = Image.new('RGB', tile.size, (255, 255, 255))
-                                    rgb_tile.paste(tile, mask=tile.split()[3])  # Use alpha as mask
-                                    tile = rgb_tile
-                                elif tile.mode != 'RGB':
-                                    tile = tile.convert('RGB')
-                                tile.save(tile_buffer, format='JPEG', quality=85, optimize=True)
-                            tile_data = tile_buffer.getvalue()
-                            encoding_time = time.time() - encoding_start_time
-
-                            # Validate tile data
-                            if tile_data is None or len(tile_data) == 0:
-                                logger.error(
-                                    "❌ TILE GENERATION FAILED",
-                                    extra={
-                                        "photo_id": photo_id,
-                                        "site_id": site_id,
-                                        "level": level,
-                                        "tile_coords": f"{x//self.tile_size}_{y//self.tile_size}",
-                                        "tile_box": tile_box,
-                                        "tile_size_before_padding": f"{tile_box[2]-tile_box[0]}x{tile_box[3]-tile_box[1]}",
-                                        "padding_performed": padding_performed,
-                                        "encoding_time_ms": round(encoding_time * 1000, 2),
-                                        "tile_data_size": 0,
-                                        "error": "empty_tile_data"
-                                    }
-                                )
-                                continue
-
-                            # Store with coordinates
-                            tile_coords = f"{x//self.tile_size}_{y//self.tile_size}"
-                            level_tiles[tile_coords] = tile_data
-                            tiles_in_level += 1
-                            total_tiles_generated += 1
-                            
-                            tile_total_time = time.time() - tile_start_time
-                            
-                            # Log every 100th tile to avoid spam
-                            if total_tiles_generated % 100 == 0:
-                                logger.debug(
-                                    f"🔹 TILE GENERATED #{total_tiles_generated}",
-                                    extra={
-                                        "photo_id": photo_id,
-                                        "site_id": site_id,
-                                        "level": level,
-                                        "tile_coords": tile_coords,
-                                        "tile_data_size_bytes": len(tile_data),
-                                        "padding_performed": padding_performed,
-                                        "encoding_time_ms": round(encoding_time * 1000, 2),
-                                        "total_tile_time_ms": round(tile_total_time * 1000, 2),
-                                        "tiles_generated_so_far": total_tiles_generated
-                                    }
-                                )
-
-                    level_time = time.time() - level_start_time
-                    logger.debug(
-                        f"✅ LEVEL {level} COMPLETED",
-                        extra={
-                            "photo_id": photo_id,
-                            "site_id": site_id,
-                            "level": level,
-                            "tiles_in_level": tiles_in_level,
-                            "level_time_ms": round(level_time * 1000, 2),
-                            "resize_time_ms": round(resize_time * 1000, 2),
-                            "total_tiles_so_far": total_tiles_generated
-                        }
-                    )
-                    
-                    tiles_data[level] = level_tiles
-
-                total_generation_time = time.time() - tile_generation_start_time
-                total_operation_time = time.time() - generation_start_time
-                
-                logger.success(
-                    "✅ TILE GENERATION COMPLETED",
-                    extra={
-                        "photo_id": photo_id,
-                        "site_id": site_id,
-                        "total_levels": levels,
-                        "total_tiles_generated": total_tiles_generated,
-                        "original_width": original_width,
-                        "original_height": original_height,
-                        "tile_format": self.format,
-                        "tile_size": self.tile_size,
-                        "generation_performance": {
-                            "total_generation_time_ms": round(total_generation_time * 1000, 2),
-                            "total_operation_time_ms": round(total_operation_time * 1000, 2),
-                            "average_tile_time_ms": round(total_generation_time / total_tiles_generated * 1000, 2) if total_tiles_generated > 0 else 0,
-                            "tiles_per_second": round(total_tiles_generated / total_generation_time, 2) if total_generation_time > 0 else 0
-                        },
-                        "timing_breakdown": {
-                            "validation_time_ms": round((time.time() - validation_start_time) * 1000, 2),
-                            "format_determination_time_ms": round(format_determination_time * 1000, 2),
-                            "dimension_resolution_time_ms": round(dimension_resolution_time * 1000, 2),
-                            "level_calculation_time_ms": round(level_calculation_time * 1000, 2)
-                        },
-                        "data_source": "snapshot" if use_snapshot else "traditional"
-                    }
-                )
-
-                return tiles_data, original_width, original_height
-
-            except Exception as e:
-                total_operation_time = time.time() - generation_start_time
-                
-                logger.error(
-                    "❌ TILE GENERATION FAILED",
-                    extra={
-                        "photo_id": photo_id,
-                        "site_id": site_id,
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                        "total_operation_time_ms": round(total_operation_time * 1000, 2),
-                        "content_size": len(content),
-                        "failure_point": "tile_generation"
-                    }
-                )
-                
-                import traceback
-                logger.error(
-                    "📋 TILE GENERATION ERROR TRACEBACK",
-                    extra={
-                        "photo_id": photo_id,
-                        "site_id": site_id,
-                        "traceback": traceback.format_exc(),
-                        "error_details": {
-                            "error": str(e),
-                            "error_type": type(e).__name__,
-                            "module": type(e).__module__ if hasattr(type(e), '__module__') else 'unknown'
-                        }
-                    }
-                )
-                
-                raise Exception(f"Tile generation failed: {str(e)}")
+                    if tile_bytes:
+                        level_tiles[f"{col}_{row}"] = tile_bytes
+            
+            tiles_data[level] = level_tiles
+            
+        return tiles_data, width, height
 
     async def _upload_tiles_concurrent(
         self,
@@ -1414,455 +770,57 @@ class DeepZoomBackgroundService:
         tiles_data: Dict[int, Dict[str, bytes]],
         total_tiles: int
     ) -> int:
-        """Upload tiles with concurrent control and comprehensive performance metrics"""
-        import time
-        upload_start_time = time.time()
+        """Upload tiles using StorageInterface with concurrency control"""
         
-        with logger.contextualize(
-            operation="upload_tiles_concurrent",
-            photo_id=task.photo_id,
-            site_id=task.site_id,
-            total_tiles=total_tiles,
-            levels_count=len(tiles_data),
-            max_concurrent_uploads=self.max_concurrent_uploads,
-            service="deep_zoom_background_service"
-        ):
-            try:
-                logger.info(
-                    "🚀 CONCURRENT TILE UPLOAD STARTED",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "total_tiles": total_tiles,
-                        "levels_count": len(tiles_data),
-                        "max_concurrent_uploads": self.max_concurrent_uploads,
-                        "upload_start_time": datetime.now().isoformat()
-                    }
-                )
-                
-                # Create semaphore for upload control
-                upload_semaphore = asyncio.Semaphore(self.max_concurrent_uploads)
-                
-                # Create upload tasks with detailed tracking
-                task_creation_start_time = time.time()
-                upload_tasks = []
-                tile_details_by_level = {}
-                
-                for level, tiles_level in tiles_data.items():
-                    level_tile_count = len(tiles_level)
-                    tile_details_by_level[level] = level_tile_count
-                    
-                    logger.debug(
-                        f"🔍 CREATING UPLOAD TASKS FOR LEVEL {level}",
-                        extra={
-                            "photo_id": task.photo_id,
-                            "site_id": task.site_id,
-                            "level": level,
-                            "tiles_in_level": level_tile_count,
-                            "total_tiles_so_far": len(upload_tasks)
-                        }
-                    )
-                    
-                    for tile_coords, tile_data in tiles_level.items():
-                        upload_task = self._upload_single_tile_with_semaphore(
-                            task, level, tile_coords, tile_data, upload_semaphore
-                        )
-                        upload_tasks.append(upload_task)
-                
-                task_creation_time = time.time() - task_creation_start_time
-                
-                logger.info(
-                    "📋 UPLOAD TASKS CREATED",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "total_upload_tasks": len(upload_tasks),
-                        "task_creation_time_ms": round(task_creation_time * 1000, 2),
-                        "tiles_by_level": tile_details_by_level,
-                        "average_tiles_per_level": round(total_tiles / len(tiles_data), 2) if tiles_data else 0
-                    }
-                )
-                
-                # Process uploads in batches to avoid overwhelming the system
-                batch_size = 20
-                completed_tiles = 0
-                successful_uploads = []
-                failed_uploads = []
-                batch_processing_times = []
-                error_types = {}
-                
-                total_batches = (len(upload_tasks) + batch_size - 1) // batch_size
-                
-                for batch_num, i in enumerate(range(0, len(upload_tasks), batch_size), 1):
-                    batch_start_time = time.time()
-                    batch = upload_tasks[i:i + batch_size]
-                    
-                    logger.info(
-                        f"🔄 PROCESSING BATCH {batch_num}/{total_batches}",
-                        extra={
-                            "photo_id": task.photo_id,
-                            "site_id": task.site_id,
-                            "batch_number": batch_num,
-                            "total_batches": total_batches,
-                            "batch_size": len(batch),
-                            "batch_start_index": i,
-                            "batch_end_index": min(i + batch_size, len(upload_tasks)),
-                            "completed_tiles_before_batch": completed_tiles
-                        }
-                    )
-                    
-                    batch_results = await asyncio.gather(*batch, return_exceptions=True)
-                    batch_processing_time = time.time() - batch_start_time
-                    batch_processing_times.append(batch_processing_time)
-                    
-                    # Process batch results with detailed error tracking
-                    batch_successful = 0
-                    batch_failed = 0
-                    
-                    for result_idx, result in enumerate(batch_results):
-                        if isinstance(result, Exception):
-                            failed_uploads.append(result)
-                            batch_failed += 1
-                            
-                            # Track error types for analysis
-                            error_type = type(result).__name__
-                            error_types[error_type] = error_types.get(error_type, 0) + 1
-                            
-                            logger.warning(
-                                f"❌ TILE UPLOAD FAILED IN BATCH {batch_num}",
-                                extra={
-                                    "photo_id": task.photo_id,
-                                    "site_id": task.site_id,
-                                    "batch_number": batch_num,
-                                    "result_index": result_idx,
-                                    "error_type": error_type,
-                                    "error_message": str(result)[:200],  # Truncate long errors
-                                    "total_failed_so_far": len(failed_uploads)
-                                }
-                            )
-                        elif result is not None:
-                            successful_uploads.append(result)
-                            completed_tiles += 1
-                            batch_successful += 1
-                        else:
-                            # None result - treat as failure
-                            failed_uploads.append(Exception("Upload returned None"))
-                            batch_failed += 1
-                            error_types["NoneResult"] = error_types.get("NoneResult", 0) + 1
-                    
-                    # Update progress
-                    progress = 10 + int((completed_tiles / total_tiles) * 80)  # 10-90%
-                    await self._update_processing_status(
-                        task, "uploading", progress, total_tiles, len(tiles_data), completed_tiles
-                    )
-                    
-                    # Calculate batch performance metrics
-                    batch_throughput = len(batch) / batch_processing_time if batch_processing_time > 0 else 0
-                    overall_progress = (completed_tiles / total_tiles) * 100 if total_tiles > 0 else 0
-                    
-                    logger.info(
-                        f"✅ BATCH {batch_num} COMPLETED",
-                        extra={
-                            "photo_id": task.photo_id,
-                            "site_id": task.site_id,
-                            "batch_number": batch_num,
-                            "batch_successful": batch_successful,
-                            "batch_failed": batch_failed,
-                            "batch_processing_time_ms": round(batch_processing_time * 1000, 2),
-                            "batch_throughput_tiles_per_sec": round(batch_throughput, 2),
-                            "completed_tiles": completed_tiles,
-                            "total_tiles": total_tiles,
-                            "overall_progress_percent": round(overall_progress, 2),
-                            "progress_update": progress,
-                            "successful_uploads": len(successful_uploads),
-                            "failed_uploads": len(failed_uploads)
-                        }
-                    )
-                    
-                    # Small delay between batches to prevent overwhelming
-                    if i + batch_size < len(upload_tasks):
-                        await asyncio.sleep(0.1)
-                
-                # Calculate final performance metrics
-                total_upload_time = time.time() - upload_start_time
-                average_batch_time = sum(batch_processing_times) / len(batch_processing_times) if batch_processing_times else 0
-                success_rate = (completed_tiles / total_tiles) * 100 if total_tiles > 0 else 0
-                overall_throughput = completed_tiles / total_upload_time if total_upload_time > 0 else 0
-                
-                # Log comprehensive upload summary
-                logger.success(
-                    "🎉 CONCURRENT TILE UPLOAD COMPLETED",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "final_results": {
-                            "completed_tiles": completed_tiles,
-                            "total_tiles": total_tiles,
-                            "successful_uploads": len(successful_uploads),
-                            "failed_uploads": len(failed_uploads),
-                            "success_rate_percent": round(success_rate, 2)
-                        },
-                        "performance_metrics": {
-                            "total_upload_time_ms": round(total_upload_time * 1000, 2),
-                            "average_batch_time_ms": round(average_batch_time * 1000, 2),
-                            "overall_throughput_tiles_per_sec": round(overall_throughput, 2),
-                            "task_creation_time_ms": round(task_creation_time * 1000, 2),
-                            "total_batches_processed": len(batch_processing_times),
-                            "batch_size_used": batch_size
-                        },
-                        "error_analysis": {
-                            "error_types": error_types,
-                            "error_count": len(failed_uploads),
-                            "error_rate_percent": round((len(failed_uploads) / total_tiles) * 100, 2) if total_tiles > 0 else 0
-                        },
-                        "levels_processed": tile_details_by_level
-                    }
-                )
-                
-                # Log warnings for any issues
-                if failed_uploads:
-                    logger.warning(
-                        "⚠️ TILE UPLOAD ISSUES DETECTED",
-                        extra={
-                            "photo_id": task.photo_id,
-                            "site_id": task.site_id,
-                            "failed_upload_count": len(failed_uploads),
-                            "success_rate_percent": round(success_rate, 2),
-                            "error_breakdown": error_types,
-                            "recommendation": "Check MinIO connectivity and storage capacity" if len(failed_uploads) > total_tiles * 0.1 else "Monitor for patterns"
-                        }
-                    )
-                
-                # Performance warnings
-                if overall_throughput < 5:  # Less than 5 tiles per second
-                    logger.warning(
-                        "⚠️ SLOW UPLOAD PERFORMANCE DETECTED",
-                        extra={
-                            "photo_id": task.photo_id,
-                            "site_id": task.site_id,
-                            "throughput_tiles_per_sec": round(overall_throughput, 2),
-                            "recommended_action": "Consider increasing concurrent uploads or checking network bandwidth"
-                        }
-                    )
-                
-                return completed_tiles
-            
-            except Exception as e:
-                total_upload_time = time.time() - upload_start_time
-                
-                logger.error(
-                    "❌ CONCURRENT TILE UPLOAD FAILED",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                        "total_upload_time_ms": round(total_upload_time * 1000, 2),
-                        "tiles_data_levels": len(tiles_data),
-                        "total_tiles_expected": total_tiles,
-                        "failure_point": "concurrent_upload_coordinator"
-                    }
-                )
-                
-                import traceback
-                logger.error(
-                    "📋 CONCURRENT UPLOAD ERROR TRACEBACK",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "traceback": traceback.format_exc(),
-                        "error_details": {
-                            "error": str(e),
-                            "error_type": type(e).__name__,
-                            "module": type(e).__module__ if hasattr(type(e), '__module__') else 'unknown'
-                        }
-                    }
-                )
-                
-                raise Exception(f"Concurrent tile upload failed: {str(e)}")
-
-    async def _upload_single_tile_with_semaphore(
-        self,
-        task: TileProcessingTask,
-        level: int,
-        tile_coords: str,
-        tile_data: bytes,
-        semaphore: asyncio.Semaphore
-    ) -> Optional[str]:
-        """Upload single tile with semaphore control"""
-        async with semaphore:
-            return await self._upload_single_tile(task, level, tile_coords, tile_data)
-
-    async def _upload_single_tile(
-        self,
-        task: TileProcessingTask,
-        level: int,
-        tile_coords: str,
-        tile_data: bytes
-    ) -> Optional[str]:
-        """Upload single tile to MinIO with detailed debugging"""
-        import time
-        upload_start_time = time.time()
+        logger.info(f"📤 Starting concurrent task upload for {total_tiles} tiles")
         
-        with logger.contextualize(
-            operation="upload_single_tile",
-            photo_id=task.photo_id,
-            site_id=task.site_id,
-            level=level,
-            tile_coords=tile_coords,
-            tile_size=self.tile_size,
-            format=self.format,
-            service="deep_zoom_background_service"
-        ):
-            try:
-                # Validate tile data
-                if tile_data is None or len(tile_data) == 0:
-                    logger.error(
-                        "❌ TILE DATA VALIDATION FAILED",
-                        extra={
-                            "photo_id": task.photo_id,
-                            "site_id": task.site_id,
-                            "level": level,
-                            "tile_coords": tile_coords,
-                            "tile_data_is_none": tile_data is None,
-                            "tile_data_length": len(tile_data) if tile_data else 0,
-                            "validation_error": "empty_or_null_tile_data"
-                        }
-                    )
-                    return None
-                
-                # Determine extension
-                extension = 'png' if self.format == 'png' else 'jpg'
-                object_name = f"{task.site_id}/tiles/{task.photo_id}/{level}/{tile_coords}.{extension}"
-                
-                logger.debug(
-                    "🔍 TILE UPLOAD STARTED",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "level": level,
-                        "tile_coords": tile_coords,
-                        "tile_size": self.tile_size,
+        upload_semaphore = asyncio.Semaphore(self.max_concurrent_uploads)
+        
+        async def upload_worker(level, tile_coords, tile_data):
+            async with upload_semaphore:
+                try:
+                    col = tile_coords.split('_')[0]
+                    row = tile_coords.split('_')[1]
+                    
+                    metadata = {
+                        "level": str(level),
+                        "col": col,
+                        "row": row,
                         "format": self.format,
-                        "extension": extension,
-                        "object_name": object_name,
-                        "tile_data_size_bytes": len(tile_data),
-                        "upload_start_time": datetime.now().isoformat()
+                        "tile_size": str(self.tile_size)
                     }
-                )
+                    
+                    await self.storage.upload_deep_zoom_tile(
+                        site_id=task.site_id,
+                        photo_id=task.photo_id,
+                        level=level,
+                        x=int(col),
+                        y=int(row),
+                        content=tile_data,
+                        content_type=f"image/{self.format}",
+                        metadata=metadata
+                    )
+                    return True
+                except Exception as e:
+                    logger.error(f"Upload failed for tile {level}/{tile_coords}: {e}")
+                    return False
+
+        # Create tasks
+        tasks = []
+        for level, tiles_level in tiles_data.items():
+            for tile_coords, tile_data in tiles_level.items():
+                tasks.append(upload_worker(level, tile_coords, tile_data))
                 
-                # Prepare metadata
-                tile_metadata = {
-                    'photo_id': task.photo_id,
-                    'site_id': task.site_id,
-                    'level': level,
-                    'tile_coords': tile_coords,
-                    'tile_size': self.tile_size,
-                    'format': self.format
-                }
-                
-                if task.archaeological_metadata:
-                    tile_metadata.update({
-                        'inventory_number': task.archaeological_metadata.get('inventory_number'),
-                        'excavation_area': task.archaeological_metadata.get('excavation_area'),
-                        'material': task.archaeological_metadata.get('material')
-                    })
-                
-                # Upload to MinIO with timing
-                minio_upload_start_time = time.time()
-                from app.services.archaeological_minio_service import archaeological_minio_service
-                
-                logger.info(
-                    "📤 MINIO UPLOAD INITIATED",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "level": level,
-                        "tile_coords": tile_coords,
-                        "bucket_name": archaeological_minio_service.buckets['tiles'],
-                        "object_name": object_name,
-                        "content_type": 'image/png' if self.format == 'png' else 'image/jpeg',
-                        "tile_metadata": tile_metadata,
-                        "tile_data_size_bytes": len(tile_data)
-                    }
-                )
-                
-                result = await asyncio.to_thread(
-                    archaeological_minio_service._client.put_object,
-                    bucket_name=archaeological_minio_service.buckets['tiles'],
-                    object_name=object_name,
-                    data=io.BytesIO(tile_data),
-                    length=len(tile_data),
-                    content_type='image/png' if self.format == 'png' else 'image/jpeg',
-                    metadata={
-                        'x-amz-meta-photo-id': str(tile_metadata.get('photo_id', '')),
-                        'x-amz-meta-site-id': str(tile_metadata.get('site_id', '')),
-                        'x-amz-meta-level': str(tile_metadata.get('level', '')),
-                        'x-amz-meta-tile-coords': str(tile_metadata.get('tile_coords', '')),
-                        'x-amz-meta-tile-size': str(tile_metadata.get('tile_size', '')),
-                        'x-amz-meta-inventory-number': str(tile_metadata.get('inventory_number', '')),
-                        'x-amz-meta-excavation-area': str(tile_metadata.get('excavation_area', '')),
-                        'x-amz-meta-material': str(tile_metadata.get('material', ''))
-                    }
-                )
-                
-                minio_upload_time = time.time() - minio_upload_start_time
-                total_upload_time = time.time() - upload_start_time
-                
-                logger.success(
-                    "✅ TILE UPLOAD COMPLETED",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "level": level,
-                        "tile_coords": tile_coords,
-                        "object_name": object_name,
-                        "minio_upload_time_ms": round(minio_upload_time * 1000, 2),
-                        "total_upload_time_ms": round(total_upload_time * 1000, 2),
-                        "tile_data_size_bytes": len(tile_data),
-                        "upload_speed_kb_per_sec": round((len(tile_data) / 1024) / minio_upload_time, 2) if minio_upload_time > 0 else 0,
-                        "bucket_name": archaeological_minio_service.buckets['tiles']
-                    }
-                )
-                
-                return object_name
-            
-            except Exception as e:
-                total_upload_time = time.time() - upload_start_time
-                
-                logger.error(
-                    "❌ TILE UPLOAD FAILED",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "level": level,
-                        "tile_coords": tile_coords,
-                        "error": str(e),
-                        "error_type": type(e).__name__,
-                        "total_upload_time_ms": round(total_upload_time * 1000, 2),
-                        "tile_data_size_bytes": len(tile_data) if tile_data else 0,
-                        "failure_point": "minio_upload"
-                    }
-                )
-                
-                import traceback
-                logger.error(
-                    "📋 TILE UPLOAD ERROR TRACEBACK",
-                    extra={
-                        "photo_id": task.photo_id,
-                        "site_id": task.site_id,
-                        "level": level,
-                        "tile_coords": tile_coords,
-                        "traceback": traceback.format_exc(),
-                        "error_details": {
-                            "error": str(e),
-                            "error_type": type(e).__name__,
-                            "module": type(e).__module__ if hasattr(type(e), '__module__') else 'unknown'
-                        }
-                    }
-                )
-                
-                return None
+        results = await asyncio.gather(*tasks)
+        completed_tiles = sum(1 for r in results if r)
+        
+        if completed_tiles < len(tasks):
+            logger.warning(f"⚠️ Only {completed_tiles}/{len(tasks)} tiles uploaded successfully")
+        
+        return completed_tiles
+
+    # _upload_single_tile logic has been consolidated into _upload_tiles_concurrent
+
 
     async def _create_and_upload_metadata(
         self,
@@ -2243,171 +1201,33 @@ class DeepZoomBackgroundService:
         status: str,
         tile_count: int = None,
         levels: int = None,
+        max_zoom_level: int = None,
         use_snapshot: bool = False
     ):
-        """
-        Update photo status in database with snapshot optimization.
-        
-        If processing uses snapshot data, intermediate status updates are skipped to avoid 
-        database lock contention, as status is tracked via MinIO metadata.
-        Final status (completed/failed) is ALWAYS written to the database to ensure UI consistency.
-        """
-        try:
-            # Check if this task is using snapshot data
-            task = None
-            if photo_id in self.processing_tasks:
-                task = self.processing_tasks[photo_id]
-            elif photo_id in self.completed_tasks:
-                task = self.completed_tasks[photo_id]
-            elif photo_id in self.failed_tasks:
-                task = self.failed_tasks[photo_id]
-            
-            # Optimization: Skip intermediate database updates if using snapshot mode
-            # This reduces lock contention on SQLite during heavy processing
-            is_snapshot_mode = task and hasattr(task, 'snapshot_data') and task.snapshot_data
-            is_final_status = status in ["completed", "failed"]
-            
-            if is_snapshot_mode and not is_final_status:
-                logger.debug(f"⚡ SNAPSHOT OPTIMIZATION: Skipping intermediate DB update for {photo_id} ({status})")
-                return
-            
-            # Proceed with standard database update
-            if is_final_status:
-                logger.info(f"💾 DATABASE UPDATE: Finalizing photo {photo_id} status to {status}")
-            else:
-                logger.debug(f"💾 DATABASE UPDATE: Updating photo {photo_id} status to {status}")
-            
-            # Import from centralized database engine
-            from app.database.engine import AsyncSessionLocal as async_session_maker
-            from app.models import Photo
-            from sqlalchemy import select
-            from datetime import datetime
-            
-            # Photo.id is stored as STRING
-            photo_id_str = str(photo_id)
-            
-            async with async_session_maker() as db:
-                try:
-                    # Use robust lookup logic
-                    photo = await self._find_photo_record_robust(photo_id_str, db)
-                    
-                    if photo:
-                        # Update status
-                        photo.deepzoom_status = status
-                        
-                        if status == "completed":
-                            photo.has_deep_zoom = True
-                            photo.deep_zoom_processed_at = datetime.now()
-                            if tile_count is not None:
-                                photo.tile_count = tile_count
-                            if levels is not None:
-                                photo.max_zoom_level = levels
-                        elif status == "failed":
-                            photo.has_deep_zoom = False
-                            photo.deep_zoom_processed_at = datetime.now()
-                        
-                        await db.commit()
-                        logger.info(f"✅ Photo {photo_id} deep zoom status updated to: {status}")
-                    else:
-                        # Try with a completely fresh session as last resort
-                        logger.warning(f"⚠️ Photo {photo_id} not found in main session, trying fresh session...")
-                        
-                        async with async_session_maker() as fresh_db:
-                            photo_fresh = await self._find_photo_record_robust(photo_id_str, fresh_db)
-                            
-                            if photo_fresh:
-                                logger.info(f"✅ Photo {photo_id} found in fresh session, updating status")
-                                photo_fresh.deepzoom_status = status
-                                
-                                if status == "completed":
-                                    photo_fresh.has_deep_zoom = True
-                                    photo_fresh.deep_zoom_processed_at = datetime.now()
-                                    if tile_count is not None:
-                                        photo_fresh.tile_count = tile_count
-                                    if levels is not None:
-                                        photo_fresh.max_zoom_level = levels
-                                elif status == "failed":
-                                    photo_fresh.has_deep_zoom = False
-                                    photo_fresh.deep_zoom_processed_at = datetime.now()
-                                
-                                await fresh_db.commit()
-                                logger.info(f"✅ Photo {photo_id} status updated via fresh session")
-                            else:
-                                logger.error(f"❌ Photo {photo_id} not found in any session for status update")
-                                # Don't fail the entire processing for status update issues
-                                logger.error(f"⚠️ Status update failed for {photo_id} but tiles were processed successfully")
-                                return
-                                
-                except Exception as e:
-                    logger.error(f"❌ Database error in status update for {photo_id}: {e}")
-                    await db.rollback()
-                    raise
-                    
-        except Exception as e:
-            logger.error(f"❌ Failed to update photo database status for {photo_id}: {e}")
-            # Don't re-raise to avoid breaking the entire processing pipeline
-            logger.error(f"⚠️ Status update failed but tile processing was successful for {photo_id}")
+        """Update photo status in database using PhotoRepository"""
+        if not self.session_factory:
+            logger.warning("No session factory available for updates")
+            return
 
-    async def _find_photo_record_robust(
-        self,
-        photo_id: str,
-        db: AsyncSession,
-        max_retries: int = 5
-    ) -> Optional[Photo]:
-        """
-        Robustly find photo record with retry logic and WAL handling.
-        
-        Used to ensure reliable database updates even during high concurrency or 
-        when initial transactions haven't fully propagated in SQLite WAL mode.
-        """
-
-        logger.debug(f"🔍 DB LOOKUP: Looking up photo {photo_id} for status update")
-
-        for attempt in range(max_retries):
+        async with self.session_factory() as session:
             try:
-                # Add delay before retry (except first attempt)
-                if attempt > 0:
-                    delay = 0.1 * (2 ** attempt)
-                    logger.debug(f"⏳ RETRY: Attempt {attempt + 1}/{max_retries} for photo {photo_id} after {delay:.1f}s")
-                    await asyncio.sleep(delay)
-
-                # Try UUID query first
-                try:
-                    photo_uuid = UUID(photo_id)
-                    result = await db.execute(
-                        select(Photo).where(Photo.id == photo_uuid)
-                    )
-                    photo_obj = result.scalar_one_or_none()
-
-                    if photo_obj:
-                        if attempt > 0:
-                            logger.debug(f"✅ FOUND: Photo {photo_id} found with UUID (attempt {attempt + 1})")
-                        return photo_obj
-                except ValueError:
-                    pass
-
-                # Try string query
-                result = await db.execute(
-                    select(Photo).where(Photo.id == photo_id)
+                repo = PhotoRepository(session)
+                
+                # Map deepzoom status to Photo update
+                await repo.update_deep_zoom_status(
+                    photo_id=UUID(photo_id),
+                    status=status,
+                    has_deep_zoom=(status == "completed"),
+                    tile_count=tile_count,
+                    max_zoom_level=max_zoom_level or levels
                 )
-                photo_obj = result.scalar_one_or_none()
-
-                if photo_obj:
-                    if attempt > 0:
-                        logger.debug(f"✅ FOUND: Photo {photo_id} found with string (attempt {attempt + 1})")
-                    return photo_obj
-
-                # Force WAL checkpoint on retry
-                if attempt > 0:
-                    await db.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))
-                    logger.debug(f"🔄 WAL CHECKPOINT: Forced checkpoint for status update (attempt {attempt + 1})")
-
+                
+                await session.commit()
+                logger.info(f"✅ Database updated for photo {photo_id}: status={status}")
+                
             except Exception as e:
-                logger.warning(f"⚠️ LOOKUP ERROR: Error finding photo {photo_id} (attempt {attempt + 1}): {e}")
-                continue
-
-        logger.error(f"❌ NOT FOUND: Photo {photo_id} not found after {max_retries} attempts")
-        return None
+                logger.error(f"Failed to update photo status for {photo_id}: {e}")
+                await session.rollback()
 
     async def _send_processing_notification(
         self,

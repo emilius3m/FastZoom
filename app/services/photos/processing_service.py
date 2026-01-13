@@ -238,6 +238,10 @@ class PhotoProcessingService:
                 raise PhotoServiceError("MinIO service required for TUS processing")
                 
             full_metadata = {**arch_metadata, **tech_metadata}
+            
+            # Ensure original_filename is included for MinIO metadata mapping
+            full_metadata['original_filename'] = filename
+            
             minio_url = await self.minio_service.upload_photo_with_metadata(
                 photo_data=file_data,
                 photo_id=f"{photo_uuid}{Path(filename).suffix}",

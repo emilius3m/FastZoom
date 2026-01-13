@@ -1043,6 +1043,7 @@ class DeepZoomMinIOService:
                         object_name=metadata_path
                     )
                 
+                metadata_content = None  # Initialize to avoid UnboundLocalError
                 response = await asyncio.to_thread(_download_metadata)
                 metadata_content = response.read()
                 response.close()
@@ -1059,6 +1060,20 @@ class DeepZoomMinIOService:
                     if tiles_exist:
                         logger.info(f"✅ Tiles found for photo {photo_id} but metadata.json missing - reconstructing info")
                         return await self._reconstruct_tiles_info(site_id, photo_id, tiles_exist)
+                    
+                    # Return "not found" if neither metadata nor tiles exist
+                    return {
+                        'photo_id': photo_id,
+                        'site_id': site_id,
+                        'available': False,
+                        'status': 'not_found',
+                        'message': 'Deep zoom tiles not generated for this photo',
+                        'width': 0,
+                        'height': 0,
+                        'levels': 0,
+                        'tile_size': self.tile_size,
+                        'total_tiles': 0
+                    }
                 else:
                     logger.error(f"MinIO error accessing metadata for photo {photo_id}: {e}")
                     raise
@@ -1121,6 +1136,20 @@ class DeepZoomMinIOService:
                 }
 
             # Parse metadata JSON
+            if metadata_content is None:
+                 return {
+                    'photo_id': photo_id,
+                    'site_id': site_id,
+                    'available': False,
+                    'status': 'error',
+                    'message': "Metadata content is None",
+                    'width': 0,
+                    'height': 0,
+                    'levels': 0,
+                    'tile_size': self.tile_size,
+                    'total_tiles': 0
+                }
+
             if isinstance(metadata_content, bytes):
                 metadata_content = metadata_content.decode('utf-8')
             

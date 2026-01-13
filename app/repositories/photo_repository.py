@@ -426,3 +426,47 @@ class PhotoRepository(BaseRepository[Photo]):
 
         result = await self.db_session.execute(query)
         return result.scalars().all()
+
+    async def get_photo_for_processing(self, photo_id: UUID) -> Optional[Photo]:
+        """
+        Recupera foto per elaborazione deep zoom
+        Non carica relazioni non necessarie per leggerezza
+        """
+        query = select(Photo).where(Photo.id == photo_id)
+        result = await self.db_session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def update_deep_zoom_status(
+        self,
+        photo_id: UUID,
+        status: str,
+        has_deep_zoom: bool = False,
+        tile_count: Optional[int] = None,
+        max_zoom_level: Optional[int] = None,
+        error_message: Optional[str] = None
+    ) -> Optional[Photo]:
+        """
+        Aggiorna stato deep zoom della foto
+        """
+        photo = await self.get(photo_id)
+        if not photo:
+            return None
+            
+        photo.deepzoom_status = status
+        
+        if has_deep_zoom:
+            photo.has_deep_zoom = True
+            from datetime import datetime, timezone
+            photo.deep_zoom_processed_at = datetime.now(timezone.utc)
+            
+        if tile_count is not None:
+            photo.tile_count = tile_count
+            
+        if max_zoom_level is not None:
+            photo.max_zoom_level = max_zoom_level
+            
+        # Nota: error_message non è persistito nel modello Photo attuale, 
+        # ma potrebbe essere loggato o salvato in un task log separato
+            
+        await self.db_session.commit()
+        return photo

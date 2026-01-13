@@ -21,8 +21,9 @@ from app.core.exceptions import (
     StorageError, StorageFullError, StorageTemporaryError,
     StorageConnectionError, StorageNotFoundError
 )
-# Import locale per evitare circular import
-# from app.services.deep_zoom_minio_service import deep_zoom_minio_service
+from app.core.interfaces.storage import FileStorageInterface
+
+
 
 
 class RetryWithJitter:
@@ -72,8 +73,12 @@ class RetryWithJitter:
                         raise StorageTemporaryError(f"MinIO operation failed after retries: {error_message}")
                 else:
                     # Errori non retryable
-                    logger.error(f"MinIO {operation_name} failed with non-retryable error: {error_code} - {error_message}")
-                    raise StorageError(f"MinIO operation failed: {error_message}")
+                    if error_code == 'NoSuchKey':
+                         logger.debug(f"MinIO {operation_name} - key not found (NoSuchKey)")
+                         raise StorageNotFoundError(f"File not found: {error_message}")
+                    else:
+                         logger.error(f"MinIO {operation_name} failed with non-retryable error: {error_code} - {error_message}")
+                         raise StorageError(f"MinIO operation failed: {error_message}")
             
             except Exception as e:
                 last_exception = e
@@ -127,7 +132,7 @@ class RetryWithJitter:
         return True
 
 
-class ArchaeologicalMinIOService:
+class ArchaeologicalMinIOService(FileStorageInterface):
     """Servizio MinIO ottimizzato per dati archeologici con supporto avanzato"""
 
     def _create_minio_client(self) -> Minio:
@@ -152,6 +157,12 @@ class ArchaeologicalMinIOService:
             access_key = os.getenv("MINIO_ACCESS_KEY", "")
             secret_key = os.getenv("MINIO_SECRET_KEY", "")
             secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
+
+        # Store these as instance attributes for later use
+        self.minio_endpoint = minio_url
+        self.access_key = access_key
+        self.secret_key = secret_key
+        self.secure = secure
 
         client = Minio(
             endpoint=minio_url,
@@ -273,7 +284,8 @@ class ArchaeologicalMinIOService:
                     content_type=content_type,
                     metadata=metadata
                 )
-                return f"minio://{bucket_name}/{object_name}"
+                # Return a full URL including the endpoint
+                return f"http{'s' if self.secure else ''}://{self.minio_endpoint}/{bucket_name}/{object_name}"
             finally:
                 socket.setdefaulttimeout(original_timeout)
 
@@ -549,7 +561,8 @@ class ArchaeologicalMinIOService:
             'copyright_holder': 'x-amz-meta-copyright-holder',
             'license_type': 'x-amz-meta-license-type',
             'usage_rights': 'x-amz-meta-usage-rights',
-            'validation_notes': 'x-amz-meta-validation-notes'
+            'validation_notes': 'x-amz-meta-validation-notes',
+            'original_filename': 'x-amz-meta-original-filename'
         }
 
         # Applica il mapping
@@ -604,6 +617,51 @@ class ArchaeologicalMinIOService:
             expires_hours=expires_hours,
             operation_name="photo stream URL generation"
         )
+
+    async def upload_deep_zoom_tile(
+        self,
+        tile_data: bytes,
+        site_id: str,
+        object_name: str,
+        content_type: str,
+        tile_metadata: Dict[str, Any]
+    ) -> str:
+        """
+        Upload tile Deep Zoom con gestione retry e circuit breaker.
+        
+        Args:
+            tile_data: Contenuto binario del tile
+            site_id: ID del sito (per metadati)
+            object_name: Path completo dell'oggetto nel bucket (es. site_id/tiles/photo_id/level/x_y.png)
+            content_type: Tipo content (image/jpeg o image/png)
+            tile_metadata: Dizionario con metadati da associare al tile
+        """
+        
+        # Crea metadati di base
+        base_metadata = self._create_base_metadata(site_id, content_type)
+        
+        # Mapping specifico per metadati tile
+        # Nota: usiamo le chiavi passate in tile_metadata e le prefissiamo con x-amz-meta-
+        # se non sono già mappate
+        final_metadata = base_metadata.copy()
+        for k, v in tile_metadata.items():
+            key = f"x-amz-meta-{k.replace('_', '-')}"
+            if v is not None:
+                final_metadata[key] = str(v)
+                
+        # Usa il metodo di upload unificato
+        # Nota: target_freed_mb è basso (10MB) perché i tile sono piccoli
+        result_url = await self._upload_with_retry(
+            bucket_name=self.buckets['tiles'],
+            object_name=object_name,
+            data=tile_data,
+            content_type=content_type,
+            metadata=final_metadata,
+            operation_name=f"tile {object_name}",
+            target_freed_mb=10
+        )
+        
+        return result_url
 
     async def search_photos_by_metadata(
         self,
@@ -1337,6 +1395,42 @@ class ArchaeologicalMinIOService:
                 'col': str(col),
                 'row': str(row)
             }
+        )
+
+
+    async def upload_file(
+        self, 
+        data: bytes, 
+        bucket: str, 
+        object_name: str, 
+        content_type: str, 
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Upload a file to storage to satisfy FileStorageInterface"""
+        return await self._upload_with_retry(
+            content=data,
+            bucket_name=bucket,
+            object_name=object_name,
+            content_type=content_type,
+            metadata=metadata
+        )
+
+    async def get_file(self, bucket: str, object_name: str) -> bytes:
+        """Retrieve file content from storage to satisfy FileStorageInterface"""
+        
+        # Use execute_with_retry for robust retrieval
+        async def _get_operation():
+            response = None
+            try:
+                response = self._client.get_object(bucket, object_name)
+                return response.read()
+            finally:
+                if response:
+                    response.close()
+                    
+        return await self.retry_handler.execute_with_retry(
+            _get_operation,
+            f"get_file:{bucket}/{object_name}"
         )
 
 
