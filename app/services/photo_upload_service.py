@@ -459,7 +459,8 @@ class PhotoUploadService:
                 height = result.metadata.get("height", 0)
                 max_dimension = max(width, height)
 
-                if max_dimension > 2000:  # Threshold per deep zoom
+                from app.services.photos.config import MIN_DIMENSION_FOR_TILES
+                if max_dimension > MIN_DIMENSION_FOR_TILES:  # Threshold per deep zoom
                     logger.info(f"Photo {result.photo_id} needs deep zoom tiles ({width}x{height})")
 
                     # Recupera record completo per metadati archeologici

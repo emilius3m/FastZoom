@@ -20,6 +20,7 @@ from app.models.stratigraphy import us_files_association, usm_files_association
 from app.models.documentation_and_field import Photo
 from app.services.storage_service import storage_service
 from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
+from app.services.photos.config import MIN_DIMENSION_FOR_TILES
 
 
 def safe_uuid_str(uuid_input) -> str:
@@ -324,8 +325,8 @@ class USFileService:
            
             # Avvia deep zoom per immagini grandi
             if (content_type.startswith('image/') and 
-                file_metadata.get('width', 0) > 2000 and 
-                file_metadata.get('height', 0) > 2000):
+                file_metadata.get('width', 0) > MIN_DIMENSION_FOR_TILES and 
+                file_metadata.get('height', 0) > MIN_DIMENSION_FOR_TILES):
                
                 us_file.is_deepzoom_enabled = True
                 us_file.deepzoom_status = 'scheduled'

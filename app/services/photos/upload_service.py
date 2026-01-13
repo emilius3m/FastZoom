@@ -634,7 +634,8 @@ class PhotoUploadService:
                 if he.status_code == 507:  # Storage full
                     logger.error("Storage full during upload")
                     try:
-                        cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=2000)
+                        from app.services.photos.config import EMERGENCY_CLEANUP_TARGET_MB
+                        cleanup_result = await storage_management_service.emergency_cleanup(target_freed_mb=EMERGENCY_CLEANUP_TARGET_MB)
                         if cleanup_result['success']:
                             logger.info("Emergency cleanup successful", freed_mb=cleanup_result['total_freed_mb'])
                         else:
